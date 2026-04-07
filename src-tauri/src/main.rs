@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    homearnavblade_lib::run()
+    blade_lib::run()
 }
