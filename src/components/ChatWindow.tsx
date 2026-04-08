@@ -253,7 +253,7 @@ export function ChatWindow({
           </div>
         )}
 
-        <MessageList messages={messages} loading={loading} toolExecutions={toolExecutions} />
+        <MessageList messages={messages} loading={loading} toolExecutions={toolExecutions} onQuickAction={onSend} />
 
         {/* Smart clipboard bar */}
         {clipboardDetection && !loading && (

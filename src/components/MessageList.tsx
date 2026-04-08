@@ -45,6 +45,7 @@ interface Props {
   messages: Message[];
   loading: boolean;
   toolExecutions: ToolExecution[];
+  onQuickAction?: (prompt: string) => void;
 }
 
 function sanitizeHighlightHtml(html: string): string {
@@ -110,17 +111,58 @@ function CodeBlock({ className, children }: { className?: string; children: Reac
 
 const MemoCodeBlock = memo(CodeBlock);
 
+function DateSeparator({ timestamp }: { timestamp: number }) {
+  const date = new Date(timestamp);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  let label: string;
+  if (date.toDateString() === today.toDateString()) label = "Today";
+  else if (date.toDateString() === yesterday.toDateString()) label = "Yesterday";
+  else label = date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+
+  return (
+    <div className="flex items-center gap-3 py-1">
+      <div className="flex-1 h-px bg-blade-border/50" />
+      <span className="text-2xs text-blade-muted/50 uppercase tracking-wider">{label}</span>
+      <div className="flex-1 h-px bg-blade-border/50" />
+    </div>
+  );
+}
+
+function shouldShowDateSeparator(messages: Message[], index: number): boolean {
+  if (index === 0) return true;
+  const prev = new Date(messages[index - 1].timestamp).toDateString();
+  const curr = new Date(messages[index].timestamp).toDateString();
+  return prev !== curr;
+}
+
 const MessageBubble = memo(function MessageBubble({ msg }: { msg: Message }) {
   const [hovered, setHovered] = useState(false);
+  const [copied, setCopied] = useState(false);
   const isUser = msg.role === "user";
+
+  const handleDoubleClick = useCallback(() => {
+    if (!msg.content) return;
+    navigator.clipboard.writeText(msg.content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1200);
+  }, [msg.content]);
 
   return (
     <div
       className={`flex ${isUser ? "justify-end" : "justify-start"} animate-fade-in`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onDoubleClick={handleDoubleClick}
     >
       <div className={`relative ${isUser ? "max-w-[75%]" : "max-w-[85%]"}`}>
+        {copied && (
+          <div className={`absolute -top-6 ${isUser ? "right-0" : "left-3"} text-2xs text-blade-accent animate-fade-in`}>
+            copied
+          </div>
+        )}
         {isUser ? (
           /* User: compact pill, subtle accent */
           <div className="rounded-2xl rounded-br-md bg-blade-accent/90 px-4 py-2 text-[0.8125rem] leading-relaxed text-white/95">
@@ -179,7 +221,16 @@ const MessageBubble = memo(function MessageBubble({ msg }: { msg: Message }) {
   );
 });
 
-export function MessageList({ messages, loading, toolExecutions }: Props) {
+const QUICK_ACTIONS = [
+  { emoji: "💡", title: "Brainstorm", prompt: "Help me brainstorm ideas for " },
+  { emoji: "📝", title: "Write", prompt: "Write a " },
+  { emoji: "🐛", title: "Debug", prompt: "Debug this: " },
+  { emoji: "📊", title: "Analyze", prompt: "Analyze this: " },
+  { emoji: "🔍", title: "Research", prompt: "Research " },
+  { emoji: "⚡", title: "Explain", prompt: "Explain how " },
+];
+
+export function MessageList({ messages, loading, toolExecutions, onQuickAction }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -203,27 +254,36 @@ export function MessageList({ messages, loading, toolExecutions }: Props) {
               <p className="text-blade-secondary text-sm font-medium">Blade</p>
               <p className="text-blade-muted text-xs mt-1">Your personal AI. Ready when you are.</p>
             </div>
-            <div className="grid grid-cols-2 gap-2 mt-2 max-w-xs">
-              {[
-                { icon: "🎤", label: "Voice input", hint: "Click mic" },
-                { icon: "📸", label: "Screen capture", hint: "Click camera" },
-                { icon: "⌨️", label: "Shortcuts", hint: "Ctrl+K" },
-                { icon: "🔊", label: "Voice output", hint: "Toggle TTS" },
-              ].map((f) => (
-                <div key={f.label} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blade-surface/50 border border-blade-border/50">
-                  <span className="text-xs">{f.icon}</span>
-                  <div>
-                    <p className="text-2xs text-blade-secondary">{f.label}</p>
-                    <p className="text-2xs text-blade-muted">{f.hint}</p>
-                  </div>
-                </div>
-              ))}
+            {onQuickAction && (
+              <div className="grid grid-cols-2 gap-2 mt-2 max-w-xs animate-fade-in">
+                {QUICK_ACTIONS.map((action) => (
+                  <button
+                    key={action.title}
+                    onClick={() => onQuickAction(action.prompt)}
+                    className="flex items-center gap-2 rounded-lg bg-blade-surface/50 border border-blade-border/50 hover:border-blade-accent/30 px-3 py-2 text-left transition-colors"
+                  >
+                    <span className="text-sm">{action.emoji}</span>
+                    <span className="text-2xs text-blade-secondary">{action.title}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-4 mt-3 text-2xs text-blade-muted/40">
+              <span>🎤 mic</span>
+              <span>📸 screen</span>
+              <span>⌨️ Ctrl+K</span>
+              <span>🔊 TTS</span>
             </div>
           </div>
         )}
 
-        {messages.map((msg) => (
-          <MessageBubble key={msg.id} msg={msg} />
+        {messages.map((msg, idx) => (
+          <div key={msg.id}>
+            {shouldShowDateSeparator(messages, idx) && (
+              <DateSeparator timestamp={msg.timestamp} />
+            )}
+            <MessageBubble msg={msg} />
+          </div>
         ))}
 
         {(activeTools.length > 0 || recentCompleted.length > 0) && (
