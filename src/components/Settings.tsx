@@ -3,6 +3,39 @@ import { invoke } from "@tauri-apps/api/core";
 import { BladeConfig } from "../types";
 import { McpSettings } from "./McpSettings";
 
+const PROVIDER_MATRIX = [
+  {
+    id: "gemini",
+    name: "Google Gemini",
+    model: "gemini-2.0-flash",
+    badges: ["fast", "tools", "good default"],
+  },
+  {
+    id: "groq",
+    name: "Groq",
+    model: "llama-3.3-70b-versatile",
+    badges: ["very fast", "tools", "cheap"],
+  },
+  {
+    id: "openai",
+    name: "OpenAI",
+    model: "gpt-4o-mini",
+    badges: ["tools", "reliable", "multi-modal"],
+  },
+  {
+    id: "anthropic",
+    name: "Anthropic",
+    model: "claude-sonnet-4-20250514",
+    badges: ["tools", "strong reasoning", "careful"],
+  },
+  {
+    id: "ollama",
+    name: "Ollama",
+    model: "llama3.2",
+    badges: ["local", "offline", "no api key"],
+  },
+];
+
 interface Props {
   config: BladeConfig;
   onBack: () => void;
@@ -164,6 +197,59 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
 
           {status && <p className="text-xs text-green-400">{status}</p>}
           {error && <p className="text-xs text-red-400">{error}</p>}
+        </section>
+
+        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
+          <div>
+            <h2 className="text-base font-semibold">Provider Guide</h2>
+            <p className="text-sm text-blade-muted">
+              Quick guidance for choosing a provider without leaving the app.
+            </p>
+          </div>
+          <div className="space-y-3">
+            {PROVIDER_MATRIX.map((providerInfo) => {
+              const isActive = providerInfo.id === provider;
+
+              return (
+                <button
+                  key={providerInfo.id}
+                  onClick={() => {
+                    setProvider(providerInfo.id);
+                    setModel(providerInfo.model);
+                  }}
+                  className={`w-full text-left rounded-xl border px-4 py-3 transition-colors ${
+                    isActive
+                      ? "border-blade-accent bg-blade-bg"
+                      : "border-blade-border bg-blade-bg/60 hover:border-blade-muted"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-medium">{providerInfo.name}</div>
+                      <div className="text-xs text-blade-muted mt-0.5">
+                        Recommended default: {providerInfo.model}
+                      </div>
+                    </div>
+                    {isActive && (
+                      <span className="text-[11px] uppercase tracking-[0.2em] text-blade-accent">
+                        active
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {providerInfo.badges.map((badge) => (
+                      <span
+                        key={badge}
+                        className="text-[11px] rounded-full border border-blade-border bg-blade-surface px-2.5 py-1 text-blade-muted"
+                      >
+                        {badge}
+                      </span>
+                    ))}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </section>
 
         <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
