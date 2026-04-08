@@ -24,6 +24,7 @@ mod screen;
 mod trace;
 mod tray;
 mod voice;
+mod voice_local;
 
 use std::sync::Arc;
 use tauri::{Manager, WindowEvent};
@@ -53,6 +54,32 @@ pub(crate) fn toggle_quickask(app: &tauri::AppHandle) {
             let _ = window.set_focus();
         }
     }
+}
+
+#[tauri::command]
+fn open_screen_overlay(app: tauri::AppHandle) -> Result<(), String> {
+    // Check if overlay already exists
+    if let Some(window) = app.get_webview_window("overlay") {
+        let _ = window.show();
+        let _ = window.set_focus();
+        return Ok(());
+    }
+
+    tauri::WebviewWindowBuilder::new(
+        &app,
+        "overlay",
+        tauri::WebviewUrl::App("overlay.html".into()),
+    )
+    .title("Screen Capture")
+    .fullscreen(true)
+    .decorations(false)
+    .transparent(true)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .build()
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -164,6 +191,10 @@ pub fn run() {
             memory::get_memory_log,
             router::classify_message,
             tray::set_tray_status,
+            open_screen_overlay,
+            voice_local::whisper_model_available,
+            voice_local::whisper_download_model,
+            voice_local::whisper_model_info,
             embeddings::embed_and_store,
             embeddings::semantic_search,
             embeddings::vector_store_size,
