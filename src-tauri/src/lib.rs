@@ -3,6 +3,7 @@ mod agents;
 mod automation;
 mod brain;
 mod context;
+mod character;
 mod clipboard;
 mod commands;
 mod config;
@@ -17,19 +18,16 @@ mod router;
 mod providers;
 mod screen;
 mod trace;
+mod tray;
 mod voice;
 
 use std::sync::Arc;
-use tauri::{
-    menu::{Menu, MenuItem},
-    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Manager, WindowEvent,
-};
+use tauri::{Manager, WindowEvent};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_log::{Target, TargetKind};
 
-fn toggle_window(app: &tauri::AppHandle) {
+pub(crate) fn toggle_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         if window.is_visible().unwrap_or(false) {
             let _ = window.hide();
@@ -40,7 +38,7 @@ fn toggle_window(app: &tauri::AppHandle) {
     }
 }
 
-fn toggle_quickask(app: &tauri::AppHandle) {
+pub(crate) fn toggle_quickask(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("quickask") {
         if window.is_visible().unwrap_or(false) {
             let _ = window.hide();
@@ -151,8 +149,12 @@ pub fn run() {
             automation::auto_scroll,
             context::get_active_window,
             context::get_user_activity,
+            character::consolidate_character,
+            character::get_character_bible,
+            character::update_character_section,
             memory::get_memory_log,
             router::classify_message,
+            tray::set_tray_status,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
@@ -207,38 +209,7 @@ pub fn run() {
                 },
             );
 
-            let quit = MenuItem::with_id(app, "quit", "Quit Blade", true, None::<&str>)?;
-            let show = MenuItem::with_id(app, "show", "Show / Hide", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show, &quit])?;
-
-            let handle2 = app.handle().clone();
-            let icon = tauri::image::Image::from_path("icons/32x32.png")
-                .or_else(|_| tauri::image::Image::from_path("icons/icon.png"))
-                .ok();
-
-            let mut tray_builder = TrayIconBuilder::new().menu(&menu);
-            if let Some(icon) = icon {
-                tray_builder = tray_builder.icon(icon);
-            }
-
-            tray_builder
-                .on_menu_event(move |app, event| match event.id.as_ref() {
-                    "quit" => app.exit(0),
-                    "show" => toggle_window(&handle2),
-                    _ => {}
-                })
-                .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click {
-                        button: MouseButton::Left,
-                        button_state: MouseButtonState::Up,
-                        ..
-                    } = event
-                    {
-                        let app = tray.app_handle();
-                        toggle_window(app);
-                    }
-                })
-                .build(app)?;
+            tray::create_tray(app)?;
 
             Ok(())
         })

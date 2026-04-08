@@ -10,9 +10,16 @@ pub fn build_system_prompt(tools: &[McpTool]) -> String {
     // Core identity
     parts.push(BLADE_IDENTITY.to_string());
 
-    // User persona (if exists)
+    // Character Bible (structured knowledge about the user)
+    if let Some(bible) = crate::character::bible_summary() {
+        parts.push(format!("## About the User\n\n{}", bible));
+    }
+
+    // User persona (raw notes, supplements the Bible)
     if let Some(persona) = load_persona() {
-        parts.push(format!("## About the User\n\n{}", persona));
+        if !persona.trim().is_empty() {
+            parts.push(format!("## Additional User Context\n\n{}", persona));
+        }
     }
 
     // Available tools
