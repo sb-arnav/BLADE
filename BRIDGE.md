@@ -193,7 +193,40 @@ Working note for split ownership between Artemis and Claude on the Blade repo.
 - **Screenshot thumbnails** — user messages with `image_base64` show the screenshot as a rounded thumbnail (max 192px height) above the text. (`MessageList.tsx`)
 - **sendMessage accepts images** — `sendMessage(content, imageBase64?)` passes images to backend cleanly. Message serialization includes `image_base64` only when present.
 
-## Open UI/UX Work (Artemis)
+## URGENT: UI Overhaul (Artemis)
+
+Arnav tested the app and called the UI "shit af." This is the top priority now. The backend works — the frontend needs to match.
+
+**Specific problems to fix:**
+- The overall look feels like a generic chatbot wrapper, not a premium desktop app
+- Onboarding flow needs to feel polished and intentional, not form-like
+- Chat area needs visual hierarchy — clear distinction between user/assistant messages
+- Empty states need personality, not placeholder text
+- The app should feel native and fast, not like a web page in a frame
+
+**Design direction:**
+- Look at Arc Browser, Linear, Raycast for inspiration — clean, fast, opinionated
+- Dark by default. The blade color palette is good, use it more aggressively
+- Animations should be subtle and purposeful — no bouncing dots, use smooth fades
+- Typography matters — proper font sizes, weights, line heights
+- Spacing needs to breathe — currently too cramped or too generic
+- The titlebar should feel integrated, not bolted on
+
+**Specific things to build/improve:**
+- Better message bubbles — code blocks should look great, text should be readable
+- Smooth transitions between routes (chat → settings → onboarding)
+- Loading states that feel intentional
+- The conversation sidebar should feel like part of the app, not a dropdown
+- Voice/screenshot buttons should feel native, not like afterthoughts
+- Error states should be helpful, not just red text
+
+**Don't do:**
+- Don't add features. Focus purely on making what exists look and feel great.
+- Don't touch any backend files.
+
+## Other Open UI/UX Work (Artemis)
 
 - Request trace viewer in diagnostics (backend has `get_recent_traces()`)
 - Conversation search / filter in sidebar
+- Wire `learn_from_conversation()` call when conversation ends
+- Wire TTS via Web Speech API for voice output

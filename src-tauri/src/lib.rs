@@ -84,6 +84,7 @@ pub fn run() {
             router::classify_message,
         ])
         .setup(move |app| {
+            // Ensure window is visible and focused on startup
             if let Some(window) = app.get_webview_window("main") {
                 if let Some(window_state) = config::load_config().window_state {
                     let _ = window.set_size(Size::Physical(PhysicalSize::new(
@@ -95,6 +96,8 @@ pub fn run() {
                         window_state.y,
                     )));
                 }
+                let _ = window.show();
+                let _ = window.set_focus();
             }
 
             let startup_config = config::load_config();
@@ -131,8 +134,16 @@ pub fn run() {
             let menu = Menu::with_items(app, &[&show, &quit])?;
 
             let handle2 = app.handle().clone();
-            TrayIconBuilder::new()
-                .menu(&menu)
+            let icon = tauri::image::Image::from_path("icons/32x32.png")
+                .or_else(|_| tauri::image::Image::from_path("icons/icon.png"))
+                .ok();
+
+            let mut tray_builder = TrayIconBuilder::new().menu(&menu);
+            if let Some(icon) = icon {
+                tray_builder = tray_builder.icon(icon);
+            }
+
+            tray_builder
                 .on_menu_event(move |app, event| match event.id.as_ref() {
                     "quit" => app.exit(0),
                     "show" => toggle_window(&handle2),
