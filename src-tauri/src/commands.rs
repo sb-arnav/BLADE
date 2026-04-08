@@ -30,16 +30,30 @@ pub async fn send_message_stream(
     };
 
     let system_prompt = brain::build_system_prompt(&tool_snapshot);
-    let tools = tool_snapshot
+    let tools: Vec<ToolDefinition> = tool_snapshot
         .iter()
         .map(|tool| ToolDefinition {
             name: tool.qualified_name.clone(),
             description: tool.description.clone(),
             input_schema: tool.input_schema.clone(),
         })
-        .collect::<Vec<_>>();
-    let mut conversation = providers::build_conversation(messages, Some(system_prompt));
+        .collect();
+    let conversation = providers::build_conversation(messages, Some(system_prompt));
 
+    // No tools configured → stream directly (fast path, best UX)
+    if tools.is_empty() {
+        return providers::stream_text(
+            &app,
+            &config.provider,
+            &config.api_key,
+            &config.model,
+            &conversation,
+        )
+        .await;
+    }
+
+    // Tools configured → non-streaming tool loop
+    let mut conversation = conversation;
     for _ in 0..8 {
         let turn = providers::complete_turn(
             &config.provider,
@@ -56,6 +70,7 @@ pub async fn send_message_stream(
         });
 
         if turn.tool_calls.is_empty() {
+            // Final text response — emit at once (already complete)
             if !turn.content.is_empty() {
                 let _ = app.emit("chat_token", turn.content);
             }

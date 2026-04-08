@@ -92,6 +92,13 @@ export function Discovery({ onComplete, onSkip }: Props) {
       sections.push(`Tools: ${report.installed_tools.join(", ")}`);
     }
 
+    // Import Claude Code memories — rich context already written
+    if (report?.claude_memories && report.claude_memories.length > 0) {
+      sections.push(
+        `## Imported from Claude Code\n\n${report.claude_memories.join("\n\n---\n\n")}`
+      );
+    }
+
     const persona = sections.join("\n\n");
 
     try {
@@ -109,6 +116,7 @@ export function Discovery({ onComplete, onSkip }: Props) {
         aiTools: report.ai_tools.length,
         tools: report.installed_tools.length,
         languages: report.dev_environment.languages.length,
+        memories: report.claude_memories?.length ?? 0,
       }
     : null;
 
@@ -164,6 +172,9 @@ export function Discovery({ onComplete, onSkip }: Props) {
               <Stat label="AI tools" value={summaryStats.aiTools} />
               <Stat label="Languages" value={summaryStats.languages} />
               <Stat label="Dev tools" value={summaryStats.tools} />
+              {summaryStats.memories > 0 && (
+                <Stat label="Memories imported" value={summaryStats.memories} />
+              )}
             </div>
             {report?.user_identity?.name && (
               <p className="text-xs text-blade-muted">
