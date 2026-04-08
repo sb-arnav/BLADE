@@ -24,6 +24,7 @@ interface Props {
   onRespondApproval: (approved: boolean) => void;
   onDeleteConversation: (id: string) => void;
   onRetry: () => void;
+  onSlashCommand?: (action: string) => void;
   provider?: string;
   model?: string;
   streakDays?: number;
@@ -66,6 +67,7 @@ export function ChatWindow({
   onRespondApproval,
   onDeleteConversation,
   onRetry,
+  onSlashCommand,
   provider,
   model,
   streakDays,
@@ -334,7 +336,7 @@ export function ChatWindow({
           </div>
         )}
 
-        <InputBar onSend={onSend} disabled={loading} />
+        <InputBar onSend={onSend} onSlashCommand={onSlashCommand} disabled={loading} />
       </div>
 
       {pendingApproval && (

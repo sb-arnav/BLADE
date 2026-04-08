@@ -2,6 +2,7 @@ import { Message, ToolExecution } from "../types";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import TypingIndicator from "./TypingIndicator";
+import MessageReactions from "./MessageReactions";
 import remarkGfm from "remark-gfm";
 import hljs from "highlight.js/lib/core";
 import typescript from "highlight.js/lib/languages/typescript";
@@ -220,6 +221,7 @@ const MessageBubble = memo(function MessageBubble({ msg }: { msg: Message }) {
               </span>
             )}
             {!isUser && msg.content && <CopyButton text={msg.content} label="copy" />}
+            {!isUser && <MessageReactions messageId={msg.id} visible={hovered} />}
           </div>
         )}
       </div>
