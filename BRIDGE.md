@@ -193,36 +193,29 @@ Working note for split ownership between Artemis and Claude on the Blade repo.
 - **Screenshot thumbnails** — user messages with `image_base64` show the screenshot as a rounded thumbnail (max 192px height) above the text. (`MessageList.tsx`)
 - **sendMessage accepts images** — `sendMessage(content, imageBase64?)` passes images to backend cleanly. Message serialization includes `image_base64` only when present.
 
-## URGENT: UI Overhaul (Artemis)
+## UI Overhaul — DONE (Artemis, 2026-04-08, batch 9)
 
-Arnav tested the app and called the UI "shit af." This is the top priority now. The backend works — the frontend needs to match.
+Full visual redesign. No features added, pure design overhaul targeting Arc/Linear/Raycast quality.
 
-**Specific problems to fix:**
-- The overall look feels like a generic chatbot wrapper, not a premium desktop app
-- Onboarding flow needs to feel polished and intentional, not form-like
-- Chat area needs visual hierarchy — clear distinction between user/assistant messages
-- Empty states need personality, not placeholder text
-- The app should feel native and fast, not like a web page in a frame
+**What changed:**
 
-**Design direction:**
-- Look at Arc Browser, Linear, Raycast for inspiration — clean, fast, opinionated
-- Dark by default. The blade color palette is good, use it more aggressively
-- Animations should be subtle and purposeful — no bouncing dots, use smooth fades
-- Typography matters — proper font sizes, weights, line heights
-- Spacing needs to breathe — currently too cramped or too generic
-- The titlebar should feel integrated, not bolted on
+- **Color system** — refined palette with deeper blacks (#09090b bg), proper secondary/muted hierarchy, accent-muted for selected states, surface-hover for interactions. All border and hover states have dedicated tokens now.
+- **Typography** — antialiased rendering, JetBrains Mono for code, Inter with OpenType features, proper size hierarchy (2xs/xs/sm), letter-spacing tuning.
+- **Custom scrollbar** — thin 6px dark scrollbar, no jarring light tracks.
+- **Message design** — assistant messages have NO bubble, just a left accent border (like Linear comments). User messages are compact rounded pills. Loading is a blinking cursor, not bouncing dots. Messages fade in.
+- **Code blocks** — dark (#0c0c0f) with rounded container, language label + copy in header bar, proper monospace sizing.
+- **Empty state** — accent-muted icon box with "Blade / Ready when you are." — minimal, not cheesy.
+- **Sidebar** — rounded conversation items, accent-muted selected state, plus icon for new, settings icon at bottom. Overlay has backdrop blur.
+- **Header** — 40px height, thin border, minimal. Just hamburger + title + clear + settings.
+- **InputBar** — action buttons in rounded containers with hover states, send button fills accent when text present (empty = invisible). Border turns red during recording. Hints are 50% opacity.
+- **TitleBar** — 36px, integrated, smaller controls (7px dots), window buttons are 10px icons.
+- **Error states** — rounded cards with colored bg/border tints (red-500/8, emerald-500/8), not solid backgrounds.
+- **Onboarding** — provider list as clean bordered rows with chevron, accent icon box branding, fade-in animations.
+- **Tool approval** — split button footer (Deny | Allow), no heavy backgrounds.
+- **Command palette** — accent-muted selected state, 2px search icon, backdrop blur overlay.
+- **Animations** — fadeIn (translateY 4px), slideIn (translateX 8px), pulse-slow (2.5s). All purposeful, no bounce.
 
-**Specific things to build/improve:**
-- Better message bubbles — code blocks should look great, text should be readable
-- Smooth transitions between routes (chat → settings → onboarding)
-- Loading states that feel intentional
-- The conversation sidebar should feel like part of the app, not a dropdown
-- Voice/screenshot buttons should feel native, not like afterthoughts
-- Error states should be helpful, not just red text
-
-**Don't do:**
-- Don't add features. Focus purely on making what exists look and feel great.
-- Don't touch any backend files.
+**Files touched:** `tailwind.config.js`, `index.css`, `TitleBar.tsx`, `ChatWindow.tsx`, `MessageList.tsx`, `InputBar.tsx`, `CommandPalette.tsx`, `ToolApprovalDialog.tsx`, `Onboarding.tsx`
 
 ## Other Open UI/UX Work (Artemis)
 

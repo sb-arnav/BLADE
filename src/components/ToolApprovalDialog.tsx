@@ -24,7 +24,6 @@ export function ToolApprovalDialog({ request, onRespond }: Props) {
     return () => clearInterval(interval);
   }, [request.approval_id, onRespond]);
 
-  // Try to parse arguments as JSON for display
   let argsDisplay: string;
   try {
     const parsed = JSON.parse(request.arguments);
@@ -35,42 +34,42 @@ export function ToolApprovalDialog({ request, onRespond }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black/60" />
-      <div className="relative w-full max-w-md bg-blade-surface border border-amber-900/50 rounded-2xl shadow-2xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-blade-border flex items-center justify-between">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-[2px]" />
+      <div className="relative w-full max-w-sm bg-blade-surface border border-amber-500/20 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
+        <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-            <span className="text-sm font-medium text-blade-text">Tool wants to run</span>
+            <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse-slow" />
+            <span className="text-xs font-medium text-blade-text">Tool approval</span>
           </div>
-          <span className="text-xs text-blade-muted font-mono">{secondsLeft}s</span>
+          <span className="text-2xs text-blade-muted font-mono tabular-nums">{secondsLeft}s</span>
         </div>
 
-        <div className="px-4 py-3 space-y-3">
+        <div className="px-4 pb-3 space-y-3">
           <div>
-            <p className="text-xs uppercase tracking-wide text-blade-muted mb-1">Tool</p>
-            <p className="text-sm font-mono text-blade-text">{request.name}</p>
+            <p className="text-2xs text-blade-muted mb-1">Tool</p>
+            <p className="text-xs font-mono text-blade-text">{request.name}</p>
           </div>
 
           {argsDisplay && argsDisplay !== "{}" && (
             <div>
-              <p className="text-xs uppercase tracking-wide text-blade-muted mb-1">Arguments</p>
-              <pre className="text-xs text-blade-muted bg-blade-bg rounded-lg p-2.5 overflow-x-auto max-h-40 border border-blade-border">
+              <p className="text-2xs text-blade-muted mb-1">Arguments</p>
+              <pre className="text-2xs text-blade-secondary bg-blade-bg rounded-lg p-2.5 overflow-x-auto max-h-32 border border-blade-border font-mono">
                 {argsDisplay}
               </pre>
             </div>
           )}
         </div>
 
-        <div className="px-4 py-3 border-t border-blade-border flex items-center gap-2">
+        <div className="flex border-t border-blade-border">
           <button
             onClick={() => onRespond(false)}
-            className="flex-1 px-4 py-2.5 text-sm rounded-xl border border-blade-border text-blade-muted hover:text-blade-text hover:border-blade-muted transition-colors"
+            className="flex-1 py-2.5 text-xs text-blade-secondary hover:text-blade-text hover:bg-blade-surface-hover transition-colors border-r border-blade-border"
           >
             Deny
           </button>
           <button
             onClick={() => onRespond(true)}
-            className="flex-1 px-4 py-2.5 text-sm rounded-xl bg-blade-accent text-white font-medium hover:opacity-90 transition-opacity"
+            className="flex-1 py-2.5 text-xs text-blade-accent font-medium hover:bg-blade-accent-muted transition-colors"
           >
             Allow
           </button>

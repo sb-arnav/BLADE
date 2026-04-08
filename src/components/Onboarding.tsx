@@ -5,7 +5,7 @@ const PROVIDERS = [
   {
     id: "gemini",
     name: "Google Gemini",
-    description: "Free tier · Fast · Recommended",
+    description: "Free tier, fast, recommended to start",
     model: "gemini-2.0-flash",
     needsKey: true,
     keyUrl: "https://aistudio.google.com/apikey",
@@ -13,7 +13,7 @@ const PROVIDERS = [
   {
     id: "groq",
     name: "Groq",
-    description: "Free tier · Fastest responses",
+    description: "Free tier, fastest inference",
     model: "llama-3.3-70b-versatile",
     needsKey: true,
     keyUrl: "https://console.groq.com/keys",
@@ -21,7 +21,7 @@ const PROVIDERS = [
   {
     id: "openai",
     name: "OpenAI",
-    description: "GPT-4o mini · Bring your key",
+    description: "GPT-4o mini, reliable",
     model: "gpt-4o-mini",
     needsKey: true,
     keyUrl: "https://platform.openai.com/api-keys",
@@ -29,7 +29,7 @@ const PROVIDERS = [
   {
     id: "anthropic",
     name: "Anthropic",
-    description: "Claude · Bring your key",
+    description: "Claude, strong reasoning",
     model: "claude-sonnet-4-20250514",
     needsKey: true,
     keyUrl: "https://console.anthropic.com/settings/keys",
@@ -37,7 +37,7 @@ const PROVIDERS = [
   {
     id: "ollama",
     name: "Ollama",
-    description: "Local · Free · Needs good hardware",
+    description: "Local, offline, needs hardware",
     model: "llama3.2",
     needsKey: false,
     keyUrl: "",
@@ -59,7 +59,6 @@ export function Onboarding({ onComplete }: Props) {
     setStep("testing");
     setTestResult(null);
     setTestError(null);
-
     try {
       const result = await invoke<string>("test_provider", {
         provider: selected.id,
@@ -83,110 +82,117 @@ export function Onboarding({ onComplete }: Props) {
 
   return (
     <div className="flex-1 flex flex-col justify-center bg-blade-bg text-blade-text p-6">
-      <div className="max-w-md mx-auto w-full">
+      <div className="max-w-sm mx-auto w-full animate-fade-in">
         <div className="mb-8">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-3 h-3 rounded-full bg-blade-accent" />
-            <h1 className="text-xl font-semibold">Blade</h1>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-lg bg-blade-accent-muted flex items-center justify-center">
+              <div className="w-2 h-2 rounded-full bg-blade-accent" />
+            </div>
+            <h1 className="text-base font-semibold tracking-tight">Blade</h1>
           </div>
-          <p className="text-blade-muted text-sm">
-            {step === "pick" && "Connect an AI provider to get started."}
-            {step === "key" && `Enter your ${selected.name} API key.`}
-            {step === "testing" && "Testing connection..."}
+          <p className="text-blade-secondary text-xs leading-relaxed">
+            {step === "pick" && "Connect a provider to get started."}
+            {step === "key" && `Paste your ${selected.name} API key.`}
+            {step === "testing" && "Checking connection..."}
           </p>
         </div>
 
         {step === "pick" && (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {PROVIDERS.map((provider) => (
               <button
                 key={provider.id}
                 onClick={() => {
                   setSelected(provider);
-                  setStep(provider.needsKey ? "key" : "testing");
                   if (!provider.needsKey) {
+                    setStep("testing");
                     setTimeout(() => handleTest(), 0);
+                  } else {
+                    setStep("key");
                   }
                 }}
-                className={`w-full text-left px-4 py-3 rounded-xl border transition-colors ${
-                  selected.id === provider.id
-                    ? "border-blade-accent bg-blade-surface"
-                    : "border-blade-border hover:border-blade-muted"
-                }`}
+                className="w-full text-left px-3.5 py-3 rounded-lg border border-blade-border hover:border-blade-border-hover hover:bg-blade-surface transition-colors group"
               >
-                <div className="text-sm font-medium">{provider.name}</div>
-                <div className="text-xs text-blade-muted">{provider.description}</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[0.8125rem] font-medium">{provider.name}</span>
+                  <svg viewBox="0 0 24 24" className="w-3 h-3 text-blade-muted group-hover:text-blade-secondary transition-colors" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M9 6l6 6-6 6" />
+                  </svg>
+                </div>
+                <p className="text-2xs text-blade-muted mt-0.5">{provider.description}</p>
               </button>
             ))}
           </div>
         )}
 
         {step === "key" && (
-          <div className="space-y-4">
+          <div className="space-y-4 animate-fade-in">
             <div>
               <input
                 type="password"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                placeholder="Paste API key..."
-                className="w-full bg-blade-surface border border-blade-border rounded-xl px-4 py-3 text-sm text-blade-text outline-none focus:border-blade-accent placeholder:text-blade-muted"
+                onKeyDown={(e) => { if (e.key === "Enter" && apiKey.trim()) handleTest(); }}
+                placeholder="sk-..."
+                className="w-full bg-blade-surface border border-blade-border rounded-lg px-3.5 py-2.5 text-[0.8125rem] text-blade-text outline-none focus:border-blade-accent/50 placeholder:text-blade-muted transition-colors"
                 autoFocus
               />
               <a
                 href={selected.keyUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs text-blade-accent hover:underline mt-2 inline-block"
+                className="text-2xs text-blade-accent hover:text-blade-accent-hover mt-2 inline-block transition-colors"
               >
-                Get a free {selected.name} key
+                Get a {selected.name} key
               </a>
             </div>
             <div className="flex gap-2">
               <button
                 onClick={() => setStep("pick")}
-                className="px-4 py-2 text-sm text-blade-muted hover:text-blade-text transition-colors"
+                className="px-3 py-2 text-xs text-blade-muted hover:text-blade-secondary transition-colors"
               >
                 Back
               </button>
               <button
                 onClick={handleTest}
                 disabled={!apiKey.trim()}
-                className="flex-1 px-4 py-2 text-sm font-medium bg-blade-accent text-white rounded-xl disabled:opacity-40 hover:opacity-90 transition-opacity"
+                className="flex-1 px-3 py-2 text-xs font-medium bg-blade-accent text-white rounded-lg disabled:opacity-30 hover:bg-blade-accent-hover transition-colors"
               >
-                Test Connection
+                Test connection
               </button>
             </div>
           </div>
         )}
 
         {step === "testing" && (
-          <div className="space-y-4">
+          <div className="space-y-4 animate-fade-in">
             {!testResult && !testError && (
-              <div className="text-blade-muted text-sm animate-pulse">
+              <div className="flex items-center gap-2 text-xs text-blade-secondary">
+                <div className="w-1.5 h-1.5 rounded-full bg-blade-accent animate-pulse-slow" />
                 Testing {selected.name}...
               </div>
             )}
             {testResult && (
               <div className="space-y-3">
-                <div className="px-4 py-3 bg-green-950 border border-green-900 rounded-xl text-green-400 text-sm">
-                  Connected! Response: "{testResult}"
+                <div className="px-3.5 py-2.5 rounded-lg bg-emerald-500/8 border border-emerald-500/15 text-emerald-400 text-xs">
+                  Connected.
                 </div>
                 <button
                   onClick={handleSave}
-                  className="w-full px-4 py-3 text-sm font-medium bg-blade-accent text-white rounded-xl hover:opacity-90 transition-opacity"
+                  className="w-full px-3 py-2.5 text-xs font-medium bg-blade-accent text-white rounded-lg hover:bg-blade-accent-hover transition-colors"
                 >
-                  Start using Blade
+                  Continue
                 </button>
               </div>
             )}
             {testError && (
               <div className="space-y-3">
-                <div className="px-4 py-3 bg-red-950 border border-red-900 rounded-xl text-red-400 text-sm">
+                <div className="px-3.5 py-2.5 rounded-lg bg-red-500/8 border border-red-500/15 text-red-400 text-xs">
                   {testError}
                 </div>
                 <button
                   onClick={() => setStep("key")}
-                  className="px-4 py-2 text-sm text-blade-muted hover:text-blade-text transition-colors"
+                  className="text-xs text-blade-muted hover:text-blade-secondary transition-colors"
                 >
                   Try again
                 </button>
