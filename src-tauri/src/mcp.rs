@@ -240,7 +240,31 @@ impl McpManager {
             .collect()
     }
 
+    /// Check if a server process is still alive, remove it if dead
+    async fn check_health(&mut self, server_name: &str) {
+        if let Some(process) = self.processes.get_mut(server_name) {
+            if let Ok(Some(_)) = process.child.try_wait() {
+                // Process exited — remove it so ensure_running will respawn
+                self.processes.remove(server_name);
+            }
+        }
+    }
+
+    /// Get server status for UI
+    pub fn server_status(&self) -> Vec<(String, bool)> {
+        self.servers
+            .keys()
+            .map(|name| {
+                let running = self.processes.contains_key(name);
+                (name.clone(), running)
+            })
+            .collect()
+    }
+
     async fn ensure_running(&mut self, server_name: &str) -> Result<(), String> {
+        // Check if existing process died
+        self.check_health(server_name).await;
+
         if self.processes.contains_key(server_name) {
             return Ok(());
         }

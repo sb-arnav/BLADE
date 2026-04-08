@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ConversationSummary, Message, StoredConversation } from "../types";
+import { ConversationSummary, Message, StoredConversation, ToolExecution } from "../types";
 
 function sortConversations(items: ConversationSummary[]) {
   return [...items].sort((a, b) => b.updated_at - a.updated_at);
@@ -13,6 +13,7 @@ export function useChat() {
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toolExecutions, setToolExecutions] = useState<ToolExecution[]>([]);
   const streamBuffer = useRef("");
   const messagesRef = useRef<Message[]>([]);
   const bootstrappedRef = useRef(false);
@@ -94,11 +95,34 @@ export function useChat() {
     const unlistenDone = listen("chat_done", () => {
       streamBuffer.current = "";
       setLoading(false);
+      setToolExecutions([]);
+    });
+
+    const unlistenToolExecuting = listen<{ name: string }>("tool_executing", (event) => {
+      const execution: ToolExecution = {
+        id: crypto.randomUUID(),
+        tool_name: event.payload.name,
+        status: "executing",
+        started_at: Date.now(),
+      };
+      setToolExecutions((prev) => [...prev, execution]);
+    });
+
+    const unlistenToolCompleted = listen<{ name: string }>("tool_completed", (event) => {
+      setToolExecutions((prev) =>
+        prev.map((ex) =>
+          ex.tool_name === event.payload.name && ex.status === "executing"
+            ? { ...ex, status: "completed" as const, completed_at: Date.now() }
+            : ex
+        )
+      );
     });
 
     return () => {
       unlistenToken.then((fn) => fn());
       unlistenDone.then((fn) => fn());
+      unlistenToolExecuting.then((fn) => fn());
+      unlistenToolCompleted.then((fn) => fn());
     };
   }, []);
 
@@ -182,6 +206,7 @@ export function useChat() {
     messages,
     loading,
     error,
+    toolExecutions,
     conversations,
     currentConversationId,
     currentConversation,

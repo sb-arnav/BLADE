@@ -228,6 +228,14 @@ pub fn mcp_get_servers() -> Vec<SavedMcpServerConfig> {
 }
 
 #[tauri::command]
+pub async fn mcp_server_status(
+    state: tauri::State<'_, SharedMcpManager>,
+) -> Result<Vec<(String, bool)>, String> {
+    let manager = state.lock().await;
+    Ok(manager.server_status())
+}
+
+#[tauri::command]
 pub async fn mcp_remove_server(
     state: tauri::State<'_, SharedMcpManager>,
     name: String,
