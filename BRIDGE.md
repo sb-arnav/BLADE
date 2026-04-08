@@ -94,11 +94,24 @@ Working note for split ownership between Artemis and Claude on the Blade repo.
 - Streaming during tool loop (final text streams, but mid-loop tool-call turns are non-streaming — by design)
 - Request tracing for provider calls (debug logs with request IDs)
 
+## Recently Shipped by Artemis (2026-04-08, batch 2)
+
+- **Per-tool trust overrides** — click permission badge to cycle Auto→Ask→Blocked. "reset" button reverts to pattern-based default. Uses `set_tool_trust`/`reset_tool_trust`/`get_tool_overrides`. (`McpSettings.tsx`)
+- **MCP server import** — "Import from Claude Code" button calls `discover_mcp_servers()`, auto-adds found servers. (`McpSettings.tsx`)
+- **Server status indicators** — green/red/gray dot per server from `mcp_server_status()`. (`McpSettings.tsx`)
+- **Clipboard contextual actions** — listens to `clipboard_changed`, shows bar with Explain/Summarize quick actions + dismiss. (`ChatWindow.tsx`, `useChat.ts`)
+- **Command palette** — Ctrl+K opens palette with: New conversation, Clear, Settings, Discovery, Back to chat. Fuzzy filter, Enter to select. (`CommandPalette.tsx`, `App.tsx`)
+- **Richer tool execution display** — uses `risk` from event payload. Shows risk-aware tool indicator. (`useChat.ts`, `types.ts`)
+
+## Recently Shipped by Artemis (2026-04-08, batch 3)
+
+- **Command palette keyboard nav** — Arrow up/down to navigate, Enter to select, Esc to close. Active item highlighted with accent tint. Mouse hover + keyboard work together. Search icon + esc hint in input. (`CommandPalette.tsx`)
+- **Risk-colored tool indicators** — Active tools show green/amber/red pulse matching their risk level. Completed tools show checkmark or X for 3 seconds after finishing. (`MessageList.tsx`)
+- **InputBar polish** — Send button is now an SVG arrow icon. Ctrl+K shortcut hint shown bottom-right. (`InputBar.tsx`)
+- **Accent hover color** — Added `blade-accent-hover` (#818cf8) for interactive hover states. (`tailwind.config.js`)
+
 ## Open UI/UX Work (Artemis)
 
-- Per-tool trust override toggles in MCP settings (backend commands are ready: `set_tool_trust`, `reset_tool_trust`)
-- MCP server import button ("Import from Claude Code") using `discover_mcp_servers()`
-- MCP server status indicators (green/red dot) using `mcp_server_status()`
-- Clipboard contextual actions (listen to `clipboard_changed`, offer "Explain" / "Summarize")
-- Persona/context editing in settings (commands ready: `get_persona`/`set_persona`/`get_context`/`set_context`)
-- Command palette (Ctrl+K)
+- Tool approval dialog when `Ask` tool fires (needs backend approval event — check if `tool_executing` with risk=Ask should block until UI confirms)
+- Conversation deletion (needs backend `history_delete_conversation` command)
+- Syntax highlighting in code blocks (consider adding highlight.js or shiki)

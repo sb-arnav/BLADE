@@ -9,6 +9,7 @@ export default {
           surface: "#111111",
           border: "#1f1f1f",
           accent: "#6366f1",
+          "accent-hover": "#818cf8",
           text: "#e5e5e5",
           muted: "#666666",
         }

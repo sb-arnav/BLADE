@@ -17,6 +17,9 @@ export function MessageList({ messages, loading, toolExecutions }: Props) {
   }, [messages, loading, toolExecutions]);
 
   const activeTools = toolExecutions.filter((t) => t.status === "executing");
+  const recentCompleted = toolExecutions.filter(
+    (t) => t.status === "completed" && t.completed_at && Date.now() - t.completed_at < 3000
+  );
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
@@ -45,20 +48,30 @@ export function MessageList({ messages, loading, toolExecutions }: Props) {
         </div>
       ))}
 
-      {activeTools.length > 0 && (
+      {(activeTools.length > 0 || recentCompleted.length > 0) && (
         <div className="flex justify-start">
-          <div className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-blade-muted">
-            <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-            <span>
-              {activeTools.length === 1
-                ? activeTools[0].tool_name
-                : `${activeTools.length} tools`}
-            </span>
+          <div className="space-y-1">
+            {activeTools.map((tool) => (
+              <div key={tool.id} className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-blade-muted">
+                <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                  tool.risk === "Blocked" ? "bg-red-400" : tool.risk === "Ask" ? "bg-amber-400" : "bg-green-400"
+                }`} />
+                <span className="font-mono">{tool.tool_name}</span>
+              </div>
+            ))}
+            {recentCompleted.map((tool) => (
+              <div key={tool.id} className="flex items-center gap-2 rounded-lg px-3 py-1 text-xs text-blade-muted opacity-60">
+                <span className={tool.is_error ? "text-red-400" : "text-green-400"}>
+                  {tool.is_error ? "x" : "\u2713"}
+                </span>
+                <span className="font-mono">{tool.tool_name}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {loading && activeTools.length === 0 && (
+      {loading && activeTools.length === 0 && recentCompleted.length === 0 && (
         <div className="flex justify-start">
           <div className="bg-blade-surface border border-blade-border rounded-xl px-4 py-2.5">
             <div className="flex space-x-1">

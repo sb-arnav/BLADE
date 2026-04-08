@@ -2,6 +2,8 @@ use crate::brain;
 use crate::config::{load_config, save_config, BladeConfig, SavedMcpServerConfig};
 use crate::permissions;
 use crate::trace;
+use std::collections::HashMap as StdHashMap;
+use tokio::sync::oneshot;
 use crate::history::{
     list_conversations, load_conversation, save_conversation, ConversationSummary, HistoryMessage,
     StoredConversation,
@@ -14,12 +16,14 @@ use tauri::Emitter;
 use tokio::sync::Mutex;
 
 pub type SharedMcpManager = Arc<Mutex<McpManager>>;
+pub type ApprovalMap = Arc<Mutex<StdHashMap<String, oneshot::Sender<bool>>>>;
 const MAX_TOOL_RESULT_CHARS: usize = 12_000;
 
 #[tauri::command]
 pub async fn send_message_stream(
     app: tauri::AppHandle,
     state: tauri::State<'_, SharedMcpManager>,
+    approvals: tauri::State<'_, ApprovalMap>,
     messages: Vec<ChatMessage>,
 ) -> Result<(), String> {
     let config = load_config();
@@ -115,6 +119,43 @@ pub async fn send_message_stream(
                     is_error: true,
                 });
                 continue;
+            }
+
+            // Ask-risk tools need user approval
+            if risk == permissions::ToolRisk::Ask {
+                let approval_id = format!("approval-{}", tool_call.id);
+                let (tx, rx) = oneshot::channel::<bool>();
+
+                {
+                    let mut map = approvals.lock().await;
+                    map.insert(approval_id.clone(), tx);
+                }
+
+                let _ = app.emit("tool_approval_needed", serde_json::json!({
+                    "approval_id": &approval_id,
+                    "name": &tool_call.name,
+                    "arguments": &tool_call.arguments,
+                    "risk": "Ask",
+                }));
+
+                // Wait for UI response (timeout after 60s)
+                let approved = tokio::time::timeout(
+                    std::time::Duration::from_secs(60),
+                    rx,
+                )
+                .await
+                .unwrap_or(Ok(false))
+                .unwrap_or(false);
+
+                if !approved {
+                    conversation.push(ConversationMessage::Tool {
+                        tool_call_id: tool_call.id,
+                        tool_name: tool_call.name,
+                        content: "Tool execution denied by user.".to_string(),
+                        is_error: true,
+                    });
+                    continue;
+                }
             }
 
             // Emit tool execution event (for UI audit trail)
@@ -260,6 +301,30 @@ pub async fn mcp_remove_server(
     let mut manager = state.lock().await;
     manager.remove_server(&name).await;
     Ok(())
+}
+
+// --- Tool Approval ---
+
+#[tauri::command]
+pub async fn respond_tool_approval(
+    approvals: tauri::State<'_, ApprovalMap>,
+    approval_id: String,
+    approved: bool,
+) -> Result<(), String> {
+    let mut map = approvals.lock().await;
+    if let Some(tx) = map.remove(&approval_id) {
+        let _ = tx.send(approved);
+        Ok(())
+    } else {
+        Err(format!("No pending approval: {}", approval_id))
+    }
+}
+
+// --- History ---
+
+#[tauri::command]
+pub fn history_delete_conversation(conversation_id: String) -> Result<(), String> {
+    crate::history::delete_conversation(&conversation_id)
 }
 
 #[tauri::command]

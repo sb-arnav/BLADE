@@ -43,12 +43,20 @@ export function InputBar({ onSend, disabled }: Props) {
         <button
           onClick={handleSend}
           disabled={disabled || !value.trim()}
-          className="text-blade-accent hover:text-white disabled:text-blade-muted transition-colors text-sm font-medium pb-0.5"
+          className="text-blade-accent hover:text-white disabled:text-blade-muted transition-colors pb-0.5"
+          aria-label="Send message"
         >
-          ↑
+          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 19V5M5 12l7-7 7 7" />
+          </svg>
         </button>
       </div>
-      <p className="text-blade-muted text-xs mt-1.5 ml-1">Enter to send · Shift+Enter for newline</p>
+      <div className="flex items-center justify-between mt-1.5 ml-1">
+        <p className="text-blade-muted text-xs">Enter to send · Shift+Enter for newline</p>
+        <p className="text-blade-muted text-xs mr-1">
+          <kbd className="font-mono text-[10px] border border-blade-border rounded px-1 py-0.5">Ctrl K</kbd>
+        </p>
+      </div>
     </div>
   );
 }
