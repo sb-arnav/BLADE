@@ -6,7 +6,6 @@
   "permissions": [
     "core:default",
     "global-shortcut:default",
-    "sql:default",
     "store:default",
     "notification:default",
     "autostart:default",
