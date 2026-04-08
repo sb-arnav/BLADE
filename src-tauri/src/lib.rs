@@ -47,6 +47,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::send_message_stream,
             commands::get_config,
+            commands::debug_config,
+            commands::reset_onboarding,
             commands::set_config,
             commands::test_provider,
             commands::mcp_add_server,

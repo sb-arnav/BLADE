@@ -20,7 +20,10 @@ export default function App() {
 
   const loadConfig = async () => {
     try {
+      const debug = await invoke("debug_config");
+      console.log("[Blade] Config debug:", debug);
       const cfg = await invoke<BladeConfig>("get_config");
+      console.log("[Blade] Config loaded:", { onboarded: cfg.onboarded, provider: cfg.provider, hasKey: !!cfg.api_key });
       setConfig(cfg);
     } catch {
       setConfig({
