@@ -26,9 +26,18 @@ pub async fn send_message_stream(
     approvals: tauri::State<'_, ApprovalMap>,
     messages: Vec<ChatMessage>,
 ) -> Result<(), String> {
-    let config = load_config();
+    let mut config = load_config();
     if config.api_key.is_empty() && config.provider != "ollama" {
         return Err("No API key configured. Go to settings.".to_string());
+    }
+
+    // Smart routing: auto-select best model for the task
+    if let Some(last_user_msg) = messages.iter().rev().find(|m| m.role == "user") {
+        let has_image = last_user_msg.image_base64.is_some();
+        let task = crate::router::classify_task(&last_user_msg.content, has_image);
+        if let Some(suggested) = crate::router::suggest_model(&config.provider, &task) {
+            config.model = suggested;
+        }
     }
 
     let tool_snapshot = {

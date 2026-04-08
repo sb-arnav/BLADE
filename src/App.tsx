@@ -54,7 +54,7 @@ export default function App() {
   const handleScreenshot = async () => {
     try {
       const png = await invoke<string>("capture_screen");
-      chat.sendMessage(`[screenshot attached]\n\ndata:image/png;base64,${png}`);
+      chat.sendMessage("What's on my screen?", png);
     } catch {
       // Screenshot failed
     }
