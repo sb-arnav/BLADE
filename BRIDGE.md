@@ -151,7 +151,39 @@ Working note for split ownership between Artemis and Claude on the Blade repo.
 - **Conversation header** — shows current conversation title with accent dot. Clean layout with hamburger, clear, and settings controls.
 - **Gear icon upgrade** — replaced the janky star-gear SVG with a proper settings icon.
 
+## Recently Shipped by Claude (2026-04-08, batch 3)
+
+- **Voice input** — microphone capture via `cpal`, WAV encoding via `hound`, transcription via Groq Whisper API (`whisper-large-v3`). Three commands: `voice_start_recording`, `voice_stop_recording`, `voice_transcribe(audio_base64)`. (`voice.rs`)
+- **Screen capture** — full screen or region capture via `xcap`, returns base64 PNG. Two commands: `capture_screen`, `capture_screen_region(x, y, width, height)`. (`screen.rs`)
+
+## New Commands for UI (Voice + Screen)
+
+| Command | What it does | Notes |
+|---------|-------------|-------|
+| `voice_start_recording()` | Start mic recording | Non-blocking, runs in background thread |
+| `voice_stop_recording()` | Stop and return base64 WAV | Returns the audio data |
+| `voice_transcribe(audio_base64)` | Send to Groq Whisper → text | Needs Groq key (uses provider key if on Groq) |
+| `capture_screen()` | Full screenshot → base64 PNG | Primary monitor |
+| `capture_screen_region(x, y, w, h)` | Region screenshot → base64 PNG | Crop from primary monitor |
+
+## How to Wire Voice (Artemis)
+
+1. Add a mic button in InputBar (hold-to-record or toggle)
+2. On press: `invoke("voice_start_recording")`
+3. On release: `const wav = await invoke("voice_stop_recording")`
+4. Transcribe: `const text = await invoke("voice_transcribe", { audioBase64: wav })`
+5. Put `text` into the input field or send directly
+
+## How to Wire Screen (Artemis)
+
+1. Add a "screenshot" button or keyboard shortcut
+2. `const png = await invoke("capture_screen")`
+3. Send as a message with the image: the provider needs to receive it as a vision message. For now, send the base64 to the chat with a prefix like `[screenshot attached]` and include it in the provider call. (Backend vision support in providers is next if needed — tell Claude.)
+4. Or: auto-capture when user asks "what's on my screen?"
+
 ## Open UI/UX Work (Artemis)
 
+- **Voice button** in InputBar — hold to record, release to transcribe + send
+- **Screenshot button** — capture screen + send to AI
 - Request trace viewer in diagnostics (backend has `get_recent_traces()`)
 - Conversation search / filter in sidebar
