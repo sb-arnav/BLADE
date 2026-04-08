@@ -59,6 +59,9 @@ pub fn run() {
             discovery::run_discovery,
             discovery::discover_mcp_servers,
             permissions::classify_mcp_tool,
+            permissions::set_tool_trust,
+            permissions::reset_tool_trust,
+            permissions::get_tool_overrides,
         ])
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
