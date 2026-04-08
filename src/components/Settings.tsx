@@ -3,6 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { BladeConfig } from "../types";
 import { McpSettings } from "./McpSettings";
 
+type SettingsTab = "provider" | "memory" | "mcp" | "about";
+
 const PROVIDER_MATRIX = [
   {
     id: "gemini",
@@ -43,7 +45,15 @@ interface Props {
   onConfigRefresh: () => Promise<void>;
 }
 
+const TABS: { id: SettingsTab; label: string }[] = [
+  { id: "provider", label: "Provider" },
+  { id: "memory", label: "Memory" },
+  { id: "mcp", label: "MCP" },
+  { id: "about", label: "About" },
+];
+
 export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
+  const [tab, setTab] = useState<SettingsTab>("provider");
   const [provider, setProvider] = useState(config.provider);
   const [apiKey, setApiKey] = useState(config.api_key);
   const [model, setModel] = useState(config.model);
@@ -129,10 +139,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
     <div className="h-full overflow-y-auto px-4 py-4">
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold">Settings</h1>
-            <p className="text-sm text-blade-muted">Provider, model, API key, and MCP servers.</p>
-          </div>
+          <h1 className="text-lg font-semibold">Settings</h1>
           <button
             onClick={onBack}
             className="text-sm text-blade-muted hover:text-blade-text transition-colors"
@@ -140,7 +147,23 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             back
           </button>
         </div>
+        <div className="flex items-center gap-1 border-b border-blade-border pb-0">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-3 py-1.5 text-xs rounded-t-lg transition-colors -mb-px ${
+                tab === t.id
+                  ? "text-blade-text bg-blade-surface border border-blade-border border-b-blade-surface"
+                  : "text-blade-muted hover:text-blade-secondary"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
+        {tab === "provider" && <>
         <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <label className="space-y-2">
@@ -251,7 +274,9 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             })}
           </div>
         </section>
+        </>}
 
+        {tab === "memory" && <>
         <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
           <div>
             <h2 className="text-base font-semibold">Blade Memory</h2>
@@ -294,7 +319,9 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             </p>
           </div>
         </section>
+        </>}
 
+        {tab === "about" && <>
         <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
           <div>
             <h2 className="text-base font-semibold">Diagnostics</h2>
@@ -319,12 +346,15 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             </div>
           </div>
         </section>
+        </>}
 
+        {tab === "mcp" && <>
         <McpSettings
           onServersChanged={async () => {
             await onConfigRefresh();
           }}
         />
+        </>}
       </div>
     </div>
   );
