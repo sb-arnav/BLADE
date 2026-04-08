@@ -163,7 +163,28 @@ pub async fn stream_text(
         model, api_key
     );
 
-    let body = build_body(messages, &[]);
+    // Simple body without tool declarations for streaming
+    let system = messages.iter().find_map(|m| match m {
+        super::ConversationMessage::System(c) => Some(serde_json::json!({"parts": [{"text": c}]})),
+        _ => None,
+    });
+    let contents: Vec<serde_json::Value> = messages.iter().filter_map(|m| match m {
+        super::ConversationMessage::System(_) => None,
+        super::ConversationMessage::User(c) => Some(serde_json::json!({"role": "user", "parts": [{"text": c}]})),
+        super::ConversationMessage::UserWithImage { text, image_base64 } => Some(serde_json::json!({
+            "role": "user", "parts": [{"text": text}, {"inlineData": {"mimeType": "image/png", "data": image_base64}}]
+        })),
+        super::ConversationMessage::Assistant { content, .. } => {
+            if content.is_empty() { return None; }
+            Some(serde_json::json!({"role": "model", "parts": [{"text": content}]}))
+        },
+        super::ConversationMessage::Tool { .. } => None,
+    }).collect();
+
+    let mut body = serde_json::json!({"contents": contents});
+    if let Some(sys) = system {
+        body["systemInstruction"] = sys;
+    }
 
     let response = client
         .post(&url)

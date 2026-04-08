@@ -151,6 +151,25 @@ pub async fn complete(
     })
 }
 
+fn serialize_simple(message: &ConversationMessage) -> Option<serde_json::Value> {
+    match message {
+        ConversationMessage::System(_) => None,
+        ConversationMessage::User(c) => Some(serde_json::json!({"role": "user", "content": c})),
+        ConversationMessage::UserWithImage { text, image_base64 } => Some(serde_json::json!({
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": image_base64}},
+                {"type": "text", "text": text},
+            ],
+        })),
+        ConversationMessage::Assistant { content, .. } => {
+            if content.is_empty() { return None; }
+            Some(serde_json::json!({"role": "assistant", "content": content}))
+        },
+        ConversationMessage::Tool { .. } => None,
+    }
+}
+
 pub async fn stream_text(
     app: &tauri::AppHandle,
     api_key: &str,
@@ -165,7 +184,7 @@ pub async fn stream_text(
         ConversationMessage::System(c) => Some(c.clone()),
         _ => None,
     });
-    let msgs: Vec<serde_json::Value> = messages.iter().filter_map(serialize_message).collect();
+    let msgs: Vec<serde_json::Value> = messages.iter().filter_map(serialize_simple).collect();
 
     let mut body = serde_json::json!({
         "model": model,
