@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "Bash(git rebase:*)",
+      "Bash(git checkout:*)",
+      "Bash(git restore:*)",
+      "Bash(npm install:*)",
+      "Bash(powershell -Command 'Remove-Item -Recurse -Force \"$env:APPDATA\\\\blade\" -ErrorAction SilentlyContinue; echo \"Config deleted\"')",
+      "Bash(npm run:*)",
+      "Bash(powershell -Command 'if \\(Test-Path \"\"$env:APPDATA\\\\blade\\\\config.json\"\"\\) { Get-Content \"\"$env:APPDATA\\\\blade\\\\config.json\"\" } else { echo \"\"No config yet\"\" }')",
+      "Bash(powershell -Command 'if \\(Test-Path \"\"$env:APPDATA\\\\blade\\\\config.json\"\"\\) { Get-Content \"\"$env:APPDATA\\\\blade\\\\config.json\"\" } else { echo \"\"No config yet\"\" }; echo \"\"---\"\"; Get-Process -Name blade -ErrorAction SilentlyContinue | Select-Object Id')",
+      "Bash(cargo check:*)",
+      "Bash(find /c/Users/arnav/Documents/blade -name tailwind.config.* -o -name tsconfig.json)",
+      "Bash(npm list:*)",
+      "Bash(npm audit:*)",
+      "Bash(grep -E \"\\\\.\\(json|toml|yml\\)$\")",
+      "Bash(for f:*)",
+      "Bash(do test:*)",
+      "Bash(echo \"$f: done\")",
+      "Bash(echo \"$f: pending\")",
+      "Bash(done)",
+      "Bash(find src/ -name \"*.ts\" -o -name \"*.tsx\" -exec cat {} +)"
+    ]
+  }
+}

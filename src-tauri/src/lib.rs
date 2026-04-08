@@ -2,6 +2,8 @@ mod brain;
 mod clipboard;
 mod commands;
 mod config;
+mod crypto;
+mod db;
 mod discovery;
 mod history;
 mod mcp;
@@ -17,9 +19,11 @@ use std::sync::Arc;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Manager, PhysicalPosition, PhysicalSize, Position, Size, WindowEvent,
+    Manager, WindowEvent,
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
+use tauri_plugin_autostart::MacosLauncher;
+use tauri_plugin_log::{Target, TargetKind};
 
 fn toggle_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -40,10 +44,39 @@ pub fn run() {
         Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
     let setup_manager = mcp_manager.clone();
 
+    // Initialize database
+    let db_conn = db::init_db().expect("Failed to initialize database");
+    let shared_db = Arc::new(std::sync::Mutex::new(db_conn));
+
     tauri::Builder::default()
+        // --- Plugins ---
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_sql::Builder::new().build())
+        .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--hidden"])))
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            // Focus existing window when second instance launched
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
+        .plugin(tauri_plugin_window_state::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_log::Builder::new()
+            .targets([
+                Target::new(TargetKind::Stdout),
+                Target::new(TargetKind::LogDir { file_name: Some("blade".into()) }),
+            ])
+            .build())
+        // --- State ---
         .manage(mcp_manager)
         .manage(approval_map)
+        .manage(shared_db)
         .invoke_handler(tauri::generate_handler![
             commands::send_message_stream,
             commands::get_config,
