@@ -18,6 +18,7 @@ mod memory;
 mod permissions;
 mod router;
 mod providers;
+mod rag;
 mod screen;
 mod trace;
 mod tray;
@@ -165,6 +166,9 @@ pub fn run() {
             embeddings::embed_and_store,
             embeddings::semantic_search,
             embeddings::vector_store_size,
+            rag::rag_ingest_file,
+            rag::rag_ingest_directory,
+            rag::rag_query,
             files::file_read,
             files::file_write,
             files::file_list,
