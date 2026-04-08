@@ -3,7 +3,7 @@ use futures::StreamExt;
 use reqwest::Client;
 use tauri::{AppHandle, Emitter};
 
-fn build_contents(messages: &[ChatMessage]) -> serde_json::Value {
+fn build_contents(messages: &[ChatMessage], system_prompt: Option<&str>) -> serde_json::Value {
     let contents: Vec<serde_json::Value> = messages
         .iter()
         .map(|m| {
@@ -13,7 +13,16 @@ fn build_contents(messages: &[ChatMessage]) -> serde_json::Value {
             })
         })
         .collect();
-    serde_json::json!({ "contents": contents })
+
+    let mut body = serde_json::json!({ "contents": contents });
+
+    if let Some(sys) = system_prompt {
+        body["systemInstruction"] = serde_json::json!({
+            "parts": [{"text": sys}]
+        });
+    }
+
+    body
 }
 
 pub async fn stream(
@@ -21,6 +30,7 @@ pub async fn stream(
     api_key: &str,
     model: &str,
     messages: Vec<ChatMessage>,
+    system_prompt: Option<&str>,
 ) -> Result<(), String> {
     let client = Client::new();
     let url = format!(
@@ -28,7 +38,7 @@ pub async fn stream(
         model, api_key
     );
 
-    let body = build_contents(&messages);
+    let body = build_contents(&messages, system_prompt);
 
     let response = client
         .post(&url)

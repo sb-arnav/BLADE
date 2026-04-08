@@ -7,18 +7,19 @@ pub async fn stream(
     app: &AppHandle,
     model: &str,
     messages: Vec<ChatMessage>,
+    system_prompt: Option<&str>,
 ) -> Result<(), String> {
     let client = Client::new();
 
-    let msgs: Vec<serde_json::Value> = messages
-        .iter()
-        .map(|m| {
-            serde_json::json!({
-                "role": &m.role,
-                "content": &m.content
-            })
-        })
-        .collect();
+    let mut msgs: Vec<serde_json::Value> = Vec::new();
+
+    if let Some(sys) = system_prompt {
+        msgs.push(serde_json::json!({"role": "system", "content": sys}));
+    }
+
+    for m in &messages {
+        msgs.push(serde_json::json!({"role": &m.role, "content": &m.content}));
+    }
 
     let body = serde_json::json!({
         "model": model,
