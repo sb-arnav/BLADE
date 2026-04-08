@@ -5,6 +5,7 @@ mod config;
 mod discovery;
 mod history;
 mod mcp;
+mod permissions;
 mod providers;
 
 use std::sync::Arc;
@@ -56,6 +57,7 @@ pub fn run() {
             clipboard::get_clipboard,
             clipboard::set_clipboard,
             discovery::run_discovery,
+            permissions::classify_mcp_tool,
         ])
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {

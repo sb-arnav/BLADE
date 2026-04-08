@@ -2,6 +2,12 @@
 
 Reviewed on 2026-04-08 UTC while provider/tool-call work was in progress.
 
+## Active Split
+
+- Claude: provider adapters, tool-call correctness, provider-specific streaming/tool-use edge cases, request tracing inside provider clients.
+- Codex: settings/productivity surface, security hardening outside provider adapters, persona/context UX, approval-model foundations, and repo-local documentation.
+- Shared caution: avoid editing the same provider files in parallel unless re-synced first.
+
 ## Highest Priority
 
 - Move provider API keys out of `config.json` into OS-backed secure storage. Current local file permissions help, but plaintext config is still the biggest avoidable secret risk.
@@ -13,6 +19,8 @@ Reviewed on 2026-04-08 UTC while provider/tool-call work was in progress.
 ## Security
 
 - Keep Tauri capabilities least-privilege. Remove broad permissions the webview does not need and scope future permissions to exact windows/commands.
+- Prefer Tauri `stronghold` for secret storage rather than extending plaintext config. Research direction: secure storage should be the next backend security slice.
+- Use Tauri dialog/confirmation flows for destructive tool approvals instead of hand-rolled prompt parsing.
 - Validate MCP server registration before saving. At minimum: show exact binary path and args, warn on relative paths, and consider a trust prompt for first run.
 - Add timeouts, output truncation, and size caps for MCP tool results before they hit the chat UI or get fed back to the model.
 - Treat markdown as untrusted content. Keep `react-markdown` in safe mode, avoid raw HTML, and be careful with custom URL handling or future plugins.
@@ -31,3 +39,4 @@ Reviewed on 2026-04-08 UTC while provider/tool-call work was in progress.
 - Expose persona/context editing in the UI since the backend already has a brain module.
 - Add background jobs for long-running MCP actions so the main chat loop stays responsive.
 - Add a searchable command palette for conversations, settings, and tools.
+- Show a small “diagnostics” block in settings with provider name, model, conversation mode, and request tracing status.

@@ -1,5 +1,6 @@
 use crate::brain;
 use crate::config::{load_config, save_config, BladeConfig, SavedMcpServerConfig};
+use crate::permissions;
 use crate::history::{
     list_conversations, load_conversation, save_conversation, ConversationSummary, HistoryMessage,
     StoredConversation,
@@ -80,12 +81,47 @@ pub async fn send_message_stream(
         }
 
         for tool_call in turn.tool_calls {
+            // Check tool risk level
+            let tool_desc = {
+                let manager = state.lock().await;
+                manager
+                    .get_tools()
+                    .iter()
+                    .find(|t| t.qualified_name == tool_call.name)
+                    .map(|t| t.description.clone())
+                    .unwrap_or_default()
+            };
+
+            let risk = permissions::classify_tool(&tool_call.name, &tool_desc);
+
+            if risk == permissions::ToolRisk::Blocked {
+                conversation.push(ConversationMessage::Tool {
+                    tool_call_id: tool_call.id,
+                    tool_name: tool_call.name,
+                    content: "Tool blocked by safety policy.".to_string(),
+                    is_error: true,
+                });
+                continue;
+            }
+
+            // Emit tool execution event (for UI audit trail)
+            let _ = app.emit("tool_executing", serde_json::json!({
+                "name": &tool_call.name,
+                "arguments": &tool_call.arguments,
+                "risk": format!("{:?}", risk),
+            }));
+
             let tool_result = {
                 let mut manager = state.lock().await;
                 manager
                     .call_tool(&tool_call.name, tool_call.arguments.clone())
                     .await?
             };
+
+            let _ = app.emit("tool_completed", serde_json::json!({
+                "name": &tool_call.name,
+                "is_error": tool_result.is_error,
+            }));
 
             conversation.push(ConversationMessage::Tool {
                 tool_call_id: tool_call.id,
