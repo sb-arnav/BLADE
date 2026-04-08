@@ -16,6 +16,7 @@ mod history;
 mod mcp;
 mod memory;
 mod permissions;
+mod plugins;
 mod router;
 mod providers;
 mod rag;
@@ -166,6 +167,11 @@ pub fn run() {
             embeddings::embed_and_store,
             embeddings::semantic_search,
             embeddings::vector_store_size,
+            plugins::registry::plugin_list,
+            plugins::registry::plugin_install,
+            plugins::registry::plugin_uninstall,
+            plugins::registry::plugin_toggle,
+            plugins::registry::plugin_get_commands,
             rag::rag_ingest_file,
             rag::rag_ingest_directory,
             rag::rag_query,
