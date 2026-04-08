@@ -1,3 +1,4 @@
+mod brain;
 mod commands;
 mod config;
 mod mcp;
@@ -38,6 +39,10 @@ pub fn run() {
             commands::mcp_discover_tools,
             commands::mcp_call_tool,
             commands::mcp_get_tools,
+            brain::get_persona,
+            brain::set_persona,
+            brain::get_context,
+            brain::set_context,
         ])
         .setup(|app| {
             // Register Alt+Space global hotkey

@@ -3,7 +3,7 @@ use futures::StreamExt;
 use reqwest::Client;
 use tauri::{AppHandle, Emitter};
 
-fn build_body(model: &str, messages: &[ChatMessage]) -> serde_json::Value {
+fn build_body(model: &str, messages: &[ChatMessage], system_prompt: Option<&str>) -> serde_json::Value {
     let msgs: Vec<serde_json::Value> = messages
         .iter()
         .map(|m| {
@@ -14,12 +14,18 @@ fn build_body(model: &str, messages: &[ChatMessage]) -> serde_json::Value {
         })
         .collect();
 
-    serde_json::json!({
+    let mut body = serde_json::json!({
         "model": model,
         "max_tokens": 4096,
         "messages": msgs,
         "stream": true
-    })
+    });
+
+    if let Some(sys) = system_prompt {
+        body["system"] = serde_json::json!(sys);
+    }
+
+    body
 }
 
 pub async fn stream(
@@ -27,9 +33,10 @@ pub async fn stream(
     api_key: &str,
     model: &str,
     messages: Vec<ChatMessage>,
+    system_prompt: Option<&str>,
 ) -> Result<(), String> {
     let client = Client::new();
-    let body = build_body(model, &messages);
+    let body = build_body(model, &messages, system_prompt);
 
     let response = client
         .post("https://api.anthropic.com/v1/messages")

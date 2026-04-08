@@ -14,20 +14,21 @@ pub struct ChatMessage {
 }
 
 /// Stream a chat response, emitting "chat_token" events for each chunk
-/// and "chat_done" when complete.
+/// and "chat_done" when complete. Injects system prompt automatically.
 pub async fn stream_chat(
     app: &AppHandle,
     provider: &str,
     api_key: &str,
     model: &str,
     messages: Vec<ChatMessage>,
+    system_prompt: Option<String>,
 ) -> Result<(), String> {
     match provider {
-        "gemini" => gemini::stream(app, api_key, model, messages).await,
-        "groq" => groq::stream(app, api_key, model, messages).await,
-        "openai" => openai::stream(app, api_key, model, messages).await,
-        "anthropic" => anthropic::stream(app, api_key, model, messages).await,
-        "ollama" => ollama::stream(app, model, messages).await,
+        "gemini" => gemini::stream(app, api_key, model, messages, system_prompt.as_deref()).await,
+        "groq" => groq::stream(app, api_key, model, messages, system_prompt.as_deref()).await,
+        "openai" => openai::stream(app, api_key, model, messages, system_prompt.as_deref()).await,
+        "anthropic" => anthropic::stream(app, api_key, model, messages, system_prompt.as_deref()).await,
+        "ollama" => ollama::stream(app, model, messages, system_prompt.as_deref()).await,
         _ => Err(format!("Unknown provider: {}", provider)),
     }
 }

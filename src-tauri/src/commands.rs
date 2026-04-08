@@ -1,3 +1,4 @@
+use crate::brain;
 use crate::config::{load_config, save_config, BladeConfig};
 use crate::mcp::{McpManager, McpServerConfig, McpTool, McpToolResult};
 use crate::providers::{self, ChatMessage};
@@ -9,6 +10,7 @@ pub type SharedMcpManager = Arc<Mutex<McpManager>>;
 #[tauri::command]
 pub async fn send_message_stream(
     app: tauri::AppHandle,
+    state: tauri::State<'_, SharedMcpManager>,
     messages: Vec<ChatMessage>,
 ) -> Result<(), String> {
     let config = load_config();
@@ -16,7 +18,21 @@ pub async fn send_message_stream(
         return Err("No API key configured. Go to settings.".to_string());
     }
 
-    providers::stream_chat(&app, &config.provider, &config.api_key, &config.model, messages).await
+    // Build system prompt with Blade personality + available MCP tools
+    let manager = state.lock().await;
+    let tools = manager.get_tools();
+    let system_prompt = brain::build_system_prompt(tools);
+    drop(manager);
+
+    providers::stream_chat(
+        &app,
+        &config.provider,
+        &config.api_key,
+        &config.model,
+        messages,
+        Some(system_prompt),
+    )
+    .await
 }
 
 #[tauri::command]
