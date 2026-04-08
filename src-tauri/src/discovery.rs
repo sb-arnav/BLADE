@@ -402,6 +402,154 @@ fn discover_claude_memories(home: &Path) -> Vec<String> {
     memories
 }
 
+/// Import MCP server configs from Claude Code settings
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportedMcpServer {
+    pub name: String,
+    pub command: String,
+    pub args: Vec<String>,
+    pub env: HashMap<String, String>,
+    pub source: String,
+}
+
+#[tauri::command]
+pub fn discover_mcp_servers() -> Vec<ImportedMcpServer> {
+    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+    let mut servers = Vec::new();
+
+    // Claude Code settings locations
+    let settings_paths = vec![
+        home.join(".claude").join("settings.json"),
+        home.join(".claude.json"),
+    ];
+
+    // Also check project-level configs
+    let claude_projects = home.join(".claude").join("projects");
+    if claude_projects.exists() {
+        if let Ok(entries) = fs::read_dir(&claude_projects) {
+            for entry in entries.flatten() {
+                let project_settings = entry.path().join("settings.json");
+                if project_settings.exists() {
+                    parse_claude_mcp_config(&project_settings, "claude-code-project", &mut servers);
+                }
+            }
+        }
+    }
+
+    for path in settings_paths {
+        if path.exists() {
+            parse_claude_mcp_config(&path, "claude-code", &mut servers);
+        }
+    }
+
+    // Codex CLI config
+    let codex_config = home.join(".codex").join("config.json");
+    if codex_config.exists() {
+        parse_codex_mcp_config(&codex_config, &mut servers);
+    }
+
+    // Deduplicate by name
+    let mut seen = std::collections::HashSet::new();
+    servers.retain(|s| seen.insert(s.name.clone()));
+
+    servers
+}
+
+fn parse_claude_mcp_config(path: &Path, source: &str, servers: &mut Vec<ImportedMcpServer>) {
+    let content = match fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+
+    let json: serde_json::Value = match serde_json::from_str(&content) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+
+    let mcp_servers = match json.get("mcpServers").and_then(|v| v.as_object()) {
+        Some(obj) => obj,
+        None => return,
+    };
+
+    for (name, config) in mcp_servers {
+        let command = config["command"].as_str().unwrap_or_default().to_string();
+        if command.is_empty() {
+            continue;
+        }
+
+        let args: Vec<String> = config["args"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let env: HashMap<String, String> = config["env"]
+            .as_object()
+            .map(|obj| {
+                obj.iter()
+                    .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        servers.push(ImportedMcpServer {
+            name: name.clone(),
+            command,
+            args,
+            env,
+            source: source.to_string(),
+        });
+    }
+}
+
+fn parse_codex_mcp_config(path: &Path, servers: &mut Vec<ImportedMcpServer>) {
+    let content = match fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+
+    let json: serde_json::Value = match serde_json::from_str(&content) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+
+    // Codex uses "mcp_servers" or "mcpServers"
+    let mcp_key = if json.get("mcp_servers").is_some() {
+        "mcp_servers"
+    } else {
+        "mcpServers"
+    };
+
+    if let Some(obj) = json.get(mcp_key).and_then(|v| v.as_object()) {
+        for (name, config) in obj {
+            let command = config["command"].as_str().unwrap_or_default().to_string();
+            if command.is_empty() {
+                continue;
+            }
+
+            let args: Vec<String> = config["args"]
+                .as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            servers.push(ImportedMcpServer {
+                name: name.clone(),
+                command,
+                args,
+                env: HashMap::new(),
+                source: "codex-cli".to_string(),
+            });
+        }
+    }
+}
+
 fn strip_frontmatter(content: &str) -> String {
     let trimmed = content.trim();
     if trimmed.starts_with("---") {

@@ -57,6 +57,7 @@ pub fn run() {
             clipboard::get_clipboard,
             clipboard::set_clipboard,
             discovery::run_discovery,
+            discovery::discover_mcp_servers,
             permissions::classify_mcp_tool,
         ])
         .setup(|app| {
