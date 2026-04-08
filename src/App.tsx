@@ -2,24 +2,31 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ChatWindow } from "./components/ChatWindow";
 import { Onboarding } from "./components/Onboarding";
+import { Settings } from "./components/Settings";
+import { TitleBar } from "./components/TitleBar";
+import { useChat } from "./hooks/useChat";
+import { BladeConfig } from "./types";
 
-interface Config {
-  provider: string;
-  api_key: string;
-  model: string;
-  onboarded: boolean;
-}
+type Route = "chat" | "settings";
 
 export default function App() {
-  const [config, setConfig] = useState<Config | null>(null);
+  const [config, setConfig] = useState<BladeConfig | null>(null);
   const [loading, setLoading] = useState(true);
+  const [route, setRoute] = useState<Route>("chat");
+  const chat = useChat();
 
   const loadConfig = async () => {
     try {
-      const cfg = await invoke<Config>("get_config");
+      const cfg = await invoke<BladeConfig>("get_config");
       setConfig(cfg);
     } catch {
-      setConfig({ provider: "", api_key: "", model: "", onboarded: false });
+      setConfig({
+        provider: "",
+        api_key: "",
+        model: "",
+        onboarded: false,
+        mcp_servers: [],
+      });
     }
     setLoading(false);
   };
@@ -37,8 +44,43 @@ export default function App() {
   }
 
   if (!config?.onboarded) {
-    return <Onboarding onComplete={loadConfig} />;
+    return (
+      <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
+        <TitleBar />
+        <Onboarding onComplete={loadConfig} />
+      </div>
+    );
   }
 
-  return <ChatWindow />;
+  return (
+    <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
+      <TitleBar />
+      <div className="flex-1 min-h-0">
+        {route === "settings" ? (
+          <Settings
+            config={config}
+            onBack={() => setRoute("chat")}
+            onSaved={(nextConfig) => {
+              setConfig(nextConfig);
+              setRoute("chat");
+            }}
+            onConfigRefresh={loadConfig}
+          />
+        ) : (
+          <ChatWindow
+            messages={chat.messages}
+            loading={chat.loading}
+            error={chat.error}
+            conversations={chat.conversations}
+            currentConversationId={chat.currentConversationId}
+            onSend={chat.sendMessage}
+            onClear={chat.clearMessages}
+            onNewConversation={chat.newConversation}
+            onSwitchConversation={chat.switchConversation}
+            onOpenSettings={() => setRoute("settings")}
+          />
+        )}
+      </div>
+    </div>
+  );
 }

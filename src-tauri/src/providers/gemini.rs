@@ -41,7 +41,10 @@ fn serialize_message(message: &ConversationMessage) -> Option<serde_json::Value>
             "role": "user",
             "parts": [{"text": content}],
         })),
-        ConversationMessage::Assistant { content, tool_calls } => {
+        ConversationMessage::Assistant {
+            content,
+            tool_calls,
+        } => {
             let mut parts = Vec::new();
             if !content.is_empty() {
                 parts.push(serde_json::json!({ "text": content }));
@@ -132,7 +135,10 @@ pub async fn complete(
         }
     }
 
-    Ok(AssistantTurn { content, tool_calls })
+    Ok(AssistantTurn {
+        content,
+        tool_calls,
+    })
 }
 
 pub async fn test(api_key: &str, model: &str) -> Result<String, String> {

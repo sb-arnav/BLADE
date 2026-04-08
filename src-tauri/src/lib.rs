@@ -2,6 +2,7 @@ mod brain;
 mod clipboard;
 mod commands;
 mod config;
+mod discovery;
 mod history;
 mod mcp;
 mod providers;
@@ -55,6 +56,7 @@ pub fn run() {
             brain::set_context,
             clipboard::get_clipboard,
             clipboard::set_clipboard,
+            discovery::run_discovery,
         ])
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {

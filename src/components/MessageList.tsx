@@ -1,5 +1,7 @@
 import { Message } from "../types";
 import { useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface Props {
   messages: Message[];
@@ -26,13 +28,15 @@ export function MessageList({ messages, loading }: Props) {
           className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
         >
           <div
-            className={`max-w-[80%] rounded-xl px-4 py-2.5 text-sm leading-relaxed ${
+            className={`max-w-[85%] rounded-xl px-4 py-2.5 text-sm leading-relaxed ${
               msg.role === "user"
                 ? "bg-blade-accent text-white"
                 : "bg-blade-surface text-blade-text border border-blade-border"
             }`}
           >
-            <pre className="whitespace-pre-wrap font-sans">{msg.content}</pre>
+            <div className={`message-markdown ${msg.role === "user" ? "message-markdown-user" : ""}`}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+            </div>
           </div>
         </div>
       ))}

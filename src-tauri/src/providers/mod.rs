@@ -91,11 +91,7 @@ pub async fn complete_turn(
     }
 }
 
-pub async fn test_connection(
-    provider: &str,
-    api_key: &str,
-    model: &str,
-) -> Result<String, String> {
+pub async fn test_connection(provider: &str, api_key: &str, model: &str) -> Result<String, String> {
     match provider {
         "gemini" => gemini::test(api_key, model).await,
         "groq" => groq::test(api_key, model).await,

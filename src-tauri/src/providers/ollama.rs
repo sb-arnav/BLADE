@@ -1,7 +1,10 @@
 use super::{AssistantTurn, ConversationMessage};
 use reqwest::Client;
 
-pub async fn complete(model: &str, messages: &[ConversationMessage]) -> Result<AssistantTurn, String> {
+pub async fn complete(
+    model: &str,
+    messages: &[ConversationMessage],
+) -> Result<AssistantTurn, String> {
     let client = Client::new();
 
     let msgs: Vec<serde_json::Value> = messages

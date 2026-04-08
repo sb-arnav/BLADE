@@ -21,7 +21,7 @@ const PROVIDERS = [
   {
     id: "openai",
     name: "OpenAI",
-    description: "GPT-4o · Bring your key",
+    description: "GPT-4o mini · Bring your key",
     model: "gpt-4o-mini",
     needsKey: true,
     keyUrl: "https://platform.openai.com/api-keys",
@@ -82,9 +82,8 @@ export function Onboarding({ onComplete }: Props) {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-blade-bg text-blade-text p-6">
-      <div className="flex-1 flex flex-col justify-center max-w-md mx-auto w-full">
-        {/* Header */}
+    <div className="flex-1 flex flex-col justify-center bg-blade-bg text-blade-text p-6">
+      <div className="max-w-md mx-auto w-full">
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-3 h-3 rounded-full bg-blade-accent" />
@@ -97,33 +96,31 @@ export function Onboarding({ onComplete }: Props) {
           </p>
         </div>
 
-        {/* Provider picker */}
         {step === "pick" && (
           <div className="space-y-2">
-            {PROVIDERS.map((p) => (
+            {PROVIDERS.map((provider) => (
               <button
-                key={p.id}
+                key={provider.id}
                 onClick={() => {
-                  setSelected(p);
-                  setStep(p.needsKey ? "key" : "testing");
-                  if (!p.needsKey) {
+                  setSelected(provider);
+                  setStep(provider.needsKey ? "key" : "testing");
+                  if (!provider.needsKey) {
                     setTimeout(() => handleTest(), 0);
                   }
                 }}
                 className={`w-full text-left px-4 py-3 rounded-xl border transition-colors ${
-                  selected.id === p.id
+                  selected.id === provider.id
                     ? "border-blade-accent bg-blade-surface"
                     : "border-blade-border hover:border-blade-muted"
                 }`}
               >
-                <div className="text-sm font-medium">{p.name}</div>
-                <div className="text-xs text-blade-muted">{p.description}</div>
+                <div className="text-sm font-medium">{provider.name}</div>
+                <div className="text-xs text-blade-muted">{provider.description}</div>
               </button>
             ))}
           </div>
         )}
 
-        {/* API key input */}
         {step === "key" && (
           <div className="space-y-4">
             <div>
@@ -141,7 +138,7 @@ export function Onboarding({ onComplete }: Props) {
                 rel="noreferrer"
                 className="text-xs text-blade-accent hover:underline mt-2 inline-block"
               >
-                Get a free {selected.name} key →
+                Get a free {selected.name} key
               </a>
             </div>
             <div className="flex gap-2">
@@ -162,7 +159,6 @@ export function Onboarding({ onComplete }: Props) {
           </div>
         )}
 
-        {/* Testing */}
         {step === "testing" && (
           <div className="space-y-4">
             {!testResult && !testError && (
