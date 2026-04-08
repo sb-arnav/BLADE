@@ -5,6 +5,16 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "global-shortcut:default"
+    "global-shortcut:default",
+    "sql:default",
+    "store:default",
+    "notification:default",
+    "autostart:default",
+    "window-state:default",
+    "process:default",
+    "dialog:default",
+    "fs:default",
+    "os:default",
+    "log:default"
   ]
 }
