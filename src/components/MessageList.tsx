@@ -1,6 +1,7 @@
 import { Message, ToolExecution } from "../types";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import TypingIndicator from "./TypingIndicator";
 import remarkGfm from "remark-gfm";
 import hljs from "highlight.js/lib/core";
 import typescript from "highlight.js/lib/languages/typescript";
@@ -310,10 +311,8 @@ export function MessageList({ messages, loading, toolExecutions, onQuickAction }
         )}
 
         {loading && activeTools.length === 0 && recentCompleted.length === 0 && (
-          <div className="flex justify-start animate-fade-in">
-            <div className="pl-3 border-l-2 border-blade-accent/30">
-              <span className="typing-cursor text-blade-accent text-sm">\u258C</span>
-            </div>
+          <div className="flex justify-start">
+            <TypingIndicator visible />
           </div>
         )}
         <div ref={bottomRef} />

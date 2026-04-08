@@ -103,6 +103,13 @@ export function useChat() {
       streamBuffer.current = "";
       setLoading(false);
       setToolExecutions([]);
+
+      // Auto-learn from conversation after enough context (6+ messages)
+      const msgs = messagesRef.current;
+      if (msgs.length >= 6 && msgs.length % 6 === 0) {
+        const recent = msgs.slice(-6).map((m) => `${m.role}: ${m.content}`).join("\n");
+        invoke("learn_from_conversation", { conversation: recent }).catch(() => {});
+      }
     });
 
     const unlistenToolExecuting = listen<{ name: string; risk: string }>("tool_executing", (event) => {

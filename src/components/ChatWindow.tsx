@@ -26,6 +26,8 @@ interface Props {
   onRetry: () => void;
   provider?: string;
   model?: string;
+  streakDays?: number;
+  totalMessages?: number;
   ttsEnabled: boolean;
   ttsSpeaking: boolean;
   onToggleTTS: () => void;
@@ -65,6 +67,8 @@ export function ChatWindow({
   onRetry,
   provider,
   model,
+  streakDays,
+  totalMessages,
   ttsEnabled,
   ttsSpeaking,
   onToggleTTS,
@@ -162,7 +166,13 @@ export function ChatWindow({
             );
           })}
         </div>
-        <div className="border-t border-blade-border px-3 py-2">
+        <div className="border-t border-blade-border px-3 py-2 space-y-1">
+          {(streakDays || totalMessages) ? (
+            <div className="flex items-center gap-3 text-2xs text-blade-muted/50 py-0.5">
+              {streakDays ? <span>🔥 {streakDays}d streak</span> : null}
+              {totalMessages ? <span>{totalMessages} msgs</span> : null}
+            </div>
+          ) : null}
           <button
             onClick={() => { onOpenSettings(); toggleSidebar(false); }}
             className="flex items-center gap-2 text-xs text-blade-muted hover:text-blade-secondary transition-colors py-1 w-full"
