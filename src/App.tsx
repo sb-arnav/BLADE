@@ -9,6 +9,8 @@ import { TitleBar } from "./components/TitleBar";
 import { useChat } from "./hooks/useChat";
 import { useTTS } from "./hooks/useTTS";
 import { useKeyboard } from "./hooks/useKeyboard";
+import { useNotificationSound } from "./hooks/useNotificationSound";
+import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
 
 type Route = "chat" | "settings" | "discovery";
@@ -20,6 +22,7 @@ export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const chat = useChat();
   const tts = useTTS(chat.messages, chat.loading);
+  const sound = useNotificationSound(chat.loading);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const loadConfig = async () => {
@@ -74,6 +77,8 @@ export default function App() {
     { id: "clear", label: "Clear messages", action: () => chat.clearMessages() },
     { id: "screenshot", label: "Capture screen", action: handleScreenshot },
     { id: "tts", label: tts.enabled ? "Disable voice output" : "Enable voice output", action: tts.toggleEnabled },
+    { id: "sound", label: sound.enabled ? "Disable notification sound" : "Enable notification sound", action: sound.toggleEnabled },
+    { id: "export", label: "Export conversation to clipboard", action: () => copyConversation(chat.messages, chat.currentConversation?.title) },
     { id: "settings", label: "Open settings  Ctrl+,", action: () => setRoute("settings") },
     { id: "discovery", label: "Run discovery scan", action: () => setRoute("discovery") },
     { id: "chat", label: "Back to chat", action: () => setRoute("chat") },
@@ -145,6 +150,8 @@ export default function App() {
             onRespondApproval={chat.respondToApproval}
             onDeleteConversation={chat.deleteConversation}
             onRetry={chat.retryLastMessage}
+            provider={config?.provider}
+            model={config?.model}
             ttsEnabled={tts.enabled}
             ttsSpeaking={tts.speaking}
             onToggleTTS={tts.toggleEnabled}

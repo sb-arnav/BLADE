@@ -166,9 +166,12 @@ const MessageBubble = memo(function MessageBubble({ msg }: { msg: Message }) {
             </div>
           </div>
         )}
-        {hovered && !isUser && msg.content && (
-          <div className="absolute -bottom-4 left-3 opacity-0 group-hover:opacity-100 transition-opacity">
-            <CopyButton text={msg.content} label="copy" />
+        {hovered && (
+          <div className={`absolute -bottom-5 ${isUser ? "right-0" : "left-3"} flex items-center gap-2`}>
+            <span className="text-2xs text-blade-muted/50">
+              {new Date(msg.timestamp).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+            </span>
+            {!isUser && msg.content && <CopyButton text={msg.content} label="copy" />}
           </div>
         )}
       </div>
@@ -192,13 +195,29 @@ export function MessageList({ messages, loading, toolExecutions }: Props) {
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-2xl mx-auto px-6 py-6 space-y-6">
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
-            <div className="w-8 h-8 rounded-xl bg-blade-accent-muted flex items-center justify-center">
-              <div className="w-2.5 h-2.5 rounded-full bg-blade-accent" />
+          <div className="flex flex-col items-center justify-center min-h-[50vh] gap-5">
+            <div className="w-10 h-10 rounded-xl bg-blade-accent-muted flex items-center justify-center">
+              <div className="w-3 h-3 rounded-full bg-blade-accent" />
             </div>
             <div className="text-center">
               <p className="text-blade-secondary text-sm font-medium">Blade</p>
-              <p className="text-blade-muted text-xs mt-1">Ready when you are.</p>
+              <p className="text-blade-muted text-xs mt-1">Your personal AI. Ready when you are.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-2 max-w-xs">
+              {[
+                { icon: "🎤", label: "Voice input", hint: "Click mic" },
+                { icon: "📸", label: "Screen capture", hint: "Click camera" },
+                { icon: "⌨️", label: "Shortcuts", hint: "Ctrl+K" },
+                { icon: "🔊", label: "Voice output", hint: "Toggle TTS" },
+              ].map((f) => (
+                <div key={f.label} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blade-surface/50 border border-blade-border/50">
+                  <span className="text-xs">{f.icon}</span>
+                  <div>
+                    <p className="text-2xs text-blade-secondary">{f.label}</p>
+                    <p className="text-2xs text-blade-muted">{f.hint}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

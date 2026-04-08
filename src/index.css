@@ -205,6 +205,58 @@ body {
   color: #89ddff;
 }
 
+/* Tables */
+.message-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.6rem 0;
+  font-size: 0.8em;
+}
+
+.message-markdown th,
+.message-markdown td {
+  border: 1px solid #1c1c22;
+  padding: 0.4rem 0.65rem;
+  text-align: left;
+}
+
+.message-markdown th {
+  background: #0f0f12;
+  font-weight: 600;
+  color: #ececef;
+  font-size: 0.9em;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.message-markdown tr:nth-child(even) {
+  background: rgba(15, 15, 18, 0.5);
+}
+
+.message-markdown hr {
+  border: none;
+  border-top: 1px solid #1c1c22;
+  margin: 1rem 0;
+}
+
+/* Task lists */
+.message-markdown input[type="checkbox"] {
+  appearance: none;
+  width: 0.85em;
+  height: 0.85em;
+  border: 1.5px solid #52525b;
+  border-radius: 3px;
+  margin-right: 0.35em;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+
+.message-markdown input[type="checkbox"]:checked {
+  background: #6366f1;
+  border-color: #6366f1;
+}
+
 /* Typing cursor animation for loading */
 @keyframes blink {
   0%, 100% { opacity: 1; }

@@ -23,6 +23,8 @@ interface Props {
   onRespondApproval: (approved: boolean) => void;
   onDeleteConversation: (id: string) => void;
   onRetry: () => void;
+  provider?: string;
+  model?: string;
   ttsEnabled: boolean;
   ttsSpeaking: boolean;
   onToggleTTS: () => void;
@@ -60,6 +62,8 @@ export function ChatWindow({
   onRespondApproval,
   onDeleteConversation,
   onRetry,
+  provider,
+  model,
   ttsEnabled,
   ttsSpeaking,
   onToggleTTS,
@@ -181,6 +185,11 @@ export function ChatWindow({
             <span className="text-xs text-blade-secondary truncate">
               {conversations.find((c) => c.id === currentConversationId)?.title ?? "New conversation"}
             </span>
+            {provider && (
+              <span className="text-2xs text-blade-muted/60 bg-blade-surface px-1.5 py-0.5 rounded-md font-mono shrink-0">
+                {provider}{model ? ` · ${model.split("/").pop()?.split("-").slice(0, 2).join("-")}` : ""}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1">
             <button
