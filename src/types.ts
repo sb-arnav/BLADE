@@ -39,6 +39,16 @@ export interface McpTool {
   server_name: string;
 }
 
+export interface ToolExecution {
+  id: string;
+  tool_name: string;
+  status: "executing" | "completed";
+  started_at: number;
+  completed_at?: number;
+}
+
+export type ToolPermission = "Auto" | "Ask" | "Blocked";
+
 export interface DiscoveryReport {
   user_identity: {
     name: string | null;

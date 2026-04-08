@@ -47,6 +47,7 @@ pub fn run() {
             commands::mcp_get_tools,
             commands::mcp_get_servers,
             commands::mcp_remove_server,
+            commands::mcp_server_status,
             commands::history_list_conversations,
             commands::history_load_conversation,
             commands::history_save_conversation,
