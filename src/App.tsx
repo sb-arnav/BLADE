@@ -51,9 +51,19 @@ export default function App() {
 
   const closePalette = useCallback(() => setPaletteOpen(false), []);
 
+  const handleScreenshot = async () => {
+    try {
+      const png = await invoke<string>("capture_screen");
+      chat.sendMessage(`[screenshot attached]\n\ndata:image/png;base64,${png}`);
+    } catch {
+      // Screenshot failed
+    }
+  };
+
   const commands = [
     { id: "new", label: "New conversation", action: () => chat.newConversation() },
     { id: "clear", label: "Clear messages", action: () => chat.clearMessages() },
+    { id: "screenshot", label: "Capture screen", action: handleScreenshot },
     { id: "settings", label: "Open settings", action: () => setRoute("settings") },
     { id: "discovery", label: "Run discovery scan", action: () => setRoute("discovery") },
     { id: "chat", label: "Back to chat", action: () => setRoute("chat") },

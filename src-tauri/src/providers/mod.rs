@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 pub struct ChatMessage {
     pub role: String,
     pub content: String,
+    #[serde(default)]
+    pub image_base64: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -30,6 +32,10 @@ pub struct ToolCall {
 pub enum ConversationMessage {
     System(String),
     User(String),
+    UserWithImage {
+        text: String,
+        image_base64: String,
+    },
     Assistant {
         content: String,
         tool_calls: Vec<ToolCall>,
@@ -65,6 +71,11 @@ pub fn build_conversation(
             ConversationMessage::Assistant {
                 content: message.content,
                 tool_calls: Vec::new(),
+            }
+        } else if let Some(img) = message.image_base64 {
+            ConversationMessage::UserWithImage {
+                text: message.content,
+                image_base64: img,
             }
         } else {
             ConversationMessage::User(message.content)

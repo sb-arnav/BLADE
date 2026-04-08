@@ -47,6 +47,13 @@ fn serialize_message(message: &ConversationMessage) -> Option<serde_json::Value>
             "role": "user",
             "content": [{"type": "text", "text": content}],
         })),
+        ConversationMessage::UserWithImage { text, image_base64 } => Some(serde_json::json!({
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": image_base64}},
+                {"type": "text", "text": text},
+            ],
+        })),
         ConversationMessage::Assistant {
             content,
             tool_calls,
