@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 /**
  * Claude Managed Agents integration for Blade.
@@ -123,12 +124,38 @@ export function useManagedAgents() {
     abortRef.current = controller;
 
     try {
-      // Call Rust backend which spawns the Agent SDK process
-      const result = await invoke<{
-        sessionId: string;
-        messages: AgentMessage[];
-        costUsd: number;
-      }>("run_managed_agent", {
+      // Listen for streaming agent messages from Rust backend
+      const unlistenMsg = await listen<AgentMessage>("agent_message", (event) => {
+        setRuns((prev) =>
+          prev.map((r) =>
+            r.id === runId
+              ? { ...r, status: "running", messages: [...r.messages, event.payload] }
+              : r,
+          ),
+        );
+      });
+
+      const unlistenDone = await listen<{ sessionId: string; costUsd: number }>("agent_done", (event) => {
+        setRuns((prev) =>
+          prev.map((r) =>
+            r.id === runId
+              ? {
+                  ...r,
+                  status: "completed",
+                  sessionId: event.payload.sessionId,
+                  completedAt: Date.now(),
+                  totalCostUsd: event.payload.costUsd,
+                }
+              : r,
+          ),
+        );
+        unlistenMsg();
+        unlistenDone();
+      });
+
+      // Invoke the Rust command that spawns the agent subprocess
+      await invoke("run_managed_agent", {
+        runId,
         prompt: config.prompt,
         tools: config.tools,
         mcpServers: config.mcpServers ? JSON.stringify(config.mcpServers) : null,
@@ -137,21 +164,6 @@ export function useManagedAgents() {
         sessionId: config.sessionId || null,
         workingDirectory: config.workingDirectory || null,
       });
-
-      setRuns((prev) =>
-        prev.map((r) =>
-          r.id === runId
-            ? {
-                ...r,
-                status: "completed",
-                sessionId: result.sessionId,
-                messages: result.messages,
-                completedAt: Date.now(),
-                totalCostUsd: result.costUsd,
-              }
-            : r,
-        ),
-      );
     } catch (e) {
       setRuns((prev) =>
         prev.map((r) =>
