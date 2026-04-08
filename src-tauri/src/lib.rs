@@ -10,6 +10,7 @@ mod config;
 mod crypto;
 mod db;
 mod discovery;
+mod embeddings;
 mod files;
 mod history;
 mod mcp;
@@ -68,6 +69,10 @@ pub fn run() {
     let agent_queue: agents::queue::SharedAgentQueue =
         Arc::new(tokio::sync::Mutex::new(agents::queue::AgentQueue::default()));
 
+    // Vector store for semantic search
+    let vector_store: embeddings::SharedVectorStore =
+        Arc::new(std::sync::Mutex::new(embeddings::VectorStore::new()));
+
     tauri::Builder::default()
         // --- Plugins ---
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -98,6 +103,7 @@ pub fn run() {
         .manage(approval_map)
         .manage(shared_db)
         .manage(agent_queue)
+        .manage(vector_store)
         .invoke_handler(tauri::generate_handler![
             commands::send_message_stream,
             commands::get_config,
@@ -156,6 +162,9 @@ pub fn run() {
             memory::get_memory_log,
             router::classify_message,
             tray::set_tray_status,
+            embeddings::embed_and_store,
+            embeddings::semantic_search,
+            embeddings::vector_store_size,
             files::file_read,
             files::file_write,
             files::file_list,

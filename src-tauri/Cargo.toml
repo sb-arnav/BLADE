@@ -43,6 +43,7 @@ xcap = "0.0.14"
 base64 = "0.22"
 image = "0.25"
 enigo = "0.2"
+fastembed = "5"
 uuid = { version = "1", features = ["v4"] }
 aes-gcm = "0.10"
 rand = "0.8"
