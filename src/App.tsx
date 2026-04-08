@@ -87,6 +87,7 @@ export default function App() {
             messages={chat.messages}
             loading={chat.loading}
             error={chat.error}
+            toolExecutions={chat.toolExecutions}
             conversations={chat.conversations}
             currentConversationId={chat.currentConversationId}
             onSend={chat.sendMessage}

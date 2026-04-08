@@ -1,4 +1,4 @@
-import { ConversationSummary, Message } from "../types";
+import { ConversationSummary, Message, ToolExecution } from "../types";
 import { MessageList } from "./MessageList";
 import { InputBar } from "./InputBar";
 
@@ -6,6 +6,7 @@ interface Props {
   messages: Message[];
   loading: boolean;
   error: string | null;
+  toolExecutions: ToolExecution[];
   conversations: ConversationSummary[];
   currentConversationId: string | null;
   onSend: (message: string) => void;
@@ -29,6 +30,7 @@ export function ChatWindow({
   messages,
   loading,
   error,
+  toolExecutions,
   conversations,
   currentConversationId,
   onSend,
@@ -83,7 +85,7 @@ export function ChatWindow({
         </div>
       )}
 
-      <MessageList messages={messages} loading={loading} />
+      <MessageList messages={messages} loading={loading} toolExecutions={toolExecutions} />
       <InputBar onSend={onSend} disabled={loading} />
     </div>
   );

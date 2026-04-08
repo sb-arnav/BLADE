@@ -315,7 +315,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             </div>
             <div className="rounded-xl border border-blade-border bg-blade-bg/70 px-3 py-2">
               <div className="text-xs uppercase tracking-wide text-blade-muted">Secret Storage</div>
-              <div className="text-sm mt-1">Plaintext config today, secure storage planned</div>
+              <div className="text-sm mt-1">OS Keychain (Credential Manager)</div>
             </div>
           </div>
         </section>
