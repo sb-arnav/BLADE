@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { McpServerConfig, McpTool } from "../types";
+import { McpServerConfig, McpTool, ToolPermission } from "../types";
 
 interface Props {
   onServersChanged: () => Promise<void>;
@@ -12,8 +12,27 @@ export function McpSettings({ onServersChanged }: Props) {
   const [name, setName] = useState("");
   const [command, setCommand] = useState("");
   const [args, setArgs] = useState("");
+  const [toolPermissions, setToolPermissions] = useState<Record<string, ToolPermission>>({});
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const classifyTools = async (toolList: McpTool[]) => {
+    const perms: Record<string, ToolPermission> = {};
+    await Promise.all(
+      toolList.map(async (tool) => {
+        try {
+          const perm = await invoke<ToolPermission>("classify_mcp_tool", {
+            name: tool.qualified_name,
+            description: tool.description,
+          });
+          perms[tool.qualified_name] = perm;
+        } catch {
+          perms[tool.qualified_name] = "Ask";
+        }
+      })
+    );
+    setToolPermissions((prev) => ({ ...prev, ...perms }));
+  };
 
   const loadState = async () => {
     const [nextServers, nextTools] = await Promise.all([
@@ -22,6 +41,7 @@ export function McpSettings({ onServersChanged }: Props) {
     ]);
     setServers(nextServers);
     setTools(nextTools);
+    if (nextTools.length > 0) classifyTools(nextTools);
   };
 
   useEffect(() => {
@@ -159,12 +179,18 @@ export function McpSettings({ onServersChanged }: Props) {
               {(toolsByServer[server.name] ?? []).length === 0 ? (
                 <p className="text-xs text-blade-muted">No tools discovered yet.</p>
               ) : (
-                (toolsByServer[server.name] ?? []).map((tool) => (
-                  <div key={tool.qualified_name} className="rounded-lg border border-blade-border px-3 py-2">
-                    <p className="text-xs font-medium">{tool.qualified_name}</p>
-                    <p className="text-xs text-blade-muted">{tool.description || "No description"}</p>
-                  </div>
-                ))
+                (toolsByServer[server.name] ?? []).map((tool) => {
+                  const perm = toolPermissions[tool.qualified_name];
+                  return (
+                    <div key={tool.qualified_name} className="rounded-lg border border-blade-border px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-medium">{tool.qualified_name}</p>
+                        {perm && <PermissionBadge permission={perm} />}
+                      </div>
+                      <p className="text-xs text-blade-muted mt-0.5">{tool.description || "No description"}</p>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
@@ -174,5 +200,20 @@ export function McpSettings({ onServersChanged }: Props) {
       {status && <p className="text-xs text-green-400">{status}</p>}
       {error && <p className="text-xs text-red-400">{error}</p>}
     </section>
+  );
+}
+
+const PERM_STYLES: Record<ToolPermission, { bg: string; text: string; label: string }> = {
+  Auto: { bg: "bg-green-950 border-green-900", text: "text-green-400", label: "auto" },
+  Ask: { bg: "bg-amber-950 border-amber-900", text: "text-amber-400", label: "ask" },
+  Blocked: { bg: "bg-red-950 border-red-900", text: "text-red-400", label: "blocked" },
+};
+
+function PermissionBadge({ permission }: { permission: ToolPermission }) {
+  const style = PERM_STYLES[permission];
+  return (
+    <span className={`text-[10px] uppercase tracking-wider font-medium rounded-full border px-2 py-0.5 ${style.bg} ${style.text}`}>
+      {style.label}
+    </span>
   );
 }

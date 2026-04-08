@@ -64,7 +64,7 @@ pub fn run() {
             permissions::reset_tool_trust,
             permissions::get_tool_overrides,
         ])
-        .setup(|app| {
+        .setup(move |app| {
             if let Some(window) = app.get_webview_window("main") {
                 if let Some(window_state) = config::load_config().window_state {
                     let _ = window.set_size(Size::Physical(PhysicalSize::new(
