@@ -9,6 +9,7 @@ mod commands;
 mod config;
 mod crypto;
 mod db;
+mod db_commands;
 mod discovery;
 mod embeddings;
 mod files;
@@ -152,6 +153,36 @@ pub fn run() {
             commands::history_load_conversation,
             commands::history_save_conversation,
             commands::history_delete_conversation,
+            // Database commands
+            db_commands::db_list_conversations,
+            db_commands::db_get_conversation,
+            db_commands::db_save_conversation,
+            db_commands::db_delete_conversation,
+            db_commands::db_search_messages,
+            db_commands::db_pin_conversation,
+            db_commands::db_rename_conversation,
+            db_commands::db_conversation_stats,
+            db_commands::db_list_knowledge,
+            db_commands::db_get_knowledge,
+            db_commands::db_add_knowledge,
+            db_commands::db_update_knowledge,
+            db_commands::db_delete_knowledge,
+            db_commands::db_search_knowledge,
+            db_commands::db_knowledge_by_tag,
+            db_commands::db_knowledge_tags,
+            db_commands::db_knowledge_stats,
+            db_commands::db_track_event,
+            db_commands::db_events_since,
+            db_commands::db_prune_analytics,
+            db_commands::db_analytics_summary,
+            db_commands::db_get_setting,
+            db_commands::db_set_setting,
+            db_commands::db_get_all_settings,
+            db_commands::db_delete_setting,
+            db_commands::db_list_templates,
+            db_commands::db_add_template,
+            db_commands::db_delete_template,
+            db_commands::db_increment_template_usage,
             brain::get_persona,
             brain::set_persona,
             brain::get_context,
