@@ -56,8 +56,11 @@ pub async fn send_message_stream(
         .collect();
     let conversation = providers::build_conversation(messages, Some(system_prompt));
 
-    // No tools configured → stream directly (fast path, best UX)
-    if tools.is_empty() {
+    // Check if any message has an image (vision request)
+    let has_image = conversation.iter().any(|m| matches!(m, ConversationMessage::UserWithImage { .. }));
+
+    // No tools configured and no images → stream directly (fast path, best UX)
+    if tools.is_empty() && !has_image {
         let span = trace::TraceSpan::new(&config.provider, &config.model, "stream_text");
         let result = providers::stream_text(
             &app,
