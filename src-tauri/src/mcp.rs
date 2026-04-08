@@ -187,6 +187,12 @@ pub struct McpManager {
     tools: Vec<McpTool>,
 }
 
+impl Default for McpManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl McpManager {
     pub fn new() -> Self {
         Self {
@@ -198,6 +204,14 @@ impl McpManager {
 
     pub fn register_server(&mut self, name: String, config: McpServerConfig) {
         self.servers.insert(name, config);
+    }
+
+    pub async fn remove_server(&mut self, name: &str) {
+        self.servers.remove(name);
+        self.tools.retain(|tool| tool.server_name != name);
+        if let Some(mut process) = self.processes.remove(name) {
+            process.kill().await;
+        }
     }
 
     pub fn get_tools(&self) -> &[McpTool] {
