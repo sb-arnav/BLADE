@@ -4,8 +4,12 @@ use std::io;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
+use tokio::time::{timeout, Duration};
 
 static REQUEST_ID: AtomicU64 = AtomicU64::new(1);
+const MCP_INIT_TIMEOUT: Duration = Duration::from_secs(10);
+const MCP_DISCOVERY_TIMEOUT: Duration = Duration::from_secs(15);
+const MCP_TOOL_CALL_TIMEOUT: Duration = Duration::from_secs(30);
 
 // --- JSON-RPC Types ---
 
@@ -261,9 +265,12 @@ impl McpManager {
             }
         });
 
-        let _result = process
-            .send_request("initialize", Some(init_params))
-            .await?;
+        let _result = timeout(
+            MCP_INIT_TIMEOUT,
+            process.send_request("initialize", Some(init_params)),
+        )
+        .await
+        .map_err(|_| format!("Timed out initializing MCP server: {}", server_name))??;
 
         // Send initialized notification (no response expected for notifications)
         let notif = serde_json::json!({
@@ -305,7 +312,12 @@ impl McpManager {
                     None => Some(serde_json::json!({})),
                 };
 
-                let result = process.send_request("tools/list", params).await?;
+                let result = timeout(
+                    MCP_DISCOVERY_TIMEOUT,
+                    process.send_request("tools/list", params),
+                )
+                .await
+                .map_err(|_| format!("Timed out discovering tools for MCP server: {}", name))??;
 
                 if let Some(tools) = result["tools"].as_array() {
                     for tool in tools {
@@ -360,7 +372,12 @@ impl McpManager {
             "arguments": arguments,
         });
 
-        let result = process.send_request("tools/call", Some(params)).await?;
+        let result = timeout(
+            MCP_TOOL_CALL_TIMEOUT,
+            process.send_request("tools/call", Some(params)),
+        )
+        .await
+        .map_err(|_| format!("Timed out calling MCP tool: {}", qualified_name))??;
 
         let is_error = result["isError"].as_bool().unwrap_or(false);
         let content = if let Some(arr) = result["content"].as_array() {

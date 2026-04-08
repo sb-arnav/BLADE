@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -69,11 +71,26 @@ pub fn load_config() -> BladeConfig {
 pub fn save_config(config: &BladeConfig) -> Result<(), String> {
     let path = config_path();
     let data = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
-    fs::write(path, data).map_err(|e| e.to_string())
+    write_blade_file(&path, &data)
 }
 
 pub fn update_window_state(window_state: WindowState) -> Result<(), String> {
     let mut config = load_config();
     config.window_state = Some(window_state);
     save_config(&config)
+}
+
+pub fn write_blade_file(path: &PathBuf, contents: &str) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    fs::write(path, contents).map_err(|e| e.to_string())?;
+
+    #[cfg(unix)]
+    {
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600)).map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
 }

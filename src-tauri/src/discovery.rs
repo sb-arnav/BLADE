@@ -376,7 +376,11 @@ fn discover_claude_memories(home: &Path) -> Vec<String> {
                     let path = file_entry.path();
 
                     // Skip MEMORY.md (it's just an index) and non-md files
-                    let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                    let name = path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_string();
                     if name == "MEMORY.md" || !name.ends_with(".md") {
                         continue;
                     }

@@ -184,7 +184,9 @@ pub async fn stream_text(
 
             if let Some(data) = line.strip_prefix("data: ") {
                 if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
-                    if let Some(text) = json["candidates"][0]["content"]["parts"][0]["text"].as_str() {
+                    if let Some(text) =
+                        json["candidates"][0]["content"]["parts"][0]["text"].as_str()
+                    {
                         let _ = app.emit("chat_token", text);
                     }
                 }

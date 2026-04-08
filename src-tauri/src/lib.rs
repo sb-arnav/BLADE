@@ -33,7 +33,6 @@ pub fn run() {
     let setup_manager = mcp_manager.clone();
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(mcp_manager)
         .invoke_handler(tauri::generate_handler![
