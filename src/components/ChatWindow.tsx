@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { ConversationSummary, Message, ToolApprovalRequest, ToolExecution } from "../types";
+import { detectClipboardType } from "../utils/clipboardDetect";
 import { MessageList } from "./MessageList";
 import { InputBar } from "./InputBar";
 import { SearchInput } from "./SearchInput";
@@ -86,11 +87,18 @@ export function ChatWindow({
     try { localStorage.setItem("blade-sidebar", open ? "open" : "closed"); } catch {}
   };
 
-  const handleClipboardAction = (action: string) => {
-    if (!clipboardText) return;
-    const preview = clipboardText.length > 200 ? clipboardText.slice(0, 200) + "..." : clipboardText;
-    onSend(`${action} this:\n\n${preview}`);
-    onDismissClipboard();
+  const clipboardDetection = useMemo(
+    () => clipboardText ? detectClipboardType(clipboardText) : null,
+    [clipboardText]
+  );
+
+  const TYPE_ICONS: Record<string, string> = {
+    code: "{ }",
+    error: "!",
+    url: "🔗",
+    json: "{ }",
+    command: "$",
+    text: "T",
   };
 
   return (
@@ -247,36 +255,37 @@ export function ChatWindow({
 
         <MessageList messages={messages} loading={loading} toolExecutions={toolExecutions} />
 
-        {/* Clipboard bar */}
-        {clipboardText && !loading && (
-          <div className="mx-4 mb-2 px-3 py-2 rounded-lg bg-blade-surface border border-blade-border flex items-center gap-2 animate-fade-in">
-            <svg viewBox="0 0 24 24" className="w-3 h-3 text-blade-muted shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="8" y="2" width="8" height="4" rx="1" />
-              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-            </svg>
-            <span className="text-2xs text-blade-muted truncate flex-1">
-              {clipboardText.slice(0, 50)}{clipboardText.length > 50 ? "..." : ""}
-            </span>
-            <button
-              onClick={() => handleClipboardAction("Explain")}
-              className="text-2xs px-2 py-0.5 rounded-md bg-blade-surface-hover text-blade-secondary hover:text-blade-text transition-colors"
-            >
-              Explain
-            </button>
-            <button
-              onClick={() => handleClipboardAction("Summarize")}
-              className="text-2xs px-2 py-0.5 rounded-md bg-blade-surface-hover text-blade-secondary hover:text-blade-text transition-colors"
-            >
-              Summarize
-            </button>
-            <button
-              onClick={onDismissClipboard}
-              className="text-blade-muted hover:text-blade-secondary transition-colors"
-            >
-              <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M6 6l12 12M18 6L6 18" />
-              </svg>
-            </button>
+        {/* Smart clipboard bar */}
+        {clipboardDetection && !loading && (
+          <div className="mx-4 mb-2 px-3 py-2 rounded-lg bg-blade-surface border border-blade-border animate-fade-in">
+            <div className="flex items-center gap-2">
+              <span className="text-2xs font-mono text-blade-accent shrink-0 w-5 text-center">
+                {TYPE_ICONS[clipboardDetection.type] ?? "T"}
+              </span>
+              <span className="text-2xs text-blade-muted truncate flex-1" title={clipboardDetection.preview}>
+                <span className="text-blade-secondary/60 uppercase tracking-wider mr-1.5">{clipboardDetection.type}</span>
+                {clipboardDetection.preview}
+              </span>
+              <button
+                onClick={onDismissClipboard}
+                className="text-blade-muted hover:text-blade-secondary transition-colors shrink-0"
+              >
+                <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex items-center gap-1.5 mt-1.5">
+              {clipboardDetection.actions.map((action) => (
+                <button
+                  key={action.label}
+                  onClick={() => { onSend(action.prompt); onDismissClipboard(); }}
+                  className="text-2xs px-2 py-0.5 rounded-md bg-blade-surface-hover text-blade-secondary hover:text-blade-text transition-colors"
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

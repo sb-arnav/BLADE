@@ -2,6 +2,7 @@ import { useCallback, useRef, useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ChatWindow } from "./components/ChatWindow";
 import { CommandPalette } from "./components/CommandPalette";
+import { Diagnostics } from "./components/Diagnostics";
 import { Discovery } from "./components/Discovery";
 import { Onboarding } from "./components/Onboarding";
 import { Settings } from "./components/Settings";
@@ -13,7 +14,7 @@ import { useNotificationSound } from "./hooks/useNotificationSound";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
 
-type Route = "chat" | "settings" | "discovery";
+type Route = "chat" | "settings" | "discovery" | "diagnostics";
 
 export default function App() {
   const [config, setConfig] = useState<BladeConfig | null>(null);
@@ -80,6 +81,7 @@ export default function App() {
     { id: "sound", label: sound.enabled ? "Disable notification sound" : "Enable notification sound", action: sound.toggleEnabled },
     { id: "export", label: "Export conversation to clipboard", action: () => copyConversation(chat.messages, chat.currentConversation?.title) },
     { id: "settings", label: "Open settings  Ctrl+,", action: () => setRoute("settings") },
+    { id: "diagnostics", label: "View API traces", action: () => setRoute("diagnostics") },
     { id: "discovery", label: "Run discovery scan", action: () => setRoute("discovery") },
     { id: "chat", label: "Back to chat", action: () => setRoute("chat") },
   ];
@@ -100,6 +102,15 @@ export default function App() {
           await loadConfig();
           setRoute("discovery");
         }} />
+      </div>
+    );
+  }
+
+  if (route === "diagnostics") {
+    return (
+      <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
+        <TitleBar />
+        <Diagnostics onBack={() => setRoute("chat")} />
       </div>
     );
   }
