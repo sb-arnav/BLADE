@@ -216,6 +216,27 @@ export function useChat() {
     [createConversation, currentConversationId]
   );
 
+  // Retry last failed message — removes empty assistant msg and resends
+  const retryLastMessage = useCallback(async () => {
+    const msgs = messagesRef.current;
+    // Find the last user message (skip trailing empty assistant)
+    let lastUserIdx = -1;
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].role === "user") { lastUserIdx = i; break; }
+    }
+    if (lastUserIdx === -1) return;
+
+    const userMsg = msgs[lastUserIdx];
+    // Remove the user msg and any assistant msg after it
+    const cleaned = msgs.slice(0, lastUserIdx);
+    setMessages(cleaned);
+    messagesRef.current = cleaned;
+    setError(null);
+
+    // Resend
+    await sendMessage(userMsg.content, userMsg.image_base64);
+  }, [sendMessage]);
+
   const clearMessages = useCallback(() => setMessages([]), []);
 
   const newConversation = useCallback(async () => {
@@ -281,6 +302,7 @@ export function useChat() {
     currentConversationId,
     currentConversation,
     sendMessage,
+    retryLastMessage,
     clearMessages,
     newConversation,
     switchConversation,

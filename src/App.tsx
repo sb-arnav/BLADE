@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useRef, useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ChatWindow } from "./components/ChatWindow";
 import { CommandPalette } from "./components/CommandPalette";
@@ -7,6 +7,8 @@ import { Onboarding } from "./components/Onboarding";
 import { Settings } from "./components/Settings";
 import { TitleBar } from "./components/TitleBar";
 import { useChat } from "./hooks/useChat";
+import { useTTS } from "./hooks/useTTS";
+import { useKeyboard } from "./hooks/useKeyboard";
 import { BladeConfig } from "./types";
 
 type Route = "chat" | "settings" | "discovery";
@@ -17,6 +19,8 @@ export default function App() {
   const [route, setRoute] = useState<Route>("chat");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const chat = useChat();
+  const tts = useTTS(chat.messages, chat.loading);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const loadConfig = async () => {
     try {
@@ -41,17 +45,6 @@ export default function App() {
     loadConfig();
   }, []);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        setPaletteOpen((prev) => !prev);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
   const closePalette = useCallback(() => setPaletteOpen(false), []);
 
   const handleScreenshot = async () => {
@@ -63,11 +56,25 @@ export default function App() {
     }
   };
 
+  // Keyboard shortcuts
+  useKeyboard({
+    onNewConversation: () => chat.newConversation(),
+    onSettings: () => setRoute((r) => r === "settings" ? "chat" : "settings"),
+    onToggleSidebar: undefined,
+    onFocusInput: () => inputRef.current?.focus(),
+    onPalette: () => setPaletteOpen((p) => !p),
+    onEscape: () => {
+      if (paletteOpen) setPaletteOpen(false);
+      // sidebar closes via its own overlay click
+    },
+  });
+
   const commands = [
-    { id: "new", label: "New conversation", action: () => chat.newConversation() },
+    { id: "new", label: "New conversation  Ctrl+N", action: () => chat.newConversation() },
     { id: "clear", label: "Clear messages", action: () => chat.clearMessages() },
     { id: "screenshot", label: "Capture screen", action: handleScreenshot },
-    { id: "settings", label: "Open settings", action: () => setRoute("settings") },
+    { id: "tts", label: tts.enabled ? "Disable voice output" : "Enable voice output", action: tts.toggleEnabled },
+    { id: "settings", label: "Open settings  Ctrl+,", action: () => setRoute("settings") },
     { id: "discovery", label: "Run discovery scan", action: () => setRoute("discovery") },
     { id: "chat", label: "Back to chat", action: () => setRoute("chat") },
   ];
@@ -137,6 +144,11 @@ export default function App() {
             pendingApproval={chat.pendingApproval}
             onRespondApproval={chat.respondToApproval}
             onDeleteConversation={chat.deleteConversation}
+            onRetry={chat.retryLastMessage}
+            ttsEnabled={tts.enabled}
+            ttsSpeaking={tts.speaking}
+            onToggleTTS={tts.toggleEnabled}
+            onStopTTS={tts.stop}
           />
         )}
       </div>
