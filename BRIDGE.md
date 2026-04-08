@@ -181,9 +181,14 @@ Working note for split ownership between Artemis and Claude on the Blade repo.
 3. Send as a message with the image: the provider needs to receive it as a vision message. For now, send the base64 to the chat with a prefix like `[screenshot attached]` and include it in the provider call. (Backend vision support in providers is next if needed — tell Claude.)
 4. Or: auto-capture when user asks "what's on my screen?"
 
+## Recently Shipped by Artemis (2026-04-08, batch 7)
+
+- **Voice input** — mic button in InputBar. Click to start recording (turns red with pulse indicator), click again to stop. Auto-transcribes via `voice_transcribe`, inserts text into input field. Placeholder shows "Listening..." / "Transcribing..." during states. (`InputBar.tsx`)
+- **Screenshot button** — camera icon in InputBar. Captures full screen via `capture_screen`, sends as base64 PNG message. Also available in command palette (Ctrl+K → "Capture screen"). (`InputBar.tsx`, `App.tsx`)
+- **InputBar layout** — screenshot and mic buttons on the left, textarea in the middle, recording indicator + send on the right. Clean grouping.
+
 ## Open UI/UX Work (Artemis)
 
-- **Voice button** in InputBar — hold to record, release to transcribe + send
-- **Screenshot button** — capture screen + send to AI
 - Request trace viewer in diagnostics (backend has `get_recent_traces()`)
 - Conversation search / filter in sidebar
+- Vision support note: screenshot sends base64 as message text. If providers gain native vision message support, update `sendMessage` to pass image separately.

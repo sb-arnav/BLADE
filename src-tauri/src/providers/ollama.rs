@@ -18,6 +18,11 @@ pub async fn complete(
                 "role": "user",
                 "content": content,
             })),
+            ConversationMessage::UserWithImage { text, image_base64 } => Some(serde_json::json!({
+                "role": "user",
+                "content": text,
+                "images": [image_base64],
+            })),
             ConversationMessage::Assistant { content, .. } => Some(serde_json::json!({
                 "role": "assistant",
                 "content": content,
@@ -74,6 +79,9 @@ pub async fn stream_text(
             }
             super::ConversationMessage::User(c) => {
                 Some(serde_json::json!({"role": "user", "content": c}))
+            }
+            super::ConversationMessage::UserWithImage { text, image_base64 } => {
+                Some(serde_json::json!({"role": "user", "content": text, "images": [image_base64]}))
             }
             super::ConversationMessage::Assistant { content, .. } => {
                 Some(serde_json::json!({"role": "assistant", "content": content}))
