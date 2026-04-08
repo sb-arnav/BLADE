@@ -129,44 +129,48 @@ export function Discovery({ onComplete, onSkip }: Props) {
         </div>
 
         {step === "ask" && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <p className="text-sm text-blade-text leading-relaxed">
-              Blade can scan your PC to understand your setup — what tools you use, what you're building, how you work. Everything stays local.
+              Let me learn how you work. I'll scan your machine to find your projects, tools, and dev setup. Nothing leaves your PC.
             </p>
-            <p className="text-xs text-blade-muted">
-              This makes Blade deeply personal from the first conversation.
-            </p>
-            <div className="flex gap-2 pt-2">
+            <div className="flex flex-col gap-2">
               <button
                 onClick={runScan}
-                className="flex-1 px-4 py-3 text-sm font-medium bg-blade-accent text-white rounded-xl hover:opacity-90 transition-opacity"
+                className="w-full px-4 py-3 text-sm font-medium bg-blade-accent text-white rounded-xl hover:opacity-90 transition-opacity"
               >
-                Scan my setup
+                Let's go
               </button>
               <button
                 onClick={onSkip}
-                className="px-4 py-3 text-sm text-blade-muted hover:text-blade-text transition-colors"
+                className="w-full px-4 py-2 text-xs text-blade-muted hover:text-blade-text transition-colors"
               >
-                Skip
+                I'll set this up later
               </button>
             </div>
           </div>
         )}
 
         {step === "scanning" && (
-          <div className="space-y-3">
-            <div className="text-sm text-blade-muted animate-pulse">
-              Looking around...
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-2 rounded-full bg-blade-accent animate-pulse" />
+              <span className="text-sm text-blade-text">Scanning your machine...</span>
             </div>
-            <div className="text-xs text-blade-muted">
-              Checking AI tools, projects, dev environment...
+            <div className="space-y-2 pl-5">
+              <p className="text-xs text-blade-muted animate-pulse" style={{ animationDelay: "0ms" }}>Looking for projects</p>
+              <p className="text-xs text-blade-muted animate-pulse" style={{ animationDelay: "200ms" }}>Checking installed tools</p>
+              <p className="text-xs text-blade-muted animate-pulse" style={{ animationDelay: "400ms" }}>Reading AI configurations</p>
             </div>
           </div>
         )}
 
         {step === "results" && summaryStats && (
-          <div className="space-y-4">
-            <p className="text-sm text-blade-text">Here's what I found:</p>
+          <div className="space-y-5">
+            {report?.user_identity?.name && (
+              <p className="text-sm text-blade-text">
+                Got it, {report.user_identity.name}.
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <Stat label="Projects" value={summaryStats.projects} />
               <Stat label="AI tools" value={summaryStats.aiTools} />
@@ -176,33 +180,31 @@ export function Discovery({ onComplete, onSkip }: Props) {
                 <Stat label="Memories imported" value={summaryStats.memories} />
               )}
             </div>
-            {report?.user_identity?.name && (
-              <p className="text-xs text-blade-muted">
-                Hi {report.user_identity.name}
-                {report.user_identity.github_username
-                  ? ` (@${report.user_identity.github_username})`
-                  : ""}
-              </p>
-            )}
             {report?.ai_tools && report.ai_tools.length > 0 && (
               <p className="text-xs text-blade-muted">
-                AI: {report.ai_tools.map((t) => t.name).join(", ")}
+                Found: {report.ai_tools.map((t) => t.name).join(", ")}
               </p>
             )}
+            <p className="text-xs text-blade-muted">
+              A few quick questions so I can dial things in.
+            </p>
             <button
               onClick={() => setStep("interview")}
               className="w-full px-4 py-3 text-sm font-medium bg-blade-accent text-white rounded-xl hover:opacity-90 transition-opacity"
             >
-              Continue — a few quick questions
+              Continue
             </button>
           </div>
         )}
 
         {step === "interview" && (
           <div className="space-y-4">
-            <p className="text-sm font-medium text-blade-text">
-              {INTERVIEW_QUESTIONS[currentQuestion].question}
-            </p>
+            <div className="flex items-start gap-3">
+              <div className="w-2 h-2 rounded-full bg-blade-accent mt-1.5 shrink-0" />
+              <p className="text-sm text-blade-text leading-relaxed">
+                {INTERVIEW_QUESTIONS[currentQuestion].question}
+              </p>
+            </div>
             <input
               type="text"
               value={inputValue}
@@ -215,32 +217,38 @@ export function Discovery({ onComplete, onSkip }: Props) {
               autoFocus
             />
             <div className="flex justify-between items-center">
-              <span className="text-xs text-blade-muted">
-                {currentQuestion + 1} / {INTERVIEW_QUESTIONS.length}
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={submitAnswer}
-                  className="px-4 py-2 text-sm text-blade-muted hover:text-blade-text transition-colors"
-                >
-                  {inputValue.trim() ? "Next" : "Skip"}
-                </button>
+              <div className="flex gap-1">
+                {INTERVIEW_QUESTIONS.map((_, i) => (
+                  <div
+                    key={i}
+                    className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                      i <= currentQuestion ? "bg-blade-accent" : "bg-blade-border"
+                    }`}
+                  />
+                ))}
               </div>
+              <button
+                onClick={submitAnswer}
+                className="px-4 py-2 text-sm text-blade-muted hover:text-blade-text transition-colors"
+              >
+                {inputValue.trim() ? "Next" : "Skip"}
+              </button>
             </div>
           </div>
         )}
 
         {step === "synthesizing" && (
-          <div className="text-sm text-blade-muted animate-pulse">
-            Building your profile...
+          <div className="flex items-center gap-3">
+            <div className="w-2 h-2 rounded-full bg-blade-accent animate-pulse" />
+            <span className="text-sm text-blade-muted">Building your profile...</span>
           </div>
         )}
 
         {step === "done" && (
-          <div className="space-y-4">
-            <div className="px-4 py-3 bg-green-950 border border-green-900 rounded-xl text-green-400 text-sm">
-              Blade is ready. Every conversation will be tailored to you.
-            </div>
+          <div className="space-y-5">
+            <p className="text-sm text-blade-text">
+              All set. Blade will use everything it learned to be useful from the first message.
+            </p>
             <button
               onClick={onComplete}
               className="w-full px-4 py-3 text-sm font-medium bg-blade-accent text-white rounded-xl hover:opacity-90 transition-opacity"

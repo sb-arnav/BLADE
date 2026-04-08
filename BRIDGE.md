@@ -32,12 +32,21 @@ Working note for split ownership between Artemis and Claude on the Blade repo.
 
 ## Open UI/UX Work
 
-- Add a provider capability matrix in Settings so users can tell at a glance what each provider is good at.
-- Keep the diagnostics panel compact but useful, with provider, model, secret storage, and tool mode.
-- Improve Discovery onboarding copy and visual hierarchy so it feels less like a form and more like a guided setup.
-- Add a visible tool-execution state in the chat UI once the backend exposes that status cleanly.
+- ~~Add a provider capability matrix in Settings so users can tell at a glance what each provider is good at.~~ Done
+- ~~Keep the diagnostics panel compact but useful, with provider, model, secret storage, and tool mode.~~ Done
+- ~~Improve Discovery onboarding copy and visual hierarchy so it feels less like a form and more like a guided setup.~~ Done (2026-04-08)
+- ~~Add a visible tool-execution state in the chat UI once the backend exposes that status cleanly.~~ Done (2026-04-08)
+- Per-tool trust overrides UI (user can promote Ask→Auto or demote Auto→Ask) — not yet, needs backend command
 
-## Recently Shipped by Claude (2026-04-08)
+## Recently Shipped by Artemis (2026-04-08)
+
+- **Tool execution status in chat** — listens to `tool_executing`/`tool_completed` events, shows amber pulse indicator with tool name during execution. Bouncing dots only show when no tools are active. (`useChat.ts`, `MessageList.tsx`)
+- **Per-tool permission badges** — each discovered MCP tool shows its classification (Auto/Ask/Blocked) with color-coded badge. Permissions auto-classified on tool discovery. (`McpSettings.tsx`)
+- **Discovery onboarding polish** — rewritten copy to feel conversational instead of form-like. Scanning step shows animated checklist. Interview uses dot progress instead of "2/4" counter. Results step greets by name. Done screen is clean and confident.
+- **Fixed stale diagnostics** — Secret Storage now shows "OS Keychain (Credential Manager)" instead of "Plaintext config today, secure storage planned".
+- **Better empty state** — chat shows "What are we working on?" with accent dot instead of generic "Blade is ready."
+
+## Previously Shipped by Claude (2026-04-08)
 
 - **Keychain storage** — API keys now in OS Credential Manager, not plaintext config. Auto-migrates existing keys. (`config.rs`)
 - **Streaming responses** — all 5 providers have `stream_text()`. Used when no MCP tools configured (fast path). (`providers/*.rs`)
