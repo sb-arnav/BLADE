@@ -205,6 +205,35 @@ pub fn get_config() -> BladeConfig {
 }
 
 #[tauri::command]
+pub fn debug_config() -> serde_json::Value {
+    let config_dir = crate::config::blade_config_dir();
+    let config_path = config_dir.join("config.json");
+    let file_exists = config_path.exists();
+    let file_content = std::fs::read_to_string(&config_path).unwrap_or_else(|_| "NOT FOUND".to_string());
+    let loaded = load_config();
+
+    serde_json::json!({
+        "config_dir": config_dir.to_string_lossy(),
+        "config_path": config_path.to_string_lossy(),
+        "file_exists": file_exists,
+        "file_content": file_content,
+        "loaded_onboarded": loaded.onboarded,
+        "loaded_provider": loaded.provider,
+        "loaded_has_key": !loaded.api_key.is_empty(),
+    })
+}
+
+#[tauri::command]
+pub fn reset_onboarding() -> Result<(), String> {
+    let mut config = load_config();
+    config.onboarded = false;
+    config.api_key = String::new();
+    config.provider = "gemini".to_string();
+    config.model = "gemini-2.0-flash".to_string();
+    save_config(&config)
+}
+
+#[tauri::command]
 pub fn set_config(provider: String, api_key: String, model: String) -> Result<(), String> {
     let mut config = load_config();
     config.provider = provider;
