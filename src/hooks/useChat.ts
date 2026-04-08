@@ -80,14 +80,18 @@ export function useChat() {
   }, [createConversation, loadConversation]);
 
   useEffect(() => {
+    let active = true;
+
     const unlistenToken = listen<string>("chat_token", (event) => {
+      if (!active) return;
       streamBuffer.current += event.payload;
+      const content = streamBuffer.current;
       setMessages((prev) => {
         const last = prev[prev.length - 1];
         if (last?.role === "assistant") {
           return [
             ...prev.slice(0, -1),
-            { ...last, content: streamBuffer.current },
+            { ...last, content },
           ];
         }
         return prev;
@@ -95,6 +99,7 @@ export function useChat() {
     });
 
     const unlistenDone = listen("chat_done", () => {
+      if (!active) return;
       streamBuffer.current = "";
       setLoading(false);
       setToolExecutions([]);
@@ -133,6 +138,7 @@ export function useChat() {
     });
 
     return () => {
+      active = false;
       unlistenToken.then((fn) => fn());
       unlistenDone.then((fn) => fn());
       unlistenToolExecuting.then((fn) => fn());
