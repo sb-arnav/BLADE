@@ -68,7 +68,11 @@ struct McpProcess {
 }
 
 impl McpProcess {
-    async fn spawn(command: &str, args: &[String], env: &HashMap<String, String>) -> io::Result<Self> {
+    async fn spawn(
+        command: &str,
+        args: &[String],
+        env: &HashMap<String, String>,
+    ) -> io::Result<Self> {
         let mut cmd = Command::new(command);
         cmd.args(args)
             .envs(env)
@@ -278,11 +282,7 @@ impl McpManager {
             .write_all(&payload)
             .await
             .map_err(|e| e.to_string())?;
-        process
-            .stdin
-            .flush()
-            .await
-            .map_err(|e| e.to_string())?;
+        process.stdin.flush().await.map_err(|e| e.to_string())?;
 
         self.processes.insert(server_name.to_string(), process);
         Ok(())
@@ -311,7 +311,10 @@ impl McpManager {
                     for tool in tools {
                         let raw_name = tool["name"].as_str().unwrap_or("unknown");
                         let description = tool["description"].as_str().unwrap_or("");
-                        let schema = tool.get("inputSchema").cloned().unwrap_or(serde_json::json!({}));
+                        let schema = tool
+                            .get("inputSchema")
+                            .cloned()
+                            .unwrap_or(serde_json::json!({}));
 
                         all_tools.push(McpTool {
                             name: raw_name.to_string(),

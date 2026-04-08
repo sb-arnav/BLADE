@@ -45,7 +45,10 @@ fn serialize_message(message: &ConversationMessage) -> serde_json::Value {
             "role": "user",
             "content": content,
         }),
-        ConversationMessage::Assistant { content, tool_calls } => {
+        ConversationMessage::Assistant {
+            content,
+            tool_calls,
+        } => {
             let tool_calls_json: Vec<serde_json::Value> = tool_calls
                 .iter()
                 .map(|call| {
@@ -136,7 +139,10 @@ pub async fn complete(
         .map(parse_tool_calls)
         .unwrap_or_default();
 
-    Ok(AssistantTurn { content, tool_calls })
+    Ok(AssistantTurn {
+        content,
+        tool_calls,
+    })
 }
 
 pub async fn test(api_key: &str, model: &str) -> Result<String, String> {

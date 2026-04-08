@@ -1,13 +1,80 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { Message } from "../types";
+import { ConversationSummary, Message, StoredConversation } from "../types";
+
+function sortConversations(items: ConversationSummary[]) {
+  return [...items].sort((a, b) => b.updated_at - a.updated_at);
+}
 
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const streamBuffer = useRef("");
+  const messagesRef = useRef<Message[]>([]);
+  const bootstrappedRef = useRef(false);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  const persistConversation = useCallback(
+    async (conversationId: string, nextMessages: Message[]) => {
+      const summary = await invoke<ConversationSummary>("history_save_conversation", {
+        conversationId,
+        messages: nextMessages,
+      });
+
+      setConversations((prev) => {
+        const withoutCurrent = prev.filter((item) => item.id !== summary.id);
+        return sortConversations([summary, ...withoutCurrent]);
+      });
+    },
+    []
+  );
+
+  const loadConversation = useCallback(async (conversationId: string) => {
+    const conversation = await invoke<StoredConversation>("history_load_conversation", {
+      conversationId,
+    });
+    setCurrentConversationId(conversation.id);
+    setMessages(conversation.messages);
+  }, []);
+
+  const createConversation = useCallback(async () => {
+    const conversationId = crypto.randomUUID();
+    setCurrentConversationId(conversationId);
+    setMessages([]);
+    await persistConversation(conversationId, []);
+    return conversationId;
+  }, [persistConversation]);
+
+  useEffect(() => {
+    if (bootstrappedRef.current) {
+      return;
+    }
+    bootstrappedRef.current = true;
+
+    const bootstrap = async () => {
+      const items = await invoke<ConversationSummary[]>("history_list_conversations");
+      const sorted = sortConversations(items);
+      setConversations(sorted);
+
+      if (sorted.length > 0) {
+        await loadConversation(sorted[0].id);
+        return;
+      }
+
+      await createConversation();
+    };
+
+    bootstrap().catch((cause) => {
+      setError(typeof cause === "string" ? cause : String(cause));
+    });
+  }, [createConversation, loadConversation]);
 
   useEffect(() => {
     const unlistenToken = listen<string>("chat_token", (event) => {
@@ -35,8 +102,19 @@ export function useChat() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!currentConversationId || loading) {
+      return;
+    }
+
+    persistConversation(currentConversationId, messages).catch((cause) => {
+      setError(typeof cause === "string" ? cause : String(cause));
+    });
+  }, [currentConversationId, loading, messages, persistConversation]);
+
   const sendMessage = useCallback(
     async (content: string) => {
+      const conversationId = currentConversationId ?? (await createConversation());
       const userMsg: Message = {
         id: crypto.randomUUID(),
         role: "user",
@@ -51,27 +129,65 @@ export function useChat() {
         timestamp: Date.now(),
       };
 
+      const nextMessages = [...messagesRef.current, userMsg, assistantMsg];
+
       streamBuffer.current = "";
-      setMessages((prev) => [...prev, userMsg, assistantMsg]);
+      setMessages(nextMessages);
+      setCurrentConversationId(conversationId);
       setLoading(true);
       setError(null);
 
       try {
-        const allMessages = [...messages, userMsg].map((m) => ({
-          role: m.role,
-          content: m.content,
-        }));
-
-        await invoke("send_message_stream", { messages: allMessages });
-      } catch (e) {
-        setError(typeof e === "string" ? e : String(e));
+        await invoke("send_message_stream", {
+          messages: nextMessages
+            .filter((message) => message.role === "user" || message.role === "assistant")
+            .map((message) => ({
+              role: message.role,
+              content: message.content,
+            })),
+        });
+      } catch (cause) {
+        setError(typeof cause === "string" ? cause : String(cause));
         setLoading(false);
       }
     },
-    [messages]
+    [createConversation, currentConversationId]
   );
 
   const clearMessages = useCallback(() => setMessages([]), []);
 
-  return { messages, loading, error, sendMessage, clearMessages };
+  const newConversation = useCallback(async () => {
+    setError(null);
+    await createConversation();
+  }, [createConversation]);
+
+  const switchConversation = useCallback(
+    async (conversationId: string) => {
+      if (loading || conversationId === currentConversationId) {
+        return;
+      }
+
+      setError(null);
+      await loadConversation(conversationId);
+    },
+    [currentConversationId, loadConversation, loading]
+  );
+
+  const currentConversation = useMemo(
+    () => conversations.find((item) => item.id === currentConversationId) ?? null,
+    [conversations, currentConversationId]
+  );
+
+  return {
+    messages,
+    loading,
+    error,
+    conversations,
+    currentConversationId,
+    currentConversation,
+    sendMessage,
+    clearMessages,
+    newConversation,
+    switchConversation,
+  };
 }
