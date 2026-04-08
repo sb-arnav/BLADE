@@ -1,6 +1,7 @@
 use crate::brain;
 use crate::config::{load_config, save_config, BladeConfig, SavedMcpServerConfig};
 use crate::permissions;
+use crate::trace;
 use crate::history::{
     list_conversations, load_conversation, save_conversation, ConversationSummary, HistoryMessage,
     StoredConversation,
@@ -44,7 +45,8 @@ pub async fn send_message_stream(
 
     // No tools configured → stream directly (fast path, best UX)
     if tools.is_empty() {
-        return providers::stream_text(
+        let span = trace::TraceSpan::new(&config.provider, &config.model, "stream_text");
+        let result = providers::stream_text(
             &app,
             &config.provider,
             &config.api_key,
@@ -52,19 +54,30 @@ pub async fn send_message_stream(
             &conversation,
         )
         .await;
+        let entry = span.finish(result.is_ok(), result.as_ref().err().cloned());
+        trace::log_trace(&entry);
+        return result;
     }
 
     // Tools configured → non-streaming tool loop
     let mut conversation = conversation;
-    for _ in 0..8 {
-        let turn = providers::complete_turn(
+    for iteration in 0..8 {
+        let span = trace::TraceSpan::new(
+            &config.provider,
+            &config.model,
+            &format!("complete_turn_{}", iteration),
+        );
+        let turn_result = providers::complete_turn(
             &config.provider,
             &config.api_key,
             &config.model,
             &conversation,
             &tools,
         )
-        .await?;
+        .await;
+        let entry = span.finish(turn_result.is_ok(), turn_result.as_ref().err().cloned());
+        trace::log_trace(&entry);
+        let turn = turn_result?;
 
         conversation.push(ConversationMessage::Assistant {
             content: turn.content.clone(),

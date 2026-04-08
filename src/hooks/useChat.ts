@@ -14,6 +14,7 @@ export function useChat() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toolExecutions, setToolExecutions] = useState<ToolExecution[]>([]);
+  const [clipboardText, setClipboardText] = useState<string | null>(null);
   const streamBuffer = useRef("");
   const messagesRef = useRef<Message[]>([]);
   const bootstrappedRef = useRef(false);
@@ -98,24 +99,32 @@ export function useChat() {
       setToolExecutions([]);
     });
 
-    const unlistenToolExecuting = listen<{ name: string }>("tool_executing", (event) => {
+    const unlistenToolExecuting = listen<{ name: string; risk: string }>("tool_executing", (event) => {
       const execution: ToolExecution = {
         id: crypto.randomUUID(),
         tool_name: event.payload.name,
+        risk: (event.payload.risk as ToolExecution["risk"]) ?? "Ask",
         status: "executing",
         started_at: Date.now(),
       };
       setToolExecutions((prev) => [...prev, execution]);
     });
 
-    const unlistenToolCompleted = listen<{ name: string }>("tool_completed", (event) => {
+    const unlistenToolCompleted = listen<{ name: string; is_error: boolean }>("tool_completed", (event) => {
       setToolExecutions((prev) =>
         prev.map((ex) =>
           ex.tool_name === event.payload.name && ex.status === "executing"
-            ? { ...ex, status: "completed" as const, completed_at: Date.now() }
+            ? { ...ex, status: "completed" as const, is_error: event.payload.is_error, completed_at: Date.now() }
             : ex
         )
       );
+    });
+
+    const unlistenClipboard = listen<string>("clipboard_changed", (event) => {
+      const text = event.payload?.trim();
+      if (text && text.length > 10 && text.length < 5000) {
+        setClipboardText(text);
+      }
     });
 
     return () => {
@@ -123,6 +132,7 @@ export function useChat() {
       unlistenDone.then((fn) => fn());
       unlistenToolExecuting.then((fn) => fn());
       unlistenToolCompleted.then((fn) => fn());
+      unlistenClipboard.then((fn) => fn());
     };
   }, []);
 
@@ -202,11 +212,15 @@ export function useChat() {
     [conversations, currentConversationId]
   );
 
+  const dismissClipboard = useCallback(() => setClipboardText(null), []);
+
   return {
     messages,
     loading,
     error,
     toolExecutions,
+    clipboardText,
+    dismissClipboard,
     conversations,
     currentConversationId,
     currentConversation,

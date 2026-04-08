@@ -42,12 +42,26 @@ export interface McpTool {
 export interface ToolExecution {
   id: string;
   tool_name: string;
+  risk: ToolPermission;
   status: "executing" | "completed";
+  is_error?: boolean;
   started_at: number;
   completed_at?: number;
 }
 
 export type ToolPermission = "Auto" | "Ask" | "Blocked";
+
+export interface ImportedMcpServer {
+  name: string;
+  command: string;
+  args: string[];
+  source: string;
+}
+
+export interface ServerStatus {
+  name: string;
+  running: boolean;
+}
 
 export interface DiscoveryReport {
   user_identity: {
