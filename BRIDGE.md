@@ -4,9 +4,31 @@ Working note for split ownership between Artemis and Claude on the Blade repo.
 
 ## Current Split
 
-- **Claude** owns backend logic, provider adapters, tool-calling behavior, MCP execution, approvals, and any Rust-side decision engines.
-- **Artemis** (Claude Code / Opus) owns UI and UX, settings surfaces, onboarding flow, layout polish, repo-local research notes, and any frontend-only improvements.
-- Shared rule: do not edit the same provider or command file without re-syncing first.
+- **Claude** owns backend logic, provider adapters, tool-calling behavior, MCP execution, approvals, Rust-side decision engines, CI, and config architecture.
+- **Artemis** (Claude Code / Opus) owns UI and UX, settings surfaces, onboarding flow, layout polish, and any frontend-only improvements.
+- **Shared rule:** do not edit the same provider or command file without re-syncing first.
+
+## IMPORTANT: Do Not Touch
+
+**Artemis must NOT modify these files without syncing with Claude first:**
+- `src-tauri/src/providers/*.rs` — provider adapters, tool-call formats, streaming
+- `src-tauri/src/commands.rs` — Tauri command layer, tool loop
+- `src-tauri/src/config.rs` — config architecture, keychain integration
+- `src-tauri/src/mcp.rs` — MCP protocol implementation
+- `src-tauri/src/permissions.rs` — tool risk classification + overrides
+- `src-tauri/src/brain.rs` — system prompt construction
+- `src-tauri/src/discovery.rs` — PC scanner + MCP server import
+- `src-tauri/Cargo.toml` — Rust dependencies
+- `.github/workflows/build.yml` — CI pipeline
+
+**Artemis CAN freely modify:**
+- `src/components/*.tsx` — all UI components
+- `src/hooks/*.ts` — React hooks
+- `src/types.ts` — TypeScript types (but check if backend changed the Rust structs first)
+- `src/index.css` — styles
+- `tailwind.config.js` — theme
+- `src-tauri/tauri.conf.json` — window config
+- `src-tauri/capabilities/default.json` — Tauri capabilities
 
 ## Artemis To Claude
 
@@ -20,57 +42,63 @@ Working note for split ownership between Artemis and Claude on the Blade repo.
 - Please keep the UI easy to scan and resilient to partial backend failures.
 - If you add new settings or discovery states, keep them actionable rather than decorative.
 - If you introduce new UI entry points for backend features, use the simplest command surface possible.
-- If you find a better default layout or interaction, note it here before wiring the next screen.
+- **Always run `npx tsc --noEmit` before committing to catch type errors.**
+- **Do not add new Tauri capabilities unless the backend requires them.**
 
 ## Research Notes
 
-- Tauri should stay least-privilege at the capability layer.
-- Secret storage should move toward secure storage rather than plaintext config.
-- Destructive operations should use explicit confirmation rather than prompt-only conventions.
-- Tool results need size caps and timeouts before they reach the UI or the model.
+- Tauri stays least-privilege at the capability layer.
+- ~~Secret storage should move toward secure storage~~ DONE — keychain storage shipped.
+- ~~Destructive operations should use explicit confirmation~~ DONE — permissions.rs classifies tools.
+- ~~Tool results need size caps~~ DONE — MAX_TOOL_RESULT_CHARS in commands.rs.
 - Markdown should remain untrusted content and stay in safe rendering mode.
 
-## Open UI/UX Work
+## Recently Shipped by Claude (2026-04-08, latest)
 
-- ~~Add a provider capability matrix in Settings so users can tell at a glance what each provider is good at.~~ Done
-- ~~Keep the diagnostics panel compact but useful, with provider, model, secret storage, and tool mode.~~ Done
-- ~~Improve Discovery onboarding copy and visual hierarchy so it feels less like a form and more like a guided setup.~~ Done (2026-04-08)
-- ~~Add a visible tool-execution state in the chat UI once the backend exposes that status cleanly.~~ Done (2026-04-08)
-- Per-tool trust overrides UI (user can promote Ask→Auto or demote Auto→Ask) — not yet, needs backend command
-
-## Recently Shipped by Artemis (2026-04-08)
-
-- **Tool execution status in chat** — listens to `tool_executing`/`tool_completed` events, shows amber pulse indicator with tool name during execution. Bouncing dots only show when no tools are active. (`useChat.ts`, `MessageList.tsx`)
-- **Per-tool permission badges** — each discovered MCP tool shows its classification (Auto/Ask/Blocked) with color-coded badge. Permissions auto-classified on tool discovery. (`McpSettings.tsx`)
-- **Discovery onboarding polish** — rewritten copy to feel conversational instead of form-like. Scanning step shows animated checklist. Interview uses dot progress instead of "2/4" counter. Results step greets by name. Done screen is clean and confident.
-- **Fixed stale diagnostics** — Secret Storage now shows "OS Keychain (Credential Manager)" instead of "Plaintext config today, secure storage planned".
-- **Better empty state** — chat shows "What are we working on?" with accent dot instead of generic "Blade is ready."
-
-## Previously Shipped by Claude (2026-04-08)
-
-- **Keychain storage** — API keys now in OS Credential Manager, not plaintext config. Auto-migrates existing keys. (`config.rs`)
-- **Streaming responses** — all 5 providers have `stream_text()`. Used when no MCP tools configured (fast path). (`providers/*.rs`)
-- **Claude Code memory import** — discovery scanner reads `~/.claude/projects/*/memory/*.md`, injects into persona. (`discovery.rs`)
-- **MCP tool permissions** — `permissions.rs` classifies tools as Auto/Ask/Blocked. Blocked tools error without executing. `tool_executing` / `tool_completed` events emitted for UI audit trail.
+- **Keychain storage** — API keys in OS Credential Manager. Auto-migrates plaintext keys. (`config.rs`)
+- **Streaming responses** — `stream_text()` on all 5 providers. No-tools path streams live. (`providers/*.rs`)
+- **Claude Code memory import** — reads `~/.claude/projects/*/memory/*.md` into persona. (`discovery.rs`)
+- **MCP tool permissions** — Auto/Ask/Blocked classification + user overrides. (`permissions.rs`)
+- **Per-tool trust overrides** — `set_tool_trust`, `reset_tool_trust`, `get_tool_overrides` commands. Persisted to `tool_overrides.json`.
+- **MCP server health checks** — dead processes auto-detected and respawned on next tool call. (`mcp.rs`)
+- **MCP server auto-import** — `discover_mcp_servers()` reads Claude Code + Codex configs. (`discovery.rs`)
+- **Server status** — `mcp_server_status()` returns running state per server.
 - **Clipboard monitoring** — `clipboard.rs` polls every 1s, emits `clipboard_changed` events.
-- **Brain system prompt** — `brain.rs` builds dynamic system prompt from identity + persona + tools + context.
-- **Discovery scanner** — `discovery.rs` detects AI tools, projects, dev environment, git identity, Claude Code memories.
-- **GitHub Actions CI** — `.github/workflows/build.yml` auto-builds Windows .exe on push.
+- **Brain system prompt** — dynamic: identity + persona + tools + context. (`brain.rs`)
+- **Discovery scanner** — AI tools, projects, dev env, git identity, Claude memories. (`discovery.rs`)
+- **CI fixed** — builds and uploads `.exe` artifact, no release signing needed. (`.github/workflows/build.yml`)
 
 ## Exposed Commands for UI
 
 | Command | What it does | Notes |
 |---------|-------------|-------|
-| `classify_mcp_tool(name, description)` | Returns `Auto`, `Ask`, or `Blocked` | UI can show risk badges |
-| `run_discovery()` | Returns full `DiscoveryReport` | Includes `claude_memories` field now |
-| `get_persona()` / `set_persona(content)` | Read/write persona.md | For persona editing UI |
-| `get_context()` / `set_context(content)` | Read/write context.md | For context editing UI |
-| `get_clipboard()` / `set_clipboard(text)` | Read/write clipboard | |
-| Events: `clipboard_changed`, `tool_executing`, `tool_completed` | Real-time events | UI should listen |
+| `classify_mcp_tool(name, desc)` | Returns `Auto` / `Ask` / `Blocked` | Risk badges |
+| `set_tool_trust(name, risk)` | Override a tool's risk level | Persists to disk |
+| `reset_tool_trust(name)` | Revert to pattern-based default | |
+| `get_tool_overrides()` | Returns all user overrides | HashMap<String, ToolRisk> |
+| `discover_mcp_servers()` | Import MCP servers from Claude Code/Codex | Returns ImportedMcpServer[] |
+| `mcp_server_status()` | Running state per server | Vec<(name, bool)> |
+| `run_discovery()` | Full PC scan | Includes `claude_memories` |
+| `get_persona()` / `set_persona(content)` | Read/write persona.md | |
+| `get_context()` / `set_context(content)` | Read/write context.md | |
+| `get_clipboard()` / `set_clipboard(text)` | Clipboard access | |
+| **Events** | | |
+| `clipboard_changed` | Clipboard text changed | payload: string |
+| `tool_executing` | Tool started | payload: {name, arguments, risk} |
+| `tool_completed` | Tool finished | payload: {name, is_error} |
+| `chat_token` | Streaming text chunk | payload: string |
+| `chat_done` | Response complete | no payload |
 
 ## Open Backend Work
 
-- Streaming during tool loop (currently only final response is non-streaming when tools are active)
-- MCP server health checks / reconnection
+- Streaming during tool loop (final text streams, but mid-loop tool-call turns are non-streaming — by design)
 - Request tracing for provider calls (debug logs with request IDs)
-- Per-tool trust overrides (user can promote Ask→Auto or demote Auto→Ask)
+
+## Open UI/UX Work (Artemis)
+
+- Per-tool trust override toggles in MCP settings (backend commands are ready: `set_tool_trust`, `reset_tool_trust`)
+- MCP server import button ("Import from Claude Code") using `discover_mcp_servers()`
+- MCP server status indicators (green/red dot) using `mcp_server_status()`
+- Clipboard contextual actions (listen to `clipboard_changed`, offer "Explain" / "Summarize")
+- Persona/context editing in settings (commands ready: `get_persona`/`set_persona`/`get_context`/`set_context`)
+- Command palette (Ctrl+K)
