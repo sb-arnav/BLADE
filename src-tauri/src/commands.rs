@@ -26,8 +26,11 @@ pub async fn send_message_stream(
     approvals: tauri::State<'_, ApprovalMap>,
     messages: Vec<ChatMessage>,
 ) -> Result<(), String> {
+    let _ = app.emit("blade_status", "processing");
+
     let mut config = load_config();
     if config.api_key.is_empty() && config.provider != "ollama" {
+        let _ = app.emit("blade_status", "error");
         return Err("No API key configured. Go to settings.".to_string());
     }
 
@@ -72,6 +75,11 @@ pub async fn send_message_stream(
         .await;
         let entry = span.finish(result.is_ok(), result.as_ref().err().cloned());
         trace::log_trace(&entry);
+        if result.is_ok() {
+            let _ = app.emit("blade_status", "idle");
+        } else {
+            let _ = app.emit("blade_status", "error");
+        }
         return result;
     }
 
@@ -93,7 +101,13 @@ pub async fn send_message_stream(
         .await;
         let entry = span.finish(turn_result.is_ok(), turn_result.as_ref().err().cloned());
         trace::log_trace(&entry);
-        let turn = turn_result?;
+        let turn = match turn_result {
+            Ok(t) => t,
+            Err(e) => {
+                let _ = app.emit("blade_status", "error");
+                return Err(e);
+            }
+        };
 
         conversation.push(ConversationMessage::Assistant {
             content: turn.content.clone(),
@@ -106,6 +120,7 @@ pub async fn send_message_stream(
                 let _ = app.emit("chat_token", turn.content);
             }
             let _ = app.emit("chat_done", ());
+            let _ = app.emit("blade_status", "idle");
             return Ok(());
         }
 
@@ -199,6 +214,7 @@ pub async fn send_message_stream(
     }
 
     let _ = app.emit("chat_done", ());
+    let _ = app.emit("blade_status", "error");
     Err("Tool loop exceeded safe limit.".to_string())
 }
 
