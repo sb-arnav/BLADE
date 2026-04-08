@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 struct RecordingState {
     samples: Vec<f32>,
     is_recording: bool,
+    sample_rate: u32,
 }
 
 static RECORDING: std::sync::LazyLock<Arc<Mutex<RecordingState>>> =
@@ -12,6 +13,7 @@ static RECORDING: std::sync::LazyLock<Arc<Mutex<RecordingState>>> =
         Arc::new(Mutex::new(RecordingState {
             samples: Vec::new(),
             is_recording: false,
+            sample_rate: 16000,
         }))
     });
 
@@ -40,6 +42,11 @@ pub fn voice_start_recording() -> Result<(), String> {
         let sample_rate = config.sample_rate().0;
         let channels = config.channels() as usize;
         let recording_clone = recording.clone();
+
+        // Store the actual device sample rate
+        if let Ok(mut state) = recording.lock() {
+            state.sample_rate = sample_rate;
+        }
 
         let stream = device
             .build_input_stream(
@@ -78,8 +85,7 @@ pub fn voice_start_recording() -> Result<(), String> {
             drop(stream);
         }
 
-        // Store sample rate for WAV encoding
-        let _ = sample_rate; // Used implicitly via the recording state
+        // sample_rate already stored in RecordingState above
     });
 
     Ok(())
@@ -91,14 +97,15 @@ pub fn voice_stop_recording() -> Result<String, String> {
     let mut state = RECORDING.lock().map_err(|e| e.to_string())?;
     state.is_recording = false;
     let samples = std::mem::take(&mut state.samples);
+    let sample_rate = state.sample_rate;
     drop(state);
 
     if samples.is_empty() {
         return Err("No audio recorded".to_string());
     }
 
-    // Encode as WAV
-    let wav_data = encode_wav(&samples, 1, 16000)?;
+    // Encode as WAV using the actual device sample rate
+    let wav_data = encode_wav(&samples, 1, sample_rate)?;
     Ok(base64::engine::general_purpose::STANDARD.encode(&wav_data))
 }
 

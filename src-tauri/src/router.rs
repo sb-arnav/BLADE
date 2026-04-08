@@ -77,7 +77,7 @@ pub fn suggest_model(provider: &str, task: &TaskType) -> Option<String> {
             TaskType::Simple => Some("llama-3.3-70b-versatile".to_string()),
             TaskType::Code => Some("llama-3.3-70b-versatile".to_string()),
             TaskType::Complex => Some("llama-3.3-70b-versatile".to_string()),
-            TaskType::Vision => Some("llama-3.2-90b-vision-preview".to_string()),
+            TaskType::Vision => Some("meta-llama/llama-4-scout-17b-16e-instruct".to_string()),
             TaskType::Creative => Some("llama-3.3-70b-versatile".to_string()),
         },
         "openai" => match task {
