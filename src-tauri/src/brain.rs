@@ -1,4 +1,4 @@
-use crate::config::load_config;
+use crate::config::blade_config_dir;
 use crate::mcp::McpTool;
 use std::fs;
 use std::path::PathBuf;
@@ -74,18 +74,12 @@ fn load_context_notes() -> Option<String> {
     fs::read_to_string(path).ok()
 }
 
-fn config_dir() -> PathBuf {
-    dirs::config_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("blade")
-}
-
 fn persona_path() -> PathBuf {
-    config_dir().join("persona.md")
+    blade_config_dir().join("persona.md")
 }
 
 fn context_path() -> PathBuf {
-    config_dir().join("context.md")
+    blade_config_dir().join("context.md")
 }
 
 // --- Tauri Commands ---

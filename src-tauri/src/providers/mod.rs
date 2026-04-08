@@ -1,11 +1,10 @@
+pub mod anthropic;
 pub mod gemini;
 pub mod groq;
-pub mod openai;
-pub mod anthropic;
 pub mod ollama;
+pub mod openai;
 
 use serde::{Deserialize, Serialize};
-use tauri::AppHandle;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
@@ -13,27 +12,85 @@ pub struct ChatMessage {
     pub content: String,
 }
 
-/// Stream a chat response, emitting "chat_token" events for each chunk
-/// and "chat_done" when complete. Injects system prompt automatically.
-pub async fn stream_chat(
-    app: &AppHandle,
+#[derive(Debug, Clone)]
+pub struct ToolDefinition {
+    pub name: String,
+    pub description: String,
+    pub input_schema: serde_json::Value,
+}
+
+#[derive(Debug, Clone)]
+pub struct ToolCall {
+    pub id: String,
+    pub name: String,
+    pub arguments: serde_json::Value,
+}
+
+#[derive(Debug, Clone)]
+pub enum ConversationMessage {
+    System(String),
+    User(String),
+    Assistant {
+        content: String,
+        tool_calls: Vec<ToolCall>,
+    },
+    Tool {
+        tool_call_id: String,
+        tool_name: String,
+        content: String,
+        is_error: bool,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct AssistantTurn {
+    pub content: String,
+    pub tool_calls: Vec<ToolCall>,
+}
+
+pub fn build_conversation(
+    messages: Vec<ChatMessage>,
+    system_prompt: Option<String>,
+) -> Vec<ConversationMessage> {
+    let mut conversation = Vec::new();
+
+    if let Some(system_prompt) = system_prompt {
+        if !system_prompt.trim().is_empty() {
+            conversation.push(ConversationMessage::System(system_prompt));
+        }
+    }
+
+    conversation.extend(messages.into_iter().map(|message| {
+        if message.role == "assistant" {
+            ConversationMessage::Assistant {
+                content: message.content,
+                tool_calls: Vec::new(),
+            }
+        } else {
+            ConversationMessage::User(message.content)
+        }
+    }));
+
+    conversation
+}
+
+pub async fn complete_turn(
     provider: &str,
     api_key: &str,
     model: &str,
-    messages: Vec<ChatMessage>,
-    system_prompt: Option<String>,
-) -> Result<(), String> {
+    messages: &[ConversationMessage],
+    tools: &[ToolDefinition],
+) -> Result<AssistantTurn, String> {
     match provider {
-        "gemini" => gemini::stream(app, api_key, model, messages, system_prompt.as_deref()).await,
-        "groq" => groq::stream(app, api_key, model, messages, system_prompt.as_deref()).await,
-        "openai" => openai::stream(app, api_key, model, messages, system_prompt.as_deref()).await,
-        "anthropic" => anthropic::stream(app, api_key, model, messages, system_prompt.as_deref()).await,
-        "ollama" => ollama::stream(app, model, messages, system_prompt.as_deref()).await,
+        "gemini" => gemini::complete(api_key, model, messages, tools).await,
+        "groq" => groq::complete(api_key, model, messages, tools).await,
+        "openai" => openai::complete(api_key, model, messages, tools).await,
+        "anthropic" => anthropic::complete(api_key, model, messages, tools).await,
+        "ollama" => ollama::complete(model, messages).await,
         _ => Err(format!("Unknown provider: {}", provider)),
     }
 }
 
-/// Test if the connection works (non-streaming, short prompt)
 pub async fn test_connection(
     provider: &str,
     api_key: &str,

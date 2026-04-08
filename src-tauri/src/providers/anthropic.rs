@@ -1,15 +1,23 @@
-use super::ChatMessage;
-use futures::StreamExt;
+use super::{AssistantTurn, ConversationMessage, ToolCall, ToolDefinition};
 use reqwest::Client;
-use tauri::{AppHandle, Emitter};
 
-fn build_body(model: &str, messages: &[ChatMessage], system_prompt: Option<&str>) -> serde_json::Value {
-    let msgs: Vec<serde_json::Value> = messages
+fn build_body(
+    model: &str,
+    messages: &[ConversationMessage],
+    tools: &[ToolDefinition],
+) -> serde_json::Value {
+    let system = messages.iter().find_map(|message| match message {
+        ConversationMessage::System(content) => Some(content.clone()),
+        _ => None,
+    });
+    let msgs: Vec<serde_json::Value> = messages.iter().filter_map(serialize_message).collect();
+    let tool_defs: Vec<serde_json::Value> = tools
         .iter()
-        .map(|m| {
+        .map(|tool| {
             serde_json::json!({
-                "role": &m.role,
-                "content": &m.content
+                "name": &tool.name,
+                "description": &tool.description,
+                "input_schema": &tool.input_schema,
             })
         })
         .collect();
@@ -18,25 +26,74 @@ fn build_body(model: &str, messages: &[ChatMessage], system_prompt: Option<&str>
         "model": model,
         "max_tokens": 4096,
         "messages": msgs,
-        "stream": true
+        "stream": false
     });
 
-    if let Some(sys) = system_prompt {
-        body["system"] = serde_json::json!(sys);
+    if let Some(system) = system {
+        body["system"] = serde_json::Value::String(system);
+    }
+
+    if !tool_defs.is_empty() {
+        body["tools"] = serde_json::Value::Array(tool_defs);
     }
 
     body
 }
 
-pub async fn stream(
-    app: &AppHandle,
+fn serialize_message(message: &ConversationMessage) -> Option<serde_json::Value> {
+    match message {
+        ConversationMessage::System(_) => None,
+        ConversationMessage::User(content) => Some(serde_json::json!({
+            "role": "user",
+            "content": [{"type": "text", "text": content}],
+        })),
+        ConversationMessage::Assistant { content, tool_calls } => {
+            let mut blocks = Vec::new();
+            if !content.is_empty() {
+                blocks.push(serde_json::json!({
+                    "type": "text",
+                    "text": content,
+                }));
+            }
+            blocks.extend(tool_calls.iter().map(|call| {
+                serde_json::json!({
+                    "type": "tool_use",
+                    "id": &call.id,
+                    "name": &call.name,
+                    "input": &call.arguments,
+                })
+            }));
+
+            Some(serde_json::json!({
+                "role": "assistant",
+                "content": blocks,
+            }))
+        }
+        ConversationMessage::Tool {
+            tool_call_id,
+            content,
+            is_error,
+            ..
+        } => Some(serde_json::json!({
+            "role": "user",
+            "content": [{
+                "type": "tool_result",
+                "tool_use_id": tool_call_id,
+                "content": content,
+                "is_error": is_error,
+            }],
+        })),
+    }
+}
+
+pub async fn complete(
     api_key: &str,
     model: &str,
-    messages: Vec<ChatMessage>,
-    system_prompt: Option<&str>,
-) -> Result<(), String> {
+    messages: &[ConversationMessage],
+    tools: &[ToolDefinition],
+) -> Result<AssistantTurn, String> {
     let client = Client::new();
-    let body = build_body(model, &messages, system_prompt);
+    let body = build_body(model, messages, tools);
 
     let response = client
         .post("https://api.anthropic.com/v1/messages")
@@ -54,32 +111,31 @@ pub async fn stream(
         return Err(format!("Anthropic API error {}: {}", status, body));
     }
 
-    let mut stream = response.bytes_stream();
-    let mut buffer = String::new();
+    let json: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
+    let mut content = String::new();
+    let mut tool_calls = Vec::new();
 
-    while let Some(chunk) = stream.next().await {
-        let bytes = chunk.map_err(|e| format!("Stream error: {}", e))?;
-        buffer.push_str(&String::from_utf8_lossy(&bytes));
-
-        while let Some(pos) = buffer.find('\n') {
-            let line = buffer[..pos].to_string();
-            buffer = buffer[pos + 1..].to_string();
-
-            if let Some(data) = line.strip_prefix("data: ") {
-                if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
-                    // Anthropic streams content_block_delta events
-                    if json["type"] == "content_block_delta" {
-                        if let Some(text) = json["delta"]["text"].as_str() {
-                            let _ = app.emit("chat_token", text);
-                        }
+    if let Some(blocks) = json["content"].as_array() {
+        for block in blocks {
+            match block["type"].as_str().unwrap_or_default() {
+                "text" => {
+                    if let Some(text) = block["text"].as_str() {
+                        content.push_str(text);
                     }
                 }
+                "tool_use" => {
+                    tool_calls.push(ToolCall {
+                        id: block["id"].as_str().unwrap_or("tool_use").to_string(),
+                        name: block["name"].as_str().unwrap_or("unknown_tool").to_string(),
+                        arguments: block["input"].clone(),
+                    });
+                }
+                _ => {}
             }
         }
     }
 
-    let _ = app.emit("chat_done", ());
-    Ok(())
+    Ok(AssistantTurn { content, tool_calls })
 }
 
 pub async fn test(api_key: &str, model: &str) -> Result<String, String> {

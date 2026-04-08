@@ -1,30 +1,32 @@
-use super::ChatMessage;
-use futures::StreamExt;
+use super::{AssistantTurn, ConversationMessage};
 use reqwest::Client;
-use tauri::{AppHandle, Emitter};
 
-pub async fn stream(
-    app: &AppHandle,
-    model: &str,
-    messages: Vec<ChatMessage>,
-    system_prompt: Option<&str>,
-) -> Result<(), String> {
+pub async fn complete(model: &str, messages: &[ConversationMessage]) -> Result<AssistantTurn, String> {
     let client = Client::new();
 
-    let mut msgs: Vec<serde_json::Value> = Vec::new();
-
-    if let Some(sys) = system_prompt {
-        msgs.push(serde_json::json!({"role": "system", "content": sys}));
-    }
-
-    for m in &messages {
-        msgs.push(serde_json::json!({"role": &m.role, "content": &m.content}));
-    }
+    let msgs: Vec<serde_json::Value> = messages
+        .iter()
+        .filter_map(|message| match message {
+            ConversationMessage::System(content) => Some(serde_json::json!({
+                "role": "system",
+                "content": content,
+            })),
+            ConversationMessage::User(content) => Some(serde_json::json!({
+                "role": "user",
+                "content": content,
+            })),
+            ConversationMessage::Assistant { content, .. } => Some(serde_json::json!({
+                "role": "assistant",
+                "content": content,
+            })),
+            ConversationMessage::Tool { .. } => None,
+        })
+        .collect();
 
     let body = serde_json::json!({
         "model": model,
         "messages": msgs,
-        "stream": true
+        "stream": false
     });
 
     let response = client
@@ -40,30 +42,16 @@ pub async fn stream(
         return Err(format!("Ollama error {}: {}", status, body));
     }
 
-    let mut stream = response.bytes_stream();
-    let mut buffer = String::new();
+    let json: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
+    let content = json["message"]["content"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
 
-    while let Some(chunk) = stream.next().await {
-        let bytes = chunk.map_err(|e| format!("Stream error: {}", e))?;
-        buffer.push_str(&String::from_utf8_lossy(&bytes));
-
-        // Ollama sends newline-delimited JSON (not SSE)
-        while let Some(pos) = buffer.find('\n') {
-            let line = buffer[..pos].to_string();
-            buffer = buffer[pos + 1..].to_string();
-
-            if !line.trim().is_empty() {
-                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
-                    if let Some(text) = json["message"]["content"].as_str() {
-                        let _ = app.emit("chat_token", text);
-                    }
-                }
-            }
-        }
-    }
-
-    let _ = app.emit("chat_done", ());
-    Ok(())
+    Ok(AssistantTurn {
+        content,
+        tool_calls: Vec::new(),
+    })
 }
 
 pub async fn test(model: &str) -> Result<String, String> {

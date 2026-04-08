@@ -1,6 +1,25 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SavedMcpServerConfig {
+    pub name: String,
+    pub command: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+    #[serde(default)]
+    pub env: HashMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WindowState {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BladeConfig {
@@ -8,6 +27,10 @@ pub struct BladeConfig {
     pub api_key: String,
     pub model: String,
     pub onboarded: bool,
+    #[serde(default)]
+    pub mcp_servers: Vec<SavedMcpServerConfig>,
+    #[serde(default)]
+    pub window_state: Option<WindowState>,
 }
 
 impl Default for BladeConfig {
@@ -17,16 +40,22 @@ impl Default for BladeConfig {
             api_key: String::new(),
             model: "gemini-2.0-flash".to_string(),
             onboarded: false,
+            mcp_servers: Vec::new(),
+            window_state: None,
         }
     }
 }
 
-fn config_path() -> PathBuf {
+pub fn blade_config_dir() -> PathBuf {
     let config_dir = dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("blade");
     fs::create_dir_all(&config_dir).ok();
-    config_dir.join("config.json")
+    config_dir
+}
+
+fn config_path() -> PathBuf {
+    blade_config_dir().join("config.json")
 }
 
 pub fn load_config() -> BladeConfig {
@@ -41,4 +70,10 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
     let path = config_path();
     let data = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
     fs::write(path, data).map_err(|e| e.to_string())
+}
+
+pub fn update_window_state(window_state: WindowState) -> Result<(), String> {
+    let mut config = load_config();
+    config.window_state = Some(window_state);
+    save_config(&config)
 }
