@@ -136,7 +136,7 @@ pub async fn complete(
     let content = message["content"].as_str().unwrap_or_default().to_string();
     let tool_calls = message["tool_calls"]
         .as_array()
-        .map(parse_tool_calls)
+        .map(|v| parse_tool_calls(v))
         .unwrap_or_default();
 
     Ok(AssistantTurn {
