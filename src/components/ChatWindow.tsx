@@ -157,7 +157,10 @@ export function ChatWindow({
               >
                 <p className="text-xs truncate">{conv.title || "New conversation"}</p>
                 <div className="flex items-center justify-between mt-0.5">
-                  <span className="text-2xs text-blade-muted">{formatTime(conv.updated_at)}</span>
+                  <span className="text-2xs text-blade-muted">
+                    {formatTime(conv.updated_at)}
+                    {conv.message_count ? <span className="ml-1.5 text-blade-muted/40">{conv.message_count}m</span> : null}
+                  </span>
                   {conversations.length > 1 && (
                     <span
                       onClick={(e) => { e.stopPropagation(); onDeleteConversation(conv.id); }}

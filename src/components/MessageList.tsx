@@ -214,6 +214,11 @@ const MessageBubble = memo(function MessageBubble({ msg }: { msg: Message }) {
             <span className="text-2xs text-blade-muted/50">
               {new Date(msg.timestamp).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
             </span>
+            {msg.content && (
+              <span className="text-2xs text-blade-muted/30">
+                {msg.content.split(/\s+/).filter(Boolean).length}w
+              </span>
+            )}
             {!isUser && msg.content && <CopyButton text={msg.content} label="copy" />}
           </div>
         )}
