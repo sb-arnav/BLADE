@@ -156,12 +156,9 @@ fn serialize_simple(message: &super::ConversationMessage) -> Option<serde_json::
     match message {
         super::ConversationMessage::System(c) => Some(serde_json::json!({"role": "system", "content": c})),
         super::ConversationMessage::User(c) => Some(serde_json::json!({"role": "user", "content": c})),
-        super::ConversationMessage::UserWithImage { text, image_base64 } => Some(serde_json::json!({
+        super::ConversationMessage::UserWithImage { text, .. } => Some(serde_json::json!({
             "role": "user",
-            "content": [
-                {"type": "text", "text": text},
-                {"type": "image_url", "image_url": {"url": format!("data:image/png;base64,{}", image_base64)}}
-            ],
+            "content": text,
         })),
         super::ConversationMessage::Assistant { content, .. } => {
             if content.is_empty() { return None; }
