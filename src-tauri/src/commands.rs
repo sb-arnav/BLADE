@@ -1,5 +1,10 @@
 use crate::config::{load_config, save_config, BladeConfig};
+use crate::mcp::{McpManager, McpServerConfig, McpTool, McpToolResult};
 use crate::providers::{self, ChatMessage};
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
+pub type SharedMcpManager = Arc<Mutex<McpManager>>;
 
 #[tauri::command]
 pub async fn send_message_stream(
@@ -37,4 +42,49 @@ pub async fn test_provider(
     model: String,
 ) -> Result<String, String> {
     providers::test_connection(&provider, &api_key, &model).await
+}
+
+// --- MCP Commands ---
+
+#[tauri::command]
+pub async fn mcp_add_server(
+    state: tauri::State<'_, SharedMcpManager>,
+    name: String,
+    command: String,
+    args: Vec<String>,
+) -> Result<(), String> {
+    let config = McpServerConfig {
+        command,
+        args,
+        env: std::collections::HashMap::new(),
+    };
+    let mut manager = state.lock().await;
+    manager.register_server(name, config);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn mcp_discover_tools(
+    state: tauri::State<'_, SharedMcpManager>,
+) -> Result<Vec<McpTool>, String> {
+    let mut manager = state.lock().await;
+    manager.discover_all_tools().await
+}
+
+#[tauri::command]
+pub async fn mcp_call_tool(
+    state: tauri::State<'_, SharedMcpManager>,
+    tool_name: String,
+    arguments: serde_json::Value,
+) -> Result<McpToolResult, String> {
+    let mut manager = state.lock().await;
+    manager.call_tool(&tool_name, arguments).await
+}
+
+#[tauri::command]
+pub async fn mcp_get_tools(
+    state: tauri::State<'_, SharedMcpManager>,
+) -> Result<Vec<McpTool>, String> {
+    let manager = state.lock().await;
+    Ok(manager.get_tools().to_vec())
 }

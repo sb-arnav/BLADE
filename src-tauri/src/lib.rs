@@ -1,5 +1,6 @@
 mod commands;
 mod config;
+mod mcp;
 mod providers;
 
 use tauri::{
@@ -22,14 +23,21 @@ fn toggle_window(app: &tauri::AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let mcp_manager = commands::SharedMcpManager::default();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .manage(mcp_manager)
         .invoke_handler(tauri::generate_handler![
             commands::send_message_stream,
             commands::get_config,
             commands::set_config,
             commands::test_provider,
+            commands::mcp_add_server,
+            commands::mcp_discover_tools,
+            commands::mcp_call_tool,
+            commands::mcp_get_tools,
         ])
         .setup(|app| {
             // Register Alt+Space global hotkey
