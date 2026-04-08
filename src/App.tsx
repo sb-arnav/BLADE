@@ -13,6 +13,8 @@ import { useChat } from "./hooks/useChat";
 import { useTTS } from "./hooks/useTTS";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useNotificationSound } from "./hooks/useNotificationSound";
+import { useStats } from "./hooks/useStats";
+import { useFileDrop } from "./hooks/useFileDrop";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
 
@@ -26,7 +28,21 @@ export default function App() {
   const chat = useChat();
   const tts = useTTS(chat.messages, chat.loading);
   const sound = useNotificationSound(chat.loading);
+  const { stats, recordMessage } = useStats();
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleImageDrop = useCallback((dataUrl: string) => {
+    // dataUrl is "data:image/png;base64,..." — extract the base64 part
+    const base64 = dataUrl.split(",")[1];
+    if (base64) sendWithStats("Analyze this image", base64);
+  }, []);
+
+  const handleTextDrop = useCallback((text: string) => {
+    const preview = text.length > 2000 ? text.slice(0, 2000) + "\n...[truncated]" : text;
+    sendWithStats(`Analyze this file:\n\n\`\`\`\n${preview}\n\`\`\``);
+  }, []);
+
+  const { isDragging } = useFileDrop(handleImageDrop, handleTextDrop);
 
   const loadConfig = async () => {
     try {
@@ -64,6 +80,11 @@ export default function App() {
   }, []);
 
   const closePalette = useCallback(() => setPaletteOpen(false), []);
+
+  const sendWithStats = useCallback((content: string, imageBase64?: string) => {
+    recordMessage();
+    chat.sendMessage(content, imageBase64);
+  }, [chat.sendMessage, recordMessage]);
 
   const handleScreenshot = async () => {
     try {
@@ -140,7 +161,20 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
+    <div className="h-screen flex flex-col bg-blade-bg text-blade-text relative">
+      {isDragging && (
+        <div className="absolute inset-0 z-50 bg-blade-bg/90 backdrop-blur-sm flex items-center justify-center border-2 border-dashed border-blade-accent/40 rounded-xl m-2 pointer-events-none animate-fade-in">
+          <div className="text-center">
+            <div className="w-12 h-12 rounded-xl bg-blade-accent-muted flex items-center justify-center mx-auto mb-3">
+              <svg viewBox="0 0 24 24" className="w-6 h-6 text-blade-accent" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M12 5v14M5 12l7-7 7 7" />
+              </svg>
+            </div>
+            <p className="text-sm text-blade-secondary">Drop file to analyze</p>
+            <p className="text-2xs text-blade-muted mt-1">Images or text files</p>
+          </div>
+        </div>
+      )}
       <TitleBar />
       <CommandPalette commands={commands} open={paletteOpen} onClose={closePalette} />
       <div className="flex-1 min-h-0">
@@ -163,7 +197,7 @@ export default function App() {
             clipboardText={chat.clipboardText}
             conversations={chat.conversations}
             currentConversationId={chat.currentConversationId}
-            onSend={chat.sendMessage}
+            onSend={sendWithStats}
             onClear={chat.clearMessages}
             onNewConversation={chat.newConversation}
             onSwitchConversation={chat.switchConversation}
@@ -174,6 +208,8 @@ export default function App() {
             onDeleteConversation={chat.deleteConversation}
             onRetry={chat.retryLastMessage}
             provider={config?.provider}
+            streakDays={stats.streakDays}
+            totalMessages={stats.totalMessages}
             model={config?.model}
             ttsEnabled={tts.enabled}
             ttsSpeaking={tts.speaking}
