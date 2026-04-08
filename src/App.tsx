@@ -11,6 +11,7 @@ import { Discovery } from "./components/Discovery";
 import FocusMode from "./components/FocusMode";
 import { KnowledgeBase } from "./components/KnowledgeBase";
 import { ModelComparison } from "./components/ModelComparison";
+import AgentManager from "./components/AgentManager";
 import SystemPromptPreview from "./components/SystemPromptPreview";
 import { Onboarding } from "./components/Onboarding";
 import { Settings } from "./components/Settings";
@@ -27,7 +28,7 @@ import { useFileDrop } from "./hooks/useFileDrop";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents";
 
 export default function App() {
   const [config, setConfig] = useState<BladeConfig | null>(null);
@@ -168,6 +169,7 @@ export default function App() {
     { id: "focus", label: "Focus mode  Ctrl+F", action: () => setFocusMode(true) },
     { id: "sysprompt", label: "View system prompt", action: () => setSystemPromptOpen(true) },
     { id: "shortcuts", label: "Keyboard shortcuts  Ctrl+/", action: () => setShortcutHelpOpen(true) },
+    { id: "agents", label: "Agent tasks", action: () => setRoute("agents") },
     { id: "chat", label: "Back to chat", action: () => setRoute("chat") },
   ];
 
@@ -246,6 +248,15 @@ export default function App() {
           onComplete={() => setRoute("chat")}
           onSkip={() => setRoute("chat")}
         />
+      </div>
+    );
+  }
+
+  if (route === "agents") {
+    return (
+      <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
+        <TitleBar />
+        <AgentManager />
       </div>
     );
   }

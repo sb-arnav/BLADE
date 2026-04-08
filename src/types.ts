@@ -72,6 +72,30 @@ export interface ServerStatus {
   running: boolean;
 }
 
+// ── Agent System ───────────────────────────────────────────────────────────────
+
+export interface AgentStep {
+  id: string;
+  description: string;
+  tool_name: string | null;
+  tool_args: unknown | null;
+  status: "Pending" | "Running" | "Completed" | "Failed" | "Skipped";
+  result: string | null;
+  started_at: number | null;
+  completed_at: number | null;
+}
+
+export interface Agent {
+  id: string;
+  goal: string;
+  status: "Planning" | "Executing" | "WaitingApproval" | "Paused" | "Completed" | "Failed";
+  steps: AgentStep[];
+  current_step: number;
+  created_at: number;
+  updated_at: number;
+  error: string | null;
+}
+
 export interface DiscoveryReport {
   user_identity: {
     name: string | null;

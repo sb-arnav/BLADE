@@ -1,5 +1,6 @@
 mod agent_commands;
 mod agents;
+mod automation;
 mod brain;
 mod clipboard;
 mod commands;
@@ -128,6 +129,12 @@ pub fn run() {
             agent_commands::agent_pause,
             agent_commands::agent_resume,
             agent_commands::agent_cancel,
+            automation::auto_type_text,
+            automation::auto_press_key,
+            automation::auto_key_combo,
+            automation::auto_mouse_move,
+            automation::auto_mouse_click,
+            automation::auto_scroll,
             memory::get_memory_log,
             router::classify_message,
         ])
