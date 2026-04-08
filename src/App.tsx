@@ -16,6 +16,7 @@ import { KnowledgeBase } from "./components/KnowledgeBase";
 import { ModelComparison } from "./components/ModelComparison";
 import { NotificationCenter, useNotifications } from "./components/NotificationCenter";
 import AgentManager from "./components/AgentManager";
+import { ManagedAgentPanel } from "./components/ManagedAgentPanel";
 import SystemPromptPreview from "./components/SystemPromptPreview";
 import { Onboarding } from "./components/Onboarding";
 import { Settings } from "./components/Settings";
@@ -38,7 +39,7 @@ import { useVoiceCommands } from "./hooks/useVoiceCommands";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents";
 
 export default function App() {
   const [config, setConfig] = useState<BladeConfig | null>(null);
@@ -225,6 +226,7 @@ export default function App() {
     { id: "sysprompt", label: "View system prompt", action: () => setSystemPromptOpen(true) },
     { id: "shortcuts", label: "Keyboard shortcuts  Ctrl+/", action: () => setShortcutHelpOpen(true) },
     { id: "agents", label: "Agent tasks", action: () => setRoute("agents") },
+    { id: "managed-agents", label: "Managed Agents (Claude SDK)", action: () => setRoute("managed-agents") },
     { id: "terminal", label: "Terminal", action: () => setRoute("terminal") },
     { id: "files", label: "File browser", action: () => setRoute("files") },
     { id: "sync", label: "Sync settings", action: () => setRoute("sync") },
@@ -277,6 +279,7 @@ export default function App() {
     workflows: <WorkflowBuilder onBack={() => setRoute("chat")} onRunOutput={(output) => { sendWithStats(output); setRoute("chat"); }} />,
     activity: <ActivityFeed items={activity.items} onBack={() => setRoute("chat")} />,
     sync: <SyncSettings onBack={() => setRoute("chat")} />,
+    "managed-agents": <ManagedAgentPanel onBack={() => setRoute("chat")} onSendToChat={(text) => { sendWithStats(text); setRoute("chat"); }} />,
   };
 
   if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {
