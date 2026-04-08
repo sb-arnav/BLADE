@@ -148,14 +148,28 @@ export function useChat() {
     };
   }, []);
 
+  const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (!currentConversationId || loading) {
       return;
     }
 
-    persistConversation(currentConversationId, messages).catch((cause) => {
-      setError(typeof cause === "string" ? cause : String(cause));
-    });
+    if (persistTimerRef.current) {
+      clearTimeout(persistTimerRef.current);
+    }
+
+    persistTimerRef.current = setTimeout(() => {
+      persistConversation(currentConversationId, messages).catch((cause) => {
+        setError(typeof cause === "string" ? cause : String(cause));
+      });
+    }, 500);
+
+    return () => {
+      if (persistTimerRef.current) {
+        clearTimeout(persistTimerRef.current);
+      }
+    };
   }, [currentConversationId, loading, messages, persistConversation]);
 
   const sendMessage = useCallback(
