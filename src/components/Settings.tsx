@@ -14,6 +14,8 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
   const [provider, setProvider] = useState(config.provider);
   const [apiKey, setApiKey] = useState(config.api_key);
   const [model, setModel] = useState(config.model);
+  const [persona, setPersona] = useState("");
+  const [contextNotes, setContextNotes] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,6 +24,23 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
     setApiKey(config.api_key);
     setModel(config.model);
   }, [config]);
+
+  useEffect(() => {
+    const loadBrain = async () => {
+      try {
+        const [nextPersona, nextContext] = await Promise.all([
+          invoke<string>("get_persona"),
+          invoke<string>("get_context"),
+        ]);
+        setPersona(nextPersona);
+        setContextNotes(nextContext);
+      } catch (cause) {
+        setError(typeof cause === "string" ? cause : String(cause));
+      }
+    };
+
+    loadBrain();
+  }, []);
 
   const handleTest = async () => {
     setStatus("Testing connection...");
@@ -51,6 +70,22 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
       };
       setStatus("Settings saved.");
       onSaved(nextConfig);
+    } catch (cause) {
+      setStatus(null);
+      setError(typeof cause === "string" ? cause : String(cause));
+    }
+  };
+
+  const handleSaveBrain = async () => {
+    setStatus("Saving Blade memory...");
+    setError(null);
+
+    try {
+      await Promise.all([
+        invoke("set_persona", { content: persona }),
+        invoke("set_context", { content: contextNotes }),
+      ]);
+      setStatus("Blade memory saved.");
     } catch (cause) {
       setStatus(null);
       setError(typeof cause === "string" ? cause : String(cause));
@@ -129,6 +164,74 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
 
           {status && <p className="text-xs text-green-400">{status}</p>}
           {error && <p className="text-xs text-red-400">{error}</p>}
+        </section>
+
+        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
+          <div>
+            <h2 className="text-base font-semibold">Blade Memory</h2>
+            <p className="text-sm text-blade-muted">
+              Personalize how Blade writes and what long-lived context it should remember.
+            </p>
+          </div>
+
+          <label className="space-y-2 block">
+            <span className="text-xs uppercase tracking-wide text-blade-muted">Persona</span>
+            <textarea
+              value={persona}
+              onChange={(event) => setPersona(event.target.value)}
+              rows={5}
+              className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none resize-y min-h-[120px]"
+              placeholder="Example: I like concise answers, TypeScript-first examples, and startup-style prioritization."
+            />
+          </label>
+
+          <label className="space-y-2 block">
+            <span className="text-xs uppercase tracking-wide text-blade-muted">Context Notes</span>
+            <textarea
+              value={contextNotes}
+              onChange={(event) => setContextNotes(event.target.value)}
+              rows={6}
+              className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none resize-y min-h-[140px]"
+              placeholder="Pinned facts, active projects, conventions, or reminders Blade should fold into future system prompts."
+            />
+          </label>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleSaveBrain}
+              className="px-4 py-2 rounded-xl bg-blade-bg border border-blade-border text-sm hover:border-blade-muted transition-colors"
+            >
+              Save memory
+            </button>
+            <p className="text-xs text-blade-muted">
+              Stored locally and injected into Blade&apos;s system prompt.
+            </p>
+          </div>
+        </section>
+
+        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+          <div>
+            <h2 className="text-base font-semibold">Diagnostics</h2>
+            <p className="text-sm text-blade-muted">Quick view of the current runtime setup.</p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-xl border border-blade-border bg-blade-bg/70 px-3 py-2">
+              <div className="text-xs uppercase tracking-wide text-blade-muted">Provider</div>
+              <div className="text-sm mt-1">{provider || "Not set"}</div>
+            </div>
+            <div className="rounded-xl border border-blade-border bg-blade-bg/70 px-3 py-2">
+              <div className="text-xs uppercase tracking-wide text-blade-muted">Model</div>
+              <div className="text-sm mt-1 break-all">{model || "Not set"}</div>
+            </div>
+            <div className="rounded-xl border border-blade-border bg-blade-bg/70 px-3 py-2">
+              <div className="text-xs uppercase tracking-wide text-blade-muted">Tool Mode</div>
+              <div className="text-sm mt-1">Auto with MCP when tools are available</div>
+            </div>
+            <div className="rounded-xl border border-blade-border bg-blade-bg/70 px-3 py-2">
+              <div className="text-xs uppercase tracking-wide text-blade-muted">Secret Storage</div>
+              <div className="text-sm mt-1">Plaintext config today, secure storage planned</div>
+            </div>
+          </div>
         </section>
 
         <McpSettings
