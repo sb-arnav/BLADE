@@ -2,6 +2,7 @@ mod agent_commands;
 mod agents;
 mod automation;
 mod brain;
+mod context;
 mod clipboard;
 mod commands;
 mod config;
@@ -33,6 +34,19 @@ fn toggle_window(app: &tauri::AppHandle) {
         if window.is_visible().unwrap_or(false) {
             let _ = window.hide();
         } else {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    }
+}
+
+fn toggle_quickask(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("quickask") {
+        if window.is_visible().unwrap_or(false) {
+            let _ = window.hide();
+        } else {
+            // Re-center each time so it appears near the middle of the screen
+            let _ = window.center();
             let _ = window.show();
             let _ = window.set_focus();
         }
@@ -135,6 +149,8 @@ pub fn run() {
             automation::auto_mouse_move,
             automation::auto_mouse_click,
             automation::auto_scroll,
+            context::get_active_window,
+            context::get_user_activity,
             memory::get_memory_log,
             router::classify_message,
         ])
@@ -144,6 +160,22 @@ pub fn run() {
                 let _ = window.show();
                 let _ = window.set_focus();
             }
+
+            // Create the Quick Ask floating widget window
+            let _quickask = tauri::WebviewWindowBuilder::new(
+                app,
+                "quickask",
+                tauri::WebviewUrl::App("quickask.html".into()),
+            )
+            .title("Blade Quick Ask")
+            .inner_size(500.0, 72.0)
+            .decorations(false)
+            .transparent(true)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .center()
+            .visible(false)
+            .build()?;
 
             let startup_config = config::load_config();
             let manager = setup_manager.clone();
@@ -166,11 +198,12 @@ pub fn run() {
             // Start clipboard watcher
             clipboard::start_clipboard_watcher(app.handle().clone());
 
+            // Alt+Space → toggle Quick Ask floating widget
             let handle = app.handle().clone();
             let _ = app.global_shortcut().on_shortcut(
                 Shortcut::new(Some(Modifiers::ALT), Code::Space),
                 move |_app, _shortcut, _event| {
-                    toggle_window(&handle);
+                    toggle_quickask(&handle);
                 },
             );
 
