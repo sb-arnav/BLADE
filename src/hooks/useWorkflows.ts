@@ -549,7 +549,7 @@ export function useWorkflows() {
               const filledArgs = interpolateTemplate(argsTemplate, initialInput, currentOutput);
 
               try {
-                const result = await invoke<string>("call_mcp_tool", {
+                const result = await invoke<string>("mcp_call_tool", {
                   toolName,
                   arguments: filledArgs,
                 });

@@ -1,25 +1,30 @@
-import { useCallback, useRef, useState, useEffect } from "react";
+import React, { useCallback, useRef, useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { Analytics } from "./components/Analytics";
+import { ActivityFeed, useActivityFeed } from "./components/ActivityFeed";
+import Canvas from "./components/Canvas";
 import { ChatWindow } from "./components/ChatWindow";
 import { CommandPalette } from "./components/CommandPalette";
 import { ConversationInsightsPanel } from "./components/ConversationInsightsPanel";
 import { Diagnostics } from "./components/Diagnostics";
 import { Discovery } from "./components/Discovery";
+import { FileBrowser } from "./components/FileBrowser";
 import FocusMode from "./components/FocusMode";
 import { KnowledgeBase } from "./components/KnowledgeBase";
 import { ModelComparison } from "./components/ModelComparison";
+import { NotificationCenter, useNotifications } from "./components/NotificationCenter";
 import AgentManager from "./components/AgentManager";
 import SystemPromptPreview from "./components/SystemPromptPreview";
 import { Onboarding } from "./components/Onboarding";
 import { Settings } from "./components/Settings";
+import { SyncSettings } from "./components/SyncStatus";
 import TemplateManager from "./components/TemplateManager";
+import { Terminal } from "./components/Terminal";
 import { ThemePicker } from "./components/ThemePicker";
 import ShortcutHelp from "./components/ShortcutHelp";
-import { Terminal } from "./components/Terminal";
-import { FileBrowser } from "./components/FileBrowser";
+import WorkflowBuilder from "./components/WorkflowBuilder";
 import { TitleBar } from "./components/TitleBar";
 import { useChat } from "./hooks/useChat";
 import { useTTS } from "./hooks/useTTS";
@@ -27,10 +32,13 @@ import { useKeyboard } from "./hooks/useKeyboard";
 import { useNotificationSound } from "./hooks/useNotificationSound";
 import { useStats } from "./hooks/useStats";
 import { useFileDrop } from "./hooks/useFileDrop";
+import { useContextAwareness } from "./hooks/useContextAwareness";
+import { useProactiveMode } from "./hooks/useProactiveMode";
+import { useVoiceCommands } from "./hooks/useVoiceCommands";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync";
 
 export default function App() {
   const [config, setConfig] = useState<BladeConfig | null>(null);
@@ -42,15 +50,20 @@ export default function App() {
   const [templateManagerOpen, setTemplateManagerOpen] = useState(false);
   const [themePickerOpen, setThemePickerOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const chat = useChat();
   const tts = useTTS(chat.messages, chat.loading);
   const sound = useNotificationSound(chat.loading);
   const { stats, recordMessage } = useStats();
+  const notifications = useNotifications();
+  const activity = useActivityFeed();
+  const contextAwareness = useContextAwareness();
+  const proactive = useProactiveMode();
+  const voiceCommands = useVoiceCommands();
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const handleImageDrop = useCallback((dataUrl: string) => {
-    // dataUrl is "data:image/png;base64,..." — extract the base64 part
     const base64 = dataUrl.split(",")[1];
     if (base64) sendWithStats("Analyze this image", base64);
   }, []);
@@ -83,9 +96,11 @@ export default function App() {
 
   useEffect(() => {
     loadConfig();
+    // Log context awareness greeting for proactive suggestions
+    console.log("[Blade]", contextAwareness.getGreeting());
   }, []);
 
-  // Open external links in OS browser instead of webview
+  // Open external links in OS browser
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       const anchor = (e.target as HTMLElement).closest("a");
@@ -100,13 +115,36 @@ export default function App() {
     return () => document.removeEventListener("click", handleClick);
   }, []);
 
-  // Auto-focus input when window becomes visible (Alt+Space)
+  // Auto-focus input when window becomes visible
   useEffect(() => {
     const unlisten = listen("tauri://focus", () => {
       setTimeout(() => inputRef.current?.focus(), 50);
     });
     return () => { unlisten.then((fn) => fn()); };
   }, []);
+
+  // Notify when response completes (if window is hidden)
+  useEffect(() => {
+    if (!chat.loading && chat.messages.length > 0) {
+      const last = chat.messages[chat.messages.length - 1];
+      if (last.role === "assistant" && last.content) {
+        activity.track("message", "Response received", last.content.slice(0, 80));
+      }
+    }
+  }, [chat.loading]);
+
+  // Handle proactive suggestions
+  useEffect(() => {
+    if (proactive.suggestions.length > 0) {
+      const latest = proactive.suggestions[proactive.suggestions.length - 1];
+      notifications.add({
+        type: "info",
+        title: latest.title,
+        message: latest.description,
+        action: { label: "Try it", callback: () => sendWithStats(latest.prompt) },
+      });
+    }
+  }, [proactive.suggestions.length]);
 
   const hideWindow = useCallback(() => {
     getCurrentWindow().hide();
@@ -119,21 +157,33 @@ export default function App() {
       case "clear": chat.clearMessages(); break;
       case "new": chat.newConversation(); break;
       case "screenshot": invoke<string>("capture_screen").then((png) => chat.sendMessage("What's on my screen?", png)).catch(() => {}); break;
+      case "voice": break; // handled by InputBar
       case "focus": setFocusMode(true); break;
       case "export": copyConversation(chat.messages, chat.currentConversation?.title); break;
       case "help": setShortcutHelpOpen(true); break;
     }
-  }, [chat]);
+    activity.track("message", `Slash command: /${action}`, "");
+  }, [chat, activity]);
 
   const sendWithStats = useCallback((content: string, imageBase64?: string) => {
     recordMessage();
+    activity.track("message", "Message sent", content.slice(0, 80));
+
+    // Check for voice commands
+    const cmd = voiceCommands.processTranscription(content);
+    if (cmd && cmd.action !== "ask") {
+      handleSlashCommand(cmd.action);
+      return;
+    }
+
     chat.sendMessage(content, imageBase64);
-  }, [chat.sendMessage, recordMessage]);
+  }, [chat.sendMessage, recordMessage, activity, voiceCommands, handleSlashCommand]);
 
   const handleScreenshot = async () => {
     try {
       const png = await invoke<string>("capture_screen");
       chat.sendMessage("What's on my screen?", png);
+      activity.track("screenshot", "Screenshot captured", "");
     } catch {
       // Screenshot failed
     }
@@ -146,7 +196,7 @@ export default function App() {
     onToggleSidebar: undefined,
     onFocusInput: () => inputRef.current?.focus(),
     onPalette: () => setPaletteOpen((p) => !p),
-    onEscape: paletteOpen ? () => setPaletteOpen(false) : shortcutHelpOpen ? () => setShortcutHelpOpen(false) : undefined,
+    onEscape: paletteOpen ? () => setPaletteOpen(false) : shortcutHelpOpen ? () => setShortcutHelpOpen(false) : notificationsOpen ? () => setNotificationsOpen(false) : undefined,
     onHideWindow: hideWindow,
     onShortcutHelp: () => setShortcutHelpOpen((p) => !p),
     onFocusMode: () => setFocusMode((p) => !p),
@@ -163,7 +213,10 @@ export default function App() {
     { id: "templates", label: "Prompt templates", action: () => setTemplateManagerOpen(true) },
     { id: "themes", label: "Change theme", action: () => setThemePickerOpen(true) },
     { id: "insights", label: "Conversation insights", action: () => setInsightsOpen(true) },
+    { id: "canvas", label: "Open canvas / whiteboard", action: () => setRoute("canvas") },
+    { id: "workflows", label: "Workflow builder", action: () => setRoute("workflows") },
     { id: "analytics", label: "Usage analytics", action: () => setRoute("analytics") },
+    { id: "activity", label: "Activity feed", action: () => setRoute("activity") },
     { id: "knowledge", label: "Knowledge base", action: () => setRoute("knowledge") },
     { id: "comparison", label: "Compare models", action: () => setRoute("comparison") },
     { id: "diagnostics", label: "View API traces", action: () => setRoute("diagnostics") },
@@ -174,6 +227,8 @@ export default function App() {
     { id: "agents", label: "Agent tasks", action: () => setRoute("agents") },
     { id: "terminal", label: "Terminal", action: () => setRoute("terminal") },
     { id: "files", label: "File browser", action: () => setRoute("files") },
+    { id: "sync", label: "Sync settings", action: () => setRoute("sync") },
+    { id: "notifications", label: "Notifications", action: () => setNotificationsOpen(true) },
     { id: "chat", label: "Back to chat", action: () => setRoute("chat") },
   ];
 
@@ -208,77 +263,27 @@ export default function App() {
     );
   }
 
-  if (route === "analytics") {
-    return (
-      <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
-        <TitleBar />
-        <Analytics onBack={() => setRoute("chat")} />
-      </div>
-    );
-  }
+  // Full-page routes
+  const fullPageRoutes: Record<string, React.ReactNode> = {
+    analytics: <Analytics onBack={() => setRoute("chat")} />,
+    knowledge: <KnowledgeBase onBack={() => setRoute("chat")} onInsertToChat={(content) => { sendWithStats(content); setRoute("chat"); }} />,
+    comparison: <ModelComparison onBack={() => setRoute("chat")} />,
+    diagnostics: <Diagnostics onBack={() => setRoute("chat")} />,
+    discovery: <Discovery onComplete={() => setRoute("chat")} onSkip={() => setRoute("chat")} />,
+    agents: <AgentManager />,
+    terminal: <Terminal onBack={() => setRoute("chat")} onSendToChat={(text) => { sendWithStats(text); setRoute("chat"); }} />,
+    files: <FileBrowser onBack={() => setRoute("chat")} onSendToChat={(content, name) => { sendWithStats(`Analyze ${name}:\n\n\`\`\`\n${content.slice(0, 3000)}\n\`\`\``); setRoute("chat"); }} />,
+    canvas: <Canvas onBack={() => setRoute("chat")} onSendToChat={(text) => { sendWithStats(text); setRoute("chat"); }} />,
+    workflows: <WorkflowBuilder onBack={() => setRoute("chat")} onRunOutput={(output) => { sendWithStats(output); setRoute("chat"); }} />,
+    activity: <ActivityFeed items={activity.items} onBack={() => setRoute("chat")} />,
+    sync: <SyncSettings onBack={() => setRoute("chat")} />,
+  };
 
-  if (route === "knowledge") {
+  if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {
     return (
       <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
         <TitleBar />
-        <KnowledgeBase onBack={() => setRoute("chat")} onInsertToChat={(content) => { sendWithStats(content); setRoute("chat"); }} />
-      </div>
-    );
-  }
-
-  if (route === "comparison") {
-    return (
-      <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
-        <TitleBar />
-        <ModelComparison onBack={() => setRoute("chat")} />
-      </div>
-    );
-  }
-
-  if (route === "diagnostics") {
-    return (
-      <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
-        <TitleBar />
-        <Diagnostics onBack={() => setRoute("chat")} />
-      </div>
-    );
-  }
-
-  if (route === "discovery") {
-    return (
-      <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
-        <TitleBar />
-        <Discovery
-          onComplete={() => setRoute("chat")}
-          onSkip={() => setRoute("chat")}
-        />
-      </div>
-    );
-  }
-
-  if (route === "agents") {
-    return (
-      <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
-        <TitleBar />
-        <AgentManager />
-      </div>
-    );
-  }
-
-  if (route === "terminal") {
-    return (
-      <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
-        <TitleBar />
-        <Terminal onBack={() => setRoute("chat")} onSendToChat={(text) => { sendWithStats(text); setRoute("chat"); }} />
-      </div>
-    );
-  }
-
-  if (route === "files") {
-    return (
-      <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
-        <TitleBar />
-        <FileBrowser onBack={() => setRoute("chat")} onSendToChat={(content, name) => { sendWithStats(`Analyze ${name}:\n\n\`\`\`\n${content.slice(0, 3000)}\n\`\`\``); setRoute("chat"); }} />
+        {fullPageRoutes[route]}
       </div>
     );
   }
@@ -305,6 +310,16 @@ export default function App() {
       <TemplateManager open={templateManagerOpen} onClose={() => setTemplateManagerOpen(false)} onUseTemplate={(content: string) => { sendWithStats(content); setTemplateManagerOpen(false); }} />
       <ThemePicker open={themePickerOpen} onClose={() => setThemePickerOpen(false)} />
       <ConversationInsightsPanel messages={chat.messages} open={insightsOpen} onClose={() => setInsightsOpen(false)} />
+      <NotificationCenter
+        open={notificationsOpen}
+        onClose={() => setNotificationsOpen(false)}
+        notifications={notifications.notifications}
+        onMarkRead={notifications.markRead}
+        onMarkAllRead={notifications.markAllRead}
+        onDismiss={notifications.dismiss}
+        onClearAll={notifications.clearAll}
+        onAction={(r) => { setRoute(r as Route); setNotificationsOpen(false); }}
+      />
       <div className="flex-1 min-h-0">
         {route === "settings" ? (
           <Settings
