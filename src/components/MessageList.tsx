@@ -1,5 +1,5 @@
 import { Message, ToolExecution } from "../types";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import hljs from "highlight.js/lib/core";
@@ -108,7 +108,9 @@ function CodeBlock({ className, children }: { className?: string; children: Reac
   );
 }
 
-function MessageBubble({ msg }: { msg: Message }) {
+const MemoCodeBlock = memo(CodeBlock);
+
+const MessageBubble = memo(function MessageBubble({ msg }: { msg: Message }) {
   const [hovered, setHovered] = useState(false);
   const isUser = msg.role === "user";
 
@@ -152,7 +154,7 @@ function MessageBubble({ msg }: { msg: Message }) {
                     if (isInline) {
                       return <code className={className} {...rest}>{children}</code>;
                     }
-                    return <CodeBlock className={className}>{children}</CodeBlock>;
+                    return <MemoCodeBlock className={className}>{children}</MemoCodeBlock>;
                   },
                   pre({ children }) {
                     return <>{children}</>;
@@ -172,7 +174,7 @@ function MessageBubble({ msg }: { msg: Message }) {
       </div>
     </div>
   );
-}
+});
 
 export function MessageList({ messages, loading, toolExecutions }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);

@@ -11,6 +11,7 @@ export function InputBar({ onSend, disabled }: Props) {
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const [inputError, setInputError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSend = () => {
@@ -29,6 +30,7 @@ export function InputBar({ onSend, disabled }: Props) {
   };
 
   const handleVoice = useCallback(async () => {
+    setInputError(null);
     if (recording) {
       setRecording(false);
       setTranscribing(true);
@@ -39,22 +41,32 @@ export function InputBar({ onSend, disabled }: Props) {
           setValue((prev) => (prev ? prev + " " + text.trim() : text.trim()));
           textareaRef.current?.focus();
         }
-      } catch { /* noop */ }
+      } catch (e) {
+        setInputError(typeof e === "string" ? e : "Transcription failed");
+        setTimeout(() => setInputError(null), 4000);
+      }
       setTranscribing(false);
     } else {
       try {
         await invoke("voice_start_recording");
         setRecording(true);
-      } catch { /* noop */ }
+      } catch (e) {
+        setInputError(typeof e === "string" ? e : "Mic not available");
+        setTimeout(() => setInputError(null), 4000);
+      }
     }
   }, [recording]);
 
   const handleScreenshot = useCallback(async () => {
+    setInputError(null);
     setCapturing(true);
     try {
       const png = await invoke<string>("capture_screen");
       onSend("What's on my screen?", png);
-    } catch { /* noop */ }
+    } catch (e) {
+      setInputError(typeof e === "string" ? e : "Screenshot failed");
+      setTimeout(() => setInputError(null), 4000);
+    }
     setCapturing(false);
   }, [onSend]);
 
@@ -62,6 +74,11 @@ export function InputBar({ onSend, disabled }: Props) {
 
   return (
     <div className="px-4 pb-4 pt-2">
+      {inputError && (
+        <div className="mb-2 px-3 py-1.5 rounded-lg bg-red-500/8 border border-red-500/15 text-red-400 text-2xs animate-fade-in">
+          {inputError}
+        </div>
+      )}
       <div className={`flex items-end gap-1.5 rounded-xl border transition-colors ${
         recording
           ? "border-red-500/30 bg-red-500/5"

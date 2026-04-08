@@ -54,7 +54,14 @@ export function ChatWindow({
   onRespondApproval,
   onDeleteConversation,
 }: Props) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    try { return localStorage.getItem("blade-sidebar") === "open"; } catch { return false; }
+  });
+
+  const toggleSidebar = (open: boolean) => {
+    setSidebarOpen(open);
+    try { localStorage.setItem("blade-sidebar", open ? "open" : "closed"); } catch {}
+  };
 
   const handleClipboardAction = (action: string) => {
     if (!clipboardText) return;
@@ -69,7 +76,7 @@ export function ChatWindow({
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-30 bg-black/50 backdrop-blur-[2px] transition-opacity"
-          onClick={() => setSidebarOpen(false)}
+          onClick={() => toggleSidebar(false)}
         />
       )}
 
@@ -83,7 +90,7 @@ export function ChatWindow({
         <div className="flex items-center justify-between px-3 py-2.5">
           <span className="text-2xs font-medium tracking-widest uppercase text-blade-muted">History</span>
           <button
-            onClick={() => { onNewConversation(); setSidebarOpen(false); }}
+            onClick={() => { onNewConversation(); toggleSidebar(false); }}
             className="w-6 h-6 rounded-md flex items-center justify-center text-blade-muted hover:text-blade-secondary hover:bg-blade-surface-hover transition-colors"
             title="New conversation"
           >
@@ -98,7 +105,7 @@ export function ChatWindow({
             return (
               <button
                 key={conv.id}
-                onClick={() => { onSwitchConversation(conv.id); setSidebarOpen(false); }}
+                onClick={() => { onSwitchConversation(conv.id); toggleSidebar(false); }}
                 className={`group w-full text-left rounded-lg px-2.5 py-2 mb-0.5 transition-colors ${
                   isActive
                     ? "bg-blade-accent-muted text-blade-text"
@@ -123,7 +130,7 @@ export function ChatWindow({
         </div>
         <div className="border-t border-blade-border px-3 py-2">
           <button
-            onClick={() => { onOpenSettings(); setSidebarOpen(false); }}
+            onClick={() => { onOpenSettings(); toggleSidebar(false); }}
             className="flex items-center gap-2 text-xs text-blade-muted hover:text-blade-secondary transition-colors py-1 w-full"
           >
             <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
@@ -141,7 +148,7 @@ export function ChatWindow({
         <div className="flex items-center justify-between h-10 px-4 border-b border-blade-border/50 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <button
-              onClick={() => setSidebarOpen(true)}
+              onClick={() => toggleSidebar(true)}
               className="text-blade-muted hover:text-blade-secondary transition-colors shrink-0"
               aria-label="History"
             >
