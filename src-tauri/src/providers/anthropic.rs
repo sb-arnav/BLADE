@@ -155,9 +155,12 @@ fn serialize_simple(message: &ConversationMessage) -> Option<serde_json::Value> 
     match message {
         ConversationMessage::System(_) => None,
         ConversationMessage::User(c) => Some(serde_json::json!({"role": "user", "content": c})),
-        ConversationMessage::UserWithImage { text, .. } => Some(serde_json::json!({
+        ConversationMessage::UserWithImage { text, image_base64 } => Some(serde_json::json!({
             "role": "user",
-            "content": text,
+            "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": image_base64}},
+                {"type": "text", "text": text},
+            ],
         })),
         ConversationMessage::Assistant { content, .. } => {
             if content.is_empty() { return None; }

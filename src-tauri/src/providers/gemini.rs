@@ -171,8 +171,8 @@ pub async fn stream_text(
     let contents: Vec<serde_json::Value> = messages.iter().filter_map(|m| match m {
         super::ConversationMessage::System(_) => None,
         super::ConversationMessage::User(c) => Some(serde_json::json!({"role": "user", "parts": [{"text": c}]})),
-        super::ConversationMessage::UserWithImage { text, .. } => Some(serde_json::json!({
-            "role": "user", "parts": [{"text": text}]
+        super::ConversationMessage::UserWithImage { text, image_base64 } => Some(serde_json::json!({
+            "role": "user", "parts": [{"text": text}, {"inlineData": {"mimeType": "image/png", "data": image_base64}}]
         })),
         super::ConversationMessage::Assistant { content, .. } => {
             if content.is_empty() { return None; }
