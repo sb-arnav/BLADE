@@ -8,6 +8,7 @@ import { Diagnostics } from "./components/Diagnostics";
 import { Discovery } from "./components/Discovery";
 import { Onboarding } from "./components/Onboarding";
 import { Settings } from "./components/Settings";
+import ShortcutHelp from "./components/ShortcutHelp";
 import { TitleBar } from "./components/TitleBar";
 import { useChat } from "./hooks/useChat";
 import { useTTS } from "./hooks/useTTS";
@@ -25,6 +26,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [route, setRoute] = useState<Route>("chat");
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const chat = useChat();
   const tts = useTTS(chat.messages, chat.loading);
   const sound = useNotificationSound(chat.loading);
@@ -102,8 +104,9 @@ export default function App() {
     onToggleSidebar: undefined,
     onFocusInput: () => inputRef.current?.focus(),
     onPalette: () => setPaletteOpen((p) => !p),
-    onEscape: paletteOpen ? () => setPaletteOpen(false) : undefined,
+    onEscape: paletteOpen ? () => setPaletteOpen(false) : shortcutHelpOpen ? () => setShortcutHelpOpen(false) : undefined,
     onHideWindow: hideWindow,
+    onShortcutHelp: () => setShortcutHelpOpen((p) => !p),
   });
 
   const commands = [
@@ -116,6 +119,7 @@ export default function App() {
     { id: "settings", label: "Open settings  Ctrl+,", action: () => setRoute("settings") },
     { id: "diagnostics", label: "View API traces", action: () => setRoute("diagnostics") },
     { id: "discovery", label: "Run discovery scan", action: () => setRoute("discovery") },
+    { id: "shortcuts", label: "Keyboard shortcuts  Ctrl+/", action: () => setShortcutHelpOpen(true) },
     { id: "chat", label: "Back to chat", action: () => setRoute("chat") },
   ];
 
@@ -177,6 +181,7 @@ export default function App() {
       )}
       <TitleBar />
       <CommandPalette commands={commands} open={paletteOpen} onClose={closePalette} />
+      <ShortcutHelp open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
       <div className="flex-1 min-h-0">
         {route === "settings" ? (
           <Settings

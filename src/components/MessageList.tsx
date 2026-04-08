@@ -233,10 +233,23 @@ const QUICK_ACTIONS = [
 
 export function MessageList({ messages, loading, toolExecutions, onQuickAction }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading, toolExecutions]);
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setShowScrollBtn(distFromBottom > 200);
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
 
   const activeTools = toolExecutions.filter((t) => t.status === "executing");
   const recentCompleted = toolExecutions.filter(
@@ -244,7 +257,18 @@ export function MessageList({ messages, loading, toolExecutions, onQuickAction }
   );
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto relative" ref={scrollRef} onScroll={handleScroll}>
+      {showScrollBtn && (
+        <button
+          onClick={scrollToBottom}
+          className="fixed bottom-24 right-6 z-20 w-8 h-8 rounded-full bg-blade-surface border border-blade-border shadow-lg flex items-center justify-center text-blade-muted hover:text-blade-accent hover:border-blade-accent/30 transition-all animate-fade-in"
+          aria-label="Scroll to bottom"
+        >
+          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M12 5v14M5 12l7 7 7-7" />
+          </svg>
+        </button>
+      )}
       <div className="max-w-2xl mx-auto px-6 py-6 space-y-6">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center min-h-[50vh] gap-5">
