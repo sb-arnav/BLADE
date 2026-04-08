@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
 import { ChatWindow } from "./components/ChatWindow";
 import { CommandPalette } from "./components/CommandPalette";
 import { Diagnostics } from "./components/Diagnostics";
@@ -49,6 +51,18 @@ export default function App() {
     loadConfig();
   }, []);
 
+  // Auto-focus input when window becomes visible (Alt+Space)
+  useEffect(() => {
+    const unlisten = listen("tauri://focus", () => {
+      setTimeout(() => inputRef.current?.focus(), 50);
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
+
+  const hideWindow = useCallback(() => {
+    getCurrentWindow().hide();
+  }, []);
+
   const closePalette = useCallback(() => setPaletteOpen(false), []);
 
   const handleScreenshot = async () => {
@@ -67,10 +81,8 @@ export default function App() {
     onToggleSidebar: undefined,
     onFocusInput: () => inputRef.current?.focus(),
     onPalette: () => setPaletteOpen((p) => !p),
-    onEscape: () => {
-      if (paletteOpen) setPaletteOpen(false);
-      // sidebar closes via its own overlay click
-    },
+    onEscape: paletteOpen ? () => setPaletteOpen(false) : undefined,
+    onHideWindow: hideWindow,
   });
 
   const commands = [

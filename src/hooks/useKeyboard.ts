@@ -7,6 +7,7 @@ export interface KeyboardActions {
   onFocusInput?: () => void;
   onPalette?: () => void;
   onEscape?: () => void;
+  onHideWindow?: () => void;
 }
 
 const ALWAYS_ACTIVE_KEYS = new Set(['Escape', 'k']);
@@ -27,7 +28,11 @@ export function useKeyboard(actions: KeyboardActions) {
       }
 
       if (key === 'escape') {
-        actions.onEscape?.();
+        if (actions.onEscape) {
+          actions.onEscape();
+        } else {
+          actions.onHideWindow?.();
+        }
         return;
       }
 
