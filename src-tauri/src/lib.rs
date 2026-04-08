@@ -10,6 +10,7 @@ mod config;
 mod crypto;
 mod db;
 mod discovery;
+mod files;
 mod history;
 mod mcp;
 mod memory;
@@ -155,6 +156,12 @@ pub fn run() {
             memory::get_memory_log,
             router::classify_message,
             tray::set_tray_status,
+            files::file_read,
+            files::file_write,
+            files::file_list,
+            files::file_tree,
+            files::file_exists,
+            files::file_mkdir,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
