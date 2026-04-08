@@ -1,3 +1,5 @@
+mod agent_commands;
+mod agents;
 mod brain;
 mod clipboard;
 mod commands;
@@ -48,6 +50,10 @@ pub fn run() {
     let db_conn = db::init_db().expect("Failed to initialize database");
     let shared_db = Arc::new(std::sync::Mutex::new(db_conn));
 
+    // Agent queue
+    let agent_queue: agents::queue::SharedAgentQueue =
+        Arc::new(tokio::sync::Mutex::new(agents::queue::AgentQueue::default()));
+
     tauri::Builder::default()
         // --- Plugins ---
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -77,6 +83,7 @@ pub fn run() {
         .manage(mcp_manager)
         .manage(approval_map)
         .manage(shared_db)
+        .manage(agent_queue)
         .invoke_handler(tauri::generate_handler![
             commands::send_message_stream,
             commands::get_config,
@@ -115,6 +122,12 @@ pub fn run() {
             screen::capture_screen,
             screen::capture_screen_region,
             memory::learn_from_conversation,
+            agent_commands::agent_create,
+            agent_commands::agent_list,
+            agent_commands::agent_get,
+            agent_commands::agent_pause,
+            agent_commands::agent_resume,
+            agent_commands::agent_cancel,
             memory::get_memory_log,
             router::classify_message,
         ])
