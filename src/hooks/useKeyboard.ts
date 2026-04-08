@@ -9,6 +9,7 @@ export interface KeyboardActions {
   onEscape?: () => void;
   onHideWindow?: () => void;
   onShortcutHelp?: () => void;
+  onFocusMode?: () => void;
 }
 
 const ALWAYS_ACTIVE_KEYS = new Set(['Escape', 'k']);
@@ -46,6 +47,7 @@ export function useKeyboard(actions: KeyboardActions) {
         l: actions.onFocusInput,
         k: actions.onPalette,
         '/': actions.onShortcutHelp,
+        f: actions.onFocusMode,
       };
 
       const handler = shortcut[key];

@@ -6,6 +6,8 @@ import { ChatWindow } from "./components/ChatWindow";
 import { CommandPalette } from "./components/CommandPalette";
 import { Diagnostics } from "./components/Diagnostics";
 import { Discovery } from "./components/Discovery";
+import FocusMode from "./components/FocusMode";
+import SystemPromptPreview from "./components/SystemPromptPreview";
 import { Onboarding } from "./components/Onboarding";
 import { Settings } from "./components/Settings";
 import ShortcutHelp from "./components/ShortcutHelp";
@@ -27,6 +29,8 @@ export default function App() {
   const [route, setRoute] = useState<Route>("chat");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
+  const [systemPromptOpen, setSystemPromptOpen] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
   const chat = useChat();
   const tts = useTTS(chat.messages, chat.loading);
   const sound = useNotificationSound(chat.loading);
@@ -122,6 +126,7 @@ export default function App() {
     onEscape: paletteOpen ? () => setPaletteOpen(false) : shortcutHelpOpen ? () => setShortcutHelpOpen(false) : undefined,
     onHideWindow: hideWindow,
     onShortcutHelp: () => setShortcutHelpOpen((p) => !p),
+    onFocusMode: () => setFocusMode((p) => !p),
   });
 
   const commands = [
@@ -134,9 +139,22 @@ export default function App() {
     { id: "settings", label: "Open settings  Ctrl+,", action: () => setRoute("settings") },
     { id: "diagnostics", label: "View API traces", action: () => setRoute("diagnostics") },
     { id: "discovery", label: "Run discovery scan", action: () => setRoute("discovery") },
+    { id: "focus", label: "Focus mode  Ctrl+F", action: () => setFocusMode(true) },
+    { id: "sysprompt", label: "View system prompt", action: () => setSystemPromptOpen(true) },
     { id: "shortcuts", label: "Keyboard shortcuts  Ctrl+/", action: () => setShortcutHelpOpen(true) },
     { id: "chat", label: "Back to chat", action: () => setRoute("chat") },
   ];
+
+  if (focusMode && config?.onboarded) {
+    return (
+      <FocusMode
+        messages={chat.messages}
+        loading={chat.loading}
+        onSend={sendWithStats}
+        onExit={() => setFocusMode(false)}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -197,6 +215,7 @@ export default function App() {
       <TitleBar />
       <CommandPalette commands={commands} open={paletteOpen} onClose={closePalette} />
       <ShortcutHelp open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
+      <SystemPromptPreview open={systemPromptOpen} onClose={() => setSystemPromptOpen(false)} />
       <div className="flex-1 min-h-0">
         {route === "settings" ? (
           <Settings

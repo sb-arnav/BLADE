@@ -26,6 +26,7 @@ export interface ConversationSummary {
   title: string;
   created_at: number;
   updated_at: number;
+  message_count?: number;
 }
 
 export interface StoredConversation extends ConversationSummary {
