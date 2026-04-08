@@ -51,7 +51,7 @@ pub fn run() {
     tauri::Builder::default()
         // --- Plugins ---
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_sql::Builder::new().build())
+        // SQLite handled by db.rs via rusqlite directly
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--hidden"])))
@@ -119,18 +119,8 @@ pub fn run() {
             router::classify_message,
         ])
         .setup(move |app| {
-            // Ensure window is visible and focused on startup
+            // Window state (position/size) handled by tauri-plugin-window-state
             if let Some(window) = app.get_webview_window("main") {
-                if let Some(window_state) = config::load_config().window_state {
-                    let _ = window.set_size(Size::Physical(PhysicalSize::new(
-                        window_state.width,
-                        window_state.height,
-                    )));
-                    let _ = window.set_position(Position::Physical(PhysicalPosition::new(
-                        window_state.x,
-                        window_state.y,
-                    )));
-                }
                 let _ = window.show();
                 let _ = window.set_focus();
             }
@@ -204,17 +194,7 @@ pub fn run() {
                 api.prevent_close();
                 let _ = window.hide();
             }
-
-            if matches!(event, WindowEvent::Moved(_) | WindowEvent::Resized(_)) {
-                if let (Ok(position), Ok(size)) = (window.outer_position(), window.outer_size()) {
-                    let _ = config::update_window_state(config::WindowState {
-                        x: position.x,
-                        y: position.y,
-                        width: size.width,
-                        height: size.height,
-                    });
-                }
-            }
+            // Window state (position/size) saved by tauri-plugin-window-state
         })
         .run(tauri::generate_context!())
         .expect("error running blade");

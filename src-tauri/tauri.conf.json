@@ -44,11 +44,5 @@
     "publisher": "Arnav Maurya",
     "shortDescription": "Blade - Personal AI"
   },
-  "plugins": {
-    "sql": {
-      "preload": {
-        "db": "sqlite:blade.db"
-      }
-    }
-  }
+  "plugins": {}
 }
