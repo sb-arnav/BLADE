@@ -10,6 +10,7 @@ pub struct DiscoveryReport {
     pub projects: Vec<ProjectInfo>,
     pub dev_environment: DevEnvironment,
     pub installed_tools: Vec<String>,
+    pub claude_memories: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,6 +54,7 @@ pub fn run_discovery() -> DiscoveryReport {
     report.projects = discover_projects(&home);
     report.dev_environment = discover_dev_environment(&home);
     report.installed_tools = discover_installed_tools(&home);
+    report.claude_memories = discover_claude_memories(&home);
 
     report
 }
@@ -351,4 +353,57 @@ fn discover_installed_tools(home: &Path) -> Vec<String> {
     }
 
     tools
+}
+
+/// Read Claude Code memory files — these contain rich context about the user
+fn discover_claude_memories(home: &Path) -> Vec<String> {
+    let mut memories = Vec::new();
+    let projects_dir = home.join(".claude").join("projects");
+
+    if !projects_dir.exists() {
+        return memories;
+    }
+
+    if let Ok(project_dirs) = fs::read_dir(&projects_dir) {
+        for project_entry in project_dirs.flatten() {
+            let memory_dir = project_entry.path().join("memory");
+            if !memory_dir.exists() {
+                continue;
+            }
+
+            if let Ok(memory_files) = fs::read_dir(&memory_dir) {
+                for file_entry in memory_files.flatten() {
+                    let path = file_entry.path();
+
+                    // Skip MEMORY.md (it's just an index) and non-md files
+                    let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                    if name == "MEMORY.md" || !name.ends_with(".md") {
+                        continue;
+                    }
+
+                    if let Ok(content) = fs::read_to_string(&path) {
+                        // Strip frontmatter, keep the actual content
+                        let cleaned = strip_frontmatter(&content);
+                        if !cleaned.trim().is_empty() && cleaned.len() < 2000 {
+                            memories.push(cleaned);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Cap at 20 memories to avoid token explosion
+    memories.truncate(20);
+    memories
+}
+
+fn strip_frontmatter(content: &str) -> String {
+    let trimmed = content.trim();
+    if trimmed.starts_with("---") {
+        if let Some(end) = trimmed[3..].find("---") {
+            return trimmed[end + 6..].trim().to_string();
+        }
+    }
+    trimmed.to_string()
 }

@@ -91,6 +91,25 @@ pub async fn complete_turn(
     }
 }
 
+/// Stream a text-only response (no tool calling). Used when no tools are
+/// configured or for the final turn after all tool calls are done.
+pub async fn stream_text(
+    app: &tauri::AppHandle,
+    provider: &str,
+    api_key: &str,
+    model: &str,
+    messages: &[ConversationMessage],
+) -> Result<(), String> {
+    match provider {
+        "gemini" => gemini::stream_text(app, api_key, model, messages).await,
+        "groq" => groq::stream_text(app, api_key, model, messages).await,
+        "openai" => openai::stream_text(app, api_key, model, messages).await,
+        "anthropic" => anthropic::stream_text(app, api_key, model, messages).await,
+        "ollama" => ollama::stream_text(app, model, messages).await,
+        _ => Err(format!("Unknown provider: {}", provider)),
+    }
+}
+
 pub async fn test_connection(provider: &str, api_key: &str, model: &str) -> Result<String, String> {
     match provider {
         "gemini" => gemini::test(api_key, model).await,
