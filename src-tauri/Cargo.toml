@@ -23,3 +23,4 @@ futures = "0.3"
 dirs = "6"
 arboard = "3"
 chrono = "0.4"
+keyring = { version = "3", features = ["windows-native", "apple-native", "sync-secret-service"] }
