@@ -6,7 +6,25 @@ fn build_body(
     messages: &[ConversationMessage],
     tools: &[ToolDefinition],
 ) -> serde_json::Value {
-    let msgs: Vec<serde_json::Value> = messages.iter().map(serialize_message).collect();
+    let mut msgs: Vec<serde_json::Value> = messages.iter().map(serialize_message).collect();
+
+    // Non-vision models reject array content — flatten image messages to text only
+    let is_vision = model.contains("vision") || model.contains("scout") || model.contains("llama-4");
+    if !is_vision {
+        for msg in &mut msgs {
+            if msg["content"].is_array() {
+                let text = msg["content"]
+                    .as_array()
+                    .unwrap_or(&vec![])
+                    .iter()
+                    .filter_map(|p| p["text"].as_str())
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                msg["content"] = serde_json::Value::String(text);
+            }
+        }
+    }
+
     let tool_payload: Vec<serde_json::Value> = tools
         .iter()
         .map(|tool| {
@@ -156,9 +174,12 @@ fn serialize_simple(message: &super::ConversationMessage) -> Option<serde_json::
     match message {
         super::ConversationMessage::System(c) => Some(serde_json::json!({"role": "system", "content": c})),
         super::ConversationMessage::User(c) => Some(serde_json::json!({"role": "user", "content": c})),
-        super::ConversationMessage::UserWithImage { text, .. } => Some(serde_json::json!({
+        super::ConversationMessage::UserWithImage { text, image_base64 } => Some(serde_json::json!({
             "role": "user",
-            "content": text,
+            "content": [
+                {"type": "text", "text": text},
+                {"type": "image_url", "image_url": {"url": format!("data:image/png;base64,{}", image_base64)}}
+            ],
         })),
         super::ConversationMessage::Assistant { content, .. } => {
             if content.is_empty() { return None; }
@@ -178,7 +199,24 @@ pub async fn stream_text(
     use tauri::Emitter;
 
     let client = Client::new();
-    let msgs: Vec<serde_json::Value> = messages.iter().filter_map(serialize_simple).collect();
+    let mut msgs: Vec<serde_json::Value> = messages.iter().filter_map(serialize_simple).collect();
+
+    // Non-vision models reject array content — flatten image messages to text only
+    let is_vision = model.contains("vision") || model.contains("scout") || model.contains("llama-4");
+    if !is_vision {
+        for msg in &mut msgs {
+            if msg["content"].is_array() {
+                let text = msg["content"]
+                    .as_array()
+                    .unwrap_or(&vec![])
+                    .iter()
+                    .filter_map(|p| p["text"].as_str())
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                msg["content"] = serde_json::Value::String(text);
+            }
+        }
+    }
 
     let body = serde_json::json!({
         "model": model,
