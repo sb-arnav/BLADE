@@ -27,6 +27,11 @@ import { ThemePicker } from "./components/ThemePicker";
 import ShortcutHelp from "./components/ShortcutHelp";
 import WorkflowBuilder from "./components/WorkflowBuilder";
 import { TitleBar } from "./components/TitleBar";
+import { EmailAssistant } from "./components/EmailAssistant";
+import DocumentGenerator from "./components/DocumentGenerator";
+import WebAutomation from "./components/WebAutomation";
+import { AgentTeamPanel } from "./components/AgentTeamPanel";
+import { GitPanel } from "./components/GitPanel";
 import { useChat } from "./hooks/useChat";
 import { useTTS } from "./hooks/useTTS";
 import { useKeyboard } from "./hooks/useKeyboard";
@@ -39,7 +44,7 @@ import { useVoiceCommands } from "./hooks/useVoiceCommands";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git";
 
 export default function App() {
   const [config, setConfig] = useState<BladeConfig | null>(null);
@@ -229,6 +234,11 @@ export default function App() {
     { id: "managed-agents", label: "Managed Agents (Claude SDK)", action: () => setRoute("managed-agents") },
     { id: "terminal", label: "Terminal", action: () => setRoute("terminal") },
     { id: "files", label: "File browser", action: () => setRoute("files") },
+    { id: "email", label: "Email assistant", action: () => setRoute("email") },
+    { id: "docs", label: "Document generator", action: () => setRoute("docs") },
+    { id: "web-auto", label: "Web automation", action: () => setRoute("web-auto") },
+    { id: "agent-teams", label: "Agent teams", action: () => setRoute("agent-teams") },
+    { id: "git", label: "Git panel", action: () => setRoute("git") },
     { id: "sync", label: "Sync settings", action: () => setRoute("sync") },
     { id: "notifications", label: "Notifications", action: () => setNotificationsOpen(true) },
     { id: "chat", label: "Back to chat", action: () => setRoute("chat") },
@@ -280,6 +290,11 @@ export default function App() {
     activity: <ActivityFeed items={activity.items} onBack={() => setRoute("chat")} />,
     sync: <SyncSettings onBack={() => setRoute("chat")} />,
     "managed-agents": <ManagedAgentPanel onBack={() => setRoute("chat")} onSendToChat={(text) => { sendWithStats(text); setRoute("chat"); }} />,
+    "email": <EmailAssistant onBack={() => setRoute("chat")} onSendToChat={(text) => { sendWithStats(text); setRoute("chat"); }} />,
+    "docs": <DocumentGenerator onBack={() => setRoute("chat")} />,
+    "web-auto": <WebAutomation onBack={() => setRoute("chat")} onSendToChat={(text) => { sendWithStats(text); setRoute("chat"); }} />,
+    "agent-teams": <AgentTeamPanel onBack={() => setRoute("chat")} onSendToChat={(text) => { sendWithStats(text); setRoute("chat"); }} />,
+    "git": <GitPanel onBack={() => setRoute("chat")} onSendToChat={(text) => { sendWithStats(text); setRoute("chat"); }} />,
   };
 
   if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {
