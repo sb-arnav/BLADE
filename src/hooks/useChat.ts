@@ -16,7 +16,9 @@ export function useChat() {
   const [toolExecutions, setToolExecutions] = useState<ToolExecution[]>([]);
   const [clipboardText, setClipboardText] = useState<string | null>(null);
   const [pendingApproval, setPendingApproval] = useState<ToolApprovalRequest | null>(null);
+  const [lastResponseTime, setLastResponseTime] = useState<number | null>(null);
   const streamBuffer = useRef("");
+  const requestStartRef = useRef<number>(0);
   const messagesRef = useRef<Message[]>([]);
   const bootstrappedRef = useRef(false);
 
@@ -101,6 +103,10 @@ export function useChat() {
     const unlistenDone = listen("chat_done", () => {
       if (!active) return;
       streamBuffer.current = "";
+      if (requestStartRef.current > 0) {
+        setLastResponseTime(Date.now() - requestStartRef.current);
+        requestStartRef.current = 0;
+      }
       setLoading(false);
       setToolExecutions([]);
 
@@ -200,6 +206,8 @@ export function useChat() {
       const nextMessages = [...messagesRef.current, userMsg, assistantMsg];
 
       streamBuffer.current = "";
+      requestStartRef.current = Date.now();
+      setLastResponseTime(null);
       setMessages(nextMessages);
       setCurrentConversationId(conversationId);
       setLoading(true);
@@ -308,6 +316,7 @@ export function useChat() {
     conversations,
     currentConversationId,
     currentConversation,
+    lastResponseTime,
     sendMessage,
     retryLastMessage,
     clearMessages,

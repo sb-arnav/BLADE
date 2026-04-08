@@ -176,6 +176,14 @@ fn save_disk_config(config: &DiskConfig) -> Result<(), String> {
 }
 
 pub fn update_window_state(window_state: WindowState) -> Result<(), String> {
+    // Don't save minimized/off-screen sentinel positions (Windows uses -32000)
+    if window_state.x < -10000 || window_state.y < -10000 {
+        return Ok(());
+    }
+    // Don't save tiny sizes (likely minimized or transitional)
+    if window_state.width < 200 || window_state.height < 100 {
+        return Ok(());
+    }
     let mut config = load_config();
     config.window_state = Some(window_state);
     save_config(&config)

@@ -69,6 +69,21 @@ export default function App() {
     loadConfig();
   }, []);
 
+  // Open external links in OS browser instead of webview
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      const anchor = (e.target as HTMLElement).closest("a");
+      if (!anchor) return;
+      const href = anchor.getAttribute("href");
+      if (href && (href.startsWith("http://") || href.startsWith("https://"))) {
+        e.preventDefault();
+        window.open(href, "_blank");
+      }
+    };
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, []);
+
   // Auto-focus input when window becomes visible (Alt+Space)
   useEffect(() => {
     const unlisten = listen("tauri://focus", () => {
@@ -215,6 +230,7 @@ export default function App() {
             provider={config?.provider}
             streakDays={stats.streakDays}
             totalMessages={stats.totalMessages}
+            lastResponseTime={chat.lastResponseTime}
             model={config?.model}
             ttsEnabled={tts.enabled}
             ttsSpeaking={tts.speaking}

@@ -28,6 +28,7 @@ interface Props {
   model?: string;
   streakDays?: number;
   totalMessages?: number;
+  lastResponseTime?: number | null;
   ttsEnabled: boolean;
   ttsSpeaking: boolean;
   onToggleTTS: () => void;
@@ -69,6 +70,7 @@ export function ChatWindow({
   model,
   streakDays,
   totalMessages,
+  lastResponseTime,
   ttsEnabled,
   ttsSpeaking,
   onToggleTTS,
@@ -231,6 +233,11 @@ export function ChatWindow({
             {provider && (
               <span className="text-2xs text-blade-muted/60 bg-blade-surface px-1.5 py-0.5 rounded-md font-mono shrink-0">
                 {provider}{model ? ` · ${model.split("/").pop()?.split("-").slice(0, 2).join("-")}` : ""}
+                {lastResponseTime != null && (
+                  <span className="text-blade-muted/40 ml-1.5">
+                    {lastResponseTime < 1000 ? `${lastResponseTime}ms` : `${(lastResponseTime / 1000).toFixed(1)}s`}
+                  </span>
+                )}
               </span>
             )}
           </div>
