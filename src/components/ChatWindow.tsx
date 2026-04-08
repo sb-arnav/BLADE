@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ConversationSummary, Message, ToolApprovalRequest, ToolExecution } from "../types";
 import { MessageList } from "./MessageList";
 import { InputBar } from "./InputBar";
+import { SearchInput } from "./SearchInput";
 import { ToolApprovalDialog } from "./ToolApprovalDialog";
 
 interface Props {
@@ -21,6 +22,11 @@ interface Props {
   pendingApproval: ToolApprovalRequest | null;
   onRespondApproval: (approved: boolean) => void;
   onDeleteConversation: (id: string) => void;
+  onRetry: () => void;
+  ttsEnabled: boolean;
+  ttsSpeaking: boolean;
+  onToggleTTS: () => void;
+  onStopTTS: () => void;
 }
 
 function formatTime(timestamp: number): string {
@@ -53,7 +59,20 @@ export function ChatWindow({
   pendingApproval,
   onRespondApproval,
   onDeleteConversation,
+  onRetry,
+  ttsEnabled,
+  ttsSpeaking,
+  onToggleTTS,
+  onStopTTS,
 }: Props) {
+  const [search, setSearch] = useState("");
+
+  const filteredConversations = useMemo(() => {
+    if (!search.trim()) return conversations;
+    const q = search.toLowerCase();
+    return conversations.filter((c) => (c.title || "").toLowerCase().includes(q));
+  }, [conversations, search]);
+
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     try { return localStorage.getItem("blade-sidebar") === "open"; } catch { return false; }
   });
@@ -99,8 +118,11 @@ export function ChatWindow({
             </svg>
           </button>
         </div>
+        <div className="px-2 pb-1.5">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search conversations…" />
+        </div>
         <div className="flex-1 overflow-y-auto px-1.5 pb-2">
-          {conversations.map((conv) => {
+          {filteredConversations.map((conv) => {
             const isActive = conv.id === currentConversationId;
             return (
               <button
@@ -162,6 +184,27 @@ export function ChatWindow({
           </div>
           <div className="flex items-center gap-1">
             <button
+              onClick={ttsSpeaking ? onStopTTS : onToggleTTS}
+              className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
+                ttsEnabled
+                  ? "text-blade-accent hover:bg-blade-surface"
+                  : "text-blade-muted hover:text-blade-secondary hover:bg-blade-surface"
+              }`}
+              title={ttsEnabled ? (ttsSpeaking ? "Stop speaking" : "TTS on — click to disable") : "Enable TTS"}
+            >
+              {ttsSpeaking ? (
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="6" y="4" width="4" height="16" rx="1" />
+                  <rect x="14" y="4" width="4" height="16" rx="1" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                  {ttsEnabled && <path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14" />}
+                </svg>
+              )}
+            </button>
+            <button
               onClick={onClear}
               className="h-7 px-2 rounded-md text-2xs text-blade-muted hover:text-blade-secondary hover:bg-blade-surface transition-colors"
             >
@@ -182,8 +225,14 @@ export function ChatWindow({
 
         {/* Error */}
         {error && (
-          <div className="mx-4 mt-3 px-3 py-2 rounded-lg bg-red-500/8 border border-red-500/15 text-red-400 text-xs animate-fade-in">
-            {error}
+          <div className="mx-4 mt-3 px-3 py-2 rounded-lg bg-red-500/8 border border-red-500/15 text-red-400 text-xs animate-fade-in flex items-center justify-between gap-2">
+            <span className="truncate">{error}</span>
+            <button
+              onClick={onRetry}
+              className="shrink-0 px-2 py-0.5 rounded-md bg-red-500/10 hover:bg-red-500/20 text-red-400 text-2xs transition-colors"
+            >
+              retry
+            </button>
           </div>
         )}
 
