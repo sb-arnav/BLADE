@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ChatWindow } from "./components/ChatWindow";
+import { Discovery } from "./components/Discovery";
 import { Onboarding } from "./components/Onboarding";
 import { Settings } from "./components/Settings";
 import { TitleBar } from "./components/TitleBar";
 import { useChat } from "./hooks/useChat";
 import { BladeConfig } from "./types";
 
-type Route = "chat" | "settings";
+type Route = "chat" | "settings" | "discovery";
 
 export default function App() {
   const [config, setConfig] = useState<BladeConfig | null>(null);
@@ -47,7 +48,22 @@ export default function App() {
     return (
       <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
         <TitleBar />
-        <Onboarding onComplete={loadConfig} />
+        <Onboarding onComplete={async () => {
+          await loadConfig();
+          setRoute("discovery");
+        }} />
+      </div>
+    );
+  }
+
+  if (route === "discovery") {
+    return (
+      <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
+        <TitleBar />
+        <Discovery
+          onComplete={() => setRoute("chat")}
+          onSkip={() => setRoute("chat")}
+        />
       </div>
     );
   }
