@@ -38,3 +38,20 @@ export interface McpTool {
   input_schema: unknown;
   server_name: string;
 }
+
+export interface DiscoveryReport {
+  user_identity: {
+    name: string | null;
+    email: string | null;
+    github_username: string | null;
+  } | null;
+  ai_tools: { name: string; config_path: string; details: Record<string, string> }[];
+  projects: { name: string; path: string; stack: string[]; description: string | null }[];
+  dev_environment: {
+    languages: string[];
+    package_managers: string[];
+    editors: string[];
+    shell: string | null;
+  };
+  installed_tools: string[];
+}
