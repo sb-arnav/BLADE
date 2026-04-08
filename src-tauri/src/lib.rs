@@ -1,40 +1,13 @@
-use std::process::Command;
+mod commands;
+mod config;
+mod providers;
+
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager, WindowEvent,
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
-
-#[derive(serde::Deserialize)]
-struct ChatMessage {
-    role: String,
-    content: String,
-}
-
-#[tauri::command]
-fn send_message(messages: Vec<ChatMessage>) -> Result<String, String> {
-    // Build prompt from conversation history
-    let mut prompt_parts: Vec<String> = messages
-        .iter()
-        .map(|m| format!("{}: {}", m.role.to_uppercase(), m.content))
-        .collect();
-    prompt_parts.push("ASSISTANT:".to_string());
-    let prompt = prompt_parts.join("\n\n");
-
-    let output = Command::new("claude")
-        .args(["-p", &prompt])
-        .output()
-        .map_err(|e| format!("Failed to run claude: {}", e))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("Claude error: {}", stderr));
-    }
-
-    let response = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    Ok(response)
-}
 
 fn toggle_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -52,9 +25,14 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![send_message])
+        .invoke_handler(tauri::generate_handler![
+            commands::send_message_stream,
+            commands::get_config,
+            commands::set_config,
+            commands::test_provider,
+        ])
         .setup(|app| {
-            // Register Alt+Space global hotkey (Win+Space is reserved on Windows)
+            // Register Alt+Space global hotkey
             let handle = app.handle().clone();
             let _ = app.global_shortcut().on_shortcut(
                 Shortcut::new(Some(Modifiers::ALT), Code::Space),
@@ -92,7 +70,6 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            // Hide instead of close when X is pressed
             if let WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
                 let _ = window.hide();
