@@ -102,6 +102,17 @@ export default function App() {
 
   const closePalette = useCallback(() => setPaletteOpen(false), []);
 
+  const handleSlashCommand = useCallback((action: string) => {
+    switch (action) {
+      case "clear": chat.clearMessages(); break;
+      case "new": chat.newConversation(); break;
+      case "screenshot": invoke<string>("capture_screen").then((png) => chat.sendMessage("What's on my screen?", png)).catch(() => {}); break;
+      case "focus": setFocusMode(true); break;
+      case "export": copyConversation(chat.messages, chat.currentConversation?.title); break;
+      case "help": setShortcutHelpOpen(true); break;
+    }
+  }, [chat]);
+
   const sendWithStats = useCallback((content: string, imageBase64?: string) => {
     recordMessage();
     chat.sendMessage(content, imageBase64);
@@ -246,6 +257,7 @@ export default function App() {
             onRespondApproval={chat.respondToApproval}
             onDeleteConversation={chat.deleteConversation}
             onRetry={chat.retryLastMessage}
+            onSlashCommand={handleSlashCommand}
             provider={config?.provider}
             streakDays={stats.streakDays}
             totalMessages={stats.totalMessages}

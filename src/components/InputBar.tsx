@@ -1,28 +1,84 @@
-import { useCallback, useRef, useState, KeyboardEvent } from "react";
+import { useCallback, useRef, useState, useMemo, KeyboardEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
+
+const SLASH_COMMANDS = [
+  { cmd: "/clear", label: "Clear conversation", action: "clear" },
+  { cmd: "/new", label: "New conversation", action: "new" },
+  { cmd: "/screenshot", label: "Capture screen", action: "screenshot" },
+  { cmd: "/voice", label: "Start voice input", action: "voice" },
+  { cmd: "/focus", label: "Enter focus mode", action: "focus" },
+  { cmd: "/export", label: "Export conversation", action: "export" },
+  { cmd: "/help", label: "Show keyboard shortcuts", action: "help" },
+] as const;
+
+type SlashAction = (typeof SLASH_COMMANDS)[number]["action"];
 
 interface Props {
   onSend: (message: string, imageBase64?: string) => void;
+  onSlashCommand?: (action: SlashAction) => void;
   disabled: boolean;
 }
 
-export function InputBar({ onSend, disabled }: Props) {
+export function InputBar({ onSend, onSlashCommand, disabled }: Props) {
   const [value, setValue] = useState("");
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [inputError, setInputError] = useState<string | null>(null);
+  const [slashActive, setSlashActive] = useState(false);
+  const [slashIndex, setSlashIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const slashMatches = useMemo(() => {
+    if (!slashActive || !value.startsWith("/")) return [];
+    const q = value.toLowerCase();
+    return SLASH_COMMANDS.filter((c) => c.cmd.startsWith(q) || c.label.toLowerCase().includes(q.slice(1)));
+  }, [value, slashActive]);
+
+  const executeSlash = useCallback((action: SlashAction) => {
+    setValue("");
+    setSlashActive(false);
+    onSlashCommand?.(action);
+  }, [onSlashCommand]);
 
   const handleSend = () => {
     const trimmed = value.trim();
     if (!trimmed || disabled) return;
+
+    // Handle slash commands
+    if (slashMatches.length > 0 && slashActive) {
+      executeSlash(slashMatches[slashIndex].action);
+      return;
+    }
+
     onSend(trimmed);
     setValue("");
+    setSlashActive(false);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (slashActive && slashMatches.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSlashIndex((i) => Math.min(i + 1, slashMatches.length - 1));
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSlashIndex((i) => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === "Tab") {
+        e.preventDefault();
+        executeSlash(slashMatches[slashIndex].action);
+        return;
+      }
+      if (e.key === "Escape") {
+        setSlashActive(false);
+        return;
+      }
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -93,7 +149,23 @@ export function InputBar({ onSend, disabled }: Props) {
   const busy = disabled || transcribing || capturing;
 
   return (
-    <div className="px-4 pb-4 pt-2">
+    <div className="px-4 pb-4 pt-2 relative">
+      {slashActive && slashMatches.length > 0 && (
+        <div className="absolute bottom-full left-4 right-4 mb-1 bg-blade-surface border border-blade-border rounded-lg shadow-lg overflow-hidden animate-fade-in z-10">
+          {slashMatches.map((cmd, i) => (
+            <button
+              key={cmd.cmd}
+              onClick={() => executeSlash(cmd.action)}
+              className={`w-full text-left px-3 py-2 flex items-center gap-3 text-xs transition-colors ${
+                i === slashIndex ? "bg-blade-accent-muted text-blade-text" : "text-blade-secondary hover:bg-blade-surface-hover"
+              }`}
+            >
+              <span className="font-mono text-blade-accent">{cmd.cmd}</span>
+              <span className="text-blade-muted">{cmd.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
       {inputError && (
         <div className="mb-2 px-3 py-1.5 rounded-lg bg-red-500/8 border border-red-500/15 text-red-400 text-2xs animate-fade-in">
           {inputError}
@@ -147,7 +219,16 @@ export function InputBar({ onSend, disabled }: Props) {
         <textarea
           ref={textareaRef}
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => {
+            const v = e.target.value;
+            setValue(v);
+            if (v.startsWith("/") && v.length <= 15) {
+              setSlashActive(true);
+              setSlashIndex(0);
+            } else {
+              setSlashActive(false);
+            }
+          }}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           placeholder={recording ? "Listening..." : transcribing ? "Transcribing..." : "Message Blade..."}
