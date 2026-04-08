@@ -29,6 +29,26 @@ export function InputBar({ onSend, disabled }: Props) {
     }
   };
 
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const blob = item.getAsFile();
+        if (!blob) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          const base64 = dataUrl.split(",")[1];
+          if (base64) onSend("What's in this image?", base64);
+        };
+        reader.readAsDataURL(blob);
+        return;
+      }
+    }
+  }, [onSend]);
+
   const handleVoice = useCallback(async () => {
     setInputError(null);
     if (recording) {
@@ -129,6 +149,7 @@ export function InputBar({ onSend, disabled }: Props) {
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder={recording ? "Listening..." : transcribing ? "Transcribing..." : "Message Blade..."}
           disabled={busy}
           rows={1}

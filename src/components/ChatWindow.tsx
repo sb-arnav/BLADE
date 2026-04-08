@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ConversationSummary, Message, ToolApprovalRequest, ToolExecution } from "../types";
 import { detectClipboardType } from "../utils/clipboardDetect";
 import { MessageList } from "./MessageList";
@@ -75,6 +75,9 @@ export function ChatWindow({
   onStopTTS,
 }: Props) {
   const [search, setSearch] = useState("");
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   const filteredConversations = useMemo(() => {
     if (!search.trim()) return conversations;
@@ -200,9 +203,31 @@ export function ChatWindow({
                 <path d="M3.5 7h17M3.5 12h17M3.5 17h17" />
               </svg>
             </button>
-            <span className="text-xs text-blade-secondary truncate">
-              {conversations.find((c) => c.id === currentConversationId)?.title ?? "New conversation"}
-            </span>
+            {editingTitle ? (
+              <input
+                ref={titleInputRef}
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={() => setEditingTitle(false)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === "Escape") setEditingTitle(false);
+                }}
+                className="text-xs text-blade-secondary bg-transparent border-b border-blade-accent/30 outline-none w-40"
+                autoFocus
+              />
+            ) : (
+              <span
+                className="text-xs text-blade-secondary truncate cursor-default"
+                onDoubleClick={() => {
+                  const title = conversations.find((c) => c.id === currentConversationId)?.title ?? "";
+                  setTitleDraft(title);
+                  setEditingTitle(true);
+                }}
+                title="Double-click to rename"
+              >
+                {conversations.find((c) => c.id === currentConversationId)?.title ?? "New conversation"}
+              </span>
+            )}
             {provider && (
               <span className="text-2xs text-blade-muted/60 bg-blade-surface px-1.5 py-0.5 rounded-md font-mono shrink-0">
                 {provider}{model ? ` · ${model.split("/").pop()?.split("-").slice(0, 2).join("-")}` : ""}
