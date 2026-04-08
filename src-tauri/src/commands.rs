@@ -12,6 +12,7 @@ use tauri::Emitter;
 use tokio::sync::Mutex;
 
 pub type SharedMcpManager = Arc<Mutex<McpManager>>;
+const MAX_TOOL_RESULT_CHARS: usize = 12_000;
 
 #[tauri::command]
 pub async fn send_message_stream(
@@ -130,6 +131,13 @@ pub async fn mcp_add_server(
     command: String,
     args: Vec<String>,
 ) -> Result<(), String> {
+    if name.trim().is_empty() {
+        return Err("MCP server name cannot be empty.".to_string());
+    }
+    if command.trim().is_empty() {
+        return Err("MCP server command cannot be empty.".to_string());
+    }
+
     let config = McpServerConfig {
         command: command.clone(),
         args: args.clone(),
@@ -216,22 +224,32 @@ pub fn history_save_conversation(
 }
 
 fn format_tool_result(result: &McpToolResult) -> String {
-    let mut parts = result
+    let parts = result
         .content
         .iter()
         .filter_map(|content| content.text.clone())
         .collect::<Vec<_>>();
 
-    if parts.is_empty() {
-        parts.push(
-            serde_json::to_string(&result.content)
-                .unwrap_or_else(|_| "Tool returned no text.".to_string()),
-        );
-    }
-
-    if result.is_error {
-        format!("Tool error:\n{}", parts.join("\n"))
+    let text = if parts.is_empty() {
+        serde_json::to_string(&result.content)
+            .unwrap_or_else(|_| "Tool returned no text.".to_string())
     } else {
         parts.join("\n")
+    };
+
+    let truncated = if text.chars().count() > MAX_TOOL_RESULT_CHARS {
+        let shortened = text.chars().take(MAX_TOOL_RESULT_CHARS).collect::<String>();
+        format!(
+            "{}\n\n[tool output truncated after {} characters]",
+            shortened, MAX_TOOL_RESULT_CHARS
+        )
+    } else {
+        text
+    };
+
+    if result.is_error {
+        format!("Tool error:\n{}", truncated)
+    } else {
+        truncated
     }
 }

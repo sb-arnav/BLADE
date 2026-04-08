@@ -69,9 +69,15 @@ pub async fn stream_text(
     let msgs: Vec<serde_json::Value> = messages
         .iter()
         .filter_map(|m| match m {
-            super::ConversationMessage::System(c) => Some(serde_json::json!({"role": "system", "content": c})),
-            super::ConversationMessage::User(c) => Some(serde_json::json!({"role": "user", "content": c})),
-            super::ConversationMessage::Assistant { content, .. } => Some(serde_json::json!({"role": "assistant", "content": content})),
+            super::ConversationMessage::System(c) => {
+                Some(serde_json::json!({"role": "system", "content": c}))
+            }
+            super::ConversationMessage::User(c) => {
+                Some(serde_json::json!({"role": "user", "content": c}))
+            }
+            super::ConversationMessage::Assistant { content, .. } => {
+                Some(serde_json::json!({"role": "assistant", "content": content}))
+            }
             super::ConversationMessage::Tool { .. } => None,
         })
         .collect();

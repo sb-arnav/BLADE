@@ -1,4 +1,4 @@
-use crate::config::blade_config_dir;
+use crate::config::{blade_config_dir, write_blade_file};
 use crate::mcp::McpTool;
 use std::fs;
 use std::path::PathBuf;
@@ -92,8 +92,7 @@ pub fn get_persona() -> String {
 #[tauri::command]
 pub fn set_persona(content: String) -> Result<(), String> {
     let path = persona_path();
-    fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
-    fs::write(path, content).map_err(|e| e.to_string())
+    write_blade_file(&path, &content)
 }
 
 #[tauri::command]
@@ -104,6 +103,5 @@ pub fn get_context() -> String {
 #[tauri::command]
 pub fn set_context(content: String) -> Result<(), String> {
     let path = context_path();
-    fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
-    fs::write(path, content).map_err(|e| e.to_string())
+    write_blade_file(&path, &content)
 }

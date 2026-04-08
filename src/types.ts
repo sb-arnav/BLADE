@@ -54,4 +54,5 @@ export interface DiscoveryReport {
     shell: string | null;
   };
   installed_tools: string[];
+  claude_memories: string[];
 }

@@ -1,4 +1,4 @@
-use crate::config::blade_config_dir;
+use crate::config::{blade_config_dir, write_blade_file};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -66,9 +66,14 @@ pub fn list_conversations() -> Result<Vec<ConversationSummary>, String> {
             continue;
         }
 
-        let raw = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-        let conversation =
-            serde_json::from_str::<StoredConversation>(&raw).map_err(|e| e.to_string())?;
+        let raw = match fs::read_to_string(&path) {
+            Ok(raw) => raw,
+            Err(_) => continue,
+        };
+        let conversation = match serde_json::from_str::<StoredConversation>(&raw) {
+            Ok(conversation) => conversation,
+            Err(_) => continue,
+        };
 
         conversations.push(ConversationSummary {
             id: conversation.id,
@@ -115,7 +120,7 @@ pub fn save_conversation(
     };
 
     let raw = serde_json::to_string_pretty(&conversation).map_err(|e| e.to_string())?;
-    fs::write(path, raw).map_err(|e| e.to_string())?;
+    write_blade_file(&path, &raw)?;
 
     Ok(ConversationSummary {
         id: conversation.id,
