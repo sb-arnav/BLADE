@@ -1,12 +1,170 @@
 import { Message, ToolExecution } from "../types";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import hljs from "highlight.js/lib/core";
+import typescript from "highlight.js/lib/languages/typescript";
+import javascript from "highlight.js/lib/languages/javascript";
+import python from "highlight.js/lib/languages/python";
+import rust from "highlight.js/lib/languages/rust";
+import bash from "highlight.js/lib/languages/bash";
+import json from "highlight.js/lib/languages/json";
+import css from "highlight.js/lib/languages/css";
+import xml from "highlight.js/lib/languages/xml";
+import sql from "highlight.js/lib/languages/sql";
+import go from "highlight.js/lib/languages/go";
+import yaml from "highlight.js/lib/languages/yaml";
+import markdown from "highlight.js/lib/languages/markdown";
+
+hljs.registerLanguage("typescript", typescript);
+hljs.registerLanguage("ts", typescript);
+hljs.registerLanguage("tsx", typescript);
+hljs.registerLanguage("javascript", javascript);
+hljs.registerLanguage("js", javascript);
+hljs.registerLanguage("jsx", javascript);
+hljs.registerLanguage("python", python);
+hljs.registerLanguage("py", python);
+hljs.registerLanguage("rust", rust);
+hljs.registerLanguage("rs", rust);
+hljs.registerLanguage("bash", bash);
+hljs.registerLanguage("sh", bash);
+hljs.registerLanguage("shell", bash);
+hljs.registerLanguage("zsh", bash);
+hljs.registerLanguage("json", json);
+hljs.registerLanguage("css", css);
+hljs.registerLanguage("html", xml);
+hljs.registerLanguage("xml", xml);
+hljs.registerLanguage("sql", sql);
+hljs.registerLanguage("go", go);
+hljs.registerLanguage("yaml", yaml);
+hljs.registerLanguage("yml", yaml);
+hljs.registerLanguage("markdown", markdown);
+hljs.registerLanguage("md", markdown);
 
 interface Props {
   messages: Message[];
   loading: boolean;
   toolExecutions: ToolExecution[];
+}
+
+/**
+ * Sanitize highlight.js output: only allow <span> tags with class attributes.
+ * highlight.js only produces <span class="hljs-..."> tags, so this strips
+ * anything that isn't a span open/close tag.
+ */
+function sanitizeHighlightHtml(html: string): string {
+  // Allow only <span ...> and </span>, escape everything else
+  return html.replace(/<\/?[^>]+>/g, (tag) => {
+    if (/^<span\s/.test(tag) || tag === "</span>") return tag;
+    return tag.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  });
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }, [text]);
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="text-[10px] text-blade-muted hover:text-blade-text transition-colors font-mono"
+    >
+      {copied ? "copied" : "copy"}
+    </button>
+  );
+}
+
+function CodeBlock({ className, children }: { className?: string; children: React.ReactNode }) {
+  const codeRef = useRef<HTMLElement>(null);
+  const code = String(children).replace(/\n$/, "");
+  const lang = className?.replace("language-", "") ?? "";
+
+  useEffect(() => {
+    if (!codeRef.current) return;
+
+    let highlighted: string;
+    try {
+      if (lang && hljs.getLanguage(lang)) {
+        highlighted = hljs.highlight(code, { language: lang }).value;
+      } else {
+        highlighted = hljs.highlightAuto(code).value;
+      }
+    } catch {
+      // Fallback: escape and show as plain text
+      codeRef.current.textContent = code;
+      return;
+    }
+
+    // sanitizeHighlightHtml strips any tag that isn't <span>...</span>
+    // highlight.js output is trusted library output containing only span tags
+    // with hljs-* class names derived from language grammar rules
+    const sanitized = sanitizeHighlightHtml(highlighted);
+    codeRef.current.innerHTML = sanitized; // eslint-disable-line no-unsanitized/property
+  }, [code, lang]);
+
+  return (
+    <div className="relative group">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-blade-border/50">
+        <span className="text-[10px] text-blade-muted font-mono uppercase">{lang || "code"}</span>
+        <CopyButton text={code} />
+      </div>
+      <pre className="!mt-0 !rounded-t-none overflow-x-auto px-3 py-3">
+        <code ref={codeRef} />
+      </pre>
+    </div>
+  );
+}
+
+function MessageBubble({ msg }: { msg: Message }) {
+  const [showCopy, setShowCopy] = useState(false);
+
+  return (
+    <div
+      className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} group`}
+      onMouseEnter={() => setShowCopy(true)}
+      onMouseLeave={() => setShowCopy(false)}
+    >
+      <div className="relative max-w-[85%]">
+        <div
+          className={`rounded-xl px-4 py-2.5 text-sm leading-relaxed ${
+            msg.role === "user"
+              ? "bg-blade-accent text-white"
+              : "bg-blade-surface text-blade-text border border-blade-border"
+          }`}
+        >
+          <div className={`message-markdown ${msg.role === "user" ? "message-markdown-user" : ""}`}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                code({ className, children, ...rest }) {
+                  const isInline = !className && typeof children === "string" && !children.includes("\n");
+                  if (isInline) {
+                    return <code className={className} {...rest}>{children}</code>;
+                  }
+                  return <CodeBlock className={className}>{children}</CodeBlock>;
+                },
+                pre({ children }) {
+                  return <>{children}</>;
+                },
+              }}
+            >
+              {msg.content}
+            </ReactMarkdown>
+          </div>
+        </div>
+        {showCopy && msg.role === "assistant" && msg.content && (
+          <div className="absolute -bottom-5 right-0">
+            <CopyButton text={msg.content} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function MessageList({ messages, loading, toolExecutions }: Props) {
@@ -29,23 +187,9 @@ export function MessageList({ messages, loading, toolExecutions }: Props) {
           <p className="text-blade-muted text-sm">What are we working on?</p>
         </div>
       )}
+
       {messages.map((msg) => (
-        <div
-          key={msg.id}
-          className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-        >
-          <div
-            className={`max-w-[85%] rounded-xl px-4 py-2.5 text-sm leading-relaxed ${
-              msg.role === "user"
-                ? "bg-blade-accent text-white"
-                : "bg-blade-surface text-blade-text border border-blade-border"
-            }`}
-          >
-            <div className={`message-markdown ${msg.role === "user" ? "message-markdown-user" : ""}`}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-            </div>
-          </div>
-        </div>
+        <MessageBubble key={msg.id} msg={msg} />
       ))}
 
       {(activeTools.length > 0 || recentCompleted.length > 0) && (

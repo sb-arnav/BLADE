@@ -86,3 +86,72 @@ body {
   background: rgba(255, 255, 255, 0.12);
   border-color: rgba(255, 255, 255, 0.16);
 }
+
+/* highlight.js theme — dark, matches Blade palette */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-name {
+  color: #c792ea;
+}
+
+.hljs-string,
+.hljs-attr,
+.hljs-template-tag {
+  color: #c3e88d;
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-variable.constant_ {
+  color: #f78c6c;
+}
+
+.hljs-comment,
+.hljs-doctag {
+  color: #546e7a;
+  font-style: italic;
+}
+
+.hljs-function .hljs-title,
+.hljs-title.function_ {
+  color: #82aaff;
+}
+
+.hljs-type,
+.hljs-title.class_ {
+  color: #ffcb6b;
+}
+
+.hljs-params {
+  color: #e5e5e5;
+}
+
+.hljs-regexp {
+  color: #89ddff;
+}
+
+.hljs-symbol {
+  color: #82aaff;
+}
+
+.hljs-meta {
+  color: #89ddff;
+}
+
+.hljs-attribute {
+  color: #ffcb6b;
+}
+
+.hljs-selector-class,
+.hljs-selector-id {
+  color: #c792ea;
+}
+
+.hljs-tag {
+  color: #f07178;
+}
+
+.hljs-punctuation {
+  color: #89ddff;
+}

@@ -51,6 +51,13 @@ export interface ToolExecution {
 
 export type ToolPermission = "Auto" | "Ask" | "Blocked";
 
+export interface ToolApprovalRequest {
+  approval_id: string;
+  name: string;
+  arguments: string;
+  risk: ToolPermission;
+}
+
 export interface ImportedMcpServer {
   name: string;
   command: string;

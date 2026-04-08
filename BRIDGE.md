@@ -133,8 +133,25 @@ Working note for split ownership between Artemis and Claude on the Blade repo.
 | **New Event** | | |
 | `tool_approval_needed` | Ask-risk tool needs approval | payload: {approval_id, name, arguments, risk} |
 
+## Recently Shipped by Artemis (2026-04-08, batch 4)
+
+- **Tool approval dialog** — modal appears when `Ask`-risk tool needs approval. Shows tool name, parsed JSON arguments, 60s countdown timer. Allow/Deny buttons call `respond_tool_approval`. Auto-denies on timeout. Amber pulse indicator. (`ToolApprovalDialog.tsx`, `useChat.ts`, `ChatWindow.tsx`)
+- **Conversation deletion** — "del" button in chat header (only shows when >1 conversation). Calls `history_delete_conversation`, removes from list, creates new conversation if active one deleted. (`ChatWindow.tsx`, `useChat.ts`)
+
+## Recently Shipped by Artemis (2026-04-08, batch 5)
+
+- **Syntax highlighting** — highlight.js with 12 languages (TS, JS, Python, Rust, Bash, JSON, CSS, HTML, SQL, Go, YAML, Markdown). Custom dark theme matching Blade palette. Sanitized output (only `<span>` tags allowed). (`MessageList.tsx`, `index.css`)
+- **Code block copy buttons** — each fenced code block shows language label + "copy" button in header bar. (`MessageList.tsx`)
+- **Message copy** — hover over assistant messages to reveal "copy" button. (`MessageList.tsx`)
+- **TitleBar maximize** — added maximize/restore button between minimize and close. All three buttons now use proper SVG icons. Close button turns red on hover. (`TitleBar.tsx`)
+
+## Recently Shipped by Artemis (2026-04-08, batch 6)
+
+- **Conversation sidebar** — replaced `<select>` dropdown with a slide-out panel. Shows all conversations with titles, relative timestamps (now/5m/2h/3d/Mar 12), delete button on hover. New conversation and Settings links built in. Hamburger menu icon to open. (`ChatWindow.tsx`)
+- **Conversation header** — shows current conversation title with accent dot. Clean layout with hamburger, clear, and settings controls.
+- **Gear icon upgrade** — replaced the janky star-gear SVG with a proper settings icon.
+
 ## Open UI/UX Work (Artemis)
 
-- **Tool approval dialog** — listen for `tool_approval_needed`, show modal with tool name + args, Allow/Deny buttons, call `respond_tool_approval`. Backend is ready and blocking.
-- **Conversation deletion** — add delete button per conversation, call `history_delete_conversation`. Backend is ready.
-- Syntax highlighting in code blocks (consider adding highlight.js or shiki)
+- Request trace viewer in diagnostics (backend has `get_recent_traces()`)
+- Conversation search / filter in sidebar

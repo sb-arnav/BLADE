@@ -121,6 +121,9 @@ export default function App() {
             onSwitchConversation={chat.switchConversation}
             onOpenSettings={() => setRoute("settings")}
             onDismissClipboard={chat.dismissClipboard}
+            pendingApproval={chat.pendingApproval}
+            onRespondApproval={chat.respondToApproval}
+            onDeleteConversation={chat.deleteConversation}
           />
         )}
       </div>

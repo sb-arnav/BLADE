@@ -1,6 +1,8 @@
-import { ConversationSummary, Message, ToolExecution } from "../types";
+import { useState } from "react";
+import { ConversationSummary, Message, ToolApprovalRequest, ToolExecution } from "../types";
 import { MessageList } from "./MessageList";
 import { InputBar } from "./InputBar";
+import { ToolApprovalDialog } from "./ToolApprovalDialog";
 
 interface Props {
   messages: Message[];
@@ -16,16 +18,22 @@ interface Props {
   onSwitchConversation: (conversationId: string) => void | Promise<void>;
   onOpenSettings: () => void;
   onDismissClipboard: () => void;
+  pendingApproval: ToolApprovalRequest | null;
+  onRespondApproval: (approved: boolean) => void;
+  onDeleteConversation: (id: string) => void;
 }
 
-function GearIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M12 3.75l1.18 2.4 2.64.38-1.91 1.86.45 2.63L12 9.78l-2.36 1.24.45-2.63-1.91-1.86 2.64-.38L12 3.75Z" />
-      <circle cx="12" cy="12" r="3.25" />
-      <path d="M4.5 12a7.5 7.5 0 0 1 .08-1.08M19.42 10.92A7.5 7.5 0 0 1 19.5 12M7.1 18.25l1.52-1.54M15.38 16.71l1.52 1.54M7.1 5.75l1.52 1.54M15.38 7.29l1.52-1.54" />
-    </svg>
-  );
+function formatTime(timestamp: number): string {
+  const now = Date.now();
+  const diff = now - timestamp;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d`;
+  return new Date(timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 export function ChatWindow({
@@ -42,88 +50,173 @@ export function ChatWindow({
   onSwitchConversation,
   onOpenSettings,
   onDismissClipboard,
+  pendingApproval,
+  onRespondApproval,
+  onDeleteConversation,
 }: Props) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   const handleClipboardAction = (action: string) => {
     if (!clipboardText) return;
     const preview = clipboardText.length > 200 ? clipboardText.slice(0, 200) + "..." : clipboardText;
     onSend(`${action} this:\n\n${preview}`);
     onDismissClipboard();
   };
+
+  const currentTitle = conversations.find((c) => c.id === currentConversationId)?.title ?? "New conversation";
+
   return (
-    <div className="flex flex-col h-full bg-blade-bg text-blade-text">
-      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-blade-border">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <div className="w-2 h-2 rounded-full bg-blade-accent" />
-          <select
-            value={currentConversationId ?? ""}
-            onChange={(event) => onSwitchConversation(event.target.value)}
-            className="min-w-0 flex-1 bg-blade-surface border border-blade-border rounded-lg px-3 py-1.5 text-sm text-blade-text outline-none"
-          >
-            {conversations.map((conversation) => (
-              <option key={conversation.id} value={conversation.id}>
-                {conversation.title}
-              </option>
-            ))}
-          </select>
+    <div className="flex h-full bg-blade-bg text-blade-text">
+      {/* Sidebar overlay */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-30 bg-black/40" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      {/* Sidebar */}
+      <div
+        className={`fixed inset-y-0 left-0 z-40 w-64 bg-blade-surface border-r border-blade-border flex flex-col transition-transform duration-200 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+        style={{ top: "2.5rem" }} // below TitleBar
+      >
+        <div className="flex items-center justify-between px-3 py-3 border-b border-blade-border">
+          <span className="text-xs uppercase tracking-wide text-blade-muted">Conversations</span>
           <button
-            onClick={() => onNewConversation()}
-            className="text-xs text-blade-muted hover:text-blade-text transition-colors"
+            onClick={() => {
+              onNewConversation();
+              setSidebarOpen(false);
+            }}
+            className="text-xs text-blade-accent hover:text-blade-accent-hover transition-colors"
           >
-            new
+            + new
           </button>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex-1 overflow-y-auto py-1">
+          {conversations.map((conv) => {
+            const isActive = conv.id === currentConversationId;
+            return (
+              <div
+                key={conv.id}
+                className={`group flex items-start gap-2 px-3 py-2.5 cursor-pointer transition-colors ${
+                  isActive ? "bg-blade-bg" : "hover:bg-blade-bg/50"
+                }`}
+                onClick={() => {
+                  onSwitchConversation(conv.id);
+                  setSidebarOpen(false);
+                }}
+              >
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm truncate ${isActive ? "text-blade-text" : "text-blade-muted"}`}>
+                    {conv.title || "New conversation"}
+                  </p>
+                  <p className="text-[10px] text-blade-muted mt-0.5">
+                    {formatTime(conv.updated_at)}
+                  </p>
+                </div>
+                {conversations.length > 1 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteConversation(conv.id);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 text-[10px] text-blade-muted hover:text-red-400 transition-all mt-0.5"
+                  >
+                    del
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div className="border-t border-blade-border px-3 py-2">
           <button
-            onClick={onClear}
-            className="text-blade-muted hover:text-blade-text text-xs transition-colors"
+            onClick={() => {
+              onOpenSettings();
+              setSidebarOpen(false);
+            }}
+            className="w-full text-left text-xs text-blade-muted hover:text-blade-text transition-colors py-1"
           >
-            clear
-          </button>
-          <button
-            onClick={onOpenSettings}
-            aria-label="Open settings"
-            className="text-blade-muted hover:text-blade-text transition-colors"
-          >
-            <GearIcon />
+            Settings
           </button>
         </div>
       </div>
 
-      {error && (
-        <div className="px-4 py-2 bg-red-950 border-b border-red-900 text-red-400 text-xs">
-          {error}
+      {/* Main chat area */}
+      <div className="flex flex-col flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-blade-border">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="text-blade-muted hover:text-blade-text transition-colors shrink-0"
+              aria-label="Open conversation list"
+            >
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <div className="w-2 h-2 rounded-full bg-blade-accent shrink-0" />
+            <span className="text-sm truncate">{currentTitle}</span>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              onClick={onClear}
+              className="text-blade-muted hover:text-blade-text text-xs transition-colors"
+            >
+              clear
+            </button>
+            <button
+              onClick={onOpenSettings}
+              aria-label="Open settings"
+              className="text-blade-muted hover:text-blade-text transition-colors"
+            >
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
+              </svg>
+            </button>
+          </div>
         </div>
+
+        {error && (
+          <div className="px-4 py-2 bg-red-950 border-b border-red-900 text-red-400 text-xs">
+            {error}
+          </div>
+        )}
+
+        <MessageList messages={messages} loading={loading} toolExecutions={toolExecutions} />
+
+        {clipboardText && !loading && (
+          <div className="px-4 py-2 border-t border-blade-border bg-blade-surface/50 flex items-center gap-2">
+            <span className="text-xs text-blade-muted truncate flex-1">
+              Clipboard: {clipboardText.slice(0, 60)}{clipboardText.length > 60 ? "..." : ""}
+            </span>
+            <button
+              onClick={() => handleClipboardAction("Explain")}
+              className="text-[11px] px-2.5 py-1 rounded-lg border border-blade-border text-blade-muted hover:text-blade-text hover:border-blade-muted transition-colors"
+            >
+              Explain
+            </button>
+            <button
+              onClick={() => handleClipboardAction("Summarize")}
+              className="text-[11px] px-2.5 py-1 rounded-lg border border-blade-border text-blade-muted hover:text-blade-text hover:border-blade-muted transition-colors"
+            >
+              Summarize
+            </button>
+            <button
+              onClick={onDismissClipboard}
+              className="text-blade-muted hover:text-blade-text text-xs transition-colors ml-1"
+            >
+              x
+            </button>
+          </div>
+        )}
+
+        <InputBar onSend={onSend} disabled={loading} />
+      </div>
+
+      {pendingApproval && (
+        <ToolApprovalDialog request={pendingApproval} onRespond={onRespondApproval} />
       )}
-
-      <MessageList messages={messages} loading={loading} toolExecutions={toolExecutions} />
-
-      {clipboardText && !loading && (
-        <div className="px-4 py-2 border-t border-blade-border bg-blade-surface/50 flex items-center gap-2">
-          <span className="text-xs text-blade-muted truncate flex-1">
-            Clipboard: {clipboardText.slice(0, 60)}{clipboardText.length > 60 ? "..." : ""}
-          </span>
-          <button
-            onClick={() => handleClipboardAction("Explain")}
-            className="text-[11px] px-2.5 py-1 rounded-lg border border-blade-border text-blade-muted hover:text-blade-text hover:border-blade-muted transition-colors"
-          >
-            Explain
-          </button>
-          <button
-            onClick={() => handleClipboardAction("Summarize")}
-            className="text-[11px] px-2.5 py-1 rounded-lg border border-blade-border text-blade-muted hover:text-blade-text hover:border-blade-muted transition-colors"
-          >
-            Summarize
-          </button>
-          <button
-            onClick={onDismissClipboard}
-            className="text-blade-muted hover:text-blade-text text-xs transition-colors ml-1"
-          >
-            x
-          </button>
-        </div>
-      )}
-
-      <InputBar onSend={onSend} disabled={loading} />
     </div>
   );
 }

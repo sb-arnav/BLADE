@@ -7,7 +7,9 @@ mod history;
 mod mcp;
 mod permissions;
 mod providers;
+mod screen;
 mod trace;
+mod voice;
 
 use std::sync::Arc;
 use tauri::{
@@ -70,6 +72,11 @@ pub fn run() {
             permissions::reset_tool_trust,
             permissions::get_tool_overrides,
             trace::get_recent_traces,
+            voice::voice_start_recording,
+            voice::voice_stop_recording,
+            voice::voice_transcribe,
+            screen::capture_screen,
+            screen::capture_screen_region,
         ])
         .setup(move |app| {
             if let Some(window) = app.get_webview_window("main") {
