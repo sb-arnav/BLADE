@@ -31,12 +31,8 @@ export function CommandPalette({ commands, open, onClose }: Props) {
     }
   }, [open]);
 
-  // Reset selection when filter changes
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [query]);
+  useEffect(() => { setSelectedIndex(0); }, [query]);
 
-  // Scroll selected item into view
   useEffect(() => {
     if (!listRef.current) return;
     const items = listRef.current.querySelectorAll("[data-cmd]");
@@ -72,10 +68,10 @@ export function CommandPalette({ commands, open, onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]">
-      <div className="fixed inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-blade-surface border border-blade-border rounded-2xl shadow-2xl overflow-hidden">
-        <div className="flex items-center gap-2 px-4 border-b border-blade-border">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[18vh]">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-blade-surface border border-blade-border rounded-xl shadow-2xl overflow-hidden animate-fade-in">
+        <div className="flex items-center gap-2.5 px-4 border-b border-blade-border">
           <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-blade-muted shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="7" />
             <path d="M21 21l-4.35-4.35" />
@@ -85,14 +81,14 @@ export function CommandPalette({ commands, open, onClose }: Props) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a command..."
-            className="w-full bg-transparent py-3 text-sm text-blade-text outline-none placeholder:text-blade-muted"
+            placeholder="Search commands..."
+            className="w-full bg-transparent py-2.5 text-[0.8125rem] text-blade-text outline-none placeholder:text-blade-muted"
           />
-          <kbd className="text-[10px] text-blade-muted border border-blade-border rounded px-1.5 py-0.5 font-mono shrink-0">esc</kbd>
+          <kbd className="text-2xs text-blade-muted/50 font-mono shrink-0">esc</kbd>
         </div>
-        <div ref={listRef} className="max-h-64 overflow-y-auto py-1">
+        <div ref={listRef} className="max-h-60 overflow-y-auto py-1">
           {filtered.length === 0 && (
-            <p className="px-4 py-3 text-xs text-blade-muted">No commands match.</p>
+            <p className="px-4 py-3 text-xs text-blade-muted">No results.</p>
           )}
           {filtered.map((cmd, i) => (
             <button
@@ -100,15 +96,15 @@ export function CommandPalette({ commands, open, onClose }: Props) {
               data-cmd
               onClick={() => handleSelect(cmd)}
               onMouseEnter={() => setSelectedIndex(i)}
-              className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center justify-between ${
+              className={`w-full text-left px-4 py-2 text-[0.8125rem] transition-colors flex items-center justify-between ${
                 i === selectedIndex
-                  ? "bg-blade-accent/10 text-blade-text"
-                  : "text-blade-text hover:bg-blade-bg/70"
+                  ? "bg-blade-accent-muted text-blade-text"
+                  : "text-blade-secondary"
               }`}
             >
               <span>{cmd.label}</span>
               {cmd.shortcut && (
-                <kbd className="text-[10px] text-blade-muted font-mono border border-blade-border rounded px-1.5 py-0.5">{cmd.shortcut}</kbd>
+                <kbd className="text-2xs text-blade-muted font-mono">{cmd.shortcut}</kbd>
               )}
             </button>
           ))}

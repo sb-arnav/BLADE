@@ -18,9 +18,7 @@ export function InputBar({ onSend, disabled }: Props) {
     if (!trimmed || disabled) return;
     onSend(trimmed);
     setValue("");
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -32,7 +30,6 @@ export function InputBar({ onSend, disabled }: Props) {
 
   const handleVoice = useCallback(async () => {
     if (recording) {
-      // Stop recording and transcribe
       setRecording(false);
       setTranscribing(true);
       try {
@@ -42,18 +39,13 @@ export function InputBar({ onSend, disabled }: Props) {
           setValue((prev) => (prev ? prev + " " + text.trim() : text.trim()));
           textareaRef.current?.focus();
         }
-      } catch {
-        // Voice failed silently — user can retry
-      }
+      } catch { /* noop */ }
       setTranscribing(false);
     } else {
-      // Start recording
       try {
         await invoke("voice_start_recording");
         setRecording(true);
-      } catch {
-        // Mic not available
-      }
+      } catch { /* noop */ }
     }
   }, [recording]);
 
@@ -62,73 +54,68 @@ export function InputBar({ onSend, disabled }: Props) {
     try {
       const png = await invoke<string>("capture_screen");
       onSend("What's on my screen?", png);
-    } catch {
-      // Screenshot failed
-    }
+    } catch { /* noop */ }
     setCapturing(false);
   }, [onSend]);
 
   const busy = disabled || transcribing || capturing;
 
   return (
-    <div className="px-4 py-3 border-t border-blade-border bg-blade-bg">
-      <div className="flex items-end gap-2 bg-blade-surface border border-blade-border rounded-xl px-3 py-2">
-        {/* Screenshot button */}
-        <button
-          onClick={handleScreenshot}
-          disabled={busy}
-          className="text-blade-muted hover:text-blade-text disabled:text-blade-muted/40 transition-colors pb-0.5"
-          aria-label="Capture screen"
-          title="Screenshot"
-        >
-          {capturing ? (
-            <div className="w-4 h-4 flex items-center justify-center">
-              <div className="w-2 h-2 rounded-full bg-blade-muted animate-pulse" />
-            </div>
-          ) : (
-            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-          )}
-        </button>
+    <div className="px-4 pb-4 pt-2">
+      <div className={`flex items-end gap-1.5 rounded-xl border transition-colors ${
+        recording
+          ? "border-red-500/30 bg-red-500/5"
+          : "border-blade-border bg-blade-surface"
+      } px-3 py-2`}>
+        {/* Action buttons */}
+        <div className="flex items-center gap-0.5 pb-0.5">
+          <button
+            onClick={handleScreenshot}
+            disabled={busy}
+            className="w-7 h-7 rounded-md flex items-center justify-center text-blade-muted hover:text-blade-secondary hover:bg-blade-surface-hover disabled:opacity-30 transition-colors"
+            title="Screenshot"
+          >
+            {capturing ? (
+              <div className="w-1.5 h-1.5 rounded-full bg-blade-accent animate-pulse-slow" />
+            ) : (
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            )}
+          </button>
+          <button
+            onClick={handleVoice}
+            disabled={busy && !recording}
+            className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
+              recording
+                ? "text-red-400 bg-red-400/10"
+                : "text-blade-muted hover:text-blade-secondary hover:bg-blade-surface-hover"
+            } ${(busy && !recording) ? "opacity-30" : ""}`}
+            title={recording ? "Stop" : "Voice"}
+          >
+            {transcribing ? (
+              <div className="w-1.5 h-1.5 rounded-full bg-blade-accent animate-pulse-slow" />
+            ) : (
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="2" width="6" height="12" rx="3" />
+                <path d="M5 10a7 7 0 0 0 14 0" />
+                <path d="M12 18v4M8 22h8" />
+              </svg>
+            )}
+          </button>
+        </div>
 
-        {/* Mic button */}
-        <button
-          onClick={handleVoice}
-          disabled={busy && !recording}
-          className={`transition-colors pb-0.5 ${
-            recording
-              ? "text-red-400 hover:text-red-300"
-              : transcribing
-                ? "text-blade-muted/40"
-                : "text-blade-muted hover:text-blade-text"
-          }`}
-          aria-label={recording ? "Stop recording" : "Start voice input"}
-          title={recording ? "Stop recording" : "Voice input"}
-        >
-          {transcribing ? (
-            <div className="w-4 h-4 flex items-center justify-center">
-              <div className="w-2 h-2 rounded-full bg-blade-muted animate-pulse" />
-            </div>
-          ) : (
-            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="9" y="2" width="6" height="12" rx="3" />
-              <path d="M5 10a7 7 0 0 0 14 0" />
-              <path d="M12 18v4M8 22h8" />
-            </svg>
-          )}
-        </button>
-
+        {/* Input */}
         <textarea
           ref={textareaRef}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={recording ? "Listening..." : transcribing ? "Transcribing..." : "Ask Blade anything..."}
+          placeholder={recording ? "Listening..." : transcribing ? "Transcribing..." : "Message Blade..."}
           disabled={busy}
           rows={1}
-          className="flex-1 bg-transparent text-blade-text text-sm resize-none outline-none placeholder:text-blade-muted max-h-32 min-h-[1.5rem]"
+          className="flex-1 bg-transparent text-blade-text text-[0.8125rem] resize-none outline-none placeholder:text-blade-muted max-h-32 min-h-[1.5rem] leading-relaxed"
           style={{ height: "auto" }}
           onInput={(e) => {
             const target = e.target as HTMLTextAreaElement;
@@ -137,27 +124,29 @@ export function InputBar({ onSend, disabled }: Props) {
           }}
         />
 
-        {/* Recording indicator */}
-        {recording && (
-          <div className="w-2 h-2 rounded-full bg-red-400 animate-pulse shrink-0 mb-1" />
-        )}
-
+        {/* Send */}
         <button
           onClick={handleSend}
           disabled={busy || !value.trim()}
-          className="text-blade-accent hover:text-white disabled:text-blade-muted transition-colors pb-0.5"
-          aria-label="Send message"
+          className={`w-7 h-7 rounded-lg flex items-center justify-center mb-0.5 transition-all ${
+            value.trim() && !busy
+              ? "bg-blade-accent text-white hover:bg-blade-accent-hover"
+              : "text-blade-muted/30"
+          }`}
+          aria-label="Send"
         >
-          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 19V5M5 12l7-7 7 7" />
           </svg>
         </button>
       </div>
-      <div className="flex items-center justify-between mt-1.5 ml-1">
-        <p className="text-blade-muted text-xs">Enter to send · Shift+Enter for newline</p>
-        <p className="text-blade-muted text-xs mr-1">
-          <kbd className="font-mono text-[10px] border border-blade-border rounded px-1 py-0.5">Ctrl K</kbd>
-        </p>
+      <div className="flex items-center justify-between mt-1 px-1">
+        <span className="text-2xs text-blade-muted/50">
+          {recording ? "Recording... click mic to stop" : "Enter to send"}
+        </span>
+        <kbd className="text-2xs text-blade-muted/40 font-mono">
+          \u2318K
+        </kbd>
       </div>
     </div>
   );

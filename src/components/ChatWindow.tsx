@@ -63,113 +63,109 @@ export function ChatWindow({
     onDismissClipboard();
   };
 
-  const currentTitle = conversations.find((c) => c.id === currentConversationId)?.title ?? "New conversation";
-
   return (
     <div className="flex h-full bg-blade-bg text-blade-text">
       {/* Sidebar overlay */}
       {sidebarOpen && (
-        <div className="fixed inset-0 z-30 bg-black/40" onClick={() => setSidebarOpen(false)} />
+        <div
+          className="fixed inset-0 z-30 bg-black/50 backdrop-blur-[2px] transition-opacity"
+          onClick={() => setSidebarOpen(false)}
+        />
       )}
 
       {/* Sidebar */}
       <div
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-blade-surface border-r border-blade-border flex flex-col transition-transform duration-200 ${
+        className={`fixed inset-y-0 left-0 z-40 w-60 bg-blade-surface border-r border-blade-border flex flex-col transition-transform duration-200 ease-out ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
-        style={{ top: "2.5rem" }} // below TitleBar
+        style={{ top: "2.25rem" }}
       >
-        <div className="flex items-center justify-between px-3 py-3 border-b border-blade-border">
-          <span className="text-xs uppercase tracking-wide text-blade-muted">Conversations</span>
+        <div className="flex items-center justify-between px-3 py-2.5">
+          <span className="text-2xs font-medium tracking-widest uppercase text-blade-muted">History</span>
           <button
-            onClick={() => {
-              onNewConversation();
-              setSidebarOpen(false);
-            }}
-            className="text-xs text-blade-accent hover:text-blade-accent-hover transition-colors"
+            onClick={() => { onNewConversation(); setSidebarOpen(false); }}
+            className="w-6 h-6 rounded-md flex items-center justify-center text-blade-muted hover:text-blade-secondary hover:bg-blade-surface-hover transition-colors"
+            title="New conversation"
           >
-            + new
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto py-1">
+        <div className="flex-1 overflow-y-auto px-1.5 pb-2">
           {conversations.map((conv) => {
             const isActive = conv.id === currentConversationId;
             return (
-              <div
+              <button
                 key={conv.id}
-                className={`group flex items-start gap-2 px-3 py-2.5 cursor-pointer transition-colors ${
-                  isActive ? "bg-blade-bg" : "hover:bg-blade-bg/50"
+                onClick={() => { onSwitchConversation(conv.id); setSidebarOpen(false); }}
+                className={`group w-full text-left rounded-lg px-2.5 py-2 mb-0.5 transition-colors ${
+                  isActive
+                    ? "bg-blade-accent-muted text-blade-text"
+                    : "text-blade-secondary hover:bg-blade-surface-hover hover:text-blade-text"
                 }`}
-                onClick={() => {
-                  onSwitchConversation(conv.id);
-                  setSidebarOpen(false);
-                }}
               >
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm truncate ${isActive ? "text-blade-text" : "text-blade-muted"}`}>
-                    {conv.title || "New conversation"}
-                  </p>
-                  <p className="text-[10px] text-blade-muted mt-0.5">
-                    {formatTime(conv.updated_at)}
-                  </p>
+                <p className="text-xs truncate">{conv.title || "New conversation"}</p>
+                <div className="flex items-center justify-between mt-0.5">
+                  <span className="text-2xs text-blade-muted">{formatTime(conv.updated_at)}</span>
+                  {conversations.length > 1 && (
+                    <span
+                      onClick={(e) => { e.stopPropagation(); onDeleteConversation(conv.id); }}
+                      className="text-2xs text-blade-muted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                    >
+                      delete
+                    </span>
+                  )}
                 </div>
-                {conversations.length > 1 && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteConversation(conv.id);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 text-[10px] text-blade-muted hover:text-red-400 transition-all mt-0.5"
-                  >
-                    del
-                  </button>
-                )}
-              </div>
+              </button>
             );
           })}
         </div>
         <div className="border-t border-blade-border px-3 py-2">
           <button
-            onClick={() => {
-              onOpenSettings();
-              setSidebarOpen(false);
-            }}
-            className="w-full text-left text-xs text-blade-muted hover:text-blade-text transition-colors py-1"
+            onClick={() => { onOpenSettings(); setSidebarOpen(false); }}
+            className="flex items-center gap-2 text-xs text-blade-muted hover:text-blade-secondary transition-colors py-1 w-full"
           >
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
+            </svg>
             Settings
           </button>
         </div>
       </div>
 
-      {/* Main chat area */}
+      {/* Main */}
       <div className="flex flex-col flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-blade-border">
+        {/* Header */}
+        <div className="flex items-center justify-between h-10 px-4 border-b border-blade-border/50 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="text-blade-muted hover:text-blade-text transition-colors shrink-0"
-              aria-label="Open conversation list"
+              className="text-blade-muted hover:text-blade-secondary transition-colors shrink-0"
+              aria-label="History"
             >
-              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M4 6h16M4 12h16M4 18h16" />
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M3.5 7h17M3.5 12h17M3.5 17h17" />
               </svg>
             </button>
-            <div className="w-2 h-2 rounded-full bg-blade-accent shrink-0" />
-            <span className="text-sm truncate">{currentTitle}</span>
+            <span className="text-xs text-blade-secondary truncate">
+              {conversations.find((c) => c.id === currentConversationId)?.title ?? "New conversation"}
+            </span>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-1">
             <button
               onClick={onClear}
-              className="text-blade-muted hover:text-blade-text text-xs transition-colors"
+              className="h-7 px-2 rounded-md text-2xs text-blade-muted hover:text-blade-secondary hover:bg-blade-surface transition-colors"
             >
               clear
             </button>
             <button
               onClick={onOpenSettings}
-              aria-label="Open settings"
-              className="text-blade-muted hover:text-blade-text transition-colors"
+              className="w-7 h-7 rounded-md text-blade-muted hover:text-blade-secondary hover:bg-blade-surface transition-colors flex items-center justify-center"
+              aria-label="Settings"
             >
-              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="3" />
                 <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
               </svg>
@@ -177,36 +173,44 @@ export function ChatWindow({
           </div>
         </div>
 
+        {/* Error */}
         {error && (
-          <div className="px-4 py-2 bg-red-950 border-b border-red-900 text-red-400 text-xs">
+          <div className="mx-4 mt-3 px-3 py-2 rounded-lg bg-red-500/8 border border-red-500/15 text-red-400 text-xs animate-fade-in">
             {error}
           </div>
         )}
 
         <MessageList messages={messages} loading={loading} toolExecutions={toolExecutions} />
 
+        {/* Clipboard bar */}
         {clipboardText && !loading && (
-          <div className="px-4 py-2 border-t border-blade-border bg-blade-surface/50 flex items-center gap-2">
-            <span className="text-xs text-blade-muted truncate flex-1">
-              Clipboard: {clipboardText.slice(0, 60)}{clipboardText.length > 60 ? "..." : ""}
+          <div className="mx-4 mb-2 px-3 py-2 rounded-lg bg-blade-surface border border-blade-border flex items-center gap-2 animate-fade-in">
+            <svg viewBox="0 0 24 24" className="w-3 h-3 text-blade-muted shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="8" y="2" width="8" height="4" rx="1" />
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+            </svg>
+            <span className="text-2xs text-blade-muted truncate flex-1">
+              {clipboardText.slice(0, 50)}{clipboardText.length > 50 ? "..." : ""}
             </span>
             <button
               onClick={() => handleClipboardAction("Explain")}
-              className="text-[11px] px-2.5 py-1 rounded-lg border border-blade-border text-blade-muted hover:text-blade-text hover:border-blade-muted transition-colors"
+              className="text-2xs px-2 py-0.5 rounded-md bg-blade-surface-hover text-blade-secondary hover:text-blade-text transition-colors"
             >
               Explain
             </button>
             <button
               onClick={() => handleClipboardAction("Summarize")}
-              className="text-[11px] px-2.5 py-1 rounded-lg border border-blade-border text-blade-muted hover:text-blade-text hover:border-blade-muted transition-colors"
+              className="text-2xs px-2 py-0.5 rounded-md bg-blade-surface-hover text-blade-secondary hover:text-blade-text transition-colors"
             >
               Summarize
             </button>
             <button
               onClick={onDismissClipboard}
-              className="text-blade-muted hover:text-blade-text text-xs transition-colors ml-1"
+              className="text-blade-muted hover:text-blade-secondary transition-colors"
             >
-              x
+              <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
             </button>
           </div>
         )}
