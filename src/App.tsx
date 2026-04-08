@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ChatWindow } from "./components/ChatWindow";
+import { CommandPalette } from "./components/CommandPalette";
 import { Discovery } from "./components/Discovery";
 import { Onboarding } from "./components/Onboarding";
 import { Settings } from "./components/Settings";
@@ -14,6 +15,7 @@ export default function App() {
   const [config, setConfig] = useState<BladeConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [route, setRoute] = useState<Route>("chat");
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const chat = useChat();
 
   const loadConfig = async () => {
@@ -35,6 +37,27 @@ export default function App() {
   useEffect(() => {
     loadConfig();
   }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  const closePalette = useCallback(() => setPaletteOpen(false), []);
+
+  const commands = [
+    { id: "new", label: "New conversation", action: () => chat.newConversation() },
+    { id: "clear", label: "Clear messages", action: () => chat.clearMessages() },
+    { id: "settings", label: "Open settings", action: () => setRoute("settings") },
+    { id: "discovery", label: "Run discovery scan", action: () => setRoute("discovery") },
+    { id: "chat", label: "Back to chat", action: () => setRoute("chat") },
+  ];
 
   if (loading) {
     return (
@@ -71,6 +94,7 @@ export default function App() {
   return (
     <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
       <TitleBar />
+      <CommandPalette commands={commands} open={paletteOpen} onClose={closePalette} />
       <div className="flex-1 min-h-0">
         {route === "settings" ? (
           <Settings
@@ -88,6 +112,7 @@ export default function App() {
             loading={chat.loading}
             error={chat.error}
             toolExecutions={chat.toolExecutions}
+            clipboardText={chat.clipboardText}
             conversations={chat.conversations}
             currentConversationId={chat.currentConversationId}
             onSend={chat.sendMessage}
@@ -95,6 +120,7 @@ export default function App() {
             onNewConversation={chat.newConversation}
             onSwitchConversation={chat.switchConversation}
             onOpenSettings={() => setRoute("settings")}
+            onDismissClipboard={chat.dismissClipboard}
           />
         )}
       </div>

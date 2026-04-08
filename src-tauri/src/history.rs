@@ -93,6 +93,15 @@ pub fn load_conversation(conversation_id: &str) -> Result<StoredConversation, St
     serde_json::from_str(&raw).map_err(|e| e.to_string())
 }
 
+pub fn delete_conversation(conversation_id: &str) -> Result<(), String> {
+    let path = conversation_path(conversation_id);
+    if path.exists() {
+        fs::remove_file(path).map_err(|e| e.to_string())
+    } else {
+        Ok(())
+    }
+}
+
 pub fn save_conversation(
     conversation_id: &str,
     messages: Vec<HistoryMessage>,

@@ -33,6 +33,7 @@ export function ChatWindow({
   loading,
   error,
   toolExecutions,
+  clipboardText,
   conversations,
   currentConversationId,
   onSend,
@@ -40,7 +41,14 @@ export function ChatWindow({
   onNewConversation,
   onSwitchConversation,
   onOpenSettings,
+  onDismissClipboard,
 }: Props) {
+  const handleClipboardAction = (action: string) => {
+    if (!clipboardText) return;
+    const preview = clipboardText.length > 200 ? clipboardText.slice(0, 200) + "..." : clipboardText;
+    onSend(`${action} this:\n\n${preview}`);
+    onDismissClipboard();
+  };
   return (
     <div className="flex flex-col h-full bg-blade-bg text-blade-text">
       <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-blade-border">
@@ -88,6 +96,33 @@ export function ChatWindow({
       )}
 
       <MessageList messages={messages} loading={loading} toolExecutions={toolExecutions} />
+
+      {clipboardText && !loading && (
+        <div className="px-4 py-2 border-t border-blade-border bg-blade-surface/50 flex items-center gap-2">
+          <span className="text-xs text-blade-muted truncate flex-1">
+            Clipboard: {clipboardText.slice(0, 60)}{clipboardText.length > 60 ? "..." : ""}
+          </span>
+          <button
+            onClick={() => handleClipboardAction("Explain")}
+            className="text-[11px] px-2.5 py-1 rounded-lg border border-blade-border text-blade-muted hover:text-blade-text hover:border-blade-muted transition-colors"
+          >
+            Explain
+          </button>
+          <button
+            onClick={() => handleClipboardAction("Summarize")}
+            className="text-[11px] px-2.5 py-1 rounded-lg border border-blade-border text-blade-muted hover:text-blade-text hover:border-blade-muted transition-colors"
+          >
+            Summarize
+          </button>
+          <button
+            onClick={onDismissClipboard}
+            className="text-blade-muted hover:text-blade-text text-xs transition-colors ml-1"
+          >
+            x
+          </button>
+        </div>
+      )}
+
       <InputBar onSend={onSend} disabled={loading} />
     </div>
   );

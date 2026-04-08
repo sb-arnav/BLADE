@@ -32,11 +32,14 @@ fn toggle_window(app: &tauri::AppHandle) {
 pub fn run() {
     let mcp_manager: commands::SharedMcpManager =
         Arc::new(tokio::sync::Mutex::new(mcp::McpManager::default()));
+    let approval_map: commands::ApprovalMap =
+        Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
     let setup_manager = mcp_manager.clone();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(mcp_manager)
+        .manage(approval_map)
         .invoke_handler(tauri::generate_handler![
             commands::send_message_stream,
             commands::get_config,
@@ -49,9 +52,11 @@ pub fn run() {
             commands::mcp_get_servers,
             commands::mcp_remove_server,
             commands::mcp_server_status,
+            commands::respond_tool_approval,
             commands::history_list_conversations,
             commands::history_load_conversation,
             commands::history_save_conversation,
+            commands::history_delete_conversation,
             brain::get_persona,
             brain::set_persona,
             brain::get_context,
