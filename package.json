@@ -10,6 +10,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.96",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
     "highlight.js": "^11.11.1",
