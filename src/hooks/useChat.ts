@@ -1,7 +1,6 @@
 import { useState, useCallback } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { Message } from "../types";
-
-const BACKEND = "http://127.0.0.1:7731";
 
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -26,26 +25,20 @@ export function useChat() {
         content: m.content,
       }));
 
-      const res = await fetch(`${BACKEND}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: allMessages }),
+      const response = await invoke<string>("send_message", {
+        messages: allMessages,
       });
-
-      if (!res.ok) throw new Error(`Backend error: ${res.status}`);
-
-      const data = await res.json();
 
       const assistantMsg: Message = {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: data.response,
+        content: response,
         timestamp: Date.now(),
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unknown error");
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
