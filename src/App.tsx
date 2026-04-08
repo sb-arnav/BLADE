@@ -18,6 +18,8 @@ import { Settings } from "./components/Settings";
 import TemplateManager from "./components/TemplateManager";
 import { ThemePicker } from "./components/ThemePicker";
 import ShortcutHelp from "./components/ShortcutHelp";
+import { Terminal } from "./components/Terminal";
+import { FileBrowser } from "./components/FileBrowser";
 import { TitleBar } from "./components/TitleBar";
 import { useChat } from "./hooks/useChat";
 import { useTTS } from "./hooks/useTTS";
@@ -28,7 +30,7 @@ import { useFileDrop } from "./hooks/useFileDrop";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files";
 
 export default function App() {
   const [config, setConfig] = useState<BladeConfig | null>(null);
@@ -170,6 +172,8 @@ export default function App() {
     { id: "sysprompt", label: "View system prompt", action: () => setSystemPromptOpen(true) },
     { id: "shortcuts", label: "Keyboard shortcuts  Ctrl+/", action: () => setShortcutHelpOpen(true) },
     { id: "agents", label: "Agent tasks", action: () => setRoute("agents") },
+    { id: "terminal", label: "Terminal", action: () => setRoute("terminal") },
+    { id: "files", label: "File browser", action: () => setRoute("files") },
     { id: "chat", label: "Back to chat", action: () => setRoute("chat") },
   ];
 
@@ -257,6 +261,24 @@ export default function App() {
       <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
         <TitleBar />
         <AgentManager />
+      </div>
+    );
+  }
+
+  if (route === "terminal") {
+    return (
+      <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
+        <TitleBar />
+        <Terminal onBack={() => setRoute("chat")} onSendToChat={(text) => { sendWithStats(text); setRoute("chat"); }} />
+      </div>
+    );
+  }
+
+  if (route === "files") {
+    return (
+      <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
+        <TitleBar />
+        <FileBrowser onBack={() => setRoute("chat")} onSendToChat={(content, name) => { sendWithStats(`Analyze ${name}:\n\n\`\`\`\n${content.slice(0, 3000)}\n\`\`\``); setRoute("chat"); }} />
       </div>
     );
   }
