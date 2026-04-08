@@ -2,14 +2,20 @@ import { useCallback, useRef, useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
+import { Analytics } from "./components/Analytics";
 import { ChatWindow } from "./components/ChatWindow";
 import { CommandPalette } from "./components/CommandPalette";
+import { ConversationInsightsPanel } from "./components/ConversationInsightsPanel";
 import { Diagnostics } from "./components/Diagnostics";
 import { Discovery } from "./components/Discovery";
 import FocusMode from "./components/FocusMode";
+import { KnowledgeBase } from "./components/KnowledgeBase";
+import { ModelComparison } from "./components/ModelComparison";
 import SystemPromptPreview from "./components/SystemPromptPreview";
 import { Onboarding } from "./components/Onboarding";
 import { Settings } from "./components/Settings";
+import TemplateManager from "./components/TemplateManager";
+import { ThemePicker } from "./components/ThemePicker";
 import ShortcutHelp from "./components/ShortcutHelp";
 import { TitleBar } from "./components/TitleBar";
 import { useChat } from "./hooks/useChat";
@@ -21,7 +27,7 @@ import { useFileDrop } from "./hooks/useFileDrop";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison";
 
 export default function App() {
   const [config, setConfig] = useState<BladeConfig | null>(null);
@@ -30,6 +36,9 @@ export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const [systemPromptOpen, setSystemPromptOpen] = useState(false);
+  const [templateManagerOpen, setTemplateManagerOpen] = useState(false);
+  const [themePickerOpen, setThemePickerOpen] = useState(false);
+  const [insightsOpen, setInsightsOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const chat = useChat();
   const tts = useTTS(chat.messages, chat.loading);
@@ -148,6 +157,12 @@ export default function App() {
     { id: "sound", label: sound.enabled ? "Disable notification sound" : "Enable notification sound", action: sound.toggleEnabled },
     { id: "export", label: "Export conversation to clipboard", action: () => copyConversation(chat.messages, chat.currentConversation?.title) },
     { id: "settings", label: "Open settings  Ctrl+,", action: () => setRoute("settings") },
+    { id: "templates", label: "Prompt templates", action: () => setTemplateManagerOpen(true) },
+    { id: "themes", label: "Change theme", action: () => setThemePickerOpen(true) },
+    { id: "insights", label: "Conversation insights", action: () => setInsightsOpen(true) },
+    { id: "analytics", label: "Usage analytics", action: () => setRoute("analytics") },
+    { id: "knowledge", label: "Knowledge base", action: () => setRoute("knowledge") },
+    { id: "comparison", label: "Compare models", action: () => setRoute("comparison") },
     { id: "diagnostics", label: "View API traces", action: () => setRoute("diagnostics") },
     { id: "discovery", label: "Run discovery scan", action: () => setRoute("discovery") },
     { id: "focus", label: "Focus mode  Ctrl+F", action: () => setFocusMode(true) },
@@ -183,6 +198,33 @@ export default function App() {
           await loadConfig();
           setRoute("discovery");
         }} />
+      </div>
+    );
+  }
+
+  if (route === "analytics") {
+    return (
+      <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
+        <TitleBar />
+        <Analytics onBack={() => setRoute("chat")} />
+      </div>
+    );
+  }
+
+  if (route === "knowledge") {
+    return (
+      <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
+        <TitleBar />
+        <KnowledgeBase onBack={() => setRoute("chat")} onInsertToChat={(content) => { sendWithStats(content); setRoute("chat"); }} />
+      </div>
+    );
+  }
+
+  if (route === "comparison") {
+    return (
+      <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
+        <TitleBar />
+        <ModelComparison onBack={() => setRoute("chat")} />
       </div>
     );
   }
@@ -227,6 +269,9 @@ export default function App() {
       <CommandPalette commands={commands} open={paletteOpen} onClose={closePalette} />
       <ShortcutHelp open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
       <SystemPromptPreview open={systemPromptOpen} onClose={() => setSystemPromptOpen(false)} />
+      <TemplateManager open={templateManagerOpen} onClose={() => setTemplateManagerOpen(false)} onUseTemplate={(content: string) => { sendWithStats(content); setTemplateManagerOpen(false); }} />
+      <ThemePicker open={themePickerOpen} onClose={() => setThemePickerOpen(false)} />
+      <ConversationInsightsPanel messages={chat.messages} open={insightsOpen} onClose={() => setInsightsOpen(false)} />
       <div className="flex-1 min-h-0">
         {route === "settings" ? (
           <Settings
