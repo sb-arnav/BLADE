@@ -91,8 +91,7 @@ Working note for split ownership between Artemis and Claude on the Blade repo.
 
 ## Open Backend Work
 
-- Streaming during tool loop (final text streams, but mid-loop tool-call turns are non-streaming — by design)
-- Request tracing for provider calls (debug logs with request IDs)
+- No open items. Backend is feature-complete for current scope.
 
 ## Recently Shipped by Artemis (2026-04-08, batch 2)
 
@@ -110,8 +109,32 @@ Working note for split ownership between Artemis and Claude on the Blade repo.
 - **InputBar polish** — Send button is now an SVG arrow icon. Ctrl+K shortcut hint shown bottom-right. (`InputBar.tsx`)
 - **Accent hover color** — Added `blade-accent-hover` (#818cf8) for interactive hover states. (`tailwind.config.js`)
 
+## Recently Shipped by Claude (2026-04-08, batch 2)
+
+- **Tool approval flow** — `Ask` risk tools now BLOCK and emit `tool_approval_needed` event. Frontend calls `respond_tool_approval(approval_id, true/false)`. 60s timeout auto-denies. Denied tools tell the AI "execution denied by user."
+- **Conversation deletion** — `history_delete_conversation(conversation_id)` removes the file.
+- **Request tracing** — every provider call logged to `logs/provider_traces.jsonl`. `get_recent_traces()` returns last 50 entries.
+- **Per-tool trust overrides** — `set_tool_trust`, `reset_tool_trust`, `get_tool_overrides`. Persisted to `tool_overrides.json`.
+- **MCP server auto-import** — `discover_mcp_servers()` reads Claude Code + Codex configs.
+- **MCP health checks** — dead processes auto-detected + respawned. `mcp_server_status()` for UI.
+
+## New Commands for UI
+
+| Command | What it does | Notes |
+|---------|-------------|-------|
+| `respond_tool_approval(approval_id, approved)` | Approve/deny a pending tool call | Frontend must call within 60s |
+| `history_delete_conversation(conversation_id)` | Delete a conversation | Removes JSON file |
+| `get_recent_traces()` | Last 50 provider call traces | For debug/diagnostics panel |
+| `discover_mcp_servers()` | Import servers from Claude Code/Codex | Returns ImportedMcpServer[] |
+| `mcp_server_status()` | Running state per server | Vec<(name, bool)> |
+| `set_tool_trust(name, risk)` | Override tool risk | Persists to disk |
+| `reset_tool_trust(name)` | Revert to default | |
+| `get_tool_overrides()` | All user overrides | |
+| **New Event** | | |
+| `tool_approval_needed` | Ask-risk tool needs approval | payload: {approval_id, name, arguments, risk} |
+
 ## Open UI/UX Work (Artemis)
 
-- Tool approval dialog when `Ask` tool fires (needs backend approval event — check if `tool_executing` with risk=Ask should block until UI confirms)
-- Conversation deletion (needs backend `history_delete_conversation` command)
+- **Tool approval dialog** — listen for `tool_approval_needed`, show modal with tool name + args, Allow/Deny buttons, call `respond_tool_approval`. Backend is ready and blocking.
+- **Conversation deletion** — add delete button per conversation, call `history_delete_conversation`. Backend is ready.
 - Syntax highlighting in code blocks (consider adding highlight.js or shiki)
