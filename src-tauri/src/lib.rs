@@ -7,6 +7,7 @@ mod history;
 mod mcp;
 mod permissions;
 mod providers;
+mod trace;
 
 use std::sync::Arc;
 use tauri::{
@@ -63,6 +64,7 @@ pub fn run() {
             permissions::set_tool_trust,
             permissions::reset_tool_trust,
             permissions::get_tool_overrides,
+            trace::get_recent_traces,
         ])
         .setup(move |app| {
             if let Some(window) = app.get_webview_window("main") {

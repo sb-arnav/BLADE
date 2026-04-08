@@ -7,6 +7,7 @@ interface Props {
   loading: boolean;
   error: string | null;
   toolExecutions: ToolExecution[];
+  clipboardText: string | null;
   conversations: ConversationSummary[];
   currentConversationId: string | null;
   onSend: (message: string) => void;
@@ -14,6 +15,7 @@ interface Props {
   onNewConversation: () => void | Promise<void>;
   onSwitchConversation: (conversationId: string) => void | Promise<void>;
   onOpenSettings: () => void;
+  onDismissClipboard: () => void;
 }
 
 function GearIcon() {
