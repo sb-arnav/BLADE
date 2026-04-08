@@ -153,12 +153,13 @@ export function useChat() {
   }, [currentConversationId, loading, messages, persistConversation]);
 
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, imageBase64?: string) => {
       const conversationId = currentConversationId ?? (await createConversation());
       const userMsg: Message = {
         id: crypto.randomUUID(),
         role: "user",
         content,
+        image_base64: imageBase64,
         timestamp: Date.now(),
       };
 
@@ -184,6 +185,7 @@ export function useChat() {
             .map((message) => ({
               role: message.role,
               content: message.content,
+              ...(message.image_base64 ? { image_base64: message.image_base64 } : {}),
             })),
         });
       } catch (cause) {

@@ -12,7 +12,7 @@ interface Props {
   clipboardText: string | null;
   conversations: ConversationSummary[];
   currentConversationId: string | null;
-  onSend: (message: string) => void;
+  onSend: (message: string, imageBase64?: string) => void;
   onClear: () => void;
   onNewConversation: () => void | Promise<void>;
   onSwitchConversation: (conversationId: string) => void | Promise<void>;

@@ -5,7 +5,9 @@ mod config;
 mod discovery;
 mod history;
 mod mcp;
+mod memory;
 mod permissions;
+mod router;
 mod providers;
 mod screen;
 mod trace;
@@ -77,6 +79,9 @@ pub fn run() {
             voice::voice_transcribe,
             screen::capture_screen,
             screen::capture_screen_region,
+            memory::learn_from_conversation,
+            memory::get_memory_log,
+            router::classify_message,
         ])
         .setup(move |app| {
             if let Some(window) = app.get_webview_window("main") {

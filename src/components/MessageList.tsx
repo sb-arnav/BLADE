@@ -137,6 +137,13 @@ function MessageBubble({ msg }: { msg: Message }) {
               : "bg-blade-surface text-blade-text border border-blade-border"
           }`}
         >
+          {msg.image_base64 && (
+            <img
+              src={`data:image/png;base64,${msg.image_base64}`}
+              alt="Screenshot"
+              className="rounded-lg max-w-full max-h-48 mb-2 border border-blade-border/30"
+            />
+          )}
           <div className={`message-markdown ${msg.role === "user" ? "message-markdown-user" : ""}`}>
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}

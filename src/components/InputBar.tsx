@@ -2,7 +2,7 @@ import { useCallback, useRef, useState, KeyboardEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 interface Props {
-  onSend: (message: string) => void;
+  onSend: (message: string, imageBase64?: string) => void;
   disabled: boolean;
 }
 
@@ -61,7 +61,7 @@ export function InputBar({ onSend, disabled }: Props) {
     setCapturing(true);
     try {
       const png = await invoke<string>("capture_screen");
-      onSend(`[screenshot attached]\n\ndata:image/png;base64,${png}`);
+      onSend("What's on my screen?", png);
     } catch {
       // Screenshot failed
     }

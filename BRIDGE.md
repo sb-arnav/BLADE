@@ -187,8 +187,13 @@ Working note for split ownership between Artemis and Claude on the Blade repo.
 - **Screenshot button** — camera icon in InputBar. Captures full screen via `capture_screen`, sends as base64 PNG message. Also available in command palette (Ctrl+K → "Capture screen"). (`InputBar.tsx`, `App.tsx`)
 - **InputBar layout** — screenshot and mic buttons on the left, textarea in the middle, recording indicator + send on the right. Clean grouping.
 
+## Recently Shipped by Artemis (2026-04-08, batch 8)
+
+- **Vision-native screenshots** — screenshots now pass `image_base64` in the ChatMessage payload instead of dumping base64 into content text. Backend vision support is end-to-end. (`types.ts`, `useChat.ts`, `InputBar.tsx`, `App.tsx`)
+- **Screenshot thumbnails** — user messages with `image_base64` show the screenshot as a rounded thumbnail (max 192px height) above the text. (`MessageList.tsx`)
+- **sendMessage accepts images** — `sendMessage(content, imageBase64?)` passes images to backend cleanly. Message serialization includes `image_base64` only when present.
+
 ## Open UI/UX Work (Artemis)
 
 - Request trace viewer in diagnostics (backend has `get_recent_traces()`)
 - Conversation search / filter in sidebar
-- Vision support note: screenshot sends base64 as message text. If providers gain native vision message support, update `sendMessage` to pass image separately.
