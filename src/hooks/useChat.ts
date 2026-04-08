@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ConversationSummary, Message, StoredConversation, ToolExecution } from "../types";
+import { ConversationSummary, Message, StoredConversation, ToolApprovalRequest, ToolExecution } from "../types";
 
 function sortConversations(items: ConversationSummary[]) {
   return [...items].sort((a, b) => b.updated_at - a.updated_at);
@@ -15,6 +15,7 @@ export function useChat() {
   const [error, setError] = useState<string | null>(null);
   const [toolExecutions, setToolExecutions] = useState<ToolExecution[]>([]);
   const [clipboardText, setClipboardText] = useState<string | null>(null);
+  const [pendingApproval, setPendingApproval] = useState<ToolApprovalRequest | null>(null);
   const streamBuffer = useRef("");
   const messagesRef = useRef<Message[]>([]);
   const bootstrappedRef = useRef(false);
@@ -120,6 +121,10 @@ export function useChat() {
       );
     });
 
+    const unlistenApproval = listen<ToolApprovalRequest>("tool_approval_needed", (event) => {
+      setPendingApproval(event.payload);
+    });
+
     const unlistenClipboard = listen<string>("clipboard_changed", (event) => {
       const text = event.payload?.trim();
       if (text && text.length > 10 && text.length < 5000) {
@@ -132,6 +137,7 @@ export function useChat() {
       unlistenDone.then((fn) => fn());
       unlistenToolExecuting.then((fn) => fn());
       unlistenToolCompleted.then((fn) => fn());
+      unlistenApproval.then((fn) => fn());
       unlistenClipboard.then((fn) => fn());
     };
   }, []);
@@ -214,6 +220,31 @@ export function useChat() {
 
   const dismissClipboard = useCallback(() => setClipboardText(null), []);
 
+  const respondToApproval = useCallback(async (approved: boolean) => {
+    if (!pendingApproval) return;
+    try {
+      await invoke("respond_tool_approval", {
+        approvalId: pendingApproval.approval_id,
+        approved,
+      });
+    } catch {
+      // Backend may have timed out already
+    }
+    setPendingApproval(null);
+  }, [pendingApproval]);
+
+  const deleteConversation = useCallback(async (conversationId: string) => {
+    try {
+      await invoke("history_delete_conversation", { conversationId });
+      setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+      if (conversationId === currentConversationId) {
+        await createConversation();
+      }
+    } catch (cause) {
+      setError(typeof cause === "string" ? cause : String(cause));
+    }
+  }, [currentConversationId, createConversation]);
+
   return {
     messages,
     loading,
@@ -221,6 +252,9 @@ export function useChat() {
     toolExecutions,
     clipboardText,
     dismissClipboard,
+    pendingApproval,
+    respondToApproval,
+    deleteConversation,
     conversations,
     currentConversationId,
     currentConversation,
