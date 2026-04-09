@@ -11,14 +11,21 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.96",
+    "@tanstack/react-virtual": "^3.13.23",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
+    "@types/dompurify": "^3.0.5",
+    "date-fns": "^4.1.0",
+    "dompurify": "^3.3.3",
     "highlight.js": "^11.11.1",
+    "marked": "^18.0.0",
     "mermaid": "^11.14.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "usehooks-ts": "^3.1.1",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
