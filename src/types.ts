@@ -19,6 +19,11 @@ export interface BladeConfig {
   model: string;
   onboarded: boolean;
   mcp_servers: McpServerConfig[];
+  token_efficient?: boolean;
+  user_name?: string;
+  work_mode?: string;
+  response_style?: string;
+  blade_email?: string;
 }
 
 export interface ConversationSummary {

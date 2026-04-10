@@ -171,6 +171,7 @@ pub fn run() {
             commands::debug_config,
             commands::reset_onboarding,
             commands::set_config,
+            commands::update_init_prefs,
             commands::test_provider,
             commands::mcp_add_server,
             commands::mcp_discover_tools,
