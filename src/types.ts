@@ -330,3 +330,87 @@ export interface DiscoveryReport {
   installed_tools: string[];
   claude_memories: string[];
 }
+
+// ── Brain (Character Bible) ────────────────────────────────────────────────────
+
+export interface BrainPreference {
+  id: string;
+  text: string;
+  confidence: number;
+  source: "feedback" | "manual";
+  updated_at: number;
+}
+
+export interface BrainNode {
+  id: string;
+  label: string;
+  kind: "person" | "project" | "tool" | "concept" | "company" | "url";
+  summary: string;
+  mention_count: number;
+  last_seen_at: number;
+}
+
+export interface BrainEdge {
+  id: string;
+  from_id: string;
+  to_id: string;
+  label: string;
+  weight: number;
+}
+
+export interface BrainSkill {
+  id: string;
+  name: string;
+  trigger_pattern: string;
+  prompt_modifier: string;
+  tools_json: string;
+  usage_count: number;
+  active: boolean;
+  created_at: number;
+}
+
+export interface BrainMemory {
+  id: string;
+  text: string;
+  source_conversation_id: string;
+  entities_json: string;
+  confidence: number;
+  created_at: number;
+  expires_at?: number | null;
+}
+
+export interface BrainReaction {
+  id: string;
+  message_id: string;
+  polarity: number; // 1 = thumbs up, -1 = thumbs down
+  content: string;
+  context_json: string;
+  created_at: number;
+}
+
+// ── Mission DSL ───────────────────────────────────────────────────────────────
+
+export interface MissionStageSpec {
+  id: string;
+  title: string;
+  goalTemplate: string;
+  dependsOn: string[];
+  runtimeHint: string;
+  loopUntil?: string;
+  approvalGate?: boolean;
+  injectBrain?: boolean;
+  maxIterations?: number;
+}
+
+export interface MissionSpec {
+  id: string;
+  title: string;
+  description: string;
+  tags: string[];
+  builtIn: boolean;
+  inputVars: Record<string, { label: string; placeholder: string; required: boolean }>;
+  stages: MissionStageSpec[];
+  createdAt: number;
+  lastRunAt?: number;
+  schedule?: string;
+}

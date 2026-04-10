@@ -1,4 +1,11 @@
 use crate::config::{blade_config_dir, load_config, write_blade_file};
+use rusqlite;
+
+fn uuid_v4() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let t = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().subsec_nanos();
+    format!("{:x}-{:x}-{:x}-{:x}", t, t ^ 0xdeadbeef, t.wrapping_mul(0x9e3779b9), t.wrapping_add(0x12345678))
+}
 use std::fs;
 use std::path::PathBuf;
 
@@ -107,6 +114,17 @@ Key facts:"#,
             .open(&log_path)
         {
             let _ = writeln!(file, "{}", line);
+        }
+    }
+
+    // Also write each fact as a structured brain memory entry
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+        for fact in facts.lines() {
+            let fact = fact.trim().trim_start_matches('-').trim();
+            if fact.is_empty() { continue; }
+            let id = format!("{}", uuid_v4());
+            let _ = crate::db::brain_add_memory(&conn, &id, fact, "", "[]", 0.7, None);
         }
     }
 

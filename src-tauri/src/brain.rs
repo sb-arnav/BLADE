@@ -1,4 +1,5 @@
 use crate::config::{blade_config_dir, write_blade_file};
+use rusqlite;
 use crate::mcp::McpTool;
 use std::fs;
 use std::path::PathBuf;
@@ -10,8 +11,15 @@ pub fn build_system_prompt(tools: &[McpTool]) -> String {
     // Core identity
     parts.push(BLADE_IDENTITY.to_string());
 
-    // Character Bible (structured knowledge about the user)
-    if let Some(bible) = crate::character::bible_summary() {
+    // Character Bible — inject from SQLite (structured, compounding knowledge)
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+        let ctx = crate::db::brain_build_context(&conn, 700);
+        if !ctx.trim().is_empty() {
+            parts.push(ctx);
+        }
+    } else if let Some(bible) = crate::character::bible_summary() {
+        // Fallback to file-based bible if DB not yet initialized
         parts.push(format!("## About the User\n\n{}", bible));
     }
 

@@ -20,7 +20,7 @@ import { useRuntimes } from "./hooks/useRuntimes";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character";
 
 const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
 const Canvas = lazy(() => import("./components/Canvas"));
@@ -46,6 +46,7 @@ const DocumentGenerator = lazy(() => import("./components/DocumentGenerator"));
 const WebAutomation = lazy(() => import("./components/WebAutomation"));
 const AgentTeamPanel = lazy(() => import("./components/AgentTeamPanel").then((m) => ({ default: m.AgentTeamPanel })));
 const GitPanel = lazy(() => import("./components/GitPanel").then((m) => ({ default: m.GitPanel })));
+const CharacterBible = lazy(() => import("./components/CharacterBible").then((m) => ({ default: m.CharacterBible })));
 
 function ShellFallback({ label = "Loading workspace..." }: { label?: string }) {
   return (
@@ -305,6 +306,7 @@ export default function App() {
     { id: "web-auto", label: "Blade: open web automation", action: () => openRoute("web-auto") },
     { id: "agent-teams", label: "Blade: open agent teams", action: () => openRoute("agent-teams") },
     { id: "git", label: "Blade: open git workspace", action: () => openRoute("git") },
+    { id: "character", label: "Blade: open Character Bible", action: () => openRoute("character") },
     { id: "sync", label: "Blade: open sync settings", action: () => openRoute("sync") },
     { id: "notifications", label: "Blade: show notifications", action: () => setNotificationsOpen(true) },
     { id: "chat", label: "Blade: return to chat", action: () => openRoute("chat") },
@@ -365,6 +367,7 @@ export default function App() {
     "web-auto": <WebAutomation onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} />,
     "agent-teams": <AgentTeamPanel onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} />,
     "git": <GitPanel onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} />,
+    "character": <CharacterBible onBack={() => openRoute("chat")} />,
   };
 
   if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {

@@ -431,3 +431,149 @@ pub fn db_increment_template_usage(
     .map_err(|e| format!("DB error: {}", e))?;
     Ok(())
 }
+
+// ── Brain (Character Bible) ────────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn brain_get_identity(state: tauri::State<'_, SharedDb>) -> Result<std::collections::HashMap<String, String>, String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_get_identity(&conn)
+}
+
+#[tauri::command]
+pub fn brain_set_identity(state: tauri::State<'_, SharedDb>, key: String, value: String) -> Result<(), String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_set_identity(&conn, &key, &value)
+}
+
+#[tauri::command]
+pub fn brain_get_style_tags(state: tauri::State<'_, SharedDb>) -> Result<Vec<String>, String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_get_style_tags(&conn)
+}
+
+#[tauri::command]
+pub fn brain_add_style_tag(state: tauri::State<'_, SharedDb>, id: String, tag: String) -> Result<(), String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_add_style_tag(&conn, &id, &tag)
+}
+
+#[tauri::command]
+pub fn brain_remove_style_tag(state: tauri::State<'_, SharedDb>, id: String) -> Result<(), String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_remove_style_tag(&conn, &id)
+}
+
+#[tauri::command]
+pub fn brain_get_preferences(state: tauri::State<'_, SharedDb>) -> Result<Vec<db::BrainPreferenceRow>, String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_get_preferences(&conn)
+}
+
+#[tauri::command]
+pub fn brain_upsert_preference(state: tauri::State<'_, SharedDb>, id: String, text: String, confidence: f64, source: String) -> Result<(), String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_upsert_preference(&conn, &id, &text, confidence, &source)
+}
+
+#[tauri::command]
+pub fn brain_delete_preference(state: tauri::State<'_, SharedDb>, id: String) -> Result<(), String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_delete_preference(&conn, &id)
+}
+
+#[tauri::command]
+pub fn brain_get_memories(state: tauri::State<'_, SharedDb>, limit: Option<i64>) -> Result<Vec<db::BrainMemoryRow>, String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_get_memories(&conn, limit.unwrap_or(50))
+}
+
+#[tauri::command]
+pub fn brain_add_memory(state: tauri::State<'_, SharedDb>, id: String, text: String, source_conversation_id: String, entities_json: String, confidence: f64, expires_at: Option<i64>) -> Result<(), String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_add_memory(&conn, &id, &text, &source_conversation_id, &entities_json, confidence, expires_at)
+}
+
+#[tauri::command]
+pub fn brain_delete_memory(state: tauri::State<'_, SharedDb>, id: String) -> Result<(), String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_delete_memory(&conn, &id)
+}
+
+#[tauri::command]
+pub fn brain_clear_memories(state: tauri::State<'_, SharedDb>) -> Result<(), String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_clear_memories(&conn)
+}
+
+#[tauri::command]
+pub fn brain_get_nodes(state: tauri::State<'_, SharedDb>) -> Result<Vec<db::BrainNodeRow>, String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_get_nodes(&conn)
+}
+
+#[tauri::command]
+pub fn brain_upsert_node(state: tauri::State<'_, SharedDb>, id: String, label: String, kind: String, summary: String) -> Result<(), String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_upsert_node(&conn, &id, &label, &kind, &summary)
+}
+
+#[tauri::command]
+pub fn brain_delete_node(state: tauri::State<'_, SharedDb>, id: String) -> Result<(), String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_delete_node(&conn, &id)
+}
+
+#[tauri::command]
+pub fn brain_get_edges(state: tauri::State<'_, SharedDb>) -> Result<Vec<db::BrainEdgeRow>, String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_get_edges(&conn)
+}
+
+#[tauri::command]
+pub fn brain_upsert_edge(state: tauri::State<'_, SharedDb>, id: String, from_id: String, to_id: String, label: String) -> Result<(), String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_upsert_edge(&conn, &id, &from_id, &to_id, &label)
+}
+
+#[tauri::command]
+pub fn brain_get_skills(state: tauri::State<'_, SharedDb>) -> Result<Vec<db::BrainSkillRow>, String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_get_skills(&conn)
+}
+
+#[tauri::command]
+pub fn brain_upsert_skill(state: tauri::State<'_, SharedDb>, id: String, name: String, trigger_pattern: String, prompt_modifier: String, tools_json: String) -> Result<(), String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_upsert_skill(&conn, &id, &name, &trigger_pattern, &prompt_modifier, &tools_json)
+}
+
+#[tauri::command]
+pub fn brain_delete_skill(state: tauri::State<'_, SharedDb>, id: String) -> Result<(), String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_delete_skill(&conn, &id)
+}
+
+#[tauri::command]
+pub fn brain_set_skill_active(state: tauri::State<'_, SharedDb>, id: String, active: bool) -> Result<(), String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_set_skill_active(&conn, &id, active)
+}
+
+#[tauri::command]
+pub fn brain_add_reaction(state: tauri::State<'_, SharedDb>, id: String, message_id: String, polarity: i64, content: String, context_json: String) -> Result<(), String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_add_reaction(&conn, &id, &message_id, polarity, &content, &context_json)
+}
+
+#[tauri::command]
+pub fn brain_get_reactions(state: tauri::State<'_, SharedDb>, limit: Option<i64>) -> Result<Vec<db::BrainReactionRow>, String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_get_reactions(&conn, limit.unwrap_or(100))
+}
+
+#[tauri::command]
+pub fn brain_get_context(state: tauri::State<'_, SharedDb>, budget_tokens: Option<usize>) -> Result<String, String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    Ok(db::brain_build_context(&conn, budget_tokens.unwrap_or(700)))
+}
