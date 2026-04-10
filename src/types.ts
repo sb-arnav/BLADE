@@ -408,9 +408,9 @@ export interface MissionSpec {
   description: string;
   tags: string[];
   builtIn: boolean;
-  inputVars: Record<string, { label: string; placeholder: string; required: boolean }>;
+  inputVars: string[];
   stages: MissionStageSpec[];
-  createdAt: number;
-  lastRunAt?: number;
+  createdAt: string;
+  lastRunAt?: string;
   schedule?: string;
 }
