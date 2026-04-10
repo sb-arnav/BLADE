@@ -216,6 +216,7 @@ pub fn run() {
             brain::get_persona,
             brain::set_persona,
             brain::get_context,
+            brain::brain_extract_from_exchange,
             brain::set_context,
             clipboard::get_clipboard,
             clipboard::set_clipboard,

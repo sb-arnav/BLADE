@@ -309,6 +309,60 @@ export function useSelfEvolution(
     tokensSaved: compressedContexts.reduce((s, c) => s + (c.originalTokens - c.compressedTokens), 0),
   };
 
+  // ── Auto-template authoring from repeated mission patterns ────────────────
+
+  const proposeTemplateFromMissions = useCallback(async (
+    completedGoals: string[],
+    onPropose: (spec: MissionSpec) => void,
+  ) => {
+    if (!allSpecs || completedGoals.length < 3) return;
+
+    // Cluster goals by first 5 words (cheap n-gram similarity)
+    const clusters: Record<string, string[]> = {};
+    for (const goal of completedGoals) {
+      const key = goal.toLowerCase().trim().split(/\s+/).slice(0, 5).join(" ");
+      if (!clusters[key]) clusters[key] = [];
+      clusters[key].push(goal);
+    }
+
+    for (const [key, goals] of Object.entries(clusters)) {
+      if (goals.length < 3) continue;
+      // Check if we already have a template for this pattern
+      const exists = allSpecs.some((s) => s.title.toLowerCase().includes(key.split(" ")[0]));
+      if (exists) continue;
+
+      // Derive input var names from the goal — find the varying part
+      const words = goals[0].split(/\s+/);
+      const inputVars = words
+        .filter((w) => w.length > 3 && /^[a-z]/i.test(w))
+        .slice(0, 2)
+        .map((w) => w.toLowerCase().replace(/[^a-z]/g, ""));
+
+      const newSpec: MissionSpec = {
+        id: `auto-${key.replace(/\s+/g, "-").slice(0, 30)}-${Date.now()}`,
+        title: `Auto: ${goals[0].slice(0, 50)}`,
+        description: `Auto-generated from ${goals.length} similar missions: ${key}…`,
+        tags: ["auto-generated"],
+        builtIn: false,
+        inputVars: inputVars.length > 0 ? inputVars : ["goal"],
+        stages: [
+          {
+            id: "s1",
+            title: "Execute",
+            goalTemplate: inputVars.length > 0
+              ? goals[0].replace(new RegExp(inputVars[0], "i"), `{{${inputVars[0]}}}`)
+              : `{{goal}}`,
+            dependsOn: [],
+            runtimeHint: "blade-native",
+          },
+        ],
+        createdAt: new Date().toISOString(),
+      };
+
+      onPropose(newSpec);
+    }
+  }, [allSpecs]);
+
   // ── Mission-spawning capabilities ──────────────────────────────────────────
 
   const onMissionReadyRef = useRef(onMissionReady);
@@ -398,5 +452,6 @@ export function useSelfEvolution(
     spawnMission,
     learnFromStage,
     checkScheduledMissions,
+    proposeTemplateFromMissions,
   };
 }
