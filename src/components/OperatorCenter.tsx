@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import AgentManager from "./AgentManager";
 import { ManagedAgentPanel } from "./ManagedAgentPanel";
 import { RuntimeTaskState, UseRuntimesResult, useRuntimes } from "../hooks/useRuntimes";
-import { MissionSpec, OperatorMission, RuntimeDescriptor, RuntimeRouteRecommendation, RuntimeSessionRef, TaskArtifact } from "../types";
+import { MissionSpec, MissionStage, OperatorMission, RuntimeDescriptor, RuntimeRouteRecommendation, RuntimeSessionRef, TaskArtifact } from "../types";
 import { invoke } from "@tauri-apps/api/core";
 import { BUILT_IN_TEMPLATES } from "../data/missionTemplates";
 import { listMissionSpecs, saveMissionSpec, deleteMissionSpec, specToOperatorMission, missingVars } from "../lib/missionSpec";
+import { addMemory as brainAddMemory } from "../data/characterBible";
 
 type OperatorTab = "mission" | "blade" | "managed" | "library";
 
@@ -403,9 +404,6 @@ export function OperatorCenter({
     await handleDesignMission(`${task.goal}\n\n${nextHandoffNote}`);
   };
 
-  const missionTaskByStageId = (stageId: string) =>
-    runtimes.tasks.find((task) => missionExecution[stageId] && task.id === missionExecution[stageId]) || null;
-
   const launchMissionStage = async (stageId: string) => {
     if (!mission) return;
     const plan = await runtimes.planNextMissionStage(mission);
@@ -431,12 +429,6 @@ export function OperatorCenter({
         return next;
       });
     }
-  };
-
-  const stageStatus = (stageId: string) => {
-    const task = missionTaskByStageId(stageId);
-    if (!task) return "pending";
-    return task.status;
   };
 
   useEffect(() => {
@@ -782,87 +774,38 @@ export function OperatorCenter({
                           Run mission
                         </button>
                       </div>
-                      <div className="mt-3 space-y-2">
-                        {mission.stages.map((stage) => {
-                          const stageTask = missionTaskByStageId(stage.id);
-                          const stageArtifacts = stageTask ? prominentArtifacts(stageTask.artifacts, 2) : [];
-                          return (
-                          <div key={stage.id} className="rounded-lg border border-white/5 bg-black/20 px-3 py-2">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="text-2xs text-blade-secondary">{stage.title}</div>
-                                <div className="mt-1 text-2xs text-blade-muted">
-                                  {stage.runtime.runtime_id}
-                                  {stage.runtime.preferred_substrate ? ` · ${stage.runtime.preferred_substrate}` : ""}
-                                  {` · ${stageStatus(stage.id)}`}
-                                </div>
-                                {stage.runtime.prefers_warm_runtime ? (
-                                  <div className="mt-1 text-2xs text-emerald-300/80">
-                                    Warm runtime reuse
-                                  </div>
-                                ) : null}
-                                {stageStatus(stage.id) === "pending" ? (
-                                  <div className="mt-1 text-2xs text-sky-300/80">
-                                    Kernel-planned stage
-                                  </div>
-                                ) : null}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => {
-                                    setGoal(stage.goal);
-                                    setSelectedRuntimeId(stage.runtime.runtime_id);
-                                    setOperatorType(
-                                      stage.runtime.operator_type === "desktop_operator" ? "desktop_operator" : "general_operator"
-                                    );
-                                    setPreferredSubstrate(stage.runtime.preferred_substrate || "");
-                                  }}
-                                  className="text-2xs px-2 py-1 rounded-md bg-blade-surface-hover text-blade-secondary hover:text-blade-text transition-colors"
-                                >
-                                  use
-                                </button>
-                                <button
-                                  onClick={() => void launchMissionStage(stage.id)}
-                                  disabled={stage.depends_on.some((dependencyId) => !missionTaskByStageId(dependencyId))}
-                                  className="text-2xs px-2 py-1 rounded-md bg-[#16172a] text-[#c8cbff] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                                >
-                                  run
-                                </button>
-                              </div>
-                            </div>
-                            <div className="mt-2 text-2xs text-blade-muted whitespace-pre-wrap line-clamp-3">
-                              {stage.goal}
-                            </div>
-                            {stageTask?.summary ? (
-                              <div className="mt-2 rounded-md border border-white/5 bg-black/20 px-2 py-1.5 text-2xs text-blade-secondary whitespace-pre-wrap line-clamp-4">
-                                {stageTask.summary}
-                              </div>
-                            ) : null}
-                            {stageArtifacts.length > 0 ? (
-                              <div className="mt-2 space-y-1.5">
-                                {stageArtifacts.map((artifact) => (
-                                  <div
-                                    key={artifact.id}
-                                    className="rounded-md border border-emerald-500/10 bg-emerald-500/5 px-2 py-1.5 text-2xs text-emerald-100"
-                                  >
-                                    <div className="text-[10px] uppercase tracking-[0.16em] text-emerald-300/80">
-                                      {artifact.label} · {artifact.kind}
-                                    </div>
-                                    <div className="mt-1 text-2xs text-emerald-50/90 whitespace-pre-wrap line-clamp-3">
-                                      {compactArtifactValue(artifact.value, 220)}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : null}
-                            {stage.depends_on.length > 0 ? (
-                              <div className="mt-2 text-2xs text-blade-muted/70">
-                                Depends on {stage.depends_on.join(", ")}
-                              </div>
-                            ) : null}
-                          </div>
-                        )})}
-                      </div>
+                      <MissionPipeline
+                        mission={mission}
+                        missionExecution={missionExecution}
+                        tasks={runtimes.tasks}
+                        onUseStage={(stage) => {
+                          setGoal(stage.goal);
+                          setSelectedRuntimeId(stage.runtime.runtime_id);
+                          setOperatorType(
+                            stage.runtime.operator_type === "desktop_operator" ? "desktop_operator" : "general_operator"
+                          );
+                          setPreferredSubstrate(stage.runtime.preferred_substrate || "");
+                        }}
+                        onRunStage={(stageId) => void launchMissionStage(stageId)}
+                        onSaveToBrain={async () => {
+                          if (!mission) return;
+                          const summary = mission.stages
+                            .map((s) => {
+                              const t = runtimes.tasks.find((tk) => missionExecution[s.id] && tk.id === missionExecution[s.id]);
+                              return t?.summary ? `Stage ${s.title}: ${t.summary}` : null;
+                            })
+                            .filter(Boolean)
+                            .join("\n");
+                          if (summary) {
+                            await brainAddMemory(
+                              `Mission "${mission.goal.slice(0, 80)}": ${summary}`,
+                              "",
+                              [],
+                              0.85,
+                            );
+                          }
+                        }}
+                      />
                     </div>
                   ) : null}
                 </div>
@@ -1344,6 +1287,174 @@ export function OperatorCenter({
           <ManagedAgentPanel onBack={() => setTab("mission")} onSendToChat={onSendToChat} />
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Mission Pipeline Component ────────────────────────────────────────────────
+
+function stageStatusColor(status: string) {
+  switch (status) {
+    case "running": return "border-sky-500/40 bg-sky-500/10 text-sky-300";
+    case "completed": return "border-emerald-500/40 bg-emerald-500/10 text-emerald-300";
+    case "cancelled":
+    case "error": return "border-red-500/40 bg-red-500/10 text-red-300";
+    default: return "border-blade-border bg-blade-bg/60 text-blade-muted";
+  }
+}
+
+function stageStatusDot(status: string) {
+  switch (status) {
+    case "running": return (
+      <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-75" />
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-sky-500" />
+      </span>
+    );
+    case "completed": return <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 flex-shrink-0" />;
+    case "cancelled":
+    case "error": return <span className="h-2.5 w-2.5 rounded-full bg-red-500 flex-shrink-0" />;
+    default: return <span className="h-2.5 w-2.5 rounded-full bg-blade-border flex-shrink-0" />;
+  }
+}
+
+function MissionPipeline({
+  mission,
+  missionExecution,
+  tasks,
+  onUseStage,
+  onRunStage,
+  onSaveToBrain,
+}: {
+  mission: OperatorMission;
+  missionExecution: Record<string, string>;
+  tasks: RuntimeTaskState[];
+  onUseStage: (stage: MissionStage) => void;
+  onRunStage: (stageId: string) => void;
+  onSaveToBrain: () => void;
+}) {
+  const [expandedStageId, setExpandedStageId] = useState<string | null>(null);
+  const [savedToBrain, setSavedToBrain] = useState(false);
+
+  const taskByStageId = (stageId: string) =>
+    tasks.find((t) => missionExecution[stageId] && t.id === missionExecution[stageId]) || null;
+
+  const getStatus = (stageId: string) => {
+    const t = taskByStageId(stageId);
+    if (!t) return "pending";
+    return t.status;
+  };
+
+  const allDone = mission.stages.every((s) => getStatus(s.id) === "completed");
+
+  return (
+    <div className="mt-3 space-y-3">
+      {/* Pipeline strip */}
+      <div className="flex items-center gap-0 overflow-x-auto pb-1">
+        {mission.stages.map((stage, idx) => {
+          const status = getStatus(stage.id);
+          const isExpanded = expandedStageId === stage.id;
+          return (
+            <div key={stage.id} className="flex items-center min-w-0">
+              <button
+                onClick={() => setExpandedStageId(isExpanded ? null : stage.id)}
+                className={`flex items-center gap-2 rounded-xl border px-3 py-2 transition-colors text-left flex-shrink-0 ${stageStatusColor(status)} ${isExpanded ? "ring-1 ring-blade-accent/40" : ""}`}
+              >
+                {stageStatusDot(status)}
+                <span className="text-2xs font-medium max-w-[100px] truncate">{stage.title}</span>
+              </button>
+              {idx < mission.stages.length - 1 ? (
+                <div className="flex items-center px-1 flex-shrink-0">
+                  <div className="h-px w-5 bg-blade-border" />
+                  <svg className="w-3 h-3 text-blade-border flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M9 18l6-6-6-6" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Expanded stage detail */}
+      {expandedStageId ? (() => {
+        const stage = mission.stages.find((s) => s.id === expandedStageId);
+        if (!stage) return null;
+        const task = taskByStageId(stage.id);
+        const status = getStatus(stage.id);
+        const artifacts = task ? prominentArtifacts(task.artifacts, 3) : [];
+        const recentMessages = task?.messages.slice(-3) ?? [];
+        const canRun = !stage.depends_on.some((dep) => !taskByStageId(dep));
+        return (
+          <div className="rounded-xl border border-blade-border bg-blade-bg/60 p-3 space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs font-medium text-blade-text">{stage.title}</div>
+                <div className="text-2xs text-blade-muted mt-0.5">{stage.runtime.runtime_id} · {status}</div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button onClick={() => onUseStage(stage)} className="text-2xs px-2 py-1 rounded-md bg-blade-surface text-blade-secondary hover:text-blade-text transition-colors">
+                  use
+                </button>
+                <button
+                  onClick={() => onRunStage(stage.id)}
+                  disabled={!canRun || !!missionExecution[stage.id]}
+                  className="text-2xs px-2 py-1 rounded-md bg-[#16172a] text-[#c8cbff] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  run
+                </button>
+              </div>
+            </div>
+            <div className="text-2xs text-blade-muted whitespace-pre-wrap line-clamp-3">{stage.goal}</div>
+            {task?.summary ? (
+              <div className="rounded-md border border-white/5 bg-black/20 px-2 py-1.5 text-2xs text-blade-secondary whitespace-pre-wrap line-clamp-4">
+                {task.summary}
+              </div>
+            ) : null}
+            {/* Live log — last 3 messages */}
+            {recentMessages.length > 0 ? (
+              <div className="rounded-md border border-sky-500/10 bg-sky-500/5 p-2 space-y-1">
+                <div className="text-[10px] uppercase tracking-[0.16em] text-sky-300/60 mb-1">Live log</div>
+                {recentMessages.map((msg, i) => (
+                  <div key={i} className="text-2xs text-blade-muted whitespace-pre-wrap line-clamp-2">
+                    {msg.content.slice(0, 280)}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {/* Artifacts */}
+            {artifacts.length > 0 ? (
+              <div className="space-y-1.5">
+                {artifacts.map((artifact) => (
+                  <div key={artifact.id} className="rounded-md border border-emerald-500/10 bg-emerald-500/5 px-2 py-1.5">
+                    <div className="text-[10px] uppercase tracking-[0.16em] text-emerald-300/80">{artifact.label} · {artifact.kind}</div>
+                    <div className="mt-1 text-2xs text-emerald-50/90 whitespace-pre-wrap line-clamp-3">
+                      {compactArtifactValue(artifact.value, 220)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        );
+      })() : null}
+
+      {/* Completion card */}
+      {allDone ? (
+        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-3 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-xs font-medium text-emerald-300">Mission complete</div>
+            <div className="text-2xs text-emerald-300/60 mt-0.5">All {mission.stages.length} stages finished.</div>
+          </div>
+          <button
+            onClick={async () => { await onSaveToBrain(); setSavedToBrain(true); }}
+            disabled={savedToBrain}
+            className={`text-2xs px-3 py-1.5 rounded-lg transition-colors ${savedToBrain ? "text-emerald-300/50 cursor-default" : "bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"}`}
+          >
+            {savedToBrain ? "Saved to Brain ✓" : "Save to Brain"}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
