@@ -1,4 +1,5 @@
 mod agent_commands;
+mod native_tools;
 mod agents;
 mod automation;
 mod brain;
