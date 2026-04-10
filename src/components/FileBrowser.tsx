@@ -201,7 +201,7 @@ export function FileBrowser({ onBack, onSendToChat }: Props) {
                   onClick={handleSendToAI}
                   className="text-2xs px-2 py-0.5 rounded-md bg-blade-accent/10 text-blade-accent hover:bg-blade-accent/20 transition-colors shrink-0"
                 >
-                  Send to AI
+                  Send to Blade
                 </button>
               </div>
 

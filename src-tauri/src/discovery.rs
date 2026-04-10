@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -57,6 +58,45 @@ pub fn run_discovery() -> DiscoveryReport {
     report.claude_memories = discover_claude_memories(&home);
 
     report
+}
+
+fn command_in_path(name: &str) -> bool {
+    let Some(path_var) = std::env::var_os("PATH") else {
+        return false;
+    };
+    for entry in std::env::split_paths(&path_var) {
+        for candidate in executable_names(name) {
+            if entry.join(candidate).exists() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn executable_names(name: &str) -> Vec<OsString> {
+    #[cfg(not(windows))]
+    let names = vec![OsString::from(name)];
+    #[cfg(windows)]
+    {
+        let mut names = vec![OsString::from(name)];
+        names.push(OsString::from(format!("{name}.exe")));
+        names.push(OsString::from(format!("{name}.cmd")));
+        names.push(OsString::from(format!("{name}.bat")));
+        return names;
+    }
+    #[cfg(not(windows))]
+    names
+}
+
+fn read_dir_names(dir: &Path) -> Vec<String> {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    entries
+        .flatten()
+        .filter_map(|entry| entry.file_name().to_str().map(str::to_string))
+        .collect()
 }
 
 fn discover_identity(home: &Path) -> Option<UserIdentity> {
@@ -177,6 +217,201 @@ fn discover_ai_tools(home: &Path) -> Vec<AiTool> {
         tools.push(AiTool {
             name: "Ollama".into(),
             config_path: ollama_dir.to_string_lossy().to_string(),
+            details,
+        });
+    }
+
+    // Open Interpreter
+    let open_interpreter_config = home.join(".config").join("open-interpreter");
+    let open_interpreter_pipx = home
+        .join(".local")
+        .join("share")
+        .join("pipx")
+        .join("venvs")
+        .join("open-interpreter");
+    if open_interpreter_config.exists()
+        || open_interpreter_pipx.exists()
+        || command_in_path("interpreter")
+    {
+        let mut details = HashMap::new();
+        details.insert(
+            "cli_available".into(),
+            if command_in_path("interpreter") {
+                "true"
+            } else {
+                "false"
+            }
+            .into(),
+        );
+        let profiles_dir = open_interpreter_config.join("profiles");
+        if profiles_dir.exists() {
+            let profiles = read_dir_names(&profiles_dir);
+            if !profiles.is_empty() {
+                details.insert("profile_count".into(), profiles.len().to_string());
+                details.insert("profiles".into(), profiles.join(", "));
+            }
+        }
+        if open_interpreter_pipx.exists() {
+            details.insert("installed_via".into(), "pipx".into());
+        }
+        tools.push(AiTool {
+            name: "Open Interpreter".into(),
+            config_path: if open_interpreter_config.exists() {
+                open_interpreter_config.to_string_lossy().to_string()
+            } else {
+                open_interpreter_pipx.to_string_lossy().to_string()
+            },
+            details,
+        });
+    }
+
+    // Aider
+    let aider_config = home.join(".aider.conf.yml");
+    let aider_model_settings = home.join(".aider.model.settings.yml");
+    if aider_config.exists() || aider_model_settings.exists() || command_in_path("aider") {
+        let mut details = HashMap::new();
+        details.insert(
+            "cli_available".into(),
+            if command_in_path("aider") {
+                "true"
+            } else {
+                "false"
+            }
+            .into(),
+        );
+        if aider_config.exists() {
+            details.insert("has_main_config".into(), "true".into());
+        }
+        if aider_model_settings.exists() {
+            details.insert("has_model_settings".into(), "true".into());
+        }
+        tools.push(AiTool {
+            name: "Aider".into(),
+            config_path: if aider_config.exists() {
+                aider_config.to_string_lossy().to_string()
+            } else if aider_model_settings.exists() {
+                aider_model_settings.to_string_lossy().to_string()
+            } else {
+                "aider".into()
+            },
+            details,
+        });
+    }
+
+    // OpenHands
+    let openhands_config = home.join(".config").join("openhands");
+    if openhands_config.exists() || command_in_path("openhands") || command_in_path("uvx") {
+        let mut details = HashMap::new();
+        details.insert(
+            "cli_available".into(),
+            if command_in_path("openhands") {
+                "true"
+            } else {
+                "false"
+            }
+            .into(),
+        );
+        details.insert(
+            "uvx_available".into(),
+            if command_in_path("uvx") {
+                "true"
+            } else {
+                "false"
+            }
+            .into(),
+        );
+        if openhands_config.exists() {
+            let files = read_dir_names(&openhands_config);
+            if !files.is_empty() {
+                details.insert("config_entries".into(), files.join(", "));
+            }
+        }
+        tools.push(AiTool {
+            name: "OpenHands".into(),
+            config_path: if openhands_config.exists() {
+                openhands_config.to_string_lossy().to_string()
+            } else {
+                "openhands".into()
+            },
+            details,
+        });
+    }
+
+    // browser-use
+    let browser_use_config = home.join(".config").join("browser-use");
+    let browser_use_cache = home.join(".cache").join("browser-use");
+    if browser_use_config.exists() || browser_use_cache.exists() || command_in_path("browser-use") {
+        let mut details = HashMap::new();
+        details.insert(
+            "cli_available".into(),
+            if command_in_path("browser-use") {
+                "true"
+            } else {
+                "false"
+            }
+            .into(),
+        );
+        if browser_use_config.exists() {
+            let files = read_dir_names(&browser_use_config);
+            if !files.is_empty() {
+                details.insert("config_entries".into(), files.join(", "));
+            }
+        }
+        if browser_use_cache.exists() {
+            details.insert("has_cache".into(), "true".into());
+        }
+        tools.push(AiTool {
+            name: "browser-use".into(),
+            config_path: if browser_use_config.exists() {
+                browser_use_config.to_string_lossy().to_string()
+            } else if browser_use_cache.exists() {
+                browser_use_cache.to_string_lossy().to_string()
+            } else {
+                "browser-use".into()
+            },
+            details,
+        });
+    }
+
+    // OpenCode
+    let opencode_config = home.join(".config").join("opencode");
+    let opencode_share = home.join(".local").join("share").join("opencode");
+    if opencode_config.exists() || opencode_share.exists() || command_in_path("opencode") {
+        let mut details = HashMap::new();
+        details.insert(
+            "cli_available".into(),
+            if command_in_path("opencode") {
+                "true"
+            } else {
+                "false"
+            }
+            .into(),
+        );
+        if opencode_config.exists() {
+            let files = read_dir_names(&opencode_config);
+            if !files.is_empty() {
+                details.insert("config_entries".into(), files.join(", "));
+            }
+        }
+        if opencode_share.exists() {
+            let db = opencode_share.join("opencode.db");
+            let log_dir = opencode_share.join("log");
+            if db.exists() {
+                details.insert("has_runtime_db".into(), "true".into());
+            }
+            if log_dir.exists() {
+                details.insert("has_logs".into(), "true".into());
+            }
+        }
+        tools.push(AiTool {
+            name: "OpenCode".into(),
+            config_path: if opencode_config.exists() {
+                opencode_config.to_string_lossy().to_string()
+            } else if opencode_share.exists() {
+                opencode_share.to_string_lossy().to_string()
+            } else {
+                "opencode".into()
+            },
             details,
         });
     }
@@ -350,6 +585,31 @@ fn discover_installed_tools(home: &Path) -> Vec<String> {
         if path.exists() {
             tools.push(name.to_string());
         }
+    }
+
+    if home.join(".ollama").exists() {
+        tools.push("Ollama".into());
+    }
+    if home.join(".config").join("open-interpreter").exists() || command_in_path("interpreter") {
+        tools.push("Open Interpreter".into());
+    }
+    if home.join(".aider.conf.yml").exists() || command_in_path("aider") {
+        tools.push("Aider".into());
+    }
+    if home.join(".config").join("openhands").exists()
+        || command_in_path("openhands")
+        || command_in_path("uvx")
+    {
+        tools.push("OpenHands".into());
+    }
+    if home.join(".config").join("browser-use").exists() || command_in_path("browser-use") {
+        tools.push("browser-use".into());
+    }
+    if home.join(".config").join("opencode").exists()
+        || home.join(".local").join("share").join("opencode").exists()
+        || command_in_path("opencode")
+    {
+        tools.push("OpenCode".into());
     }
 
     tools

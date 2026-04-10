@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, useMemo, KeyboardEvent } from "react";
+import { useCallback, useRef, useState, useMemo, KeyboardEvent, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 const SLASH_COMMANDS = [
@@ -17,9 +17,11 @@ interface Props {
   onSend: (message: string, imageBase64?: string) => void;
   onSlashCommand?: (action: SlashAction) => void;
   disabled: boolean;
+  draftValue?: string | null;
+  onDraftConsumed?: () => void;
 }
 
-export function InputBar({ onSend, onSlashCommand, disabled }: Props) {
+export function InputBar({ onSend, onSlashCommand, disabled, draftValue, onDraftConsumed }: Props) {
   const [value, setValue] = useState("");
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
@@ -40,6 +42,23 @@ export function InputBar({ onSend, onSlashCommand, disabled }: Props) {
     setSlashActive(false);
     onSlashCommand?.(action);
   }, [onSlashCommand]);
+
+  useEffect(() => {
+    if (!draftValue) return;
+    setValue(draftValue);
+    setSlashActive(draftValue.startsWith("/"));
+    setSlashIndex(0);
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+        textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        const end = textareaRef.current.value.length;
+        textareaRef.current.setSelectionRange(end, end);
+      }
+    });
+    onDraftConsumed?.();
+  }, [draftValue, onDraftConsumed]);
 
   const handleSend = () => {
     const trimmed = value.trim();
@@ -261,7 +280,7 @@ export function InputBar({ onSend, onSlashCommand, disabled }: Props) {
       </div>
       <div className="flex items-center justify-between mt-1 px-1">
         <span className="text-2xs text-blade-muted/50">
-          {recording ? "Recording... click mic to stop" : "Enter to send"}
+          {recording ? "Recording... click mic to stop" : "Type, speak, paste, or capture your screen"}
         </span>
         <kbd className="text-2xs text-blade-muted/40 font-mono">
           \u2318K

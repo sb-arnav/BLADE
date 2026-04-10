@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -96,8 +96,6 @@ export function useDatabaseExplorer() {
   const [queryHistory, setQueryHistory] = useState<QueryResult[]>(loadHistory);
   const [savedQueries, setSavedQueries] = useState<SavedQuery[]>(loadSavedQueries);
   const [loading, setLoading] = useState(false);
-  const abortRef = useRef(false);
-
   // ── Execute raw SQL via Tauri ───────────────────────────────────────────
 
   const executeRawSQL = useCallback(

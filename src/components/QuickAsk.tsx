@@ -188,7 +188,7 @@ export function QuickAsk() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask anything..."
+          placeholder="Ask Blade about your current work, screen, or next step..."
           disabled={loading}
           className="flex-1 bg-transparent outline-none text-blade-text placeholder:text-blade-muted"
           style={{

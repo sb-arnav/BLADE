@@ -3,7 +3,6 @@ import {
   useDatabaseExplorer,
   type DBTable,
   type QueryResult,
-  type SavedQuery,
 } from "../hooks/useDatabaseExplorer";
 
 // ── Props ────────────────────────────────────────────────────────────────────
@@ -26,7 +25,7 @@ const SQL_KEYWORDS = new Set([
   "CAST", "COALESCE", "IFNULL", "REPLACE", "PRAGMA", "EXPLAIN",
 ]);
 
-function highlightSQL(sql: string): JSX.Element[] {
+function highlightSQL(sql: string): React.ReactNode[] {
   const tokens = sql.split(/(\s+|[(),;*])/g);
   return tokens.map((token, i) => {
     const upper = token.toUpperCase();
@@ -297,7 +296,6 @@ export default function DatabaseExplorer({ onBack, onSendToChat }: Props) {
     saveQuery,
     deleteSavedQuery,
     getTables,
-    getTableData,
     generateQueryFromPrompt,
     exportResult,
   } = useDatabaseExplorer();

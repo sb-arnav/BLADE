@@ -25,27 +25,73 @@ pub fn classify_task(message: &str, has_image: bool) -> TaskType {
 
     // Code signals
     let code_signals = [
-        "code", "function", "error", "bug", "debug", "compile", "syntax",
-        "implement", "refactor", "api", "endpoint", "database", "query",
-        "```", "def ", "fn ", "class ", "import ", "const ", "let ", "var ",
-        "rust", "python", "javascript", "typescript",
+        "code",
+        "function",
+        "error",
+        "bug",
+        "debug",
+        "compile",
+        "syntax",
+        "implement",
+        "refactor",
+        "api",
+        "endpoint",
+        "database",
+        "query",
+        "```",
+        "def ",
+        "fn ",
+        "class ",
+        "import ",
+        "const ",
+        "let ",
+        "var ",
+        "rust",
+        "python",
+        "javascript",
+        "typescript",
     ];
     let code_score: usize = code_signals.iter().filter(|s| lower.contains(*s)).count();
 
     // Complex signals
     let complex_signals = [
-        "explain", "analyze", "compare", "why", "how does", "trade-off",
-        "architecture", "design", "strategy", "plan", "review",
-        "what are the implications", "pros and cons",
+        "explain",
+        "analyze",
+        "compare",
+        "why",
+        "how does",
+        "trade-off",
+        "architecture",
+        "design",
+        "strategy",
+        "plan",
+        "review",
+        "what are the implications",
+        "pros and cons",
     ];
-    let complex_score: usize = complex_signals.iter().filter(|s| lower.contains(*s)).count();
+    let complex_score: usize = complex_signals
+        .iter()
+        .filter(|s| lower.contains(*s))
+        .count();
 
     // Creative signals
     let creative_signals = [
-        "write", "draft", "compose", "story", "poem", "essay",
-        "brainstorm", "ideas", "name", "slogan", "tagline",
+        "write",
+        "draft",
+        "compose",
+        "story",
+        "poem",
+        "essay",
+        "brainstorm",
+        "ideas",
+        "name",
+        "slogan",
+        "tagline",
     ];
-    let creative_score: usize = creative_signals.iter().filter(|s| lower.contains(*s)).count();
+    let creative_score: usize = creative_signals
+        .iter()
+        .filter(|s| lower.contains(*s))
+        .count();
 
     // Simple: short messages, greetings, yes/no
     if message.len() < 20 {

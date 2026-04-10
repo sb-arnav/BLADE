@@ -81,9 +81,9 @@ export function Terminal({ onBack, onSendToChat }: Props) {
           <button
             onClick={handleSendLastOutput}
             className="text-2xs text-blade-muted hover:text-blade-accent transition-colors px-2 py-0.5 rounded"
-            title="Send last output to AI"
+            title="Send last output to Blade"
           >
-            → AI
+            ask Blade
           </button>
           <button
             onClick={clear}
@@ -133,7 +133,7 @@ export function Terminal({ onBack, onSendToChat }: Props) {
         <div className="flex items-center gap-3">
           <span>Ctrl+L clear</span>
           <span>↑↓ history</span>
-          <span>? AI help</span>
+          <span>? ask Blade</span>
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import {
   usePresentation,
   Slide,
@@ -89,7 +89,6 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
     reorderSlides,
     duplicateSlide,
     generateFromPrompt,
-    applyGeneratedSlides,
     exportAsMarkdown,
     exportAsHtml,
     stats,
@@ -1132,7 +1131,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
 function renderSlideContent(
   slide: Slide,
   tc: { bg: string; text: string; accent: string; surface: string },
-): JSX.Element {
+): ReactElement {
   switch (slide.type) {
     case "title":
       return (
@@ -1295,7 +1294,7 @@ function renderEditableSlide(
   tc: { bg: string; text: string; accent: string; surface: string },
   onChange: (field: string, value: unknown) => void,
   _pres: Presentation,
-): JSX.Element {
+): ReactElement {
   const titleInput = (
     <input
       className="bg-transparent border-none outline-none w-full text-center font-bold focus:ring-1 focus:ring-indigo-500/30 rounded px-2 py-1"

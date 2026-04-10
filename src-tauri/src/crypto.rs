@@ -50,8 +50,7 @@ pub fn encrypt(plaintext: &str, key: &[u8]) -> Result<String, String> {
         return Err(format!("Invalid key length: {} (expected 32)", key.len()));
     }
 
-    let cipher =
-        Aes256Gcm::new_from_slice(key).map_err(|e| format!("Cipher init error: {e}"))?;
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| format!("Cipher init error: {e}"))?;
 
     let mut nonce_bytes = [0u8; NONCE_LEN];
     OsRng.fill_bytes(&mut nonce_bytes);
@@ -86,8 +85,7 @@ pub fn decrypt(ciphertext_b64: &str, key: &[u8]) -> Result<String, String> {
     let (nonce_bytes, ciphertext) = combined.split_at(NONCE_LEN);
     let nonce = Nonce::from_slice(nonce_bytes);
 
-    let cipher =
-        Aes256Gcm::new_from_slice(key).map_err(|e| format!("Cipher init error: {e}"))?;
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| format!("Cipher init error: {e}"))?;
 
     let plaintext = cipher
         .decrypt(nonce, ciphertext)

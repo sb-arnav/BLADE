@@ -2,11 +2,12 @@ mod agent_commands;
 mod agents;
 mod automation;
 mod brain;
-mod context;
+mod browser_native;
 mod character;
 mod clipboard;
 mod commands;
 mod config;
+mod context;
 mod crypto;
 mod db;
 mod db_commands;
@@ -14,23 +15,26 @@ mod discovery;
 mod embeddings;
 mod files;
 mod history;
+mod managed_agents;
 mod mcp;
 mod memory;
 mod permissions;
 mod plugins;
-mod router;
 mod providers;
 mod rag;
+mod router;
+mod runtimes;
 mod screen;
 mod trace;
 mod tray;
+mod ui_automation;
 mod voice;
 mod voice_local;
 
 use std::sync::Arc;
 use tauri::{Manager, WindowEvent};
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
 use tauri_plugin_autostart::MacosLauncher;
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
 use tauri_plugin_log::{Target, TargetKind};
 
 pub(crate) fn toggle_window(app: &tauri::AppHandle) {
@@ -98,6 +102,18 @@ pub fn run() {
     // Agent queue
     let agent_queue: agents::queue::SharedAgentQueue =
         Arc::new(tokio::sync::Mutex::new(agents::queue::AgentQueue::default()));
+    let runtime_registry: runtimes::SharedRuntimeRegistry =
+        Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
+    let runtime_tasks: runtimes::SharedTaskGraphRegistry =
+        Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
+    let runtime_missions: runtimes::SharedMissionRegistry =
+        Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
+    let runtime_company_objects: runtimes::SharedCompanyObjectRegistry =
+        Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
+    let runtime_security_engagements: runtimes::SharedSecurityEngagementRegistry =
+        Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
+    let runtime_servers: runtimes::SharedRuntimeServerRegistry =
+        Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
 
     // Vector store for semantic search
     let vector_store: embeddings::SharedVectorStore =
@@ -109,7 +125,10 @@ pub fn run() {
         // SQLite handled by db.rs via rusqlite directly
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--hidden"])))
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec!["--hidden"]),
+        ))
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             // Focus existing window when second instance launched
             if let Some(window) = app.get_webview_window("main") {
@@ -119,21 +138,32 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_os::init())
-        .plugin(tauri_plugin_log::Builder::new()
-            .targets([
-                Target::new(TargetKind::Stdout),
-                Target::new(TargetKind::LogDir { file_name: Some("blade".into()) }),
-            ])
-            .build())
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .targets([
+                    Target::new(TargetKind::Stdout),
+                    Target::new(TargetKind::LogDir {
+                        file_name: Some("blade".into()),
+                    }),
+                ])
+                .build(),
+        )
         // --- State ---
         .manage(mcp_manager)
         .manage(approval_map)
         .manage(shared_db)
         .manage(agent_queue)
         .manage(vector_store)
+        .manage(runtime_registry)
+        .manage(runtime_tasks)
+        .manage(runtime_missions)
+        .manage(runtime_company_objects)
+        .manage(runtime_security_engagements)
+        .manage(runtime_servers)
         .invoke_handler(tauri::generate_handler![
             commands::send_message_stream,
             commands::get_config,
@@ -202,7 +232,32 @@ pub fn run() {
             screen::capture_screen,
             screen::capture_screen_region,
             memory::learn_from_conversation,
+            managed_agents::run_managed_agent,
+            runtimes::discover_ai_runtimes,
+            runtimes::runtime_list_task_graphs,
+            runtimes::runtime_save_mission,
+            runtimes::runtime_list_missions,
+            runtimes::runtime_save_company_object,
+            runtimes::runtime_list_company_objects,
+            runtimes::runtime_list_capability_blueprints,
+            runtimes::security_create_engagement,
+            runtimes::security_list_engagements,
+            runtimes::security_mark_engagement_verified,
+            runtimes::route_operator_task,
+            runtimes::design_operator_mission,
+            runtimes::runtime_plan_next_mission_stage,
+            runtimes::runtime_continue_mission,
+            runtimes::runtime_run_mission,
+            runtimes::runtime_list_sessions,
+            runtimes::runtime_prepare_install,
+            runtimes::runtime_start_server,
+            runtimes::runtime_stop_server,
+            runtimes::runtime_start_task,
+            runtimes::runtime_resume_session,
+            runtimes::runtime_stop_task,
             agent_commands::agent_create,
+            agent_commands::agent_create_desktop,
+            agent_commands::agent_respond_desktop_action,
             agent_commands::agent_list,
             agent_commands::agent_get,
             agent_commands::agent_pause,
@@ -212,9 +267,29 @@ pub fn run() {
             automation::auto_press_key,
             automation::auto_key_combo,
             automation::auto_mouse_move,
+            automation::auto_get_mouse_position,
             automation::auto_mouse_click,
+            automation::auto_mouse_click_relative,
+            automation::auto_mouse_double_click,
+            automation::auto_mouse_drag,
             automation::auto_scroll,
+            automation::auto_open_url,
+            automation::auto_open_path,
+            automation::auto_launch_app,
+            automation::auto_copy_to_clipboard,
+            automation::auto_paste_clipboard,
+            browser_native::web_action,
+            browser_native::browser_describe_page,
+            ui_automation::uia_get_active_window_snapshot,
+            ui_automation::uia_describe_active_window,
+            ui_automation::uia_click_element,
+            ui_automation::uia_invoke_element,
+            ui_automation::uia_focus_element,
+            ui_automation::uia_set_element_value,
+            ui_automation::uia_wait_for_element,
             context::get_active_window,
+            context::list_open_windows,
+            context::focus_window,
             context::get_user_activity,
             character::consolidate_character,
             character::get_character_bible,

@@ -3,22 +3,47 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 const appWindow = getCurrentWindow();
 
 export function TitleBar() {
+  const handleDragStart = async () => {
+    try {
+      await appWindow.startDragging();
+    } catch {
+      // Ignore drag failures on unsupported platforms.
+    }
+  };
+
+  const handleToggleMaximize = async () => {
+    try {
+      await appWindow.toggleMaximize();
+    } catch {
+      // Ignore window control failures.
+    }
+  };
+
   return (
-    <div
-      data-tauri-drag-region
-      className="h-9 bg-blade-bg flex items-center justify-between px-3 shrink-0 select-none"
-    >
-      <div data-tauri-drag-region className="flex items-center gap-1.5">
-        <div className="w-[7px] h-[7px] rounded-full bg-blade-accent" />
-        <span className="text-2xs font-medium tracking-widest uppercase text-blade-muted">
+    <div className="h-9 bg-blade-bg flex items-center gap-3 px-3 shrink-0 select-none border-b border-blade-border/40">
+      <div
+        className="flex items-center gap-1.5 shrink-0 cursor-grab active:cursor-grabbing"
+        onMouseDown={handleDragStart}
+        onDoubleClick={handleToggleMaximize}
+        title="Drag window"
+      >
+        <div className="w-2 h-2 rounded-full bg-blade-accent shadow-[0_0_10px_rgba(99,102,241,0.45)]" />
+        <span className="text-2xs font-medium tracking-[0.35em] uppercase text-blade-muted">
           Blade
         </span>
       </div>
 
-      <div className="flex items-center">
+      <div
+        className="flex-1 h-full cursor-grab active:cursor-grabbing"
+        onMouseDown={handleDragStart}
+        onDoubleClick={handleToggleMaximize}
+        title="Drag window"
+      />
+
+      <div className="flex items-center gap-0.5 titlebar-no-drag shrink-0">
         <button
           onClick={() => appWindow.minimize()}
-          className="w-7 h-7 rounded text-blade-muted/60 hover:text-blade-secondary hover:bg-blade-surface transition-colors flex items-center justify-center"
+          className="w-8 h-8 rounded-md text-blade-muted/60 hover:text-blade-secondary hover:bg-blade-surface transition-colors flex items-center justify-center"
           aria-label="Minimize"
         >
           <svg viewBox="0 0 24 24" className="w-[10px] h-[10px]" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -26,8 +51,8 @@ export function TitleBar() {
           </svg>
         </button>
         <button
-          onClick={() => appWindow.toggleMaximize()}
-          className="w-7 h-7 rounded text-blade-muted/60 hover:text-blade-secondary hover:bg-blade-surface transition-colors flex items-center justify-center"
+          onClick={handleToggleMaximize}
+          className="w-8 h-8 rounded-md text-blade-muted/60 hover:text-blade-secondary hover:bg-blade-surface transition-colors flex items-center justify-center"
           aria-label="Maximize"
         >
           <svg viewBox="0 0 24 24" className="w-[10px] h-[10px]" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -36,7 +61,7 @@ export function TitleBar() {
         </button>
         <button
           onClick={() => appWindow.close()}
-          className="w-7 h-7 rounded text-blade-muted/60 hover:text-red-400 hover:bg-red-400/10 transition-colors flex items-center justify-center"
+          className="w-8 h-8 rounded-md text-blade-muted/60 hover:text-red-400 hover:bg-red-400/10 transition-colors flex items-center justify-center"
           aria-label="Close"
         >
           <svg viewBox="0 0 24 24" className="w-[10px] h-[10px]" fill="none" stroke="currentColor" strokeWidth="2.5">

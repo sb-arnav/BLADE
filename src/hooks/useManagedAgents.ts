@@ -43,6 +43,7 @@ export interface AgentMessage {
     subtype?: string;
     costUsd?: number;
     durationMs?: number;
+    runId?: string;
   };
 }
 
@@ -126,6 +127,7 @@ export function useManagedAgents() {
     try {
       // Listen for streaming agent messages from Rust backend
       const unlistenMsg = await listen<AgentMessage>("agent_message", (event) => {
+        if (event.payload.metadata?.runId !== runId) return;
         setRuns((prev) =>
           prev.map((r) =>
             r.id === runId
@@ -135,13 +137,14 @@ export function useManagedAgents() {
         );
       });
 
-      const unlistenDone = await listen<{ sessionId: string; costUsd: number }>("agent_done", (event) => {
+      const unlistenDone = await listen<{ sessionId: string; costUsd: number; runId?: string; isError?: boolean }>("agent_done", (event) => {
+        if (event.payload.runId !== runId) return;
         setRuns((prev) =>
           prev.map((r) =>
             r.id === runId
               ? {
                   ...r,
-                  status: "completed",
+                  status: event.payload.isError ? "error" : "completed",
                   sessionId: event.payload.sessionId,
                   completedAt: Date.now(),
                   totalCostUsd: event.payload.costUsd,
@@ -159,6 +162,7 @@ export function useManagedAgents() {
         prompt: config.prompt,
         tools: config.tools,
         mcpServers: config.mcpServers ? JSON.stringify(config.mcpServers) : null,
+        subagents: config.subagents ? JSON.stringify(config.subagents) : null,
         permissionMode: config.permissionMode || "default",
         maxTurns: config.maxTurns || 20,
         sessionId: config.sessionId || null,

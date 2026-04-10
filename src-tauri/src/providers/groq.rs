@@ -9,7 +9,8 @@ fn build_body(
     let mut msgs: Vec<serde_json::Value> = messages.iter().map(serialize_message).collect();
 
     // Non-vision models reject array content — flatten image messages to text only
-    let is_vision = model.contains("vision") || model.contains("scout") || model.contains("llama-4");
+    let is_vision =
+        model.contains("vision") || model.contains("scout") || model.contains("llama-4");
     if !is_vision {
         for msg in &mut msgs {
             if msg["content"].is_array() {
@@ -172,19 +173,27 @@ pub async fn complete(
 
 fn serialize_simple(message: &super::ConversationMessage) -> Option<serde_json::Value> {
     match message {
-        super::ConversationMessage::System(c) => Some(serde_json::json!({"role": "system", "content": c})),
-        super::ConversationMessage::User(c) => Some(serde_json::json!({"role": "user", "content": c})),
-        super::ConversationMessage::UserWithImage { text, image_base64 } => Some(serde_json::json!({
-            "role": "user",
-            "content": [
-                {"type": "text", "text": text},
-                {"type": "image_url", "image_url": {"url": format!("data:image/png;base64,{}", image_base64)}}
-            ],
-        })),
+        super::ConversationMessage::System(c) => {
+            Some(serde_json::json!({"role": "system", "content": c}))
+        }
+        super::ConversationMessage::User(c) => {
+            Some(serde_json::json!({"role": "user", "content": c}))
+        }
+        super::ConversationMessage::UserWithImage { text, image_base64 } => {
+            Some(serde_json::json!({
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": text},
+                    {"type": "image_url", "image_url": {"url": format!("data:image/png;base64,{}", image_base64)}}
+                ],
+            }))
+        }
         super::ConversationMessage::Assistant { content, .. } => {
-            if content.is_empty() { return None; }
+            if content.is_empty() {
+                return None;
+            }
             Some(serde_json::json!({"role": "assistant", "content": content}))
-        },
+        }
         super::ConversationMessage::Tool { .. } => None,
     }
 }
@@ -202,7 +211,8 @@ pub async fn stream_text(
     let mut msgs: Vec<serde_json::Value> = messages.iter().filter_map(serialize_simple).collect();
 
     // Non-vision models reject array content — flatten image messages to text only
-    let is_vision = model.contains("vision") || model.contains("scout") || model.contains("llama-4");
+    let is_vision =
+        model.contains("vision") || model.contains("scout") || model.contains("llama-4");
     if !is_vision {
         for msg in &mut msgs {
             if msg["content"].is_array() {

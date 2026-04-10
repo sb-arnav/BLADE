@@ -70,11 +70,24 @@ interface AgentRowProps {
   onPause: () => void;
   onResume: () => void;
   onCancel: () => void;
+  onApproveDesktopAction: () => void;
+  onDenyDesktopAction: () => void;
 }
 
-function AgentRow({ agent, expanded, onToggle, onPause, onResume, onCancel }: AgentRowProps) {
+function AgentRow({
+  agent,
+  expanded,
+  onToggle,
+  onPause,
+  onResume,
+  onCancel,
+  onApproveDesktopAction,
+  onDenyDesktopAction,
+}: AgentRowProps) {
   const completedSteps = agent.steps.filter((s) => s.status === "Completed").length;
   const totalSteps = agent.steps.length;
+  const isDesktopAgent = agent.context?.mode === "desktop_control";
+  const desktopExecutionMode = agent.context?.execution_mode ?? "supervised";
 
   return (
     <div
@@ -107,6 +120,14 @@ function AgentRow({ agent, expanded, onToggle, onPause, onResume, onCancel }: Ag
           <p className="text-sm text-[#e5e5e5] truncate leading-snug">{agent.goal}</p>
           <div className="flex items-center gap-2 mt-0.5">
             <span className="text-xs text-[#444]">{relativeTime(agent.created_at)}</span>
+            {isDesktopAgent && (
+              <>
+                <span className="text-[#2a2a2a]">·</span>
+                <span className="text-[10px] uppercase tracking-[0.18em] text-[#6366f1]">
+                  {desktopExecutionMode === "auto" ? "desktop auto" : "desktop beta"}
+                </span>
+              </>
+            )}
             {totalSteps > 0 && (
               <>
                 <span className="text-[#2a2a2a]">·</span>
@@ -130,6 +151,8 @@ function AgentRow({ agent, expanded, onToggle, onPause, onResume, onCancel }: Ag
             onPause={onPause}
             onResume={onResume}
             onCancel={onCancel}
+            onApproveDesktopAction={onApproveDesktopAction}
+            onDenyDesktopAction={onDenyDesktopAction}
           />
         </div>
       )}
@@ -149,7 +172,7 @@ function EmptyState() {
         </svg>
       </div>
       <p className="text-sm text-[#666] text-center leading-relaxed">
-        No agents yet.<br />Type a goal above and press Enter.
+        No agents running yet.<br />Describe a goal and let Blade break it down.
       </p>
     </div>
   );
@@ -157,11 +180,12 @@ function EmptyState() {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export function AgentManager() {
-  const { agents, creating, error, dismissError, createAgent, pauseAgent, resumeAgent, cancelAgent, refresh } =
+export function AgentManager({ onBack }: { onBack?: () => void }) {
+  const { agents, creating, error, dismissError, createAgent, createDesktopAgent, respondDesktopAction, pauseAgent, resumeAgent, cancelAgent, refresh } =
     useAgents();
 
   const [goal, setGoal] = useState("");
+  const [desktopExecutionMode, setDesktopExecutionMode] = useState<"supervised" | "auto">("supervised");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -176,6 +200,16 @@ export function AgentManager() {
     }
   };
 
+  const handleCreateDesktopAgent = async () => {
+    if (creating || !goal.trim()) return;
+    const trimmed = goal.trim();
+    setGoal("");
+    const id = await createDesktopAgent(trimmed, 8, desktopExecutionMode);
+    if (id) {
+      setExpandedId(id);
+    }
+  };
+
   const toggleExpand = (id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));
   };
@@ -184,11 +218,21 @@ export function AgentManager() {
     <div className="flex flex-col h-full bg-[#09090b]">
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#1f1f1f] flex-shrink-0">
-        <div>
-          <h2 className="text-sm font-semibold text-[#e5e5e5]">Agents</h2>
-          <p className="text-xs text-[#666] mt-0.5">
-            {agents.length > 0 ? `${agents.length} agent${agents.length !== 1 ? "s" : ""}` : "No agents"}
-          </p>
+        <div className="flex items-center gap-3">
+          {onBack ? (
+            <button
+              onClick={onBack}
+              className="text-[#666] hover:text-[#e5e5e5] text-xs transition-colors"
+            >
+              ← back
+            </button>
+          ) : null}
+          <div>
+            <h2 className="text-sm font-semibold text-[#e5e5e5]">Agents</h2>
+            <p className="text-xs text-[#666] mt-0.5">
+              {agents.length > 0 ? `${agents.length} agent${agents.length !== 1 ? "s" : ""}` : "No agents"}
+            </p>
+          </div>
         </div>
         <button
           onClick={refresh}
@@ -234,6 +278,42 @@ export function AgentManager() {
             </kbd>
           )}
         </div>
+        <div className="flex flex-wrap items-center gap-2 mt-2">
+          <div className="flex items-center gap-1 p-0.5 rounded-md border border-[#1f1f1f] bg-[#0d0d0f]">
+            <button
+              onClick={() => setDesktopExecutionMode("supervised")}
+              className={`text-2xs px-2 py-1 rounded ${
+                desktopExecutionMode === "supervised"
+                  ? "bg-[#1a1a1f] text-[#e5e5e5]"
+                  : "text-[#666] hover:text-[#e5e5e5]"
+              } transition-colors`}
+            >
+              Supervised
+            </button>
+            <button
+              onClick={() => setDesktopExecutionMode("auto")}
+              className={`text-2xs px-2 py-1 rounded ${
+                desktopExecutionMode === "auto"
+                  ? "bg-[#1a1a1f] text-[#e5e5e5]"
+                  : "text-[#666] hover:text-[#e5e5e5]"
+              } transition-colors`}
+            >
+              Auto
+            </button>
+          </div>
+          <button
+            onClick={handleCreateDesktopAgent}
+            disabled={creating || !goal.trim()}
+            className="text-2xs px-2.5 py-1 rounded-md bg-[#6366f1]/10 text-[#818cf8] border border-[#6366f1]/20 hover:bg-[#6366f1]/15 transition-colors disabled:opacity-40"
+          >
+            Start desktop control
+          </button>
+          <span className="text-2xs text-[#666]">
+            {desktopExecutionMode === "supervised"
+              ? "Blade will capture the screen, propose one UI action at a time, and wait for your approval."
+              : "Blade will capture the screen, choose one UI action at a time, and execute it automatically unless the action looks risky."}
+          </span>
+        </div>
       </div>
 
       {/* Error banner */}
@@ -266,6 +346,8 @@ export function AgentManager() {
               onPause={() => pauseAgent(agent.id)}
               onResume={() => resumeAgent(agent.id)}
               onCancel={() => cancelAgent(agent.id)}
+              onApproveDesktopAction={() => respondDesktopAction(agent.id, true)}
+              onDenyDesktopAction={() => respondDesktopAction(agent.id, false)}
             />
           ))
         )}

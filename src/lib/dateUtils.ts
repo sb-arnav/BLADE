@@ -29,7 +29,6 @@ import {
   differenceInMinutes,
   differenceInSeconds,
   differenceInWeeks,
-  differenceInMonths,
   isBefore,
   isAfter,
   isSameDay,

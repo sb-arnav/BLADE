@@ -169,10 +169,6 @@ function saveInvoices(invoices: Invoice[]) {
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
 
-function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 function monthKey(dateStr: string): string {
   return dateStr.slice(0, 7); // "YYYY-MM"
 }

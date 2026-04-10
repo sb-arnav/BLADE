@@ -35,7 +35,7 @@ export const BladeConfigSchema = z.object({
     name: z.string().min(1),
     command: z.string().min(1),
     args: z.array(z.string()),
-    env: z.record(z.string()).optional(),
+    env: z.record(z.string(), z.string()).optional(),
   })),
 });
 
@@ -72,7 +72,7 @@ export const TemplateSchema = z.object({
 export const WorkflowStepSchema = z.object({
   id: z.string(),
   type: z.enum(["prompt", "condition", "transform", "output", "loop", "mcp_tool"]),
-  config: z.record(z.unknown()),
+  config: z.record(z.string(), z.unknown()),
   label: z.string(),
   order: z.number().int(),
 });
@@ -193,7 +193,7 @@ export const APIRequestSchema = z.object({
   name: z.string(),
   method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]),
   url: z.string().url(),
-  headers: z.record(z.string()),
+  headers: z.record(z.string(), z.string()),
   body: z.string(),
   bodyType: z.enum(["json", "form", "text", "none"]),
   auth: z.object({
@@ -290,6 +290,6 @@ export function safeParseWithErrors<T>(schema: z.ZodType<T>, data: unknown): {
   if (result.success) return { data: result.data, errors: [] };
   return {
     data: null,
-    errors: result.error.errors.map((e) => `${e.path.join(".")}: ${e.message}`),
+    errors: result.error.issues.map((e: any) => `${e.path.join(".")}: ${e.message}`),
   };
 }

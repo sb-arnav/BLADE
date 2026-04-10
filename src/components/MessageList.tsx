@@ -1,5 +1,6 @@
 import { Message, ToolExecution } from "../types";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { ActiveWindowInfo, ContextSuggestion } from "../hooks/useContextAwareness";
 import ReactMarkdown from "react-markdown";
 import TypingIndicator from "./TypingIndicator";
 import MessageReactions from "./MessageReactions";
@@ -48,6 +49,8 @@ interface Props {
   loading: boolean;
   toolExecutions: ToolExecution[];
   onQuickAction?: (prompt: string) => void;
+  activeWindow?: ActiveWindowInfo | null;
+  contextSuggestions?: ContextSuggestion[];
 }
 
 function sanitizeHighlightHtml(html: string): string {
@@ -230,15 +233,46 @@ const MessageBubble = memo(function MessageBubble({ msg }: { msg: Message }) {
 });
 
 const QUICK_ACTIONS = [
-  { emoji: "💡", title: "Brainstorm", prompt: "Help me brainstorm ideas for " },
-  { emoji: "📝", title: "Write", prompt: "Write a " },
-  { emoji: "🐛", title: "Debug", prompt: "Debug this: " },
-  { emoji: "📊", title: "Analyze", prompt: "Analyze this: " },
-  { emoji: "🔍", title: "Research", prompt: "Research " },
-  { emoji: "⚡", title: "Explain", prompt: "Explain how " },
+  {
+    emoji: "💡",
+    title: "Brainstorm",
+    prompt: "Help me brainstorm ideas for:\n\nGoal:\nAudience or user:\nConstraints:\nWhat I've tried so far:\n",
+  },
+  {
+    emoji: "📝",
+    title: "Write",
+    prompt: "Help me write this piece.\n\nType of writing:\nTopic:\nTone:\nTarget length:\nKey points to include:\n",
+  },
+  {
+    emoji: "🐛",
+    title: "Debug",
+    prompt: "Help me debug this issue.\n\nExpected behavior:\nActual behavior:\nError message:\nRelevant code or steps:\n",
+  },
+  {
+    emoji: "📊",
+    title: "Analyze",
+    prompt: "Analyze this for me:\n\nWhat it is:\nWhat you should look for:\nContext:\n",
+  },
+  {
+    emoji: "🔍",
+    title: "Research",
+    prompt: "Research this topic for me:\n\nTopic:\nWhat decision I need to make:\nConstraints or preferences:\n",
+  },
+  {
+    emoji: "⚡",
+    title: "Explain",
+    prompt: "Explain this clearly and simply:\n\nTopic:\nMy current understanding:\nWhat I'm confused about:\n",
+  },
 ];
 
-export function MessageList({ messages, loading, toolExecutions, onQuickAction }: Props) {
+export function MessageList({
+  messages,
+  loading,
+  toolExecutions,
+  onQuickAction,
+  activeWindow,
+  contextSuggestions,
+}: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
@@ -262,6 +296,8 @@ export function MessageList({ messages, loading, toolExecutions, onQuickAction }
   const recentCompleted = toolExecutions.filter(
     (t) => t.status === "completed" && t.completed_at && Date.now() - t.completed_at < 3000
   );
+  const focusLabel = activeWindow?.title?.trim() || activeWindow?.process_name?.trim() || null;
+  const suggestionList = (contextSuggestions ?? []).slice(0, 4);
 
   return (
     <div className="flex-1 overflow-y-auto relative" ref={scrollRef} onScroll={handleScroll}>
@@ -284,7 +320,39 @@ export function MessageList({ messages, loading, toolExecutions, onQuickAction }
             </div>
             <div className="text-center">
               <p className="text-blade-secondary text-sm font-medium">Blade</p>
-              <p className="text-blade-muted text-xs mt-1">Your personal AI. Ready when you are.</p>
+              <p className="text-blade-muted text-xs mt-1">
+                Your personal desktop intelligence. It can listen, see your screen, use tools, and help with what you are doing right now.
+              </p>
+            </div>
+            <div className="w-full max-w-lg rounded-2xl border border-blade-border bg-blade-surface/50 p-4 animate-fade-in">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-2xs uppercase tracking-[0.2em] text-blade-muted">Live context</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-blade-border px-2.5 py-1 text-2xs text-blade-secondary">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  Voice + screen ready
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-blade-border px-2.5 py-1 text-2xs text-blade-secondary">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blade-accent" />
+                  Tool actions guarded
+                </span>
+              </div>
+              <div className="mt-3 text-sm text-blade-text">
+                {focusLabel ? `I can help with the app in front of you: ${focusLabel}` : "I can work from your current screen, voice, clipboard, files, and tools."}
+              </div>
+              {suggestionList.length > 0 && onQuickAction ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {suggestionList.map((suggestion) => (
+                    <button
+                      key={suggestion.id}
+                      onClick={() => onQuickAction(suggestion.prompt)}
+                      className="rounded-full border border-blade-border bg-blade-bg/70 px-3 py-1.5 text-2xs text-blade-secondary hover:border-blade-accent/30 hover:text-blade-text transition-colors"
+                    >
+                      <span className="mr-1">{suggestion.icon}</span>
+                      {suggestion.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
             {onQuickAction && (
               <div className="grid grid-cols-2 gap-2 mt-2 max-w-xs animate-fade-in">
@@ -301,10 +369,10 @@ export function MessageList({ messages, loading, toolExecutions, onQuickAction }
               </div>
             )}
             <div className="flex items-center gap-4 mt-3 text-2xs text-blade-muted/40">
-              <span>🎤 mic</span>
-              <span>📸 screen</span>
-              <span>⌨️ Ctrl+K</span>
-              <span>🔊 TTS</span>
+              <span>mic</span>
+              <span>screen</span>
+              <span>paste</span>
+              <span>Ctrl+K</span>
             </div>
           </div>
         )}

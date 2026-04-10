@@ -1,37 +1,12 @@
-import React, { useCallback, useRef, useState, useEffect } from "react";
+import React, { Suspense, lazy, useCallback, useRef, useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
-import { Analytics } from "./components/Analytics";
 import { ActivityFeed, useActivityFeed } from "./components/ActivityFeed";
-import Canvas from "./components/Canvas";
 import { ChatWindow } from "./components/ChatWindow";
 import { CommandPalette } from "./components/CommandPalette";
-import { ConversationInsightsPanel } from "./components/ConversationInsightsPanel";
-import { Diagnostics } from "./components/Diagnostics";
-import { Discovery } from "./components/Discovery";
-import { FileBrowser } from "./components/FileBrowser";
-import FocusMode from "./components/FocusMode";
-import { KnowledgeBase } from "./components/KnowledgeBase";
-import { ModelComparison } from "./components/ModelComparison";
 import { NotificationCenter, useNotifications } from "./components/NotificationCenter";
-import AgentManager from "./components/AgentManager";
-import { ManagedAgentPanel } from "./components/ManagedAgentPanel";
-import SystemPromptPreview from "./components/SystemPromptPreview";
-import { Onboarding } from "./components/Onboarding";
-import { Settings } from "./components/Settings";
-import { SyncSettings } from "./components/SyncStatus";
-import TemplateManager from "./components/TemplateManager";
-import { Terminal } from "./components/Terminal";
-import { ThemePicker } from "./components/ThemePicker";
-import ShortcutHelp from "./components/ShortcutHelp";
-import WorkflowBuilder from "./components/WorkflowBuilder";
 import { TitleBar } from "./components/TitleBar";
-import { EmailAssistant } from "./components/EmailAssistant";
-import DocumentGenerator from "./components/DocumentGenerator";
-import WebAutomation from "./components/WebAutomation";
-import { AgentTeamPanel } from "./components/AgentTeamPanel";
-import { GitPanel } from "./components/GitPanel";
 import { useChat } from "./hooks/useChat";
 import { useTTS } from "./hooks/useTTS";
 import { useKeyboard } from "./hooks/useKeyboard";
@@ -41,10 +16,94 @@ import { useFileDrop } from "./hooks/useFileDrop";
 import { useContextAwareness } from "./hooks/useContextAwareness";
 import { useProactiveMode } from "./hooks/useProactiveMode";
 import { useVoiceCommands } from "./hooks/useVoiceCommands";
+import { useRuntimes } from "./hooks/useRuntimes";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
 
 type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git";
+
+const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
+const Canvas = lazy(() => import("./components/Canvas"));
+const ConversationInsightsPanel = lazy(() => import("./components/ConversationInsightsPanel").then((m) => ({ default: m.ConversationInsightsPanel })));
+const Diagnostics = lazy(() => import("./components/Diagnostics").then((m) => ({ default: m.Diagnostics })));
+const Discovery = lazy(() => import("./components/Discovery").then((m) => ({ default: m.Discovery })));
+const FileBrowser = lazy(() => import("./components/FileBrowser").then((m) => ({ default: m.FileBrowser })));
+const FocusMode = lazy(() => import("./components/FocusMode"));
+const KnowledgeBase = lazy(() => import("./components/KnowledgeBase").then((m) => ({ default: m.KnowledgeBase })));
+const ModelComparison = lazy(() => import("./components/ModelComparison").then((m) => ({ default: m.ModelComparison })));
+const OperatorCenter = lazy(() => import("./components/OperatorCenter"));
+const SystemPromptPreview = lazy(() => import("./components/SystemPromptPreview"));
+const Onboarding = lazy(() => import("./components/Onboarding").then((m) => ({ default: m.Onboarding })));
+const Settings = lazy(() => import("./components/Settings").then((m) => ({ default: m.Settings })));
+const SyncSettings = lazy(() => import("./components/SyncStatus").then((m) => ({ default: m.SyncSettings })));
+const TemplateManager = lazy(() => import("./components/TemplateManager"));
+const Terminal = lazy(() => import("./components/Terminal").then((m) => ({ default: m.Terminal })));
+const ThemePicker = lazy(() => import("./components/ThemePicker").then((m) => ({ default: m.ThemePicker })));
+const ShortcutHelp = lazy(() => import("./components/ShortcutHelp"));
+const WorkflowBuilder = lazy(() => import("./components/WorkflowBuilder"));
+const EmailAssistant = lazy(() => import("./components/EmailAssistant").then((m) => ({ default: m.EmailAssistant })));
+const DocumentGenerator = lazy(() => import("./components/DocumentGenerator"));
+const WebAutomation = lazy(() => import("./components/WebAutomation"));
+const AgentTeamPanel = lazy(() => import("./components/AgentTeamPanel").then((m) => ({ default: m.AgentTeamPanel })));
+const GitPanel = lazy(() => import("./components/GitPanel").then((m) => ({ default: m.GitPanel })));
+
+function ShellFallback({ label = "Loading workspace..." }: { label?: string }) {
+  return (
+    <div className="flex items-center justify-center h-full bg-blade-bg">
+      <div className="text-center">
+        <div className="w-2 h-2 rounded-full bg-blade-accent animate-pulse mx-auto" />
+        <p className="text-2xs text-blade-muted mt-3">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+const ROUTE_INTENT_LABELS: Partial<Record<Route, { title: string; note: string }>> = {
+  terminal: {
+    title: "Terminal workspace",
+    note: "Blade opened the terminal so you can run commands and send output back into the conversation.",
+  },
+  files: {
+    title: "File workspace",
+    note: "Blade opened your files so you can inspect local context and send anything important back into chat.",
+  },
+  canvas: {
+    title: "Canvas workspace",
+    note: "Blade opened a visual thinking space so you can sketch, map ideas, and bring them back into the conversation.",
+  },
+  workflows: {
+    title: "Workflow workspace",
+    note: "Blade opened workflows so you can turn repeated tasks into reusable execution flows.",
+  },
+  agents: {
+    title: "Operator center",
+    note: "Blade opened operator center so you can route work across Blade native execution, Claude, and Codex runtimes.",
+  },
+  "managed-agents": {
+    title: "Operator center",
+    note: "Blade opened operator center with Claude-focused tools so you can work across managed runs and imported runtimes in one place.",
+  },
+  email: {
+    title: "Email workspace",
+    note: "Blade opened email tools so you can read, draft, and move decisions back into your main thread.",
+  },
+  docs: {
+    title: "Document workspace",
+    note: "Blade opened document generation so you can produce a structured draft and continue from chat.",
+  },
+  "web-auto": {
+    title: "Web automation",
+    note: "Blade opened web automation so you can turn browsing or scraping tasks into guided actions.",
+  },
+  "agent-teams": {
+    title: "Agent teams",
+    note: "Blade opened agent teams for coordinated multi-role execution.",
+  },
+  git: {
+    title: "Git workspace",
+    note: "Blade opened git tools so you can inspect repo state and push decisions back into chat.",
+  },
+};
 
 export default function App() {
   const [config, setConfig] = useState<BladeConfig | null>(null);
@@ -58,6 +117,7 @@ export default function App() {
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const [workspaceIntent, setWorkspaceIntent] = useState<{ route: Route; title: string; note: string } | null>(null);
   const chat = useChat();
   const tts = useTTS(chat.messages, chat.loading);
   const sound = useNotificationSound(chat.loading);
@@ -67,6 +127,7 @@ export default function App() {
   const contextAwareness = useContextAwareness();
   const proactive = useProactiveMode();
   const voiceCommands = useVoiceCommands();
+  const runtimeCenter = useRuntimes();
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const handleImageDrop = useCallback((dataUrl: string) => {
@@ -158,6 +219,11 @@ export default function App() {
 
   const closePalette = useCallback(() => setPaletteOpen(false), []);
 
+  const openRoute = useCallback((nextRoute: Route, intent?: { title: string; note: string }) => {
+    setRoute(nextRoute);
+    setWorkspaceIntent(intent ? { route: nextRoute, ...intent } : ROUTE_INTENT_LABELS[nextRoute] ? { route: nextRoute, ...ROUTE_INTENT_LABELS[nextRoute]! } : null);
+  }, []);
+
   const handleSlashCommand = useCallback((action: string) => {
     switch (action) {
       case "clear": chat.clearMessages(); break;
@@ -209,49 +275,51 @@ export default function App() {
   });
 
   const commands = [
-    { id: "new", label: "New conversation  Ctrl+N", action: () => chat.newConversation() },
-    { id: "clear", label: "Clear messages", action: () => chat.clearMessages() },
-    { id: "screenshot", label: "Capture screen", action: handleScreenshot },
-    { id: "tts", label: tts.enabled ? "Disable voice output" : "Enable voice output", action: tts.toggleEnabled },
-    { id: "sound", label: sound.enabled ? "Disable notification sound" : "Enable notification sound", action: sound.toggleEnabled },
-    { id: "export", label: "Export conversation to clipboard", action: () => copyConversation(chat.messages, chat.currentConversation?.title) },
-    { id: "settings", label: "Open settings  Ctrl+,", action: () => setRoute("settings") },
-    { id: "templates", label: "Prompt templates", action: () => setTemplateManagerOpen(true) },
-    { id: "themes", label: "Change theme", action: () => setThemePickerOpen(true) },
-    { id: "insights", label: "Conversation insights", action: () => setInsightsOpen(true) },
-    { id: "canvas", label: "Open canvas / whiteboard", action: () => setRoute("canvas") },
-    { id: "workflows", label: "Workflow builder", action: () => setRoute("workflows") },
-    { id: "analytics", label: "Usage analytics", action: () => setRoute("analytics") },
-    { id: "activity", label: "Activity feed", action: () => setRoute("activity") },
-    { id: "knowledge", label: "Knowledge base", action: () => setRoute("knowledge") },
-    { id: "comparison", label: "Compare models", action: () => setRoute("comparison") },
-    { id: "diagnostics", label: "View API traces", action: () => setRoute("diagnostics") },
-    { id: "discovery", label: "Run discovery scan", action: () => setRoute("discovery") },
-    { id: "focus", label: "Focus mode  Ctrl+F", action: () => setFocusMode(true) },
-    { id: "sysprompt", label: "View system prompt", action: () => setSystemPromptOpen(true) },
-    { id: "shortcuts", label: "Keyboard shortcuts  Ctrl+/", action: () => setShortcutHelpOpen(true) },
-    { id: "agents", label: "Agent tasks", action: () => setRoute("agents") },
-    { id: "managed-agents", label: "Managed Agents (Claude SDK)", action: () => setRoute("managed-agents") },
-    { id: "terminal", label: "Terminal", action: () => setRoute("terminal") },
-    { id: "files", label: "File browser", action: () => setRoute("files") },
-    { id: "email", label: "Email assistant", action: () => setRoute("email") },
-    { id: "docs", label: "Document generator", action: () => setRoute("docs") },
-    { id: "web-auto", label: "Web automation", action: () => setRoute("web-auto") },
-    { id: "agent-teams", label: "Agent teams", action: () => setRoute("agent-teams") },
-    { id: "git", label: "Git panel", action: () => setRoute("git") },
-    { id: "sync", label: "Sync settings", action: () => setRoute("sync") },
-    { id: "notifications", label: "Notifications", action: () => setNotificationsOpen(true) },
-    { id: "chat", label: "Back to chat", action: () => setRoute("chat") },
+    { id: "new", label: "Blade: start a new conversation  Ctrl+N", action: () => chat.newConversation() },
+    { id: "clear", label: "Blade: clear this thread", action: () => chat.clearMessages() },
+    { id: "screenshot", label: "Blade: capture my screen", action: handleScreenshot },
+    { id: "tts", label: tts.enabled ? "Blade: disable voice output" : "Blade: enable voice output", action: tts.toggleEnabled },
+    { id: "sound", label: sound.enabled ? "Blade: disable notification sound" : "Blade: enable notification sound", action: sound.toggleEnabled },
+    { id: "export", label: "Blade: export conversation to clipboard", action: () => copyConversation(chat.messages, chat.currentConversation?.title) },
+    { id: "settings", label: "Blade: open settings  Ctrl+,", action: () => openRoute("settings") },
+    { id: "templates", label: "Blade: open prompt templates", action: () => setTemplateManagerOpen(true) },
+    { id: "themes", label: "Blade: change theme", action: () => setThemePickerOpen(true) },
+    { id: "insights", label: "Blade: show conversation insights", action: () => setInsightsOpen(true) },
+    { id: "canvas", label: "Blade: open canvas workspace", action: () => openRoute("canvas") },
+    { id: "workflows", label: "Blade: open workflow builder", action: () => openRoute("workflows") },
+    { id: "analytics", label: "Blade: open analytics", action: () => openRoute("analytics") },
+    { id: "activity", label: "Blade: show activity feed", action: () => openRoute("activity") },
+    { id: "knowledge", label: "Blade: open knowledge base", action: () => openRoute("knowledge") },
+    { id: "comparison", label: "Blade: compare models", action: () => openRoute("comparison") },
+    { id: "diagnostics", label: "Blade: view diagnostics", action: () => openRoute("diagnostics") },
+    { id: "discovery", label: "Blade: run discovery scan", action: () => openRoute("discovery") },
+    { id: "focus", label: "Blade: enter focus mode  Ctrl+F", action: () => setFocusMode(true) },
+    { id: "sysprompt", label: "Blade: view system prompt", action: () => setSystemPromptOpen(true) },
+    { id: "shortcuts", label: "Blade: show keyboard shortcuts  Ctrl+/", action: () => setShortcutHelpOpen(true) },
+    { id: "agents", label: "Blade: open operator center", action: () => openRoute("agents") },
+    { id: "managed-agents", label: "Blade: open operator center (Claude focus)", action: () => openRoute("managed-agents") },
+    { id: "terminal", label: "Blade: open terminal workspace", action: () => openRoute("terminal") },
+    { id: "files", label: "Blade: open file workspace", action: () => openRoute("files") },
+    { id: "email", label: "Blade: open email workspace", action: () => openRoute("email") },
+    { id: "docs", label: "Blade: open document workspace", action: () => openRoute("docs") },
+    { id: "web-auto", label: "Blade: open web automation", action: () => openRoute("web-auto") },
+    { id: "agent-teams", label: "Blade: open agent teams", action: () => openRoute("agent-teams") },
+    { id: "git", label: "Blade: open git workspace", action: () => openRoute("git") },
+    { id: "sync", label: "Blade: open sync settings", action: () => openRoute("sync") },
+    { id: "notifications", label: "Blade: show notifications", action: () => setNotificationsOpen(true) },
+    { id: "chat", label: "Blade: return to chat", action: () => openRoute("chat") },
   ];
 
   if (focusMode && config?.onboarded) {
     return (
-      <FocusMode
-        messages={chat.messages}
-        loading={chat.loading}
-        onSend={sendWithStats}
-        onExit={() => setFocusMode(false)}
-      />
+      <Suspense fallback={<ShellFallback label="Entering focus mode..." />}>
+        <FocusMode
+          messages={chat.messages}
+          loading={chat.loading}
+          onSend={sendWithStats}
+          onExit={() => setFocusMode(false)}
+        />
+      </Suspense>
     );
   }
 
@@ -267,41 +335,62 @@ export default function App() {
     return (
       <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
         <TitleBar />
-        <Onboarding onComplete={async () => {
-          await loadConfig();
-          setRoute("discovery");
-        }} />
+        <Suspense fallback={<ShellFallback label="Preparing Blade..." />}>
+          <Onboarding onComplete={async () => {
+            await loadConfig();
+            setRoute("discovery");
+          }} />
+        </Suspense>
       </div>
     );
   }
 
   // Full-page routes
   const fullPageRoutes: Record<string, React.ReactNode> = {
-    analytics: <Analytics onBack={() => setRoute("chat")} />,
-    knowledge: <KnowledgeBase onBack={() => setRoute("chat")} onInsertToChat={(content) => { sendWithStats(content); setRoute("chat"); }} />,
-    comparison: <ModelComparison onBack={() => setRoute("chat")} />,
-    diagnostics: <Diagnostics onBack={() => setRoute("chat")} />,
-    discovery: <Discovery onComplete={() => setRoute("chat")} onSkip={() => setRoute("chat")} />,
-    agents: <AgentManager />,
-    terminal: <Terminal onBack={() => setRoute("chat")} onSendToChat={(text) => { sendWithStats(text); setRoute("chat"); }} />,
-    files: <FileBrowser onBack={() => setRoute("chat")} onSendToChat={(content, name) => { sendWithStats(`Analyze ${name}:\n\n\`\`\`\n${content.slice(0, 3000)}\n\`\`\``); setRoute("chat"); }} />,
-    canvas: <Canvas onBack={() => setRoute("chat")} onSendToChat={(text) => { sendWithStats(text); setRoute("chat"); }} />,
-    workflows: <WorkflowBuilder onBack={() => setRoute("chat")} onRunOutput={(output) => { sendWithStats(output); setRoute("chat"); }} />,
-    activity: <ActivityFeed items={activity.items} onBack={() => setRoute("chat")} />,
-    sync: <SyncSettings onBack={() => setRoute("chat")} />,
-    "managed-agents": <ManagedAgentPanel onBack={() => setRoute("chat")} onSendToChat={(text) => { sendWithStats(text); setRoute("chat"); }} />,
-    "email": <EmailAssistant onBack={() => setRoute("chat")} onSendToChat={(text) => { sendWithStats(text); setRoute("chat"); }} />,
-    "docs": <DocumentGenerator onBack={() => setRoute("chat")} />,
-    "web-auto": <WebAutomation onBack={() => setRoute("chat")} onSendToChat={(text) => { sendWithStats(text); setRoute("chat"); }} />,
-    "agent-teams": <AgentTeamPanel onBack={() => setRoute("chat")} onSendToChat={(text) => { sendWithStats(text); setRoute("chat"); }} />,
-    "git": <GitPanel onBack={() => setRoute("chat")} onSendToChat={(text) => { sendWithStats(text); setRoute("chat"); }} />,
+    analytics: <Analytics onBack={() => openRoute("chat")} />,
+    knowledge: <KnowledgeBase onBack={() => openRoute("chat")} onInsertToChat={(content) => { sendWithStats(content); openRoute("chat"); }} />,
+    comparison: <ModelComparison onBack={() => openRoute("chat")} />,
+    diagnostics: <Diagnostics onBack={() => openRoute("chat")} />,
+    discovery: <Discovery onComplete={() => openRoute("chat")} onSkip={() => openRoute("chat")} />,
+    agents: <OperatorCenter onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} runtimeCenter={runtimeCenter} defaultTab="mission" />,
+    terminal: <Terminal onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} />,
+    files: <FileBrowser onBack={() => openRoute("chat")} onSendToChat={(content, name) => { sendWithStats(`Analyze ${name}:\n\n\`\`\`\n${content.slice(0, 3000)}\n\`\`\``); openRoute("chat"); }} />,
+    canvas: <Canvas onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} />,
+    workflows: <WorkflowBuilder onBack={() => openRoute("chat")} onRunOutput={(output) => { sendWithStats(output); openRoute("chat"); }} />,
+    activity: <ActivityFeed items={activity.items} onBack={() => openRoute("chat")} />,
+    sync: <SyncSettings onBack={() => openRoute("chat")} />,
+    "managed-agents": <OperatorCenter onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} runtimeCenter={runtimeCenter} defaultTab="managed" />,
+    "email": <EmailAssistant onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} />,
+    "docs": <DocumentGenerator onBack={() => openRoute("chat")} />,
+    "web-auto": <WebAutomation onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} />,
+    "agent-teams": <AgentTeamPanel onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} />,
+    "git": <GitPanel onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} />,
   };
 
   if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {
     return (
-      <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
+        <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
         <TitleBar />
-        {fullPageRoutes[route]}
+        {workspaceIntent && workspaceIntent.route === route ? (
+          <div className="px-4 py-2 border-b border-blade-border/40 bg-blade-bg/90">
+            <div className="max-w-5xl mx-auto flex items-start justify-between gap-4">
+              <div>
+                <div className="text-2xs uppercase tracking-[0.2em] text-blade-muted">Blade handoff</div>
+                <div className="text-sm text-blade-secondary mt-1">{workspaceIntent.title}</div>
+                <div className="text-2xs text-blade-muted mt-1">{workspaceIntent.note}</div>
+              </div>
+              <button
+                onClick={() => setWorkspaceIntent(null)}
+                className="text-2xs text-blade-muted hover:text-blade-secondary transition-colors"
+              >
+                dismiss
+              </button>
+            </div>
+          </div>
+        ) : null}
+        <Suspense fallback={<ShellFallback />}>
+          {fullPageRoutes[route]}
+        </Suspense>
       </div>
     );
   }
@@ -323,11 +412,13 @@ export default function App() {
       )}
       <TitleBar />
       <CommandPalette commands={commands} open={paletteOpen} onClose={closePalette} />
-      <ShortcutHelp open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
-      <SystemPromptPreview open={systemPromptOpen} onClose={() => setSystemPromptOpen(false)} />
-      <TemplateManager open={templateManagerOpen} onClose={() => setTemplateManagerOpen(false)} onUseTemplate={(content: string) => { sendWithStats(content); setTemplateManagerOpen(false); }} />
-      <ThemePicker open={themePickerOpen} onClose={() => setThemePickerOpen(false)} />
-      <ConversationInsightsPanel messages={chat.messages} open={insightsOpen} onClose={() => setInsightsOpen(false)} />
+      <Suspense fallback={null}>
+        <ShortcutHelp open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
+        <SystemPromptPreview open={systemPromptOpen} onClose={() => setSystemPromptOpen(false)} />
+        <TemplateManager open={templateManagerOpen} onClose={() => setTemplateManagerOpen(false)} onUseTemplate={(content: string) => { sendWithStats(content); setTemplateManagerOpen(false); }} />
+        <ThemePicker open={themePickerOpen} onClose={() => setThemePickerOpen(false)} />
+        <ConversationInsightsPanel messages={chat.messages} open={insightsOpen} onClose={() => setInsightsOpen(false)} />
+      </Suspense>
       <NotificationCenter
         open={notificationsOpen}
         onClose={() => setNotificationsOpen(false)}
@@ -336,50 +427,57 @@ export default function App() {
         onMarkAllRead={notifications.markAllRead}
         onDismiss={notifications.dismiss}
         onClearAll={notifications.clearAll}
-        onAction={(r) => { setRoute(r as Route); setNotificationsOpen(false); }}
+        onAction={(r) => { openRoute(r as Route); setNotificationsOpen(false); }}
       />
       <div className="flex-1 min-h-0">
-        {route === "settings" ? (
-          <Settings
-            config={config}
-            onBack={() => setRoute("chat")}
-            onSaved={(nextConfig) => {
-              setConfig(nextConfig);
-              setRoute("chat");
-            }}
-            onConfigRefresh={loadConfig}
-          />
-        ) : (
-          <ChatWindow
-            messages={chat.messages}
-            loading={chat.loading}
-            error={chat.error}
-            toolExecutions={chat.toolExecutions}
-            clipboardText={chat.clipboardText}
-            conversations={chat.conversations}
-            currentConversationId={chat.currentConversationId}
-            onSend={sendWithStats}
-            onClear={chat.clearMessages}
-            onNewConversation={chat.newConversation}
-            onSwitchConversation={chat.switchConversation}
-            onOpenSettings={() => setRoute("settings")}
-            onDismissClipboard={chat.dismissClipboard}
-            pendingApproval={chat.pendingApproval}
-            onRespondApproval={chat.respondToApproval}
-            onDeleteConversation={chat.deleteConversation}
-            onRetry={chat.retryLastMessage}
-            onSlashCommand={handleSlashCommand}
-            provider={config?.provider}
-            streakDays={stats.streakDays}
-            totalMessages={stats.totalMessages}
-            lastResponseTime={chat.lastResponseTime}
-            model={config?.model}
-            ttsEnabled={tts.enabled}
-            ttsSpeaking={tts.speaking}
-            onToggleTTS={tts.toggleEnabled}
-            onStopTTS={tts.stop}
-          />
-        )}
+        <Suspense fallback={<ShellFallback label={route === "settings" ? "Loading settings..." : "Loading Blade..."} />}>
+          {route === "settings" ? (
+            <Settings
+              config={config}
+              onBack={() => openRoute("chat")}
+              onSaved={(nextConfig) => {
+                setConfig(nextConfig);
+                openRoute("chat");
+              }}
+              onConfigRefresh={loadConfig}
+            />
+          ) : (
+            <ChatWindow
+              messages={chat.messages}
+              loading={chat.loading}
+              error={chat.error}
+              toolExecutions={chat.toolExecutions}
+              clipboardText={chat.clipboardText}
+              conversations={chat.conversations}
+              currentConversationId={chat.currentConversationId}
+              onSend={sendWithStats}
+              onClear={chat.clearMessages}
+              onNewConversation={chat.newConversation}
+              onSwitchConversation={chat.switchConversation}
+              onOpenSettings={() => openRoute("settings")}
+              onDismissClipboard={chat.dismissClipboard}
+              pendingApproval={chat.pendingApproval}
+              onRespondApproval={chat.respondToApproval}
+              onDeleteConversation={chat.deleteConversation}
+              onRetry={chat.retryLastMessage}
+              onSlashCommand={handleSlashCommand}
+              provider={config?.provider}
+              streakDays={stats.streakDays}
+              totalMessages={stats.totalMessages}
+              lastResponseTime={chat.lastResponseTime}
+              model={config?.model}
+              ttsEnabled={tts.enabled}
+              ttsSpeaking={tts.speaking}
+              onToggleTTS={tts.toggleEnabled}
+              onStopTTS={tts.stop}
+              activeWindow={contextAwareness.context.activeWindow}
+              contextSuggestions={contextAwareness.context.suggestedActions}
+              onOpenWorkspace={(workspace) => openRoute(workspace)}
+              runtimes={runtimeCenter.runtimes}
+              onOpenOperators={() => openRoute("agents")}
+            />
+          )}
+        </Suspense>
       </div>
     </div>
   );

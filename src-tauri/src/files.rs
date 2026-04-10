@@ -74,7 +74,11 @@ pub fn file_list(path: String) -> Result<Vec<FileInfo>, String> {
         let name = entry.file_name().to_string_lossy().to_string();
 
         // Skip hidden files and common noise
-        if name.starts_with('.') || name == "node_modules" || name == "target" || name == "__pycache__" {
+        if name.starts_with('.')
+            || name == "node_modules"
+            || name == "target"
+            || name == "__pycache__"
+        {
             continue;
         }
 
@@ -90,9 +94,7 @@ pub fn file_list(path: String) -> Result<Vec<FileInfo>, String> {
         });
     }
 
-    entries.sort_by(|a, b| {
-        b.is_dir.cmp(&a.is_dir).then(a.name.cmp(&b.name))
-    });
+    entries.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then(a.name.cmp(&b.name)));
 
     Ok(entries)
 }
@@ -116,7 +118,11 @@ pub fn file_tree(path: String, max_depth: Option<u32>) -> Result<FileTree, Strin
     })
 }
 
-fn build_tree(dir: &Path, current_depth: u32, max_depth: u32) -> Result<Vec<FileTreeEntry>, String> {
+fn build_tree(
+    dir: &Path,
+    current_depth: u32,
+    max_depth: u32,
+) -> Result<Vec<FileTreeEntry>, String> {
     if current_depth >= max_depth || !dir.is_dir() {
         return Ok(Vec::new());
     }
@@ -128,7 +134,13 @@ fn build_tree(dir: &Path, current_depth: u32, max_depth: u32) -> Result<Vec<File
         let entry = entry.map_err(|e| e.to_string())?;
         let name = entry.file_name().to_string_lossy().to_string();
 
-        if name.starts_with('.') || name == "node_modules" || name == "target" || name == "__pycache__" || name == "dist" || name == "build" {
+        if name.starts_with('.')
+            || name == "node_modules"
+            || name == "target"
+            || name == "__pycache__"
+            || name == "dist"
+            || name == "build"
+        {
             continue;
         }
 

@@ -565,19 +565,21 @@ Be balanced, specific, and reference actual arguments made.`;
         const config = await invoke<BladeConfig>("get_config");
         let debate = debates.find((d) => d.id === debateId) ?? activeDebate;
         if (!debate) throw new Error("Debate not found");
+        const existingDebate = debate;
 
-        const framework = FRAMEWORKS.find((f) => f.id === debate.frameworkId);
+        const framework = FRAMEWORKS.find((f) => f.id === existingDebate.frameworkId);
 
         // Update status to arguing
-        debate = { ...debate, status: "arguing", updatedAt: Date.now() };
+        debate = { ...existingDebate, status: "arguing", updatedAt: Date.now() };
         setActiveDebate(debate);
+        const currentDebate = debate;
 
         // Generate arguments for all positions in parallel
         const results = await Promise.allSettled(
-          debate.positions.map(async (position) => {
+          currentDebate.positions.map(async (position) => {
             const prompt = (framework?.promptTemplate ?? "Analyze {topic} from the {perspective} perspective. Provide 3-5 arguments, each on its own line prefixed with a dash (-).")
               .replace("{perspective}", position.perspective)
-              .replace("{topic}", debate!.topic);
+              .replace("{topic}", currentDebate.topic);
 
             const raw = await callLLM(config.provider, config.model, config.api_key, prompt);
             const args = parseArgumentLines(raw);

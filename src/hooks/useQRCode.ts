@@ -5,10 +5,6 @@ import { useCallback } from "react";
  * Pure JavaScript implementation — no external libraries.
  */
 
-// QR Code encoding tables
-const EC_LEVELS = { L: 0, M: 1, Q: 2, H: 3 } as const;
-type ECLevel = keyof typeof EC_LEVELS;
-
 // Simplified QR — generates SVG path data for a QR code
 // Uses a basic encoding that works for short strings
 function generateQRMatrix(data: string): boolean[][] {

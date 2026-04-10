@@ -49,8 +49,6 @@ const DEFAULT_CONFIG: PomodoroConfig = {
 
 const CONFIG_KEY = "blade-pomodoro-config";
 const HISTORY_KEY = "blade-pomodoro-history";
-const STATS_KEY = "blade-pomodoro-stats";
-
 function loadConfig(): PomodoroConfig {
   try { return { ...DEFAULT_CONFIG, ...JSON.parse(localStorage.getItem(CONFIG_KEY) || "{}") }; }
   catch { return DEFAULT_CONFIG; }

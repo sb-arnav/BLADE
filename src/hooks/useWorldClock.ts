@@ -99,7 +99,6 @@ function formatTimeInfo(timezone: string): TimeInfo {
     const isDaytime = hours >= 6 && hours < 20;
 
     // Calculate offset string
-    const localOffset = -now.getTimezoneOffset() / 60;
     const tzFormatter = new Intl.DateTimeFormat("en-US", { timeZone: timezone, timeZoneName: "shortOffset" });
     const offsetPart = tzFormatter.formatToParts(now).find((p) => p.type === "timeZoneName")?.value || "";
 

@@ -87,16 +87,13 @@ export default function FinanceDashboard({ onBack }: Props) {
     addTransaction,
     deleteTransaction,
     addBudget,
-    updateBudget,
     deleteBudget,
-    addInvoice,
     updateInvoice,
     deleteInvoice,
     generateInvoice,
     getStats,
     exportReport,
     importTransactions,
-    categories,
   } = useFinance();
 
   const [tab, setTab] = useState<Tab>("overview");
@@ -294,8 +291,6 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
     "px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors";
   const btnSecondary =
     "px-4 py-2 bg-zinc-700/60 hover:bg-zinc-600/60 text-zinc-300 text-sm font-medium rounded-lg transition-colors border border-zinc-600/40";
-  const btnDanger =
-    "px-3 py-1.5 bg-red-600/20 hover:bg-red-600/40 text-red-400 text-xs rounded-lg transition-colors";
 
   return (
     <div className="flex flex-col h-full bg-zinc-900 text-zinc-100">

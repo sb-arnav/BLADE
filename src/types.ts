@@ -67,6 +67,222 @@ export interface ImportedMcpServer {
   source: string;
 }
 
+export interface RuntimeCapability {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export interface RuntimeSessionRef {
+  runtime_id: string;
+  session_id: string;
+  cwd?: string | null;
+  title: string;
+  resumable: boolean;
+  last_active_at: number;
+}
+
+export interface InstallRequirement {
+  runtime_id: string;
+  kind: string;
+  title: string;
+  message: string;
+  command?: string | null;
+  url?: string | null;
+}
+
+export interface RuntimeDescriptor {
+  id: string;
+  name: string;
+  source: string;
+  installed: boolean;
+  authenticated: boolean;
+  version?: string | null;
+  capabilities: RuntimeCapability[];
+  platforms: string[];
+  sessions: RuntimeSessionRef[];
+  active_tasks: number;
+  server_url?: string | null;
+  install_requirement?: InstallRequirement | null;
+}
+
+export interface TaskCheckpoint {
+  id: string;
+  title: string;
+  detail: string;
+  status: string;
+  timestamp: number;
+}
+
+export interface TaskArtifact {
+  id: string;
+  label: string;
+  kind: string;
+  value: string;
+}
+
+export interface TaskGraph {
+  id: string;
+  goal: string;
+  operator_type: string;
+  preferred_runtime?: string | null;
+  preferred_substrate?: string | null;
+  security_engagement_id?: string | null;
+  mission_id?: string | null;
+  stage_id?: string | null;
+  parent_task_id?: string | null;
+  handoff_note?: string | null;
+  checkpoints: TaskCheckpoint[];
+  artifacts: TaskArtifact[];
+  approvals: string[];
+  status: string;
+  session?: RuntimeSessionRef | null;
+}
+
+export interface RuntimeRouteRecommendation {
+  runtime_id: string;
+  operator_type: string;
+  preferred_substrate?: string | null;
+  rationale: string;
+  confidence: number;
+  prefers_warm_runtime: boolean;
+}
+
+export interface MissionStage {
+  id: string;
+  title: string;
+  goal: string;
+  depends_on: string[];
+  runtime: RuntimeRouteRecommendation;
+}
+
+export interface OperatorMission {
+  id: string;
+  goal: string;
+  summary: string;
+  stages: MissionStage[];
+}
+
+export interface PlannedMissionStage {
+  stage: MissionStage;
+  parent_task_id?: string | null;
+  handoff_note?: string | null;
+  resume_session_id?: string | null;
+}
+
+export interface MissionRunResult {
+  launched: TaskGraph[];
+  blocked: boolean;
+  completed: boolean;
+  next_stage_id?: string | null;
+}
+
+export interface StoredMission {
+  mission: OperatorMission;
+  status: string;
+  last_run_at?: number | null;
+  next_stage_id?: string | null;
+  auto_run: boolean;
+}
+
+export interface CompanyObject {
+  id: string;
+  kind: string;
+  title: string;
+  summary: string;
+  status: string;
+  owner?: string | null;
+  linked_mission_id?: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface SecurityEngagement {
+  id: string;
+  title: string;
+  owner_name: string;
+  contact: string;
+  scope: string;
+  asset_kind: string;
+  verification_method: string;
+  challenge_token: string;
+  proof_instructions: string;
+  proof_value?: string | null;
+  status: string;
+  verified_at?: number | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface CapabilityBlueprint {
+  id: string;
+  title: string;
+  category: string;
+  summary: string;
+  goal_template: string;
+  runtime_hint?: string | null;
+  install_command?: string | null;
+  source_url?: string | null;
+}
+
+export interface PluginManifest {
+  name: string;
+  version: string;
+  description: string;
+  author?: string;
+  permissions: string[];
+  commands: Array<{ name: string; description: string; handler: string }>;
+  ui_slots: Array<{ slot: string; component: string }>;
+}
+
+export interface InstalledPlugin {
+  manifest: PluginManifest;
+  path: string;
+  enabled: boolean;
+}
+
+export interface PluginCommandInfo {
+  plugin: string;
+  name: string;
+  description: string;
+}
+
+export interface RuntimeMessageEvent {
+  taskId: string;
+  runtimeId: string;
+  sessionId?: string | null;
+  type: string;
+  role: string;
+  content: string;
+  timestamp: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RuntimeStateChangedEvent {
+  taskId: string;
+  runtimeId: string;
+  status: string;
+  sessionId?: string | null;
+  error?: string | null;
+  timestamp: number;
+}
+
+export interface TaskCheckpointEvent {
+  taskId: string;
+  runtimeId: string;
+  checkpoint: TaskCheckpoint;
+}
+
+export interface TaskDoneEvent {
+  taskId: string;
+  runtimeId: string;
+  status: string;
+  sessionId?: string | null;
+  summary?: string | null;
+  error?: string | null;
+  timestamp: number;
+}
+
 export interface ServerStatus {
   name: string;
   running: boolean;
@@ -91,6 +307,7 @@ export interface Agent {
   status: "Planning" | "Executing" | "WaitingApproval" | "Paused" | "Completed" | "Failed";
   steps: AgentStep[];
   current_step: number;
+  context?: Record<string, string>;
   created_at: number;
   updated_at: number;
   error: string | null;

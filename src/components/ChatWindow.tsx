@@ -1,5 +1,6 @@
-import { useMemo, useRef, useState } from "react";
-import { ConversationSummary, Message, ToolApprovalRequest, ToolExecution } from "../types";
+import { useMemo, useState } from "react";
+import { ConversationSummary, Message, RuntimeDescriptor, ToolApprovalRequest, ToolExecution } from "../types";
+import { ActiveWindowInfo, ContextSuggestion } from "../hooks/useContextAwareness";
 import { detectClipboardType } from "../utils/clipboardDetect";
 import { MessageList } from "./MessageList";
 import { InputBar } from "./InputBar";
@@ -34,6 +35,11 @@ interface Props {
   ttsSpeaking: boolean;
   onToggleTTS: () => void;
   onStopTTS: () => void;
+  activeWindow?: ActiveWindowInfo | null;
+  contextSuggestions?: ContextSuggestion[];
+  onOpenWorkspace?: (workspace: "terminal" | "files" | "canvas" | "workflows" | "agents") => void;
+  runtimes?: RuntimeDescriptor[];
+  onOpenOperators?: () => void;
 }
 
 function formatTime(timestamp: number): string {
@@ -77,11 +83,14 @@ export function ChatWindow({
   ttsSpeaking,
   onToggleTTS,
   onStopTTS,
+  activeWindow,
+  contextSuggestions,
+  onOpenWorkspace,
+  runtimes,
+  onOpenOperators,
 }: Props) {
   const [search, setSearch] = useState("");
-  const [editingTitle, setEditingTitle] = useState(false);
-  const [titleDraft, setTitleDraft] = useState("");
-  const titleInputRef = useRef<HTMLInputElement>(null);
+  const [composerDraft, setComposerDraft] = useState<string | null>(null);
 
   const filteredConversations = useMemo(() => {
     if (!search.trim()) return conversations;
@@ -111,6 +120,35 @@ export function ChatWindow({
     command: "$",
     text: "T",
   };
+  const contextLabel = activeWindow?.title?.trim() || activeWindow?.process_name?.trim() || null;
+  const visibleSuggestions = (contextSuggestions ?? []).slice(0, 3);
+  const workspaceActions = [
+    {
+      id: "terminal",
+      label: "Open terminal",
+      description: "Run commands with Blade alongside you",
+      action: () => onOpenWorkspace?.("terminal"),
+    },
+    {
+      id: "files",
+      label: "Open files",
+      description: "Browse code, docs, and local context",
+      action: () => onOpenWorkspace?.("files"),
+    },
+    {
+      id: "canvas",
+      label: "Open canvas",
+      description: "Think visually with Blade",
+      action: () => onOpenWorkspace?.("canvas"),
+    },
+    {
+      id: "agents",
+      label: "Open operators",
+      description: "Route work across Blade, Claude, and Codex",
+      action: () => onOpenWorkspace?.("agents"),
+    },
+  ] as const;
+  const runtimeStrip = (runtimes ?? []).slice(0, 4);
 
   return (
     <div className="flex h-full bg-blade-bg text-blade-text">
@@ -210,40 +248,22 @@ export function ChatWindow({
                 <path d="M3.5 7h17M3.5 12h17M3.5 17h17" />
               </svg>
             </button>
-            {editingTitle ? (
-              <input
-                ref={titleInputRef}
-                value={titleDraft}
-                onChange={(e) => setTitleDraft(e.target.value)}
-                onBlur={() => setEditingTitle(false)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === "Escape") setEditingTitle(false);
-                }}
-                className="text-xs text-blade-secondary bg-transparent border-b border-blade-accent/30 outline-none w-40"
-                autoFocus
-              />
-            ) : (
-              <span
-                className="text-xs text-blade-secondary truncate cursor-default"
-                onDoubleClick={() => {
-                  const title = conversations.find((c) => c.id === currentConversationId)?.title ?? "";
-                  setTitleDraft(title);
-                  setEditingTitle(true);
-                }}
-                title="Double-click to rename"
-              >
-                {conversations.find((c) => c.id === currentConversationId)?.title ?? "New conversation"}
-              </span>
-            )}
+            <span className="text-xs text-blade-secondary truncate">
+              {conversations.find((c) => c.id === currentConversationId)?.title ?? "New conversation"}
+            </span>
             {provider && (
-              <span className="text-2xs text-blade-muted/60 bg-blade-surface px-1.5 py-0.5 rounded-md font-mono shrink-0">
+              <button
+                onClick={onOpenSettings}
+                className="text-2xs text-blade-muted/70 bg-blade-surface px-1.5 py-0.5 rounded-md font-mono shrink-0 hover:text-blade-secondary hover:border-blade-accent/30 border border-transparent transition-colors"
+                title="Open provider and model settings"
+              >
                 {provider}{model ? ` · ${model.split("/").pop()?.split("-").slice(0, 2).join("-")}` : ""}
                 {lastResponseTime != null && (
                   <span className="text-blade-muted/40 ml-1.5">
                     {lastResponseTime < 1000 ? `${lastResponseTime}ms` : `${(lastResponseTime / 1000).toFixed(1)}s`}
                   </span>
                 )}
-              </span>
+              </button>
             )}
           </div>
           <div className="flex items-center gap-1">
@@ -286,6 +306,92 @@ export function ChatWindow({
             </button>
           </div>
         </div>
+        <div className="px-4 py-2 border-b border-blade-border/30 shrink-0 bg-blade-bg/80">
+          <div className="max-w-2xl mx-auto flex flex-wrap items-center gap-2 text-2xs text-blade-muted">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-blade-border bg-blade-surface/70 px-2.5 py-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              Blade is live
+            </span>
+            {runtimeStrip.map((runtime) => (
+              <span
+                key={runtime.id}
+                className={`inline-flex items-center rounded-full border px-2.5 py-1 ${
+                  !runtime.installed
+                    ? "border-amber-500/20 bg-amber-500/10 text-amber-200"
+                    : !runtime.authenticated
+                      ? "border-orange-500/20 bg-orange-500/10 text-orange-200"
+                      : runtime.active_tasks > 0
+                        ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-200"
+                        : "border-blade-border bg-blade-surface/70"
+                }`}
+              >
+                {runtime.name}
+                {!runtime.installed
+                  ? " · install"
+                  : !runtime.authenticated
+                    ? " · auth"
+                    : runtime.active_tasks > 0
+                      ? ` · ${runtime.active_tasks} live`
+                      : " · ready"}
+              </span>
+            ))}
+            {contextLabel ? (
+              <button
+                onClick={() => setComposerDraft(`Help me with what I'm doing in ${contextLabel}.\n\nCurrent goal:\nWhat I'm trying to do:\nWhere I'm stuck:\n`)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-blade-border bg-blade-surface/70 px-2.5 py-1 hover:border-blade-accent/30 hover:text-blade-secondary transition-colors"
+                title="Use the app in focus as context"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-blade-accent" />
+                In focus: {contextLabel.length > 42 ? `${contextLabel.slice(0, 42)}...` : contextLabel}
+              </button>
+            ) : null}
+            <span className="inline-flex items-center rounded-full border border-blade-border bg-blade-surface/70 px-2.5 py-1">
+              Voice
+            </span>
+            <span className="inline-flex items-center rounded-full border border-blade-border bg-blade-surface/70 px-2.5 py-1">
+              Screen
+            </span>
+            <span className="inline-flex items-center rounded-full border border-blade-border bg-blade-surface/70 px-2.5 py-1">
+              Tools
+            </span>
+            {onOpenOperators ? (
+              <button
+                onClick={onOpenOperators}
+                className="inline-flex items-center rounded-full border border-blade-accent/20 bg-[#16172a] px-2.5 py-1 text-[#c8cbff] hover:text-white transition-colors"
+              >
+                Operators
+              </button>
+            ) : null}
+          </div>
+          {messages.length === 0 && visibleSuggestions.length > 0 ? (
+            <div className="max-w-2xl mx-auto mt-2 flex flex-wrap gap-2">
+              {visibleSuggestions.map((suggestion) => (
+                <button
+                  key={suggestion.id}
+                  onClick={() => setComposerDraft(suggestion.prompt)}
+                  className="text-2xs rounded-full border border-blade-border bg-blade-surface/60 px-2.5 py-1 text-blade-secondary hover:border-blade-accent/30 hover:text-blade-text transition-colors"
+                >
+                  <span className="mr-1">{suggestion.icon}</span>
+                  {suggestion.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {messages.length === 0 ? (
+            <div className="max-w-2xl mx-auto mt-3 grid gap-2 sm:grid-cols-2">
+              {workspaceActions.map((workspace) => (
+                <button
+                  key={workspace.id}
+                  onClick={workspace.action}
+                  className="rounded-xl border border-blade-border bg-blade-surface/50 px-3 py-2 text-left hover:border-blade-accent/30 transition-colors"
+                >
+                  <div className="text-xs text-blade-secondary">{workspace.label}</div>
+                  <div className="mt-1 text-2xs text-blade-muted">{workspace.description}</div>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
 
         {/* Error */}
         {error && (
@@ -300,7 +406,14 @@ export function ChatWindow({
           </div>
         )}
 
-        <MessageList messages={messages} loading={loading} toolExecutions={toolExecutions} onQuickAction={onSend} />
+        <MessageList
+          messages={messages}
+          loading={loading}
+          toolExecutions={toolExecutions}
+          onQuickAction={setComposerDraft}
+          activeWindow={activeWindow}
+          contextSuggestions={contextSuggestions}
+        />
 
         {/* Smart clipboard bar */}
         {clipboardDetection && !loading && (
@@ -336,7 +449,13 @@ export function ChatWindow({
           </div>
         )}
 
-        <InputBar onSend={onSend} onSlashCommand={onSlashCommand} disabled={loading} />
+        <InputBar
+          onSend={onSend}
+          onSlashCommand={onSlashCommand}
+          disabled={loading}
+          draftValue={composerDraft}
+          onDraftConsumed={() => setComposerDraft(null)}
+        />
       </div>
 
       {pendingApproval && (
