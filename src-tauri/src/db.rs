@@ -327,6 +327,20 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
             context_json TEXT NOT NULL DEFAULT '{}',
             created_at INTEGER NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS capability_reports (
+            id TEXT PRIMARY KEY,
+            category TEXT NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            user_request TEXT NOT NULL DEFAULT '',
+            blade_response TEXT NOT NULL DEFAULT '',
+            suggested_fix TEXT NOT NULL DEFAULT '',
+            severity TEXT NOT NULL DEFAULT 'medium',
+            status TEXT NOT NULL DEFAULT 'open',
+            reported_at INTEGER NOT NULL,
+            resolved_at INTEGER
+        );
         ",
     )
     .map_err(|e| format!("DB error: {}", e))?;
@@ -345,6 +359,74 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
     )
     .map_err(|e| format!("DB error: {}", e))?;
 
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Capability Reports — CRUD
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CapabilityReport {
+    pub id: String,
+    pub category: String,      // "capability_gap" | "runtime_error" | "missing_tool" | "failed_mission" | "user_friction"
+    pub title: String,
+    pub description: String,
+    pub user_request: String,
+    pub blade_response: String,
+    pub suggested_fix: String,
+    pub severity: String,      // "low" | "medium" | "high" | "critical"
+    pub status: String,        // "open" | "investigating" | "resolved" | "wont_fix"
+    pub reported_at: i64,
+    pub resolved_at: Option<i64>,
+}
+
+pub fn report_capability_gap(
+    conn: &Connection,
+    id: &str,
+    category: &str,
+    title: &str,
+    description: &str,
+    user_request: &str,
+    blade_response: &str,
+    suggested_fix: &str,
+    severity: &str,
+) -> Result<(), String> {
+    let now = chrono::Utc::now().timestamp_millis();
+    conn.execute(
+        "INSERT OR IGNORE INTO capability_reports(id,category,title,description,user_request,blade_response,suggested_fix,severity,status,reported_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,'open',?9)",
+        params![id, category, title, description, user_request, blade_response, suggested_fix, severity, now],
+    ).map_err(|e| format!("DB error: {}", e))?;
+    Ok(())
+}
+
+pub fn get_capability_reports(conn: &Connection, limit: usize) -> Result<Vec<CapabilityReport>, String> {
+    let mut stmt = conn.prepare(
+        "SELECT id,category,title,description,user_request,blade_response,suggested_fix,severity,status,reported_at,resolved_at FROM capability_reports ORDER BY reported_at DESC LIMIT ?1"
+    ).map_err(|e| format!("DB error: {}", e))?;
+    let rows = stmt.query_map(params![limit as i64], |row| Ok(CapabilityReport {
+        id: row.get(0)?,
+        category: row.get(1)?,
+        title: row.get(2)?,
+        description: row.get(3)?,
+        user_request: row.get(4)?,
+        blade_response: row.get(5)?,
+        suggested_fix: row.get(6)?,
+        severity: row.get(7)?,
+        status: row.get(8)?,
+        reported_at: row.get(9)?,
+        resolved_at: row.get(10)?,
+    })).map_err(|e| format!("DB error: {}", e))?
+    .filter_map(|r| r.ok()).collect();
+    Ok(rows)
+}
+
+pub fn update_report_status(conn: &Connection, id: &str, status: &str) -> Result<(), String> {
+    let resolved_at = if status == "resolved" { Some(chrono::Utc::now().timestamp_millis()) } else { None };
+    conn.execute(
+        "UPDATE capability_reports SET status=?1, resolved_at=?2 WHERE id=?3",
+        params![status, resolved_at, id],
+    ).map_err(|e| format!("DB error: {}", e))?;
     Ok(())
 }
 

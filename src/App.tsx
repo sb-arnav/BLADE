@@ -20,7 +20,7 @@ import { useRuntimes } from "./hooks/useRuntimes";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports";
 
 const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
 const Canvas = lazy(() => import("./components/Canvas"));
@@ -47,6 +47,7 @@ const WebAutomation = lazy(() => import("./components/WebAutomation"));
 const AgentTeamPanel = lazy(() => import("./components/AgentTeamPanel").then((m) => ({ default: m.AgentTeamPanel })));
 const GitPanel = lazy(() => import("./components/GitPanel").then((m) => ({ default: m.GitPanel })));
 const CharacterBible = lazy(() => import("./components/CharacterBible").then((m) => ({ default: m.CharacterBible })));
+const CapabilityReports = lazy(() => import("./components/CapabilityReports").then((m) => ({ default: m.CapabilityReports })));
 
 function ShellFallback({ label = "Loading workspace..." }: { label?: string }) {
   return (
@@ -191,6 +192,20 @@ export default function App() {
     return () => { unlisten.then((fn) => fn()); };
   }, []);
 
+  // Capability gap detected
+  useEffect(() => {
+    const unlisten = listen<{ user_request: string }>("capability_gap_detected", (event) => {
+      activity.track("knowledge", "Capability gap filed", event.payload.user_request);
+      notifications.add({
+        type: "warning",
+        title: "Capability gap detected",
+        message: event.payload.user_request,
+        action: { label: "View reports", callback: () => openRoute("reports") },
+      });
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
+
   // Brain entity extraction notifications
   useEffect(() => {
     const unlisten = listen<{ new_entities: number }>("brain_grew", (event) => {
@@ -318,6 +333,7 @@ export default function App() {
     { id: "agent-teams", label: "Blade: open agent teams", action: () => openRoute("agent-teams") },
     { id: "git", label: "Blade: open git workspace", action: () => openRoute("git") },
     { id: "character", label: "Blade: open Character Bible", action: () => openRoute("character") },
+    { id: "reports", label: "Blade: view capability gap reports", action: () => openRoute("reports") },
     { id: "sync", label: "Blade: open sync settings", action: () => openRoute("sync") },
     { id: "notifications", label: "Blade: show notifications", action: () => setNotificationsOpen(true) },
     { id: "chat", label: "Blade: return to chat", action: () => openRoute("chat") },
@@ -379,6 +395,7 @@ export default function App() {
     "agent-teams": <AgentTeamPanel onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} />,
     "git": <GitPanel onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} />,
     "character": <CharacterBible onBack={() => openRoute("chat")} />,
+    "reports": <CapabilityReports onBack={() => openRoute("chat")} />,
   };
 
   if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {

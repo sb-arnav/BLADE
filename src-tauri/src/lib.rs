@@ -22,6 +22,7 @@ mod permissions;
 mod plugins;
 mod providers;
 mod rag;
+mod reports;
 mod router;
 mod runtimes;
 mod screen;
@@ -261,6 +262,11 @@ pub fn run() {
             runtimes::delete_mission_spec,
             runtimes::learn_from_mission_stage,
             runtimes::get_due_scheduled_missions,
+            reports::report_gap,
+            reports::get_reports,
+            reports::update_report_status,
+            reports::set_report_webhook,
+            reports::get_report_webhook,
             agent_commands::agent_create,
             agent_commands::agent_create_desktop,
             agent_commands::agent_respond_desktop_action,

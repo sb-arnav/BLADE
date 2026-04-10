@@ -414,3 +414,23 @@ export interface MissionSpec {
   lastRunAt?: string;
   schedule?: string;
 }
+
+// ── Capability Reports ────────────────────────────────────────────────────────
+
+export type ReportCategory = "capability_gap" | "missing_tool" | "runtime_error" | "failed_mission" | "user_friction";
+export type ReportSeverity = "low" | "medium" | "high" | "critical";
+export type ReportStatus = "open" | "investigating" | "resolved" | "wont_fix";
+
+export interface CapabilityReport {
+  id: string;
+  category: ReportCategory;
+  title: string;
+  description: string;
+  user_request: string;
+  blade_response: string;
+  suggested_fix: string;
+  severity: ReportSeverity;
+  status: ReportStatus;
+  reported_at: number;
+  resolved_at?: number | null;
+}

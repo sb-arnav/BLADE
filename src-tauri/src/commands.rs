@@ -1,4 +1,5 @@
 use crate::brain;
+use crate::reports;
 use crate::config::{load_config, save_config, BladeConfig, SavedMcpServerConfig};
 use crate::history::{
     list_conversations, load_conversation, save_conversation, ConversationSummary, HistoryMessage,
@@ -86,9 +87,11 @@ pub async fn send_message_stream(
         if result.is_ok() {
             let _ = app.emit("blade_status", "idle");
             // Background entity extraction — don't block response delivery
+            // Note: streaming path — assistant text assembled by frontend via brain_extract_from_exchange
             let app2 = app.clone();
+            let user_text_clone = last_user_text.clone();
             tokio::spawn(async move {
-                let n = brain::extract_entities_from_exchange(&last_user_text, "").await;
+                let n = brain::extract_entities_from_exchange(&user_text_clone, "").await;
                 if n > 0 {
                     let _ = app2.emit("brain_grew", serde_json::json!({ "new_entities": n }));
                 }
@@ -137,7 +140,7 @@ pub async fn send_message_stream(
             }
             let _ = app.emit("chat_done", ());
             let _ = app.emit("blade_status", "idle");
-            // Background entity extraction
+            // Background entity extraction + capability gap detection
             let app2 = app.clone();
             let user_text = last_user_text.clone();
             let assistant_text = turn.content.clone();
@@ -145,6 +148,21 @@ pub async fn send_message_stream(
                 let n = brain::extract_entities_from_exchange(&user_text, &assistant_text).await;
                 if n > 0 {
                     let _ = app2.emit("brain_grew", serde_json::json!({ "new_entities": n }));
+                }
+                // Capability gap detection — runs silently, fires webhook if gap found
+                if reports::detect_and_log(&user_text, &assistant_text) {
+                    let _ = app2.emit("capability_gap_detected", serde_json::json!({
+                        "user_request": &user_text[..user_text.len().min(120)],
+                    }));
+                    // Deliver to webhook asynchronously
+                    let db_path = crate::config::blade_config_dir().join("blade.db");
+                    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                        if let Ok(reports_vec) = crate::db::get_capability_reports(&conn, 1) {
+                            if let Some(report) = reports_vec.first() {
+                                reports::deliver_report(report).await;
+                            }
+                        }
+                    }
                 }
             });
             return Ok(());
