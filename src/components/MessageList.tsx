@@ -224,7 +224,7 @@ const MessageBubble = memo(function MessageBubble({ msg }: { msg: Message }) {
               </span>
             )}
             {!isUser && msg.content && <CopyButton text={msg.content} label="copy" />}
-            {!isUser && <MessageReactions messageId={msg.id} visible={hovered} />}
+            {!isUser && <MessageReactions messageId={msg.id} messageContent={msg.content} visible={hovered} />}
           </div>
         )}
       </div>

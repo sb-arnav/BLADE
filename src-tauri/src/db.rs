@@ -62,6 +62,71 @@ pub struct SearchResult {
 }
 
 // ---------------------------------------------------------------------------
+// Brain row types
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct BrainPreferenceRow {
+    pub id: String,
+    pub text: String,
+    pub confidence: f64,
+    pub source: String,
+    pub updated_at: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct BrainNodeRow {
+    pub id: String,
+    pub label: String,
+    pub kind: String,
+    pub summary: String,
+    pub mention_count: i64,
+    pub last_seen_at: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct BrainEdgeRow {
+    pub id: String,
+    pub from_id: String,
+    pub to_id: String,
+    pub label: String,
+    pub weight: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct BrainSkillRow {
+    pub id: String,
+    pub name: String,
+    pub trigger_pattern: String,
+    pub prompt_modifier: String,
+    pub tools_json: String,
+    pub usage_count: i64,
+    pub active: bool,
+    pub created_at: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct BrainMemoryRow {
+    pub id: String,
+    pub text: String,
+    pub source_conversation_id: String,
+    pub entities_json: String,
+    pub confidence: f64,
+    pub created_at: i64,
+    pub expires_at: Option<i64>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct BrainReactionRow {
+    pub id: String,
+    pub message_id: String,
+    pub polarity: i64,
+    pub content: String,
+    pub context_json: String,
+    pub created_at: i64,
+}
+
+// ---------------------------------------------------------------------------
 // Database initialization
 // ---------------------------------------------------------------------------
 
@@ -183,6 +248,84 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
             updated_at INTEGER NOT NULL,
             completed_at INTEGER,
             error TEXT
+        );
+
+        -- ── Brain (Character Bible) ───────────────────────────────────────────
+
+        -- Key-value identity (name, role)
+        CREATE TABLE IF NOT EXISTS brain_identity (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+
+        -- Working style tags e.g. ships-fast, no-fluff
+        CREATE TABLE IF NOT EXISTS brain_style_tags (
+            id TEXT PRIMARY KEY,
+            tag TEXT NOT NULL UNIQUE
+        );
+
+        -- Derived + manual preferences from feedback loop
+        CREATE TABLE IF NOT EXISTS brain_preferences (
+            id TEXT PRIMARY KEY,
+            text TEXT NOT NULL,
+            confidence REAL NOT NULL DEFAULT 0.5,
+            source TEXT NOT NULL DEFAULT 'manual',
+            updated_at INTEGER NOT NULL
+        );
+
+        -- Knowledge graph nodes
+        CREATE TABLE IF NOT EXISTS brain_nodes (
+            id TEXT PRIMARY KEY,
+            label TEXT NOT NULL,
+            kind TEXT NOT NULL DEFAULT 'concept',
+            summary TEXT NOT NULL DEFAULT '',
+            mention_count INTEGER NOT NULL DEFAULT 1,
+            last_seen_at INTEGER NOT NULL
+        );
+
+        -- Knowledge graph edges
+        CREATE TABLE IF NOT EXISTS brain_edges (
+            id TEXT PRIMARY KEY,
+            from_id TEXT NOT NULL,
+            to_id TEXT NOT NULL,
+            label TEXT NOT NULL DEFAULT 'related',
+            weight INTEGER NOT NULL DEFAULT 1,
+            FOREIGN KEY (from_id) REFERENCES brain_nodes(id) ON DELETE CASCADE,
+            FOREIGN KEY (to_id) REFERENCES brain_nodes(id) ON DELETE CASCADE,
+            UNIQUE(from_id, to_id, label)
+        );
+
+        -- Learned skills (auto-discovered patterns)
+        CREATE TABLE IF NOT EXISTS brain_skills (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            trigger_pattern TEXT NOT NULL,
+            prompt_modifier TEXT NOT NULL,
+            tools_json TEXT NOT NULL DEFAULT '[]',
+            usage_count INTEGER NOT NULL DEFAULT 0,
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at INTEGER NOT NULL
+        );
+
+        -- Memory entries extracted from conversations
+        CREATE TABLE IF NOT EXISTS brain_memories (
+            id TEXT PRIMARY KEY,
+            text TEXT NOT NULL,
+            source_conversation_id TEXT NOT NULL DEFAULT '',
+            entities_json TEXT NOT NULL DEFAULT '[]',
+            confidence REAL NOT NULL DEFAULT 0.7,
+            created_at INTEGER NOT NULL,
+            expires_at INTEGER
+        );
+
+        -- Raw feedback reactions (👍👎) for pattern detection
+        CREATE TABLE IF NOT EXISTS brain_reactions (
+            id TEXT PRIMARY KEY,
+            message_id TEXT NOT NULL,
+            polarity INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            context_json TEXT NOT NULL DEFAULT '{}',
+            created_at INTEGER NOT NULL
         );
         ",
     )
@@ -954,5 +1097,241 @@ mod tests {
         // Overwrite
         set_setting(&conn, "theme", "light").unwrap();
         assert_eq!(get_setting(&conn, "theme").unwrap(), Some("light".into()));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Brain — CRUD
+// ---------------------------------------------------------------------------
+
+pub fn brain_get_identity(conn: &Connection) -> Result<std::collections::HashMap<String, String>, String> {
+    let mut stmt = conn
+        .prepare("SELECT key, value FROM brain_identity")
+        .map_err(|e| format!("DB error: {}", e))?;
+    let map: std::collections::HashMap<String, String> = stmt
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .map_err(|e| format!("DB error: {}", e))?
+        .filter_map(|r| r.ok())
+        .collect();
+    Ok(map)
+}
+
+pub fn brain_set_identity(conn: &Connection, key: &str, value: &str) -> Result<(), String> {
+    conn.execute(
+        "INSERT INTO brain_identity(key, value) VALUES(?1, ?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        params![key, value],
+    )
+    .map_err(|e| format!("DB error: {}", e))?;
+    Ok(())
+}
+
+pub fn brain_get_style_tags(conn: &Connection) -> Result<Vec<String>, String> {
+    let mut stmt = conn.prepare("SELECT tag FROM brain_style_tags ORDER BY tag").map_err(|e| format!("DB error: {}", e))?;
+    let tags = stmt.query_map([], |row| row.get(0)).map_err(|e| format!("DB error: {}", e))?.filter_map(|r| r.ok()).collect();
+    Ok(tags)
+}
+
+pub fn brain_add_style_tag(conn: &Connection, id: &str, tag: &str) -> Result<(), String> {
+    conn.execute("INSERT OR IGNORE INTO brain_style_tags(id, tag) VALUES(?1, ?2)", params![id, tag]).map_err(|e| format!("DB error: {}", e))?;
+    Ok(())
+}
+
+pub fn brain_remove_style_tag(conn: &Connection, id: &str) -> Result<(), String> {
+    conn.execute("DELETE FROM brain_style_tags WHERE id=?1", params![id]).map_err(|e| format!("DB error: {}", e))?;
+    Ok(())
+}
+
+pub fn brain_get_preferences(conn: &Connection) -> Result<Vec<BrainPreferenceRow>, String> {
+    let mut stmt = conn.prepare("SELECT id, text, confidence, source, updated_at FROM brain_preferences ORDER BY confidence DESC").map_err(|e| format!("DB error: {}", e))?;
+    let rows = stmt.query_map([], |row| Ok(BrainPreferenceRow {
+        id: row.get(0)?, text: row.get(1)?, confidence: row.get(2)?, source: row.get(3)?, updated_at: row.get(4)?,
+    })).map_err(|e| format!("DB error: {}", e))?.filter_map(|r| r.ok()).collect();
+    Ok(rows)
+}
+
+pub fn brain_upsert_preference(conn: &Connection, id: &str, text: &str, confidence: f64, source: &str) -> Result<(), String> {
+    let now = chrono::Utc::now().timestamp_millis();
+    conn.execute(
+        "INSERT INTO brain_preferences(id, text, confidence, source, updated_at) VALUES(?1,?2,?3,?4,?5) ON CONFLICT(id) DO UPDATE SET text=excluded.text, confidence=excluded.confidence, source=excluded.source, updated_at=excluded.updated_at",
+        params![id, text, confidence, source, now],
+    ).map_err(|e| format!("DB error: {}", e))?;
+    Ok(())
+}
+
+pub fn brain_delete_preference(conn: &Connection, id: &str) -> Result<(), String> {
+    conn.execute("DELETE FROM brain_preferences WHERE id=?1", params![id]).map_err(|e| format!("DB error: {}", e))?;
+    Ok(())
+}
+
+pub fn brain_get_memories(conn: &Connection, limit: i64) -> Result<Vec<BrainMemoryRow>, String> {
+    let mut stmt = conn.prepare("SELECT id, text, source_conversation_id, entities_json, confidence, created_at, expires_at FROM brain_memories WHERE (expires_at IS NULL OR expires_at > ?1) ORDER BY created_at DESC LIMIT ?2").map_err(|e| format!("DB error: {}", e))?;
+    let now = chrono::Utc::now().timestamp_millis();
+    let rows = stmt.query_map(params![now, limit], |row| Ok(BrainMemoryRow {
+        id: row.get(0)?, text: row.get(1)?, source_conversation_id: row.get(2)?, entities_json: row.get(3)?, confidence: row.get(4)?, created_at: row.get(5)?, expires_at: row.get(6)?,
+    })).map_err(|e| format!("DB error: {}", e))?.filter_map(|r| r.ok()).collect();
+    Ok(rows)
+}
+
+pub fn brain_add_memory(conn: &Connection, id: &str, text: &str, source_conversation_id: &str, entities_json: &str, confidence: f64, expires_at: Option<i64>) -> Result<(), String> {
+    let now = chrono::Utc::now().timestamp_millis();
+    // Enforce 500-entry cap: delete oldest if over limit
+    let count: i64 = conn.query_row("SELECT COUNT(*) FROM brain_memories", [], |row| row.get(0)).unwrap_or(0);
+    if count >= 500 {
+        conn.execute("DELETE FROM brain_memories WHERE id IN (SELECT id FROM brain_memories ORDER BY confidence ASC, created_at ASC LIMIT 10)", []).ok();
+    }
+    conn.execute(
+        "INSERT OR IGNORE INTO brain_memories(id, text, source_conversation_id, entities_json, confidence, created_at, expires_at) VALUES(?1,?2,?3,?4,?5,?6,?7)",
+        params![id, text, source_conversation_id, entities_json, confidence, now, expires_at],
+    ).map_err(|e| format!("DB error: {}", e))?;
+    Ok(())
+}
+
+pub fn brain_delete_memory(conn: &Connection, id: &str) -> Result<(), String> {
+    conn.execute("DELETE FROM brain_memories WHERE id=?1", params![id]).map_err(|e| format!("DB error: {}", e))?;
+    Ok(())
+}
+
+pub fn brain_clear_memories(conn: &Connection) -> Result<(), String> {
+    conn.execute("DELETE FROM brain_memories", []).map_err(|e| format!("DB error: {}", e))?;
+    Ok(())
+}
+
+pub fn brain_get_nodes(conn: &Connection) -> Result<Vec<BrainNodeRow>, String> {
+    let mut stmt = conn.prepare("SELECT id, label, kind, summary, mention_count, last_seen_at FROM brain_nodes ORDER BY mention_count DESC").map_err(|e| format!("DB error: {}", e))?;
+    let rows = stmt.query_map([], |row| Ok(BrainNodeRow {
+        id: row.get(0)?, label: row.get(1)?, kind: row.get(2)?, summary: row.get(3)?, mention_count: row.get(4)?, last_seen_at: row.get(5)?,
+    })).map_err(|e| format!("DB error: {}", e))?.filter_map(|r| r.ok()).collect();
+    Ok(rows)
+}
+
+pub fn brain_upsert_node(conn: &Connection, id: &str, label: &str, kind: &str, summary: &str) -> Result<(), String> {
+    let now = chrono::Utc::now().timestamp_millis();
+    conn.execute(
+        "INSERT INTO brain_nodes(id, label, kind, summary, mention_count, last_seen_at) VALUES(?1,?2,?3,?4,1,?5) ON CONFLICT(id) DO UPDATE SET mention_count=mention_count+1, last_seen_at=excluded.last_seen_at, summary=CASE WHEN excluded.summary!='' THEN excluded.summary ELSE summary END",
+        params![id, label, kind, summary, now],
+    ).map_err(|e| format!("DB error: {}", e))?;
+    Ok(())
+}
+
+pub fn brain_delete_node(conn: &Connection, id: &str) -> Result<(), String> {
+    conn.execute("DELETE FROM brain_nodes WHERE id=?1", params![id]).map_err(|e| format!("DB error: {}", e))?;
+    Ok(())
+}
+
+pub fn brain_get_edges(conn: &Connection) -> Result<Vec<BrainEdgeRow>, String> {
+    let mut stmt = conn.prepare("SELECT id, from_id, to_id, label, weight FROM brain_edges ORDER BY weight DESC").map_err(|e| format!("DB error: {}", e))?;
+    let rows = stmt.query_map([], |row| Ok(BrainEdgeRow {
+        id: row.get(0)?, from_id: row.get(1)?, to_id: row.get(2)?, label: row.get(3)?, weight: row.get(4)?,
+    })).map_err(|e| format!("DB error: {}", e))?.filter_map(|r| r.ok()).collect();
+    Ok(rows)
+}
+
+pub fn brain_upsert_edge(conn: &Connection, id: &str, from_id: &str, to_id: &str, label: &str) -> Result<(), String> {
+    conn.execute(
+        "INSERT INTO brain_edges(id, from_id, to_id, label, weight) VALUES(?1,?2,?3,?4,1) ON CONFLICT(from_id, to_id, label) DO UPDATE SET weight=weight+1",
+        params![id, from_id, to_id, label],
+    ).map_err(|e| format!("DB error: {}", e))?;
+    Ok(())
+}
+
+pub fn brain_get_skills(conn: &Connection) -> Result<Vec<BrainSkillRow>, String> {
+    let mut stmt = conn.prepare("SELECT id, name, trigger_pattern, prompt_modifier, tools_json, usage_count, active, created_at FROM brain_skills ORDER BY usage_count DESC").map_err(|e| format!("DB error: {}", e))?;
+    let rows = stmt.query_map([], |row| Ok(BrainSkillRow {
+        id: row.get(0)?, name: row.get(1)?, trigger_pattern: row.get(2)?, prompt_modifier: row.get(3)?, tools_json: row.get(4)?, usage_count: row.get(5)?, active: row.get::<_, i64>(6)? != 0, created_at: row.get(7)?,
+    })).map_err(|e| format!("DB error: {}", e))?.filter_map(|r| r.ok()).collect();
+    Ok(rows)
+}
+
+pub fn brain_upsert_skill(conn: &Connection, id: &str, name: &str, trigger_pattern: &str, prompt_modifier: &str, tools_json: &str) -> Result<(), String> {
+    let now = chrono::Utc::now().timestamp_millis();
+    conn.execute(
+        "INSERT INTO brain_skills(id, name, trigger_pattern, prompt_modifier, tools_json, usage_count, active, created_at) VALUES(?1,?2,?3,?4,?5,0,1,?6) ON CONFLICT(id) DO UPDATE SET name=excluded.name, trigger_pattern=excluded.trigger_pattern, prompt_modifier=excluded.prompt_modifier, tools_json=excluded.tools_json",
+        params![id, name, trigger_pattern, prompt_modifier, tools_json, now],
+    ).map_err(|e| format!("DB error: {}", e))?;
+    Ok(())
+}
+
+pub fn brain_delete_skill(conn: &Connection, id: &str) -> Result<(), String> {
+    conn.execute("DELETE FROM brain_skills WHERE id=?1", params![id]).map_err(|e| format!("DB error: {}", e))?;
+    Ok(())
+}
+
+pub fn brain_set_skill_active(conn: &Connection, id: &str, active: bool) -> Result<(), String> {
+    conn.execute("UPDATE brain_skills SET active=?1 WHERE id=?2", params![active as i64, id]).map_err(|e| format!("DB error: {}", e))?;
+    Ok(())
+}
+
+pub fn brain_increment_skill_usage(conn: &Connection, id: &str) -> Result<(), String> {
+    conn.execute("UPDATE brain_skills SET usage_count=usage_count+1 WHERE id=?1", params![id]).map_err(|e| format!("DB error: {}", e))?;
+    Ok(())
+}
+
+pub fn brain_add_reaction(conn: &Connection, id: &str, message_id: &str, polarity: i64, content: &str, context_json: &str) -> Result<(), String> {
+    let now = chrono::Utc::now().timestamp_millis();
+    conn.execute(
+        "INSERT OR IGNORE INTO brain_reactions(id, message_id, polarity, content, context_json, created_at) VALUES(?1,?2,?3,?4,?5,?6)",
+        params![id, message_id, polarity, content, context_json, now],
+    ).map_err(|e| format!("DB error: {}", e))?;
+    Ok(())
+}
+
+pub fn brain_get_reactions(conn: &Connection, limit: i64) -> Result<Vec<BrainReactionRow>, String> {
+    let mut stmt = conn.prepare("SELECT id, message_id, polarity, content, context_json, created_at FROM brain_reactions ORDER BY created_at DESC LIMIT ?1").map_err(|e| format!("DB error: {}", e))?;
+    let rows = stmt.query_map(params![limit], |row| Ok(BrainReactionRow {
+        id: row.get(0)?, message_id: row.get(1)?, polarity: row.get(2)?, content: row.get(3)?, context_json: row.get(4)?, created_at: row.get(5)?,
+    })).map_err(|e| format!("DB error: {}", e))?.filter_map(|r| r.ok()).collect();
+    Ok(rows)
+}
+
+/// Builds the character bible context string for injection into the system prompt.
+/// Respects a soft token budget (1 token ≈ 4 chars).
+pub fn brain_build_context(conn: &Connection, budget_tokens: usize) -> String {
+    let budget_chars = budget_tokens * 4;
+    let mut parts: Vec<String> = Vec::new();
+
+    // Identity block
+    let identity = brain_get_identity(conn).unwrap_or_default();
+    let name = identity.get("name").cloned().unwrap_or_default();
+    let role = identity.get("role").cloned().unwrap_or_default();
+    if !name.is_empty() || !role.is_empty() {
+        parts.push(format!("## About the User\nName: {}\nRole: {}", name, role));
+    }
+
+    // Style tags
+    if let Ok(tags) = brain_get_style_tags(conn) {
+        if !tags.is_empty() {
+            parts.push(format!("Working style: {}", tags.join(", ")));
+        }
+    }
+
+    // Top preferences (confidence > 0.6)
+    if let Ok(prefs) = brain_get_preferences(conn) {
+        let high_conf: Vec<String> = prefs.iter().filter(|p| p.confidence > 0.6).take(5).map(|p| format!("- {}", p.text)).collect();
+        if !high_conf.is_empty() {
+            parts.push(format!("Preferences:\n{}", high_conf.join("\n")));
+        }
+    }
+
+    // Recent memories (trim to budget)
+    if let Ok(memories) = brain_get_memories(conn, 20) {
+        let mem_lines: Vec<String> = memories.iter().map(|m| format!("- {}", m.text)).collect();
+        if !mem_lines.is_empty() {
+            parts.push(format!("Known facts:\n{}", mem_lines.join("\n")));
+        }
+    }
+
+    // Knowledge graph summary (top nodes by mention)
+    if let Ok(nodes) = brain_get_nodes(conn) {
+        let top: Vec<String> = nodes.iter().take(10).map(|n| format!("- {} ({})", n.label, n.kind)).collect();
+        if !top.is_empty() {
+            parts.push(format!("Key entities:\n{}", top.join("\n")));
+        }
+    }
+
+    let result = parts.join("\n\n");
+    if result.len() > budget_chars {
+        result[..budget_chars].to_string()
+    } else {
+        result
     }
 }

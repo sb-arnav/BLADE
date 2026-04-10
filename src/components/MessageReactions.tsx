@@ -1,4 +1,5 @@
 import { useState, useCallback, useSyncExternalStore } from "react";
+import { addReaction as brainAddReaction } from "../data/characterBible";
 
 const STORAGE_KEY = "blade-reactions";
 
@@ -78,9 +79,11 @@ const REACTIONS = [
 
 export default function MessageReactions({
   messageId,
+  messageContent,
   visible,
 }: {
   messageId: string;
+  messageContent?: string;
   visible: boolean;
 }) {
   const { getReactions, toggleReaction } = useReactions();
@@ -88,6 +91,18 @@ export default function MessageReactions({
   const [hovered, setHovered] = useState(false);
 
   const show = visible || hovered;
+
+  const handleReaction = useCallback(
+    (emoji: string) => {
+      toggleReaction(messageId, emoji);
+      // Feed 👍/👎 into Brain for pattern detection
+      if ((emoji === "\u{1F44D}" || emoji === "\u{1F44E}") && messageContent) {
+        const polarity = emoji === "\u{1F44D}" ? 1 : -1;
+        void brainAddReaction(messageId, polarity as 1 | -1, messageContent);
+      }
+    },
+    [messageId, messageContent, toggleReaction],
+  );
 
   return (
     <div
@@ -105,7 +120,7 @@ export default function MessageReactions({
             key={emoji}
             aria-label={label}
             title={label}
-            onClick={() => toggleReaction(messageId, emoji)}
+            onClick={() => handleReaction(emoji)}
             className={[
               "w-6 h-6 rounded-md text-xs flex items-center justify-center transition",
               "hover:bg-blade-surface-hover",
