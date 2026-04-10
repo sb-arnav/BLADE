@@ -5579,3 +5579,81 @@ pub fn delete_mission_spec(id: String) -> Result<(), String> {
     }
     Ok(())
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Brain-Mission integration: learn from completed mission stages
+// ──────────────────────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn learn_from_mission_stage(
+    mission_id: String,
+    stage_id: String,
+    stage_title: String,
+    stage_summary: String,
+    artifacts_json: String,
+) -> Result<String, String> {
+    use crate::memory::uuid_v4;
+
+    if stage_summary.trim().is_empty() {
+        return Ok("No summary to learn from.".to_string());
+    }
+
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    let conn = rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())?;
+
+    // Write a brain memory for this stage outcome
+    let memory_text = format!(
+        "[Mission {mission_id} / {stage_title}] {stage_summary}"
+    );
+    let id = uuid_v4();
+    crate::db::brain_add_memory(&conn, &id, &memory_text, &mission_id, &artifacts_json, 0.8, None)
+        .map_err(|e| e.to_string())?;
+
+    Ok(format!("Learned from stage {stage_id}."))
+}
+
+/// Check for scheduled missions and return any that are due
+#[tauri::command]
+pub fn get_due_scheduled_missions() -> Vec<serde_json::Value> {
+    use chrono::Utc;
+
+    let dir = mission_specs_dir();
+    if !dir.exists() { return Vec::new(); }
+
+    let now = Utc::now();
+    let mut due = Vec::new();
+
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            if entry.path().extension().and_then(|e| e.to_str()) == Some("json") {
+                if let Ok(content) = std::fs::read_to_string(entry.path()) {
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                        // Only scheduled missions with a cron-like schedule field
+                        if let Some(schedule) = val.get("schedule").and_then(|s| s.as_str()) {
+                            // Simple daily/weekly check: "daily@HH:MM" or "weekly@DOW@HH:MM"
+                            let is_due = check_schedule(schedule, &now);
+                            if is_due {
+                                due.push(val);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    due
+}
+
+fn check_schedule(schedule: &str, now: &chrono::DateTime<chrono::Utc>) -> bool {
+    use chrono::Timelike;
+    // Format: "daily@HH:MM" — check if current UTC hour:minute matches
+    if let Some(rest) = schedule.strip_prefix("daily@") {
+        let parts: Vec<&str> = rest.splitn(2, ':').collect();
+        if parts.len() == 2 {
+            let h: u32 = parts[0].parse().unwrap_or(99);
+            let m: u32 = parts[1].parse().unwrap_or(99);
+            return now.hour() == h && now.minute() < m + 5 && now.minute() >= m;
+        }
+    }
+    false
+}

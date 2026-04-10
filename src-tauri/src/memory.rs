@@ -1,7 +1,7 @@
 use crate::config::{blade_config_dir, load_config, write_blade_file};
 use rusqlite;
 
-fn uuid_v4() -> String {
+pub fn uuid_v4() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let t = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().subsec_nanos();
     format!("{:x}-{:x}-{:x}-{:x}", t, t ^ 0xdeadbeef, t.wrapping_mul(0x9e3779b9), t.wrapping_add(0x12345678))

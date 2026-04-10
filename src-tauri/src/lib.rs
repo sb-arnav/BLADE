@@ -258,6 +258,8 @@ pub fn run() {
             runtimes::list_mission_specs,
             runtimes::save_mission_spec,
             runtimes::delete_mission_spec,
+            runtimes::learn_from_mission_stage,
+            runtimes::get_due_scheduled_missions,
             agent_commands::agent_create,
             agent_commands::agent_create_desktop,
             agent_commands::agent_respond_desktop_action,

@@ -1,4 +1,8 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { MissionSpec, OperatorMission } from "../types";
+import { specToOperatorMission } from "../lib/missionSpec";
+import { addMemory } from "../data/characterBible";
 
 /**
  * Self-Evolution System — Hermes/Letta-inspired.
@@ -154,7 +158,24 @@ function compressContext(messages: Array<{ role: string; content: string }>): {
   };
 }
 
-export function useSelfEvolution() {
+// ── Mission intent detection ────────────────────────────────────────────────
+
+const MISSION_TRIGGERS: Array<{
+  pattern: RegExp;
+  templateId: string;
+  buildVars: (msg: string, m: RegExpMatchArray) => Record<string, string>;
+}> = [
+  { pattern: /\b(research|look up|find out about|investigate)\s+(.+)/i, templateId: "research-deep-dive", buildVars: (_, m) => ({ topic: m[2]?.trim() ?? "" }) },
+  { pattern: /\b(write a? ?(blog|article|post) about)\s+(.+)/i, templateId: "write-blog-post", buildVars: (_, m) => ({ topic: m[3]?.trim() ?? "", audience: "general audience", length: "1000-1500 words" }) },
+  { pattern: /\b(debug|fix|diagnose)\s+(?:the\s+)?(?:issue|bug|error|problem)[:\s]+(.+)/i, templateId: "debug-issue", buildVars: (_, m) => ({ issue: m[2]?.trim() ?? m[0], repo_path: "." }) },
+  { pattern: /\b(analyse|analyze|compare)\s+(.+?)\s+(?:vs?\.?|versus|against)\s+(.+)/i, templateId: "competitor-analysis", buildVars: (_, m) => ({ competitor: m[2]?.trim() ?? "", product: m[3]?.trim() ?? "" }) },
+  { pattern: /\b(build|implement|add)\s+(?:a\s+)?(.+?)\s+(?:feature|endpoint|component|function)/i, templateId: "code-feature", buildVars: (_, m) => ({ feature: m[2]?.trim() ?? m[0], repo_path: "." }) },
+];
+
+export function useSelfEvolution(
+  allSpecs?: MissionSpec[],
+  onMissionReady?: (mission: OperatorMission) => void,
+) {
   const [skills, setSkills] = useState<GeneratedSkill[]>(loadSkills);
   const [optimizations] = useState<PromptOptimization[]>(loadOptimizations);
   const [compressedContexts, setCompressedContexts] = useState<CompressedContext[]>(loadCompressed);
@@ -288,6 +309,78 @@ export function useSelfEvolution() {
     tokensSaved: compressedContexts.reduce((s, c) => s + (c.originalTokens - c.compressedTokens), 0),
   };
 
+  // ── Mission-spawning capabilities ──────────────────────────────────────────
+
+  const onMissionReadyRef = useRef(onMissionReady);
+  onMissionReadyRef.current = onMissionReady;
+
+  const detectMissionIntent = useCallback((message: string): { spec: MissionSpec; vars: Record<string, string> } | null => {
+    if (!allSpecs) return null;
+    for (const trigger of MISSION_TRIGGERS) {
+      const match = message.match(trigger.pattern);
+      if (match) {
+        const spec = allSpecs.find((s) => s.id === trigger.templateId);
+        if (spec) {
+          const vars = trigger.buildVars(message, match);
+          const hasAllVars = spec.inputVars.every((v) => !!vars[v]);
+          if (hasAllVars) return { spec, vars };
+        }
+      }
+    }
+    return null;
+  }, [allSpecs]);
+
+  const spawnMission = useCallback(async (spec: MissionSpec, vars: Record<string, string>): Promise<OperatorMission> => {
+    const mission = specToOperatorMission(spec, vars);
+    await invoke("runtime_save_mission", { mission, autoRun: false }).catch(() => {});
+    onMissionReadyRef.current?.(mission);
+    return mission;
+  }, []);
+
+  const learnFromStage = useCallback(async (
+    missionId: string,
+    stageId: string,
+    stageTitle: string,
+    summary: string,
+    artifactsJson = "[]",
+  ) => {
+    await invoke("learn_from_mission_stage", {
+      missionId, stageId, stageTitle, stageSummary: summary, artifactsJson,
+    }).catch(() => {});
+    if (summary.length > 20) {
+      await addMemory(
+        `[Auto-learned] ${stageTitle}: ${summary.slice(0, 300)}`,
+        missionId,
+        [],
+        0.75,
+      ).catch(() => {});
+    }
+  }, []);
+
+  const checkScheduledMissions = useCallback(async (): Promise<MissionSpec[]> => {
+    try {
+      return await invoke<MissionSpec[]>("get_due_scheduled_missions") ?? [];
+    } catch {
+      return [];
+    }
+  }, []);
+
+  // Periodic scheduler poll (every 5 minutes)
+  useEffect(() => {
+    if (!allSpecs) return;
+    const poll = async () => {
+      const due = await checkScheduledMissions();
+      for (const spec of due) {
+        if (spec.inputVars.length === 0) {
+          const mission = specToOperatorMission(spec, {});
+          onMissionReadyRef.current?.(mission);
+        }
+      }
+    };
+    const timer = setInterval(() => void poll(), 5 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [allSpecs, checkScheduledMissions]);
+
   return {
     skills,
     optimizations,
@@ -300,5 +393,10 @@ export function useSelfEvolution() {
     toggleSkill,
     deleteSkill,
     stats,
+    // Mission-spawning
+    detectMissionIntent,
+    spawnMission,
+    learnFromStage,
+    checkScheduledMissions,
   };
 }
