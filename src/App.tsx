@@ -191,6 +191,17 @@ export default function App() {
     return () => { unlisten.then((fn) => fn()); };
   }, []);
 
+  // Brain entity extraction notifications
+  useEffect(() => {
+    const unlisten = listen<{ new_entities: number }>("brain_grew", (event) => {
+      const n = event.payload.new_entities;
+      if (n > 0) {
+        activity.track("knowledge", `Brain grew`, `+${n} new entit${n === 1 ? "y" : "ies"} added to knowledge graph`);
+      }
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
+
   // Notify when response completes (if window is hidden)
   useEffect(() => {
     if (!chat.loading && chat.messages.length > 0) {

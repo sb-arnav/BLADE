@@ -102,6 +102,7 @@ export function useChat() {
 
     const unlistenDone = listen("chat_done", () => {
       if (!active) return;
+      const assembledBuffer = streamBuffer.current;
       streamBuffer.current = "";
       if (requestStartRef.current > 0) {
         setLastResponseTime(Date.now() - requestStartRef.current);
@@ -112,6 +113,18 @@ export function useChat() {
 
       // Fire-and-forget: let the backend learn from the completed conversation
       invoke("learn_from_conversation", { messages: messagesRef.current }).catch(() => {});
+
+      // Background entity extraction — use last user + assembled assistant text
+      const msgs = messagesRef.current;
+      const lastUser = [...msgs].reverse().find((m) => m.role === "user");
+      const lastAssistant = assembledBuffer ||
+        ([...msgs].reverse().find((m) => m.role === "assistant")?.content ?? "");
+      if (lastUser && lastAssistant) {
+        invoke("brain_extract_from_exchange", {
+          userText: lastUser.content,
+          assistantText: lastAssistant,
+        }).catch(() => {});
+      }
     });
 
     const unlistenToolExecuting = listen<{ name: string; risk: string }>("tool_executing", (event) => {

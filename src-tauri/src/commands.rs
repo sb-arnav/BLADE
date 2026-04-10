@@ -64,6 +64,12 @@ pub async fn send_message_stream(
         .iter()
         .any(|m| matches!(m, ConversationMessage::UserWithImage { .. }));
 
+    // Capture last user message for entity extraction later
+    let last_user_text = messages.iter().rev()
+        .find(|m| m.role == "user")
+        .map(|m| m.content.clone())
+        .unwrap_or_default();
+
     // No tools configured and no images → stream directly (fast path, best UX)
     if tools.is_empty() && !has_image {
         let span = trace::TraceSpan::new(&config.provider, &config.model, "stream_text");
@@ -79,6 +85,14 @@ pub async fn send_message_stream(
         trace::log_trace(&entry);
         if result.is_ok() {
             let _ = app.emit("blade_status", "idle");
+            // Background entity extraction — don't block response delivery
+            let app2 = app.clone();
+            tokio::spawn(async move {
+                let n = brain::extract_entities_from_exchange(&last_user_text, "").await;
+                if n > 0 {
+                    let _ = app2.emit("brain_grew", serde_json::json!({ "new_entities": n }));
+                }
+            });
         } else {
             let _ = app.emit("blade_status", "error");
         }
@@ -119,10 +133,20 @@ pub async fn send_message_stream(
         if turn.tool_calls.is_empty() {
             // Final text response — emit at once (already complete)
             if !turn.content.is_empty() {
-                let _ = app.emit("chat_token", turn.content);
+                let _ = app.emit("chat_token", turn.content.clone());
             }
             let _ = app.emit("chat_done", ());
             let _ = app.emit("blade_status", "idle");
+            // Background entity extraction
+            let app2 = app.clone();
+            let user_text = last_user_text.clone();
+            let assistant_text = turn.content.clone();
+            tokio::spawn(async move {
+                let n = brain::extract_entities_from_exchange(&user_text, &assistant_text).await;
+                if n > 0 {
+                    let _ = app2.emit("brain_grew", serde_json::json!({ "new_entities": n }));
+                }
+            });
             return Ok(());
         }
 
