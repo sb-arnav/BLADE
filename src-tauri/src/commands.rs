@@ -44,6 +44,16 @@ pub async fn send_message_stream(
         }
     }
 
+    // Token-efficient mode: downgrade to faster/cheaper model
+    if config.token_efficient {
+        config.model = match (config.provider.as_str(), config.model.as_str()) {
+            ("anthropic", m) if m.contains("sonnet") || m.contains("opus") => "claude-haiku-4-5-20251001".to_string(),
+            ("openai", m) if m == "gpt-4o" || m.contains("gpt-4-") => "gpt-4o-mini".to_string(),
+            ("gemini", m) if m.contains("pro") || m.contains("1.5") => "gemini-2.0-flash".to_string(),
+            _ => config.model.clone(),
+        };
+    }
+
     let tool_snapshot = {
         let manager = state.lock().await;
         manager.get_tools().to_vec()
@@ -304,12 +314,43 @@ pub fn reset_onboarding() -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn set_config(provider: String, api_key: String, model: String) -> Result<(), String> {
+pub fn set_config(
+    provider: String,
+    api_key: String,
+    model: String,
+    token_efficient: Option<bool>,
+    user_name: Option<String>,
+    work_mode: Option<String>,
+    response_style: Option<String>,
+    blade_email: Option<String>,
+) -> Result<(), String> {
     let mut config = load_config();
     config.provider = provider;
     config.api_key = api_key;
     config.model = model;
     config.onboarded = true;
+    if let Some(v) = token_efficient { config.token_efficient = v; }
+    if let Some(v) = user_name { config.user_name = v; }
+    if let Some(v) = work_mode { config.work_mode = v; }
+    if let Some(v) = response_style { config.response_style = v; }
+    if let Some(v) = blade_email { config.blade_email = v; }
+    save_config(&config)
+}
+
+#[tauri::command]
+pub fn update_init_prefs(
+    token_efficient: Option<bool>,
+    user_name: Option<String>,
+    work_mode: Option<String>,
+    response_style: Option<String>,
+    blade_email: Option<String>,
+) -> Result<(), String> {
+    let mut config = load_config();
+    if let Some(v) = token_efficient { config.token_efficient = v; }
+    if let Some(v) = user_name { config.user_name = v; }
+    if let Some(v) = work_mode { config.work_mode = v; }
+    if let Some(v) = response_style { config.response_style = v; }
+    if let Some(v) = blade_email { config.blade_email = v; }
     save_config(&config)
 }
 

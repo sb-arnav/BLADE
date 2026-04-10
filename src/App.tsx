@@ -20,7 +20,7 @@ import { useRuntimes } from "./hooks/useRuntimes";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init";
 
 const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
 const Canvas = lazy(() => import("./components/Canvas"));
@@ -33,7 +33,7 @@ const KnowledgeBase = lazy(() => import("./components/KnowledgeBase").then((m) =
 const ModelComparison = lazy(() => import("./components/ModelComparison").then((m) => ({ default: m.ModelComparison })));
 const OperatorCenter = lazy(() => import("./components/OperatorCenter"));
 const SystemPromptPreview = lazy(() => import("./components/SystemPromptPreview"));
-const Onboarding = lazy(() => import("./components/Onboarding").then((m) => ({ default: m.Onboarding })));
+const InitWizard = lazy(() => import("./components/InitWizard").then((m) => ({ default: m.InitWizard })));
 const Settings = lazy(() => import("./components/Settings").then((m) => ({ default: m.Settings })));
 const SyncSettings = lazy(() => import("./components/SyncStatus").then((m) => ({ default: m.SyncSettings })));
 const TemplateManager = lazy(() => import("./components/TemplateManager"));
@@ -255,6 +255,7 @@ export default function App() {
     switch (action) {
       case "clear": chat.clearMessages(); break;
       case "new": chat.newConversation(); break;
+      case "init": openRoute("init"); break;
       case "screenshot": invoke<string>("capture_screen").then((png) => chat.sendMessage("What's on my screen?", png)).catch(() => {}); break;
       case "voice": break; // handled by InputBar
       case "focus": setFocusMode(true); break;
@@ -334,6 +335,7 @@ export default function App() {
     { id: "git", label: "Blade: open git workspace", action: () => openRoute("git") },
     { id: "character", label: "Blade: open Character Bible", action: () => openRoute("character") },
     { id: "reports", label: "Blade: view capability gap reports", action: () => openRoute("reports") },
+    { id: "init", label: "Blade: /init — reconfigure Blade from scratch", action: () => openRoute("init") },
     { id: "sync", label: "Blade: open sync settings", action: () => openRoute("sync") },
     { id: "notifications", label: "Blade: show notifications", action: () => setNotificationsOpen(true) },
     { id: "chat", label: "Blade: return to chat", action: () => openRoute("chat") },
@@ -365,9 +367,9 @@ export default function App() {
       <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
         <TitleBar />
         <Suspense fallback={<ShellFallback label="Preparing Blade..." />}>
-          <Onboarding onComplete={async () => {
+          <InitWizard onComplete={async () => {
             await loadConfig();
-            setRoute("discovery");
+            setRoute("chat");
           }} />
         </Suspense>
       </div>
@@ -396,6 +398,7 @@ export default function App() {
     "git": <GitPanel onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} />,
     "character": <CharacterBible onBack={() => openRoute("chat")} />,
     "reports": <CapabilityReports onBack={() => openRoute("chat")} />,
+    "init": <InitWizard onComplete={async () => { await loadConfig(); openRoute("chat"); }} isReinit />,
   };
 
   if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {

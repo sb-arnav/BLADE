@@ -35,6 +35,16 @@ struct DiskConfig {
     mcp_servers: Vec<SavedMcpServerConfig>,
     #[serde(default)]
     window_state: Option<WindowState>,
+    #[serde(default)]
+    token_efficient: bool,
+    #[serde(default)]
+    user_name: String,
+    #[serde(default)]
+    work_mode: String,
+    #[serde(default)]
+    response_style: String,
+    #[serde(default)]
+    blade_email: String,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -48,6 +58,11 @@ impl Default for DiskConfig {
             onboarded: false,
             mcp_servers: Vec::new(),
             window_state: None,
+            token_efficient: false,
+            user_name: String::new(),
+            work_mode: String::new(),
+            response_style: String::new(),
+            blade_email: String::new(),
             api_key: None,
         }
     }
@@ -64,6 +79,16 @@ pub struct BladeConfig {
     pub mcp_servers: Vec<SavedMcpServerConfig>,
     #[serde(default)]
     pub window_state: Option<WindowState>,
+    #[serde(default)]
+    pub token_efficient: bool,
+    #[serde(default)]
+    pub user_name: String,
+    #[serde(default)]
+    pub work_mode: String,
+    #[serde(default)]
+    pub response_style: String,
+    #[serde(default)]
+    pub blade_email: String,
 }
 
 impl Default for BladeConfig {
@@ -75,6 +100,11 @@ impl Default for BladeConfig {
             onboarded: false,
             mcp_servers: Vec::new(),
             window_state: None,
+            token_efficient: false,
+            user_name: String::new(),
+            work_mode: String::new(),
+            response_style: String::new(),
+            blade_email: String::new(),
         }
     }
 }
@@ -150,6 +180,11 @@ pub fn load_config() -> BladeConfig {
         onboarded: disk.onboarded,
         mcp_servers: disk.mcp_servers,
         window_state: disk.window_state,
+        token_efficient: disk.token_efficient,
+        user_name: disk.user_name,
+        work_mode: disk.work_mode,
+        response_style: disk.response_style,
+        blade_email: disk.blade_email,
     }
 }
 
@@ -163,6 +198,11 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         onboarded: config.onboarded,
         mcp_servers: config.mcp_servers.clone(),
         window_state: config.window_state.clone(),
+        token_efficient: config.token_efficient,
+        user_name: config.user_name.clone(),
+        work_mode: config.work_mode.clone(),
+        response_style: config.response_style.clone(),
+        blade_email: config.blade_email.clone(),
         api_key: None,
     };
 
