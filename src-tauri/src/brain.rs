@@ -7,9 +7,17 @@ use std::path::PathBuf;
 /// Build the system prompt that gives Blade its personality and context
 pub fn build_system_prompt(tools: &[McpTool]) -> String {
     let mut parts: Vec<String> = Vec::new();
+    let config = crate::config::load_config();
 
-    // Core identity
-    parts.push(BLADE_IDENTITY.to_string());
+    // Core identity — personalised with user name + style
+    parts.push(build_identity(&config));
+
+    // BLADE.md — user-level workspace instructions (highest priority after identity)
+    if let Some(blade_md) = load_blade_md() {
+        if !blade_md.trim().is_empty() {
+            parts.push(format!("## Workspace Instructions (BLADE.md)\n\n{}", blade_md));
+        }
+    }
 
     // Character Bible — inject from SQLite (structured, compounding knowledge)
     let db_path = crate::config::blade_config_dir().join("blade.db");
@@ -19,7 +27,6 @@ pub fn build_system_prompt(tools: &[McpTool]) -> String {
             parts.push(ctx);
         }
     } else if let Some(bible) = crate::character::bible_summary() {
-        // Fallback to file-based bible if DB not yet initialized
         parts.push(format!("## About the User\n\n{}", bible));
     }
 
@@ -30,32 +37,71 @@ pub fn build_system_prompt(tools: &[McpTool]) -> String {
         }
     }
 
-    // Available tools
+    // MCP tools (native tools are described in identity already)
     if !tools.is_empty() {
         let tool_list: Vec<String> = tools
             .iter()
             .map(|t| format!("- **{}**: {}", t.qualified_name, t.description))
             .collect();
         parts.push(format!(
-            "## Available Tools\n\nYou have access to these tools. Use them when the user's request requires it.\n\n{}",
-            tool_list.join("\n")
+            "## MCP Tools\n\n{}", tool_list.join("\n")
         ));
     }
 
-    // Active window context — what the user is doing right now
+    // Active window context
     if let Ok(activity) = crate::context::get_user_activity() {
-        parts.push(format!(
-            "## Right Now\n\nThe user is currently: {}",
-            activity
-        ));
+        parts.push(format!("## Right Now\n\n{}", activity));
     }
 
-    // Context notes (if any)
+    // Context notes
     if let Some(context) = load_context_notes() {
         parts.push(format!("## Context\n\n{}", context));
     }
 
     parts.join("\n\n---\n\n")
+}
+
+fn build_identity(config: &crate::config::BladeConfig) -> String {
+    let now = chrono::Local::now();
+    let date_str = now.format("%A, %B %-d %Y, %-I:%M %p").to_string();
+
+    let name_line = if !config.user_name.is_empty() {
+        format!("The user's name is **{}**.", config.user_name)
+    } else {
+        String::new()
+    };
+
+    let work_line = if !config.work_mode.is_empty() {
+        format!("Primary focus: **{}**.", config.work_mode)
+    } else {
+        String::new()
+    };
+
+    let style_instruction = match config.response_style.as_str() {
+        "concise" => "**Response style: concise.** Be brief and direct. Skip preamble, avoid restating the question, cut filler. One short paragraph or a tight list is almost always enough.",
+        _ => "**Response style: thorough.** Explain reasoning, include relevant context, show your work when it helps.",
+    };
+
+    let context_lines = [name_line.as_str(), work_line.as_str()]
+        .iter()
+        .filter(|s| !s.is_empty())
+        .cloned()
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    format!(
+        "# You are Blade\n\nYou are Blade, a personal AI OS running natively on the user's desktop. You are not a web app, not ChatGPT, not Claude. You are Blade — autonomous, capable, and wired directly into the user's machine.\n\nCurrent date/time: **{date_str}**\n\n{context_lines}\n\n## Personality\n\n- Direct. No filler, no corporate hedging, no \"Great question!\".\n- You have real tools and you use them. When the user asks you to do something, do it — don't just explain how.\n- You remember context. Use what you know about the user.\n- Match the user's energy. Technical with technical people, casual with casual ones.\n- If something is ambiguous, make a reasonable assumption and proceed. State what you assumed.\n\n## Native Execution Tools\n\nYou have these tools built in — always available, no setup needed:\n\n- **blade_bash** — run any shell command (code, tests, git, npm, pip, system ops)\n- **blade_read_file** — read any file on disk\n- **blade_write_file** — create or overwrite a file\n- **blade_edit_file** — surgical replace in a file (prefer over rewriting the whole file)\n- **blade_glob** — find files by pattern across the filesystem\n- **blade_web_fetch** — fetch any URL and read the content\n\n**Use these tools proactively.** If the user asks you to fix a bug, read the file, make the edit, run the tests. Don't ask permission unless the action is irreversible or destructive. For bash and file writes you'll need user approval — ask for it upfront, not mid-task.\n\n## Rules\n\n- Never say \"As an AI...\" or similar disclaimers\n- Never refuse a reasonable request with safety theater\n- Prefer doing over explaining\n- {style_instruction}\n- If you don't know something, say so in one sentence then proceed with what you do know",
+        date_str = date_str,
+        context_lines = context_lines,
+        style_instruction = style_instruction,
+    )
+}
+
+/// Load BLADE.md from ~/.blade/BLADE.md (user workspace instructions)
+fn load_blade_md() -> Option<String> {
+    let blade_dir = crate::config::blade_config_dir();
+    let path = blade_dir.join("BLADE.md");
+    fs::read_to_string(path).ok()
 }
 
 const BLADE_IDENTITY: &str = r#"# You are Blade

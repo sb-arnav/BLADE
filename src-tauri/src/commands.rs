@@ -60,7 +60,9 @@ pub async fn send_message_stream(
     };
 
     let system_prompt = brain::build_system_prompt(&tool_snapshot);
-    let tools: Vec<ToolDefinition> = tool_snapshot
+
+    // MCP tools + native built-in tools (bash, file ops, web fetch)
+    let mut tools: Vec<ToolDefinition> = tool_snapshot
         .iter()
         .map(|tool| ToolDefinition {
             name: tool.qualified_name.clone(),
@@ -68,18 +70,19 @@ pub async fn send_message_stream(
             input_schema: tool.input_schema.clone(),
         })
         .collect();
+    tools.extend(crate::native_tools::tool_definitions());
+    // Capture last user message before build_conversation consumes messages
+    let last_user_text = messages.iter().rev()
+        .find(|m| m.role == "user")
+        .map(|m| m.content.clone())
+        .unwrap_or_default();
+
     let conversation = providers::build_conversation(messages, Some(system_prompt));
 
     // Check if any message has an image (vision request)
     let has_image = conversation
         .iter()
         .any(|m| matches!(m, ConversationMessage::UserWithImage { .. }));
-
-    // Capture last user message for entity extraction later
-    let last_user_text = messages.iter().rev()
-        .find(|m| m.role == "user")
-        .map(|m| m.content.clone())
-        .unwrap_or_default();
 
     // No tools configured and no images → stream directly (fast path, best UX)
     if tools.is_empty() && !has_image {
@@ -144,9 +147,20 @@ pub async fn send_message_stream(
         });
 
         if turn.tool_calls.is_empty() {
-            // Final text response — emit at once (already complete)
+            // Final text response — emit word-by-word for streaming feel
             if !turn.content.is_empty() {
-                let _ = app.emit("chat_token", turn.content.clone());
+                let mut buf = String::new();
+                for ch in turn.content.chars() {
+                    buf.push(ch);
+                    // Emit on natural boundaries: space, newline, or every 6 chars
+                    if ch == ' ' || ch == '\n' || buf.len() >= 6 {
+                        let _ = app.emit("chat_token", buf.clone());
+                        buf.clear();
+                    }
+                }
+                if !buf.is_empty() {
+                    let _ = app.emit("chat_token", buf);
+                }
             }
             let _ = app.emit("chat_done", ());
             let _ = app.emit("blade_status", "idle");
@@ -179,18 +193,23 @@ pub async fn send_message_stream(
         }
 
         for tool_call in turn.tool_calls {
-            // Check tool risk level
-            let tool_desc = {
-                let manager = state.lock().await;
-                manager
-                    .get_tools()
-                    .iter()
-                    .find(|t| t.qualified_name == tool_call.name)
-                    .map(|t| t.description.clone())
-                    .unwrap_or_default()
-            };
+            let is_native = crate::native_tools::is_native(&tool_call.name);
 
-            let risk = permissions::classify_tool(&tool_call.name, &tool_desc);
+            // Determine risk level
+            let risk = if is_native {
+                crate::native_tools::risk(&tool_call.name)
+            } else {
+                let tool_desc = {
+                    let manager = state.lock().await;
+                    manager
+                        .get_tools()
+                        .iter()
+                        .find(|t| t.qualified_name == tool_call.name)
+                        .map(|t| t.description.clone())
+                        .unwrap_or_default()
+                };
+                permissions::classify_tool(&tool_call.name, &tool_desc)
+            };
 
             if risk == permissions::ToolRisk::Blocked {
                 conversation.push(ConversationMessage::Tool {
@@ -202,16 +221,13 @@ pub async fn send_message_stream(
                 continue;
             }
 
-            // Ask-risk tools need user approval
             if risk == permissions::ToolRisk::Ask {
                 let approval_id = format!("approval-{}", tool_call.id);
                 let (tx, rx) = oneshot::channel::<bool>();
-
                 {
                     let mut map = approvals.lock().await;
                     map.insert(approval_id.clone(), tx);
                 }
-
                 let _ = app.emit(
                     "tool_approval_needed",
                     serde_json::json!({
@@ -221,13 +237,10 @@ pub async fn send_message_stream(
                         "risk": "Ask",
                     }),
                 );
-
-                // Wait for UI response (timeout after 60s)
                 let approved = tokio::time::timeout(std::time::Duration::from_secs(60), rx)
                     .await
                     .unwrap_or(Ok(false))
                     .unwrap_or(false);
-
                 if !approved {
                     conversation.push(ConversationMessage::Tool {
                         tool_call_id: tool_call.id,
@@ -239,7 +252,6 @@ pub async fn send_message_stream(
                 }
             }
 
-            // Emit tool execution event (for UI audit trail)
             let _ = app.emit(
                 "tool_executing",
                 serde_json::json!({
@@ -249,26 +261,32 @@ pub async fn send_message_stream(
                 }),
             );
 
-            let tool_result = {
-                let mut manager = state.lock().await;
-                manager
-                    .call_tool(&tool_call.name, tool_call.arguments.clone())
-                    .await?
+            // Execute: native tools handled inline, MCP tools via manager
+            let (content, is_error) = if is_native {
+                crate::native_tools::execute(&tool_call.name, &tool_call.arguments).await
+            } else {
+                let result = {
+                    let mut manager = state.lock().await;
+                    manager
+                        .call_tool(&tool_call.name, tool_call.arguments.clone())
+                        .await?
+                };
+                (format_tool_result(&result), result.is_error)
             };
 
             let _ = app.emit(
                 "tool_completed",
                 serde_json::json!({
                     "name": &tool_call.name,
-                    "is_error": tool_result.is_error,
+                    "is_error": is_error,
                 }),
             );
 
             conversation.push(ConversationMessage::Tool {
                 tool_call_id: tool_call.id,
                 tool_name: tool_call.name,
-                content: format_tool_result(&tool_result),
-                is_error: tool_result.is_error,
+                content,
+                is_error,
             });
         }
     }
