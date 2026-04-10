@@ -38,10 +38,7 @@ pub fn db_save_conversation(
 }
 
 #[tauri::command]
-pub fn db_delete_conversation(
-    state: tauri::State<'_, SharedDb>,
-    id: String,
-) -> Result<(), String> {
+pub fn db_delete_conversation(state: tauri::State<'_, SharedDb>, id: String) -> Result<(), String> {
     let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
     db::delete_conversation(&conn, &id)
 }
@@ -97,11 +94,9 @@ pub fn db_conversation_stats(
         .query_row("SELECT COUNT(*) FROM messages", [], |row| row.get(0))
         .unwrap_or(0);
     let oldest: i64 = conn
-        .query_row(
-            "SELECT MIN(created_at) FROM conversations",
-            [],
-            |row| row.get(0),
-        )
+        .query_row("SELECT MIN(created_at) FROM conversations", [], |row| {
+            row.get(0)
+        })
         .unwrap_or(0);
 
     Ok(serde_json::json!({
@@ -154,10 +149,7 @@ pub fn db_update_knowledge(
 }
 
 #[tauri::command]
-pub fn db_delete_knowledge(
-    state: tauri::State<'_, SharedDb>,
-    id: String,
-) -> Result<(), String> {
+pub fn db_delete_knowledge(state: tauri::State<'_, SharedDb>, id: String) -> Result<(), String> {
     let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
     db::delete_knowledge(&conn, &id)
 }
@@ -215,9 +207,7 @@ pub fn db_knowledge_tags(
 }
 
 #[tauri::command]
-pub fn db_knowledge_stats(
-    state: tauri::State<'_, SharedDb>,
-) -> Result<serde_json::Value, String> {
+pub fn db_knowledge_stats(state: tauri::State<'_, SharedDb>) -> Result<serde_json::Value, String> {
     let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
     let entries = db::list_knowledge(&conn)?;
     let total = entries.len();
@@ -351,13 +341,13 @@ pub fn db_get_all_settings(
 }
 
 #[tauri::command]
-pub fn db_delete_setting(
-    state: tauri::State<'_, SharedDb>,
-    key: String,
-) -> Result<(), String> {
+pub fn db_delete_setting(state: tauri::State<'_, SharedDb>, key: String) -> Result<(), String> {
     let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
-    conn.execute("DELETE FROM settings WHERE key = ?1", rusqlite::params![key])
-        .map_err(|e| format!("DB error: {}", e))?;
+    conn.execute(
+        "DELETE FROM settings WHERE key = ?1",
+        rusqlite::params![key],
+    )
+    .map_err(|e| format!("DB error: {}", e))?;
     Ok(())
 }
 
@@ -418,10 +408,7 @@ pub fn db_add_template(
 }
 
 #[tauri::command]
-pub fn db_delete_template(
-    state: tauri::State<'_, SharedDb>,
-    id: String,
-) -> Result<(), String> {
+pub fn db_delete_template(state: tauri::State<'_, SharedDb>, id: String) -> Result<(), String> {
     let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
     conn.execute(
         "DELETE FROM templates WHERE id = ?1 AND is_builtin = 0",

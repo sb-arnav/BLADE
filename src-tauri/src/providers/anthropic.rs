@@ -163,9 +163,11 @@ fn serialize_simple(message: &ConversationMessage) -> Option<serde_json::Value> 
             ],
         })),
         ConversationMessage::Assistant { content, .. } => {
-            if content.is_empty() { return None; }
+            if content.is_empty() {
+                return None;
+            }
             Some(serde_json::json!({"role": "assistant", "content": content}))
-        },
+        }
         ConversationMessage::Tool { .. } => None,
     }
 }

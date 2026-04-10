@@ -126,7 +126,10 @@ pub async fn voice_transcribe(audio_base64: String) -> Result<String, String> {
     };
 
     if api_key.is_empty() {
-        return Err("No API key available for transcription. Use Groq provider or add a Groq key.".to_string());
+        return Err(
+            "No API key available for transcription. Use Groq provider or add a Groq key."
+                .to_string(),
+        );
     }
 
     let audio_bytes = base64::engine::general_purpose::STANDARD

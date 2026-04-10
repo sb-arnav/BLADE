@@ -1,4 +1,4 @@
-use super::{InstalledPlugin, PluginManifest, plugins_dir};
+use super::{plugins_dir, InstalledPlugin, PluginManifest};
 use std::fs;
 use std::path::Path;
 

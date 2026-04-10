@@ -30,7 +30,7 @@ pub struct PluginCommand {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UiSlot {
-    pub slot: String, // "sidebar", "settings", "message-action", "slash-command"
+    pub slot: String,      // "sidebar", "settings", "message-action", "slash-command"
     pub component: String, // JS component name or file
 }
 

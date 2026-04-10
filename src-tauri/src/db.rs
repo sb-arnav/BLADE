@@ -78,8 +78,7 @@ pub fn init_db() -> Result<Connection, String> {
             .map_err(|e| format!("DB error: failed to create config dir: {}", e))?;
     }
 
-    let conn = Connection::open(&db_path)
-        .map_err(|e| format!("DB error: {}", e))?;
+    let conn = Connection::open(&db_path).map_err(|e| format!("DB error: {}", e))?;
 
     // Enable WAL mode for concurrent reads
     conn.pragma_update(None, "journal_mode", "WAL")
@@ -241,10 +240,7 @@ pub fn list_conversations(conn: &Connection) -> Result<Vec<ConversationRow>, Str
 }
 
 /// Fetches a single conversation together with all of its messages.
-pub fn get_conversation(
-    conn: &Connection,
-    id: &str,
-) -> Result<ConversationWithMessages, String> {
+pub fn get_conversation(conn: &Connection, id: &str) -> Result<ConversationWithMessages, String> {
     let conversation = conn
         .query_row(
             "SELECT id, title, created_at, updated_at, message_count, pinned
@@ -389,11 +385,8 @@ pub fn delete_conversation(conn: &Connection, id: &str) -> Result<(), String> {
     )
     .map_err(|e| format!("DB error: {}", e))?;
 
-    conn.execute(
-        "DELETE FROM conversations WHERE id = ?1",
-        params![id],
-    )
-    .map_err(|e| format!("DB error: {}", e))?;
+    conn.execute("DELETE FROM conversations WHERE id = ?1", params![id])
+        .map_err(|e| format!("DB error: {}", e))?;
 
     Ok(())
 }
@@ -441,10 +434,7 @@ fn rebuild_messages_fts(conn: &Connection, conversation_id: &str) -> Result<(), 
 
 /// Full-text search across all messages using FTS5.
 /// Returns results ranked by relevance (best first).
-pub fn search_messages(
-    conn: &Connection,
-    query: &str,
-) -> Result<Vec<SearchResult>, String> {
+pub fn search_messages(conn: &Connection, query: &str) -> Result<Vec<SearchResult>, String> {
     if query.trim().is_empty() {
         return Ok(Vec::new());
     }
@@ -632,20 +622,14 @@ pub fn delete_knowledge(conn: &Connection, id: &str) -> Result<(), String> {
         );
     }
 
-    conn.execute(
-        "DELETE FROM knowledge_entries WHERE id = ?1",
-        params![id],
-    )
-    .map_err(|e| format!("DB error: {}", e))?;
+    conn.execute("DELETE FROM knowledge_entries WHERE id = ?1", params![id])
+        .map_err(|e| format!("DB error: {}", e))?;
 
     Ok(())
 }
 
 /// Full-text search across knowledge entries using FTS5.
-pub fn search_knowledge(
-    conn: &Connection,
-    query: &str,
-) -> Result<Vec<KnowledgeRow>, String> {
+pub fn search_knowledge(conn: &Connection, query: &str) -> Result<Vec<KnowledgeRow>, String> {
     if query.trim().is_empty() {
         return Ok(Vec::new());
     }
@@ -709,10 +693,7 @@ pub fn track_event(
 }
 
 /// Returns all analytics events whose timestamp is >= `since` (epoch millis).
-pub fn get_events_since(
-    conn: &Connection,
-    since: i64,
-) -> Result<Vec<AnalyticsEvent>, String> {
+pub fn get_events_since(conn: &Connection, since: i64) -> Result<Vec<AnalyticsEvent>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, event_type, timestamp, metadata
@@ -947,12 +928,7 @@ mod tests {
         let conn = test_db();
 
         track_event(&conn, "app_open", None).unwrap();
-        track_event(
-            &conn,
-            "message_sent",
-            Some("{\"model\": \"gpt-4\"}"),
-        )
-        .unwrap();
+        track_event(&conn, "message_sent", Some("{\"model\": \"gpt-4\"}")).unwrap();
 
         let events = get_events_since(&conn, 0).unwrap();
         assert_eq!(events.len(), 2);

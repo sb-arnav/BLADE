@@ -84,9 +84,14 @@ Each field is a string with bullet points. Keep each section under 10 bullet poi
     }];
     let conversation = providers::build_conversation(messages, None);
 
-    let turn =
-        providers::complete_turn(&config.provider, &config.api_key, &config.model, &conversation, &[])
-            .await?;
+    let turn = providers::complete_turn(
+        &config.provider,
+        &config.api_key,
+        &config.model,
+        &conversation,
+        &[],
+    )
+    .await?;
 
     // Parse response
     let content = turn.content.trim();

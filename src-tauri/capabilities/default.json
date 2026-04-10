@@ -11,6 +11,7 @@
     "autostart:default",
     "window-state:default",
     "process:default",
+    "updater:default",
     "dialog:default",
     "fs:default",
     "os:default",

@@ -81,7 +81,7 @@ export function CommandPalette({ commands, open, onClose }: Props) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search commands..."
+            placeholder="Ask Blade to open or do something..."
             className="w-full bg-transparent py-2.5 text-[0.8125rem] text-blade-text outline-none placeholder:text-blade-muted"
           />
           <kbd className="text-2xs text-blade-muted/50 font-mono shrink-0">esc</kbd>

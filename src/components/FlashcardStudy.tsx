@@ -2,9 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   useFlashcards,
   Flashcard,
-  FlashcardDeck,
   ReviewRating,
-  ReviewSession,
   getNextReviewLabel,
 } from "../hooks/useFlashcards";
 
@@ -108,7 +106,6 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
   const [genDeckId, setGenDeckId] = useState<string | null>(null);
   const [genTopic, setGenTopic] = useState("");
   const [genCount, setGenCount] = useState(10);
-  const [genPreview, setGenPreview] = useState<{ front: string; back: string; tags: string[] }[]>([]);
   const [genLoading, setGenLoading] = useState(false);
 
   // New deck modal

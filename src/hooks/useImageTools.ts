@@ -229,7 +229,7 @@ export function useImageTools() {
   const [loading, setLoading] = useState(false);
 
   const processImage = useCallback(async (
-    src: string,
+    _src: string,
     originalName: string,
     originalSize: number,
     operation: string,

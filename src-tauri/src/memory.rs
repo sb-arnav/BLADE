@@ -13,7 +13,9 @@ fn memory_log_path() -> PathBuf {
 /// Extract key facts from a conversation and append to context.md
 /// Called by frontend when a conversation ends or on demand
 #[tauri::command]
-pub async fn learn_from_conversation(messages: Vec<crate::providers::ChatMessage>) -> Result<String, String> {
+pub async fn learn_from_conversation(
+    messages: Vec<crate::providers::ChatMessage>,
+) -> Result<String, String> {
     let config = load_config();
     if config.api_key.is_empty() && config.provider != "ollama" {
         return Err("No API key for learning".to_string());
@@ -80,7 +82,12 @@ Key facts:"#,
     let updated = if existing.is_empty() {
         format!("## Learned {}\n\n{}", timestamp, facts)
     } else {
-        format!("{}\n\n## Learned {}\n\n{}", existing.trim(), timestamp, facts)
+        format!(
+            "{}\n\n## Learned {}\n\n{}",
+            existing.trim(),
+            timestamp,
+            facts
+        )
     };
 
     write_blade_file(&context_path(), &updated)?;

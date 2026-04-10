@@ -37,11 +37,35 @@ fn classify_default(name: &str, description: &str) -> ToolRisk {
     }
 
     let dangerous = [
-        "delete", "remove", "write", "create", "update", "modify",
-        "send", "post", "put", "patch", "push", "deploy", "execute",
-        "run", "shell", "bash", "exec", "install", "uninstall",
-        "kill", "stop", "restart", "move", "rename", "upload",
-        "publish", "release", "commit", "merge",
+        "delete",
+        "remove",
+        "write",
+        "create",
+        "update",
+        "modify",
+        "send",
+        "post",
+        "put",
+        "patch",
+        "push",
+        "deploy",
+        "execute",
+        "run",
+        "shell",
+        "bash",
+        "exec",
+        "install",
+        "uninstall",
+        "kill",
+        "stop",
+        "restart",
+        "move",
+        "rename",
+        "upload",
+        "publish",
+        "release",
+        "commit",
+        "merge",
     ];
     for pattern in &dangerous {
         if name_lower.contains(pattern) || desc_lower.contains(pattern) {
@@ -50,9 +74,8 @@ fn classify_default(name: &str, description: &str) -> ToolRisk {
     }
 
     let safe = [
-        "get", "list", "read", "search", "find", "show", "view",
-        "fetch", "query", "describe", "info", "status", "count",
-        "check", "verify", "validate", "parse", "convert",
+        "get", "list", "read", "search", "find", "show", "view", "fetch", "query", "describe",
+        "info", "status", "count", "check", "verify", "validate", "parse", "convert",
     ];
     for pattern in &safe {
         if name_lower.contains(pattern) {

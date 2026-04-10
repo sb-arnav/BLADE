@@ -1,0 +1,15 @@
+{
+  "bundle": {
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "dialog": false,
+      "pubkey": "__TAURI_UPDATER_PUBKEY__",
+      "endpoints": [
+        "https://github.com/sb-arnav/blade/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

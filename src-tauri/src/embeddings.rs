@@ -115,7 +115,10 @@ pub async fn embed_and_store(
     metadata: serde_json::Value,
 ) -> Result<(), String> {
     let embeddings = embed_texts(&[text.clone()])?;
-    let embedding = embeddings.into_iter().next().ok_or("No embedding generated")?;
+    let embedding = embeddings
+        .into_iter()
+        .next()
+        .ok_or("No embedding generated")?;
 
     let mut s = store.lock().map_err(|e| e.to_string())?;
     s.add(text, embedding, metadata);
@@ -129,7 +132,10 @@ pub async fn semantic_search(
     top_k: Option<usize>,
 ) -> Result<Vec<SearchResult>, String> {
     let embeddings = embed_texts(&[query])?;
-    let query_embedding = embeddings.into_iter().next().ok_or("No embedding generated")?;
+    let query_embedding = embeddings
+        .into_iter()
+        .next()
+        .ok_or("No embedding generated")?;
 
     let s = store.lock().map_err(|e| e.to_string())?;
     Ok(s.search(&query_embedding, top_k.unwrap_or(5)))

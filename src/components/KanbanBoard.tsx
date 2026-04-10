@@ -75,8 +75,6 @@ export default function KanbanBoard({ onBack, onSendToChat }: Props) {
     tasks,
     projects,
     activeProject,
-    statusOrder,
-    statusLabels,
     createTask,
     updateTask,
     deleteTask,
@@ -89,9 +87,7 @@ export default function KanbanBoard({ onBack, onSendToChat }: Props) {
     addComment,
     generateTasksFromPrompt,
     getStats,
-    getOverdueTasks,
     searchTasks,
-    bulkUpdate,
     exportTasks,
   } = useTaskPlanner();
 
@@ -116,9 +112,6 @@ export default function KanbanBoard({ onBack, onSendToChat }: Props) {
   const [newProjectColor, setNewProjectColor] = useState("#6366f1");
   const [showExport, setShowExport] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [editField, setEditField] = useState<string | null>(null);
-
   // Detail-modal form
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -219,7 +212,6 @@ export default function KanbanBoard({ onBack, onSendToChat }: Props) {
     setEditLabels(task.labels.join(", "));
     setNewSubtaskTitle("");
     setNewCommentText("");
-    setEditField(null);
   }, []);
 
   const saveTaskDetail = useCallback(() => {

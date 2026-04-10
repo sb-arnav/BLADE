@@ -37,8 +37,7 @@ pub async fn rag_ingest_file(
         return Err(format!("File not found: {}", file_path));
     }
 
-    let content = fs::read_to_string(path)
-        .map_err(|e| format!("Read error: {}", e))?;
+    let content = fs::read_to_string(path).map_err(|e| format!("Read error: {}", e))?;
 
     let total_chars = content.len();
     let chunks = chunk_text(&content);
@@ -86,8 +85,8 @@ pub async fn rag_ingest_directory(
 ) -> Result<Vec<IngestResult>, String> {
     let allowed_ext: Vec<String> = extensions.unwrap_or_else(|| {
         vec![
-            "txt", "md", "rs", "py", "js", "ts", "tsx", "jsx", "go", "java",
-            "c", "cpp", "h", "css", "html", "json", "yaml", "yml", "toml",
+            "txt", "md", "rs", "py", "js", "ts", "tsx", "jsx", "go", "java", "c", "cpp", "h",
+            "css", "html", "json", "yaml", "yml", "toml",
         ]
         .into_iter()
         .map(String::from)
@@ -145,8 +144,7 @@ async fn rag_ingest_single(
     store: &SharedVectorStore,
     file_path: &str,
 ) -> Result<IngestResult, String> {
-    let content = fs::read_to_string(file_path)
-        .map_err(|e| format!("Read error: {}", e))?;
+    let content = fs::read_to_string(file_path).map_err(|e| format!("Read error: {}", e))?;
 
     let total_chars = content.len();
     if total_chars > 500_000 {
@@ -204,10 +202,7 @@ pub async fn rag_query(
         .iter()
         .map(|h| RagSource {
             text: h.text.clone(),
-            file: h.metadata["file"]
-                .as_str()
-                .unwrap_or("unknown")
-                .to_string(),
+            file: h.metadata["file"].as_str().unwrap_or("unknown").to_string(),
             score: h.score,
         })
         .collect();

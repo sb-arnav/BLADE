@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRSSReader, RSSFeed, RSSItem } from "../hooks/useRSSReader";
+import { useRSSReader, RSSItem } from "../hooks/useRSSReader";
 
 // ── Props ──────────────────────────────────────────────────────────────
 
@@ -230,9 +230,6 @@ export default function RSSReader({ onBack, onSendToChat }: Props) {
     markAllRead,
     starItem,
     searchItems,
-    getUnread,
-    getStarred,
-    getByFeed,
     generateSummary,
     stats,
   } = useRSSReader();

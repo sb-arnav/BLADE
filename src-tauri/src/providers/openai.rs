@@ -154,19 +154,27 @@ pub async fn complete(
 
 fn serialize_simple(message: &super::ConversationMessage) -> Option<serde_json::Value> {
     match message {
-        super::ConversationMessage::System(c) => Some(serde_json::json!({"role": "system", "content": c})),
-        super::ConversationMessage::User(c) => Some(serde_json::json!({"role": "user", "content": c})),
-        super::ConversationMessage::UserWithImage { text, image_base64 } => Some(serde_json::json!({
-            "role": "user",
-            "content": [
-                {"type": "text", "text": text},
-                {"type": "image_url", "image_url": {"url": format!("data:image/png;base64,{}", image_base64)}}
-            ],
-        })),
+        super::ConversationMessage::System(c) => {
+            Some(serde_json::json!({"role": "system", "content": c}))
+        }
+        super::ConversationMessage::User(c) => {
+            Some(serde_json::json!({"role": "user", "content": c}))
+        }
+        super::ConversationMessage::UserWithImage { text, image_base64 } => {
+            Some(serde_json::json!({
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": text},
+                    {"type": "image_url", "image_url": {"url": format!("data:image/png;base64,{}", image_base64)}}
+                ],
+            }))
+        }
         super::ConversationMessage::Assistant { content, .. } => {
-            if content.is_empty() { return None; }
+            if content.is_empty() {
+                return None;
+            }
             Some(serde_json::json!({"role": "assistant", "content": content}))
-        },
+        }
         super::ConversationMessage::Tool { .. } => None,
     }
 }

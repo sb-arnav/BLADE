@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
+import { relaunch } from "@tauri-apps/plugin-process";
+import { check, type DownloadEvent } from "@tauri-apps/plugin-updater";
 import { BladeConfig } from "../types";
 import { McpSettings } from "./McpSettings";
 
@@ -61,6 +64,10 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
   const [contextNotes, setContextNotes] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [appVersion, setAppVersion] = useState("dev");
+  const [checkingForUpdates, setCheckingForUpdates] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   useEffect(() => {
     setProvider(config.provider);
@@ -71,12 +78,14 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
   useEffect(() => {
     const loadBrain = async () => {
       try {
-        const [nextPersona, nextContext] = await Promise.all([
+        const [nextPersona, nextContext, nextVersion] = await Promise.all([
           invoke<string>("get_persona"),
           invoke<string>("get_context"),
+          getVersion().catch(() => "dev"),
         ]);
         setPersona(nextPersona);
         setContextNotes(nextContext);
+        setAppVersion(nextVersion);
       } catch (cause) {
         setError(typeof cause === "string" ? cause : String(cause));
       }
@@ -132,6 +141,56 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
     } catch (cause) {
       setStatus(null);
       setError(typeof cause === "string" ? cause : String(cause));
+    }
+  };
+
+  const handleCheckForUpdates = async () => {
+    setCheckingForUpdates(true);
+    setUpdateError(null);
+    setUpdateStatus("Checking for updates...");
+
+    try {
+      const update = await check();
+
+      if (!update) {
+        setUpdateStatus("You're up to date.");
+        return;
+      }
+
+      setUpdateStatus(`Downloading Blade ${update.version}...`);
+      await update.downloadAndInstall((event: DownloadEvent) => {
+        if (event.event === "Started") {
+          const contentLength = event.data.contentLength;
+          setUpdateStatus(
+            contentLength
+              ? `Downloading update (${Math.round(contentLength / 1024 / 1024)} MB)...`
+              : "Downloading update...",
+          );
+        }
+
+        if (event.event === "Progress") {
+          setUpdateStatus(`Downloading update... +${Math.round(event.data.chunkLength / 1024)} KB`);
+        }
+
+        if (event.event === "Finished") {
+          setUpdateStatus("Installing update...");
+        }
+      });
+
+      setUpdateStatus(`Blade ${update.version} is ready. Restart to finish updating.`);
+    } catch (cause) {
+      setUpdateStatus(null);
+      setUpdateError(typeof cause === "string" ? cause : String(cause));
+    } finally {
+      setCheckingForUpdates(false);
+    }
+  };
+
+  const handleRestartForUpdate = async () => {
+    try {
+      await relaunch();
+    } catch (cause) {
+      setUpdateError(typeof cause === "string" ? cause : String(cause));
     }
   };
 
@@ -341,10 +400,42 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
               <div className="text-sm mt-1">Auto with MCP when tools are available</div>
             </div>
             <div className="rounded-xl border border-blade-border bg-blade-bg/70 px-3 py-2">
+              <div className="text-xs uppercase tracking-wide text-blade-muted">Version</div>
+              <div className="text-sm mt-1">{appVersion}</div>
+            </div>
+            <div className="rounded-xl border border-blade-border bg-blade-bg/70 px-3 py-2">
               <div className="text-xs uppercase tracking-wide text-blade-muted">Secret Storage</div>
               <div className="text-sm mt-1">OS Keychain (Credential Manager)</div>
             </div>
           </div>
+        </section>
+
+        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
+          <div>
+            <h2 className="text-base font-semibold">Updates</h2>
+            <p className="text-sm text-blade-muted">
+              Installed builds can pull the latest signed release without reinstalling manually.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={handleCheckForUpdates}
+              disabled={checkingForUpdates}
+              className="px-4 py-2 rounded-xl bg-blade-bg border border-blade-border text-sm hover:border-blade-muted transition-colors disabled:opacity-60"
+            >
+              {checkingForUpdates ? "Checking..." : "Check for updates"}
+            </button>
+            <button
+              onClick={handleRestartForUpdate}
+              className="px-4 py-2 rounded-xl bg-blade-accent text-white text-sm hover:opacity-90 transition-opacity"
+            >
+              Restart app
+            </button>
+          </div>
+
+          {updateStatus && <p className="text-xs text-green-400">{updateStatus}</p>}
+          {updateError && <p className="text-xs text-red-400">{updateError}</p>}
         </section>
         </>}
 

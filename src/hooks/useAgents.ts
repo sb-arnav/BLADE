@@ -28,6 +28,10 @@ interface AgentCompletedPayload {
   status: Agent["status"];
 }
 
+interface DesktopActionPendingPayload {
+  agent_id: string;
+}
+
 // ── Hook ───────────────────────────────────────────────────────────────────────
 
 export function useAgents() {
@@ -123,12 +127,31 @@ export function useAgents() {
       }
     });
 
+    const unlistenDesktopActionPending = listen<DesktopActionPendingPayload>(
+      "agent_desktop_action_pending",
+      async (event) => {
+        if (!active) return;
+        const { agent_id } = event.payload;
+        try {
+          const fresh = await invoke<Agent>("agent_get", { agentId: agent_id });
+          setAgents((prev) => prev.map((a) => (a.id === agent_id ? fresh : a)));
+        } catch {
+          patchAgent(agent_id, (agent) => ({
+            ...agent,
+            status: "WaitingApproval" as const,
+            updated_at: Date.now(),
+          }));
+        }
+      }
+    );
+
     return () => {
       active = false;
       unlistenStepStarted.then((fn) => fn());
       unlistenStepCompleted.then((fn) => fn());
       unlistenStepFailed.then((fn) => fn());
       unlistenAgentCompleted.then((fn) => fn());
+      unlistenDesktopActionPending.then((fn) => fn());
     };
   }, [patchAgent]);
 
@@ -150,6 +173,34 @@ export function useAgents() {
       setCreating(false);
     }
   }, []);
+
+  const createDesktopAgent = useCallback(
+    async (
+      goal: string,
+      maxSteps = 8,
+      executionMode: "supervised" | "auto" = "supervised"
+    ): Promise<string | null> => {
+    if (!goal.trim()) return null;
+    setCreating(true);
+    setError(null);
+    try {
+      const agentId = await invoke<string>("agent_create_desktop", {
+        goal: goal.trim(),
+        maxSteps,
+        executionMode,
+      });
+      const fresh = await invoke<Agent>("agent_get", { agentId });
+      setAgents((prev) => [fresh, ...prev]);
+      return agentId;
+    } catch (cause) {
+      setError(typeof cause === "string" ? cause : "Failed to create desktop agent");
+      return null;
+    } finally {
+      setCreating(false);
+    }
+    },
+    []
+  );
 
   const pauseAgent = useCallback(async (agentId: string) => {
     try {
@@ -178,6 +229,16 @@ export function useAgents() {
     }
   }, [patchAgent]);
 
+  const respondDesktopAction = useCallback(async (agentId: string, approved: boolean) => {
+    try {
+      await invoke("agent_respond_desktop_action", { agentId, approved });
+      const fresh = await invoke<Agent>("agent_get", { agentId });
+      setAgents((prev) => prev.map((a) => (a.id === agentId ? fresh : a)));
+    } catch (cause) {
+      setError(typeof cause === "string" ? cause : "Failed to respond to desktop action");
+    }
+  }, []);
+
   const dismissError = useCallback(() => setError(null), []);
 
   return {
@@ -186,6 +247,8 @@ export function useAgents() {
     error,
     dismissError,
     createAgent,
+    createDesktopAgent,
+    respondDesktopAction,
     pauseAgent,
     resumeAgent,
     cancelAgent,

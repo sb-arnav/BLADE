@@ -1,13 +1,10 @@
 import { useState, useMemo, useCallback } from "react";
 import {
   useGoalTracker,
-  Goal,
   GoalCategory,
   GoalPriority,
   CoachingType,
   Milestone,
-  CheckIn,
-  GoalOverview,
   GoalTemplate,
   CATEGORY_META,
   GOAL_TEMPLATES,
@@ -23,12 +20,6 @@ interface Props {
 // ── Constants ────────────────────────────────────────────────────────────────
 
 type View = "overview" | "detail" | "create" | "categories" | "archive";
-
-const PRIORITY_COLORS: Record<GoalPriority, string> = {
-  low: "text-emerald-400",
-  medium: "text-amber-400",
-  high: "text-red-400",
-};
 
 const PRIORITY_BG: Record<GoalPriority, string> = {
   low: "bg-emerald-500/10 border-emerald-500/20",
@@ -53,10 +44,6 @@ const GOAL_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ec4899", "#06b6d4", "#8b
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr + "T00:00:00");
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -75,12 +62,6 @@ function timeAgo(ts: number): string {
   if (hrs < 24) return `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
   return `${days}d ago`;
-}
-
-function daysUntil(dateStr: string): number {
-  const now = new Date(todayStr() + "T00:00:00").getTime();
-  const target = new Date(dateStr + "T00:00:00").getTime();
-  return Math.round((target - now) / 86400000);
 }
 
 // ── Progress Ring ────────────────────────────────────────────────────────────
@@ -141,7 +122,7 @@ export default function GoalDashboard({ onBack, onSendToChat }: Props) {
 
   const handleCreate = useCallback(() => {
     if (!formTitle.trim()) return;
-    const milestones: Milestone[] = formMilestones.map((t, i) => ({
+    const milestones: Milestone[] = formMilestones.map((t) => ({
       id: Math.random().toString(36).slice(2, 10) + Date.now().toString(36),
       title: t,
       completed: false,
@@ -282,7 +263,7 @@ export default function GoalDashboard({ onBack, onSendToChat }: Props) {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {overview.map(({ goal, daysRemaining, milestoneProgress, lastCheckIn, needsAttention }) => (
+                {overview.map(({ goal, daysRemaining, milestoneProgress, needsAttention }) => (
                   <button key={goal.id} onClick={() => openDetail(goal.id)} className="text-left bg-blade-surface rounded-xl p-4 border border-blade-border/30 hover:border-blade-accent/30 transition-all group relative">
                     {needsAttention && <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber-400 animate-pulse" />}
                     <div className="flex items-start gap-3">
@@ -429,7 +410,7 @@ export default function GoalDashboard({ onBack, onSendToChat }: Props) {
             <div className="bg-blade-surface rounded-xl p-4 border border-blade-border/30">
               <h3 className="text-sm font-medium mb-3">Milestones ({activeGoal.milestones.filter((m) => m.completed).length}/{activeGoal.milestones.length})</h3>
               <div className="space-y-1.5">
-                {activeGoal.milestones.map((ms, i) => (
+                {activeGoal.milestones.map((ms) => (
                   <button key={ms.id} onClick={() => completeMilestone(activeGoal.id, ms.id)} className="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-blade-base transition-colors text-left group">
                     <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center text-xs transition-colors ${ms.completed ? "border-emerald-500 bg-emerald-500/20 text-emerald-400" : "border-blade-border/60 text-transparent group-hover:border-blade-accent/40"}`}>
                       {ms.completed ? "\u2713" : ""}
@@ -453,7 +434,7 @@ export default function GoalDashboard({ onBack, onSendToChat }: Props) {
                 <h3 className="text-sm font-medium mb-3">Progress Timeline</h3>
                 {/* Mini chart */}
                 <div className="h-20 flex items-end gap-0.5 mb-3">
-                  {activeGoal.checkIns.slice(-20).map((ci, i) => (
+                  {activeGoal.checkIns.slice(-20).map((ci) => (
                     <div key={ci.id} className="flex-1 flex flex-col items-center gap-0.5" title={`${ci.date}: ${ci.progress}%`}>
                       <div className="w-full rounded-t" style={{ height: `${Math.max(ci.progress * 0.7, 2)}px`, backgroundColor: activeGoal.color, opacity: 0.4 + (ci.progress / 100) * 0.6 }} />
                     </div>

@@ -1,18 +1,18 @@
 use crate::brain;
 use crate::config::{load_config, save_config, BladeConfig, SavedMcpServerConfig};
-use crate::permissions;
-use crate::trace;
-use std::collections::HashMap as StdHashMap;
-use tokio::sync::oneshot;
 use crate::history::{
     list_conversations, load_conversation, save_conversation, ConversationSummary, HistoryMessage,
     StoredConversation,
 };
 use crate::mcp::{McpManager, McpServerConfig, McpTool, McpToolResult};
+use crate::permissions;
 use crate::providers::{self, ChatMessage, ConversationMessage, ToolDefinition};
+use crate::trace;
+use std::collections::HashMap as StdHashMap;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::Emitter;
+use tokio::sync::oneshot;
 use tokio::sync::Mutex;
 
 pub type SharedMcpManager = Arc<Mutex<McpManager>>;
@@ -60,7 +60,9 @@ pub async fn send_message_stream(
     let conversation = providers::build_conversation(messages, Some(system_prompt));
 
     // Check if any message has an image (vision request)
-    let has_image = conversation.iter().any(|m| matches!(m, ConversationMessage::UserWithImage { .. }));
+    let has_image = conversation
+        .iter()
+        .any(|m| matches!(m, ConversationMessage::UserWithImage { .. }));
 
     // No tools configured and no images → stream directly (fast path, best UX)
     if tools.is_empty() && !has_image {
@@ -158,21 +160,21 @@ pub async fn send_message_stream(
                     map.insert(approval_id.clone(), tx);
                 }
 
-                let _ = app.emit("tool_approval_needed", serde_json::json!({
-                    "approval_id": &approval_id,
-                    "name": &tool_call.name,
-                    "arguments": &tool_call.arguments,
-                    "risk": "Ask",
-                }));
+                let _ = app.emit(
+                    "tool_approval_needed",
+                    serde_json::json!({
+                        "approval_id": &approval_id,
+                        "name": &tool_call.name,
+                        "arguments": &tool_call.arguments,
+                        "risk": "Ask",
+                    }),
+                );
 
                 // Wait for UI response (timeout after 60s)
-                let approved = tokio::time::timeout(
-                    std::time::Duration::from_secs(60),
-                    rx,
-                )
-                .await
-                .unwrap_or(Ok(false))
-                .unwrap_or(false);
+                let approved = tokio::time::timeout(std::time::Duration::from_secs(60), rx)
+                    .await
+                    .unwrap_or(Ok(false))
+                    .unwrap_or(false);
 
                 if !approved {
                     conversation.push(ConversationMessage::Tool {
@@ -186,11 +188,14 @@ pub async fn send_message_stream(
             }
 
             // Emit tool execution event (for UI audit trail)
-            let _ = app.emit("tool_executing", serde_json::json!({
-                "name": &tool_call.name,
-                "arguments": &tool_call.arguments,
-                "risk": format!("{:?}", risk),
-            }));
+            let _ = app.emit(
+                "tool_executing",
+                serde_json::json!({
+                    "name": &tool_call.name,
+                    "arguments": &tool_call.arguments,
+                    "risk": format!("{:?}", risk),
+                }),
+            );
 
             let tool_result = {
                 let mut manager = state.lock().await;
@@ -199,10 +204,13 @@ pub async fn send_message_stream(
                     .await?
             };
 
-            let _ = app.emit("tool_completed", serde_json::json!({
-                "name": &tool_call.name,
-                "is_error": tool_result.is_error,
-            }));
+            let _ = app.emit(
+                "tool_completed",
+                serde_json::json!({
+                    "name": &tool_call.name,
+                    "is_error": tool_result.is_error,
+                }),
+            );
 
             conversation.push(ConversationMessage::Tool {
                 tool_call_id: tool_call.id,
@@ -228,7 +236,8 @@ pub fn debug_config() -> serde_json::Value {
     let config_dir = crate::config::blade_config_dir();
     let config_path = config_dir.join("config.json");
     let file_exists = config_path.exists();
-    let file_content = std::fs::read_to_string(&config_path).unwrap_or_else(|_| "NOT FOUND".to_string());
+    let file_content =
+        std::fs::read_to_string(&config_path).unwrap_or_else(|_| "NOT FOUND".to_string());
     let loaded = load_config();
 
     serde_json::json!({

@@ -1,13 +1,14 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 use std::fs;
+use std::path::PathBuf;
 
 /// Local Whisper transcription fallback (D2)
 /// Downloads model on first use, runs entirely offline via whisper-rs
 
 const MODEL_DIR: &str = "models";
 const MODEL_FILE: &str = "ggml-tiny.en.bin";
-const MODEL_URL: &str = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin";
+const MODEL_URL: &str =
+    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin";
 
 fn models_dir() -> PathBuf {
     let dir = crate::config::blade_config_dir().join(MODEL_DIR);
@@ -57,7 +58,11 @@ pub async fn whisper_download_model(app: tauri::AppHandle) -> Result<String, Str
 
     let _ = app.emit("whisper_download_complete", ());
 
-    Ok(format!("Downloaded {} ({} MB)", MODEL_FILE, bytes.len() / 1_000_000))
+    Ok(format!(
+        "Downloaded {} ({} MB)",
+        MODEL_FILE,
+        bytes.len() / 1_000_000
+    ))
 }
 
 /// Get model info

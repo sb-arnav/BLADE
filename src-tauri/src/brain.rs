@@ -36,7 +36,10 @@ pub fn build_system_prompt(tools: &[McpTool]) -> String {
 
     // Active window context — what the user is doing right now
     if let Ok(activity) = crate::context::get_user_activity() {
-        parts.push(format!("## Right Now\n\nThe user is currently: {}", activity));
+        parts.push(format!(
+            "## Right Now\n\nThe user is currently: {}",
+            activity
+        ));
     }
 
     // Context notes (if any)

@@ -1,4 +1,4 @@
-use super::{InstalledPlugin, loader};
+use super::{loader, InstalledPlugin};
 
 /// Tauri commands for plugin management
 
@@ -29,11 +29,14 @@ pub fn plugin_get_commands() -> Vec<PluginCommandInfo> {
         .iter()
         .filter(|p| p.enabled)
         .flat_map(|p| {
-            p.manifest.commands.iter().map(move |cmd| PluginCommandInfo {
-                plugin: p.manifest.name.clone(),
-                name: cmd.name.clone(),
-                description: cmd.description.clone(),
-            })
+            p.manifest
+                .commands
+                .iter()
+                .map(move |cmd| PluginCommandInfo {
+                    plugin: p.manifest.name.clone(),
+                    name: cmd.name.clone(),
+                    description: cmd.description.clone(),
+                })
         })
         .collect()
 }
