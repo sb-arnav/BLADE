@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import AgentManager from "./AgentManager";
 import { ManagedAgentPanel } from "./ManagedAgentPanel";
 import { RuntimeTaskState, UseRuntimesResult, useRuntimes } from "../hooks/useRuntimes";
-import { OperatorMission, RuntimeDescriptor, RuntimeRouteRecommendation, RuntimeSessionRef, TaskArtifact } from "../types";
+import { MissionSpec, OperatorMission, RuntimeDescriptor, RuntimeRouteRecommendation, RuntimeSessionRef, TaskArtifact } from "../types";
 import { invoke } from "@tauri-apps/api/core";
+import { BUILT_IN_TEMPLATES } from "../data/missionTemplates";
+import { listMissionSpecs, saveMissionSpec, deleteMissionSpec, specToOperatorMission, missingVars } from "../lib/missionSpec";
 
-type OperatorTab = "mission" | "blade" | "managed";
+type OperatorTab = "mission" | "blade" | "managed" | "library";
 
 interface Props {
   onBack: () => void;
@@ -225,6 +227,12 @@ export function OperatorCenter({
   const [firecrawlApiKey, setFirecrawlApiKey] = useState("");
   const [firecrawlApiUrl, setFirecrawlApiUrl] = useState("");
 
+  // Mission library state
+  const [librarySpecs, setLibrarySpecs] = useState<MissionSpec[]>([]);
+  const [libraryFilter, setLibraryFilter] = useState("");
+  const [composingSpec, setComposingSpec] = useState<MissionSpec | null>(null);
+  const [composerVars, setComposerVars] = useState<Record<string, string>>({});
+
   const selectedRuntime =
     runtimes.runtimes.find((runtime) => runtime.id === selectedRuntimeId) || runtimes.runtimes[0] || null;
   const latestSecurityEngagement = runtimes.securityEngagements[0] || null;
@@ -240,6 +248,26 @@ export function OperatorCenter({
       setTavilyApiKey(nextTavily || "");
       setFirecrawlApiKey(nextFirecrawlKey || "");
       setFirecrawlApiUrl(nextFirecrawlUrl || "");
+    })();
+  }, []);
+
+  // Load mission library — seed built-ins on first run
+  useEffect(() => {
+    void (async () => {
+      try {
+        const saved = await listMissionSpecs();
+        const savedIds = new Set(saved.map((s) => s.id));
+        // Seed built-in templates if they haven't been saved yet
+        for (const t of BUILT_IN_TEMPLATES) {
+          if (!savedIds.has(t.id)) {
+            await saveMissionSpec(t).catch(() => {});
+          }
+        }
+        setLibrarySpecs(await listMissionSpecs());
+      } catch {
+        // If we can't reach the backend (e.g. during dev), fall back to in-memory templates
+        setLibrarySpecs(BUILT_IN_TEMPLATES);
+      }
     })();
   }, []);
 
@@ -460,6 +488,7 @@ export function OperatorCenter({
       <div className="px-4 pt-3 flex items-center gap-2 border-b border-[#1f1f1f]">
         {[
           { id: "mission", label: "Mission control" },
+          { id: "library", label: "Mission library" },
           { id: "blade", label: "Blade native" },
           { id: "managed", label: "Claude SDK" },
         ].map((item) => (
@@ -1280,12 +1309,226 @@ export function OperatorCenter({
               </div>
             </section>
           </div>
+        ) : tab === "library" ? (
+          <MissionLibrary
+            specs={librarySpecs}
+            filter={libraryFilter}
+            onFilterChange={setLibraryFilter}
+            composingSpec={composingSpec}
+            composerVars={composerVars}
+            onComposerVarChange={(key, value) => setComposerVars((v) => ({ ...v, [key]: value }))}
+            onSelectSpec={(spec) => {
+              setComposingSpec(spec);
+              setComposerVars({});
+            }}
+            onCancelCompose={() => setComposingSpec(null)}
+            onDeleteSpec={async (id) => {
+              await deleteMissionSpec(id);
+              setLibrarySpecs(await listMissionSpecs());
+            }}
+            onLaunch={async () => {
+              if (!composingSpec) return;
+              const missing = missingVars(composingSpec, composerVars);
+              if (missing.length > 0) return;
+              const om = specToOperatorMission(composingSpec, composerVars);
+              await runtimes.saveMission(om, true);
+              setMission(om);
+              setMissionExecution({});
+              setComposingSpec(null);
+              setTab("mission");
+            }}
+          />
         ) : tab === "blade" ? (
           <AgentManager />
         ) : (
           <ManagedAgentPanel onBack={() => setTab("mission")} onSendToChat={onSendToChat} />
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Mission Library Component ─────────────────────────────────────────────────
+
+const TAG_COLORS: Record<string, string> = {
+  research: "text-emerald-300 border-emerald-500/20 bg-emerald-500/10",
+  writing: "text-sky-300 border-sky-500/20 bg-sky-500/10",
+  code: "text-violet-300 border-violet-500/20 bg-violet-500/10",
+  engineering: "text-violet-300 border-violet-500/20 bg-violet-500/10",
+  debugging: "text-orange-300 border-orange-500/20 bg-orange-500/10",
+  web: "text-pink-300 border-pink-500/20 bg-pink-500/10",
+  data: "text-cyan-300 border-cyan-500/20 bg-cyan-500/10",
+  strategy: "text-amber-300 border-amber-500/20 bg-amber-500/10",
+  content: "text-rose-300 border-rose-500/20 bg-rose-500/10",
+  productivity: "text-teal-300 border-teal-500/20 bg-teal-500/10",
+  learning: "text-indigo-300 border-indigo-500/20 bg-indigo-500/10",
+  monitoring: "text-yellow-300 border-yellow-500/20 bg-yellow-500/10",
+  system: "text-slate-300 border-slate-500/20 bg-slate-500/10",
+  news: "text-fuchsia-300 border-fuchsia-500/20 bg-fuchsia-500/10",
+  marketing: "text-red-300 border-red-500/20 bg-red-500/10",
+  thinking: "text-lime-300 border-lime-500/20 bg-lime-500/10",
+};
+
+function tagColor(tag: string) {
+  return TAG_COLORS[tag] ?? "text-blade-secondary border-blade-border bg-blade-surface";
+}
+
+function MissionLibrary({
+  specs,
+  filter,
+  onFilterChange,
+  composingSpec,
+  composerVars,
+  onComposerVarChange,
+  onSelectSpec,
+  onCancelCompose,
+  onDeleteSpec,
+  onLaunch,
+}: {
+  specs: MissionSpec[];
+  filter: string;
+  onFilterChange: (v: string) => void;
+  composingSpec: MissionSpec | null;
+  composerVars: Record<string, string>;
+  onComposerVarChange: (key: string, value: string) => void;
+  onSelectSpec: (spec: MissionSpec) => void;
+  onCancelCompose: () => void;
+  onDeleteSpec: (id: string) => void;
+  onLaunch: () => void;
+}) {
+  const lf = filter.toLowerCase();
+  const filtered = specs.filter(
+    (s) =>
+      !lf ||
+      s.title.toLowerCase().includes(lf) ||
+      s.description.toLowerCase().includes(lf) ||
+      s.tags.some((t) => t.includes(lf))
+  );
+
+  if (composingSpec) {
+    const missing = missingVars(composingSpec, composerVars);
+    return (
+      <div className="p-4 space-y-4">
+        <div className="flex items-center gap-3">
+          <button onClick={onCancelCompose} className="text-xs text-blade-muted hover:text-blade-text transition-colors">
+            ← library
+          </button>
+          <div>
+            <div className="text-sm font-medium text-blade-text">{composingSpec.title}</div>
+            <div className="text-xs text-blade-muted mt-0.5">{composingSpec.description.replace(/\{\{[^}]+\}\}/g, "…")}</div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-blade-border bg-blade-surface p-4 space-y-3">
+          <div className="text-xs text-blade-muted mb-1">Fill in the variables to generate this mission.</div>
+          {composingSpec.inputVars.map((varName) => (
+            <div key={varName}>
+              <label className="block text-2xs uppercase tracking-[0.18em] text-blade-muted mb-1">{varName.replace(/_/g, " ")}</label>
+              <input
+                type="text"
+                value={composerVars[varName] ?? ""}
+                onChange={(e) => onComposerVarChange(varName, e.target.value)}
+                placeholder={`Enter ${varName.replace(/_/g, " ")}…`}
+                className="w-full text-sm bg-blade-bg border border-blade-border rounded-lg px-3 py-2 text-blade-text placeholder:text-blade-muted outline-none focus:border-blade-accent/50"
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className="rounded-2xl border border-blade-border bg-blade-surface p-4 space-y-2">
+          <div className="text-xs text-blade-muted mb-2">Mission stages</div>
+          {composingSpec.stages.map((stage, idx) => (
+            <div key={stage.id} className="flex items-start gap-3 rounded-lg border border-blade-border/60 bg-blade-bg/60 px-3 py-2">
+              <div className="w-5 h-5 rounded-full bg-blade-accent/15 border border-blade-accent/20 text-blade-accent text-2xs flex items-center justify-center flex-shrink-0 mt-0.5">
+                {idx + 1}
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs text-blade-text font-medium">{stage.title}</div>
+                <div className="text-2xs text-blade-muted mt-0.5 line-clamp-2">
+                  {stage.goalTemplate.replace(/\{\{(\w+)\}\}/g, (_, k) => composerVars[k] ? `[${composerVars[k]}]` : `{{${k}}}`)}
+                </div>
+                {stage.runtimeHint ? (
+                  <div className="text-2xs text-blade-accent/70 mt-1">via {stage.runtimeHint}</div>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={onLaunch}
+          disabled={missing.length > 0}
+          className={`w-full py-2 rounded-xl text-sm font-medium transition-colors ${
+            missing.length === 0
+              ? "bg-blade-accent text-white hover:bg-blade-accent/90"
+              : "bg-blade-surface text-blade-muted border border-blade-border cursor-not-allowed"
+          }`}
+        >
+          {missing.length > 0 ? `Fill in: ${missing.join(", ")}` : "Launch mission →"}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="relative">
+        <input
+          type="text"
+          value={filter}
+          onChange={(e) => onFilterChange(e.target.value)}
+          placeholder="Search missions…"
+          className="w-full text-sm bg-blade-surface border border-blade-border rounded-xl px-3 py-2 pl-8 text-blade-text placeholder:text-blade-muted outline-none focus:border-blade-accent/50"
+        />
+        <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-blade-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8" strokeWidth={2} />
+          <path d="M21 21l-4.35-4.35" strokeWidth={2} strokeLinecap="round" />
+        </svg>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="text-center py-8 text-sm text-blade-muted">No missions match "{filter}"</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {filtered.map((spec) => (
+            <button
+              key={spec.id}
+              onClick={() => onSelectSpec(spec)}
+              className="text-left rounded-2xl border border-blade-border bg-blade-surface hover:border-blade-accent/30 hover:bg-blade-accent-muted p-4 transition-colors group"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="text-sm font-medium text-blade-text group-hover:text-blade-accent transition-colors">
+                  {spec.title}
+                </div>
+                {!spec.builtIn ? (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onDeleteSpec(spec.id); }}
+                    className="text-blade-muted hover:text-red-400 transition-colors flex-shrink-0"
+                    title="Delete mission"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path d="M18 6L6 18M6 6l12 12" strokeWidth={2} strokeLinecap="round" />
+                    </svg>
+                  </button>
+                ) : null}
+              </div>
+              <div className="text-xs text-blade-muted mt-1.5 line-clamp-2">
+                {spec.description.replace(/\{\{[^}]+\}\}/g, "…")}
+              </div>
+              <div className="flex flex-wrap gap-1.5 mt-3">
+                {spec.tags.map((tag) => (
+                  <span key={tag} className={`text-2xs px-1.5 py-0.5 rounded-md border ${tagColor(tag)}`}>
+                    {tag}
+                  </span>
+                ))}
+                <span className="text-2xs px-1.5 py-0.5 rounded-md border border-blade-border/60 text-blade-muted/60">
+                  {spec.stages.length} stage{spec.stages.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

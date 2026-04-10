@@ -5523,3 +5523,59 @@ pub async fn runtime_stop_task(
         )),
     }
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Mission Spec file management (templates stored in ~/.blade/missions/*.json)
+// ──────────────────────────────────────────────────────────────────────────────
+
+fn mission_specs_dir() -> std::path::PathBuf {
+    crate::config::blade_config_dir().join("missions")
+}
+
+#[tauri::command]
+pub fn list_mission_specs() -> Vec<serde_json::Value> {
+    let dir = mission_specs_dir();
+    if !dir.exists() { return Vec::new(); }
+    let mut out = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            if entry.path().extension().and_then(|e| e.to_str()) == Some("json") {
+                if let Ok(content) = std::fs::read_to_string(entry.path()) {
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                        out.push(val);
+                    }
+                }
+            }
+        }
+    }
+    // Sort by title
+    out.sort_by(|a, b| {
+        let ta = a.get("title").and_then(|v| v.as_str()).unwrap_or("");
+        let tb = b.get("title").and_then(|v| v.as_str()).unwrap_or("");
+        ta.cmp(tb)
+    });
+    out
+}
+
+#[tauri::command]
+pub fn save_mission_spec(spec: serde_json::Value) -> Result<(), String> {
+    let id = spec.get("id")
+        .and_then(|v| v.as_str())
+        .ok_or("spec missing id")?
+        .to_string();
+    let dir = mission_specs_dir();
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("{id}.json"));
+    let content = serde_json::to_string_pretty(&spec).map_err(|e| e.to_string())?;
+    std::fs::write(&path, content).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_mission_spec(id: String) -> Result<(), String> {
+    let path = mission_specs_dir().join(format!("{id}.json"));
+    if path.exists() {
+        std::fs::remove_file(&path).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
