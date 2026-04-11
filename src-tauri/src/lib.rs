@@ -317,6 +317,7 @@ pub fn run() {
             context::focus_window,
             context::get_user_activity,
             character::consolidate_character,
+            character::consolidate_reactions_to_preferences,
             character::get_character_bible,
             character::update_character_section,
             memory::get_memory_log,

@@ -1,5 +1,5 @@
 use crate::config::{blade_config_dir, load_config, write_blade_file};
-use crate::providers::{self, ChatMessage};
+use crate::providers::{self, ChatMessage, ConversationMessage};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -119,6 +119,89 @@ Each field is a string with bullet points. Keep each section under 10 bullet poi
         "Character Bible updated. {} sections refreshed.",
         6
     ))
+}
+
+/// After every few reactions, extract behavioral preferences and write to brain_preferences.
+/// This is the limbic system — feedback shapes future behavior.
+#[tauri::command]
+pub async fn consolidate_reactions_to_preferences() -> Result<usize, String> {
+    let config = load_config();
+    if config.api_key.is_empty() && config.provider != "ollama" {
+        return Ok(0);
+    }
+
+    let db_path = blade_config_dir().join("blade.db");
+    let conn = rusqlite::Connection::open(&db_path).map_err(|e| format!("DB error: {}", e))?;
+
+    let reactions = crate::db::brain_get_reactions(&conn, 30)?;
+    if reactions.len() < 3 {
+        return Ok(0);
+    }
+
+    // Build examples from reactions
+    let reaction_lines: Vec<String> = reactions
+        .iter()
+        .map(|r| {
+            let label = if r.polarity > 0 { "LIKED" } else { "DISLIKED" };
+            format!("{}: {}", label, &r.content[..r.content.len().min(150)])
+        })
+        .collect();
+
+    let prompt = format!(
+        r#"Analyze these reactions from a user to extract specific behavioral preferences.
+
+Reactions:
+{}
+
+Extract 3-5 concrete preferences about HOW this person wants their AI to respond.
+Be specific: not "user wants good responses" but "user prefers concise bullet points over paragraphs".
+
+Respond ONLY with a JSON array of objects:
+[{{"text": "preference text", "confidence": 0.8}}, ...]"#,
+        reaction_lines.join("\n")
+    );
+
+    let messages = vec![ConversationMessage::User(prompt)];
+    let model = match config.provider.as_str() {
+        "anthropic" => "claude-haiku-4-5-20251001".to_string(),
+        "openai" => "gpt-4o-mini".to_string(),
+        "gemini" => "gemini-2.0-flash".to_string(),
+        _ => config.model.clone(),
+    };
+
+    let turn = providers::complete_turn(
+        &config.provider,
+        &config.api_key,
+        &model,
+        &messages,
+        &[],
+        config.base_url.as_deref(),
+    )
+    .await?;
+
+    let raw = turn.content.trim();
+    // Strip markdown code fences if present
+    let json_str = if let Some(start) = raw.find('[') {
+        if let Some(end) = raw.rfind(']') {
+            &raw[start..=end]
+        } else { raw }
+    } else { raw };
+
+    let prefs: Vec<serde_json::Value> = serde_json::from_str(json_str)
+        .map_err(|e| format!("Parse error: {} — raw: {}", e, raw))?;
+
+    let mut written = 0;
+    for pref in &prefs {
+        let text = pref["text"].as_str().unwrap_or_default();
+        let confidence = pref["confidence"].as_f64().unwrap_or(0.7);
+        if !text.is_empty() && confidence > 0.5 {
+            let id = format!("pref-rxn-{}", uuid::Uuid::new_v4());
+            let _ = crate::db::brain_upsert_preference(&conn, &id, text, confidence, "reaction");
+            written += 1;
+        }
+    }
+
+    Ok(written)
 }
 
 #[tauri::command]

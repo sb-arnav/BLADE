@@ -1,4 +1,5 @@
 import { useState, useCallback, useSyncExternalStore } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { addReaction as brainAddReaction } from "../data/characterBible";
 
 const STORAGE_KEY = "blade-reactions";
@@ -95,10 +96,13 @@ export default function MessageReactions({
   const handleReaction = useCallback(
     (emoji: string) => {
       toggleReaction(messageId, emoji);
-      // Feed 👍/👎 into Brain for pattern detection
+      // Feed 👍/👎 into Brain for pattern detection + preference extraction
       if ((emoji === "\u{1F44D}" || emoji === "\u{1F44E}") && messageContent) {
         const polarity = emoji === "\u{1F44D}" ? 1 : -1;
-        void brainAddReaction(messageId, polarity as 1 | -1, messageContent);
+        void brainAddReaction(messageId, polarity as 1 | -1, messageContent).then(() => {
+          // Every 5 reactions, synthesize into behavioral preferences (limbic loop)
+          void invoke("consolidate_reactions_to_preferences").catch(() => {});
+        });
       }
     },
     [messageId, messageContent, toggleReaction],
