@@ -324,6 +324,93 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "blade_index_project".to_string(),
+            description: "Index a codebase directory — extract all functions, classes, types, imports into a persistent knowledge graph. Run this once when entering a new project. BLADE never forgets indexed code across restarts. Use blade_find_symbol after indexing.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Root directory of the project to index (absolute path)"},
+                    "project_name": {"type": "string", "description": "Short name for this project (e.g. 'blade', 'staq')"}
+                },
+                "required": ["path", "project_name"]
+            }),
+        },
+        ToolDefinition {
+            name: "blade_find_symbol".to_string(),
+            description: "Search BLADE's codebase knowledge graph for functions, classes, types, or any symbol. Returns file path, line number, and signature. Much faster than grep — this is indexed. Use after blade_index_project.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Symbol name or description to search for"},
+                    "project": {"type": "string", "description": "Restrict search to this project name (optional — omit to search all)"},
+                    "symbol_type": {"type": "string", "description": "Filter by type: function, class, interface, type, const, export, import (optional)"},
+                    "limit": {"type": "integer", "description": "Max results (default 20)"}
+                },
+                "required": ["query"]
+            }),
+        },
+        ToolDefinition {
+            name: "blade_recall_execution".to_string(),
+            description: "Search BLADE's execution memory — every shell command ever run, its output, and whether it succeeded. Use when you see an error you might have solved before, or to recall how something was built. BLADE remembers every command it has run.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "What to search for — error message, command name, or description"},
+                    "limit": {"type": "integer", "description": "Max results (default 10)"}
+                },
+                "required": ["query"]
+            }),
+        },
+        ToolDefinition {
+            name: "blade_pentest_authorize".to_string(),
+            description: "PENTEST MODE: Record authorization to security-test a target. REQUIRED before using any offensive security tools (nmap, nikto, sqlmap, metasploit, etc.). The user must confirm they own or are authorized to test the target. Creates a 24-hour authorization window. Without this, BLADE will refuse offensive commands.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "target": {"type": "string", "description": "Target to authorize: IP, domain, IP range (CIDR), or description like 'my home lab'"},
+                    "target_type": {"type": "string", "description": "Type: 'ip', 'domain', 'range', 'description'", "enum": ["ip", "domain", "range", "description"]},
+                    "ownership_claim": {"type": "string", "description": "Claim type: 'owner' (I own this), 'authorized' (I have written permission), 'bug_bounty' (in-scope for bounty), 'ctf' (CTF challenge), 'lab' (my own test lab), 'hired' (hired as penetration tester)"},
+                    "scope_notes": {"type": "string", "description": "What's in scope, what's out of scope, any constraints"}
+                },
+                "required": ["target", "target_type", "ownership_claim", "scope_notes"]
+            }),
+        },
+        ToolDefinition {
+            name: "blade_self_upgrade".to_string(),
+            description: "Install a missing tool or capability that BLADE needs. Use when a command fails because a tool isn't installed. Pass the tool name (e.g., 'docker', 'node', 'ffmpeg', 'claude', 'aider'). BLADE installs it automatically.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "tool": {"type": "string", "description": "Tool to install: node, python3, docker, git, ffmpeg, claude, aider, jq, ripgrep, fd, bat"},
+                    "reason": {"type": "string", "description": "Why this tool is needed (for logging)"}
+                },
+                "required": ["tool"]
+            }),
+        },
+        ToolDefinition {
+            name: "blade_spawn_agent".to_string(),
+            description: "Spawn a background AI coding agent (Claude Code, Aider, Goose) to autonomously complete a coding task. Returns immediately with an agent ID. The agent runs in the background — you can check status via blade_agent_status. Use for complex multi-file refactors, test generation, or any task that would take many tool calls. BLADE becomes the orchestrator.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "task": {"type": "string", "description": "Detailed description of what the agent should do"},
+                    "agent_type": {"type": "string", "description": "Agent to use: 'claude' (Claude Code CLI), 'aider', 'goose', 'bash' (raw script). Defaults to 'claude'.", "enum": ["claude", "aider", "goose", "bash"]},
+                    "cwd": {"type": "string", "description": "Working directory for the agent (absolute path)"}
+                },
+                "required": ["task"]
+            }),
+        },
+        ToolDefinition {
+            name: "blade_agent_status".to_string(),
+            description: "Check the status and output of a background agent spawned by blade_spawn_agent. Use to see if the agent finished and what it produced.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "agent_id": {"type": "string", "description": "Agent ID returned by blade_spawn_agent. Omit to list all recent agents."}
+                }
+            }),
+        },
+        ToolDefinition {
             name: "blade_computer_use".to_string(),
             description: "Autonomously operate the computer to complete a multi-step goal. BLADE will screenshot the screen, analyze it, decide an action (click, type, scroll, open app/URL), execute it, and repeat until done. Use for tasks like 'open the settings app and turn on dark mode', 'fill out this form', 'navigate to X and find Y'. Requires a vision-capable model. Always gets user approval before submitting forms or payments.".to_string(),
             input_schema: json!({
@@ -333,6 +420,29 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
                     "max_steps": {"type": "integer", "description": "Maximum number of actions to take (default 20, max 20)"}
                 },
                 "required": ["goal"]
+            }),
+        },
+        ToolDefinition {
+            name: "blade_cron_add".to_string(),
+            description: "Schedule a recurring task that BLADE will run autonomously on a schedule. Use when the user says 'every morning', 'every Monday', 'remind me daily', or wants automated recurring actions. Examples: daily git pull at 9am, weekly dependency check, hourly clipboard backup. Actions can be: bash commands, spawning a background agent, or sending a proactive message to the user.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Short human-readable name for this task (e.g. 'Morning standup prep')"},
+                    "schedule": {"type": "string", "description": "Natural language schedule: 'every day at 9am', 'every Monday at 10am', 'every hour', 'every 30 minutes', 'every weekday at 8am'"},
+                    "action_kind": {"type": "string", "enum": ["bash", "spawn_agent", "message"], "description": "What to do: 'bash' runs a shell command, 'spawn_agent' launches a background AI agent, 'message' sends you a proactive message/reminder"},
+                    "action_payload": {"type": "string", "description": "The command to run (for bash), the task description (for spawn_agent), or the message text (for message)"},
+                    "project_cwd": {"type": "string", "description": "Working directory for bash/agent actions (optional)"}
+                },
+                "required": ["name", "schedule", "action_kind", "action_payload"]
+            }),
+        },
+        ToolDefinition {
+            name: "blade_cron_list".to_string(),
+            description: "List all scheduled recurring tasks BLADE is running on your behalf. Shows next run time and whether each task is enabled.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
             }),
         },
     ]
@@ -380,7 +490,15 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
                 Some(c) => c,
                 None => return ("Missing required argument: content".to_string(), true),
             };
-            write_file(path, content)
+            let result = write_file(path, content);
+            // Incremental re-index: if this file belongs to an indexed project, update its symbols
+            if !result.1 {
+                let path_owned = path.to_string();
+                tauri::async_runtime::spawn(async move {
+                    crate::indexer::reindex_file_if_tracked(&path_owned);
+                });
+            }
+            result
         }
         "blade_edit_file" => {
             let path = match args["path"].as_str() {
@@ -395,7 +513,15 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
                 Some(s) => s,
                 None => return ("Missing required argument: new_string".to_string(), true),
             };
-            edit_file(path, old_string, new_string)
+            let result = edit_file(path, old_string, new_string);
+            // Incremental re-index on successful edit
+            if !result.1 {
+                let path_owned = path.to_string();
+                tauri::async_runtime::spawn(async move {
+                    crate::indexer::reindex_file_if_tracked(&path_owned);
+                });
+            }
+            result
         }
         "blade_glob" => {
             let pattern = match args["pattern"].as_str() {
@@ -621,6 +747,156 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
                 ("Cannot send notification: no app handle.".to_string(), true)
             }
         }
+        "blade_index_project" => {
+            let path = match args["path"].as_str() {
+                Some(p) => p.to_string(),
+                None => return ("Missing required argument: path".to_string(), true),
+            };
+            let project_name = match args["project_name"].as_str() {
+                Some(n) => n.to_string(),
+                None => return ("Missing required argument: project_name".to_string(), true),
+            };
+            match crate::indexer::blade_index_project(project_name.clone(), path).await {
+                Ok(summary) => (summary, false),
+                Err(e) => (format!("Index failed: {}", e), true),
+            }
+        }
+        "blade_find_symbol" => {
+            let query = match args["query"].as_str() {
+                Some(q) => q.to_string(),
+                None => return ("Missing required argument: query".to_string(), true),
+            };
+            let project = args["project"].as_str().map(|s| s.to_string());
+            let symbol_type = args["symbol_type"].as_str().map(|s| s.to_string());
+            let limit = args["limit"].as_u64().unwrap_or(20) as usize;
+            let results = crate::indexer::search_symbols(&query, project.as_deref(), limit);
+            if results.is_empty() {
+                (format!("No symbols found matching '{}'", query), false)
+            } else {
+                let filtered: Vec<_> = if let Some(ref t) = symbol_type {
+                    results.into_iter().filter(|s| s.symbol_type.contains(t.as_str())).collect()
+                } else {
+                    results
+                };
+                let text = filtered.iter().map(|s| {
+                    let doc = if s.docstring.is_empty() { String::new() } else { format!(" // {}", &s.docstring[..s.docstring.len().min(60)]) };
+                    format!("{}:{} [{}] {}{}", s.file_path, s.line_number, s.symbol_type, s.signature, doc)
+                }).collect::<Vec<_>>().join("\n");
+                (text, false)
+            }
+        }
+        "blade_pentest_authorize" => {
+            let target = match args["target"].as_str() {
+                Some(t) => t.to_string(),
+                None => return ("Missing required argument: target".to_string(), true),
+            };
+            let target_type = args["target_type"].as_str().unwrap_or("description").to_string();
+            let ownership_claim = match args["ownership_claim"].as_str() {
+                Some(c) => c.to_string(),
+                None => return ("Missing required argument: ownership_claim".to_string(), true),
+            };
+            let scope_notes = args["scope_notes"].as_str().unwrap_or("").to_string();
+            match crate::self_upgrade::pentest_authorize(target, target_type, ownership_claim, scope_notes).await {
+                Ok(msg) => (msg, false),
+                Err(e) => (format!("Authorization failed: {}", e), true),
+            }
+        }
+        "blade_self_upgrade" => {
+            let tool = match args["tool"].as_str() {
+                Some(t) => t.to_string(),
+                None => return ("Missing required argument: tool".to_string(), true),
+            };
+            match crate::self_upgrade::self_upgrade_install(tool).await {
+                Ok(result) => {
+                    let status = if result.success { "✓ Installed" } else { "✗ Failed" };
+                    (format!("{}: {}\n{}", status, result.tool, result.output), !result.success)
+                }
+                Err(e) => (format!("Install failed: {}", e), true),
+            }
+        }
+        "blade_spawn_agent" => {
+            let task = match args["task"].as_str() {
+                Some(t) => t.to_string(),
+                None => return ("Missing required argument: task".to_string(), true),
+            };
+            let agent_type = args["agent_type"].as_str().unwrap_or("claude").to_string();
+            let cwd = args["cwd"].as_str().map(|s| s.to_string());
+
+            if let Some(app) = app {
+                match crate::background_agent::agent_spawn(app.clone(), agent_type.clone(), task.clone(), cwd).await {
+                    Ok(id) => (format!(
+                        "Agent '{}' spawned with id {}. Task: \"{}\"\n\
+                         The agent is running in the background. Use blade_agent_status with this id to check progress.",
+                        agent_type, id, &task[..task.len().min(80)]
+                    ), false),
+                    Err(e) => (format!("Failed to spawn agent: {}", e), true),
+                }
+            } else {
+                // Check if agent is even available
+                let available = crate::background_agent::detect_available_agents();
+                if available.is_empty() {
+                    ("No coding agents found. Install Claude Code CLI with: npm install -g @anthropic-ai/claude-code".to_string(), true)
+                } else {
+                    (format!("Available agents: {}. Cannot spawn without app handle.", available.join(", ")), true)
+                }
+            }
+        }
+        "blade_agent_status" => {
+            let id = args["agent_id"].as_str().map(|s| s.to_string());
+            match id {
+                Some(aid) => {
+                    match crate::background_agent::agent_get_background(aid.clone()) {
+                        Some(agent) => {
+                            let status_str = match agent.status {
+                                crate::background_agent::AgentStatus::Running => "RUNNING",
+                                crate::background_agent::AgentStatus::Completed => "COMPLETED",
+                                crate::background_agent::AgentStatus::Failed => "FAILED",
+                                crate::background_agent::AgentStatus::Cancelled => "CANCELLED",
+                            };
+                            let output_preview = if agent.output.is_empty() {
+                                "(no output yet)".to_string()
+                            } else {
+                                agent.output.iter().rev().take(20).rev()
+                                    .cloned().collect::<Vec<_>>().join("\n")
+                            };
+                            (format!(
+                                "Agent {} [{}]\nTask: {}\nOutput ({} lines):\n{}",
+                                aid, status_str, agent.task, agent.output.len(), output_preview
+                            ), false)
+                        }
+                        None => (format!("No agent found with id: {}", aid), true),
+                    }
+                }
+                None => {
+                    let agents = crate::background_agent::agent_list_background();
+                    if agents.is_empty() {
+                        ("No background agents running or recently completed.".to_string(), false)
+                    } else {
+                        let lines: Vec<String> = agents.iter().take(10).map(|a| {
+                            let s = match a.status {
+                                crate::background_agent::AgentStatus::Running => "RUNNING",
+                                crate::background_agent::AgentStatus::Completed => "DONE",
+                                crate::background_agent::AgentStatus::Failed => "FAILED",
+                                crate::background_agent::AgentStatus::Cancelled => "CANCELLED",
+                            };
+                            format!("[{}] {} — {} ({})", s, a.id, &a.task[..a.task.len().min(60)], a.agent_type)
+                        }).collect();
+                        (lines.join("\n"), false)
+                    }
+                }
+            }
+        }
+        "blade_recall_execution" => {
+            let query = match args["query"].as_str() {
+                Some(q) => q.to_string(),
+                None => return ("Missing required argument: query".to_string(), true),
+            };
+            let limit = args["limit"].as_u64().unwrap_or(10) as usize;
+            match crate::execution_memory::exmem_search(query, Some(limit)).await {
+                Ok(results) => (results, false),
+                Err(e) => (format!("Execution memory search failed: {}", e), true),
+            }
+        }
         "blade_computer_use" => {
             let goal = match args["goal"].as_str() {
                 Some(g) => g.to_string(),
@@ -651,6 +927,69 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
                 ("Cannot run computer use: no app handle available.".to_string(), true)
             }
         }
+        "blade_cron_add" => {
+            let task_name = match args["name"].as_str() {
+                Some(n) => n.to_string(),
+                None => return ("Missing required argument: name".to_string(), true),
+            };
+            let schedule_str = match args["schedule"].as_str() {
+                Some(s) => s.to_string(),
+                None => return ("Missing required argument: schedule".to_string(), true),
+            };
+            let action_kind = match args["action_kind"].as_str() {
+                Some(k) => k.to_string(),
+                None => return ("Missing required argument: action_kind".to_string(), true),
+            };
+            let action_payload = match args["action_payload"].as_str() {
+                Some(p) => p.to_string(),
+                None => return ("Missing required argument: action_payload".to_string(), true),
+            };
+            let project_cwd = args["project_cwd"].as_str().map(|s| s.to_string());
+
+            match crate::cron::cron_add(
+                task_name.clone(),
+                task_name.clone(), // description = name when called from AI
+                schedule_str.clone(),
+                action_kind,
+                action_payload,
+                project_cwd,
+                None, // agent_type — use default
+            ) {
+                Ok(id) => (format!(
+                    "Scheduled task '{}' created (id: {}). Schedule: {}. I'll run this automatically.",
+                    task_name, id, schedule_str
+                ), false),
+                Err(e) => (format!("Failed to schedule task: {}", e), true),
+            }
+        }
+        "blade_cron_list" => {
+            let tasks = crate::cron::cron_list();
+            if tasks.is_empty() {
+                ("No scheduled tasks. Use blade_cron_add to set up recurring automations.".to_string(), false)
+            } else {
+                let lines: Vec<String> = tasks.iter().map(|t| {
+                    let next = chrono::DateTime::from_timestamp(t.next_run, 0)
+                        .map(|d| d.with_timezone(&chrono::Local).format("%a %b %d %H:%M").to_string())
+                        .unwrap_or_else(|| "unknown".to_string());
+                    let status = if t.enabled { "enabled" } else { "disabled" };
+                    let sched_desc = match t.schedule.kind.as_str() {
+                        "daily" => t.schedule.time_of_day.map(|m| format!("daily at {:02}:{:02}", m/60, m%60)).unwrap_or_else(|| "daily".to_string()),
+                        "weekly" => {
+                            let days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+                            let day = t.schedule.day_of_week.and_then(|d| days.get(d as usize)).copied().unwrap_or("?");
+                            t.schedule.time_of_day.map(|m| format!("every {} at {:02}:{:02}", day, m/60, m%60)).unwrap_or_else(|| format!("every {}", day))
+                        },
+                        "interval" => t.schedule.interval_secs.map(|s| {
+                            if s < 3600 { format!("every {} min", s/60) } else { format!("every {}h", s/3600) }
+                        }).unwrap_or_else(|| "interval".to_string()),
+                        "hourly" => "every hour".to_string(),
+                        other => other.to_string(),
+                    };
+                    format!("- [{}] {} — {} | next: {}", status, t.name, sched_desc, next)
+                }).collect();
+                (format!("Scheduled tasks ({}):\n\n{}", tasks.len(), lines.join("\n")), false)
+            }
+        }
         _ => (format!("Unknown native tool: {}", name), true),
     }
 }
@@ -663,6 +1002,7 @@ async fn bash(command: &str, cwd: Option<&str>, timeout_ms: u64) -> (String, boo
         .map(|d| expand_home(d))
         .map(std::path::PathBuf::from)
         .unwrap_or(home);
+    let start = std::time::Instant::now();
 
     #[cfg(target_os = "windows")]
     let spawn_result = {
@@ -701,8 +1041,46 @@ async fn bash(command: &str, cwd: Option<&str>, timeout_ms: u64) -> (String, boo
             let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
             let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
             let code = output.status.code().unwrap_or(-1);
+            let duration_ms = start.elapsed().as_millis() as i64;
+
+            // Record to execution memory — BLADE never forgets a command it ran
+            crate::execution_memory::record(
+                command,
+                work_dir.to_str().unwrap_or(""),
+                &stdout,
+                &stderr,
+                code,
+                duration_ms,
+            );
+
+            // On error, check if we've solved this before
+            let memory_hint = if code != 0 && !stderr.is_empty() {
+                crate::execution_memory::recall_on_error(&stderr)
+            } else {
+                None
+            };
+
+            // Self-upgrade: detect missing tools and offer to install
+            let upgrade_hint = if code != 0 {
+                let combined_error = format!("{}\n{}", stdout, stderr);
+                crate::self_upgrade::detect_missing_tool(&combined_error, command)
+                    .map(|gap| format!(
+                        "\n💡 Missing capability detected: {}\nInstall with: `{}`\nOr ask BLADE: \"install {}\"",
+                        gap.description, gap.install_cmd, gap.suggestion
+                    ))
+            } else {
+                None
+            };
+
             let text = format_bash_output(stdout, stderr, code);
-            (text, code != 0)
+            let mut extras = Vec::new();
+            if let Some(hint) = memory_hint { extras.push(hint); }
+            if let Some(hint) = upgrade_hint { extras.push(hint); }
+            if extras.is_empty() {
+                (text, code != 0)
+            } else {
+                (format!("{}\n\n{}", text, extras.join("\n\n")), code != 0)
+            }
         }
         Ok(Err(e)) => (format!("Command error: {}", e), true),
         Err(_) => (format!("Command timed out after {}ms", timeout_ms), true),
@@ -728,6 +1106,11 @@ fn format_bash_output(stdout: String, stderr: String, code: i32) -> String {
 
 fn read_file(path: &str, offset: usize, limit: Option<usize>) -> (String, bool) {
     let expanded = expand_home(path);
+
+    // Auto-index the project if we haven't seen it before.
+    // If BLADE reads a file in a new project directory, quietly index the whole thing.
+    maybe_trigger_auto_index(&expanded);
+
     match std::fs::read_to_string(&expanded) {
         Ok(content) => {
             let lines: Vec<&str> = content.lines().collect();
@@ -1282,4 +1665,79 @@ fn ui_wait(name: Option<String>, timeout_ms: Option<u64>) -> (String, bool) {
         Ok(msg) => (msg, false),
         Err(e) => (e, true),
     }
+}
+
+// ── AUTO-INDEX ─────────────────────────────────────────────────────────────────
+// When BLADE reads a file for the first time from a project directory,
+// trigger a background index of that project. BLADE builds persistent knowledge
+// of every codebase it touches — silently, without being asked.
+
+fn maybe_trigger_auto_index(file_path: &str) {
+    use std::path::Path;
+
+    let path = Path::new(file_path);
+    let parent = match path.parent() {
+        Some(p) => p,
+        None => return,
+    };
+
+    // Find project root: walk up until we find a Cargo.toml, package.json, etc.
+    let project_root = find_project_root(parent);
+    let (root_str, project_name) = match &project_root {
+        Some(r) => (
+            r.to_string_lossy().to_string(),
+            r.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown")
+                .to_string(),
+        ),
+        None => return,
+    };
+
+    // Check if already indexed recently (within 24 hours) — avoid re-indexing constantly
+    let known = crate::indexer::list_indexed_projects();
+    let already_indexed = known.iter().any(|p| {
+        p.project == project_name
+            && p.last_indexed > chrono::Utc::now().timestamp() - 86400
+    });
+
+    if already_indexed {
+        return;
+    }
+
+    // Spawn background index — never blocks the read
+    let root = root_str.clone();
+    let name = project_name.clone();
+    tauri::async_runtime::spawn(async move {
+        log::info!("[auto-index] Indexing project '{}' at {}", name, root);
+        let _ = crate::indexer::index_project(&name, &root).await;
+        log::info!("[auto-index] Done indexing '{}'", name);
+    });
+}
+
+fn find_project_root(start: &std::path::Path) -> Option<std::path::PathBuf> {
+    let markers = [
+        "Cargo.toml",
+        "package.json",
+        "pyproject.toml",
+        "setup.py",
+        "go.mod",
+        ".git",
+        "pom.xml",
+        "build.gradle",
+    ];
+
+    let mut current = start.to_path_buf();
+    for _ in 0..8 {
+        // max 8 levels up
+        for marker in &markers {
+            if current.join(marker).exists() {
+                return Some(current);
+            }
+        }
+        if !current.pop() {
+            break;
+        }
+    }
+    None
 }

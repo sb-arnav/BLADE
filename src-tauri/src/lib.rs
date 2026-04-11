@@ -1,5 +1,12 @@
 mod agent_commands;
 mod ambient;
+mod background_agent;
+mod cron;
+mod execution_memory;
+mod health;
+mod indexer;
+mod self_upgrade;
+mod session_handoff;
 mod computer_use;
 mod deeplearn;
 mod discord;
@@ -187,6 +194,9 @@ pub fn run() {
             commands::send_message_stream,
             commands::toggle_god_mode,
             commands::get_config,
+            config::get_all_provider_keys,
+            config::store_provider_key,
+            config::switch_provider,
             commands::debug_config,
             commands::reset_onboarding,
             commands::set_config,
@@ -417,6 +427,38 @@ pub fn run() {
             obsidian::obsidian_append_note,
             obsidian::obsidian_today_note,
             obsidian::obsidian_vault_configured,
+            health::health_get_scan,
+            health::health_scan_now,
+            health::health_summary_all,
+            cron::cron_add,
+            cron::cron_list,
+            cron::cron_delete,
+            cron::cron_toggle,
+            session_handoff::session_handoff_clear,
+            session_handoff::session_handoff_write,
+            session_handoff::session_handoff_get,
+            self_upgrade::self_upgrade_install,
+            self_upgrade::self_upgrade_catalog,
+            self_upgrade::self_upgrade_audit,
+            self_upgrade::pentest_authorize,
+            self_upgrade::pentest_check_auth,
+            self_upgrade::pentest_revoke,
+            self_upgrade::pentest_list_auth,
+            self_upgrade::pentest_check_model_safety,
+            background_agent::agent_spawn,
+            background_agent::agent_list_background,
+            background_agent::agent_get_background,
+            background_agent::agent_cancel_background,
+            background_agent::agent_detect_available,
+            background_agent::agent_get_output,
+            indexer::blade_index_project,
+            indexer::blade_find_symbol,
+            indexer::blade_list_indexed_projects,
+            indexer::blade_reindex_file,
+            indexer::blade_project_summary,
+            execution_memory::exmem_record,
+            execution_memory::exmem_search,
+            execution_memory::exmem_recent,
             reminders::reminder_add,
             reminders::reminder_add_natural,
             reminders::reminder_list,
@@ -499,6 +541,26 @@ pub fn run() {
                     }
                     // Check once per hour
                     tokio::time::sleep(tokio::time::Duration::from_secs(3600)).await;
+                }
+            });
+
+            // Proactive code health scanner — scans indexed projects every 30 min
+            health::start_health_scanner(app.handle().clone());
+
+            // BLADE Cron — autonomous scheduled tasks
+            cron::start_cron_loop(app.handle().clone());
+
+            // Write session handoff on startup (captures what happened last session)
+            let handoff_app = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                // Small delay so execution memory is initialized
+                tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+                session_handoff::write_session_handoff();
+                // Keep updating every 15 minutes during the session
+                let _ = handoff_app; // keep handle alive
+                loop {
+                    tokio::time::sleep(tokio::time::Duration::from_secs(900)).await;
+                    session_handoff::write_session_handoff();
                 }
             });
 
