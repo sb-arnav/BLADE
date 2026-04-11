@@ -348,11 +348,23 @@ export default function App() {
       }
     );
 
+    const unlistenSkillLearned = listen<{ name: string; trigger_pattern: string }>(
+      "skill_learned",
+      (event) => {
+        notifications.add({
+          type: "success",
+          title: `Skill learned: ${event.payload.name}`,
+          message: event.payload.trigger_pattern,
+        });
+      }
+    );
+
     return () => {
       unlisten.then((fn) => fn());
       unlistenBriefing.then((fn) => fn());
       unlistenReminderFired.then((fn) => fn());
       unlistenReminderCreated.then((fn) => fn());
+      unlistenSkillLearned.then((fn) => fn());
     };
   }, [tts.enabled]);
 
