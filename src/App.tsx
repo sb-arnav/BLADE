@@ -184,9 +184,12 @@ export default function App() {
     return () => document.removeEventListener("click", handleClick);
   }, []);
 
-  // Auto-focus input when window becomes visible
+  // Auto-focus input + force WebView2 repaint when window regains focus.
+  // On Windows with decorations:false, WebView2 stops painting when another
+  // app takes focus. Dispatching a resize event forces it to redraw.
   useEffect(() => {
     const unlisten = listen("tauri://focus", () => {
+      window.dispatchEvent(new Event("resize"));
       setTimeout(() => inputRef.current?.focus(), 50);
     });
     return () => { unlisten.then((fn) => fn()); };
