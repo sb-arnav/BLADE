@@ -93,6 +93,7 @@ pub async fn send_message_stream(
             &config.api_key,
             &config.model,
             &conversation,
+            config.base_url.as_deref(),
         )
         .await;
         let entry = span.finish(result.is_ok(), result.as_ref().err().cloned());
@@ -129,6 +130,7 @@ pub async fn send_message_stream(
             &config.model,
             &conversation,
             &tools,
+            config.base_url.as_deref(),
         )
         .await;
         let entry = span.finish(turn_result.is_ok(), turn_result.as_ref().err().cloned());
@@ -341,6 +343,7 @@ pub fn set_config(
     work_mode: Option<String>,
     response_style: Option<String>,
     blade_email: Option<String>,
+    base_url: Option<String>,
 ) -> Result<(), String> {
     let mut config = load_config();
     config.provider = provider;
@@ -352,6 +355,8 @@ pub fn set_config(
     if let Some(v) = work_mode { config.work_mode = v; }
     if let Some(v) = response_style { config.response_style = v; }
     if let Some(v) = blade_email { config.blade_email = v; }
+    // Empty string means "clear the custom URL"
+    config.base_url = base_url.filter(|s| !s.is_empty());
     save_config(&config)
 }
 
@@ -377,8 +382,9 @@ pub async fn test_provider(
     provider: String,
     api_key: String,
     model: String,
+    base_url: Option<String>,
 ) -> Result<String, String> {
-    providers::test_connection(&provider, &api_key, &model).await
+    providers::test_connection(&provider, &api_key, &model, base_url.as_deref()).await
 }
 
 #[tauri::command]

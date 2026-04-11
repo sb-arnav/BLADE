@@ -45,7 +45,7 @@ Respond ONLY with the JSON array, no other text."#,
     }];
     let conversation = providers::build_conversation(messages, None);
 
-    let turn = providers::complete_turn(provider, api_key, model, &conversation, &[]).await?;
+    let turn = providers::complete_turn(provider, api_key, model, &conversation, &[], None).await?;
 
     // Parse the JSON response
     let content = turn.content.trim();

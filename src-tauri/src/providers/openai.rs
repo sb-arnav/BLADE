@@ -120,12 +120,14 @@ pub async fn complete(
     model: &str,
     messages: &[ConversationMessage],
     tools: &[ToolDefinition],
+    base_url: Option<&str>,
 ) -> Result<AssistantTurn, String> {
     let client = Client::new();
     let body = build_body(model, messages, tools);
+    let url = base_url.unwrap_or("https://api.openai.com/v1/chat/completions");
 
     let response = client
-        .post("https://api.openai.com/v1/chat/completions")
+        .post(url)
         .header("Authorization", format!("Bearer {}", api_key))
         .json(&body)
         .send()
@@ -184,12 +186,14 @@ pub async fn stream_text(
     api_key: &str,
     model: &str,
     messages: &[super::ConversationMessage],
+    base_url: Option<&str>,
 ) -> Result<(), String> {
     use futures::StreamExt;
     use tauri::Emitter;
 
     let client = Client::new();
     let msgs: Vec<serde_json::Value> = messages.iter().filter_map(serialize_simple).collect();
+    let url = base_url.unwrap_or("https://api.openai.com/v1/chat/completions");
 
     let body = serde_json::json!({
         "model": model,
@@ -198,7 +202,7 @@ pub async fn stream_text(
     });
 
     let response = client
-        .post("https://api.openai.com/v1/chat/completions")
+        .post(url)
         .header("Authorization", format!("Bearer {}", api_key))
         .json(&body)
         .send()
@@ -239,8 +243,9 @@ pub async fn stream_text(
     Ok(())
 }
 
-pub async fn test(api_key: &str, model: &str) -> Result<String, String> {
+pub async fn test(api_key: &str, model: &str, base_url: Option<&str>) -> Result<String, String> {
     let client = Client::new();
+    let url = base_url.unwrap_or("https://api.openai.com/v1/chat/completions");
     let body = serde_json::json!({
         "model": model,
         "messages": [{"role": "user", "content": "Say hi in one word."}],
@@ -248,7 +253,7 @@ pub async fn test(api_key: &str, model: &str) -> Result<String, String> {
     });
 
     let response = client
-        .post("https://api.openai.com/v1/chat/completions")
+        .post(url)
         .header("Authorization", format!("Bearer {}", api_key))
         .json(&body)
         .send()

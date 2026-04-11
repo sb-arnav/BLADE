@@ -45,6 +45,8 @@ struct DiskConfig {
     response_style: String,
     #[serde(default)]
     blade_email: String,
+    #[serde(default)]
+    base_url: Option<String>,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -63,6 +65,7 @@ impl Default for DiskConfig {
             work_mode: String::new(),
             response_style: String::new(),
             blade_email: String::new(),
+            base_url: None,
             api_key: None,
         }
     }
@@ -89,6 +92,8 @@ pub struct BladeConfig {
     pub response_style: String,
     #[serde(default)]
     pub blade_email: String,
+    #[serde(default)]
+    pub base_url: Option<String>,
 }
 
 impl Default for BladeConfig {
@@ -105,6 +110,7 @@ impl Default for BladeConfig {
             work_mode: String::new(),
             response_style: String::new(),
             blade_email: String::new(),
+            base_url: None,
         }
     }
 }
@@ -185,6 +191,7 @@ pub fn load_config() -> BladeConfig {
         work_mode: disk.work_mode,
         response_style: disk.response_style,
         blade_email: disk.blade_email,
+        base_url: disk.base_url,
     }
 }
 
@@ -203,6 +210,7 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         work_mode: config.work_mode.clone(),
         response_style: config.response_style.clone(),
         blade_email: config.blade_email.clone(),
+        base_url: config.base_url.clone(),
         api_key: None,
     };
 

@@ -60,6 +60,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
   const [provider, setProvider] = useState(config.provider);
   const [apiKey, setApiKey] = useState(config.api_key);
   const [model, setModel] = useState(config.model);
+  const [baseUrl, setBaseUrl] = useState(config.base_url ?? "");
   const [persona, setPersona] = useState("");
   const [contextNotes, setContextNotes] = useState("");
   const [status, setStatus] = useState<string | null>(null);
@@ -73,6 +74,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
     setProvider(config.provider);
     setApiKey(config.api_key);
     setModel(config.model);
+    setBaseUrl(config.base_url ?? "");
   }, [config]);
 
   useEffect(() => {
@@ -99,7 +101,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
     setError(null);
 
     try {
-      const result = await invoke<string>("test_provider", { provider, apiKey, model });
+      const result = await invoke<string>("test_provider", { provider, apiKey, model, baseUrl: baseUrl || null });
       setStatus(`Connected: ${result}`);
     } catch (cause) {
       setStatus(null);
@@ -112,12 +114,13 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
     setError(null);
 
     try {
-      await invoke("set_config", { provider, apiKey, model });
+      await invoke("set_config", { provider, apiKey, model, baseUrl: baseUrl || null });
       const nextConfig: BladeConfig = {
         ...config,
         provider,
         api_key: apiKey,
         model,
+        base_url: baseUrl || undefined,
         onboarded: true,
       };
       setStatus("Settings saved.");
@@ -261,6 +264,21 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
               placeholder="Paste provider key"
             />
           </label>
+
+          {provider === "openai" && (
+            <label className="space-y-2 block">
+              <span className="text-xs uppercase tracking-wide text-blade-muted">
+                Base URL <span className="normal-case text-blade-muted/60">(optional — for Vercel AI Gateway, Azure, or other OpenAI-compatible endpoints)</span>
+              </span>
+              <input
+                type="text"
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+                className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none font-mono"
+                placeholder="https://gateway.ai.cloudflare.com/v1/.../openai"
+              />
+            </label>
+          )}
 
           <div className="flex items-center gap-3">
             <button
