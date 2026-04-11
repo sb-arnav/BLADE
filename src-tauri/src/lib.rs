@@ -236,6 +236,7 @@ pub fn run() {
             voice::voice_start_recording,
             voice::voice_stop_recording,
             voice::voice_transcribe,
+            voice::voice_transcribe_blob,
             screen::capture_screen,
             screen::capture_screen_region,
             memory::learn_from_conversation,

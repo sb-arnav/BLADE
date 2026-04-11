@@ -64,6 +64,8 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
   const [godModeTier, setGodModeTier] = useState<string>(
     config.god_mode ? (config.god_mode_tier ?? "normal") : "off"
   );
+  const [voiceMode, setVoiceMode] = useState(config.voice_mode ?? "off");
+  const [obsidianVaultPath, setObsidianVaultPath] = useState(config.obsidian_vault_path ?? "");
   const [persona, setPersona] = useState("");
   const [contextNotes, setContextNotes] = useState("");
   const [status, setStatus] = useState<string | null>(null);
@@ -79,6 +81,8 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
     setModel(config.model);
     setBaseUrl(config.base_url ?? "");
     setGodModeTier(config.god_mode ? (config.god_mode_tier ?? "normal") : "off");
+    setVoiceMode(config.voice_mode ?? "off");
+    setObsidianVaultPath(config.obsidian_vault_path ?? "");
   }, [config]);
 
   useEffect(() => {
@@ -120,7 +124,11 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
     try {
       const godModeEnabled = godModeTier !== "off";
       const godModeTierVal = godModeEnabled ? godModeTier : "normal";
-      await invoke("set_config", { provider, apiKey, model, baseUrl: baseUrl || null, godMode: godModeEnabled, godModeTier: godModeTierVal });
+      await invoke("set_config", {
+        provider, apiKey, model, baseUrl: baseUrl || null,
+        godMode: godModeEnabled, godModeTier: godModeTierVal,
+        voiceMode, obsidianVaultPath: obsidianVaultPath || null,
+      });
       const nextConfig: BladeConfig = {
         ...config,
         provider,
@@ -129,6 +137,8 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
         base_url: baseUrl || undefined,
         god_mode: godModeEnabled,
         god_mode_tier: godModeTierVal,
+        voice_mode: voiceMode,
+        obsidian_vault_path: obsidianVaultPath || undefined,
         onboarded: true,
       };
       setStatus("Settings saved.");
@@ -335,6 +345,58 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
               </p>
             )}
           </div>
+
+          {/* Voice Mode */}
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-medium">Voice Mode</p>
+              <p className="text-xs text-blade-muted mt-0.5">
+                Push-to-talk: hold <kbd className="font-mono bg-blade-surface border border-blade-border rounded px-1 text-[10px]">Ctrl+Space</kbd> to speak.
+                Always On: VAD listens continuously — say "hey Blade" to trigger, or turn on auto-send in Extreme mode.
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {(["off", "push-to-talk", "always-on"] as const).map((m) => {
+                const labels = { off: "Off", "push-to-talk": "Push-to-Talk", "always-on": "Always On" };
+                const descs = { off: "Disabled", "push-to-talk": "Hold Ctrl+Space", "always-on": "VAD + wake word" };
+                const active = voiceMode === m;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setVoiceMode(m)}
+                    className={`flex flex-col items-center gap-0.5 rounded-xl border px-2 py-2 text-center transition-colors ${
+                      active
+                        ? "border-blade-accent bg-blade-accent/10 text-blade-accent"
+                        : "border-blade-border text-blade-muted hover:border-blade-accent/50"
+                    }`}
+                  >
+                    <span className="text-xs font-semibold">{labels[m]}</span>
+                    <span className="text-[10px] leading-tight opacity-70">{descs[m]}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {voiceMode === "always-on" && (
+              <p className="text-xs text-blue-400 bg-blue-500/10 border border-blue-500/30 rounded-lg px-3 py-2">
+                Always-on uses your microphone continuously. Speech is sent to Whisper (via Groq). Say "Hey Blade" to trigger auto-send — otherwise your words fill the input box for you to review.
+              </p>
+            )}
+          </div>
+
+          {/* Obsidian Vault */}
+          <label className="space-y-2 block">
+            <span className="text-xs uppercase tracking-wide text-blade-muted">
+              Obsidian Vault Path <span className="normal-case text-blade-muted/60">(optional — Blade will read and write notes here)</span>
+            </span>
+            <input
+              type="text"
+              value={obsidianVaultPath}
+              onChange={(e) => setObsidianVaultPath(e.target.value)}
+              className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none font-mono"
+              placeholder="/home/user/vault or C:\Users\user\vault"
+            />
+          </label>
 
           <div className="flex items-center gap-3">
             <button
