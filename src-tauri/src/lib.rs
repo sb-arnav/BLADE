@@ -4,6 +4,7 @@ mod computer_use;
 mod deeplearn;
 mod discord;
 mod obsidian;
+mod journal;
 mod pulse;
 mod reminders;
 mod skill_engine;
@@ -333,6 +334,8 @@ pub fn run() {
             tray::set_tray_status,
             pulse::pulse_get_last_thought,
             pulse::pulse_now,
+            journal::journal_get_recent,
+            journal::journal_write_now,
             deeplearn::deeplearn_discover_sources,
             deeplearn::deeplearn_run,
             thread::blade_thread_update,
@@ -480,6 +483,18 @@ pub fn run() {
                 // Brief delay so the window is visible before briefing fires
                 tokio::time::sleep(tokio::time::Duration::from_secs(8)).await;
                 pulse::maybe_morning_briefing(briefing_app).await;
+            });
+
+            // Evening journal — BLADE writes its own internal log once per day after 8pm
+            tauri::async_runtime::spawn(async move {
+                loop {
+                    let hour = chrono::Local::now().hour();
+                    if hour >= 20 {
+                        journal::maybe_write_journal().await;
+                    }
+                    // Check once per hour
+                    tokio::time::sleep(tokio::time::Duration::from_secs(3600)).await;
+                }
             });
 
             // Start god mode if enabled
