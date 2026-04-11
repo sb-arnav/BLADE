@@ -98,9 +98,7 @@ export function ChatWindow({
     return conversations.filter((c) => (c.title || "").toLowerCase().includes(q));
   }, [conversations, search]);
 
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    try { return localStorage.getItem("blade-sidebar") === "open"; } catch { return false; }
-  });
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const toggleSidebar = (open: boolean) => {
     setSidebarOpen(open);
@@ -155,14 +153,15 @@ export function ChatWindow({
       {/* Sidebar overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-30 bg-black/50 backdrop-blur-[2px] transition-opacity"
+          className="fixed left-0 right-0 bottom-0 z-30 bg-black/50 backdrop-blur-[2px] transition-opacity"
+          style={{ top: "2.25rem" }}
           onClick={() => toggleSidebar(false)}
         />
       )}
 
       {/* Sidebar */}
       <div
-        className={`fixed inset-y-0 left-0 z-40 w-60 bg-blade-surface border-r border-blade-border flex flex-col transition-transform duration-200 ease-out ${
+        className={`fixed left-0 bottom-0 z-40 w-60 bg-blade-surface border-r border-blade-border flex flex-col transition-transform duration-200 ease-out ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
         style={{ top: "2.25rem" }}

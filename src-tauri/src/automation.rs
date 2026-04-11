@@ -334,8 +334,11 @@ fn parse_button(button: Option<&str>) -> Button {
 fn open_target(target: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
         std::process::Command::new("cmd")
             .args(["/C", "start", "", target])
+            .creation_flags(CREATE_NO_WINDOW)
             .spawn()
             .map_err(|e| format!("Open target failed: {}", e))?;
         return Ok(());
