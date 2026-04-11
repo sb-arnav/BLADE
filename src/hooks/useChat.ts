@@ -114,13 +114,18 @@ export function useChat() {
       // Fire-and-forget: let the backend learn from the completed conversation
       invoke("learn_from_conversation", { messages: messagesRef.current }).catch(() => {});
 
-      // Background entity extraction — use last user + assembled assistant text
+      // Background entity extraction + full exchange embedding — use assembled text
       const msgs = messagesRef.current;
       const lastUser = [...msgs].reverse().find((m) => m.role === "user");
       const lastAssistant = assembledBuffer ||
         ([...msgs].reverse().find((m) => m.role === "assistant")?.content ?? "");
       if (lastUser && lastAssistant) {
         invoke("brain_extract_from_exchange", {
+          userText: lastUser.content,
+          assistantText: lastAssistant,
+        }).catch(() => {});
+        // Auto-update working thread for streaming path (tool loop path does this in Rust)
+        invoke("blade_thread_auto_update", {
           userText: lastUser.content,
           assistantText: lastAssistant,
         }).catch(() => {});

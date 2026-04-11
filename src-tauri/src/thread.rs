@@ -167,6 +167,18 @@ pub fn blade_thread_update(
     )
 }
 
+/// Called by the frontend after streaming completes with the full assembled response.
+/// Triggers auto-update of the working thread — covers the streaming path that
+/// doesn't have assistant text available on the Rust side.
+#[tauri::command]
+pub fn blade_thread_auto_update(
+    app: tauri::AppHandle,
+    user_text: String,
+    assistant_text: String,
+) {
+    auto_update_thread(app, user_text, assistant_text);
+}
+
 /// Read current thread — used by frontend to display working memory indicator.
 #[tauri::command]
 pub fn blade_thread_get() -> Option<serde_json::Value> {

@@ -336,6 +336,7 @@ pub fn run() {
             deeplearn::deeplearn_run,
             thread::blade_thread_update,
             thread::blade_thread_get,
+            thread::blade_thread_auto_update,
             open_screen_overlay,
             voice_local::whisper_model_available,
             voice_local::whisper_download_model,
