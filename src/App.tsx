@@ -230,7 +230,7 @@ export default function App() {
     }
   }, [chat.loading]);
 
-  // Handle proactive suggestions
+  // Handle proactive suggestions (time-based)
   useEffect(() => {
     if (proactive.suggestions.length > 0) {
       const latest = proactive.suggestions[proactive.suggestions.length - 1];
@@ -242,6 +242,26 @@ export default function App() {
       });
     }
   }, [proactive.suggestions.length]);
+
+  // Ambient proactive nudges from background monitor — Blade speaks without being asked
+  useEffect(() => {
+    const unlisten = listen<{ message: string; type: string }>("proactive_nudge", (event) => {
+      const { message } = event.payload;
+      // Show as notification
+      notifications.add({
+        type: "info",
+        title: "Blade",
+        message,
+        action: { label: "Reply", callback: () => sendWithStats(message) },
+      });
+      // Speak it aloud if TTS enabled
+      if (tts.enabled) {
+        tts.speak(message);
+      }
+      activity.track("message", "Blade nudge", message.slice(0, 80));
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, [tts.enabled]);
 
   const hideWindow = useCallback(() => {
     getCurrentWindow().hide();

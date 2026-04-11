@@ -30,7 +30,7 @@ interface ProactiveConfig {
 }
 
 const DEFAULT_CONFIG: ProactiveConfig = {
-  enabled: false, // off by default — user must opt in
+  enabled: true, // on by default — Blade is proactive
   clipboardWatch: true,
   contextWatch: true,
   reminderWatch: true,

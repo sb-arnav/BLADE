@@ -1,4 +1,5 @@
 mod agent_commands;
+mod ambient;
 mod native_tools;
 mod agents;
 mod automation;
@@ -405,6 +406,9 @@ pub fn run() {
 
             // Start clipboard watcher
             clipboard::start_clipboard_watcher(app.handle().clone());
+
+            // Start ambient intelligence monitor
+            ambient::start_ambient_monitor(app.handle().clone());
 
             // Alt+Space → toggle Quick Ask floating widget
             let handle = app.handle().clone();
