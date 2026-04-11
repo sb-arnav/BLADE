@@ -10,7 +10,6 @@
   },
   "app": {
     "withGlobalTauri": true,
-    "macosPrivateApi": true,
     "windows": [
       {
         "title": "Blade",
