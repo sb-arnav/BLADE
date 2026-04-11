@@ -123,6 +123,73 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
                 "required": ["url"]
             }),
         },
+        ToolDefinition {
+            name: "blade_screenshot".to_string(),
+            description: "Take a screenshot of the user's screen. Returns a base64-encoded PNG image you can analyse to see what's on screen, verify actions worked, read text from windows, etc.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "monitor": {"type": "integer", "description": "Monitor index (0 = primary, default 0)"}
+                }
+            }),
+        },
+        ToolDefinition {
+            name: "blade_mouse".to_string(),
+            description: "Move the mouse and/or click. Use to interact with anything on screen after taking a screenshot to find the target coordinates.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "x": {"type": "integer", "description": "X coordinate (required for move/click)"},
+                    "y": {"type": "integer", "description": "Y coordinate (required for move/click)"},
+                    "action": {"type": "string", "enum": ["move", "click", "right_click", "double_click"], "description": "What to do (default: click)"}
+                }
+            }),
+        },
+        ToolDefinition {
+            name: "blade_keyboard".to_string(),
+            description: "Type text or press key combinations. Use to fill forms, trigger shortcuts, control apps after clicking into them.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "Text to type (unicode safe)"},
+                    "key": {"type": "string", "description": "Named key to press: enter, escape, tab, space, backspace, delete, up, down, left, right, home, end, pageup, pagedown, f1-f12, or a single character"},
+                    "modifiers": {"type": "array", "items": {"type": "string"}, "description": "Modifier keys to hold: ctrl, shift, alt, meta/win"}
+                }
+            }),
+        },
+        ToolDefinition {
+            name: "blade_get_processes".to_string(),
+            description: "List running processes/applications. Use to check if something is running, find a PID to kill, or see what apps are open.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "filter": {"type": "string", "description": "Filter by process name (optional, case-insensitive)"}
+                }
+            }),
+        },
+        ToolDefinition {
+            name: "blade_kill_process".to_string(),
+            description: "Kill/close a running process by name or PID.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Process name (e.g. chrome.exe, notepad.exe)"},
+                    "pid": {"type": "integer", "description": "Process ID"}
+                }
+            }),
+        },
+        ToolDefinition {
+            name: "blade_search_web".to_string(),
+            description: "Search the web and return top results with titles, URLs, and snippets. Use before blade_open_url when you need to find the right URL (latest video, docs page, etc.).".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Search query"},
+                    "max_results": {"type": "integer", "description": "Number of results (default 5)"}
+                },
+                "required": ["query"]
+            }),
+        },
     ]
 }
 
@@ -223,6 +290,42 @@ pub async fn execute(name: &str, args: &Value) -> (String, bool) {
                 None => return ("Missing required argument: url".to_string(), true),
             };
             open_url(url).await
+        }
+        "blade_screenshot" => {
+            let monitor_idx = args["monitor"].as_u64().unwrap_or(0) as usize;
+            screenshot(monitor_idx).await
+        }
+        "blade_mouse" => {
+            let x = args["x"].as_i64().map(|v| v as i32);
+            let y = args["y"].as_i64().map(|v| v as i32);
+            let action = args["action"].as_str().unwrap_or("click");
+            mouse_action(x, y, action)
+        }
+        "blade_keyboard" => {
+            let text = args["text"].as_str();
+            let key = args["key"].as_str();
+            let modifiers: Vec<&str> = args["modifiers"]
+                .as_array()
+                .map(|a| a.iter().filter_map(|v| v.as_str()).collect())
+                .unwrap_or_default();
+            keyboard_action(text, key, &modifiers)
+        }
+        "blade_get_processes" => {
+            let filter = args["filter"].as_str();
+            get_processes(filter).await
+        }
+        "blade_kill_process" => {
+            let name = args["name"].as_str();
+            let pid = args["pid"].as_i64().map(|v| v as u32);
+            kill_process(name, pid).await
+        }
+        "blade_search_web" => {
+            let query = match args["query"].as_str() {
+                Some(q) => q,
+                None => return ("Missing required argument: query".to_string(), true),
+            };
+            let max = args["max_results"].as_u64().unwrap_or(5) as usize;
+            search_web(query, max).await
         }
         _ => (format!("Unknown native tool: {}", name), true),
     }
@@ -520,6 +623,266 @@ async fn open_url(url: &str) -> (String, bool) {
         Ok(_) => (format!("Opened {} in default browser.", url), false),
         Err(e) => (format!("Failed to open URL: {}", e), true),
     }
+}
+
+async fn screenshot(monitor_idx: usize) -> (String, bool) {
+    use base64::Engine;
+    use std::io::Cursor;
+
+    let monitors = match xcap::Monitor::all() {
+        Ok(m) => m,
+        Err(e) => return (format!("Screen capture unavailable: {}", e), true),
+    };
+    let monitor = monitors.get(monitor_idx).or_else(|| monitors.first());
+    let monitor = match monitor {
+        Some(m) => m,
+        None => return ("No monitors found".to_string(), true),
+    };
+    let image = match monitor.capture_image() {
+        Ok(img) => img,
+        Err(e) => return (format!("Capture failed: {}", e), true),
+    };
+
+    // Resize to max 1280px wide to keep token cost manageable
+    let (w, h) = (image.width(), image.height());
+    let resized = if w > 1280 {
+        let scale = 1280.0 / w as f32;
+        let nw = 1280u32;
+        let nh = (h as f32 * scale) as u32;
+        image::imageops::resize(&image, nw, nh, image::imageops::FilterType::Lanczos3)
+    } else {
+        image
+    };
+
+    let mut buf = Cursor::new(Vec::new());
+    if let Err(e) = resized.write_to(&mut buf, image::ImageFormat::Png) {
+        return (format!("PNG encode failed: {}", e), true);
+    }
+    let b64 = base64::engine::general_purpose::STANDARD.encode(buf.into_inner());
+
+    (format!("data:image/png;base64,{}", b64), false)
+}
+
+fn mouse_action(x: Option<i32>, y: Option<i32>, action: &str) -> (String, bool) {
+    use enigo::{Enigo, Settings, Mouse, Button, Direction::Click, Coordinate::Abs};
+
+    let mut enigo = match Enigo::new(&Settings::default()) {
+        Ok(e) => e,
+        Err(e) => return (format!("Input control unavailable: {}", e), true),
+    };
+
+    if let (Some(x), Some(y)) = (x, y) {
+        if let Err(e) = enigo.move_mouse(x, y, Abs) {
+            return (format!("Mouse move failed: {}", e), true);
+        }
+    }
+
+    if action == "move" {
+        return (format!("Mouse moved to ({}, {})", x.unwrap_or(0), y.unwrap_or(0)), false);
+    }
+
+    // Small delay to let OS process the move
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    let result = match action {
+        "right_click" => enigo.button(Button::Right, Click),
+        "double_click" => enigo.button(Button::Left, Click)
+            .and_then(|_| { std::thread::sleep(std::time::Duration::from_millis(50)); enigo.button(Button::Left, Click) }),
+        _ => enigo.button(Button::Left, Click), // default: click
+    };
+
+    match result {
+        Ok(_) => (format!("{} at ({}, {})", action, x.unwrap_or(0), y.unwrap_or(0)), false),
+        Err(e) => (format!("Mouse action failed: {}", e), true),
+    }
+}
+
+fn keyboard_action(text: Option<&str>, key: Option<&str>, modifiers: &[&str]) -> (String, bool) {
+    use enigo::{Enigo, Settings, Keyboard, Key, Direction::{Click, Press, Release}};
+
+    let mut enigo = match Enigo::new(&Settings::default()) {
+        Ok(e) => e,
+        Err(e) => return (format!("Input control unavailable: {}", e), true),
+    };
+
+    // Hold modifiers
+    let mod_keys: Vec<Key> = modifiers.iter().filter_map(|m| match *m {
+        "ctrl" | "control" => Some(Key::Control),
+        "shift" => Some(Key::Shift),
+        "alt" => Some(Key::Alt),
+        "meta" | "win" | "super" => Some(Key::Meta),
+        _ => None,
+    }).collect();
+
+    for k in &mod_keys {
+        let _ = enigo.key(*k, Press);
+    }
+
+    let result = if let Some(text) = text {
+        enigo.text(text).map(|_| format!("Typed: {}", text))
+    } else if let Some(key_name) = key {
+        let k = match key_name.to_lowercase().as_str() {
+            "enter" | "return" => Key::Return,
+            "escape" | "esc" => Key::Escape,
+            "tab" => Key::Tab,
+            "space" => Key::Space,
+            "backspace" => Key::Backspace,
+            "delete" | "del" => Key::Delete,
+            "up" => Key::UpArrow,
+            "down" => Key::DownArrow,
+            "left" => Key::LeftArrow,
+            "right" => Key::RightArrow,
+            "home" => Key::Home,
+            "end" => Key::End,
+            "pageup" => Key::PageUp,
+            "pagedown" => Key::PageDown,
+            "f1" => Key::F1, "f2" => Key::F2, "f3" => Key::F3, "f4" => Key::F4,
+            "f5" => Key::F5, "f6" => Key::F6, "f7" => Key::F7, "f8" => Key::F8,
+            "f9" => Key::F9, "f10" => Key::F10, "f11" => Key::F11, "f12" => Key::F12,
+            s if s.len() == 1 => Key::Unicode(s.chars().next().unwrap()),
+            _ => return (format!("Unknown key: {}", key_name), true),
+        };
+        enigo.key(k, Click).map(|_| format!("Pressed: {}", key_name))
+    } else {
+        return ("Provide either 'text' or 'key'".to_string(), true);
+    };
+
+    // Release modifiers
+    for k in mod_keys.iter().rev() {
+        let _ = enigo.key(*k, Release);
+    }
+
+    match result {
+        Ok(msg) => (msg, false),
+        Err(e) => (format!("Keyboard action failed: {}", e), true),
+    }
+}
+
+async fn get_processes(filter: Option<&str>) -> (String, bool) {
+    #[cfg(target_os = "windows")]
+    let cmd = "tasklist /FO CSV /NH";
+    #[cfg(not(target_os = "windows"))]
+    let cmd = "ps -eo pid,comm,%mem --sort=-%mem";
+
+    let (output, is_err) = bash(cmd, None, 10_000).await;
+    if is_err {
+        return (output, true);
+    }
+
+    #[cfg(target_os = "windows")]
+    let lines: Vec<String> = output.lines()
+        .filter_map(|line| {
+            // CSV: "chrome.exe","1234","Console","1","50,000 K"
+            let parts: Vec<&str> = line.trim_matches('"').splitn(5, "\",\"").collect();
+            if parts.len() < 2 { return None; }
+            let name = parts[0].trim_matches('"');
+            let pid = parts[1].trim_matches('"');
+            let mem = parts.get(4).unwrap_or(&"").trim_matches('"').replace(" K", "K");
+            let entry = format!("{:<30} PID:{:<8} MEM:{}", name, pid, mem);
+            if let Some(f) = filter {
+                if !name.to_lowercase().contains(&f.to_lowercase()) { return None; }
+            }
+            Some(entry)
+        })
+        .take(50)
+        .collect();
+
+    #[cfg(not(target_os = "windows"))]
+    let lines: Vec<String> = output.lines()
+        .filter(|l| {
+            if let Some(f) = filter {
+                l.to_lowercase().contains(&f.to_lowercase())
+            } else { true }
+        })
+        .take(50)
+        .map(|l| l.to_string())
+        .collect();
+
+    if lines.is_empty() {
+        return (filter.map(|f| format!("No processes matching '{}'", f)).unwrap_or("No processes found".to_string()), false);
+    }
+    (format!("{} processes:\n{}", lines.len(), lines.join("\n")), false)
+}
+
+async fn kill_process(name: Option<&str>, pid: Option<u32>) -> (String, bool) {
+    #[cfg(target_os = "windows")]
+    let cmd = match (name, pid) {
+        (_, Some(p)) => format!("taskkill /F /PID {}", p),
+        (Some(n), _) => format!("taskkill /F /IM \"{}\"", n),
+        _ => return ("Provide name or pid".to_string(), true),
+    };
+    #[cfg(not(target_os = "windows"))]
+    let cmd = match (name, pid) {
+        (_, Some(p)) => format!("kill -9 {}", p),
+        (Some(n), _) => format!("pkill -f \"{}\"", n),
+        _ => return ("Provide name or pid".to_string(), true),
+    };
+    bash(&cmd, None, 5_000).await
+}
+
+async fn search_web(query: &str, max_results: usize) -> (String, bool) {
+    let encoded = urlencoding::encode(query);
+    let url = format!("https://lite.duckduckgo.com/lite/?q={}", encoded);
+
+    let (html, is_err) = web_fetch(&url, 50_000).await;
+    if is_err { return (html, true); }
+
+    // Parse results from DuckDuckGo Lite HTML
+    // Results look like: <a class="result-link" href="...">Title</a>
+    // and snippets in <td class="result-snippet">...
+    let mut results: Vec<String> = Vec::new();
+    let mut last_url = String::new();
+    let mut last_title = String::new();
+    let mut i = 0;
+
+    for line in html.lines() {
+        if results.len() >= max_results { break; }
+        let trimmed = line.trim();
+
+        // Extract URL from href
+        if trimmed.contains("result-link") {
+            if let Some(href_start) = trimmed.find("href=\"//") {
+                let rest = &trimmed[href_start + 6..];
+                if let Some(end) = rest.find('"') {
+                    last_url = format!("https:{}", &rest[..end]);
+                }
+            } else if let Some(href_start) = trimmed.find("href=\"https") {
+                let rest = &trimmed[href_start + 6..];
+                if let Some(end) = rest.find('"') {
+                    last_url = rest[..end].to_string();
+                }
+            }
+            // Extract title text between > and </a>
+            if let Some(start) = trimmed.rfind('>') {
+                let after = &trimmed[start + 1..];
+                if let Some(end) = after.find('<') {
+                    last_title = after[..end].trim().to_string();
+                }
+            }
+        }
+
+        // Snippet comes after
+        if trimmed.contains("result-snippet") && !last_url.is_empty() {
+            let snippet_text = trimmed
+                .replace("<td class=\"result-snippet\">", "")
+                .replace("</td>", "")
+                .replace("<b>", "")
+                .replace("</b>", "")
+                .trim()
+                .to_string();
+            if !last_title.is_empty() || !snippet_text.is_empty() {
+                results.push(format!("{}. {}\n   {}\n   {}", i + 1, last_title, snippet_text, last_url));
+                i += 1;
+            }
+            last_url.clear();
+            last_title.clear();
+        }
+    }
+
+    if results.is_empty() {
+        return (format!("No results found for: {}", query), false);
+    }
+    (format!("Search results for '{}':\n\n{}", query, results.join("\n\n")), false)
 }
 
 fn expand_home(path: &str) -> String {
