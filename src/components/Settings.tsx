@@ -268,17 +268,17 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             />
           </label>
 
-          {provider === "openai" && (
+          {provider !== "ollama" && (
             <label className="space-y-2 block">
               <span className="text-xs uppercase tracking-wide text-blade-muted">
-                Base URL <span className="normal-case text-blade-muted/60">(optional — for Vercel AI Gateway, Azure, or other OpenAI-compatible endpoints)</span>
+                Base URL <span className="normal-case text-blade-muted/60">(optional — for Vercel AI Gateway, Azure, Cloudflare, or any OpenAI-compatible endpoint)</span>
               </span>
               <input
                 type="text"
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
                 className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none font-mono"
-                placeholder="https://gateway.ai.cloudflare.com/v1/.../openai"
+                placeholder="https://ai-gateway.vercel.sh/v1"
               />
             </label>
           )}
