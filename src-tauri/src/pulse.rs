@@ -47,6 +47,9 @@ pub fn start_pulse(app: tauri::AppHandle) {
                         // Speak the pulse thought if TTS is enabled
                         crate::tts::speak(&thought);
 
+                        // Log to Obsidian vault if configured
+                        crate::obsidian::log_pulse_thought(&thought);
+
                         // Mirror to Discord if webhook is configured
                         let thought_for_discord = thought.clone();
                         tauri::async_runtime::spawn(async move {
@@ -303,6 +306,9 @@ Do not say "Good morning". Do not list items with headers. Just speak naturally,
 
             // Speak the briefing if TTS is enabled
             crate::tts::speak(&briefing);
+
+            // Log to Obsidian vault if configured
+            crate::obsidian::log_briefing(&briefing);
 
             // Mirror to Discord if webhook is configured
             let briefing_for_discord = briefing.clone();

@@ -423,6 +423,15 @@ export default function App() {
     { id: "comparison", label: "Compare models", description: "Inspect model behavior side by side", section: "Knowledge", action: () => openRoute("comparison") },
     { id: "insights", label: "Show conversation insights", description: "Surface metadata and patterns from the current thread", section: "Knowledge", action: () => setInsightsOpen(true) },
 
+    { id: "obsidian-daily", label: "Open today's Obsidian note", description: "Create or open today's daily note in your vault", section: "Knowledge", action: () => invoke("obsidian_ensure_daily_note").catch(() => {}) },
+    { id: "obsidian-save", label: "Save conversation to Obsidian", description: "Write a summary of this conversation to your vault", section: "Knowledge", action: async () => {
+      const msgs = chat.messages;
+      if (!msgs.length) return;
+      const title = chat.currentConversation?.title ?? `Conversation ${new Date().toLocaleDateString()}`;
+      const summary = msgs.slice(-10).map((m) => `**${m.role}:** ${m.content.slice(0, 500)}`).join("\n\n");
+      const id = chat.currentConversation?.id ?? "unknown";
+      await invoke("obsidian_save_conversation", { title, summary, conversationId: id }).catch(() => {});
+    }},
     { id: "pulse", label: "Pulse — ask Blade what it's thinking", description: "Trigger an unsolicited thought from Blade's background mind", section: "System", action: () => invoke<string>("pulse_now").then((t) => setPulseThought(t)).catch(() => {}) },
     { id: "deeplearn", label: "Deep Learn — let Blade read your digital life", description: "Re-run Blade's ingestion of your shell history, git, notes, and conversations", section: "System", action: () => openRoute("deeplearn") },
     { id: "settings", label: "Open settings", description: "Configure providers, memory, and Blade behavior", section: "System", shortcut: "Ctrl+,", action: () => openRoute("settings") },
