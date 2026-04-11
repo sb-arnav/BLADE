@@ -260,7 +260,7 @@ fn monitor_section() -> Option<String> {
     if monitors.is_empty() { return None; }
 
     let lines: Vec<String> = monitors.iter().enumerate().map(|(i, m)| {
-        format!("- Monitor {}: {}x{}", i, m.width(), m.height())
+        format!("- Monitor {}: {}x{}", i, m.width().unwrap_or(0), m.height().unwrap_or(0))
     }).collect();
 
     Some(format!("### Displays\n{}", lines.join("\n")))
