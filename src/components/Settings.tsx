@@ -61,6 +61,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
   const [apiKey, setApiKey] = useState(config.api_key);
   const [model, setModel] = useState(config.model);
   const [baseUrl, setBaseUrl] = useState(config.base_url ?? "");
+  const [godMode, setGodMode] = useState(config.god_mode ?? false);
   const [persona, setPersona] = useState("");
   const [contextNotes, setContextNotes] = useState("");
   const [status, setStatus] = useState<string | null>(null);
@@ -75,6 +76,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
     setApiKey(config.api_key);
     setModel(config.model);
     setBaseUrl(config.base_url ?? "");
+    setGodMode(config.god_mode ?? false);
   }, [config]);
 
   useEffect(() => {
@@ -114,13 +116,14 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
     setError(null);
 
     try {
-      await invoke("set_config", { provider, apiKey, model, baseUrl: baseUrl || null });
+      await invoke("set_config", { provider, apiKey, model, baseUrl: baseUrl || null, godMode });
       const nextConfig: BladeConfig = {
         ...config,
         provider,
         api_key: apiKey,
         model,
         base_url: baseUrl || undefined,
+        god_mode: godMode,
         onboarded: true,
       };
       setStatus("Settings saved.");
@@ -279,6 +282,38 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
               />
             </label>
           )}
+
+          {/* God Mode toggle */}
+          <label className="flex items-start gap-3 cursor-pointer group">
+            <div className="mt-0.5">
+              <input
+                type="checkbox"
+                checked={godMode}
+                onChange={async (e) => {
+                  const val = e.target.checked;
+                  setGodMode(val);
+                  try {
+                    await invoke("toggle_god_mode", { enabled: val });
+                  } catch { /* ignore */ }
+                }}
+                className="sr-only"
+              />
+              <div
+                className={`w-9 h-5 rounded-full transition-colors ${godMode ? "bg-blade-accent" : "bg-blade-border"} relative`}
+                onClick={async () => {
+                  const val = !godMode;
+                  setGodMode(val);
+                  try { await invoke("toggle_god_mode", { enabled: val }); } catch { /* ignore */ }
+                }}
+              >
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${godMode ? "translate-x-4" : "translate-x-0.5"}`} />
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-medium">God Mode</p>
+              <p className="text-xs text-blade-muted">Blade scans your machine every 5 min — recent files, downloads, running apps — and injects live context into every conversation. Short prompts start working because Blade already knows what you're doing.</p>
+            </div>
+          </label>
 
           <div className="flex items-center gap-3">
             <button

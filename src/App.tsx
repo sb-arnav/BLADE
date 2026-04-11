@@ -243,6 +243,19 @@ export default function App() {
     }
   }, [proactive.suggestions.length]);
 
+  // Multi-monitor detection
+  useEffect(() => {
+    const unlisten = listen<{ count: number; message: string }>("multiple_monitors_detected", (event) => {
+      notifications.add({
+        type: "info",
+        title: `${event.payload.count} monitors detected`,
+        message: event.payload.message,
+      });
+      if (tts.enabled) tts.speak(event.payload.message);
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, [tts.enabled]);
+
   // Ambient proactive nudges from background monitor — Blade speaks without being asked
   useEffect(() => {
     const unlisten = listen<{ message: string; type: string }>("proactive_nudge", (event) => {

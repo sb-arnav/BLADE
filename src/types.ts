@@ -25,6 +25,7 @@ export interface BladeConfig {
   response_style?: string;
   blade_email?: string;
   base_url?: string;
+  god_mode?: boolean;
 }
 
 export interface ConversationSummary {

@@ -11,6 +11,19 @@ struct WindowSession {
 }
 
 pub fn start_ambient_monitor(app: tauri::AppHandle) {
+    // Detect multiple monitors immediately at startup
+    if let Ok(monitors) = xcap::Monitor::all() {
+        if monitors.len() > 1 {
+            let _ = app.emit("multiple_monitors_detected", serde_json::json!({
+                "count": monitors.len(),
+                "message": format!(
+                    "I can see {} monitors. Want to dedicate one exclusively to me? I'll open everything there and keep your main screen clean.",
+                    monitors.len()
+                )
+            }));
+        }
+    }
+
     tauri::async_runtime::spawn(async move {
         let mut current: Option<WindowSession> = None;
         let mut last_activity = std::time::Instant::now();
