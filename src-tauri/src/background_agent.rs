@@ -15,6 +15,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tauri::Emitter;
 use std::sync::{Arc, Mutex};
 use tokio::io::AsyncBufReadExt;
 use uuid::Uuid;
