@@ -110,6 +110,7 @@ fn build_machine_context(tier: &str) -> String {
     if let Some(s) = downloads_section() { sections.push(s); }
     if let Some(s) = running_apps_section() { sections.push(s); }
     if let Some(s) = monitor_section() { sections.push(s); }
+    if let Some(s) = git_repos_section() { sections.push(s); }
 
     // Intermediate+ extras
     if tier == "intermediate" || tier == "extreme" {
@@ -325,4 +326,93 @@ fn active_window_section() -> Option<String> {
     if !win.window_title.is_empty() { parts.push(format!("Window: {}", win.window_title)); }
     if parts.is_empty() { return None; }
     Some(format!("### Active Window\n{}", parts.join("\n")))
+}
+
+/// Scan common code directories for git repos and show their status.
+/// Gives BLADE awareness of branches, dirty working trees, and ahead/behind state.
+fn git_repos_section() -> Option<String> {
+    use std::process::Command;
+
+    let home = dirs::home_dir()?;
+    // Common places devs keep repos
+    let search_roots = [
+        home.join("projects"),
+        home.join("dev"),
+        home.join("code"),
+        home.join("src"),
+        home.join("work"),
+        home.join("repos"),
+    ];
+
+    let mut repo_lines: Vec<String> = Vec::new();
+
+    for root in &search_roots {
+        if !root.is_dir() { continue; }
+        let entries = match std::fs::read_dir(root) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        for entry in entries.flatten().take(8) {
+            let path = entry.path();
+            if !path.is_dir() { continue; }
+            let git_dir = path.join(".git");
+            if !git_dir.exists() { continue; }
+
+            let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+
+            // Get branch
+            let branch = Command::new("git")
+                .args(["-C", &path.to_string_lossy(), "rev-parse", "--abbrev-ref", "HEAD"])
+                .output()
+                .ok()
+                .and_then(|o| if o.status.success() { Some(String::from_utf8_lossy(&o.stdout).trim().to_string()) } else { None })
+                .unwrap_or_else(|| "unknown".to_string());
+
+            // Dirty state: number of changed files
+            let dirty_count = Command::new("git")
+                .args(["-C", &path.to_string_lossy(), "status", "--porcelain"])
+                .output()
+                .ok()
+                .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
+                .unwrap_or(0);
+
+            // Ahead/behind vs upstream
+            let ahead_behind = Command::new("git")
+                .args(["-C", &path.to_string_lossy(), "rev-list", "--count", "--left-right", "@{upstream}...HEAD"])
+                .output()
+                .ok()
+                .and_then(|o| {
+                    if o.status.success() {
+                        let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                        let parts: Vec<&str> = s.split('\t').collect();
+                        if parts.len() == 2 {
+                            let behind: i32 = parts[0].parse().unwrap_or(0);
+                            let ahead: i32 = parts[1].parse().unwrap_or(0);
+                            Some((ahead, behind))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                });
+
+            let mut status_parts = Vec::new();
+            if dirty_count > 0 { status_parts.push(format!("{} changed", dirty_count)); }
+            if let Some((ahead, behind)) = ahead_behind {
+                if ahead > 0 { status_parts.push(format!("↑{}", ahead)); }
+                if behind > 0 { status_parts.push(format!("↓{}", behind)); }
+            }
+            let status_str = if status_parts.is_empty() { "clean".to_string() } else { status_parts.join(", ") };
+
+            repo_lines.push(format!("- **{}** `{}` — {}", name, branch, status_str));
+
+            if repo_lines.len() >= 6 { break; }
+        }
+        if repo_lines.len() >= 6 { break; }
+    }
+
+    if repo_lines.is_empty() { return None; }
+
+    Some(format!("### Git Repos\n{}", repo_lines.join("\n")))
 }
