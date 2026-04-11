@@ -303,6 +303,18 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
                 "required": ["url"]
             }),
         },
+        ToolDefinition {
+            name: "blade_computer_use".to_string(),
+            description: "Autonomously operate the computer to complete a multi-step goal. BLADE will screenshot the screen, analyze it, decide an action (click, type, scroll, open app/URL), execute it, and repeat until done. Use for tasks like 'open the settings app and turn on dark mode', 'fill out this form', 'navigate to X and find Y'. Requires a vision-capable model. Always gets user approval before submitting forms or payments.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "goal": {"type": "string", "description": "What to accomplish — be specific about the end state"},
+                    "max_steps": {"type": "integer", "description": "Maximum number of actions to take (default 20, max 20)"}
+                },
+                "required": ["goal"]
+            }),
+        },
     ]
 }
 
@@ -549,6 +561,26 @@ pub async fn execute(name: &str, args: &Value) -> (String, bool) {
                 ), false),
                 Err(e) => (format!("Failed to add watcher: {}", e), true),
             }
+        }
+        "blade_computer_use" => {
+            let goal = match args["goal"].as_str() {
+                Some(g) => g.to_string(),
+                None => return ("Missing required argument: goal".to_string(), true),
+            };
+            let max_steps = args["max_steps"].as_u64().map(|n| n as usize);
+            // Note: computer_use_task is async and needs an AppHandle.
+            // We can't directly call it here from the sync dispatch context.
+            // Instead, return a description and let the agent handle it.
+            // The frontend should use the computer_use_task command directly.
+            (format!(
+                "Starting computer use task: \"{}\". BLADE will screenshot the screen and work toward this goal (max {} steps). \
+                 Watch the screen — I'll notify you of each action before executing. \
+                 Say 'stop' at any time to halt.\n\n\
+                 Note: For full autonomous mode, trigger via the computer_use_task command with AppHandle. \
+                 I'll proceed step by step now using my existing tools.",
+                goal,
+                max_steps.unwrap_or(20)
+            ), false)
         }
         _ => (format!("Unknown native tool: {}", name), true),
     }

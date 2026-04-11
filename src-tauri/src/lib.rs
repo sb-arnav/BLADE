@@ -1,5 +1,6 @@
 mod agent_commands;
 mod ambient;
+mod computer_use;
 mod deeplearn;
 mod discord;
 mod obsidian;
@@ -337,6 +338,9 @@ pub fn run() {
             thread::blade_thread_update,
             thread::blade_thread_get,
             thread::blade_thread_auto_update,
+            computer_use::computer_use_task,
+            computer_use::computer_use_stop,
+            computer_use::computer_use_screenshot,
             open_screen_overlay,
             voice_local::whisper_model_available,
             voice_local::whisper_download_model,
