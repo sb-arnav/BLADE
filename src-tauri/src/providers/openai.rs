@@ -138,6 +138,9 @@ pub async fn complete(
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
         if status == 429 { return Err("Rate limited (429) — free tier maxed out. Wait or get a paid key at platform.openai.com/settings/billing.".to_string()); }
+        if status == 403 && body.contains("RestrictedModelsError") {
+            return Err("Vercel AI Gateway: free credits are restricted due to abuse. Top up at vercel.com/ai to use this model.".to_string());
+        }
         return Err(format!("OpenAI API error {}: {}", status, body));
     }
 
@@ -214,6 +217,9 @@ pub async fn stream_text(
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
         if status == 429 { return Err("Rate limited (429) — free tier maxed out. Wait or get a paid key at platform.openai.com/settings/billing.".to_string()); }
+        if status == 403 && body.contains("RestrictedModelsError") {
+            return Err("Vercel AI Gateway: free credits are restricted due to abuse. Top up at vercel.com/ai to use this model.".to_string());
+        }
         return Err(format!("OpenAI API error {}: {}", status, body));
     }
 
@@ -266,6 +272,9 @@ pub async fn test(api_key: &str, model: &str, base_url: Option<&str>) -> Result<
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
         if status == 429 { return Err("Rate limited (429) — free tier maxed out. Wait or get a paid key at platform.openai.com/settings/billing.".to_string()); }
+        if status == 403 && body.contains("RestrictedModelsError") {
+            return Err("Vercel AI Gateway: free credits are restricted due to abuse. Top up at vercel.com/ai to use this model.".to_string());
+        }
         return Err(format!("OpenAI API error {}: {}", status, body));
     }
 
