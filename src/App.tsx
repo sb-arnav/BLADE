@@ -518,6 +518,9 @@ export default function App() {
         chat.sendMessage(`[Computer use started] Goal: ${goal.trim()}`);
       }
     }},
+    { id: "computer-use-stop", label: "Stop computer use", description: "Halt any ongoing autonomous screen operation", section: "System", action: () => {
+      void invoke("computer_use_stop");
+    }},
     { id: "canvas", label: "Open canvas workspace", description: "Sketch ideas visually and move them back into chat", section: "System", action: () => openRoute("canvas") },
     { id: "email", label: "Open email workspace", description: "Read and draft email with Blade assistance", section: "System", action: () => openRoute("email") },
     { id: "docs", label: "Open document workspace", description: "Generate longer-form structured drafts", section: "System", action: () => openRoute("docs") },

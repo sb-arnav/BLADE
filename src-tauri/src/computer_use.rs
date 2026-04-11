@@ -62,6 +62,9 @@ pub async fn computer_use_task(
         return Err("No API key configured".to_string());
     }
 
+    // Reset stop signal at task start
+    STOP_SIGNAL.store(false, std::sync::atomic::Ordering::Relaxed);
+
     // Vision support check — computer use requires a vision-capable model
     let vision_model = best_vision_model(&config.provider, &config.model);
     let limit = max_steps.unwrap_or(MAX_STEPS).min(MAX_STEPS);
