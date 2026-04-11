@@ -331,7 +331,7 @@ pub fn risk(_name: &str) -> crate::permissions::ToolRisk {
 }
 
 /// Dispatch a native tool call. Returns (output, is_error).
-pub async fn execute(name: &str, args: &Value) -> (String, bool) {
+pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -> (String, bool) {
     match name {
         "blade_bash" => {
             let command = match args["command"].as_str() {
@@ -568,19 +568,29 @@ pub async fn execute(name: &str, args: &Value) -> (String, bool) {
                 None => return ("Missing required argument: goal".to_string(), true),
             };
             let max_steps = args["max_steps"].as_u64().map(|n| n as usize);
-            // Note: computer_use_task is async and needs an AppHandle.
-            // We can't directly call it here from the sync dispatch context.
-            // Instead, return a description and let the agent handle it.
-            // The frontend should use the computer_use_task command directly.
-            (format!(
-                "Starting computer use task: \"{}\". BLADE will screenshot the screen and work toward this goal (max {} steps). \
-                 Watch the screen — I'll notify you of each action before executing. \
-                 Say 'stop' at any time to halt.\n\n\
-                 Note: For full autonomous mode, trigger via the computer_use_task command with AppHandle. \
-                 I'll proceed step by step now using my existing tools.",
-                goal,
-                max_steps.unwrap_or(20)
-            ), false)
+
+            if let Some(app) = app {
+                let app_clone = app.clone();
+                let goal_clone = goal.clone();
+                tauri::async_runtime::spawn(async move {
+                    let result = crate::computer_use::computer_use_task(
+                        app_clone.clone(),
+                        goal_clone,
+                        max_steps,
+                    ).await;
+                    if let Err(e) = result {
+                        log::error!("[computer_use] task failed: {}", e);
+                    }
+                });
+                (format!(
+                    "Computer use task started: \"{}\". I'll screenshot the screen and work through it step by step (max {} steps). \
+                     Watch the notification panel for progress. Say 'stop computer use' to halt.",
+                    goal,
+                    max_steps.unwrap_or(20)
+                ), false)
+            } else {
+                ("Cannot run computer use: no app handle available.".to_string(), true)
+            }
         }
         _ => (format!("Unknown native tool: {}", name), true),
     }

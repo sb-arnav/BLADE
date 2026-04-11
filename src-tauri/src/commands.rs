@@ -319,7 +319,7 @@ pub async fn send_message_stream(
 
             // Execute: native tools handled inline, MCP tools via manager
             let (content, is_error) = if is_native {
-                crate::native_tools::execute(&tool_call.name, &tool_call.arguments).await
+                crate::native_tools::execute(&tool_call.name, &tool_call.arguments, Some(&app)).await
             } else {
                 let result = {
                     let mut manager = state.lock().await;
