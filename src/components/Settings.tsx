@@ -6,6 +6,7 @@ import { check, type DownloadEvent } from "@tauri-apps/plugin-updater";
 import { BladeConfig } from "../types";
 import { McpSettings } from "./McpSettings";
 import { McpCatalog } from "./McpCatalog";
+import { TelegramBridge } from "./TelegramBridge";
 
 type SettingsTab = "provider" | "memory" | "mcp" | "integrations" | "about";
 
@@ -728,7 +729,19 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
         </>}
 
         {tab === "integrations" && (
-          <div className="relative h-full">
+          <div className="relative h-full flex flex-col gap-0 overflow-y-auto">
+            {/* Native bridges first */}
+            <div className="px-4 pt-4 pb-2">
+              <p className="text-[10px] font-semibold tracking-widest text-blade-muted/70 uppercase mb-3">
+                Bridges
+              </p>
+              <TelegramBridge />
+            </div>
+            <div className="px-4 py-2">
+              <p className="text-[10px] font-semibold tracking-widest text-blade-muted/70 uppercase mb-3">
+                MCP Servers
+              </p>
+            </div>
             <McpCatalog
               onInstalled={() => {
                 void onConfigRefresh();
