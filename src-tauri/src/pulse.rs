@@ -304,6 +304,21 @@ Do not say "Good morning". Do not list items with headers. Just speak naturally,
             }));
             let _ = std::fs::write(&marker, &today);
 
+            // OS notification so briefing surfaces even if window is hidden
+            {
+                use tauri_plugin_notification::NotificationExt;
+                let short = if briefing.len() > 120 {
+                    format!("{}…", &briefing[..120])
+                } else {
+                    briefing.clone()
+                };
+                let _ = app.notification()
+                    .builder()
+                    .title("BLADE Morning Briefing")
+                    .body(short)
+                    .show();
+            }
+
             // Speak the briefing if TTS is enabled
             crate::tts::speak(&briefing);
 
