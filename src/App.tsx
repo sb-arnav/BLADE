@@ -133,6 +133,7 @@ export default function App() {
   const voiceCommands = useVoiceCommands();
   const runtimeCenter = useRuntimes();
 
+  const [pulseThought, setPulseThought] = useState<string | null>(null);
   const [voiceDraft, setVoiceDraft] = useState<string | null>(null);
   const voiceSendRef = useRef<(text: string) => void>(() => {});
   const voiceMode = useVoiceMode({
@@ -288,6 +289,28 @@ export default function App() {
     return () => { unlisten.then((fn) => fn()); };
   }, [tts.enabled]);
 
+  // PULSE — Blade's heartbeat. A thought from a mind that's been watching.
+  useEffect(() => {
+    // Load last thought on startup
+    invoke<string | null>("pulse_get_last_thought").then((t) => {
+      if (t) setPulseThought(t);
+    }).catch(() => {});
+
+    const unlisten = listen<{ thought: string; timestamp: number }>("blade_pulse", (event) => {
+      const { thought } = event.payload;
+      setPulseThought(thought);
+      notifications.add({
+        type: "info",
+        title: "Blade",
+        message: thought,
+        action: { label: "Reply", callback: () => sendWithStats(`${thought} — what do you think I should do?`) },
+      });
+      if (tts.enabled) tts.speak(thought);
+      activity.track("message", "Blade pulse", thought.slice(0, 80));
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, [tts.enabled]);
+
   const hideWindow = useCallback(() => {
     getCurrentWindow().hide();
   }, []);
@@ -376,6 +399,7 @@ export default function App() {
     { id: "comparison", label: "Compare models", description: "Inspect model behavior side by side", section: "Knowledge", action: () => openRoute("comparison") },
     { id: "insights", label: "Show conversation insights", description: "Surface metadata and patterns from the current thread", section: "Knowledge", action: () => setInsightsOpen(true) },
 
+    { id: "pulse", label: "Pulse — ask Blade what it's thinking", description: "Trigger an unsolicited thought from Blade's background mind", section: "System", action: () => invoke<string>("pulse_now").then((t) => setPulseThought(t)).catch(() => {}) },
     { id: "settings", label: "Open settings", description: "Configure providers, memory, and Blade behavior", section: "System", shortcut: "Ctrl+,", action: () => openRoute("settings") },
     { id: "sync", label: "Open sync settings", description: "Inspect sync and persistence controls", section: "System", action: () => openRoute("sync") },
     { id: "diagnostics", label: "Open diagnostics", description: "Inspect system status and troubleshooting data", section: "System", action: () => openRoute("diagnostics") },
@@ -517,6 +541,29 @@ export default function App() {
         onClearAll={notifications.clearAll}
         onAction={(r) => { openRoute(r as Route); setNotificationsOpen(false); }}
       />
+      {/* Pulse banner — Blade's unsolicited thought, surfaced when window opens */}
+      {pulseThought && route === "chat" && (
+        <div className="px-3 py-1.5 flex items-center gap-2 border-b border-blade-border/30 bg-blade-surface/40">
+          <div className="w-1.5 h-1.5 rounded-full bg-blade-accent/60 animate-pulse flex-shrink-0" />
+          <p
+            className="flex-1 text-[11px] text-blade-secondary leading-snug cursor-pointer hover:text-blade-text transition-colors"
+            onClick={() => {
+              sendWithStats(`You just said: "${pulseThought}" — expand on this.`);
+              setPulseThought(null);
+            }}
+            title="Click to discuss with Blade"
+          >
+            {pulseThought}
+          </p>
+          <button
+            onClick={() => setPulseThought(null)}
+            className="text-blade-muted hover:text-blade-text text-xs flex-shrink-0 leading-none"
+            title="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      )}
       <div className="flex-1 min-h-0">
         <Suspense fallback={<ShellFallback label={route === "settings" ? "Loading settings..." : "Loading Blade..."} />}>
           {route === "settings" ? (

@@ -8,36 +8,123 @@ import { McpSettings } from "./McpSettings";
 
 type SettingsTab = "provider" | "memory" | "mcp" | "about";
 
-const PROVIDER_MATRIX = [
+interface ProviderEntry {
+  id: string;
+  name: string;
+  model: string;
+  baseUrl?: string;
+  badges: string[];
+  keyPlaceholder?: string;
+}
+
+// Every provider that speaks OpenAI-compatible format routes through
+// providers/openai.rs automatically when base_url is set.
+const PROVIDER_MATRIX: ProviderEntry[] = [
   {
     id: "gemini",
     name: "Google Gemini",
     model: "gemini-2.0-flash",
     badges: ["fast", "tools", "good default"],
-  },
-  {
-    id: "groq",
-    name: "Groq",
-    model: "llama-3.3-70b-versatile",
-    badges: ["very fast", "tools", "cheap"],
-  },
-  {
-    id: "openai",
-    name: "OpenAI",
-    model: "gpt-4o-mini",
-    badges: ["tools", "reliable", "multi-modal"],
+    keyPlaceholder: "AIza...",
   },
   {
     id: "anthropic",
     name: "Anthropic",
     model: "claude-sonnet-4-20250514",
     badges: ["tools", "strong reasoning", "careful"],
+    keyPlaceholder: "sk-ant-...",
+  },
+  {
+    id: "openai",
+    name: "OpenAI",
+    model: "gpt-4o-mini",
+    badges: ["tools", "reliable", "multi-modal"],
+    keyPlaceholder: "sk-...",
+  },
+  {
+    id: "groq",
+    name: "Groq",
+    model: "llama-3.3-70b-versatile",
+    badges: ["very fast", "tools", "cheap"],
+    keyPlaceholder: "gsk_...",
+  },
+  {
+    id: "openai",
+    name: "DeepSeek",
+    model: "deepseek-chat",
+    baseUrl: "https://api.deepseek.com/v1",
+    badges: ["cheap", "strong coding", "OpenAI-compat"],
+    keyPlaceholder: "sk-...",
+  },
+  {
+    id: "openai",
+    name: "xAI Grok",
+    model: "grok-3-mini",
+    baseUrl: "https://api.x.ai/v1",
+    badges: ["Elon's AI", "fast", "OpenAI-compat"],
+    keyPlaceholder: "xai-...",
+  },
+  {
+    id: "openai",
+    name: "MiniMax",
+    model: "MiniMax-Text-01",
+    baseUrl: "https://api.minimax.io/v1",
+    badges: ["long context", "cheap", "OpenAI-compat"],
+    keyPlaceholder: "eyJ...",
+  },
+  {
+    id: "openai",
+    name: "Mistral",
+    model: "mistral-small-latest",
+    baseUrl: "https://api.mistral.ai/v1",
+    badges: ["EU-hosted", "tools", "OpenAI-compat"],
+    keyPlaceholder: "...",
+  },
+  {
+    id: "openai",
+    name: "Together AI",
+    model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+    baseUrl: "https://api.together.xyz/v1",
+    badges: ["open models", "cheap", "OpenAI-compat"],
+    keyPlaceholder: "...",
+  },
+  {
+    id: "openai",
+    name: "Perplexity",
+    model: "sonar-pro",
+    baseUrl: "https://api.perplexity.ai",
+    badges: ["web search built-in", "OpenAI-compat"],
+    keyPlaceholder: "pplx-...",
+  },
+  {
+    id: "openai",
+    name: "Fireworks AI",
+    model: "accounts/fireworks/models/llama-v3p3-70b-instruct",
+    baseUrl: "https://api.fireworks.ai/inference/v1",
+    badges: ["fast inference", "cheap", "OpenAI-compat"],
+    keyPlaceholder: "fw-...",
+  },
+  {
+    id: "openai",
+    name: "Cohere",
+    model: "command-r-plus",
+    baseUrl: "https://api.cohere.ai/compatibility/v1",
+    badges: ["enterprise RAG", "OpenAI-compat"],
+    keyPlaceholder: "...",
   },
   {
     id: "ollama",
     name: "Ollama",
     model: "llama3.2",
     badges: ["local", "offline", "no api key"],
+  },
+  {
+    id: "openai",
+    name: "Custom",
+    model: "",
+    baseUrl: "",
+    badges: ["any OpenAI-compat endpoint"],
+    keyPlaceholder: "your-api-key",
   },
 ];
 
@@ -55,12 +142,30 @@ const TABS: { id: SettingsTab; label: string }[] = [
   { id: "about", label: "About" },
 ];
 
+// Find the best matching provider entry for existing config
+function matchProviderEntry(cfg: { provider: string; model: string; base_url?: string }): ProviderEntry | null {
+  // Custom base_url — try to find by base_url first, then by name
+  if (cfg.base_url) {
+    const byUrl = PROVIDER_MATRIX.find(
+      (p) => p.baseUrl && cfg.base_url && p.baseUrl.startsWith(cfg.base_url.split("/v1")[0])
+    );
+    if (byUrl) return byUrl;
+  }
+  // Native provider match
+  return PROVIDER_MATRIX.find(
+    (p) => p.id === cfg.provider && !p.baseUrl && cfg.provider !== "openai"
+  ) ?? PROVIDER_MATRIX.find((p) => p.id === cfg.provider) ?? null;
+}
+
 export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
   const [tab, setTab] = useState<SettingsTab>("provider");
   const [provider, setProvider] = useState(config.provider);
   const [apiKey, setApiKey] = useState(config.api_key);
   const [model, setModel] = useState(config.model);
   const [baseUrl, setBaseUrl] = useState(config.base_url ?? "");
+  const [selectedEntry, setSelectedEntry] = useState<ProviderEntry | null>(
+    () => matchProviderEntry(config)
+  );
   const [godModeTier, setGodModeTier] = useState<string>(
     config.god_mode ? (config.god_mode_tier ?? "normal") : "off"
   );
@@ -245,55 +350,84 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
 
         {tab === "provider" && <>
         <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2">
-              <span className="text-xs uppercase tracking-wide text-blade-muted">Provider</span>
-              <select
-                value={provider}
-                onChange={(event) => setProvider(event.target.value)}
-                className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none"
-              >
-                <option value="gemini">Google Gemini</option>
-                <option value="groq">Groq</option>
-                <option value="openai">OpenAI</option>
-                <option value="anthropic">Anthropic</option>
-                <option value="ollama">Ollama</option>
-              </select>
-            </label>
+          {/* Provider card grid */}
+          <div>
+            <span className="text-xs uppercase tracking-wide text-blade-muted">Provider</span>
+            <div className="mt-2 grid grid-cols-2 gap-1.5">
+              {PROVIDER_MATRIX.map((entry, i) => {
+                const isSelected = selectedEntry === entry ||
+                  (selectedEntry?.name === entry.name && selectedEntry?.baseUrl === entry.baseUrl);
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => {
+                      setSelectedEntry(entry);
+                      setProvider(entry.id);
+                      if (entry.model) setModel(entry.model);
+                      if (entry.baseUrl !== undefined) setBaseUrl(entry.baseUrl);
+                    }}
+                    className={`flex flex-col items-start gap-0.5 rounded-xl border px-3 py-2 text-left transition-colors ${
+                      isSelected
+                        ? "border-blade-accent bg-blade-accent/10 text-blade-accent"
+                        : "border-blade-border text-blade-muted hover:border-blade-accent/40 hover:text-blade-text"
+                    }`}
+                  >
+                    <span className="text-xs font-semibold leading-tight">{entry.name}</span>
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                      {entry.badges.map((b) => (
+                        <span
+                          key={b}
+                          className={`text-[9px] px-1 rounded ${isSelected ? "bg-blade-accent/20 text-blade-accent" : "bg-blade-bg text-blade-muted"}`}
+                        >
+                          {b}
+                        </span>
+                      ))}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-            <label className="space-y-2">
+          {/* Model + key fields */}
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="space-y-1.5">
               <span className="text-xs uppercase tracking-wide text-blade-muted">Model</span>
               <input
                 value={model}
                 onChange={(event) => setModel(event.target.value)}
-                className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none"
-                placeholder="gpt-4o-mini"
+                className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none font-mono"
+                placeholder="model-name"
               />
             </label>
+
+            {provider !== "ollama" && (
+              <label className="space-y-1.5">
+                <span className="text-xs uppercase tracking-wide text-blade-muted">API Key</span>
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(event) => setApiKey(event.target.value)}
+                  className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none"
+                  placeholder={selectedEntry?.keyPlaceholder ?? "your-api-key"}
+                />
+              </label>
+            )}
           </div>
 
-          <label className="space-y-2 block">
-            <span className="text-xs uppercase tracking-wide text-blade-muted">API Key</span>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(event) => setApiKey(event.target.value)}
-              className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none"
-              placeholder="Paste provider key"
-            />
-          </label>
-
-          {provider !== "ollama" && (
-            <label className="space-y-2 block">
+          {/* Base URL — shown for openai-compat providers or when custom */}
+          {(baseUrl || selectedEntry?.name === "Custom") && provider !== "ollama" && (
+            <label className="space-y-1.5 block">
               <span className="text-xs uppercase tracking-wide text-blade-muted">
-                Base URL <span className="normal-case text-blade-muted/60">(optional — for Vercel AI Gateway, Azure, Cloudflare, or any OpenAI-compatible endpoint)</span>
+                Base URL <span className="normal-case text-blade-muted/60">(OpenAI-compatible endpoint)</span>
               </span>
               <input
                 type="text"
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
                 className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none font-mono"
-                placeholder="https://ai-gateway.vercel.sh/v1"
+                placeholder="https://api.example.com/v1"
               />
             </label>
           )}
