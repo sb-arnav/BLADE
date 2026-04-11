@@ -223,7 +223,18 @@ pub async fn send_message_stream(
                 }
             });
             // THREAD: auto-update working memory (spawns its own background task)
-            crate::thread::auto_update_thread(app.clone(), user_text_thread, assistant_text_thread);
+            crate::thread::auto_update_thread(app.clone(), user_text_thread.clone(), assistant_text_thread);
+
+            // ACTIVITY TIMELINE: record this conversation turn
+            {
+                let db_path = crate::config::blade_config_dir().join("blade.db");
+                if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                    let title = &user_text_thread[..user_text_thread.len().min(80)];
+                    let content = &assistant_text[..assistant_text.len().min(500)];
+                    let _ = crate::db::timeline_record(&conn, "conversation", title, content, "BLADE", "{}");
+                }
+            }
+
             return Ok(());
         }
 

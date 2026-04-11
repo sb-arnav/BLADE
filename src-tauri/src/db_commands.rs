@@ -583,3 +583,24 @@ pub fn brain_get_context(state: tauri::State<'_, SharedDb>, budget_tokens: Optio
     let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
     Ok(db::brain_build_context(&conn, budget_tokens.unwrap_or(700)))
 }
+
+// ── Activity Timeline ─────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn timeline_get_recent(
+    state: tauri::State<'_, SharedDb>,
+    limit: Option<i64>,
+    event_type: Option<String>,
+) -> Result<Vec<db::TimelineEvent>, String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::timeline_recent(&conn, limit.unwrap_or(50), event_type.as_deref())
+}
+
+#[tauri::command]
+pub fn timeline_prune_old(
+    state: tauri::State<'_, SharedDb>,
+    days: Option<i64>,
+) -> Result<usize, String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::timeline_prune(&conn, days.unwrap_or(30))
+}
