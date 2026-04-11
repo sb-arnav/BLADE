@@ -1,5 +1,6 @@
 mod agent_commands;
 mod ambient;
+mod deeplearn;
 mod pulse;
 mod godmode;
 mod native_tools;
@@ -321,6 +322,8 @@ pub fn run() {
             tray::set_tray_status,
             pulse::pulse_get_last_thought,
             pulse::pulse_now,
+            deeplearn::deeplearn_discover_sources,
+            deeplearn::deeplearn_run,
             open_screen_overlay,
             voice_local::whisper_model_available,
             voice_local::whisper_download_model,

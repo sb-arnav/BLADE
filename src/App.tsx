@@ -22,7 +22,7 @@ import { useRuntimes } from "./hooks/useRuntimes";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn";
 
 const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
 const Canvas = lazy(() => import("./components/Canvas"));
@@ -48,6 +48,7 @@ const DocumentGenerator = lazy(() => import("./components/DocumentGenerator"));
 const WebAutomation = lazy(() => import("./components/WebAutomation"));
 const AgentTeamPanel = lazy(() => import("./components/AgentTeamPanel").then((m) => ({ default: m.AgentTeamPanel })));
 const GitPanel = lazy(() => import("./components/GitPanel").then((m) => ({ default: m.GitPanel })));
+const DeepLearn = lazy(() => import("./components/DeepLearn").then((m) => ({ default: m.DeepLearn })));
 const CharacterBible = lazy(() => import("./components/CharacterBible").then((m) => ({ default: m.CharacterBible })));
 const CapabilityReports = lazy(() => import("./components/CapabilityReports").then((m) => ({ default: m.CapabilityReports })));
 
@@ -400,6 +401,7 @@ export default function App() {
     { id: "insights", label: "Show conversation insights", description: "Surface metadata and patterns from the current thread", section: "Knowledge", action: () => setInsightsOpen(true) },
 
     { id: "pulse", label: "Pulse — ask Blade what it's thinking", description: "Trigger an unsolicited thought from Blade's background mind", section: "System", action: () => invoke<string>("pulse_now").then((t) => setPulseThought(t)).catch(() => {}) },
+    { id: "deeplearn", label: "Deep Learn — let Blade read your digital life", description: "Re-run Blade's ingestion of your shell history, git, notes, and conversations", section: "System", action: () => openRoute("deeplearn") },
     { id: "settings", label: "Open settings", description: "Configure providers, memory, and Blade behavior", section: "System", shortcut: "Ctrl+,", action: () => openRoute("settings") },
     { id: "sync", label: "Open sync settings", description: "Inspect sync and persistence controls", section: "System", action: () => openRoute("sync") },
     { id: "diagnostics", label: "Open diagnostics", description: "Inspect system status and troubleshooting data", section: "System", action: () => openRoute("diagnostics") },
@@ -447,7 +449,7 @@ export default function App() {
         <Suspense fallback={<ShellFallback label="Preparing Blade..." />}>
           <InitWizard onComplete={async () => {
             await loadConfig();
-            setRoute("chat");
+            setRoute("deeplearn"); // Mission zero: become the user
           }} />
         </Suspense>
       </div>
@@ -476,7 +478,16 @@ export default function App() {
     "git": <GitPanel onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} />,
     "character": <CharacterBible onBack={() => openRoute("chat")} />,
     "reports": <CapabilityReports onBack={() => openRoute("chat")} />,
-    "init": <InitWizard onComplete={async () => { await loadConfig(); openRoute("chat"); }} isReinit />,
+    "init": <InitWizard onComplete={async () => { await loadConfig(); openRoute("deeplearn"); }} isReinit />,
+    "deeplearn": (
+      <DeepLearn
+        onComplete={(summary) => {
+          if (summary) setPulseThought(`I just read your life. ${summary.slice(0, 120)}${summary.length > 120 ? "…" : ""}`);
+          openRoute("chat");
+        }}
+        onSkip={() => openRoute("chat")}
+      />
+    ),
   };
 
   if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {
