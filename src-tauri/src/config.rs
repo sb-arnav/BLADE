@@ -51,12 +51,17 @@ struct DiskConfig {
     god_mode: bool,
     #[serde(default = "default_god_mode_tier")]
     god_mode_tier: String,
+    #[serde(default = "default_voice_mode")]
+    voice_mode: String,
+    #[serde(default)]
+    obsidian_vault_path: String,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
 }
 
 fn default_god_mode_tier() -> String { "normal".to_string() }
+fn default_voice_mode() -> String { "off".to_string() }
 
 impl Default for DiskConfig {
     fn default() -> Self {
@@ -74,6 +79,8 @@ impl Default for DiskConfig {
             base_url: None,
             god_mode: false,
             god_mode_tier: "normal".to_string(),
+            voice_mode: "off".to_string(),
+            obsidian_vault_path: String::new(),
             api_key: None,
         }
     }
@@ -106,6 +113,10 @@ pub struct BladeConfig {
     pub god_mode: bool,
     #[serde(default = "default_god_mode_tier")]
     pub god_mode_tier: String,
+    #[serde(default = "default_voice_mode")]
+    pub voice_mode: String,
+    #[serde(default)]
+    pub obsidian_vault_path: String,
 }
 
 impl Default for BladeConfig {
@@ -125,6 +136,8 @@ impl Default for BladeConfig {
             base_url: None,
             god_mode: false,
             god_mode_tier: "normal".to_string(),
+            voice_mode: "off".to_string(),
+            obsidian_vault_path: String::new(),
         }
     }
 }
@@ -208,6 +221,8 @@ pub fn load_config() -> BladeConfig {
         base_url: disk.base_url,
         god_mode: disk.god_mode,
         god_mode_tier: disk.god_mode_tier,
+        voice_mode: disk.voice_mode,
+        obsidian_vault_path: disk.obsidian_vault_path,
     }
 }
 
@@ -229,6 +244,8 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         base_url: config.base_url.clone(),
         god_mode: config.god_mode,
         god_mode_tier: config.god_mode_tier.clone(),
+        voice_mode: config.voice_mode.clone(),
+        obsidian_vault_path: config.obsidian_vault_path.clone(),
         api_key: None,
     };
 

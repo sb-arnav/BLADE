@@ -169,6 +169,62 @@ pub async fn voice_transcribe(audio_base64: String) -> Result<String, String> {
     Ok(text)
 }
 
+/// Transcribe any audio format (webm, m4a, ogg, mp3…) from MediaRecorder output.
+/// `file_ext` should be "webm", "mp4", "ogg", etc.
+#[tauri::command]
+pub async fn voice_transcribe_blob(audio_base64: String, file_ext: String) -> Result<String, String> {
+    let config = crate::config::load_config();
+
+    let api_key = if config.provider == "groq" {
+        config.api_key.clone()
+    } else {
+        keyring::Entry::new("blade-ai", "groq-whisper")
+            .and_then(|e| e.get_password())
+            .unwrap_or(config.api_key.clone())
+    };
+
+    if api_key.is_empty() {
+        return Err("No API key for transcription. Set Groq as provider or add a Groq key.".to_string());
+    }
+
+    let audio_bytes = base64::engine::general_purpose::STANDARD
+        .decode(&audio_base64)
+        .map_err(|e| format!("Invalid audio: {}", e))?;
+
+    let safe_ext = match file_ext.trim_start_matches('.') {
+        "mp4" | "m4a" => "recording.mp4",
+        "ogg" => "recording.ogg",
+        "mp3" => "recording.mp3",
+        "webm" | _ => "recording.webm",
+    };
+
+    let client = reqwest::Client::new();
+    let part = reqwest::multipart::Part::bytes(audio_bytes)
+        .file_name(safe_ext)
+        .mime_str("audio/webm")
+        .map_err(|e| e.to_string())?;
+
+    let form = reqwest::multipart::Form::new()
+        .text("model", "whisper-large-v3")
+        .part("file", part);
+
+    let response = client
+        .post("https://api.groq.com/openai/v1/audio/transcriptions")
+        .header("Authorization", format!("Bearer {}", api_key))
+        .multipart(form)
+        .send()
+        .await
+        .map_err(|e| format!("Transcription failed: {}", e))?;
+
+    if !response.status().is_success() {
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Whisper error: {}", body));
+    }
+
+    let json: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
+    Ok(json["text"].as_str().unwrap_or("").trim().to_string())
+}
+
 fn encode_wav(samples: &[f32], channels: u16, sample_rate: u32) -> Result<Vec<u8>, String> {
     let mut cursor = std::io::Cursor::new(Vec::new());
 

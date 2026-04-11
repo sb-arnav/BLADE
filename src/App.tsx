@@ -16,6 +16,8 @@ import { useFileDrop } from "./hooks/useFileDrop";
 import { useContextAwareness } from "./hooks/useContextAwareness";
 import { useProactiveMode } from "./hooks/useProactiveMode";
 import { useVoiceCommands } from "./hooks/useVoiceCommands";
+import { useVoiceMode } from "./hooks/useVoiceMode";
+import { VoiceOrb } from "./components/VoiceOrb";
 import { useRuntimes } from "./hooks/useRuntimes";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
@@ -130,6 +132,16 @@ export default function App() {
   const proactive = useProactiveMode();
   const voiceCommands = useVoiceCommands();
   const runtimeCenter = useRuntimes();
+
+  const [voiceDraft, setVoiceDraft] = useState<string | null>(null);
+  const voiceSendRef = useRef<(text: string) => void>(() => {});
+  const voiceMode = useVoiceMode({
+    config: config ?? { provider: "", api_key: "", model: "", onboarded: false, mcp_servers: [] },
+    onTranscription: (text, autoSend) => {
+      if (autoSend) voiceSendRef.current(text);
+      else setVoiceDraft(text);
+    },
+  });
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const handleImageDrop = useCallback((dataUrl: string) => {
@@ -314,6 +326,9 @@ export default function App() {
 
     chat.sendMessage(content, imageBase64);
   }, [chat.sendMessage, recordMessage, activity, voiceCommands, handleSlashCommand]);
+
+  // Keep voice send ref in sync so voice mode can call sendWithStats
+  useEffect(() => { voiceSendRef.current = sendWithStats; }, [sendWithStats]);
 
   const handleScreenshot = async () => {
     try {
@@ -548,10 +563,15 @@ export default function App() {
               onOpenWorkspace={(workspace) => openRoute(workspace)}
               runtimes={runtimeCenter.runtimes}
               onOpenOperators={() => openRoute("agents")}
+              voiceDraft={voiceDraft}
+              onVoiceDraftConsumed={() => setVoiceDraft(null)}
+              voiceModeOnPttDown={voiceMode.onPttMouseDown}
+              voiceModeOnPttUp={voiceMode.onPttMouseUp}
             />
           )}
         </Suspense>
       </div>
+      <VoiceOrb status={voiceMode.status} mode={voiceMode.mode} />
     </div>
   );
 }

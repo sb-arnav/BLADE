@@ -65,6 +65,20 @@ pub fn build_system_prompt(tools: &[McpTool]) -> String {
         }
     }
 
+    // Obsidian vault — tell Blade where to read/write notes
+    if !config.obsidian_vault_path.is_empty() {
+        parts.push(format!(
+            "## Obsidian Vault\n\nThe user's Obsidian vault is at `{}`. \
+             Use `blade_file_read` / `blade_file_write` to interact with it directly.\n\
+             - Daily notes go in `{}/Daily Notes/` as `YYYY-MM-DD.md`\n\
+             - When the user says \"take a note\", \"remember this\", or \"add to Obsidian\", write to the vault\n\
+             - For quick notes: append to today's daily note (create it if missing)\n\
+             - When reading context from the vault, scan the last 7 daily notes for recent threads",
+            config.obsidian_vault_path,
+            config.obsidian_vault_path
+        ));
+    }
+
     parts.join("\n\n---\n\n")
 }
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ConversationSummary, Message, RuntimeDescriptor, ToolApprovalRequest, ToolExecution } from "../types";
 import { ActiveWindowInfo, ContextSuggestion } from "../hooks/useContextAwareness";
 import { detectClipboardType } from "../utils/clipboardDetect";
@@ -40,6 +40,11 @@ interface Props {
   onOpenWorkspace?: (workspace: "terminal" | "files" | "canvas" | "workflows" | "agents") => void;
   runtimes?: RuntimeDescriptor[];
   onOpenOperators?: () => void;
+  voiceDraft?: string | null;
+  onVoiceDraftConsumed?: () => void;
+  voiceModeStatus?: string;
+  voiceModeOnPttDown?: () => void;
+  voiceModeOnPttUp?: () => void;
 }
 
 function formatTime(timestamp: number): string {
@@ -88,6 +93,10 @@ export function ChatWindow({
   onOpenWorkspace,
   runtimes,
   onOpenOperators,
+  voiceDraft,
+  onVoiceDraftConsumed,
+  voiceModeOnPttDown,
+  voiceModeOnPttUp,
 }: Props) {
   const [search, setSearch] = useState("");
   const [composerDraft, setComposerDraft] = useState<string | null>(null);
@@ -97,6 +106,14 @@ export function ChatWindow({
     const q = search.toLowerCase();
     return conversations.filter((c) => (c.title || "").toLowerCase().includes(q));
   }, [conversations, search]);
+
+  // Merge external voice draft into composer draft
+  useEffect(() => {
+    if (voiceDraft) {
+      setComposerDraft(voiceDraft);
+      onVoiceDraftConsumed?.();
+    }
+  }, [voiceDraft, onVoiceDraftConsumed]);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -454,6 +471,8 @@ export function ChatWindow({
           disabled={loading}
           draftValue={composerDraft}
           onDraftConsumed={() => setComposerDraft(null)}
+          onPttMouseDown={voiceModeOnPttDown}
+          onPttMouseUp={voiceModeOnPttUp}
         />
       </div>
 

@@ -373,6 +373,8 @@ pub fn set_config(
     base_url: Option<String>,
     god_mode: Option<bool>,
     god_mode_tier: Option<String>,
+    voice_mode: Option<String>,
+    obsidian_vault_path: Option<String>,
 ) -> Result<(), String> {
     let mut config = load_config();
     config.provider = provider;
@@ -387,6 +389,8 @@ pub fn set_config(
     config.base_url = base_url.filter(|s| !s.is_empty());
     if let Some(v) = god_mode { config.god_mode = v; }
     if let Some(v) = god_mode_tier { config.god_mode_tier = v; }
+    if let Some(v) = voice_mode { config.voice_mode = v; }
+    if let Some(v) = obsidian_vault_path { config.obsidian_vault_path = v; }
     save_config(&config)
 }
 

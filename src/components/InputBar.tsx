@@ -19,9 +19,11 @@ interface Props {
   disabled: boolean;
   draftValue?: string | null;
   onDraftConsumed?: () => void;
+  onPttMouseDown?: () => void;
+  onPttMouseUp?: () => void;
 }
 
-export function InputBar({ onSend, onSlashCommand, disabled, draftValue, onDraftConsumed }: Props) {
+export function InputBar({ onSend, onSlashCommand, disabled, draftValue, onDraftConsumed, onPttMouseDown, onPttMouseUp }: Props) {
   const [value, setValue] = useState("");
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
@@ -213,14 +215,17 @@ export function InputBar({ onSend, onSlashCommand, disabled, draftValue, onDraft
             )}
           </button>
           <button
-            onClick={handleVoice}
-            disabled={busy && !recording}
+            onClick={onPttMouseDown ? undefined : handleVoice}
+            onMouseDown={onPttMouseDown}
+            onMouseUp={onPttMouseUp}
+            onMouseLeave={onPttMouseUp}
+            disabled={busy && !recording && !onPttMouseDown}
             className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
               recording
                 ? "text-red-400 bg-red-400/10"
                 : "text-blade-muted hover:text-blade-secondary hover:bg-blade-surface-hover"
-            } ${(busy && !recording) ? "opacity-30" : ""}`}
-            title={recording ? "Stop" : "Voice"}
+            } ${(busy && !recording && !onPttMouseDown) ? "opacity-30" : ""}`}
+            title={onPttMouseDown ? "Hold to talk" : recording ? "Stop" : "Voice"}
           >
             {transcribing ? (
               <div className="w-1.5 h-1.5 rounded-full bg-blade-accent animate-pulse-slow" />
