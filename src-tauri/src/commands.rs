@@ -25,6 +25,7 @@ pub async fn send_message_stream(
     app: tauri::AppHandle,
     state: tauri::State<'_, SharedMcpManager>,
     approvals: tauri::State<'_, ApprovalMap>,
+    vector_store: tauri::State<'_, crate::embeddings::SharedVectorStore>,
     messages: Vec<ChatMessage>,
 ) -> Result<(), String> {
     let _ = app.emit("blade_status", "processing");
@@ -54,12 +55,22 @@ pub async fn send_message_stream(
         };
     }
 
+    // Capture last user message before build_conversation consumes messages
+    let last_user_text = messages.iter().rev()
+        .find(|m| m.role == "user")
+        .map(|m| m.content.clone())
+        .unwrap_or_default();
+
     let tool_snapshot = {
         let manager = state.lock().await;
         manager.get_tools().to_vec()
     };
 
-    let system_prompt = brain::build_system_prompt(&tool_snapshot);
+    let system_prompt = brain::build_system_prompt_with_recall(
+        &tool_snapshot,
+        &last_user_text,
+        Some(vector_store.inner()),
+    );
 
     // MCP tools + native built-in tools (bash, file ops, web fetch)
     let mut tools: Vec<ToolDefinition> = tool_snapshot
@@ -71,11 +82,6 @@ pub async fn send_message_stream(
         })
         .collect();
     tools.extend(crate::native_tools::tool_definitions());
-    // Capture last user message before build_conversation consumes messages
-    let last_user_text = messages.iter().rev()
-        .find(|m| m.role == "user")
-        .map(|m| m.content.clone())
-        .unwrap_or_default();
 
     let conversation = providers::build_conversation(messages, Some(system_prompt));
 
@@ -100,15 +106,18 @@ pub async fn send_message_stream(
         trace::log_trace(&entry);
         if result.is_ok() {
             let _ = app.emit("blade_status", "idle");
-            // Background entity extraction — don't block response delivery
+            // Background: entity extraction + auto-embed for persistent memory
             // Note: streaming path — assistant text assembled by frontend via brain_extract_from_exchange
             let app2 = app.clone();
             let user_text_clone = last_user_text.clone();
+            let store_clone = vector_store.inner().clone();
             tokio::spawn(async move {
                 let n = brain::extract_entities_from_exchange(&user_text_clone, "").await;
                 if n > 0 {
                     let _ = app2.emit("brain_grew", serde_json::json!({ "new_entities": n }));
                 }
+                // Embed the exchange for future semantic recall (assistant text unavailable in stream path)
+                crate::embeddings::auto_embed_exchange(&store_clone, &user_text_clone, "", "stream");
             });
         } else {
             let _ = app.emit("blade_status", "error");
@@ -168,15 +177,18 @@ pub async fn send_message_stream(
             }
             let _ = app.emit("chat_done", ());
             let _ = app.emit("blade_status", "idle");
-            // Background entity extraction + capability gap detection
+            // Background: entity extraction + auto-embed + capability gap detection
             let app2 = app.clone();
             let user_text = last_user_text.clone();
             let assistant_text = turn.content.clone();
+            let store_clone = vector_store.inner().clone();
             tokio::spawn(async move {
                 let n = brain::extract_entities_from_exchange(&user_text, &assistant_text).await;
                 if n > 0 {
                     let _ = app2.emit("brain_grew", serde_json::json!({ "new_entities": n }));
                 }
+                // Embed the full exchange for persistent semantic memory
+                crate::embeddings::auto_embed_exchange(&store_clone, &user_text, &assistant_text, "tool_loop");
                 // Capability gap detection — runs silently, fires webhook if gap found
                 if reports::detect_and_log(&user_text, &assistant_text) {
                     let _ = app2.emit("capability_gap_detected", serde_json::json!({

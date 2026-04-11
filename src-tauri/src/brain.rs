@@ -4,8 +4,17 @@ use crate::mcp::McpTool;
 use std::fs;
 use std::path::PathBuf;
 
-/// Build the system prompt that gives Blade its personality and context
+/// Build the system prompt that gives Blade its personality and context.
+/// Optionally accepts the current user message to inject semantically relevant memories.
 pub fn build_system_prompt(tools: &[McpTool]) -> String {
+    build_system_prompt_with_recall(tools, "", None)
+}
+
+pub fn build_system_prompt_with_recall(
+    tools: &[McpTool],
+    user_query: &str,
+    vector_store: Option<&crate::embeddings::SharedVectorStore>,
+) -> String {
     let mut parts: Vec<String> = Vec::new();
     let config = crate::config::load_config();
 
@@ -46,6 +55,19 @@ pub fn build_system_prompt(tools: &[McpTool]) -> String {
         parts.push(format!(
             "## MCP Tools\n\n{}", tool_list.join("\n")
         ));
+    }
+
+    // Semantic memory recall — surface past conversations relevant to this query
+    if !user_query.is_empty() {
+        if let Some(store) = vector_store {
+            let recalled = crate::embeddings::recall_relevant(store, user_query, 4);
+            if !recalled.is_empty() {
+                parts.push(format!(
+                    "## Relevant Past Exchanges\n\nThese are previous conversations semantically related to the current message. Use them for context:\n\n{}",
+                    recalled
+                ));
+            }
+        }
     }
 
     // Active window context

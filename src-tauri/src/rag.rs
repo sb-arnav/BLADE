@@ -61,11 +61,8 @@ pub async fn rag_ingest_file(
         s.add(
             chunk.text.clone(),
             embedding,
-            serde_json::json!({
-                "file": &file_path,
-                "chunk_index": chunk.index,
-                "type": "document",
-            }),
+            "document".to_string(),
+            file_path.clone(),
         );
     }
 
@@ -170,11 +167,8 @@ async fn rag_ingest_single(
         s.add(
             chunk.text.clone(),
             embedding,
-            serde_json::json!({
-                "file": file_path,
-                "chunk_index": chunk.index,
-                "type": "document",
-            }),
+            "document".to_string(),
+            file_path.to_string(),
         );
     }
 
@@ -202,7 +196,7 @@ pub async fn rag_query(
         .iter()
         .map(|h| RagSource {
             text: h.text.clone(),
-            file: h.metadata["file"].as_str().unwrap_or("unknown").to_string(),
+            file: h.source_id.clone(),
             score: h.score,
         })
         .collect();
