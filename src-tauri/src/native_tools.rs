@@ -89,6 +89,19 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "blade_list_dir".to_string(),
+            description: "List files in a directory with name, size, and modification date. Use this for: browsing Downloads, Desktop, Documents, any folder. Works on all platforms. Returns files sorted newest-first.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Directory path. Supports ~/ and common names like 'downloads', 'desktop', 'documents'"},
+                    "since_days": {"type": "integer", "description": "Only show files modified in the last N days (optional)"},
+                    "limit": {"type": "integer", "description": "Max files to return (default 50)"}
+                },
+                "required": ["path"]
+            }),
+        },
+        ToolDefinition {
             name: "blade_set_clipboard".to_string(),
             description: "Copy text to the user's clipboard. Use this instead of shell commands (clip, pbcopy, xclip) — those mangle quotes and special characters.".to_string(),
             input_schema: json!({
@@ -187,6 +200,15 @@ pub async fn execute(name: &str, args: &Value) -> (String, bool) {
             };
             let max_chars = args["max_chars"].as_u64().map(|v| v as usize).unwrap_or(20_000);
             web_fetch(url, max_chars).await
+        }
+        "blade_list_dir" => {
+            let path = match args["path"].as_str() {
+                Some(p) => p,
+                None => return ("Missing required argument: path".to_string(), true),
+            };
+            let since_days = args["since_days"].as_u64().map(|d| d as u64);
+            let limit = args["limit"].as_u64().map(|l| l as usize).unwrap_or(50);
+            list_dir(path, since_days, limit)
         }
         "blade_set_clipboard" => {
             let text = match args["text"].as_str() {
@@ -393,6 +415,77 @@ async fn web_fetch(url: &str, max_chars: usize) -> (String, bool) {
         }
         Err(e) => (format!("Fetch failed: {}", e), true),
     }
+}
+
+fn resolve_dir(path: &str) -> std::path::PathBuf {
+    let home = dirs::home_dir().unwrap_or_default();
+    let lower = path.to_lowercase();
+
+    // Friendly names for common folders
+    let resolved = match lower.trim_matches(['/', '\\', ' '].as_ref()) {
+        "downloads" | "download" => home.join("Downloads"),
+        "desktop" => home.join("Desktop"),
+        "documents" | "docs" => home.join("Documents"),
+        "pictures" | "photos" => home.join("Pictures"),
+        "music" => home.join("Music"),
+        "videos" => home.join("Videos"),
+        _ => std::path::PathBuf::from(expand_home(path)),
+    };
+    resolved
+}
+
+fn list_dir(path: &str, since_days: Option<u64>, limit: usize) -> (String, bool) {
+    let dir = resolve_dir(path);
+
+    let entries = match std::fs::read_dir(&dir) {
+        Ok(e) => e,
+        Err(e) => return (format!("Cannot read '{}': {}", dir.display(), e), true),
+    };
+
+    let cutoff = since_days.map(|d| {
+        std::time::SystemTime::now()
+            .checked_sub(std::time::Duration::from_secs(d * 86400))
+            .unwrap_or(std::time::UNIX_EPOCH)
+    });
+
+    let mut files: Vec<(std::time::SystemTime, String)> = entries
+        .filter_map(|e| e.ok())
+        .filter_map(|entry| {
+            let meta = entry.metadata().ok()?;
+            let modified = meta.modified().ok()?;
+            if let Some(cutoff) = cutoff {
+                if modified < cutoff { return None; }
+            }
+            let name = entry.file_name().to_string_lossy().to_string();
+            let size = if meta.is_dir() {
+                "<dir>".to_string()
+            } else {
+                let bytes = meta.len();
+                if bytes >= 1_000_000 { format!("{:.1} MB", bytes as f64 / 1_000_000.0) }
+                else if bytes >= 1_000 { format!("{:.0} KB", bytes as f64 / 1_000.0) }
+                else { format!("{} B", bytes) }
+            };
+
+            // Format date
+            let datetime: chrono::DateTime<chrono::Local> = modified.into();
+            let date_str = datetime.format("%Y-%m-%d %H:%M").to_string();
+
+            Some((modified, format!("{:<12} {}  {}", size, date_str, name)))
+        })
+        .collect();
+
+    // Newest first
+    files.sort_by(|a, b| b.0.cmp(&a.0));
+    files.truncate(limit);
+
+    if files.is_empty() {
+        return (format!("No files found in {}", dir.display()), false);
+    }
+
+    let header = format!("{} files in {}:\n{:<12} {}  {}",
+        files.len(), dir.display(), "SIZE", "MODIFIED", "NAME");
+    let rows: Vec<String> = files.into_iter().map(|(_, row)| row).collect();
+    (format!("{}\n{}", header, rows.join("\n")), false)
 }
 
 fn set_clipboard(text: &str) -> (String, bool) {
