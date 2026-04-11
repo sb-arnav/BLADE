@@ -239,6 +239,24 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "blade_set_api_key".to_string(),
+            description: "Configure an API key for a provider. Use this when the user gives you an API key in conversation — parse it, store it securely, and switch to that provider. Supports all providers. This is Blade configuring itself autonomously.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "provider": {
+                        "type": "string",
+                        "description": "Provider name: 'anthropic', 'openai', 'gemini', 'groq', 'ollama', or 'openai' for any OpenAI-compat provider (use with base_url)",
+                        "enum": ["anthropic", "openai", "gemini", "groq", "ollama"]
+                    },
+                    "api_key": {"type": "string", "description": "The API key to store securely in the system keychain"},
+                    "base_url": {"type": "string", "description": "Custom base URL for OpenAI-compat providers (e.g. 'https://api.githubcopilot.com' for GitHub Copilot, 'https://api.deepseek.com/v1' for DeepSeek). Leave empty for native providers."},
+                    "model": {"type": "string", "description": "Default model to use (e.g. 'claude-sonnet-4-5' for Copilot, 'deepseek-chat' for DeepSeek). Optional."}
+                },
+                "required": ["provider", "api_key"]
+            }),
+        },
+        ToolDefinition {
             name: "blade_update_thread".to_string(),
             description: "Update your own working memory — the live context document Blade keeps about what it's currently tracking. Use this to record key decisions, switch active projects, note open loops, or explicitly remember something important across the conversation. This is Blade's scratchpad, always injected into the next session.".to_string(),
             input_schema: json!({
@@ -422,6 +440,32 @@ pub async fn execute(name: &str, args: &Value) -> (String, bool) {
             let timeout_ms = args["timeout_ms"].as_u64();
             ui_wait(name, timeout_ms)
         }
+        // ── SELF-CONFIGURATION ────────────────────────────────────────────────
+        "blade_set_api_key" => {
+            let provider = match args["provider"].as_str() {
+                Some(p) => p,
+                None => return ("Missing required argument: provider".to_string(), true),
+            };
+            let api_key = match args["api_key"].as_str() {
+                Some(k) => k,
+                None => return ("Missing required argument: api_key".to_string(), true),
+            };
+            let base_url = args["base_url"].as_str().filter(|s| !s.is_empty());
+            let model = args["model"].as_str().filter(|s| !s.is_empty());
+            match crate::config::set_api_key_for_provider(provider, api_key, base_url, model) {
+                Ok(()) => {
+                    let display_key = if api_key.len() > 8 {
+                        format!("{}...{}", &api_key[..4], &api_key[api_key.len()-4..])
+                    } else {
+                        "****".to_string()
+                    };
+                    let url_note = base_url.map(|u| format!(" (endpoint: {})", u)).unwrap_or_default();
+                    (format!("API key saved for {}{}. Key: {}. Blade is now configured — you can start chatting.", provider, url_note, display_key), false)
+                }
+                Err(e) => (format!("Failed to save API key: {}", e), true),
+            }
+        }
+
         // ── THREAD: Blade's working memory ─────────────────────────────────────
         "blade_update_thread" => {
             let content = match args["content"].as_str() {

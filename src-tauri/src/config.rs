@@ -258,6 +258,33 @@ fn save_disk_config(config: &DiskConfig) -> Result<(), String> {
     write_blade_file(&path, &data)
 }
 
+/// Set an API key for any provider without requiring the full config flow.
+/// Blade can call this autonomously when the user pastes a key in conversation.
+pub fn set_api_key_for_provider(
+    provider: &str,
+    api_key: &str,
+    base_url: Option<&str>,
+    model: Option<&str>,
+) -> Result<(), String> {
+    set_api_key_in_keyring(provider, api_key)?;
+
+    // Switch to this provider in config
+    let mut config = load_config();
+    config.provider = provider.to_string();
+    if !api_key.is_empty() {
+        config.api_key = api_key.to_string();
+    }
+    if let Some(url) = base_url {
+        config.base_url = if url.is_empty() { None } else { Some(url.to_string()) };
+    }
+    if let Some(m) = model {
+        if !m.is_empty() {
+            config.model = m.to_string();
+        }
+    }
+    save_config(&config)
+}
+
 pub fn update_window_state(window_state: WindowState) -> Result<(), String> {
     // Don't save minimized/off-screen sentinel positions (Windows uses -32000)
     if window_state.x < -10000 || window_state.y < -10000 {

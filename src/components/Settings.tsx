@@ -113,6 +113,22 @@ const PROVIDER_MATRIX: ProviderEntry[] = [
     keyPlaceholder: "...",
   },
   {
+    id: "openai",
+    name: "GitHub Copilot",
+    model: "claude-sonnet-4-5",
+    baseUrl: "https://api.githubcopilot.com",
+    badges: ["Claude + GPT-4o + Gemini", "one subscription", "OpenAI-compat"],
+    keyPlaceholder: "ghp_... or ghu_...",
+  },
+  {
+    id: "openai",
+    name: "Azure OpenAI",
+    model: "gpt-4o",
+    baseUrl: "https://YOUR_RESOURCE.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT",
+    badges: ["enterprise", "private", "OpenAI-compat"],
+    keyPlaceholder: "Azure API key",
+  },
+  {
     id: "ollama",
     name: "Ollama",
     model: "llama3.2",
