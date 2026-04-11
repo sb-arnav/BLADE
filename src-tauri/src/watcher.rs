@@ -270,6 +270,29 @@ pub fn start_watcher_loop(app: tauri::AppHandle) {
 
 // ── Tauri commands ────────────────────────────────────────────────────────────
 
+/// Internal (non-command) version — callable from native_tools.rs dispatch
+pub fn watcher_add_internal(url: String, label: String, interval_mins: i32) -> Result<String, String> {
+    let url = url.trim().to_string();
+    if url.is_empty() {
+        return Err("URL cannot be empty".to_string());
+    }
+    if !url.starts_with("http://") && !url.starts_with("https://") {
+        return Err("URL must start with http:// or https://".to_string());
+    }
+
+    let id = uuid::Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().timestamp();
+    let mins = (interval_mins as i64).clamp(5, 1440);
+
+    let conn = open_db()?;
+    conn.execute(
+        "INSERT INTO watchers (id, url, label, interval_mins, last_content_hash, last_checked, last_changed, active, created_at) VALUES (?1, ?2, ?3, ?4, '', 0, 0, 1, ?5)",
+        params![id, url, label, mins, now],
+    ).map_err(|e| e.to_string())?;
+
+    Ok(id)
+}
+
 #[tauri::command]
 pub async fn watcher_add(url: String, label: String, interval_mins: Option<i64>) -> Result<String, String> {
     let url = url.trim().to_string();

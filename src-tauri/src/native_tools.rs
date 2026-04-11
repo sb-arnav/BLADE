@@ -277,6 +277,32 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
                 "properties": {}
             }),
         },
+        ToolDefinition {
+            name: "blade_set_reminder".to_string(),
+            description: "Set a reminder that fires at a specific time or after a duration. Use when the user asks you to remind them about something ('remind me in 30 minutes', 'remind me tomorrow'). You MUST use this tool — never just say you'll remember. The reminder fires as an OS notification, TTS, and Discord message.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string", "description": "Short, clear reminder title (max 80 chars)"},
+                    "note": {"type": "string", "description": "Additional context or detail for the reminder (optional)"},
+                    "time_expression": {"type": "string", "description": "When to fire: relative expressions like '30 minutes', '2 hours', '1 day', 'tomorrow', 'tonight'. Or absolute unix timestamp as a string."}
+                },
+                "required": ["title", "time_expression"]
+            }),
+        },
+        ToolDefinition {
+            name: "blade_watch_url".to_string(),
+            description: "Add a URL to BLADE's resource watcher. BLADE will check this URL periodically and alert the user when the content changes. Use when the user wants to monitor a webpage (competitor pricing, GitHub releases, status pages, etc.).".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "The URL to watch (must start with https://)"},
+                    "label": {"type": "string", "description": "Human-readable label for this watcher (e.g. 'Competitor pricing page')"},
+                    "interval_mins": {"type": "integer", "description": "How often to check in minutes (default 30, min 5, max 1440)"}
+                },
+                "required": ["url"]
+            }),
+        },
     ]
 }
 
@@ -487,6 +513,41 @@ pub async fn execute(name: &str, args: &Value) -> (String, bool) {
             match crate::thread::get_active_thread() {
                 Some(content) => (format!("Current working memory:\n\n{}", content), false),
                 None => ("No active thread — working memory is empty.".to_string(), false),
+            }
+        }
+        "blade_set_reminder" => {
+            let title = match args["title"].as_str() {
+                Some(t) => t.to_string(),
+                None => return ("Missing required argument: title".to_string(), true),
+            };
+            let note = args["note"].as_str().unwrap_or("").to_string();
+            let time_expr = match args["time_expression"].as_str() {
+                Some(t) => t.to_string(),
+                None => return ("Missing required argument: time_expression".to_string(), true),
+            };
+            match crate::reminders::reminder_add_natural(title, note, time_expr) {
+                Ok(id) => (format!("Reminder set (id: {}). You'll be alerted via notification, TTS, and Discord when it fires.", id), false),
+                Err(e) => (format!("Failed to set reminder: {}", e), true),
+            }
+        }
+        "blade_watch_url" => {
+            let url = match args["url"].as_str() {
+                Some(u) => u.to_string(),
+                None => return ("Missing required argument: url".to_string(), true),
+            };
+            if !url.starts_with("https://") && !url.starts_with("http://") {
+                return ("URL must start with http:// or https://".to_string(), true);
+            }
+            let label = args["label"].as_str().unwrap_or("").to_string();
+            let interval_mins = args["interval_mins"].as_i64().unwrap_or(30).max(5).min(1440) as i32;
+            match crate::watcher::watcher_add_internal(url.clone(), label.clone(), interval_mins) {
+                Ok(id) => (format!(
+                    "Now watching '{}' every {} minutes (id: {}). I'll alert you when the content changes.",
+                    if label.is_empty() { &url } else { &label },
+                    interval_mins,
+                    id
+                ), false),
+                Err(e) => (format!("Failed to add watcher: {}", e), true),
             }
         }
         _ => (format!("Unknown native tool: {}", name), true),
