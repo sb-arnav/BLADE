@@ -410,6 +410,58 @@ No "Good morning". No headers. No numbered lists. Start in the middle of the obs
     }
 }
 
+/// Explain the reasoning behind the last pulse thought.
+/// Returns a candid explanation of what BLADE saw that led to the thought.
+#[tauri::command]
+pub async fn pulse_explain() -> Result<String, String> {
+    let config = crate::config::load_config();
+    if config.api_key.is_empty() && config.provider != "ollama" {
+        return Err("No API key configured".to_string());
+    }
+
+    let last_thought = std::fs::read_to_string(
+        crate::config::blade_config_dir().join("last_pulse.txt")
+    ).unwrap_or_default();
+
+    if last_thought.trim().is_empty() {
+        return Err("No pulse thought to explain yet".to_string());
+    }
+
+    // Gather the same context that was used to generate the thought
+    let machine_ctx = crate::godmode::load_godmode_context().unwrap_or_default();
+    let activity = crate::context::get_user_activity().unwrap_or_default();
+    let active_thread = crate::thread::get_active_thread().unwrap_or_default();
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    let memory_summary = if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+        crate::db::brain_build_context(&conn, 200)
+    } else { String::new() };
+
+    let context_summary = [
+        if !activity.is_empty() { format!("Current activity: {}", &activity[..activity.len().min(300)]) } else { String::new() },
+        if !active_thread.is_empty() { format!("Active thread: {}", &active_thread[..active_thread.len().min(200)]) } else { String::new() },
+        if !memory_summary.is_empty() { format!("Memory: {}", &memory_summary[..memory_summary.len().min(200)]) } else { String::new() },
+    ].iter().filter(|s| !s.is_empty()).cloned().collect::<Vec<_>>().join("\n");
+
+    let prompt = format!(
+        r#"You said this as a pulse thought: "{thought}"
+
+The context you were looking at:
+{ctx}
+
+Now explain, in 2-3 sentences, exactly why you surfaced that specific thought:
+- What specific thing in the context triggered it?
+- What connection or pattern were you tracking?
+- Why did you think the person needed to hear it?
+
+Be honest and specific. Not justification — explanation."#,
+        thought = last_thought.trim(),
+        ctx = if context_summary.is_empty() { "No specific context available.".to_string() } else { context_summary },
+    );
+
+    let model = cheapest_model(&config.provider, &config.model);
+    call_provider_for_thought(&config, &model, &prompt).await
+}
+
 /// Trigger a pulse immediately (for testing or on-demand insight)
 #[tauri::command]
 pub async fn pulse_now(app: tauri::AppHandle) -> Result<String, String> {
