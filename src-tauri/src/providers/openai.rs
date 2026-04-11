@@ -45,13 +45,14 @@ fn serialize_message(message: &ConversationMessage) -> serde_json::Value {
             "role": "user",
             "content": content,
         }),
-        ConversationMessage::UserWithImage { text, image_base64 } => serde_json::json!({
-            "role": "user",
-            "content": [
-                {"type": "text", "text": text},
-                {"type": "image_url", "image_url": {"url": format!("data:image/png;base64,{}", image_base64)}}
-            ],
-        }),
+        ConversationMessage::UserWithImage { text, image_base64 } => {
+            let mut parts: Vec<serde_json::Value> = Vec::new();
+            if !text.is_empty() {
+                parts.push(serde_json::json!({"type": "text", "text": text}));
+            }
+            parts.push(serde_json::json!({"type": "image_url", "image_url": {"url": format!("data:image/png;base64,{}", image_base64)}}));
+            serde_json::json!({"role": "user", "content": parts})
+        }
         ConversationMessage::Assistant {
             content,
             tool_calls,
@@ -164,16 +165,16 @@ fn serialize_simple(message: &super::ConversationMessage) -> Option<serde_json::
             Some(serde_json::json!({"role": "system", "content": c}))
         }
         super::ConversationMessage::User(c) => {
+            if c.is_empty() { return None; }
             Some(serde_json::json!({"role": "user", "content": c}))
         }
         super::ConversationMessage::UserWithImage { text, image_base64 } => {
-            Some(serde_json::json!({
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": text},
-                    {"type": "image_url", "image_url": {"url": format!("data:image/png;base64,{}", image_base64)}}
-                ],
-            }))
+            let mut parts: Vec<serde_json::Value> = Vec::new();
+            if !text.is_empty() {
+                parts.push(serde_json::json!({"type": "text", "text": text}));
+            }
+            parts.push(serde_json::json!({"type": "image_url", "image_url": {"url": format!("data:image/png;base64,{}", image_base64)}}));
+            Some(serde_json::json!({"role": "user", "content": parts}))
         }
         super::ConversationMessage::Assistant { content, .. } => {
             if content.is_empty() {
