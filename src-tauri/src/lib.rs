@@ -378,6 +378,8 @@ pub fn run() {
             db_commands::brain_add_reaction,
             db_commands::brain_get_reactions,
             db_commands::brain_get_context,
+            db_commands::timeline_get_recent,
+            db_commands::timeline_prune_old,
             telegram::telegram_start,
             telegram::telegram_start_saved,
             telegram::telegram_stop,

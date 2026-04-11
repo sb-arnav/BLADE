@@ -385,6 +385,19 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
             last_seen INTEGER NOT NULL
         );
         CREATE UNIQUE INDEX IF NOT EXISTS idx_skill_candidates_hash ON skill_candidates(query_hash);
+
+        -- Activity timeline: every significant event BLADE observes
+        CREATE TABLE IF NOT EXISTS activity_timeline (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp INTEGER NOT NULL,
+            event_type TEXT NOT NULL,
+            title TEXT NOT NULL DEFAULT '',
+            content TEXT NOT NULL DEFAULT '',
+            app_name TEXT NOT NULL DEFAULT '',
+            metadata TEXT NOT NULL DEFAULT '{}'
+        );
+        CREATE INDEX IF NOT EXISTS idx_activity_timeline_ts ON activity_timeline(timestamp DESC);
+        CREATE INDEX IF NOT EXISTS idx_activity_timeline_type ON activity_timeline(event_type);
         ",
     )
     .map_err(|e| format!("DB error: {}", e))?;
@@ -1579,4 +1592,90 @@ pub fn skill_candidate_delete(conn: &Connection, id: i64) -> Result<(), String> 
     conn.execute("DELETE FROM skill_candidates WHERE id=?1", params![id])
         .map_err(|e| format!("DB error: {}", e))?;
     Ok(())
+}
+
+/// Record a single event in the activity timeline.
+/// event_type: "window_switch" | "clipboard" | "conversation" | "tool_call" | "god_mode" | "file"
+pub fn timeline_record(
+    conn: &Connection,
+    event_type: &str,
+    title: &str,
+    content: &str,
+    app_name: &str,
+    metadata_json: &str,
+) -> Result<i64, String> {
+    let ts = chrono::Utc::now().timestamp();
+    conn.execute(
+        "INSERT INTO activity_timeline (timestamp, event_type, title, content, app_name, metadata)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![ts, event_type, title, content, app_name, metadata_json],
+    )
+    .map_err(|e| format!("DB error: {}", e))?;
+    Ok(conn.last_insert_rowid())
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TimelineEvent {
+    pub id: i64,
+    pub timestamp: i64,
+    pub event_type: String,
+    pub title: String,
+    pub content: String,
+    pub app_name: String,
+    pub metadata: String,
+}
+
+/// Fetch the N most recent timeline events, optionally filtered by event_type.
+pub fn timeline_recent(
+    conn: &Connection,
+    limit: i64,
+    event_type_filter: Option<&str>,
+) -> Result<Vec<TimelineEvent>, String> {
+    let rows = if let Some(et) = event_type_filter {
+        let mut stmt = conn.prepare(
+            "SELECT id, timestamp, event_type, title, content, app_name, metadata
+             FROM activity_timeline WHERE event_type=?1
+             ORDER BY timestamp DESC LIMIT ?2",
+        ).map_err(|e| format!("DB error: {}", e))?;
+        stmt.query_map(params![et, limit], |row| {
+            Ok(TimelineEvent {
+                id: row.get(0)?,
+                timestamp: row.get(1)?,
+                event_type: row.get(2)?,
+                title: row.get(3)?,
+                content: row.get(4)?,
+                app_name: row.get(5)?,
+                metadata: row.get(6)?,
+            })
+        }).map_err(|e| format!("DB error: {}", e))?
+        .filter_map(|r| r.ok()).collect()
+    } else {
+        let mut stmt = conn.prepare(
+            "SELECT id, timestamp, event_type, title, content, app_name, metadata
+             FROM activity_timeline ORDER BY timestamp DESC LIMIT ?1",
+        ).map_err(|e| format!("DB error: {}", e))?;
+        stmt.query_map(params![limit], |row| {
+            Ok(TimelineEvent {
+                id: row.get(0)?,
+                timestamp: row.get(1)?,
+                event_type: row.get(2)?,
+                title: row.get(3)?,
+                content: row.get(4)?,
+                app_name: row.get(5)?,
+                metadata: row.get(6)?,
+            })
+        }).map_err(|e| format!("DB error: {}", e))?
+        .filter_map(|r| r.ok()).collect()
+    };
+    Ok(rows)
+}
+
+/// Prune timeline events older than N days
+pub fn timeline_prune(conn: &Connection, days: i64) -> Result<usize, String> {
+    let cutoff = chrono::Utc::now().timestamp() - (days * 86400);
+    let n = conn.execute(
+        "DELETE FROM activity_timeline WHERE timestamp < ?1",
+        params![cutoff],
+    ).map_err(|e| format!("DB error: {}", e))?;
+    Ok(n)
 }
