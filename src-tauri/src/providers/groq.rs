@@ -160,8 +160,32 @@ pub async fn complete(
     tools: &[ToolDefinition],
 ) -> Result<AssistantTurn, String> {
     let client = Client::new();
-    let body = build_body(model, messages, tools);
 
+    // First attempt: with tools.
+    let result = groq_request(&client, api_key, build_body(model, messages, tools)).await;
+
+    match result {
+        Ok(turn) => return Ok(turn),
+        Err(ref e) if is_function_generation_error(e) && !tools.is_empty() => {
+            // Groq/Llama failed to generate a valid tool call — retry without
+            // tools so the user gets a text response instead of a hard error.
+            groq_request(&client, api_key, build_body(model, messages, &[])).await
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// Returns true when Groq reports the model failed to generate a valid function call.
+/// In that case we can retry without tools to still return useful text.
+fn is_function_generation_error(err: &str) -> bool {
+    err.contains("Failed to call a function") || err.contains("failed_generation")
+}
+
+async fn groq_request(
+    client: &Client,
+    api_key: &str,
+    body: serde_json::Value,
+) -> Result<AssistantTurn, String> {
     let response = client
         .post("https://api.groq.com/openai/v1/chat/completions")
         .header("Authorization", format!("Bearer {}", api_key))
