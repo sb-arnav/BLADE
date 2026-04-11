@@ -56,6 +56,9 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
         let mut idle_nudged = false;
         let mut tick: u64 = 0;
         let mut last_error_hash: u64 = 0;
+        let mut session_start = std::time::Instant::now();
+        let mut long_session_nudged = false;
+        let mut stale_thread_nudged = false;
 
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
@@ -154,6 +157,57 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
                             "message": "You've been away a while. Back? Want a quick summary of where we left off, or something to jump back into?",
                             "type": "idle"
                         }));
+                    }
+                }
+            }
+
+            // ── Temporal awareness checks (every ~30 min = 60 ticks) ──────────
+            if tick % 60 == 0 && tick > 0 {
+
+                // 1. Long session — 2+ hours of active use
+                let session_hours = session_start.elapsed().as_secs() / 3600;
+                if session_hours >= 2 && !long_session_nudged {
+                    long_session_nudged = true;
+                    let _ = app.emit("proactive_nudge", serde_json::json!({
+                        "message": format!(
+                            "You've been at this for {} hours. Still the same thing, or has the work shifted?",
+                            session_hours
+                        ),
+                        "type": "long_session",
+                    }));
+                }
+
+                // 2. Stale thread — thread hasn't been updated in 2+ hours
+                if !stale_thread_nudged {
+                    let thread_stale = {
+                        let db_path = crate::config::blade_config_dir().join("blade.db");
+                        rusqlite::Connection::open(&db_path).ok()
+                            .and_then(|conn| {
+                                conn.query_row(
+                                    "SELECT MAX(updated_at) FROM active_threads",
+                                    [],
+                                    |row| row.get::<_, Option<i64>>(0),
+                                ).ok().flatten()
+                            })
+                            .map(|ts| {
+                                let now = chrono::Local::now().timestamp();
+                                now - ts > 7200 // stale if not updated in 2h
+                            })
+                            .unwrap_or(false)
+                    };
+
+                    if let Some(thread) = thread_stale.then(|| crate::thread::get_active_thread().ok()).flatten() {
+                        if !thread.trim().is_empty() {
+                            stale_thread_nudged = true;
+                            let headline = thread.lines().next().unwrap_or("your active thread").trim().to_string();
+                            let _ = app.emit("proactive_nudge", serde_json::json!({
+                                "message": format!(
+                                    "Your thread '{}' hasn't moved in two hours. Still relevant, or should I update it?",
+                                    &headline[..headline.len().min(60)]
+                                ),
+                                "type": "stale_thread",
+                            }));
+                        }
                     }
                 }
             }
