@@ -74,6 +74,7 @@ Key facts:"#,
         &config.model,
         &conversation,
         &[],
+        None,
     )
     .await?;
 

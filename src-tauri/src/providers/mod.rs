@@ -91,11 +91,12 @@ pub async fn complete_turn(
     model: &str,
     messages: &[ConversationMessage],
     tools: &[ToolDefinition],
+    base_url: Option<&str>,
 ) -> Result<AssistantTurn, String> {
     match provider {
         "gemini" => gemini::complete(api_key, model, messages, tools).await,
         "groq" => groq::complete(api_key, model, messages, tools).await,
-        "openai" => openai::complete(api_key, model, messages, tools).await,
+        "openai" => openai::complete(api_key, model, messages, tools, base_url).await,
         "anthropic" => anthropic::complete(api_key, model, messages, tools).await,
         "ollama" => ollama::complete(model, messages).await,
         _ => Err(format!("Unknown provider: {}", provider)),
@@ -110,22 +111,23 @@ pub async fn stream_text(
     api_key: &str,
     model: &str,
     messages: &[ConversationMessage],
+    base_url: Option<&str>,
 ) -> Result<(), String> {
     match provider {
         "gemini" => gemini::stream_text(app, api_key, model, messages).await,
         "groq" => groq::stream_text(app, api_key, model, messages).await,
-        "openai" => openai::stream_text(app, api_key, model, messages).await,
+        "openai" => openai::stream_text(app, api_key, model, messages, base_url).await,
         "anthropic" => anthropic::stream_text(app, api_key, model, messages).await,
         "ollama" => ollama::stream_text(app, model, messages).await,
         _ => Err(format!("Unknown provider: {}", provider)),
     }
 }
 
-pub async fn test_connection(provider: &str, api_key: &str, model: &str) -> Result<String, String> {
+pub async fn test_connection(provider: &str, api_key: &str, model: &str, base_url: Option<&str>) -> Result<String, String> {
     match provider {
         "gemini" => gemini::test(api_key, model).await,
         "groq" => groq::test(api_key, model).await,
-        "openai" => openai::test(api_key, model).await,
+        "openai" => openai::test(api_key, model, base_url).await,
         "anthropic" => anthropic::test(api_key, model).await,
         "ollama" => ollama::test(model).await,
         _ => Err(format!("Unknown provider: {}", provider)),

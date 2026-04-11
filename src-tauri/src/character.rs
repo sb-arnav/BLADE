@@ -90,6 +90,7 @@ Each field is a string with bullet points. Keep each section under 10 bullet poi
         &config.model,
         &conversation,
         &[],
+        None,
     )
     .await?;
 

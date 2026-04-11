@@ -206,6 +206,7 @@ JSON:"#,
         &config.model,
         &conversation,
         &[],
+        None,
     )
     .await;
 
