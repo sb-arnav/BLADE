@@ -398,6 +398,17 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
         );
         CREATE INDEX IF NOT EXISTS idx_activity_timeline_ts ON activity_timeline(timestamp DESC);
         CREATE INDEX IF NOT EXISTS idx_activity_timeline_type ON activity_timeline(event_type);
+        CREATE TABLE IF NOT EXISTS watchers (
+            id TEXT PRIMARY KEY,
+            url TEXT NOT NULL,
+            label TEXT NOT NULL DEFAULT '',
+            interval_mins INTEGER NOT NULL DEFAULT 30,
+            last_content_hash TEXT NOT NULL DEFAULT '',
+            last_checked INTEGER NOT NULL DEFAULT 0,
+            last_changed INTEGER NOT NULL DEFAULT 0,
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at INTEGER NOT NULL
+        );
         ",
     )
     .map_err(|e| format!("DB error: {}", e))?;

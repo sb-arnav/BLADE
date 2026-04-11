@@ -7,6 +7,8 @@ import { BladeConfig } from "../types";
 import { McpSettings } from "./McpSettings";
 import { McpCatalog } from "./McpCatalog";
 import { TelegramBridge } from "./TelegramBridge";
+import { DiscordBridge } from "./DiscordBridge";
+import { WatcherPanel } from "./WatcherPanel";
 
 type SettingsTab = "provider" | "memory" | "mcp" | "integrations" | "about";
 
@@ -508,10 +510,15 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
                 Always On: VAD listens continuously — say "hey Blade" to trigger, or turn on auto-send in Extreme mode.
               </p>
             </div>
-            <div className="grid grid-cols-3 gap-1.5">
-              {(["off", "push-to-talk", "always-on"] as const).map((m) => {
-                const labels = { off: "Off", "push-to-talk": "Push-to-Talk", "always-on": "Always On" };
-                const descs = { off: "Disabled", "push-to-talk": "Hold Ctrl+Space", "always-on": "VAD + wake word" };
+            <div className="grid grid-cols-2 gap-1.5">
+              {(["off", "tts", "push-to-talk", "always-on"] as const).map((m) => {
+                const labels = { off: "Off", tts: "Speak", "push-to-talk": "Push-to-Talk", "always-on": "Always On" };
+                const descs = {
+                  off: "Silent",
+                  tts: "BLADE talks back",
+                  "push-to-talk": "Hold Ctrl+Space",
+                  "always-on": "VAD + wake word",
+                };
                 const active = voiceMode === m;
                 return (
                   <button
@@ -530,6 +537,11 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
                 );
               })}
             </div>
+            {voiceMode === "tts" && (
+              <p className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2">
+                BLADE will speak its pulse thoughts and morning briefings aloud using your OS speech engine. No cloud API needed.
+              </p>
+            )}
             {voiceMode === "always-on" && (
               <p className="text-xs text-blue-400 bg-blue-500/10 border border-blue-500/30 rounded-lg px-3 py-2">
                 Always-on uses your microphone continuously. Speech is sent to Whisper (via Groq). Say "Hey Blade" to trigger auto-send — otherwise your words fill the input box for you to review.
@@ -736,6 +748,15 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
                 Bridges
               </p>
               <TelegramBridge />
+              <div className="mt-3">
+                <DiscordBridge />
+              </div>
+            </div>
+            <div className="px-4 py-2">
+              <p className="text-[10px] font-semibold tracking-widest text-blade-muted/70 uppercase mb-3">
+                Resource Watcher
+              </p>
+              <WatcherPanel />
             </div>
             <div className="px-4 py-2">
               <p className="text-[10px] font-semibold tracking-widest text-blade-muted/70 uppercase mb-3">

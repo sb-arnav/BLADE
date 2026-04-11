@@ -44,6 +44,15 @@ pub fn start_pulse(app: tauri::AppHandle) {
                         let thought_path = crate::config::blade_config_dir().join("last_pulse.txt");
                         let _ = std::fs::write(&thought_path, &thought);
 
+                        // Speak the pulse thought if TTS is enabled
+                        crate::tts::speak(&thought);
+
+                        // Mirror to Discord if webhook is configured
+                        let thought_for_discord = thought.clone();
+                        tauri::async_runtime::spawn(async move {
+                            crate::discord::post_pulse(&thought_for_discord).await;
+                        });
+
                         // Write to activity timeline so history accumulates
                         let db_path = crate::config::blade_config_dir().join("blade.db");
                         if let Ok(conn) = rusqlite::Connection::open(&db_path) {
@@ -291,6 +300,15 @@ Do not say "Good morning". Do not list items with headers. Just speak naturally,
                 "date": &today,
             }));
             let _ = std::fs::write(&marker, &today);
+
+            // Speak the briefing if TTS is enabled
+            crate::tts::speak(&briefing);
+
+            // Mirror to Discord if webhook is configured
+            let briefing_for_discord = briefing.clone();
+            tauri::async_runtime::spawn(async move {
+                crate::discord::post_briefing(&briefing_for_discord).await;
+            });
 
             // Also record in timeline
             let db_path = crate::config::blade_config_dir().join("blade.db");
