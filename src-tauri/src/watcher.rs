@@ -226,6 +226,14 @@ pub fn start_watcher_loop(app: tauri::AppHandle) {
                         }),
                     );
 
+                    // OS notification (works even when window is hidden)
+                    use tauri_plugin_notification::NotificationExt;
+                    let _ = app.notification()
+                        .builder()
+                        .title(format!("BLADE Watch: {}", &label[..label.len().min(40)]))
+                        .body(summary.clone())
+                        .show();
+
                     // Speak it
                     crate::tts::speak(&format!("Alert: {}. {}", label, summary));
 
