@@ -4,23 +4,35 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { Message } from "../types";
 
+interface ActiveWindow { app_name: string; window_title: string; }
+
 export function QuickAsk() {
   const [query, setQuery] = useState("");
   const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [contextApp, setContextApp] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const streamBuffer = useRef("");
   // Messages held in ref so Shift+Enter can hand them off without stale closure
   const messagesRef = useRef<Message[]>([]);
 
-  // Auto-focus whenever the window becomes visible
+  // Auto-focus + capture context whenever the window becomes visible
   useEffect(() => {
     const win = getCurrentWindow();
 
     const unlisten = win.onFocusChanged(({ payload: focused }: { payload: boolean }) => {
       if (focused) {
         setTimeout(() => inputRef.current?.focus(), 30);
+        // Capture what app was in focus before QuickAsk appeared
+        invoke<ActiveWindow>("get_active_window").then((w) => {
+          if (w.app_name && w.app_name !== "blade" && w.app_name !== "BLADE") {
+            const label = w.window_title
+              ? `${w.app_name} — ${w.window_title.slice(0, 40)}`
+              : w.app_name;
+            setContextApp(label);
+          }
+        }).catch(() => {});
       }
     });
 
@@ -58,6 +70,7 @@ export function QuickAsk() {
     setResponse("");
     setError(null);
     setLoading(false);
+    setContextApp(null);
     streamBuffer.current = "";
     messagesRef.current = [];
   }, []);
@@ -246,6 +259,35 @@ export function QuickAsk() {
           </svg>
         </button>
       </div>
+
+      {/* Context pill — shows what app BLADE can see */}
+      {contextApp && !hasResponse && !loading && (
+        <div
+          style={{
+            padding: "0 16px 8px",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "5px",
+              padding: "3px 8px",
+              borderRadius: "6px",
+              background: "rgba(99,102,241,0.08)",
+              border: "1px solid rgba(99,102,241,0.15)",
+            }}
+          >
+            <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "rgba(99,102,241,0.7)", flexShrink: 0 }} />
+            <span style={{ fontSize: "0.6rem", color: "rgba(99,102,241,0.8)", fontFamily: "Inter, sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "280px" }}>
+              {contextApp}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Divider + response area — only rendered when there's something to show */}
       {(hasResponse || error) && (
