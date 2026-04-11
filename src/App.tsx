@@ -356,6 +356,22 @@ export default function App() {
     };
   }, [tts.enabled]);
 
+  // TRAY — handle tray menu events
+  useEffect(() => {
+    const unlistenScreenshot = listen("tray_screenshot_requested", () => {
+      handleScreenshot();
+    });
+    const unlistenSettings = listen<string>("open_settings_tab", (event) => {
+      setRoute("settings");
+      // Could extend to pre-select a tab, but for now just opens settings
+      void event;
+    });
+    return () => {
+      unlistenScreenshot.then((fn) => fn());
+      unlistenSettings.then((fn) => fn());
+    };
+  }, []);
+
   // COMPUTER USE — show step progress as notifications
   useEffect(() => {
     const unlistenStep = listen<{ step: number; action: Record<string, unknown>; status: string }>(

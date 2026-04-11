@@ -28,8 +28,11 @@ impl BladeStatus {
 
 pub fn create_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     let quit = MenuItem::with_id(app, "quit", "Quit Blade", true, None::<&str>)?;
-    let show = MenuItem::with_id(app, "show", "Show / Hide", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show, &quit])?;
+    let show = MenuItem::with_id(app, "show", "Show / Hide  (Alt+Space)", true, None::<&str>)?;
+    let pulse = MenuItem::with_id(app, "pulse", "Pulse thought now", true, None::<&str>)?;
+    let reminders = MenuItem::with_id(app, "reminders", "My reminders", true, None::<&str>)?;
+    let screenshot = MenuItem::with_id(app, "screenshot", "Send screenshot to Blade", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&show, &pulse, &reminders, &screenshot, &quit])?;
 
     let icon = tauri::image::Image::from_path("icons/32x32.png")
         .or_else(|_| tauri::image::Image::from_path("icons/icon.png"))
@@ -50,6 +53,23 @@ pub fn create_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .on_menu_event(move |_app, event| match event.id.as_ref() {
             "quit" => _app.exit(0),
             "show" => crate::toggle_window(&handle),
+            "pulse" => {
+                let app_clone = handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    let _ = crate::pulse::pulse_now(app_clone).await;
+                });
+            }
+            "reminders" => {
+                // Show BLADE window and emit event to open reminders panel
+                crate::toggle_window(&handle);
+                use tauri::Emitter;
+                let _ = handle.emit("open_settings_tab", "integrations");
+            }
+            "screenshot" => {
+                use tauri::Emitter;
+                crate::toggle_window(&handle);
+                let _ = handle.emit("tray_screenshot_requested", ());
+            }
             _ => {}
         })
         .on_tray_icon_event(move |_tray, event| {
