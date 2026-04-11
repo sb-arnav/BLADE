@@ -71,17 +71,27 @@ fn serialize_message(message: &ConversationMessage) -> serde_json::Value {
                 })
                 .collect();
 
-            let content_value = if content.is_empty() && !tool_calls.is_empty() {
+            // If content is empty, send null — some APIs (Anthropic via Vercel gateway)
+            // reject empty string content blocks. When tool_calls are also empty
+            // (prior tool-call turns reconstructed from history), null is safest.
+            let content_value = if content.is_empty() {
                 serde_json::Value::Null
             } else {
                 serde_json::Value::String(content.clone())
             };
 
-            serde_json::json!({
-                "role": "assistant",
-                "content": content_value,
-                "tool_calls": tool_calls_json,
-            })
+            if tool_calls_json.is_empty() {
+                serde_json::json!({
+                    "role": "assistant",
+                    "content": content_value,
+                })
+            } else {
+                serde_json::json!({
+                    "role": "assistant",
+                    "content": content_value,
+                    "tool_calls": tool_calls_json,
+                })
+            }
         }
         ConversationMessage::Tool {
             tool_call_id,
