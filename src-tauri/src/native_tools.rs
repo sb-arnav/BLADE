@@ -88,6 +88,17 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
                 "required": ["url"]
             }),
         },
+        ToolDefinition {
+            name: "blade_open_url".to_string(),
+            description: "Open a URL in the user's default browser. Always use this instead of blade_bash for opening websites, YouTube videos, or any web links. The URL must be fully qualified (start with https://).".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "The full URL to open, e.g. https://www.youtube.com/watch?v=dQw4w9WgXcQ"}
+                },
+                "required": ["url"]
+            }),
+        },
     ]
 }
 
@@ -165,6 +176,13 @@ pub async fn execute(name: &str, args: &Value) -> (String, bool) {
             };
             let max_chars = args["max_chars"].as_u64().map(|v| v as usize).unwrap_or(20_000);
             web_fetch(url, max_chars).await
+        }
+        "blade_open_url" => {
+            let url = match args["url"].as_str() {
+                Some(u) => u,
+                None => return ("Missing required argument: url".to_string(), true),
+            };
+            open_url(url).await
         }
         _ => (format!("Unknown native tool: {}", name), true),
     }
@@ -356,6 +374,33 @@ async fn web_fetch(url: &str, max_chars: usize) -> (String, bool) {
             }
         }
         Err(e) => (format!("Fetch failed: {}", e), true),
+    }
+}
+
+async fn open_url(url: &str) -> (String, bool) {
+    // Validate it looks like a URL before passing to the OS
+    if !url.starts_with("http://") && !url.starts_with("https://") {
+        return (format!("Invalid URL '{}': must start with http:// or https://", url), true);
+    }
+
+    #[cfg(target_os = "windows")]
+    let result = tokio::process::Command::new("cmd")
+        .args(["/C", "start", "", url])
+        .spawn();
+
+    #[cfg(target_os = "macos")]
+    let result = tokio::process::Command::new("open")
+        .arg(url)
+        .spawn();
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let result = tokio::process::Command::new("xdg-open")
+        .arg(url)
+        .spawn();
+
+    match result {
+        Ok(_) => (format!("Opened {} in default browser.", url), false),
+        Err(e) => (format!("Failed to open URL: {}", e), true),
     }
 }
 
