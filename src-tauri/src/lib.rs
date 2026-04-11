@@ -3,6 +3,7 @@ mod ambient;
 mod deeplearn;
 mod pulse;
 mod skill_engine;
+mod telegram;
 mod thread;
 mod godmode;
 mod native_tools;
@@ -377,6 +378,11 @@ pub fn run() {
             db_commands::brain_add_reaction,
             db_commands::brain_get_reactions,
             db_commands::brain_get_context,
+            telegram::telegram_start,
+            telegram::telegram_start_saved,
+            telegram::telegram_stop,
+            telegram::telegram_status,
+            telegram::telegram_disconnect,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
@@ -440,6 +446,12 @@ pub fn run() {
             if startup_god_config.god_mode {
                 godmode::start_god_mode(app.handle().clone(), &startup_god_config.god_mode_tier);
             }
+
+            // Auto-start Telegram bot if a token was previously saved
+            let tg_app = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                telegram::auto_start_if_configured(tg_app).await;
+            });
 
             // Alt+Space → toggle Quick Ask floating widget
             let handle = app.handle().clone();
