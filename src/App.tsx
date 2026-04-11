@@ -318,9 +318,41 @@ export default function App() {
       setPulseThought(briefing);
     });
 
+    // REMINDERS — fire notification + toast when a scheduled reminder fires
+    const unlistenReminderFired = listen<{ id: string; title: string; note: string; timestamp: number }>(
+      "blade_reminder_fired",
+      (event) => {
+        const { title, note } = event.payload;
+        const message = note ? `${title} — ${note}` : title;
+        notifications.add({
+          type: "warning",
+          title: "Reminder",
+          message,
+          action: { label: "Dismiss", callback: () => {} },
+        });
+        if (tts.enabled) tts.speak(`Reminder: ${message}`);
+      }
+    );
+
+    // REMINDER CREATED (auto-extracted from conversation) — quiet toast
+    const unlistenReminderCreated = listen<{ id: string; title: string; source: string }>(
+      "blade_reminder_created",
+      (event) => {
+        if (event.payload.source === "auto_extract") {
+          notifications.add({
+            type: "info",
+            title: "Reminder set",
+            message: event.payload.title,
+          });
+        }
+      }
+    );
+
     return () => {
       unlisten.then((fn) => fn());
       unlistenBriefing.then((fn) => fn());
+      unlistenReminderFired.then((fn) => fn());
+      unlistenReminderCreated.then((fn) => fn());
     };
   }, [tts.enabled]);
 
