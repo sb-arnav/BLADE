@@ -372,6 +372,7 @@ pub fn set_config(
     blade_email: Option<String>,
     base_url: Option<String>,
     god_mode: Option<bool>,
+    god_mode_tier: Option<String>,
 ) -> Result<(), String> {
     let mut config = load_config();
     config.provider = provider;
@@ -385,16 +386,18 @@ pub fn set_config(
     if let Some(v) = blade_email { config.blade_email = v; }
     config.base_url = base_url.filter(|s| !s.is_empty());
     if let Some(v) = god_mode { config.god_mode = v; }
+    if let Some(v) = god_mode_tier { config.god_mode_tier = v; }
     save_config(&config)
 }
 
 #[tauri::command]
-pub async fn toggle_god_mode(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+pub async fn toggle_god_mode(app: tauri::AppHandle, enabled: bool, tier: Option<String>) -> Result<(), String> {
     let mut config = load_config();
     config.god_mode = enabled;
+    if let Some(t) = tier { config.god_mode_tier = t; }
     save_config(&config)?;
     if enabled {
-        crate::godmode::start_god_mode(app);
+        crate::godmode::start_god_mode(app, &config.god_mode_tier);
     } else {
         crate::godmode::stop_god_mode();
     }

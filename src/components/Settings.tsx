@@ -61,7 +61,9 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
   const [apiKey, setApiKey] = useState(config.api_key);
   const [model, setModel] = useState(config.model);
   const [baseUrl, setBaseUrl] = useState(config.base_url ?? "");
-  const [godMode, setGodMode] = useState(config.god_mode ?? false);
+  const [godModeTier, setGodModeTier] = useState<string>(
+    config.god_mode ? (config.god_mode_tier ?? "normal") : "off"
+  );
   const [persona, setPersona] = useState("");
   const [contextNotes, setContextNotes] = useState("");
   const [status, setStatus] = useState<string | null>(null);
@@ -76,7 +78,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
     setApiKey(config.api_key);
     setModel(config.model);
     setBaseUrl(config.base_url ?? "");
-    setGodMode(config.god_mode ?? false);
+    setGodModeTier(config.god_mode ? (config.god_mode_tier ?? "normal") : "off");
   }, [config]);
 
   useEffect(() => {
@@ -116,14 +118,17 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
     setError(null);
 
     try {
-      await invoke("set_config", { provider, apiKey, model, baseUrl: baseUrl || null, godMode });
+      const godModeEnabled = godModeTier !== "off";
+      const godModeTierVal = godModeEnabled ? godModeTier : "normal";
+      await invoke("set_config", { provider, apiKey, model, baseUrl: baseUrl || null, godMode: godModeEnabled, godModeTier: godModeTierVal });
       const nextConfig: BladeConfig = {
         ...config,
         provider,
         api_key: apiKey,
         model,
         base_url: baseUrl || undefined,
-        god_mode: godMode,
+        god_mode: godModeEnabled,
+        god_mode_tier: godModeTierVal,
         onboarded: true,
       };
       setStatus("Settings saved.");
@@ -283,37 +288,53 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             </label>
           )}
 
-          {/* God Mode toggle */}
-          <label className="flex items-start gap-3 cursor-pointer group">
-            <div className="mt-0.5">
-              <input
-                type="checkbox"
-                checked={godMode}
-                onChange={async (e) => {
-                  const val = e.target.checked;
-                  setGodMode(val);
-                  try {
-                    await invoke("toggle_god_mode", { enabled: val });
-                  } catch { /* ignore */ }
-                }}
-                className="sr-only"
-              />
-              <div
-                className={`w-9 h-5 rounded-full transition-colors ${godMode ? "bg-blade-accent" : "bg-blade-border"} relative`}
-                onClick={async () => {
-                  const val = !godMode;
-                  setGodMode(val);
-                  try { await invoke("toggle_god_mode", { enabled: val }); } catch { /* ignore */ }
-                }}
-              >
-                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${godMode ? "translate-x-4" : "translate-x-0.5"}`} />
-              </div>
-            </div>
+          {/* God Mode tier selector */}
+          <div className="space-y-3">
             <div>
               <p className="text-sm font-medium">God Mode</p>
-              <p className="text-xs text-blade-muted">Blade scans your machine every 5 min — recent files, downloads, running apps — and injects live context into every conversation. Short prompts start working because Blade already knows what you're doing.</p>
+              <p className="text-xs text-blade-muted mt-0.5">Blade scans your machine and injects live context — files, apps, clipboard — into every conversation. Short prompts work because Blade already knows what you're doing.</p>
             </div>
-          </label>
+            <div className="grid grid-cols-4 gap-1.5">
+              {(["off", "normal", "intermediate", "extreme"] as const).map((tier) => {
+                const labels: Record<string, string> = { off: "Off", normal: "Normal", intermediate: "Focused", extreme: "Extreme" };
+                const descs: Record<string, string> = {
+                  off: "Disabled",
+                  normal: "5 min scan",
+                  intermediate: "2 min + clipboard",
+                  extreme: "1 min + JARVIS",
+                };
+                const active = godModeTier === tier;
+                return (
+                  <button
+                    key={tier}
+                    type="button"
+                    onClick={async () => {
+                      setGodModeTier(tier);
+                      const enabled = tier !== "off";
+                      try {
+                        await invoke("toggle_god_mode", { enabled, tier: enabled ? tier : null });
+                      } catch { /* ignore */ }
+                    }}
+                    className={`flex flex-col items-center gap-0.5 rounded-xl border px-2 py-2 text-center transition-colors ${
+                      active
+                        ? tier === "extreme"
+                          ? "border-orange-500 bg-orange-500/10 text-orange-400"
+                          : "border-blade-accent bg-blade-accent/10 text-blade-accent"
+                        : "border-blade-border text-blade-muted hover:border-blade-accent/50"
+                    }`}
+                  >
+                    <span className="text-xs font-semibold">{labels[tier]}</span>
+                    <span className="text-[10px] leading-tight opacity-70">{descs[tier]}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {godModeTier === "extreme" && (
+              <p className="text-xs text-orange-400 bg-orange-500/10 border border-orange-500/30 rounded-lg px-3 py-2">
+                Extreme mode scans every 60 seconds and runs Blade as an active co-pilot — it will proactively suggest actions on every message. Uses significantly more API tokens. Don't use this unless you have a paid key with budget to spare.
+              </p>
+            )}
+          </div>
 
           <div className="flex items-center gap-3">
             <button

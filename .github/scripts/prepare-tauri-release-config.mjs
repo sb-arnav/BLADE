@@ -7,15 +7,18 @@ const templatePath = path.join(root, "src-tauri", "tauri.release.conf.template.j
 const outputPath = path.join(root, "src-tauri", "tauri.release.conf.json");
 const pubkey = process.env.TAURI_UPDATER_PUBKEY;
 
+await mkdir(path.dirname(outputPath), { recursive: true });
+
 if (!pubkey) {
-  console.error("TAURI_UPDATER_PUBKEY is required to generate the release updater config.");
-  process.exit(1);
+  console.warn("TAURI_UPDATER_PUBKEY not set — building without auto-updater.");
+  // Write a minimal config that doesn't enable the updater
+  await writeFile(outputPath, JSON.stringify({ bundle: { createUpdaterArtifacts: false } }, null, 2));
+  console.log(`Wrote ${path.relative(root, outputPath)} (no updater)`);
+  process.exit(0);
 }
 
 const template = await readFile(templatePath, "utf8");
 const rendered = template.replaceAll("__TAURI_UPDATER_PUBKEY__", pubkey);
-
-await mkdir(path.dirname(outputPath), { recursive: true });
 await writeFile(outputPath, rendered);
 
 console.log(`Wrote ${path.relative(root, outputPath)}`);

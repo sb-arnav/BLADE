@@ -1,18 +1,27 @@
 /// God Mode — 24/7 background machine intelligence.
-/// Scans the user's filesystem, running apps, and recent activity every 5 min.
-/// Writes a live context file that gets injected into every Blade conversation,
-/// so short prompts work because Blade already knows what you're doing.
+/// Three tiers:
+///   Normal      — 5 min scan: recent files, downloads, running apps, monitors
+///   Intermediate — 2 min scan: everything above + clipboard + active window
+///   Extreme     — 1 min scan: everything above + proactive action suggestions injected into every prompt
+///
+/// Writes a live context file injected into every Blade conversation.
 
 use std::time::Duration;
 use tauri::Emitter;
 
-pub fn start_god_mode(app: tauri::AppHandle) {
+pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
+    let tier = tier.to_string();
     tauri::async_runtime::spawn(async move {
         let mut first_run = true;
 
         loop {
             if !first_run {
-                tokio::time::sleep(Duration::from_secs(300)).await;
+                let interval_secs = match tier.as_str() {
+                    "extreme" => 60,
+                    "intermediate" => 120,
+                    _ => 300, // normal
+                };
+                tokio::time::sleep(Duration::from_secs(interval_secs)).await;
             }
             first_run = false;
 
@@ -23,19 +32,19 @@ pub fn start_god_mode(app: tauri::AppHandle) {
                 break;
             }
 
-            let ctx = build_machine_context();
+            let ctx = build_machine_context(&config.god_mode_tier);
             let path = crate::config::blade_config_dir().join("godmode_context.md");
             let _ = std::fs::write(&path, &ctx);
 
             let _ = app.emit("godmode_update", serde_json::json!({
-                "bytes": ctx.len()
+                "bytes": ctx.len(),
+                "tier": &config.god_mode_tier,
             }));
         }
     });
 }
 
 pub fn stop_god_mode() {
-    // Clearing the file signals the next cycle to stop
     let path = crate::config::blade_config_dir().join("godmode_context.md");
     let _ = std::fs::remove_file(path);
 }
@@ -45,16 +54,44 @@ pub fn load_godmode_context() -> Option<String> {
     std::fs::read_to_string(path).ok()
 }
 
-fn build_machine_context() -> String {
+fn build_machine_context(tier: &str) -> String {
     let now = chrono::Local::now();
+    let interval_label = match tier {
+        "extreme" => "1 min",
+        "intermediate" => "2 min",
+        _ => "5 min",
+    };
     let mut sections: Vec<String> = vec![
-        format!("## Live Machine Context\n_Last scanned: {}_", now.format("%H:%M %p"))
+        format!(
+            "## Live Machine Context\n_Tier: {} | Scan interval: {} | Last scan: {}_",
+            tier, interval_label, now.format("%H:%M %p")
+        )
     ];
 
     if let Some(s) = recent_files_section() { sections.push(s); }
     if let Some(s) = downloads_section() { sections.push(s); }
     if let Some(s) = running_apps_section() { sections.push(s); }
     if let Some(s) = monitor_section() { sections.push(s); }
+
+    // Intermediate+ extras
+    if tier == "intermediate" || tier == "extreme" {
+        if let Some(s) = clipboard_section() { sections.push(s); }
+        if let Some(s) = active_window_section() { sections.push(s); }
+    }
+
+    // Extreme: inject behavioral directive
+    if tier == "extreme" {
+        sections.push(
+            "### Extreme Mode Directive\n\
+             You are in JARVIS mode. You have full context of this machine. \
+             For every user message, proactively suggest the single most valuable action you could take \
+             right now based on what you can see — files, apps, clipboard, activity. \
+             Do not wait to be asked. If you see something that needs doing, say so and offer to do it. \
+             Execute tasks autonomously when the user approves. \
+             You are not an assistant waiting for instructions. You are an active co-pilot."
+                .to_string(),
+        );
+    }
 
     sections.join("\n\n")
 }
@@ -162,7 +199,6 @@ fn running_apps_section() -> Option<String> {
             if let Some(name) = parts.first() {
                 let clean = name.trim_matches('"');
                 let lower = clean.to_lowercase();
-                // Skip system noise
                 if lower.contains("system") || lower.contains("svchost") || lower.contains("runtime")
                     || lower.contains("ntoskrnl") || lower.contains("wininit") || lower.contains("csrss") {
                     continue;
@@ -181,10 +217,42 @@ fn running_apps_section() -> Option<String> {
         return Some(format!("### Running Apps\n{}", sorted.join(", ")));
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
     {
-        None
+        use std::process::Command;
+        let out = Command::new("osascript")
+            .args(["-e", "tell application \"System Events\" to get name of every process whose background only is false"])
+            .output()
+            .ok()?;
+        let text = String::from_utf8_lossy(&out.stdout);
+        let apps: Vec<&str> = text.split(", ").map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+        if apps.is_empty() { return None; }
+        return Some(format!("### Running Apps\n{}", apps.join(", ")));
     }
+
+    #[cfg(target_os = "linux")]
+    {
+        use std::process::Command;
+        let out = Command::new("ps")
+            .args(["-eo", "comm="])
+            .output()
+            .ok()?;
+        let text = String::from_utf8_lossy(&out.stdout);
+        let mut apps: std::collections::HashSet<String> = text.lines()
+            .map(|l| l.trim().to_string())
+            .filter(|s| !s.is_empty() && s.len() < 30)
+            .collect();
+        let noise = ["sh", "bash", "zsh", "ps", "grep", "awk", "sed", "cat", "ls"];
+        for n in &noise { apps.remove(*n); }
+        if apps.is_empty() { return None; }
+        let mut sorted: Vec<String> = apps.into_iter().collect();
+        sorted.sort();
+        sorted.truncate(20);
+        return Some(format!("### Running Apps\n{}", sorted.join(", ")));
+    }
+
+    #[allow(unreachable_code)]
+    None
 }
 
 fn monitor_section() -> Option<String> {
@@ -196,4 +264,27 @@ fn monitor_section() -> Option<String> {
     }).collect();
 
     Some(format!("### Displays\n{}", lines.join("\n")))
+}
+
+fn clipboard_section() -> Option<String> {
+    // Read clipboard via arboard (already a dep)
+    let mut clipboard = arboard::Clipboard::new().ok()?;
+    let text = clipboard.get_text().ok()?;
+    if text.trim().is_empty() { return None; }
+    // Truncate long content
+    let preview = if text.len() > 400 {
+        format!("{}...", &text[..400])
+    } else {
+        text.clone()
+    };
+    Some(format!("### Clipboard\n```\n{}\n```", preview))
+}
+
+fn active_window_section() -> Option<String> {
+    let win = crate::context::get_active_window().ok()?;
+    let mut parts = Vec::new();
+    if !win.app_name.is_empty() { parts.push(format!("App: {}", win.app_name)); }
+    if !win.window_title.is_empty() { parts.push(format!("Window: {}", win.window_title)); }
+    if parts.is_empty() { return None; }
+    Some(format!("### Active Window\n{}", parts.join("\n")))
 }

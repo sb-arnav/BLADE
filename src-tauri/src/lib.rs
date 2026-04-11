@@ -415,7 +415,7 @@ pub fn run() {
             // Start god mode if enabled
             let startup_god_config = config::load_config();
             if startup_god_config.god_mode {
-                godmode::start_god_mode(app.handle().clone());
+                godmode::start_god_mode(app.handle().clone(), &startup_god_config.god_mode_tier);
             }
 
             // Alt+Space → toggle Quick Ask floating widget
