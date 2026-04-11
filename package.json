@@ -1,7 +1,7 @@
 {
   "name": "homearnavblade",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.3.2",
   "type": "module",
   "engines": {
     "node": ">=20.19.0",
