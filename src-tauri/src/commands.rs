@@ -118,7 +118,9 @@ pub async fn send_message_stream(
 
     // Tools configured → non-streaming tool loop
     let mut conversation = conversation;
-    for iteration in 0..8 {
+    let mut last_tool_signature = String::new();
+    let mut repeat_count = 0u8;
+    for iteration in 0..12 {
         let span = trace::TraceSpan::new(
             &config.provider,
             &config.model,
@@ -192,6 +194,18 @@ pub async fn send_message_stream(
                 }
             });
             return Ok(());
+        }
+
+        // Detect identical tool call loops — same name+args repeated 3× means stuck
+        let sig = format!("{:?}", &turn.tool_calls);
+        if sig == last_tool_signature {
+            repeat_count += 1;
+            if repeat_count >= 3 {
+                break; // fall through to final summary call
+            }
+        } else {
+            repeat_count = 0;
+            last_tool_signature = sig;
         }
 
         for tool_call in turn.tool_calls {
@@ -293,9 +307,22 @@ pub async fn send_message_stream(
         }
     }
 
-    let _ = app.emit("chat_done", ());
-    let _ = app.emit("blade_status", "error");
-    Err("Tool loop exceeded safe limit.".to_string())
+    // Loop exhausted or stuck — do a final tool-free call so the model can
+    // summarise what it accomplished rather than showing a raw error.
+    conversation.push(ConversationMessage::User(
+        "Summarise what you've done so far and whether the task is complete.".to_string(),
+    ));
+    let summary_result = providers::stream_text(
+        &app,
+        &config.provider,
+        &config.api_key,
+        &config.model,
+        &conversation,
+        config.base_url.as_deref(),
+    )
+    .await;
+    let _ = app.emit("blade_status", if summary_result.is_ok() { "idle" } else { "error" });
+    summary_result
 }
 
 #[tauri::command]
