@@ -555,6 +555,43 @@ pub async fn mcp_remove_server(
     Ok(())
 }
 
+/// Install and register an MCP server from the catalog.
+/// Handles: npm install (if needed), env config, registration, tool discovery.
+#[tauri::command]
+pub async fn mcp_install_catalog_server(
+    state: tauri::State<'_, SharedMcpManager>,
+    name: String,
+    command: String,
+    args: Vec<String>,
+    env: HashMap<String, String>,
+) -> Result<usize, String> {
+    if name.trim().is_empty() || command.trim().is_empty() {
+        return Err("Name and command are required.".to_string());
+    }
+
+    let config = McpServerConfig {
+        command: command.clone(),
+        args: args.clone(),
+        env: env.clone(),
+    };
+
+    // Persist to config
+    let mut saved = load_config();
+    saved.mcp_servers.retain(|s| s.name != name);
+    saved.mcp_servers.push(SavedMcpServerConfig {
+        name: name.clone(),
+        command,
+        args,
+        env,
+    });
+    save_config(&saved)?;
+
+    let mut manager = state.lock().await;
+    manager.register_server(name, config);
+    let tools = manager.discover_all_tools().await?;
+    Ok(tools.len())
+}
+
 // --- Tool Approval ---
 
 #[tauri::command]

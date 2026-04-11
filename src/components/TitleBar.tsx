@@ -22,8 +22,8 @@ export function TitleBar() {
     >
       <div className="flex items-center gap-1.5 shrink-0 pointer-events-none" data-tauri-drag-region>
         <div className="w-2 h-2 rounded-full bg-blade-accent shadow-[0_0_10px_rgba(99,102,241,0.45)]" />
-        <span className="text-2xs font-medium tracking-[0.35em] uppercase text-blade-muted">
-          Blade
+        <span className="text-2xs font-semibold tracking-[0.3em] text-blade-muted">
+          BLADE
         </span>
       </div>
 

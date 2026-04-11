@@ -5,8 +5,9 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type DownloadEvent } from "@tauri-apps/plugin-updater";
 import { BladeConfig } from "../types";
 import { McpSettings } from "./McpSettings";
+import { McpCatalog } from "./McpCatalog";
 
-type SettingsTab = "provider" | "memory" | "mcp" | "about";
+type SettingsTab = "provider" | "memory" | "mcp" | "integrations" | "about";
 
 interface ProviderEntry {
   id: string;
@@ -153,6 +154,7 @@ interface Props {
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: "provider", label: "Provider" },
+  { id: "integrations", label: "Integrations" },
   { id: "memory", label: "Memory" },
   { id: "mcp", label: "MCP" },
   { id: "about", label: "About" },
@@ -724,6 +726,16 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
           {updateError && <p className="text-xs text-red-400">{updateError}</p>}
         </section>
         </>}
+
+        {tab === "integrations" && (
+          <div className="relative h-full">
+            <McpCatalog
+              onInstalled={() => {
+                void onConfigRefresh();
+              }}
+            />
+          </div>
+        )}
 
         {tab === "mcp" && <>
         <McpSettings
