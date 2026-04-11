@@ -22,7 +22,7 @@ import { useRuntimes } from "./hooks/useRuntimes";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use";
 
 const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
 const Canvas = lazy(() => import("./components/Canvas"));
@@ -51,6 +51,7 @@ const GitPanel = lazy(() => import("./components/GitPanel").then((m) => ({ defau
 const DeepLearn = lazy(() => import("./components/DeepLearn").then((m) => ({ default: m.DeepLearn })));
 const CharacterBible = lazy(() => import("./components/CharacterBible").then((m) => ({ default: m.CharacterBible })));
 const CapabilityReports = lazy(() => import("./components/CapabilityReports").then((m) => ({ default: m.CapabilityReports })));
+const ComputerUsePanel = lazy(() => import("./components/ComputerUsePanel").then((m) => ({ default: m.ComputerUsePanel })));
 
 function ShellFallback({ label = "Loading workspace..." }: { label?: string }) {
   return (
@@ -539,16 +540,8 @@ export default function App() {
     { id: "tts", label: tts.enabled ? "Disable voice output" : "Enable voice output", description: "Toggle spoken responses", section: "System", action: tts.toggleEnabled },
     { id: "sound", label: sound.enabled ? "Disable notification sound" : "Enable notification sound", description: "Toggle Blade's audible alerts", section: "System", action: sound.toggleEnabled },
     { id: "screenshot", label: "Capture screen", description: "Send the current screen into chat for analysis", section: "System", action: handleScreenshot },
-    { id: "computer-use", label: "Computer use — let Blade operate screen", description: "BLADE takes control: screenshots + clicks + types to complete a task", section: "System", action: () => {
-      const goal = window.prompt("What should BLADE do on screen?");
-      if (goal?.trim()) {
-        void invoke("computer_use_task", { goal: goal.trim() });
-        chat.sendMessage(`[Computer use started] Goal: ${goal.trim()}`);
-      }
-    }},
-    { id: "computer-use-stop", label: "Stop computer use", description: "Halt any ongoing autonomous screen operation", section: "System", action: () => {
-      void invoke("computer_use_stop");
-    }},
+    { id: "computer-use", label: "Computer use — let Blade operate screen", description: "BLADE takes control: screenshots + clicks + types to complete a task", section: "System", action: () => openRoute("computer-use") },
+    { id: "computer-use-stop", label: "Stop computer use", description: "Halt any ongoing autonomous screen operation", section: "System", action: () => { void invoke("computer_use_stop"); } },
     { id: "canvas", label: "Open canvas workspace", description: "Sketch ideas visually and move them back into chat", section: "System", action: () => openRoute("canvas") },
     { id: "email", label: "Open email workspace", description: "Read and draft email with Blade assistance", section: "System", action: () => openRoute("email") },
     { id: "docs", label: "Open document workspace", description: "Generate longer-form structured drafts", section: "System", action: () => openRoute("docs") },
@@ -622,6 +615,7 @@ export default function App() {
         onSkip={() => openRoute("chat")}
       />
     ),
+    "computer-use": <ComputerUsePanel onDismiss={() => openRoute("chat")} />,
   };
 
   if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {
