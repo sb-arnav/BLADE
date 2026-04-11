@@ -380,10 +380,12 @@ fn node_id_by_label(conn: &rusqlite::Connection, label: &str) -> Option<String> 
 // --- Tauri Commands ---
 
 /// Called by frontend after streaming completes with the assembled response text.
-/// Runs entity extraction in the background and emits brain_grew.
+/// Runs entity extraction, embeds the full exchange for semantic recall,
+/// and scans user message for implicit reminder intent.
 #[tauri::command]
 pub async fn brain_extract_from_exchange(
     app: tauri::AppHandle,
+    store: tauri::State<'_, crate::embeddings::SharedVectorStore>,
     user_text: String,
     assistant_text: String,
 ) -> Result<usize, String> {
@@ -392,6 +394,27 @@ pub async fn brain_extract_from_exchange(
         use tauri::Emitter;
         let _ = app.emit("brain_grew", serde_json::json!({ "new_entities": n }));
     }
+
+    // Embed the full exchange (user + assistant) for semantic memory recall.
+    if !assistant_text.is_empty() {
+        let store_ref = store.inner().clone();
+        let user_clone = user_text.clone();
+        let asst_clone = assistant_text.clone();
+        let conv_id = format!("stream-{}", chrono::Utc::now().timestamp());
+        tokio::spawn(async move {
+            crate::embeddings::auto_embed_exchange(&store_ref, &user_clone, &asst_clone, &conv_id);
+        });
+    }
+
+    // Scan user message for implicit reminder intent (fire-and-forget)
+    {
+        let app_clone = app.clone();
+        let user_clone = user_text.clone();
+        tokio::spawn(async move {
+            crate::reminders::extract_reminder_from_message(&app_clone, &user_clone).await;
+        });
+    }
+
     Ok(n)
 }
 
