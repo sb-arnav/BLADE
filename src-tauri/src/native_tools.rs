@@ -89,6 +89,17 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "blade_set_clipboard".to_string(),
+            description: "Copy text to the user's clipboard. Use this instead of shell commands (clip, pbcopy, xclip) — those mangle quotes and special characters.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "The text to copy to clipboard"}
+                },
+                "required": ["text"]
+            }),
+        },
+        ToolDefinition {
             name: "blade_open_url".to_string(),
             description: "Open a URL in the user's default browser. Always use this instead of blade_bash for opening websites, YouTube videos, or any web links. The URL must be fully qualified (start with https://).".to_string(),
             input_schema: json!({
@@ -176,6 +187,13 @@ pub async fn execute(name: &str, args: &Value) -> (String, bool) {
             };
             let max_chars = args["max_chars"].as_u64().map(|v| v as usize).unwrap_or(20_000);
             web_fetch(url, max_chars).await
+        }
+        "blade_set_clipboard" => {
+            let text = match args["text"].as_str() {
+                Some(t) => t,
+                None => return ("Missing required argument: text".to_string(), true),
+            };
+            set_clipboard(text)
         }
         "blade_open_url" => {
             let url = match args["url"].as_str() {
@@ -374,6 +392,13 @@ async fn web_fetch(url: &str, max_chars: usize) -> (String, bool) {
             }
         }
         Err(e) => (format!("Fetch failed: {}", e), true),
+    }
+}
+
+fn set_clipboard(text: &str) -> (String, bool) {
+    match arboard::Clipboard::new().and_then(|mut c| c.set_text(text)) {
+        Ok(_) => (format!("Copied {} chars to clipboard.", text.len()), false),
+        Err(e) => (format!("Clipboard error: {}", e), true),
     }
 }
 
