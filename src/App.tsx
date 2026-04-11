@@ -529,6 +529,8 @@ export default function App() {
 
     { id: "knowledge", label: "Open knowledge base", description: "Search and reuse saved notes and context", section: "Knowledge", action: () => openRoute("knowledge") },
     { id: "character", label: "Open Character Bible", description: "Inspect Blade's learned identity and memory", section: "Knowledge", action: () => openRoute("character") },
+    { id: "journal", label: "Read Blade's journal", description: "See what Blade has been writing about in its internal log", section: "Knowledge", action: () => invoke<string>("journal_get_recent", { days: 7 }).then((j) => { if (j) { sendWithStats(`Show me what you've written in your journal recently.\n\n${j}`); } else { sendWithStats("What have you been reflecting on lately? (Your journal is empty so far.)"); } }).catch(() => {}) },
+    { id: "journal-write", label: "Write today's journal entry", description: "Force Blade to write tonight's journal entry now", section: "Knowledge", action: () => { void invoke("journal_write_now").then(() => notifications.add({ type: "success", title: "Journal written", message: "Today's entry is ready" })).catch(() => {}); } },
     { id: "reports", label: "Open capability reports", description: "Review what Blade could not do and why", section: "Knowledge", action: () => openRoute("reports") },
     { id: "analytics", label: "Open analytics", description: "Inspect activity and usage trends", section: "Knowledge", action: () => openRoute("analytics") },
     { id: "activity", label: "Open activity feed", description: "See recent events across the app", section: "Knowledge", action: () => openRoute("activity") },
