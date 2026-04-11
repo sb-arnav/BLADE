@@ -216,6 +216,110 @@ fn extract_quantity_unit(text: &str, unit_variants: &[&str]) -> Option<i64> {
     None
 }
 
+// ── Intent extraction ─────────────────────────────────────────────────────────
+
+/// Scan a conversation exchange for implicit reminder intent.
+/// If the user expressed a time-bound commitment ("I need to call X tomorrow",
+/// "don't let me forget to…", "remind me to…"), silently create a reminder.
+/// Returns the reminder ID if one was created, or None.
+pub async fn extract_reminder_from_message(
+    app: &tauri::AppHandle,
+    user_text: &str,
+) -> Option<String> {
+    // Quick regex pre-filter to avoid LLM calls on every message.
+    // Only invoke AI when the text looks like it contains time or reminder language.
+    let lower = user_text.to_lowercase();
+    let has_time_signal = [
+        "remind", "reminder", "don't forget", "dont forget", "remember to",
+        "tomorrow", "tonight", "next week", "in an hour", "in a minute",
+        "later today", "this evening", "by end of day", "by eod", "by monday",
+        "by tuesday", "by wednesday", "by thursday", "by friday",
+        "at noon", "at midnight", "in 30", "in 15", "need to call", "need to email",
+        "need to send", "have to follow up", "follow up with", "check in with",
+        "schedule", "meeting at", "appointment at",
+    ].iter().any(|kw| lower.contains(kw));
+
+    if !has_time_signal {
+        return None;
+    }
+
+    let config = crate::config::load_config();
+    if config.api_key.is_empty() && config.provider != "ollama" {
+        return None;
+    }
+
+    // Short prompt to extract structured reminder intent
+    let now = chrono::Local::now();
+    let prompt = format!(
+        r#"Extract reminder intent from this user message. Current time: {}.
+
+Message: "{}"
+
+If the user expressed intent to be reminded about something or has a time-bound commitment, respond with EXACTLY this JSON format (no markdown, no explanation):
+{{"title": "short action", "note": "optional detail", "time_expression": "when"}}
+
+time_expression must be one of: "X minutes", "X hours", "X days", "tomorrow", "tonight"
+
+If there is NO clear reminder intent, respond with exactly: null"#,
+        now.format("%H:%M on %A %B %d"),
+        user_text.chars().take(500).collect::<String>()
+    );
+
+    use crate::providers::{self, ConversationMessage};
+    let messages = vec![ConversationMessage::User(prompt)];
+    let model = match config.provider.as_str() {
+        "anthropic" => "claude-haiku-4-5-20251001",
+        "openai" => "gpt-4o-mini",
+        "gemini" => "gemini-2.0-flash",
+        _ => &config.model,
+    };
+
+    let Ok(turn) = providers::complete_turn(
+        &config.provider,
+        &config.api_key,
+        model,
+        &messages,
+        &[],
+        config.base_url.as_deref(),
+    ).await else { return None; };
+
+    let raw = turn.content.trim();
+    if raw == "null" || raw.is_empty() {
+        return None;
+    }
+
+    // Parse the JSON response
+    let Ok(val) = serde_json::from_str::<serde_json::Value>(raw) else {
+        return None;
+    };
+
+    let title = val["title"].as_str()?.to_string();
+    let note = val["note"].as_str().unwrap_or("").to_string();
+    let time_expr = val["time_expression"].as_str()?.to_string();
+
+    if title.is_empty() || time_expr.is_empty() {
+        return None;
+    }
+
+    match reminder_add_natural(title.clone(), note, time_expr) {
+        Ok(id) => {
+            // Silently emit so UI can surface a toast — don't interrupt with TTS
+            use tauri::Emitter;
+            let _ = app.emit("blade_reminder_created", serde_json::json!({
+                "id": &id,
+                "title": &title,
+                "source": "auto_extract",
+            }));
+            log::info!("[reminders] auto-extracted reminder: {} (id: {})", title, id);
+            Some(id)
+        }
+        Err(e) => {
+            log::debug!("[reminders] auto-extract failed to create: {}", e);
+            None
+        }
+    }
+}
+
 // ── Tauri commands ────────────────────────────────────────────────────────────
 
 #[tauri::command]

@@ -106,18 +106,16 @@ pub async fn send_message_stream(
         trace::log_trace(&entry);
         if result.is_ok() {
             let _ = app.emit("blade_status", "idle");
-            // Background: entity extraction + auto-embed + thread update for persistent memory
-            // Note: streaming path — assistant text assembled by frontend via brain_extract_from_exchange
+            // Background: partial entity extraction from user message alone.
+            // Full exchange (user+assistant) is embedded by brain_extract_from_exchange
+            // once the frontend assembles the complete streamed response.
             let app2 = app.clone();
             let user_text_clone = last_user_text.clone();
-            let store_clone = vector_store.inner().clone();
             tokio::spawn(async move {
                 let n = brain::extract_entities_from_exchange(&user_text_clone, "").await;
                 if n > 0 {
                     let _ = app2.emit("brain_grew", serde_json::json!({ "new_entities": n }));
                 }
-                // Embed the exchange for future semantic recall (assistant text unavailable in stream path)
-                crate::embeddings::auto_embed_exchange(&store_clone, &user_text_clone, "", "stream");
             });
         } else {
             let _ = app.emit("blade_status", "error");
