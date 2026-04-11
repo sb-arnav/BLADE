@@ -9,6 +9,7 @@ import { McpCatalog } from "./McpCatalog";
 import { TelegramBridge } from "./TelegramBridge";
 import { DiscordBridge } from "./DiscordBridge";
 import { WatcherPanel } from "./WatcherPanel";
+import { RemindersPanel } from "./RemindersPanel";
 
 type SettingsTab = "provider" | "memory" | "mcp" | "integrations" | "about";
 
@@ -757,6 +758,12 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
                 Resource Watcher
               </p>
               <WatcherPanel />
+            </div>
+            <div className="px-4 py-2">
+              <p className="text-[10px] font-semibold tracking-widest text-blade-muted/70 uppercase mb-3">
+                Reminders
+              </p>
+              <RemindersPanel />
             </div>
             <div className="px-4 py-2">
               <p className="text-[10px] font-semibold tracking-widest text-blade-muted/70 uppercase mb-3">
