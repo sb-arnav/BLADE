@@ -45,7 +45,23 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
                     let prev_key = current.as_ref().map(|s| format!("{}|{}", s.process, s.name));
 
                     if prev_key.as_deref() != Some(&key) {
-                        // App or window switched
+                        // App or window switched — record to timeline
+                        let db_path = crate::config::blade_config_dir().join("blade.db");
+                        if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                            let title = if w.window_title.is_empty() {
+                                w.app_name.clone()
+                            } else {
+                                format!("{} — {}", w.app_name, &w.window_title[..w.window_title.len().min(60)])
+                            };
+                            let _ = crate::db::timeline_record(
+                                &conn,
+                                "window_switch",
+                                &title,
+                                "",
+                                &w.app_name,
+                                "{}",
+                            );
+                        }
                         current = Some(WindowSession {
                             name: w.window_title.clone(),
                             process: w.app_name.clone(),
