@@ -362,12 +362,29 @@ export default function App() {
       }
     );
 
+    const unlistenWatcher = listen<{ url: string; label: string; summary: string }>(
+      "watcher_alert",
+      (event) => {
+        const { label, summary } = event.payload;
+        notifications.add({
+          type: "info",
+          title: `Watch: ${label}`,
+          message: summary,
+          action: {
+            label: "Discuss",
+            callback: () => sendWithStats(`Something changed on ${label}:\n\n${summary}\n\nWhat should I know about this?`),
+          },
+        });
+      }
+    );
+
     return () => {
       unlisten.then((fn) => fn());
       unlistenBriefing.then((fn) => fn());
       unlistenReminderFired.then((fn) => fn());
       unlistenReminderCreated.then((fn) => fn());
       unlistenSkillLearned.then((fn) => fn());
+      unlistenWatcher.then((fn) => fn());
     };
   }, [tts.enabled]);
 
