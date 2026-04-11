@@ -117,17 +117,31 @@ fn parse_tool_calls(tool_calls: &[serde_json::Value]) -> Vec<ToolCall> {
     tool_calls
         .iter()
         .map(|call| {
+            let raw_name = call["function"]["name"]
+                .as_str()
+                .unwrap_or("unknown_tool");
+
+            // Some Groq/Llama models return the name with arguments embedded,
+            // e.g. `blade_glob{"pattern":"**/*.ts"}` instead of a separate
+            // arguments field. Split on the first `{` to clean it up.
+            let (name, embedded_args) = if let Some(pos) = raw_name.find('{') {
+                let n = raw_name[..pos].trim().to_string();
+                let a = serde_json::from_str::<serde_json::Value>(&raw_name[pos..]).ok();
+                (n, a)
+            } else {
+                (raw_name.to_string(), None)
+            };
+
+            // Prefer the explicit arguments field; fall back to embedded args.
             let arguments = call["function"]["arguments"]
                 .as_str()
                 .and_then(|raw| serde_json::from_str(raw).ok())
+                .or(embedded_args)
                 .unwrap_or_else(|| serde_json::json!({}));
 
             ToolCall {
                 id: call["id"].as_str().unwrap_or("call").to_string(),
-                name: call["function"]["name"]
-                    .as_str()
-                    .unwrap_or("unknown_tool")
-                    .to_string(),
+                name,
                 arguments,
             }
         })
