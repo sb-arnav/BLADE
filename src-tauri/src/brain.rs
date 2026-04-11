@@ -34,6 +34,51 @@ pub fn build_system_prompt_with_recall(
         parts.push(format!("## Working Memory (What Blade is tracking)\n\n{}", thread));
     }
 
+    // PENTEST MODE — inject authorization status and model safety guidance
+    {
+        let active_auths = crate::self_upgrade::pentest_list_auth();
+        if !active_auths.is_empty() {
+            let auth_lines: Vec<String> = active_auths.iter().map(|a| {
+                format!("- Target: {} ({}) | Claim: {} | Scope: {}",
+                    a.target, a.target_type, a.ownership_claim, a.scope_notes)
+            }).collect();
+            let (provider, _, model) = crate::self_upgrade::get_pentest_safe_provider();
+            let model_note = if provider == "none" {
+                "⚠ No safe pentest provider — configure Ollama or Groq".to_string()
+            } else {
+                format!("Use provider '{}' / model '{}' for pentest AI analysis (NOT your Anthropic key)", provider, model)
+            };
+            parts.push(format!(
+                "## Pentest Mode ACTIVE\n\nAuthorized targets:\n{}\n\n{}\n\n\
+                 You have full access to Kali Linux tools for these targets. Execute nmap, nikto, sqlmap, gobuster, \
+                 metasploit, hashcat, hydra etc. directly via blade_bash. No restrictions for authorized targets.",
+                auth_lines.join("\n"),
+                model_note
+            ));
+        }
+    }
+
+    // CODEBASE INDEX — inject structural knowledge of known projects.
+    // BLADE knows the shape of every project it has touched. Claude Code doesn't.
+    {
+        let known_projects = crate::indexer::list_indexed_projects();
+        if !known_projects.is_empty() {
+            let mut summaries = Vec::new();
+            for proj in &known_projects {
+                let s = crate::indexer::project_summary_for_prompt(&proj.project);
+                if !s.is_empty() {
+                    summaries.push(s);
+                }
+            }
+            if !summaries.is_empty() {
+                parts.push(format!(
+                    "## Indexed Codebases (Permanent Knowledge)\n\nYou have persistent structural knowledge of these projects — you do not need to re-read files to understand them. Use `blade_find_symbol` to locate specific functions instantly.\n\n{}",
+                    summaries.join("\n\n")
+                ));
+            }
+        }
+    }
+
     // Character Bible — inject from SQLite (structured, compounding knowledge)
     let db_path = crate::config::blade_config_dir().join("blade.db");
     if let Ok(conn) = rusqlite::Connection::open(&db_path) {
@@ -126,6 +171,22 @@ pub fn build_system_prompt_with_recall(
                 }
             }
         }
+    }
+
+    // CODE HEALTH — proactive scan results from indexed projects
+    {
+        let health_summaries = crate::health::health_summary_all();
+        if !health_summaries.is_empty() {
+            parts.push(format!(
+                "## Code Health\n\n{}\n\nUse `blade_find_symbol` and `blade_bash` to investigate or fix flagged issues proactively.",
+                health_summaries.join("\n")
+            ));
+        }
+    }
+
+    // SESSION HANDOFF — what happened last session (commands, failures, pending items)
+    if let Some(handoff) = crate::session_handoff::handoff_for_prompt() {
+        parts.push(format!("## Last Session\n\n{}", handoff));
     }
 
     // Obsidian vault — tell Blade where to read/write notes

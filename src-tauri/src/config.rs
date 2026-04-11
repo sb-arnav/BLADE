@@ -119,6 +119,12 @@ pub struct BladeConfig {
     pub obsidian_vault_path: String,
 }
 
+impl BladeConfig {
+    pub fn active_model_for_display(&self) -> String {
+        format!("{}/{}", self.provider, self.model)
+    }
+}
+
 impl Default for BladeConfig {
     fn default() -> Self {
         Self {
@@ -283,6 +289,60 @@ pub fn set_api_key_for_provider(
         }
     }
     save_config(&config)
+}
+
+/// Get all stored provider keys — returns which providers have a key stored
+/// and masked previews (never the full key). Also returns the active provider.
+#[tauri::command]
+pub fn get_all_provider_keys() -> serde_json::Value {
+    let providers = ["anthropic", "openai", "gemini", "groq", "ollama"];
+    let config = load_config();
+
+    let keys: Vec<serde_json::Value> = providers.iter().map(|p| {
+        let key = get_api_key_from_keyring(p);
+        let has_key = !key.is_empty();
+        let masked = if has_key && key.len() > 8 {
+            format!("{}...{}", &key[..4], &key[key.len()-4..])
+        } else if has_key {
+            "****".to_string()
+        } else {
+            String::new()
+        };
+        serde_json::json!({
+            "provider": p,
+            "has_key": has_key,
+            "masked": masked,
+            "is_active": config.provider == *p,
+        })
+    }).collect();
+
+    serde_json::json!({
+        "providers": keys,
+        "active_provider": config.active_model_for_display(),
+    })
+}
+
+/// Store a key for any provider without switching to it.
+/// Use this to pre-load all your keys without changing the active provider.
+#[tauri::command]
+pub fn store_provider_key(provider: String, api_key: String) -> Result<(), String> {
+    if provider.is_empty() {
+        return Err("Provider name is required".to_string());
+    }
+    set_api_key_in_keyring(&provider, &api_key)
+}
+
+/// Switch the active provider (and load its stored key)
+#[tauri::command]
+pub fn switch_provider(provider: String, model: Option<String>) -> Result<BladeConfig, String> {
+    let mut config = load_config();
+    config.provider = provider.clone();
+    config.api_key = get_api_key_from_keyring(&provider);
+    if let Some(m) = model {
+        if !m.is_empty() { config.model = m; }
+    }
+    save_config(&config)?;
+    Ok(config)
 }
 
 pub fn update_window_state(window_state: WindowState) -> Result<(), String> {

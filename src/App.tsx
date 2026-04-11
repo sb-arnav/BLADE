@@ -22,7 +22,7 @@ import { useRuntimes } from "./hooks/useRuntimes";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents";
 
 const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
 const Canvas = lazy(() => import("./components/Canvas"));
@@ -52,6 +52,7 @@ const DeepLearn = lazy(() => import("./components/DeepLearn").then((m) => ({ def
 const CharacterBible = lazy(() => import("./components/CharacterBible").then((m) => ({ default: m.CharacterBible })));
 const CapabilityReports = lazy(() => import("./components/CapabilityReports").then((m) => ({ default: m.CapabilityReports })));
 const ComputerUsePanel = lazy(() => import("./components/ComputerUsePanel").then((m) => ({ default: m.ComputerUsePanel })));
+const BackgroundAgentsPanel = lazy(() => import("./components/BackgroundAgentsPanel").then((m) => ({ default: m.BackgroundAgentsPanel })));
 
 function ShellFallback({ label = "Loading workspace..." }: { label?: string }) {
   return (
@@ -461,6 +462,39 @@ export default function App() {
     };
   }, []);
 
+  // BACKGROUND AGENTS — notify when agents spawn/complete
+  useEffect(() => {
+    const unlistenSpawned = listen<{ id: string; agent_type: string; task: string }>(
+      "agent_spawned",
+      (event) => {
+        const { agent_type, task } = event.payload;
+        notifications.add({
+          type: "info",
+          title: `Agent spawned: ${agent_type}`,
+          message: task.slice(0, 80),
+          action: { label: "Watch", callback: () => openRoute("bg-agents") },
+        });
+        activity.track("message", `Background agent started`, `${agent_type}: ${task.slice(0, 60)}`);
+      }
+    );
+    const unlistenComplete = listen<{ id: string; exit_code: number; status: string }>(
+      "agent_complete",
+      (event) => {
+        const { status, exit_code } = event.payload;
+        notifications.add({
+          type: status === "completed" ? "success" : "error",
+          title: status === "completed" ? "Agent finished" : "Agent failed",
+          message: `Exit code ${exit_code}`,
+          action: { label: "View output", callback: () => openRoute("bg-agents") },
+        });
+      }
+    );
+    return () => {
+      unlistenSpawned.then((fn) => fn());
+      unlistenComplete.then((fn) => fn());
+    };
+  }, []);
+
   // THREAD — load working memory state on startup + listen for updates
   useEffect(() => {
     invoke<{ title: string; content: string; project: string } | null>("blade_thread_get")
@@ -589,6 +623,7 @@ export default function App() {
     { id: "sound", label: sound.enabled ? "Disable notification sound" : "Enable notification sound", description: "Toggle Blade's audible alerts", section: "System", action: sound.toggleEnabled },
     { id: "screenshot", label: "Capture screen", description: "Send the current screen into chat for analysis", section: "System", action: handleScreenshot },
     { id: "computer-use", label: "Computer use — let Blade operate screen", description: "BLADE takes control: screenshots + clicks + types to complete a task", section: "System", action: () => openRoute("computer-use") },
+    { id: "bg-agents", label: "Background agents — watch running AI agents", description: "See Claude Code, Aider, Goose agents BLADE has spawned, and their live output", section: "System", action: () => openRoute("bg-agents") },
     { id: "computer-use-stop", label: "Stop computer use", description: "Halt any ongoing autonomous screen operation", section: "System", action: () => { void invoke("computer_use_stop"); } },
     { id: "canvas", label: "Open canvas workspace", description: "Sketch ideas visually and move them back into chat", section: "System", action: () => openRoute("canvas") },
     { id: "email", label: "Open email workspace", description: "Read and draft email with Blade assistance", section: "System", action: () => openRoute("email") },
@@ -664,6 +699,7 @@ export default function App() {
       />
     ),
     "computer-use": <ComputerUsePanel onDismiss={() => openRoute("chat")} />,
+    "bg-agents": <BackgroundAgentsPanel onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} />,
   };
 
   if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {

@@ -180,6 +180,320 @@ function matchProviderEntry(cfg: { provider: string; model: string; base_url?: s
   ) ?? PROVIDER_MATRIX.find((p) => p.id === cfg.provider) ?? null;
 }
 
+// Providers that need a key
+const KEY_PROVIDERS = [
+  { id: "anthropic", label: "Anthropic (Claude)", placeholder: "sk-ant-..." },
+  { id: "openai", label: "OpenAI (GPT)", placeholder: "sk-..." },
+  { id: "gemini", label: "Google Gemini", placeholder: "AIza..." },
+  { id: "groq", label: "Groq (Llama)", placeholder: "gsk_..." },
+];
+
+// ── Pentest Panel ─────────────────────────────────────────────────────────────
+
+interface PentestAuth {
+  target: string;
+  target_type: string;
+  ownership_claim: string;
+  scope_notes: string;
+  confirmed_at: number;
+  session_id: string;
+}
+
+function PentestPanel() {
+  const [auths, setAuths] = useState<PentestAuth[]>([]);
+  const [modelSafety, setModelSafety] = useState<{ safe: boolean; provider: string; model: string; warning?: string } | null>(null);
+
+  const load = () => {
+    invoke<PentestAuth[]>("pentest_list_auth").then(setAuths).catch(() => {});
+    invoke<{ safe: boolean; provider: string; model: string; warning?: string }>("pentest_check_model_safety")
+      .then(setModelSafety).catch(() => {});
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleRevoke = async (target: string) => {
+    await invoke("pentest_revoke", { target }).catch(() => {});
+    load();
+  };
+
+  const now = Math.floor(Date.now() / 1000);
+
+  const typeLabel: Record<string, string> = { ip: "IP", domain: "Domain", range: "Range", description: "Description" };
+  const claimLabel: Record<string, string> = { owner: "Owned", authorized: "Authorized", bug_bounty: "Bug Bounty", ctf: "CTF" };
+
+  if (auths.length === 0 && !modelSafety) {
+    return <p className="text-blade-muted text-xs">No active pentest authorizations. Ask BLADE to authorize a target to begin.</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      {modelSafety && (
+        <div className={`flex items-start gap-2 p-2 rounded-lg text-xs ${modelSafety.safe ? "bg-green-500/10 border border-green-500/20" : "bg-yellow-500/10 border border-yellow-500/20"}`}>
+          <span>{modelSafety.safe ? "✓" : "⚠"}</span>
+          <div>
+            <span className={modelSafety.safe ? "text-green-400" : "text-yellow-400"}>
+              {modelSafety.safe ? `Pentest provider: ${modelSafety.provider}/${modelSafety.model}` : modelSafety.warning}
+            </span>
+          </div>
+        </div>
+      )}
+      {auths.map((auth) => {
+        const expiresIn = 86400 - (now - auth.confirmed_at);
+        const hoursLeft = Math.max(0, Math.floor(expiresIn / 3600));
+        const minsLeft = Math.max(0, Math.floor((expiresIn % 3600) / 60));
+        const expired = expiresIn <= 0;
+        return (
+          <div key={auth.session_id} className={`flex items-start gap-2 p-2 rounded-lg border ${expired ? "opacity-50 border-blade-border/30" : "border-blade-border/50"} bg-blade-bg`}>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs font-medium text-blade-secondary">{auth.target}</span>
+                <span className="text-2xs px-1.5 py-0.5 rounded bg-blade-accent/15 text-blade-accent">{typeLabel[auth.target_type] ?? auth.target_type}</span>
+                <span className="text-2xs px-1.5 py-0.5 rounded bg-blade-surface text-blade-muted">{claimLabel[auth.ownership_claim] ?? auth.ownership_claim}</span>
+              </div>
+              {auth.scope_notes && <p className="text-2xs text-blade-muted mt-0.5 truncate">{auth.scope_notes}</p>}
+              <p className="text-2xs text-blade-muted/50 mt-0.5">
+                {expired ? "Expired" : `Expires in ${hoursLeft}h ${minsLeft}m`}
+              </p>
+            </div>
+            <button onClick={() => handleRevoke(auth.target)} className="text-blade-muted/50 hover:text-red-400 text-xs transition-colors flex-shrink-0">Revoke</button>
+          </div>
+        );
+      })}
+      {auths.length === 0 && (
+        <p className="text-blade-muted text-xs">No active authorizations. Ask BLADE: "authorize pentest on [target]" to begin.</p>
+      )}
+    </div>
+  );
+}
+
+// ── Cron Panel ────────────────────────────────────────────────────────────────
+
+interface CronTask {
+  id: string;
+  name: string;
+  description: string;
+  schedule: { kind: string; time_of_day?: number; day_of_week?: number; interval_secs?: number };
+  action: { kind: string; content: string; agent_type?: string; cwd?: string };
+  enabled: boolean;
+  last_run?: number;
+  next_run: number;
+  run_count: number;
+  created_at: number;
+}
+
+function formatSchedule(s: CronTask["schedule"]): string {
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const t = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+  if (s.kind === "daily") return s.time_of_day !== undefined ? `Daily at ${t(s.time_of_day)}` : "Daily";
+  if (s.kind === "weekly") {
+    const day = s.day_of_week !== undefined ? days[s.day_of_week] : "?";
+    return s.time_of_day !== undefined ? `Every ${day} at ${t(s.time_of_day)}` : `Every ${day}`;
+  }
+  if (s.kind === "hourly") return "Every hour";
+  if (s.kind === "interval" && s.interval_secs !== undefined) {
+    return s.interval_secs < 3600 ? `Every ${Math.round(s.interval_secs / 60)} min` : `Every ${Math.round(s.interval_secs / 3600)}h`;
+  }
+  return s.kind;
+}
+
+function CronPanel() {
+  const [tasks, setTasks] = useState<CronTask[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+  const [schedule, setSchedule] = useState("");
+  const [actionKind, setActionKind] = useState<"bash" | "message" | "spawn_agent">("bash");
+  const [actionPayload, setActionPayload] = useState("");
+  const [cwd, setCwd] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const load = () => {
+    invoke<CronTask[]>("cron_list").then(setTasks).catch(() => {});
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleAdd = async () => {
+    if (!name.trim() || !schedule.trim() || !actionPayload.trim()) return;
+    setSaving(true);
+    try {
+      await invoke("cron_add", {
+        name: name.trim(),
+        description: name.trim(),
+        scheduleText: schedule.trim(),
+        actionKind,
+        actionContent: actionPayload.trim(),
+        actionCwd: cwd.trim() || null,
+        actionAgentType: actionKind === "spawn_agent" ? "claude" : null,
+      });
+      setAdding(false);
+      setName(""); setSchedule(""); setActionPayload(""); setCwd("");
+      load();
+    } catch (e) {
+      console.error("cron_add failed:", e);
+    }
+    setSaving(false);
+  };
+
+  const handleToggle = async (id: string, enabled: boolean) => {
+    await invoke("cron_toggle", { id, enabled: !enabled }).catch(() => {});
+    load();
+  };
+
+  const handleDelete = async (id: string) => {
+    await invoke("cron_delete", { id }).catch(() => {});
+    load();
+  };
+
+  return (
+    <div>
+      {tasks.length === 0 && !adding && (
+        <p className="text-blade-muted text-xs mb-2">No scheduled tasks yet.</p>
+      )}
+      <div className="space-y-1.5 mb-2">
+        {tasks.map((task) => {
+          const nextDt = new Date(task.next_run * 1000);
+          const nextStr = nextDt.toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+          return (
+            <div key={task.id} className="flex items-start gap-2 p-2 rounded-lg bg-blade-bg border border-blade-border/50">
+              <button
+                onClick={() => handleToggle(task.id, task.enabled)}
+                className={`mt-0.5 w-7 h-3.5 rounded-full flex-shrink-0 relative transition-colors ${task.enabled ? "bg-blade-accent" : "bg-blade-border"}`}
+              >
+                <span className={`absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white shadow transition-all ${task.enabled ? "left-3.5" : "left-0.5"}`} />
+              </button>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-blade-secondary truncate">{task.name}</span>
+                  <span className="text-2xs text-blade-muted/60 flex-shrink-0">{formatSchedule(task.schedule)}</span>
+                </div>
+                <p className="text-2xs text-blade-muted truncate mt-0.5">{task.action.content}</p>
+                <p className="text-2xs text-blade-muted/40 mt-0.5">next: {nextStr} · ran {task.run_count}×</p>
+              </div>
+              <button onClick={() => handleDelete(task.id)} className="text-blade-muted/50 hover:text-red-400 text-xs transition-colors flex-shrink-0">×</button>
+            </div>
+          );
+        })}
+      </div>
+
+      {adding ? (
+        <div className="border border-blade-border/50 rounded-lg p-3 space-y-2 bg-blade-bg/50">
+          <input
+            className="w-full bg-blade-bg border border-blade-border rounded-lg px-3 py-1.5 text-xs text-blade-text placeholder:text-blade-muted"
+            placeholder="Task name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoFocus
+          />
+          <input
+            className="w-full bg-blade-bg border border-blade-border rounded-lg px-3 py-1.5 text-xs text-blade-text placeholder:text-blade-muted"
+            placeholder="Schedule: every day at 9am, every Monday at 10am, every 30 minutes…"
+            value={schedule}
+            onChange={(e) => setSchedule(e.target.value)}
+          />
+          <select
+            className="w-full bg-blade-bg border border-blade-border rounded-lg px-3 py-1.5 text-xs text-blade-text"
+            value={actionKind}
+            onChange={(e) => setActionKind(e.target.value as typeof actionKind)}
+          >
+            <option value="bash">Run shell command</option>
+            <option value="message">Send me a message</option>
+            <option value="spawn_agent">Spawn AI agent</option>
+          </select>
+          <textarea
+            className="w-full bg-blade-bg border border-blade-border rounded-lg px-3 py-1.5 text-xs text-blade-text placeholder:text-blade-muted resize-none h-14"
+            placeholder={actionKind === "bash" ? "git pull && npm run build" : actionKind === "message" ? "Good morning! Check your GitHub notifications." : "Refactor all console.log calls to use the logger utility"}
+            value={actionPayload}
+            onChange={(e) => setActionPayload(e.target.value)}
+          />
+          {actionKind !== "message" && (
+            <input
+              className="w-full bg-blade-bg border border-blade-border rounded-lg px-3 py-1.5 text-xs text-blade-text placeholder:text-blade-muted"
+              placeholder="Working directory (optional)"
+              value={cwd}
+              onChange={(e) => setCwd(e.target.value)}
+            />
+          )}
+          <div className="flex justify-end gap-2 pt-1">
+            <button onClick={() => { setAdding(false); setName(""); setSchedule(""); setActionPayload(""); }} className="text-xs text-blade-muted hover:text-blade-secondary px-3 py-1 transition-colors">Cancel</button>
+            <button
+              onClick={handleAdd}
+              disabled={saving || !name.trim() || !schedule.trim() || !actionPayload.trim()}
+              className="text-xs px-3 py-1 rounded-lg bg-blade-accent text-white hover:bg-blade-accent/90 disabled:opacity-40 transition-colors"
+            >
+              {saving ? "Saving…" : "Schedule"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setAdding(true)} className="text-xs text-blade-accent hover:text-blade-accent/80 transition-colors">
+          + Add scheduled task
+        </button>
+      )}
+    </div>
+  );
+}
+
+function KeyVault({ activeProvider }: { activeProvider: string }) {
+  const [keys, setKeys] = useState<Record<string, string>>({});
+  const [saved, setSaved] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    invoke<{ providers: Array<{ provider: string; has_key: boolean; masked: string; is_active: boolean }> }>(
+      "get_all_provider_keys"
+    ).then((res) => {
+      const init: Record<string, string> = {};
+      for (const p of res.providers) {
+        init[p.provider] = p.masked;
+      }
+      setKeys(init);
+    }).catch(() => {});
+  }, [activeProvider]);
+
+  const handleStore = async (providerId: string) => {
+    const key = keys[providerId] ?? "";
+    if (!key || key.includes("...")) return; // don't re-save masked value
+    try {
+      await invoke("store_provider_key", { provider: providerId, apiKey: key });
+      setSaved((s) => ({ ...s, [providerId]: true }));
+      setTimeout(() => setSaved((s) => ({ ...s, [providerId]: false })), 2000);
+    } catch {}
+  };
+
+  return (
+    <div className="space-y-2">
+      {KEY_PROVIDERS.map((p) => {
+        const isActive = p.id === activeProvider;
+        const val = keys[p.id] ?? "";
+        const isMasked = val.includes("...");
+        return (
+          <div key={p.id} className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${isActive ? "border-blade-accent/40 bg-blade-accent/5" : "border-blade-border"}`}>
+            <div className="w-28 flex-shrink-0">
+              <p className="text-xs text-blade-secondary leading-tight">{p.label}</p>
+              {isActive && <p className="text-[9px] text-blade-accent">active</p>}
+            </div>
+            <input
+              type="password"
+              value={val}
+              onChange={(e) => setKeys((k) => ({ ...k, [p.id]: e.target.value }))}
+              onFocus={() => { if (isMasked) setKeys((k) => ({ ...k, [p.id]: "" })); }}
+              placeholder={p.placeholder}
+              className="flex-1 min-w-0 bg-blade-bg border border-blade-border rounded-lg px-2 py-1.5 text-xs outline-none font-mono"
+            />
+            <button
+              onClick={() => handleStore(p.id)}
+              disabled={!val || isMasked}
+              className="text-xs px-2 py-1 rounded-lg bg-blade-surface border border-blade-border hover:border-blade-muted transition-colors disabled:opacity-30"
+            >
+              {saved[p.id] ? "✓" : "Store"}
+            </button>
+          </div>
+        );
+      })}
+      <p className="text-2xs text-blade-muted">All keys stored in OS keychain. BLADE uses the right key for each task automatically — Anthropic for chat, Groq/Ollama for pentest mode.</p>
+    </div>
+  );
+}
+
 export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
   const [tab, setTab] = useState<SettingsTab>("provider");
   const [provider, setProvider] = useState(config.provider);
@@ -463,12 +777,12 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             </div>
             <div className="grid grid-cols-4 gap-1.5">
               {(["off", "normal", "intermediate", "extreme"] as const).map((tier) => {
-                const labels: Record<string, string> = { off: "Off", normal: "Normal", intermediate: "Focused", extreme: "Extreme" };
+                const labels: Record<string, string> = { off: "Off", normal: "Normal", intermediate: "Focused", extreme: "GOD MODE" };
                 const descs: Record<string, string> = {
                   off: "Disabled",
                   normal: "5 min scan",
                   intermediate: "2 min + clipboard",
-                  extreme: "1 min + JARVIS",
+                  extreme: "1 min · full JARVIS",
                 };
                 const active = godModeTier === tier;
                 return (
@@ -498,7 +812,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             </div>
             {godModeTier === "extreme" && (
               <p className="text-xs text-orange-400 bg-orange-500/10 border border-orange-500/30 rounded-lg px-3 py-2">
-                Extreme mode scans every 60 seconds and runs Blade as an active co-pilot — it will proactively suggest actions on every message. Uses significantly more API tokens. Don't use this unless you have a paid key with budget to spare.
+                GOD MODE: BLADE scans every 60 seconds and acts as a live co-pilot — proactively surfacing context, flagging issues, and suggesting actions without being asked. Costs more tokens. Requires a paid key.
               </p>
             )}
           </div>
@@ -582,6 +896,14 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
 
           {status && <p className="text-xs text-green-400">{status}</p>}
           {error && <p className="text-xs text-red-400">{error}</p>}
+        </section>
+
+        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+          <div>
+            <h2 className="text-sm font-semibold">Key Vault</h2>
+            <p className="text-xs text-blade-muted mt-0.5">Store all your provider keys at once. BLADE keeps them all — switches automatically based on context.</p>
+          </div>
+          <KeyVault activeProvider={provider} />
         </section>
 
         <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
@@ -765,6 +1087,18 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
                 Reminders
               </p>
               <RemindersPanel />
+            </div>
+            <div className="px-4 py-2">
+              <p className="text-[10px] font-semibold tracking-widest text-blade-muted/70 uppercase mb-3">
+                Pentest Authorizations
+              </p>
+              <PentestPanel />
+            </div>
+            <div className="px-4 py-2">
+              <p className="text-[10px] font-semibold tracking-widest text-blade-muted/70 uppercase mb-3">
+                Scheduled Tasks
+              </p>
+              <CronPanel />
             </div>
             <div className="px-4 py-2">
               <p className="text-[10px] font-semibold tracking-widest text-blade-muted/70 uppercase mb-3">
