@@ -26,6 +26,7 @@ export interface BladeConfig {
   blade_email?: string;
   base_url?: string;
   god_mode?: boolean;
+  god_mode_tier?: string; // "normal" | "intermediate" | "extreme"
 }
 
 export interface ConversationSummary {

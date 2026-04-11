@@ -49,10 +49,14 @@ struct DiskConfig {
     base_url: Option<String>,
     #[serde(default)]
     god_mode: bool,
+    #[serde(default = "default_god_mode_tier")]
+    god_mode_tier: String,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
 }
+
+fn default_god_mode_tier() -> String { "normal".to_string() }
 
 impl Default for DiskConfig {
     fn default() -> Self {
@@ -69,6 +73,7 @@ impl Default for DiskConfig {
             blade_email: String::new(),
             base_url: None,
             god_mode: false,
+            god_mode_tier: "normal".to_string(),
             api_key: None,
         }
     }
@@ -99,6 +104,8 @@ pub struct BladeConfig {
     pub base_url: Option<String>,
     #[serde(default)]
     pub god_mode: bool,
+    #[serde(default = "default_god_mode_tier")]
+    pub god_mode_tier: String,
 }
 
 impl Default for BladeConfig {
@@ -117,6 +124,7 @@ impl Default for BladeConfig {
             blade_email: String::new(),
             base_url: None,
             god_mode: false,
+            god_mode_tier: "normal".to_string(),
         }
     }
 }
@@ -199,6 +207,7 @@ pub fn load_config() -> BladeConfig {
         blade_email: disk.blade_email,
         base_url: disk.base_url,
         god_mode: disk.god_mode,
+        god_mode_tier: disk.god_mode_tier,
     }
 }
 
@@ -219,6 +228,7 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         blade_email: config.blade_email.clone(),
         base_url: config.base_url.clone(),
         god_mode: config.god_mode,
+        god_mode_tier: config.god_mode_tier.clone(),
         api_key: None,
     };
 
