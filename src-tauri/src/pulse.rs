@@ -6,6 +6,7 @@
 ///
 /// This is the difference between a tool and an entity.
 
+use chrono::Timelike;
 use std::time::Duration;
 use tauri::Emitter;
 
@@ -196,6 +197,115 @@ pub fn pulse_get_last_thought() -> Option<String> {
     std::fs::read_to_string(&path)
         .ok()
         .filter(|s| !s.trim().is_empty())
+}
+
+/// Morning briefing — fires once per day when app starts.
+/// Richer than pulse: multi-sentence, covers unfinished threads, timeline, suggestions.
+pub async fn maybe_morning_briefing(app: tauri::AppHandle) {
+    let config = crate::config::load_config();
+    if config.api_key.is_empty() && config.provider != "ollama" {
+        return;
+    }
+
+    let now = chrono::Local::now();
+    let today = now.format("%Y-%m-%d").to_string();
+
+    // Only once per day
+    let marker = crate::config::blade_config_dir().join("last_briefing_date.txt");
+    if let Ok(last_date) = std::fs::read_to_string(&marker) {
+        if last_date.trim() == today {
+            return;
+        }
+    }
+
+    // Only fire in morning (5am–12pm local) — don't interrupt afternoon sessions
+    let hour = now.hour();
+    if hour < 5 || hour >= 12 {
+        return;
+    }
+
+    // Build briefing prompt
+    let thread = crate::thread::get_active_thread().unwrap_or_default();
+    let memory_summary = {
+        let db_path = crate::config::blade_config_dir().join("blade.db");
+        rusqlite::Connection::open(&db_path)
+            .map(|conn| crate::db::brain_build_context(&conn, 300))
+            .unwrap_or_default()
+    };
+    let recent_events = {
+        let db_path = crate::config::blade_config_dir().join("blade.db");
+        rusqlite::Connection::open(&db_path)
+            .ok()
+            .and_then(|conn| {
+                crate::db::timeline_recent(&conn, 10, None).ok()
+            })
+            .map(|events| {
+                events.into_iter().map(|e| {
+                    let dt = chrono::DateTime::from_timestamp(e.timestamp, 0)
+                        .map(|d| d.format("%-H:%M").to_string())
+                        .unwrap_or_else(|| "?".to_string());
+                    format!("- [{}] {}: {}", dt, e.event_type, &e.title[..e.title.len().min(70)])
+                }).collect::<Vec<_>>().join("\n")
+            })
+            .unwrap_or_default()
+    };
+
+    let name_line = if !config.user_name.is_empty() {
+        format!("The person's name is {}.", config.user_name)
+    } else {
+        String::new()
+    };
+
+    let prompt = format!(
+        r#"You are BLADE. It's the start of the day ({date}). {name_line}
+
+Here's what you know:
+
+Working memory (what was being tracked):
+{thread}
+
+Recent timeline:
+{events}
+
+What you know about this person:
+{memory}
+
+Generate a MORNING BRIEFING. 3-5 sentences. Be direct and specific. Cover:
+1. What was left unfinished / in progress
+2. One concrete thing that's worth doing today based on patterns you've observed
+3. Any friction or recurring problem you've noticed
+
+Do not say "Good morning". Do not list items with headers. Just speak naturally, like someone who's been watching and has something useful to say. Start mid-thought."#,
+        date = today,
+        name_line = name_line,
+        thread = if thread.is_empty() { "Nothing tracked yet.".to_string() } else { thread[..thread.len().min(400)].to_string() },
+        events = if recent_events.is_empty() { "No recent events.".to_string() } else { recent_events },
+        memory = if memory_summary.is_empty() { "No memory yet.".to_string() } else { memory_summary },
+    );
+
+    let model = cheapest_model(&config.provider, &config.model);
+    if let Ok(briefing) = call_provider_for_thought(&config, &model, &prompt).await {
+        if briefing.len() > 20 {
+            let _ = app.emit("blade_briefing", serde_json::json!({
+                "briefing": &briefing,
+                "date": &today,
+            }));
+            let _ = std::fs::write(&marker, &today);
+
+            // Also record in timeline
+            let db_path = crate::config::blade_config_dir().join("blade.db");
+            if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                let _ = crate::db::timeline_record(
+                    &conn,
+                    "briefing",
+                    &format!("Morning briefing {}", today),
+                    &briefing,
+                    "BLADE",
+                    "{}",
+                );
+            }
+        }
+    }
 }
 
 /// Trigger a pulse immediately (for testing or on-demand insight)
