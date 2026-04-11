@@ -356,6 +356,38 @@ export default function App() {
     };
   }, [tts.enabled]);
 
+  // COMPUTER USE — show step progress as notifications
+  useEffect(() => {
+    const unlistenStep = listen<{ step: number; action: Record<string, unknown>; status: string }>(
+      "computer_use_step",
+      (event) => {
+        const { step, action } = event.payload;
+        const kind = (action as { kind: string }).kind ?? "action";
+        const desc = (action as { description?: string }).description ?? kind;
+        notifications.add({
+          type: "info",
+          title: `Computer use — step ${step}`,
+          message: desc,
+        });
+      }
+    );
+    const unlistenComplete = listen<{ success: boolean; result: string; steps: number }>(
+      "computer_use_complete",
+      (event) => {
+        const { success, result, steps } = event.payload;
+        notifications.add({
+          type: success ? "success" : "error",
+          title: `Computer use — ${success ? "done" : "stopped"} (${steps} steps)`,
+          message: result,
+        });
+      }
+    );
+    return () => {
+      unlistenStep.then((fn) => fn());
+      unlistenComplete.then((fn) => fn());
+    };
+  }, []);
+
   // THREAD — load working memory state on startup + listen for updates
   useEffect(() => {
     invoke<{ title: string; content: string; project: string } | null>("blade_thread_get")
@@ -479,6 +511,13 @@ export default function App() {
     { id: "tts", label: tts.enabled ? "Disable voice output" : "Enable voice output", description: "Toggle spoken responses", section: "System", action: tts.toggleEnabled },
     { id: "sound", label: sound.enabled ? "Disable notification sound" : "Enable notification sound", description: "Toggle Blade's audible alerts", section: "System", action: sound.toggleEnabled },
     { id: "screenshot", label: "Capture screen", description: "Send the current screen into chat for analysis", section: "System", action: handleScreenshot },
+    { id: "computer-use", label: "Computer use — let Blade operate screen", description: "BLADE takes control: screenshots + clicks + types to complete a task", section: "System", action: () => {
+      const goal = window.prompt("What should BLADE do on screen?");
+      if (goal?.trim()) {
+        void invoke("computer_use_task", { goal: goal.trim() });
+        chat.sendMessage(`[Computer use started] Goal: ${goal.trim()}`);
+      }
+    }},
     { id: "canvas", label: "Open canvas workspace", description: "Sketch ideas visually and move them back into chat", section: "System", action: () => openRoute("canvas") },
     { id: "email", label: "Open email workspace", description: "Read and draft email with Blade assistance", section: "System", action: () => openRoute("email") },
     { id: "docs", label: "Open document workspace", description: "Generate longer-form structured drafts", section: "System", action: () => openRoute("docs") },
