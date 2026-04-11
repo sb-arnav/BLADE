@@ -1,10 +1,13 @@
 mod agent_commands;
 mod ambient;
 mod deeplearn;
+mod discord;
 mod pulse;
 mod skill_engine;
 mod telegram;
 mod thread;
+mod tts;
+mod watcher;
 mod godmode;
 mod native_tools;
 mod agents;
@@ -385,6 +388,17 @@ pub fn run() {
             telegram::telegram_stop,
             telegram::telegram_status,
             telegram::telegram_disconnect,
+            tts::tts_speak,
+            tts::tts_stop,
+            tts::tts_available,
+            discord::discord_connect,
+            discord::discord_disconnect,
+            discord::discord_status,
+            discord::discord_post,
+            watcher::watcher_add,
+            watcher::watcher_list_all,
+            watcher::watcher_remove,
+            watcher::watcher_toggle,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
@@ -462,6 +476,9 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 telegram::auto_start_if_configured(tg_app).await;
             });
+
+            // Start URL/resource watcher loop
+            watcher::start_watcher_loop(app.handle().clone());
 
             // Alt+Space → toggle Quick Ask floating widget
             let handle = app.handle().clone();
