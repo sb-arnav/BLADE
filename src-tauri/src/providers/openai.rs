@@ -6,7 +6,7 @@ fn build_body(
     messages: &[ConversationMessage],
     tools: &[ToolDefinition],
 ) -> serde_json::Value {
-    let msgs: Vec<serde_json::Value> = messages.iter().map(serialize_message).collect();
+    let msgs: Vec<serde_json::Value> = messages.iter().filter_map(serialize_message).collect();
     let tool_payload: Vec<serde_json::Value> = tools
         .iter()
         .map(|tool| {
@@ -35,45 +35,46 @@ fn build_body(
     body
 }
 
-fn serialize_message(message: &ConversationMessage) -> serde_json::Value {
+fn serialize_message(message: &ConversationMessage) -> Option<serde_json::Value> {
     match message {
-        ConversationMessage::System(content) => serde_json::json!({
-            "role": "system",
-            "content": content,
-        }),
-        ConversationMessage::User(content) => serde_json::json!({
-            "role": "user",
-            "content": content,
-        }),
+        ConversationMessage::System(content) => {
+            if content.trim().is_empty() { return None; }
+            Some(serde_json::json!({"role": "system", "content": content}))
+        }
+        ConversationMessage::User(content) => {
+            if content.is_empty() { return None; }
+            Some(serde_json::json!({"role": "user", "content": content}))
+        }
         ConversationMessage::UserWithImage { text, image_base64 } => {
             let mut parts: Vec<serde_json::Value> = Vec::new();
             if !text.is_empty() {
                 parts.push(serde_json::json!({"type": "text", "text": text}));
             }
             parts.push(serde_json::json!({"type": "image_url", "image_url": {"url": format!("data:image/png;base64,{}", image_base64)}}));
-            serde_json::json!({"role": "user", "content": parts})
+            Some(serde_json::json!({"role": "user", "content": parts}))
         }
-        ConversationMessage::Assistant {
-            content,
-            tool_calls,
-        } => {
+        ConversationMessage::Assistant { content, tool_calls } => {
+            // Skip degenerate turns: empty content + no tool calls.
+            // This happens when a prior tool-calling turn gets stored without its
+            // tool_calls (they aren't persisted in ChatMessage). Sending empty
+            // content — even as null — causes Anthropic to reject with
+            // "text content blocks must be non-empty" when routed via gateway.
+            if content.is_empty() && tool_calls.is_empty() {
+                return None;
+            }
+
             let tool_calls_json: Vec<serde_json::Value> = tool_calls
                 .iter()
-                .map(|call| {
-                    serde_json::json!({
-                        "id": &call.id,
-                        "type": "function",
-                        "function": {
-                            "name": &call.name,
-                            "arguments": serde_json::to_string(&call.arguments).unwrap_or_else(|_| "{}".to_string()),
-                        }
-                    })
-                })
+                .map(|call| serde_json::json!({
+                    "id": &call.id,
+                    "type": "function",
+                    "function": {
+                        "name": &call.name,
+                        "arguments": serde_json::to_string(&call.arguments).unwrap_or_else(|_| "{}".to_string()),
+                    }
+                }))
                 .collect();
 
-            // If content is empty, send null — some APIs (Anthropic via Vercel gateway)
-            // reject empty string content blocks. When tool_calls are also empty
-            // (prior tool-call turns reconstructed from history), null is safest.
             let content_value = if content.is_empty() {
                 serde_json::Value::Null
             } else {
@@ -81,27 +82,14 @@ fn serialize_message(message: &ConversationMessage) -> serde_json::Value {
             };
 
             if tool_calls_json.is_empty() {
-                serde_json::json!({
-                    "role": "assistant",
-                    "content": content_value,
-                })
+                Some(serde_json::json!({"role": "assistant", "content": content_value}))
             } else {
-                serde_json::json!({
-                    "role": "assistant",
-                    "content": content_value,
-                    "tool_calls": tool_calls_json,
-                })
+                Some(serde_json::json!({"role": "assistant", "content": content_value, "tool_calls": tool_calls_json}))
             }
         }
-        ConversationMessage::Tool {
-            tool_call_id,
-            content,
-            ..
-        } => serde_json::json!({
-            "role": "tool",
-            "tool_call_id": tool_call_id,
-            "content": content,
-        }),
+        ConversationMessage::Tool { tool_call_id, content, .. } => {
+            Some(serde_json::json!({"role": "tool", "tool_call_id": tool_call_id, "content": content}))
+        }
     }
 }
 
