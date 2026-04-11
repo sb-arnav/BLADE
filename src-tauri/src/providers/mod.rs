@@ -93,6 +93,11 @@ pub async fn complete_turn(
     tools: &[ToolDefinition],
     base_url: Option<&str>,
 ) -> Result<AssistantTurn, String> {
+    // If a custom base_url is set, always use the OpenAI-compatible client —
+    // Vercel AI Gateway, Cloudflare AI Gateway, Azure, etc. all speak OpenAI format.
+    if base_url.is_some() && provider != "ollama" {
+        return openai::complete(api_key, model, messages, tools, base_url).await;
+    }
     match provider {
         "gemini" => gemini::complete(api_key, model, messages, tools).await,
         "groq" => groq::complete(api_key, model, messages, tools).await,
@@ -113,6 +118,10 @@ pub async fn stream_text(
     messages: &[ConversationMessage],
     base_url: Option<&str>,
 ) -> Result<(), String> {
+    // If a custom base_url is set, use OpenAI-compatible streaming.
+    if base_url.is_some() && provider != "ollama" {
+        return openai::stream_text(app, api_key, model, messages, base_url).await;
+    }
     match provider {
         "gemini" => gemini::stream_text(app, api_key, model, messages).await,
         "groq" => groq::stream_text(app, api_key, model, messages).await,
@@ -124,6 +133,9 @@ pub async fn stream_text(
 }
 
 pub async fn test_connection(provider: &str, api_key: &str, model: &str, base_url: Option<&str>) -> Result<String, String> {
+    if base_url.is_some() && provider != "ollama" {
+        return openai::test(api_key, model, base_url).await;
+    }
     match provider {
         "gemini" => gemini::test(api_key, model).await,
         "groq" => groq::test(api_key, model).await,
