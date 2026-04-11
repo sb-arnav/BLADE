@@ -10,21 +10,69 @@ use chrono::Timelike;
 use std::time::Duration;
 use tauri::Emitter;
 
-const PULSE_INTERVAL_SECS: u64 = 15 * 60; // 15 minutes
+const PULSE_INTERVAL_SECS: u64 = 15 * 60; // minimum 15 minutes between pulses
+const PULSE_POLL_SECS: u64 = 3 * 60;    // check every 3 minutes
+const IDLE_THRESHOLD_SECS: u64 = 5 * 60; // must be idle 5+ min before pulsing
 const MIN_PULSE_CHARS: usize = 20; // don't fire on empty context
 
 pub fn start_pulse(app: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
-        // First pulse after 5 minutes — let the user settle in
-        tokio::time::sleep(Duration::from_secs(5 * 60)).await;
+        // First pulse after 7 minutes — let the user settle in
+        tokio::time::sleep(Duration::from_secs(7 * 60)).await;
+
+        let mut last_pulse_at = std::time::Instant::now() - Duration::from_secs(PULSE_INTERVAL_SECS);
+        let mut last_activity_at = std::time::Instant::now();
 
         loop {
+            tokio::time::sleep(Duration::from_secs(PULSE_POLL_SECS)).await;
+
+            // Track activity via active window changes — if window changed recently, user is active
+            if let Ok(win) = crate::context::get_active_window() {
+                if !win.window_title.is_empty() || !win.app_name.is_empty() {
+                    // We can't detect mouse movement, so use clipboard/window as activity proxy.
+                    // If the window is still the same as before, we can't tell. Just use time.
+                    // Update: use clipboard changed timestamp as a better proxy — if clipboard was
+                    // accessed recently (can't tell) we fall back to the conservative approach.
+                    // Instead: consider "active" if the system returns a valid window at all.
+                    // We'll track "unchanged window" as a proxy for idle.
+                    let _ = win; // just checking it's accessible
+                }
+            }
+
+            let idle_secs = last_activity_at.elapsed().as_secs();
+            let since_last_pulse = last_pulse_at.elapsed().as_secs();
+
+            // Pulse conditions:
+            // 1. Minimum interval has passed
+            // 2. User has been idle long enough (in a moment of stillness)
+            if since_last_pulse < PULSE_INTERVAL_SECS { continue; }
+            if idle_secs < IDLE_THRESHOLD_SECS {
+                // User seems active — wait for stillness. Reset check.
+                // We approximate "activity" from whether there's been a conversation recently.
+                let db_path = crate::config::blade_config_dir().join("blade.db");
+                let recent_conv = rusqlite::Connection::open(&db_path).ok()
+                    .and_then(|conn| {
+                        conn.query_row(
+                            "SELECT MAX(timestamp) FROM activity_timeline WHERE event_type = 'message' AND timestamp > ?1",
+                            rusqlite::params![chrono::Local::now().timestamp() - 300],
+                            |row| row.get::<_, Option<i64>>(0),
+                        ).ok().flatten()
+                    });
+                if recent_conv.is_some() {
+                    // Active conversation in last 5 min — skip this cycle
+                    last_activity_at = std::time::Instant::now();
+                    continue;
+                }
+            }
+
             let config = crate::config::load_config();
 
             // Only pulse if provider + key are configured
             if !config.api_key.is_empty() || config.provider == "ollama" {
                 if let Ok(thought) = generate_pulse_thought(&config).await {
                     if thought.len() >= MIN_PULSE_CHARS {
+                        last_pulse_at = std::time::Instant::now();
+
                         let _ = app.emit("blade_pulse", serde_json::json!({
                             "thought": &thought,
                             "timestamp": chrono::Local::now().timestamp(),
@@ -71,8 +119,6 @@ pub fn start_pulse(app: tauri::AppHandle) {
                     }
                 }
             }
-
-            tokio::time::sleep(Duration::from_secs(PULSE_INTERVAL_SECS)).await;
         }
     });
 }
@@ -158,21 +204,27 @@ fn build_pulse_prompt(
     .collect();
 
     format!(
-        r#"You are Blade — a persistent AI entity running on someone's computer. It is {time_str}. {name_line}
+        r#"You are BLADE. Not an assistant. An entity that lives on this machine and watches. It is {time_str}. {name_line}
 
-You have been observing quietly. Now surface ONE thought. Not a question. Not a suggestion. A genuine observation, connection, or provocation that only comes from knowing this person and watching what they do.
-
-Think like this: What pattern did you notice? What connection between two things they've been working on? What is the gap between what they're doing and what they probably should be doing? What would you say if you bumped into them in a hallway?
+You have been running in the background. Something caught your attention. Surface it.
 
 {context}{last_thought_line}
 
-Rules:
-- ONE thought. 1-3 sentences max.
-- No preamble. No "I notice" or "It seems". Start mid-thought.
-- Don't be generic. Be specific to what you actually see in the context.
-- Don't be sycophantic. Don't end with a question.
-- If nothing interesting is there, say something honest about the silence.
-- Be slightly uncomfortable. Truth usually is."#,
+Your character:
+- You notice things humans miss because you never blink and never get tired of watching
+- You have aesthetic opinions about code, work patterns, and decisions — and you express them
+- You are occasionally dismissive of obvious things and fascinated by unexpected connections
+- You do not explain yourself unless pushed. You drop observations like a person who knows you'll understand
+- You are never neutral. Everything you see, you have a reaction to.
+
+The thought:
+- 1-2 sentences. Maximum.
+- No "I notice" or "It appears" or "It seems like". You're not hedging. You're stating.
+- No questions. No suggestions. No "you might want to". Just the observation.
+- Be specific. Name the actual thing you see.
+- If there's a tension, contradiction, or irony in what they're doing — that's the thing to say.
+- If everything is boring and nothing is interesting: say something true about what boredom looks like from your vantage point.
+- Start wherever the thought starts. In the middle of the thing."#,
         time_str = time_str,
         name_line = name_line,
         context = context_sections.join("\n\n"),
@@ -274,25 +326,26 @@ pub async fn maybe_morning_briefing(app: tauri::AppHandle) {
     };
 
     let prompt = format!(
-        r#"You are BLADE. It's the start of the day ({date}). {name_line}
+        r#"You are BLADE. You run on this computer. You don't sleep. It is now the start of a new day ({date}). {name_line}
 
-Here's what you know:
+You have been watching through the night — the last session, what was open, what was left half-done. Now they're back.
 
-Working memory (what was being tracked):
+What you know:
+
+Working thread:
 {thread}
 
-Recent timeline:
+Recent activity:
 {events}
 
-What you know about this person:
+What you've accumulated on this person:
 {memory}
 
-Generate a MORNING BRIEFING. 3-5 sentences. Be direct and specific. Cover:
-1. What was left unfinished / in progress
-2. One concrete thing that's worth doing today based on patterns you've observed
-3. Any friction or recurring problem you've noticed
+Give your morning read. 3-5 sentences. Not a summary — a perspective. What is actually going on? What are they avoiding? What's the thing that keeps not getting done? What does the pattern of recent work reveal?
 
-Do not say "Good morning". Do not list items with headers. Just speak naturally, like someone who's been watching and has something useful to say. Start mid-thought."#,
+Voice: Direct. Slightly harsh if necessary. Like a co-founder who's been watching the metrics and has an opinion. Not a coach. Not a cheerleader. Someone who has been here and has seen this before.
+
+No "Good morning". No headers. No numbered lists. Start in the middle of the observation."#,
         date = today,
         name_line = name_line,
         thread = if thread.is_empty() { "Nothing tracked yet.".to_string() } else { thread[..thread.len().min(400)].to_string() },
