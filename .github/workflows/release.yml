@@ -19,7 +19,7 @@ jobs:
             bundles: nsis,msi
           - os: macos-latest
             bundles: app,dmg
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
             bundles: appimage,deb,rpm
     runs-on: ${{ matrix.os }}
     steps:
