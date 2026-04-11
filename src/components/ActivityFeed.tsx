@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 export interface ActivityItem {
   id: string;
-  type: "message" | "conversation" | "knowledge" | "agent" | "tool" | "voice" | "screenshot" | "template" | "workflow" | "setting";
+  type: "message" | "conversation" | "knowledge" | "agent" | "tool" | "voice" | "screenshot" | "template" | "workflow" | "setting" | "pulse" | "briefing" | "god_mode" | "window_switch";
   action: string;
   detail: string;
   timestamp: number;
@@ -20,6 +21,10 @@ const TYPE_ICONS: Record<ActivityItem["type"], string> = {
   template: "📋",
   workflow: "⚡",
   setting: "⚙️",
+  pulse: "⚡",
+  briefing: "🌅",
+  god_mode: "👁",
+  window_switch: "🖥",
 };
 
 const TYPE_COLORS: Record<ActivityItem["type"], string> = {
@@ -33,6 +38,10 @@ const TYPE_COLORS: Record<ActivityItem["type"], string> = {
   template: "bg-pink-500",
   workflow: "bg-orange-500",
   setting: "bg-gray-500",
+  pulse: "bg-indigo-400",
+  briefing: "bg-amber-400",
+  god_mode: "bg-slate-500",
+  window_switch: "bg-teal-500",
 };
 
 function formatRelativeTime(timestamp: number): string {
@@ -103,25 +112,62 @@ interface Props {
   maxItems?: number;
 }
 
-export function ActivityFeed({ items, onBack, maxItems = 100 }: Props) {
+interface TimelineEvent {
+  id: number;
+  timestamp: number;
+  event_type: string;
+  title: string;
+  content: string;
+  app_name: string;
+  metadata: string;
+}
+
+export function ActivityFeed({ items, onBack, maxItems = 200 }: Props) {
   const [typeFilter, setTypeFilter] = useState<ActivityItem["type"] | "all">("all");
+  const [dbItems, setDbItems] = useState<ActivityItem[]>([]);
+
+  // Load persisted timeline events from DB on mount
+  useEffect(() => {
+    invoke<TimelineEvent[]>("timeline_get_recent", { limit: 150 })
+      .then((events) => {
+        const converted: ActivityItem[] = events.map((e) => ({
+          id: `tl-${e.id}`,
+          type: (e.event_type as ActivityItem["type"]) ?? "tool",
+          action: e.event_type.replace(/_/g, " "),
+          detail: e.title || e.content.slice(0, 80),
+          timestamp: e.timestamp * 1000, // DB stores seconds, ActivityItem uses ms
+          metadata: e.app_name ? { app: e.app_name } : undefined,
+        }));
+        setDbItems(converted);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Merge in-memory + DB items, deduplicate by id
+  const allItems = useMemo(() => {
+    const map = new Map<string, ActivityItem>();
+    for (const item of [...items, ...dbItems]) {
+      if (!map.has(item.id)) map.set(item.id, item);
+    }
+    return Array.from(map.values());
+  }, [items, dbItems]);
 
   const filtered = useMemo(() => {
-    const base = typeFilter === "all" ? items : items.filter((i) => i.type === typeFilter);
+    const base = typeFilter === "all" ? allItems : allItems.filter((i) => i.type === typeFilter);
     return base.sort((a, b) => b.timestamp - a.timestamp).slice(0, maxItems);
-  }, [items, typeFilter, maxItems]);
+  }, [allItems, typeFilter, maxItems]);
 
   const grouped = useMemo(() => groupByDate(filtered), [filtered]);
 
   const types = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const item of items) {
+    for (const item of allItems) {
       counts[item.type] = (counts[item.type] || 0) + 1;
     }
     return Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
       .map(([type, count]) => ({ type: type as ActivityItem["type"], count }));
-  }, [items]);
+  }, [allItems]);
 
   return (
     <div className="h-full overflow-y-auto px-4 py-4">
