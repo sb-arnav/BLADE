@@ -304,6 +304,26 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "blade_list_reminders".to_string(),
+            description: "List all pending reminders. Use when the user asks 'what reminders do I have' or 'what's scheduled'. Returns title, note, and when each fires.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        ToolDefinition {
+            name: "blade_notify".to_string(),
+            description: "Send an OS push notification. Use when you want to alert the user about something important that you've noticed or completed — like 'Your download finished' or 'The site you were watching is now available'. Only use for genuinely important events, not for every response.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string", "description": "Notification title (short, max 50 chars)"},
+                    "body": {"type": "string", "description": "Notification body text (max 150 chars)"}
+                },
+                "required": ["title", "body"]
+            }),
+        },
+        ToolDefinition {
             name: "blade_computer_use".to_string(),
             description: "Autonomously operate the computer to complete a multi-step goal. BLADE will screenshot the screen, analyze it, decide an action (click, type, scroll, open app/URL), execute it, and repeat until done. Use for tasks like 'open the settings app and turn on dark mode', 'fill out this form', 'navigate to X and find Y'. Requires a vision-capable model. Always gets user approval before submitting forms or payments.".to_string(),
             input_schema: json!({
@@ -560,6 +580,45 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
                     id
                 ), false),
                 Err(e) => (format!("Failed to add watcher: {}", e), true),
+            }
+        }
+        "blade_list_reminders" => {
+            let reminders = crate::reminders::list_pending();
+            if reminders.is_empty() {
+                ("No pending reminders.".to_string(), false)
+            } else {
+                let now = chrono::Utc::now().timestamp();
+                let lines: Vec<String> = reminders.iter().map(|r| {
+                    let diff = r.fire_at - now;
+                    let when = if diff < 60 { "in a moment".to_string() }
+                        else if diff < 3600 { format!("in {}m", diff / 60) }
+                        else if diff < 86400 { format!("in {}h", diff / 3600) }
+                        else { format!("in {}d", diff / 86400) };
+                    if r.note.is_empty() {
+                        format!("- {} ({})", r.title, when)
+                    } else {
+                        format!("- {} — {} ({})", r.title, r.note, when)
+                    }
+                }).collect();
+                (format!("{} pending reminder(s):\n{}", reminders.len(), lines.join("\n")), false)
+            }
+        }
+        "blade_notify" => {
+            let title = args["title"].as_str().unwrap_or("BLADE").to_string();
+            let body = match args["body"].as_str() {
+                Some(b) => b.to_string(),
+                None => return ("Missing required argument: body".to_string(), true),
+            };
+            if let Some(app) = app {
+                use tauri_plugin_notification::NotificationExt;
+                let _ = app.notification()
+                    .builder()
+                    .title(&title)
+                    .body(&body)
+                    .show();
+                (format!("Notification sent: {}", title), false)
+            } else {
+                ("Cannot send notification: no app handle.".to_string(), true)
             }
         }
         "blade_computer_use" => {
