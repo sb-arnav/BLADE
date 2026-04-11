@@ -40,7 +40,7 @@ keyring = { version = "3", features = ["windows-native", "apple-native", "sync-s
 rusqlite = { version = "0.39", features = ["bundled"] }
 cpal = "0.15"
 hound = "3.5"
-xcap = "0.0.14"
+xcap = "0.2"
 base64 = "0.22"
 image = "0.25"
 enigo = "0.2"
