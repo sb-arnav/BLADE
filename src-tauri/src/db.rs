@@ -1642,13 +1642,13 @@ pub fn timeline_recent(
     limit: i64,
     event_type_filter: Option<&str>,
 ) -> Result<Vec<TimelineEvent>, String> {
-    let rows = if let Some(et) = event_type_filter {
+    let rows: Vec<TimelineEvent> = if let Some(et) = event_type_filter {
         let mut stmt = conn.prepare(
             "SELECT id, timestamp, event_type, title, content, app_name, metadata
              FROM activity_timeline WHERE event_type=?1
              ORDER BY timestamp DESC LIMIT ?2",
         ).map_err(|e| format!("DB error: {}", e))?;
-        stmt.query_map(params![et, limit], |row| {
+        let mapped = stmt.query_map(params![et, limit], |row| {
             Ok(TimelineEvent {
                 id: row.get(0)?,
                 timestamp: row.get(1)?,
@@ -1658,14 +1658,14 @@ pub fn timeline_recent(
                 app_name: row.get(5)?,
                 metadata: row.get(6)?,
             })
-        }).map_err(|e| format!("DB error: {}", e))?
-        .filter_map(|r| r.ok()).collect()
+        }).map_err(|e| format!("DB error: {}", e))?;
+        mapped.filter_map(|r| r.ok()).collect()
     } else {
         let mut stmt = conn.prepare(
             "SELECT id, timestamp, event_type, title, content, app_name, metadata
              FROM activity_timeline ORDER BY timestamp DESC LIMIT ?1",
         ).map_err(|e| format!("DB error: {}", e))?;
-        stmt.query_map(params![limit], |row| {
+        let mapped = stmt.query_map(params![limit], |row| {
             Ok(TimelineEvent {
                 id: row.get(0)?,
                 timestamp: row.get(1)?,
@@ -1675,8 +1675,8 @@ pub fn timeline_recent(
                 app_name: row.get(5)?,
                 metadata: row.get(6)?,
             })
-        }).map_err(|e| format!("DB error: {}", e))?
-        .filter_map(|r| r.ok()).collect()
+        }).map_err(|e| format!("DB error: {}", e))?;
+        mapped.filter_map(|r| r.ok()).collect()
     };
     Ok(rows)
 }

@@ -189,6 +189,7 @@ pub async fn send_message_stream(
             }).collect();
             let user_text_skill = user_text.clone();
             let assistant_text_thread = assistant_text.clone();
+            let assistant_text_timeline = assistant_text.clone();
             let user_text_thread = user_text.clone();
             tokio::spawn(async move {
                 let n = brain::extract_entities_from_exchange(&user_text, &assistant_text).await;
@@ -228,7 +229,7 @@ pub async fn send_message_stream(
                 let db_path = crate::config::blade_config_dir().join("blade.db");
                 if let Ok(conn) = rusqlite::Connection::open(&db_path) {
                     let title = &user_text_thread[..user_text_thread.len().min(80)];
-                    let content = &assistant_text[..assistant_text.len().min(500)];
+                    let content = &assistant_text_timeline[..assistant_text_timeline.len().min(500)];
                     let _ = crate::db::timeline_record(&conn, "conversation", title, content, "BLADE", "{}");
                 }
             }

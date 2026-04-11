@@ -102,36 +102,35 @@ pub fn search(query: &str, limit: usize) -> Vec<ExecutionRecord> {
     let Ok(conn) = open_db() else { return vec![] };
 
     // Try FTS5 first, fall back to LIKE
-    let fts_results: Result<Vec<ExecutionRecord>, _> = conn
-        .prepare(
+    let fts_results: Result<Vec<ExecutionRecord>, _> = (|| {
+        let mut stmt = conn.prepare(
             "SELECT e.id, e.command, e.cwd, e.stdout, e.stderr, e.exit_code, e.duration_ms, e.timestamp
              FROM executions e
              JOIN executions_fts f ON e.id = f.rowid
              WHERE executions_fts MATCH ?1
              ORDER BY rank
              LIMIT ?2",
-        )
-        .and_then(|mut stmt| {
-            stmt.query_map(params![query, limit as i64], row_to_record)
-                .map(|rows| rows.filter_map(|r| r.ok()).collect())
-        });
+        )?;
+        let rows = stmt.query_map(params![query, limit as i64], row_to_record)?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    })();
 
     match fts_results {
         Ok(rows) if !rows.is_empty() => rows,
         _ => {
             // LIKE fallback
             let pattern = format!("%{}%", query);
-            conn.prepare(
-                "SELECT id, command, cwd, stdout, stderr, exit_code, duration_ms, timestamp
-                 FROM executions
-                 WHERE command LIKE ?1 OR stdout LIKE ?1 OR stderr LIKE ?1
-                 ORDER BY timestamp DESC
-                 LIMIT ?2",
-            )
-            .and_then(|mut stmt| {
-                stmt.query_map(params![pattern, limit as i64], row_to_record)
-                    .map(|rows| rows.filter_map(|r| r.ok()).collect())
-            })
+            (|| {
+                let mut stmt = conn.prepare(
+                    "SELECT id, command, cwd, stdout, stderr, exit_code, duration_ms, timestamp
+                     FROM executions
+                     WHERE command LIKE ?1 OR stdout LIKE ?1 OR stderr LIKE ?1
+                     ORDER BY timestamp DESC
+                     LIMIT ?2",
+                )?;
+                let rows = stmt.query_map(params![pattern, limit as i64], row_to_record)?;
+                Ok::<Vec<ExecutionRecord>, rusqlite::Error>(rows.filter_map(|r| r.ok()).collect())
+            })()
             .unwrap_or_default()
         }
     }
@@ -222,13 +221,14 @@ pub fn recall_on_error(error_text: &str) -> Option<String> {
 pub fn recent_for_handoff(limit: usize) -> Vec<ExecutionRecord> {
     let Ok(conn) = open_db() else { return vec![] };
     let n = limit as i64;
-    conn.prepare(
-        "SELECT id, command, cwd, stdout, stderr, exit_code, duration_ms, timestamp
-         FROM executions ORDER BY timestamp DESC LIMIT ?1"
-    ).ok().and_then(|mut s| {
-        s.query_map(rusqlite::params![n], row_to_record).ok()
-            .map(|rows| rows.filter_map(|r| r.ok()).collect())
-    }).unwrap_or_default()
+    (|| {
+        let mut s = conn.prepare(
+            "SELECT id, command, cwd, stdout, stderr, exit_code, duration_ms, timestamp
+             FROM executions ORDER BY timestamp DESC LIMIT ?1"
+        ).ok()?;
+        let rows = s.query_map(rusqlite::params![n], row_to_record).ok()?;
+        Some(rows.filter_map(|r| r.ok()).collect())
+    })().unwrap_or_default()
 }
 
 // ── Tauri commands ─────────────────────────────────────────────────────────────
