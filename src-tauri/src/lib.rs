@@ -185,6 +185,7 @@ pub fn run() {
             commands::update_init_prefs,
             commands::test_provider,
             commands::mcp_add_server,
+            commands::mcp_install_catalog_server,
             commands::mcp_discover_tools,
             commands::mcp_call_tool,
             commands::mcp_get_tools,
