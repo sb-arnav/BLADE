@@ -137,6 +137,7 @@ pub async fn complete(
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
+        if status == 429 { return Err("Rate limited (429) — free tier maxed out. Wait or get a paid key at platform.openai.com/settings/billing.".to_string()); }
         return Err(format!("OpenAI API error {}: {}", status, body));
     }
 
@@ -212,6 +213,7 @@ pub async fn stream_text(
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
+        if status == 429 { return Err("Rate limited (429) — free tier maxed out. Wait or get a paid key at platform.openai.com/settings/billing.".to_string()); }
         return Err(format!("OpenAI API error {}: {}", status, body));
     }
 
@@ -263,6 +265,7 @@ pub async fn test(api_key: &str, model: &str, base_url: Option<&str>) -> Result<
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
+        if status == 429 { return Err("Rate limited (429) — free tier maxed out. Wait or get a paid key at platform.openai.com/settings/billing.".to_string()); }
         return Err(format!("OpenAI API error {}: {}", status, body));
     }
 

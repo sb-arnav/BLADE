@@ -1,5 +1,6 @@
 mod agent_commands;
 mod ambient;
+mod godmode;
 mod native_tools;
 mod agents;
 mod automation;
@@ -169,6 +170,7 @@ pub fn run() {
         .manage(runtime_servers)
         .invoke_handler(tauri::generate_handler![
             commands::send_message_stream,
+            commands::toggle_god_mode,
             commands::get_config,
             commands::debug_config,
             commands::reset_onboarding,
@@ -409,6 +411,12 @@ pub fn run() {
 
             // Start ambient intelligence monitor
             ambient::start_ambient_monitor(app.handle().clone());
+
+            // Start god mode if enabled
+            let startup_god_config = config::load_config();
+            if startup_god_config.god_mode {
+                godmode::start_god_mode(app.handle().clone());
+            }
 
             // Alt+Space → toggle Quick Ask floating widget
             let handle = app.handle().clone();

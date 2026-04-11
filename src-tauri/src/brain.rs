@@ -58,6 +58,13 @@ pub fn build_system_prompt(tools: &[McpTool]) -> String {
         parts.push(format!("## Context\n\n{}", context));
     }
 
+    // God Mode — live machine context (files, apps, downloads)
+    if let Some(gm) = crate::godmode::load_godmode_context() {
+        if !gm.trim().is_empty() {
+            parts.push(gm);
+        }
+    }
+
     parts.join("\n\n---\n\n")
 }
 

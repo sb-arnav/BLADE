@@ -371,6 +371,7 @@ pub fn set_config(
     response_style: Option<String>,
     blade_email: Option<String>,
     base_url: Option<String>,
+    god_mode: Option<bool>,
 ) -> Result<(), String> {
     let mut config = load_config();
     config.provider = provider;
@@ -382,9 +383,22 @@ pub fn set_config(
     if let Some(v) = work_mode { config.work_mode = v; }
     if let Some(v) = response_style { config.response_style = v; }
     if let Some(v) = blade_email { config.blade_email = v; }
-    // Empty string means "clear the custom URL"
     config.base_url = base_url.filter(|s| !s.is_empty());
+    if let Some(v) = god_mode { config.god_mode = v; }
     save_config(&config)
+}
+
+#[tauri::command]
+pub async fn toggle_god_mode(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    let mut config = load_config();
+    config.god_mode = enabled;
+    save_config(&config)?;
+    if enabled {
+        crate::godmode::start_god_mode(app);
+    } else {
+        crate::godmode::stop_god_mode();
+    }
+    Ok(())
 }
 
 #[tauri::command]
