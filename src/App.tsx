@@ -310,7 +310,18 @@ export default function App() {
       if (tts.enabled) tts.speak(thought);
       activity.track("message", "Blade pulse", thought.slice(0, 80));
     });
-    return () => { unlisten.then((fn) => fn()); };
+
+    // MORNING BRIEFING — richer once-per-day context summary
+    const unlistenBriefing = listen<{ briefing: string; date: string }>("blade_briefing", (event) => {
+      const { briefing } = event.payload;
+      // Show as pulse thought (same banner, just longer)
+      setPulseThought(briefing);
+    });
+
+    return () => {
+      unlisten.then((fn) => fn());
+      unlistenBriefing.then((fn) => fn());
+    };
   }, [tts.enabled]);
 
   // THREAD — load working memory state on startup + listen for updates

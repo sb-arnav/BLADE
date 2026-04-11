@@ -443,6 +443,14 @@ pub fn run() {
             // Start Blade's pulse — the heartbeat that makes it alive
             pulse::start_pulse(app.handle().clone());
 
+            // Morning briefing — fires once per day if it's morning
+            let briefing_app = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                // Brief delay so the window is visible before briefing fires
+                tokio::time::sleep(tokio::time::Duration::from_secs(8)).await;
+                pulse::maybe_morning_briefing(briefing_app).await;
+            });
+
             // Start god mode if enabled
             let startup_god_config = config::load_config();
             if startup_god_config.god_mode {
