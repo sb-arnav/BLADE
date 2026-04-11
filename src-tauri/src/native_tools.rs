@@ -182,21 +182,26 @@ async fn bash(command: &str, cwd: Option<&str>, timeout_ms: u64) -> (String, boo
         .map(std::path::PathBuf::from)
         .unwrap_or(home);
 
-    let spawn_result = if cfg!(target_os = "windows") {
+    #[cfg(target_os = "windows")]
+    let spawn_result = {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
         tokio::process::Command::new("cmd")
             .args(["/C", command])
             .current_dir(&work_dir)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
-            .spawn()
-    } else {
-        tokio::process::Command::new("sh")
-            .args(["-c", command])
-            .current_dir(&work_dir)
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
+            .creation_flags(CREATE_NO_WINDOW)
             .spawn()
     };
+
+    #[cfg(not(target_os = "windows"))]
+    let spawn_result = tokio::process::Command::new("sh")
+        .args(["-c", command])
+        .current_dir(&work_dir)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn();
 
     let child = match spawn_result {
         Ok(c) => c,
