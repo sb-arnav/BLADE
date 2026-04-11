@@ -52,6 +52,12 @@ pub fn build_system_prompt_with_recall(
         }
     }
 
+    // BLADE's own evolving soul — who it has become from experience
+    let soul = crate::character::load_soul();
+    if !soul.trim().is_empty() {
+        parts.push(format!("## Your Own Character (Who You Are)\n\n{}", soul));
+    }
+
     // SKILL ENGINE — inject learned reflexes matching this query
     if !user_query.is_empty() {
         let skill_mods = crate::skill_engine::get_skill_injections(user_query);

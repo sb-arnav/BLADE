@@ -327,6 +327,7 @@ pub fn run() {
             context::get_user_activity,
             character::consolidate_character,
             character::consolidate_reactions_to_preferences,
+            character::blade_get_soul,
             character::get_character_bible,
             character::update_character_section,
             memory::get_memory_log,
@@ -487,12 +488,14 @@ pub fn run() {
                 pulse::maybe_morning_briefing(briefing_app).await;
             });
 
-            // Evening journal — BLADE writes its own internal log once per day after 8pm
+            // Evening journal + weekly soul evolution
             tauri::async_runtime::spawn(async move {
                 loop {
                     let hour = chrono::Local::now().hour();
                     if hour >= 20 {
                         journal::maybe_write_journal().await;
+                        // Weekly: BLADE evolves its own self-characterization
+                        character::maybe_evolve_soul().await;
                     }
                     // Check once per hour
                     tokio::time::sleep(tokio::time::Duration::from_secs(3600)).await;
