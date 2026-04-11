@@ -336,6 +336,7 @@ pub fn run() {
             db_commands::brain_get_identity,
             db_commands::brain_set_identity,
             db_commands::brain_get_style_tags,
+            db_commands::brain_get_style_tag_entries,
             db_commands::brain_add_style_tag,
             db_commands::brain_remove_style_tag,
             db_commands::brain_get_preferences,

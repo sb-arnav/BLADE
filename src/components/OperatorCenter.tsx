@@ -4,6 +4,7 @@ import { ManagedAgentPanel } from "./ManagedAgentPanel";
 import { RuntimeTaskState, UseRuntimesResult, useRuntimes } from "../hooks/useRuntimes";
 import { MissionSpec, MissionStage, OperatorMission, RuntimeDescriptor, RuntimeRouteRecommendation, RuntimeSessionRef, TaskArtifact } from "../types";
 import { invoke } from "@tauri-apps/api/core";
+import { openUrl as tauriOpenUrl } from "@tauri-apps/plugin-opener";
 import { BUILT_IN_TEMPLATES } from "../data/missionTemplates";
 import { listMissionSpecs, saveMissionSpec, deleteMissionSpec, specToOperatorMission, missingVars } from "../lib/missionSpec";
 import { addMemory as brainAddMemory } from "../data/characterBible";
@@ -32,6 +33,74 @@ function statusLabel(runtime: RuntimeDescriptor) {
   if (!runtime.authenticated) return "auth needed";
   if (runtime.active_tasks > 0) return `${runtime.active_tasks} live`;
   return "ready";
+}
+
+type RuntimeReadiness = {
+  blocked: boolean;
+  tone: string;
+  title: string;
+  detail: string;
+  actionLabel: string;
+};
+
+function getRuntimeReadiness(runtime: RuntimeDescriptor | null): RuntimeReadiness {
+  if (!runtime) {
+    return {
+      blocked: true,
+      tone: "border-blade-border bg-blade-bg/70 text-blade-muted",
+      title: "Select a runtime",
+      detail: "Pick a runtime to see what Blade can launch and what setup it still needs.",
+      actionLabel: "Choose a runtime",
+    };
+  }
+
+  if (!runtime.installed) {
+    return {
+      blocked: true,
+      tone: "border-amber-500/20 bg-amber-500/10 text-amber-100",
+      title: "Install required",
+      detail: runtime.install_requirement?.message || `${runtime.name} is discovered but not installed on this machine yet.`,
+      actionLabel: runtime.install_requirement?.title || "Open setup guide",
+    };
+  }
+
+  if (runtime.install_requirement?.kind === "repair") {
+    return {
+      blocked: true,
+      tone: "border-rose-500/20 bg-rose-500/10 text-rose-100",
+      title: "Runtime needs repair",
+      detail: runtime.install_requirement.message || `${runtime.name} needs a repair step before Blade should rely on it.`,
+      actionLabel: runtime.install_requirement.title || "Open repair guide",
+    };
+  }
+
+  if (!runtime.authenticated) {
+    return {
+      blocked: false,
+      tone: "border-orange-500/20 bg-orange-500/10 text-orange-100",
+      title: "Authentication recommended",
+      detail: `Blade can still surface ${runtime.name}, but richer tasks may fail until credentials are connected.`,
+      actionLabel: "Review setup",
+    };
+  }
+
+  if (runtime.server_url) {
+    return {
+      blocked: false,
+      tone: "border-emerald-500/20 bg-emerald-500/10 text-emerald-100",
+      title: "Warm runtime ready",
+      detail: `${runtime.name} already has a live server, so Blade can reuse state instead of cold-starting a session.`,
+      actionLabel: "Launch now",
+    };
+  }
+
+  return {
+    blocked: false,
+    tone: "border-blade-border bg-blade-bg/70 text-blade-secondary",
+    title: "Ready to launch",
+    detail: `${runtime.name} is available for fresh tasks. Blade will cold-start a new session and stream progress back here.`,
+    actionLabel: "Start task",
+  };
 }
 
 function capabilityTone(category: string) {
@@ -131,6 +200,7 @@ function RuntimeCard({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const readiness = getRuntimeReadiness(runtime);
   return (
     <button
       onClick={onSelect}
@@ -151,6 +221,9 @@ function RuntimeCard({
       </div>
       <div className="text-2xs text-blade-muted mt-3 line-clamp-2">
         {runtime.capabilities.slice(0, 2).map((capability) => capability.label).join(" · ")}
+      </div>
+      <div className="text-2xs mt-2 line-clamp-2 text-blade-muted/80">
+        {readiness.title} · {readiness.actionLabel}
       </div>
       {runtime.install_requirement ? (
         <div className="text-2xs text-blade-muted/80 mt-2 line-clamp-2">
@@ -236,8 +309,17 @@ export function OperatorCenter({
 
   const selectedRuntime =
     runtimes.runtimes.find((runtime) => runtime.id === selectedRuntimeId) || runtimes.runtimes[0] || null;
+  const selectedRuntimeReadiness = getRuntimeReadiness(selectedRuntime);
+  const launchBlocked = !selectedRuntime || selectedRuntimeReadiness.blocked;
   const latestSecurityEngagement = runtimes.securityEngagements[0] || null;
   const verifiedSecurityEngagement = runtimes.securityEngagements.find((engagement) => engagement.status === "verified") || null;
+  const runtimeOverview = useMemo(() => {
+    const ready = runtimes.runtimes.filter((runtime) => runtime.installed && runtime.install_requirement?.kind !== "repair").length;
+    const attention = runtimes.runtimes.filter((runtime) => !runtime.installed || runtime.install_requirement?.kind === "repair" || !runtime.authenticated).length;
+    const warm = runtimes.runtimes.filter((runtime) => Boolean(runtime.server_url)).length;
+    const sessions = runtimes.runtimes.reduce((total, runtime) => total + runtime.sessions.length, 0);
+    return { ready, attention, warm, sessions };
+  }, [runtimes.runtimes]);
 
   useEffect(() => {
     void (async () => {
@@ -320,7 +402,7 @@ export function OperatorCenter({
   };
 
   const handleStart = async () => {
-    if (!selectedRuntime || !goal.trim()) return;
+    if (!selectedRuntime || !goal.trim() || getRuntimeReadiness(selectedRuntime).blocked) return;
     if (resumeSessionId.trim()) {
       await runtimes.resumeSession(selectedRuntime.id, resumeSessionId.trim(), goal, {
         cwd: cwd.trim() || null,
@@ -382,6 +464,15 @@ export function OperatorCenter({
     if (!selectedRuntime) return;
     const requirement = await runtimes.prepareInstall(selectedRuntime.id);
     if (!requirement) return;
+    if (requirement.url) {
+      try {
+        await tauriOpenUrl(requirement.url);
+        return;
+      } catch {
+        window.open(requirement.url, "_blank");
+        return;
+      }
+    }
     const details = [
       requirement.title,
       requirement.message,
@@ -459,9 +550,9 @@ export function OperatorCenter({
             ← back
           </button>
           <div>
-            <h2 className="text-sm font-semibold text-[#e5e5e5]">Operators</h2>
+            <h2 className="text-sm font-semibold text-[#e5e5e5]">Operator Center</h2>
             <p className="text-xs text-[#666] mt-0.5">
-              One control plane for Blade native execution, commercial copilots, and open-source runtimes.
+              One control plane for Blade native execution, commercial copilots, and resumable developer runtimes.
             </p>
           </div>
         </div>
@@ -512,6 +603,33 @@ export function OperatorCenter({
       <div className="flex-1 min-h-0 overflow-y-auto">
         {tab === "mission" ? (
           <div className="p-4 space-y-4">
+            <section className="grid grid-cols-2 xl:grid-cols-5 gap-3">
+              {[
+                { label: "ready runtimes", value: runtimeOverview.ready, tone: "text-blade-text" },
+                { label: "needs attention", value: runtimeOverview.attention, tone: "text-amber-200" },
+                { label: "warm runtimes", value: runtimeOverview.warm, tone: "text-emerald-200" },
+                { label: "resumable sessions", value: runtimeOverview.sessions, tone: "text-sky-200" },
+                { label: "live tasks", value: runtimes.tasks.length, tone: "text-violet-200" },
+              ].map((item) => (
+                <div key={item.label} className="rounded-2xl border border-blade-border bg-blade-surface px-4 py-3">
+                  <div className={`text-2xl font-semibold ${item.tone}`}>{item.value}</div>
+                  <div className="text-2xs uppercase tracking-[0.18em] text-blade-muted mt-1">{item.label}</div>
+                </div>
+              ))}
+            </section>
+
+            {runtimes.loading && runtimes.runtimes.length === 0 ? (
+              <section className="rounded-2xl border border-blade-border bg-blade-surface px-4 py-8">
+                <div className="text-center">
+                  <div className="w-2.5 h-2.5 rounded-full bg-blade-accent animate-pulse mx-auto" />
+                  <div className="text-sm text-blade-text mt-3">Discovering runtimes and sessions</div>
+                  <div className="text-2xs text-blade-muted mt-1">
+                    Blade is scanning local tooling, plugin packs, and resumable operator sessions.
+                  </div>
+                </div>
+              </section>
+            ) : null}
+
             <section className="rounded-2xl border border-blade-border bg-blade-surface p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -532,14 +650,23 @@ export function OperatorCenter({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-                {runtimes.runtimes.map((runtime) => (
-                  <RuntimeCard
-                    key={runtime.id}
-                    runtime={runtime}
-                    selected={selectedRuntimeId === runtime.id}
-                    onSelect={() => setSelectedRuntimeId(runtime.id)}
-                  />
-                ))}
+                {runtimes.runtimes.length > 0 ? (
+                  runtimes.runtimes.map((runtime) => (
+                    <RuntimeCard
+                      key={runtime.id}
+                      runtime={runtime}
+                      selected={selectedRuntimeId === runtime.id}
+                      onSelect={() => setSelectedRuntimeId(runtime.id)}
+                    />
+                  ))
+                ) : (
+                  <div className="md:col-span-2 rounded-xl border border-blade-border/60 bg-[#0d0d10] px-4 py-5">
+                    <div className="text-sm text-blade-text">No runtimes discovered yet</div>
+                    <div className="text-2xs text-blade-muted mt-1">
+                      Blade will surface local runtimes here after discovery succeeds. Refresh after installing or authenticating tools.
+                    </div>
+                  </div>
+                )}
               </div>
             </section>
 
@@ -616,23 +743,34 @@ export function OperatorCenter({
                 <div className="space-y-3">
                   <div>
                     <label className="block text-2xs uppercase tracking-[0.18em] text-blade-muted mb-1">Selected runtime</label>
-                      <div className="rounded-xl border border-blade-border bg-[#0d0d10] px-3 py-3">
-                        <div className="text-sm text-blade-secondary">{selectedRuntime?.name ?? "No runtime selected"}</div>
-                        <div className="text-2xs text-blade-muted mt-1">
-                          {selectedRuntime
-                            ? `${selectedRuntime.source} · ${statusLabel(selectedRuntime)}`
-                            : "Choose a runtime above"}
-                        </div>
-                        <div className="text-2xs text-blade-muted mt-1">
-                          {selectedRuntime?.capabilities.slice(0, 2).map((capability) => capability.label).join(" · ") || ""}
-                        </div>
-                        {selectedRuntime?.server_url ? (
-                          <div className="text-2xs text-emerald-300/80 mt-1 font-mono">
-                            warm server · {selectedRuntime.server_url}
-                          </div>
-                        ) : null}
+                    <div className="rounded-xl border border-blade-border bg-[#0d0d10] px-3 py-3">
+                      <div className="text-sm text-blade-secondary">{selectedRuntime?.name ?? "No runtime selected"}</div>
+                      <div className="text-2xs text-blade-muted mt-1">
+                        {selectedRuntime
+                          ? `${selectedRuntime.source} · ${statusLabel(selectedRuntime)}`
+                          : "Choose a runtime above"}
                       </div>
+                      <div className="text-2xs text-blade-muted mt-1">
+                        {selectedRuntime?.capabilities.slice(0, 3).map((capability) => capability.label).join(" · ") || ""}
+                      </div>
+                      {selectedRuntime?.version ? (
+                        <div className="text-2xs text-blade-muted/80 mt-1 font-mono">version {selectedRuntime.version}</div>
+                      ) : null}
+                      {selectedRuntime?.server_url ? (
+                        <div className="text-2xs text-emerald-300/80 mt-1 font-mono">
+                          warm server · {selectedRuntime.server_url}
+                        </div>
+                      ) : null}
                     </div>
+                  </div>
+
+                  <div className={`rounded-xl border px-3 py-3 ${selectedRuntimeReadiness.tone}`}>
+                    <div className="text-xs font-medium">{selectedRuntimeReadiness.title}</div>
+                    <div className="mt-1 text-2xs opacity-90">{selectedRuntimeReadiness.detail}</div>
+                    <div className="mt-2 text-[10px] uppercase tracking-[0.18em] opacity-70">
+                      Next step · {selectedRuntimeReadiness.actionLabel}
+                    </div>
+                  </div>
 
                   {selectedRuntime?.id === "blade-native" ? (
                     <>
@@ -680,7 +818,7 @@ export function OperatorCenter({
                     </button>
                     <button
                       onClick={handleStart}
-                      disabled={!selectedRuntime || !goal.trim()}
+                      disabled={launchBlocked || !goal.trim()}
                       className="text-xs px-3 py-2 rounded-xl bg-[#6366f1] text-white disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       {resumeSessionId.trim() ? "Resume task" : "Start task"}
@@ -806,6 +944,15 @@ export function OperatorCenter({
                           }
                         }}
                       />
+                    </div>
+                  ) : null}
+                  {selectedRuntimeReadiness.blocked ? (
+                    <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-2xs text-amber-100">
+                      Blade is holding launches on this runtime until the required install or repair step is complete.
+                    </div>
+                  ) : !selectedRuntime?.authenticated && selectedRuntime ? (
+                    <div className="rounded-lg border border-orange-500/20 bg-orange-500/10 px-3 py-2 text-2xs text-orange-100">
+                      Tasks may still launch here, but expect degraded results until credentials are connected for {selectedRuntime.name}.
                     </div>
                   ) : null}
                 </div>
@@ -1158,7 +1305,12 @@ export function OperatorCenter({
                       />
                     ))
                   ) : (
-                    <div className="text-xs text-blade-muted">No imported sessions yet.</div>
+                    <div className="rounded-lg border border-blade-border/60 bg-[#0d0d10] px-3 py-4">
+                      <div className="text-xs text-blade-text">No imported sessions yet</div>
+                      <div className="text-2xs text-blade-muted mt-1">
+                        Warm sessions from Claude, Codex, or local runtimes will appear here so you can resume work instead of restarting it.
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1246,7 +1398,12 @@ export function OperatorCenter({
                       );
                     })
                   ) : (
-                    <div className="text-xs text-blade-muted">No live tasks yet. Start one above.</div>
+                    <div className="rounded-lg border border-blade-border/60 bg-[#0d0d10] px-3 py-4">
+                      <div className="text-xs text-blade-text">No live tasks yet</div>
+                      <div className="text-2xs text-blade-muted mt-1">
+                        Start or resume an operator task above and Blade will stream checkpoints, summaries, and artifacts here.
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

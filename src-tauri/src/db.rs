@@ -66,6 +66,12 @@ pub struct SearchResult {
 // ---------------------------------------------------------------------------
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct BrainStyleTagRow {
+    pub id: String,
+    pub tag: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct BrainPreferenceRow {
     pub id: String,
     pub text: String,
@@ -1211,6 +1217,23 @@ pub fn brain_get_style_tags(conn: &Connection) -> Result<Vec<String>, String> {
     let mut stmt = conn.prepare("SELECT tag FROM brain_style_tags ORDER BY tag").map_err(|e| format!("DB error: {}", e))?;
     let tags = stmt.query_map([], |row| row.get(0)).map_err(|e| format!("DB error: {}", e))?.filter_map(|r| r.ok()).collect();
     Ok(tags)
+}
+
+pub fn brain_get_style_tag_entries(conn: &Connection) -> Result<Vec<BrainStyleTagRow>, String> {
+    let mut stmt = conn
+        .prepare("SELECT id, tag FROM brain_style_tags ORDER BY tag")
+        .map_err(|e| format!("DB error: {}", e))?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(BrainStyleTagRow {
+                id: row.get(0)?,
+                tag: row.get(1)?,
+            })
+        })
+        .map_err(|e| format!("DB error: {}", e))?
+        .filter_map(|r| r.ok())
+        .collect();
+    Ok(rows)
 }
 
 pub fn brain_add_style_tag(conn: &Connection, id: &str, tag: &str) -> Result<(), String> {

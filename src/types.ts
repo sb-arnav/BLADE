@@ -346,6 +346,11 @@ export interface BrainPreference {
   updated_at: number;
 }
 
+export interface BrainStyleTag {
+  id: string;
+  tag: string;
+}
+
 export interface BrainNode {
   id: string;
   label: string;

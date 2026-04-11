@@ -3,7 +3,7 @@
 
 import { useRef, useState } from "react";
 import { KnowledgeGraphView } from "./KnowledgeGraphView";
-import { useCharacterBible } from "../hooks/useCharacterBible";
+import { UseCharacterBibleResult, useCharacterBible } from "../hooks/useCharacterBible";
 import { BrainNode, BrainPreference, BrainSkill } from "../types";
 
 type Tab = "identity" | "graph" | "skills";
@@ -49,8 +49,7 @@ function TagInput({ onAdd }: { onAdd: (tag: string) => void }) {
 
 // ── Identity Tab ──────────────────────────────────────────────────────────────
 
-function IdentityTab() {
-  const brain = useCharacterBible();
+function IdentityTab({ brain }: { brain: UseCharacterBibleResult }) {
   const nameRef = useRef<HTMLInputElement>(null);
   const roleRef = useRef<HTMLInputElement>(null);
 
@@ -87,17 +86,14 @@ function IdentityTab() {
       <div className="rounded-xl border border-blade-border bg-blade-surface p-5">
         <h3 className="text-xs uppercase tracking-widest text-blade-muted mb-4">Working Style</h3>
         <div className="flex flex-wrap gap-2">
-          {brain.styleTags.map((tag, i) => (
+          {brain.styleTags.map((styleTag) => (
             <span
-              key={i}
+              key={styleTag.id}
               className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border border-blade-border bg-blade-bg text-blade-secondary"
             >
-              {tag}
+              {styleTag.tag}
               <button
-                onClick={() => {
-                  // find id from fresh fetch — simplification: use index as proxy
-                  brain.removeStyleTag(String(i));
-                }}
+                onClick={() => brain.removeStyleTag(styleTag.id)}
                 className="text-blade-muted hover:text-blade-text transition-colors"
               >
                 ×
@@ -181,8 +177,7 @@ function PreferenceRow({
 
 // ── Graph Tab ─────────────────────────────────────────────────────────────────
 
-function GraphTab() {
-  const brain = useCharacterBible();
+function GraphTab({ brain }: { brain: UseCharacterBibleResult }) {
   const [selected, setSelected] = useState<BrainNode | null>(null);
 
   const nodeMemories = selected
@@ -248,8 +243,7 @@ function GraphTab() {
 
 // ── Skills & Memories Tab ─────────────────────────────────────────────────────
 
-function SkillsTab() {
-  const brain = useCharacterBible();
+function SkillsTab({ brain }: { brain: UseCharacterBibleResult }) {
   const [confirmClear, setConfirmClear] = useState(false);
 
   return (
@@ -359,21 +353,56 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 export function CharacterBible({ onBack }: Props) {
+  const brain = useCharacterBible();
   const [tab, setTab] = useState<Tab>("identity");
 
   return (
     <div className="flex flex-col h-full bg-blade-bg">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-blade-border shrink-0">
-        <button onClick={onBack} className="text-blade-muted hover:text-blade-text transition-colors p-1 rounded hover:bg-blade-surface">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <div>
-          <div className="text-sm font-medium text-blade-text">Character Bible</div>
-          <div className="text-2xs text-blade-muted">What Blade knows about you</div>
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-blade-border shrink-0">
+        <div className="flex items-center gap-3">
+          <button onClick={onBack} className="text-blade-muted hover:text-blade-text transition-colors p-1 rounded hover:bg-blade-surface">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div>
+            <div className="text-sm font-medium text-blade-text">Character Bible</div>
+            <div className="text-2xs text-blade-muted">
+              Persistent identity, graph memory, and learned preferences
+            </div>
+          </div>
         </div>
+        <div className="flex items-center gap-2">
+          <div className="text-right">
+            <div className="text-2xs text-blade-secondary">
+              {brain.loading ? "Syncing from local brain..." : "Stored locally in Blade"}
+            </div>
+            <div className="text-[10px] text-blade-muted mt-0.5">
+              {brain.lastUpdated ? `Last refreshed ${relTime(brain.lastUpdated)}` : "Not loaded yet"}
+            </div>
+          </div>
+          <button
+            onClick={() => void brain.refresh()}
+            className="text-2xs px-2.5 py-1.5 rounded-md border border-blade-border text-blade-muted hover:text-blade-text hover:bg-blade-surface transition-colors"
+          >
+            refresh
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 px-4 py-3 border-b border-blade-border/70 shrink-0">
+        {[
+          { label: "style tags", value: brain.styleTags.length },
+          { label: "preferences", value: brain.preferences.length },
+          { label: "graph nodes", value: brain.nodes.length },
+          { label: "memories", value: brain.memories.length },
+        ].map((item) => (
+          <div key={item.label} className="rounded-lg border border-blade-border/70 bg-blade-surface px-3 py-2">
+            <div className="text-lg font-semibold text-blade-text">{item.value}</div>
+            <div className="text-2xs text-blade-muted uppercase tracking-[0.16em] mt-0.5">{item.label}</div>
+          </div>
+        ))}
       </div>
 
       {/* Tabs */}
@@ -391,9 +420,25 @@ export function CharacterBible({ onBack }: Props) {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {tab === "identity" && <IdentityTab />}
-        {tab === "graph" && <GraphTab />}
-        {tab === "skills" && <SkillsTab />}
+        {brain.loading ? (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center">
+              <div className="w-8 h-8 rounded-xl border border-blade-accent/20 bg-blade-accent/10 flex items-center justify-center mx-auto">
+                <div className="w-2 h-2 rounded-full bg-blade-accent animate-pulse" />
+              </div>
+              <div className="text-sm text-blade-text mt-3">Loading Character Bible</div>
+              <div className="text-2xs text-blade-muted mt-1">
+                Pulling identity, graph, memories, and learned preferences from local storage.
+              </div>
+            </div>
+          </div>
+        ) : tab === "identity" ? (
+          <IdentityTab brain={brain} />
+        ) : tab === "graph" ? (
+          <GraphTab brain={brain} />
+        ) : (
+          <SkillsTab brain={brain} />
+        )}
       </div>
     </div>
   );
