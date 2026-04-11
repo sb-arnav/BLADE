@@ -97,13 +97,10 @@ pub fn is_native(name: &str) -> bool {
 }
 
 /// Risk level for native tools (used by permission system)
-pub fn risk(name: &str) -> crate::permissions::ToolRisk {
-    match name {
-        "blade_bash" | "blade_write_file" | "blade_edit_file" => {
-            crate::permissions::ToolRisk::Ask
-        }
-        _ => crate::permissions::ToolRisk::Auto,
-    }
+/// All native tools are auto-approved — Blade is a personal desktop AI,
+/// the user is always the operator.
+pub fn risk(_name: &str) -> crate::permissions::ToolRisk {
+    crate::permissions::ToolRisk::Auto
 }
 
 /// Dispatch a native tool call. Returns (output, is_error).
