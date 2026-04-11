@@ -31,12 +31,20 @@ const KIND_ICON: Record<string, string> = {
   need_approval: "⚠",
 };
 
+interface ApprovalRequest {
+  approval_id: string;
+  step: number;
+  description: string;
+  action: string;
+}
+
 export function ComputerUsePanel({ onDismiss }: Props) {
   const [steps, setSteps] = useState<Step[]>([]);
   const [finished, setFinished] = useState<{ success: boolean; result: string; steps: number } | null>(null);
   const [goal, setGoal] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [input, setInput] = useState("");
+  const [pendingApproval, setPendingApproval] = useState<ApprovalRequest | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -79,12 +87,22 @@ export function ComputerUsePanel({ onDismiss }: Props) {
       (event) => {
         setFinished(event.payload);
         setIsRunning(false);
+        setPendingApproval(null);
+      }
+    );
+
+    const unlistenApproval = listen<ApprovalRequest>(
+      "computer_use_approval_needed",
+      (event) => {
+        setPendingApproval(event.payload);
+        setIsRunning(false); // Task is paused waiting for approval
       }
     );
 
     return () => {
       unlistenStep.then((fn) => fn());
       unlistenComplete.then((fn) => fn());
+      unlistenApproval.then((fn) => fn());
     };
   }, []);
 
@@ -106,6 +124,16 @@ export function ComputerUsePanel({ onDismiss }: Props) {
   const stopTask = () => {
     void invoke("computer_use_stop");
     setIsRunning(false);
+  };
+
+  const respondApproval = (approved: boolean) => {
+    if (!pendingApproval) return;
+    void invoke("respond_tool_approval", {
+      approvalId: pendingApproval.approval_id,
+      approved,
+    });
+    setPendingApproval(null);
+    if (approved) setIsRunning(true);
   };
 
   return (
@@ -197,6 +225,36 @@ export function ComputerUsePanel({ onDismiss }: Props) {
         ))}
         <div ref={bottomRef} />
       </div>
+
+      {/* Approval request */}
+      {pendingApproval && (
+        <div className="mx-4 mb-2 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 flex-shrink-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-yellow-400 text-sm">⚠</span>
+            <span className="text-sm font-medium text-blade-text">Approval needed — step {pendingApproval.step}</span>
+          </div>
+          <div className="text-xs text-blade-text/80 mb-2">{pendingApproval.description}</div>
+          {pendingApproval.action && (
+            <div className="text-[10px] font-mono text-blade-muted bg-blade-bg rounded p-1 mb-2 truncate">
+              {pendingApproval.action}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button
+              onClick={() => respondApproval(true)}
+              className="flex-1 text-xs py-1.5 rounded border border-green-500/40 text-green-400 hover:bg-green-500/10 transition"
+            >
+              Allow
+            </button>
+            <button
+              onClick={() => respondApproval(false)}
+              className="flex-1 text-xs py-1.5 rounded border border-red-500/30 text-red-400 hover:bg-red-500/10 transition"
+            >
+              Deny
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Result */}
       {finished && (
