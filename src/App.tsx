@@ -547,6 +547,7 @@ export default function App() {
       await invoke("obsidian_save_conversation", { title, summary, conversationId: id }).catch(() => {});
     }},
     { id: "pulse", label: "Pulse — ask Blade what it's thinking", description: "Trigger an unsolicited thought from Blade's background mind", section: "System", action: () => invoke<string>("pulse_now").then((t) => setPulseThought(t)).catch(() => {}) },
+    { id: "pulse-explain", label: "Why? — explain the last pulse thought", description: "Ask Blade to reveal the reasoning behind its last observation", section: "System", action: () => invoke<string>("pulse_explain").then((e) => sendWithStats(`Explain your reasoning: ${e}`)).catch(() => {}) },
     { id: "deeplearn", label: "Deep Learn — let Blade read your digital life", description: "Re-run Blade's ingestion of your shell history, git, notes, and conversations", section: "System", action: () => openRoute("deeplearn") },
     { id: "settings", label: "Open settings", description: "Configure providers, memory, and Blade behavior", section: "System", shortcut: "Ctrl+,", action: () => openRoute("settings") },
     { id: "sync", label: "Open sync settings", description: "Inspect sync and persistence controls", section: "System", action: () => openRoute("sync") },
@@ -733,6 +734,20 @@ export default function App() {
           >
             {pulseThought}
           </p>
+          <button
+            onClick={() => {
+              invoke<string>("pulse_explain")
+                .then((explanation) => {
+                  sendWithStats(`Why did you surface that thought? Expand: "${pulseThought}"\n\nYour explanation: ${explanation}`);
+                  setPulseThought(null);
+                })
+                .catch(() => sendWithStats(`Why did you say "${pulseThought}"?`));
+            }}
+            className="text-blade-muted hover:text-blade-accent text-[10px] flex-shrink-0 px-1 leading-none transition-colors"
+            title="Why did Blade say this?"
+          >
+            why?
+          </button>
           <button
             onClick={() => setPulseThought(null)}
             className="text-blade-muted hover:text-blade-text text-xs flex-shrink-0 leading-none"

@@ -334,6 +334,7 @@ pub fn run() {
             tray::set_tray_status,
             pulse::pulse_get_last_thought,
             pulse::pulse_now,
+            pulse::pulse_explain,
             journal::journal_get_recent,
             journal::journal_write_now,
             deeplearn::deeplearn_discover_sources,
