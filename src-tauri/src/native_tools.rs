@@ -124,8 +124,56 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "blade_ui_read".to_string(),
+            description: "Read the UI elements of the currently focused window — returns buttons, inputs, labels, checkboxes, menus, etc. as a tree. Use this INSTEAD of screenshots to see what's on screen. Free, instant, no tokens.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "max_depth": {"type": "integer", "description": "Tree depth (default 3)"},
+                    "max_lines": {"type": "integer", "description": "Max output lines (default 40)"}
+                }
+            }),
+        },
+        ToolDefinition {
+            name: "blade_ui_click".to_string(),
+            description: "Click a UI element in the focused window by its name, automation ID, or type. No coordinates needed — finds the element by accessibility label. Preferred over blade_mouse for native apps.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Element name/label (e.g. 'OK', 'Submit', 'Search')"},
+                    "automation_id": {"type": "string", "description": "Automation ID if known"},
+                    "control_type": {"type": "string", "description": "Element type: button, edit, checkbox, combobox, listitem, menuitem, etc."},
+                    "invoke": {"type": "boolean", "description": "Use invoke pattern instead of click (better for buttons, default false)"}
+                }
+            }),
+        },
+        ToolDefinition {
+            name: "blade_ui_type".to_string(),
+            description: "Find a text input in the focused window and set its value. Use for filling forms, search boxes, address bars.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Input field name/label"},
+                    "automation_id": {"type": "string", "description": "Automation ID if known"},
+                    "value": {"type": "string", "description": "Text to enter"}
+                },
+                "required": ["value"]
+            }),
+        },
+        ToolDefinition {
+            name: "blade_ui_wait".to_string(),
+            description: "Wait for a UI element to appear (e.g. after opening an app or navigating). Returns when found or times out.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Element name to wait for"},
+                    "timeout_ms": {"type": "integer", "description": "Max wait ms (default 5000)"}
+                }
+            }),
+        },
+        ToolDefinition {
             name: "blade_screenshot".to_string(),
-            description: "Take a screenshot of the user's screen. Returns a base64-encoded PNG image you can analyse to see what's on screen, verify actions worked, read text from windows, etc.".to_string(),
+            description: "LAST RESORT: take a screenshot. Prefer blade_ui_read for native apps. Only use this for games, canvas apps, or when ui_read returns nothing useful.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -326,6 +374,32 @@ pub async fn execute(name: &str, args: &Value) -> (String, bool) {
             };
             let max = args["max_results"].as_u64().unwrap_or(5) as usize;
             search_web(query, max).await
+        }
+        "blade_ui_read" => {
+            let max_depth = args["max_depth"].as_u64().map(|v| v as u32);
+            let max_lines = args["max_lines"].as_u64().map(|v| v as u32);
+            ui_read(max_depth, max_lines)
+        }
+        "blade_ui_click" => {
+            let name = args["name"].as_str().map(|s| s.to_string());
+            let automation_id = args["automation_id"].as_str().map(|s| s.to_string());
+            let control_type = args["control_type"].as_str().map(|s| s.to_string());
+            let invoke = args["invoke"].as_bool().unwrap_or(false);
+            ui_click(name, automation_id, control_type, invoke)
+        }
+        "blade_ui_type" => {
+            let name = args["name"].as_str().map(|s| s.to_string());
+            let automation_id = args["automation_id"].as_str().map(|s| s.to_string());
+            let value = match args["value"].as_str() {
+                Some(v) => v.to_string(),
+                None => return ("Missing required argument: value".to_string(), true),
+            };
+            ui_type(name, automation_id, value)
+        }
+        "blade_ui_wait" => {
+            let name = args["name"].as_str().map(|s| s.to_string());
+            let timeout_ms = args["timeout_ms"].as_u64();
+            ui_wait(name, timeout_ms)
         }
         _ => (format!("Unknown native tool: {}", name), true),
     }
@@ -899,5 +973,63 @@ fn truncate(s: String, max: usize) -> String {
         format!("{}\n...[truncated at {} chars]", &s[..max], max)
     } else {
         s
+    }
+}
+
+// ── UI Automation wrappers ─────────────────────────────────────────────────────
+
+fn ui_read(max_depth: Option<u32>, max_lines: Option<u32>) -> (String, bool) {
+    match crate::ui_automation::uia_describe_active_window(max_depth, None, max_lines) {
+        Ok(text) => (text, false),
+        Err(e) => (e, true),
+    }
+}
+
+fn ui_click(
+    name: Option<String>,
+    automation_id: Option<String>,
+    control_type: Option<String>,
+    invoke: bool,
+) -> (String, bool) {
+    let selector = crate::ui_automation::UiSelector {
+        name,
+        automation_id,
+        class_name: None,
+        control_type,
+    };
+    let result = if invoke {
+        crate::ui_automation::uia_invoke_element(selector)
+    } else {
+        crate::ui_automation::uia_click_element(selector)
+    };
+    match result {
+        Ok(msg) => (msg, false),
+        Err(e) => (e, true),
+    }
+}
+
+fn ui_type(name: Option<String>, automation_id: Option<String>, value: String) -> (String, bool) {
+    let selector = crate::ui_automation::UiSelector {
+        name,
+        automation_id,
+        class_name: None,
+        control_type: None,
+    };
+    match crate::ui_automation::uia_set_element_value(selector, value) {
+        Ok(msg) => (msg, false),
+        Err(e) => (e, true),
+    }
+}
+
+fn ui_wait(name: Option<String>, timeout_ms: Option<u64>) -> (String, bool) {
+    let selector = crate::ui_automation::UiSelector {
+        name,
+        automation_id: None,
+        class_name: None,
+        control_type: None,
+    };
+    match crate::ui_automation::uia_wait_for_element(selector, timeout_ms) {
+        Ok(msg) => (msg, false),
+        Err(e) => (e, true),
     }
 }
