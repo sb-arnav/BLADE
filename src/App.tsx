@@ -388,6 +388,31 @@ export default function App() {
     };
   }, [tts.enabled]);
 
+  // WHILE YOU WERE AWAY — digest of what happened when window was hidden
+  useEffect(() => {
+    let hiddenAt: number | null = null;
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        hiddenAt = Math.floor(Date.now() / 1000);
+      } else if (hiddenAt !== null) {
+        const since = hiddenAt;
+        hiddenAt = null;
+        // Ask Blade what happened while we were away
+        invoke<string | null>("pulse_get_digest", { hiddenSince: since })
+          .then((digest) => {
+            if (digest) {
+              setPulseThought(digest);
+            }
+          })
+          .catch(() => {});
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, []);
+
   // TRAY — handle tray menu events
   useEffect(() => {
     const unlistenScreenshot = listen("tray_screenshot_requested", () => {

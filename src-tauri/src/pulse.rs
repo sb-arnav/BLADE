@@ -264,6 +264,69 @@ async fn call_provider_for_thought(
     Ok(thought)
 }
 
+/// Generate a "while you were away" digest — what happened since the window was last active.
+/// Call this when the window regains focus after being hidden for a while.
+/// Returns None if not much happened.
+#[tauri::command]
+pub async fn pulse_get_digest(hidden_since: i64) -> Option<String> {
+    let config = crate::config::load_config();
+    if config.api_key.is_empty() && config.provider != "ollama" {
+        return None;
+    }
+
+    let now = chrono::Local::now().timestamp();
+    let mins_away = (now - hidden_since) / 60;
+
+    // Only surface digest if away for 30+ minutes
+    if mins_away < 30 {
+        return None;
+    }
+
+    // Pull timeline events since window was hidden
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    let events_since = rusqlite::Connection::open(&db_path)
+        .ok()
+        .and_then(|conn| {
+            conn.prepare(
+                "SELECT event_type, title, timestamp FROM activity_timeline WHERE timestamp > ?1 ORDER BY timestamp ASC LIMIT 15"
+            ).ok()?.query_map(rusqlite::params![hidden_since], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?,
+                ))
+            }).ok()?.flatten().collect::<Vec<_>>().into()
+        })
+        .unwrap_or_default();
+
+    if events_since.is_empty() {
+        return None;
+    }
+
+    let event_lines: Vec<String> = events_since.iter().map(|(typ, title, ts)| {
+        let dt = chrono::DateTime::from_timestamp(*ts, 0)
+            .map(|d| d.format("%-H:%M").to_string())
+            .unwrap_or_else(|| "?".to_string());
+        format!("[{}] {}: {}", dt, typ, &title[..title.len().min(60)])
+    }).collect();
+
+    let prompt = format!(
+        r#"You are BLADE. The user was away for {} minutes. Here's what happened on the machine while they were gone:
+
+{}
+
+Give a 1-2 sentence "while you were away" update. Be specific — name the actual events. Don't pad. Start with what's most interesting or actionable.
+If nothing notable happened: say nothing (return empty string).
+No "While you were away," opener — just the content."#,
+        mins_away,
+        event_lines.join("\n"),
+    );
+
+    let model = cheapest_model(&config.provider, &config.model);
+    call_provider_for_thought(&config, &model, &prompt).await.ok()
+        .filter(|s| s.len() > 20)
+}
+
 /// Load the last persisted pulse thought (for displaying when app opens)
 #[tauri::command]
 pub fn pulse_get_last_thought() -> Option<String> {
