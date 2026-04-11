@@ -9,6 +9,7 @@ import {
   BrainPreference,
   BrainReaction,
   BrainSkill,
+  BrainStyleTag,
 } from "../types";
 
 // ── Identity ──────────────────────────────────────────────────────────────────
@@ -25,6 +26,10 @@ export async function setIdentity(key: string, value: string): Promise<void> {
 
 export async function getStyleTags(): Promise<string[]> {
   return invoke<string[]>("brain_get_style_tags").catch(() => []);
+}
+
+export async function getStyleTagEntries(): Promise<BrainStyleTag[]> {
+  return invoke<BrainStyleTag[]>("brain_get_style_tag_entries").catch(() => []);
 }
 
 export async function addStyleTag(tag: string): Promise<void> {

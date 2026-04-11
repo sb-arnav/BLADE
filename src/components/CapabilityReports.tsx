@@ -127,17 +127,26 @@ export function CapabilityReports({ onBack }: { onBack: () => void }) {
   const [filter, setFilter] = useState<ReportStatus | "all">("all");
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [lastLoadedAt, setLastLoadedAt] = useState<number | null>(null);
 
   const load = async () => {
     setLoading(true);
-    const [r, w] = await Promise.all([
-      invoke<CapabilityReport[]>("get_reports", { limit: 200 }).catch(() => []),
-      invoke<string>("get_report_webhook").catch(() => ""),
-    ]);
-    setReports(r);
-    setWebhook(w);
-    setWebhookInput(w);
-    setLoading(false);
+    setLoadError(null);
+    try {
+      const [r, w] = await Promise.all([
+        invoke<CapabilityReport[]>("get_reports", { limit: 200 }).catch(() => []),
+        invoke<string>("get_report_webhook").catch(() => ""),
+      ]);
+      setReports(r);
+      setWebhook(w);
+      setWebhookInput(w);
+      setLastLoadedAt(Date.now());
+    } catch (cause) {
+      setLoadError(typeof cause === "string" ? cause : "Failed to load capability reports");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { void load(); }, []);
@@ -177,14 +186,30 @@ export function CapabilityReports({ onBack }: { onBack: () => void }) {
             </p>
           </div>
         </div>
-        <button onClick={load} className="w-7 h-7 rounded-lg flex items-center justify-center text-[#666] hover:text-[#e5e5e5] hover:bg-[#1f1f1f] transition-colors">
-          <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.75">
-            <path d="M13.5 8A5.5 5.5 0 112.5 8" /><path d="M13.5 4v4h-4" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <div className="text-2xs text-blade-secondary">
+              {loading ? "Refreshing reports..." : "Local incident queue"}
+            </div>
+            <div className="text-[10px] text-blade-muted mt-0.5">
+              {lastLoadedAt ? `Updated ${relTime(lastLoadedAt)}` : "Not loaded yet"}
+            </div>
+          </div>
+          <button onClick={load} className="w-7 h-7 rounded-lg flex items-center justify-center text-[#666] hover:text-[#e5e5e5] hover:bg-[#1f1f1f] transition-colors">
+            <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.75">
+              <path d="M13.5 8A5.5 5.5 0 112.5 8" /><path d="M13.5 4v4h-4" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
+        {loadError ? (
+          <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+            {loadError}
+          </div>
+        ) : null}
+
         {/* Stats strip */}
         <div className="grid grid-cols-3 gap-3">
           {[
@@ -248,11 +273,11 @@ export function CapabilityReports({ onBack }: { onBack: () => void }) {
         {loading ? (
           <div className="text-center py-8 text-sm text-blade-muted">Loading reports…</div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-12">
+          <div className="text-center py-12 rounded-2xl border border-blade-border bg-blade-surface">
             <div className="text-3xl mb-3">✅</div>
-            <div className="text-sm text-blade-text">No {filter === "all" ? "" : filter} reports.</div>
+            <div className="text-sm text-blade-text">No {filter === "all" ? "" : `${filter} `}reports right now.</div>
             <div className="text-xs text-blade-muted mt-1">
-              Blade will file a report here whenever it detects something it can't do.
+              Blade will file a report here whenever it detects a capability gap, runtime failure, or user-friction moment worth triaging.
             </div>
           </div>
         ) : (

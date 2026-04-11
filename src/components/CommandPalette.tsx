@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 interface Command {
   id: string;
   label: string;
+  description?: string;
+  section?: string;
   shortcut?: string;
   action: () => void;
 }
@@ -22,6 +24,17 @@ export function CommandPalette({ commands, open, onClose }: Props) {
   const filtered = query
     ? commands.filter((c) => c.label.toLowerCase().includes(query.toLowerCase()))
     : commands;
+
+  const grouped = filtered.reduce<Array<{ key: string; label: string; commands: Command[] }>>((acc, command) => {
+    const key = command.section || "Blade";
+    const existing = acc.find((group) => group.key === key);
+    if (existing) {
+      existing.commands.push(command);
+    } else {
+      acc.push({ key, label: key, commands: [command] });
+    }
+    return acc;
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -47,16 +60,20 @@ export function CommandPalette({ commands, open, onClose }: Props) {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    const hasResults = filtered.length > 0;
     switch (e.key) {
       case "ArrowDown":
+        if (!hasResults) return;
         e.preventDefault();
         setSelectedIndex((prev) => (prev + 1) % filtered.length);
         break;
       case "ArrowUp":
+        if (!hasResults) return;
         e.preventDefault();
         setSelectedIndex((prev) => (prev - 1 + filtered.length) % filtered.length);
         break;
       case "Enter":
+        if (!hasResults) return;
         e.preventDefault();
         if (filtered[selectedIndex]) handleSelect(filtered[selectedIndex]);
         break;
@@ -86,27 +103,42 @@ export function CommandPalette({ commands, open, onClose }: Props) {
           />
           <kbd className="text-2xs text-blade-muted/50 font-mono shrink-0">esc</kbd>
         </div>
-        <div ref={listRef} className="max-h-60 overflow-y-auto py-1">
+        <div ref={listRef} className="max-h-72 overflow-y-auto py-1">
           {filtered.length === 0 && (
             <p className="px-4 py-3 text-xs text-blade-muted">No results.</p>
           )}
-          {filtered.map((cmd, i) => (
-            <button
-              key={cmd.id}
-              data-cmd
-              onClick={() => handleSelect(cmd)}
-              onMouseEnter={() => setSelectedIndex(i)}
-              className={`w-full text-left px-4 py-2 text-[0.8125rem] transition-colors flex items-center justify-between ${
-                i === selectedIndex
-                  ? "bg-blade-accent-muted text-blade-text"
-                  : "text-blade-secondary"
-              }`}
-            >
-              <span>{cmd.label}</span>
-              {cmd.shortcut && (
-                <kbd className="text-2xs text-blade-muted font-mono">{cmd.shortcut}</kbd>
-              )}
-            </button>
+          {grouped.map((group) => (
+            <div key={group.key} className="py-1">
+              <div className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-[0.18em] text-blade-muted/70">
+                {group.label}
+              </div>
+              {group.commands.map((cmd) => {
+                const i = filtered.findIndex((item) => item.id === cmd.id);
+                return (
+                  <button
+                    key={cmd.id}
+                    data-cmd
+                    onClick={() => handleSelect(cmd)}
+                    onMouseEnter={() => setSelectedIndex(i)}
+                    className={`w-full text-left px-4 py-2.5 transition-colors flex items-center justify-between gap-3 ${
+                      i === selectedIndex
+                        ? "bg-blade-accent-muted text-blade-text"
+                        : "text-blade-secondary"
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <div className="text-[0.8125rem] truncate">{cmd.label}</div>
+                      {cmd.description ? (
+                        <div className="text-2xs text-blade-muted mt-0.5 truncate">{cmd.description}</div>
+                      ) : null}
+                    </div>
+                    {cmd.shortcut && (
+                      <kbd className="text-2xs text-blade-muted font-mono shrink-0">{cmd.shortcut}</kbd>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           ))}
         </div>
       </div>

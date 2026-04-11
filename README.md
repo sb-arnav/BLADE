@@ -7,9 +7,13 @@ Blade is a Tauri desktop app with a React frontend. It is intended to be distrib
 Use Node 20.19+ and npm 10+.
 
 ```bash
+source ~/.nvm/nvm.sh
+nvm use
 npm install
 npm run dev
 ```
+
+Blade ships an [`.nvmrc`](/mnt/c/Users/arnav/Documents/blade/.nvmrc), so `nvm use` will align local development with CI and release builds.
 
 To run the desktop shell during development:
 

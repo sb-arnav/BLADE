@@ -453,6 +453,12 @@ pub fn brain_get_style_tags(state: tauri::State<'_, SharedDb>) -> Result<Vec<Str
 }
 
 #[tauri::command]
+pub fn brain_get_style_tag_entries(state: tauri::State<'_, SharedDb>) -> Result<Vec<db::BrainStyleTagRow>, String> {
+    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+    db::brain_get_style_tag_entries(&conn)
+}
+
+#[tauri::command]
 pub fn brain_add_style_tag(state: tauri::State<'_, SharedDb>, id: String, tag: String) -> Result<(), String> {
     let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
     db::brain_add_style_tag(&conn, &id, &tag)

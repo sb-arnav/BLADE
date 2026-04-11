@@ -3,11 +3,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import * as cb from "../data/characterBible";
-import { BrainEdge, BrainMemory, BrainNode, BrainPreference, BrainSkill } from "../types";
+import { BrainEdge, BrainMemory, BrainNode, BrainPreference, BrainSkill, BrainStyleTag } from "../types";
 
 export interface CharacterBibleState {
   identity: Record<string, string>;
-  styleTags: string[];
+  styleTags: BrainStyleTag[];
   preferences: BrainPreference[];
   memories: BrainMemory[];
   nodes: BrainNode[];
@@ -54,7 +54,7 @@ export function useCharacterBible(): UseCharacterBibleResult {
     setState((s) => ({ ...s, loading: true }));
     const [identity, styleTags, preferences, memories, nodes, edges, skills] = await Promise.all([
       cb.getIdentity(),
-      cb.getStyleTags(),
+      cb.getStyleTagEntries(),
       cb.getPreferences(),
       cb.getMemories(100),
       cb.getNodes(),
@@ -73,13 +73,13 @@ export function useCharacterBible(): UseCharacterBibleResult {
 
   const addStyleTag = useCallback(async (tag: string) => {
     await cb.addStyleTag(tag);
-    const styleTags = await cb.getStyleTags();
+    const styleTags = await cb.getStyleTagEntries();
     setState((s) => ({ ...s, styleTags, lastUpdated: Date.now() }));
   }, []);
 
   const removeStyleTag = useCallback(async (id: string) => {
     await cb.removeStyleTag(id);
-    const styleTags = await cb.getStyleTags();
+    const styleTags = await cb.getStyleTagEntries();
     setState((s) => ({ ...s, styleTags, lastUpdated: Date.now() }));
   }, []);
 
