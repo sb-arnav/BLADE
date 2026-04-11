@@ -10,6 +10,32 @@ struct WindowSession {
     nudge_fired: bool,
 }
 
+/// Returns a brief first line from an error text — suitable for a nudge message.
+fn error_headline(text: &str) -> String {
+    text.lines()
+        .find(|l| {
+            let lo = l.to_lowercase();
+            !l.trim().is_empty() && (lo.contains("error") || lo.contains("exception") || lo.contains("traceback") || lo.contains("panicked"))
+        })
+        .unwrap_or("an error")
+        .trim()
+        .chars()
+        .take(120)
+        .collect()
+}
+
+fn looks_like_error(text: &str) -> bool {
+    if text.len() < 10 || text.len() > 20_000 { return false; }
+    let lower = text.to_lowercase();
+    lower.contains("traceback") || lower.contains("error:") ||
+        lower.contains("exception:") || lower.contains("panicked at") ||
+        lower.contains("typeerror:") || lower.contains("syntaxerror:") ||
+        lower.contains("nameerror:") || lower.contains("valueerror:") ||
+        lower.contains("attributeerror:") || lower.contains("nullpointerexception") ||
+        lower.contains("uncaught error") || lower.contains("undefined is not a function") ||
+        (lower.contains("fatal:") && lower.contains("error"))
+}
+
 pub fn start_ambient_monitor(app: tauri::AppHandle) {
     // Detect multiple monitors immediately at startup
     if let Ok(monitors) = xcap::Monitor::all() {
@@ -29,10 +55,32 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
         let mut last_activity = std::time::Instant::now();
         let mut idle_nudged = false;
         let mut tick: u64 = 0;
+        let mut last_error_hash: u64 = 0;
 
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
             tick += 1;
+
+            // Proactively detect errors in clipboard — nudge if BLADE sees something new
+            if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                if let Ok(text) = clipboard.get_text() {
+                    if looks_like_error(&text) {
+                        use std::hash::{Hash, Hasher};
+                        let mut h = std::collections::hash_map::DefaultHasher::new();
+                        text[..text.len().min(500)].hash(&mut h);
+                        let hash = h.finish();
+                        if hash != last_error_hash {
+                            last_error_hash = hash;
+                            let headline = error_headline(&text);
+                            let _ = app.emit("proactive_nudge", serde_json::json!({
+                                "message": format!("I see an error in your clipboard: {}. Want me to diagnose it?", headline),
+                                "type": "error_detected",
+                                "raw": &text[..text.len().min(800)],
+                            }));
+                        }
+                    }
+                }
+            }
 
             let win = crate::context::get_active_window().ok();
 

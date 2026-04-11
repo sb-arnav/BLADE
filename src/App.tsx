@@ -274,16 +274,18 @@ export default function App() {
 
   // Ambient proactive nudges from background monitor — Blade speaks without being asked
   useEffect(() => {
-    const unlisten = listen<{ message: string; type: string }>("proactive_nudge", (event) => {
-      const { message } = event.payload;
-      // Show as notification
+    const unlisten = listen<{ message: string; type: string; raw?: string }>("proactive_nudge", (event) => {
+      const { message, type: nudgeType, raw } = event.payload;
+      // For error detections, send the raw error so Blade can actually diagnose it
+      const replyText = nudgeType === "error_detected" && raw
+        ? `Diagnose this error:\n\`\`\`\n${raw}\n\`\`\``
+        : message;
       notifications.add({
         type: "info",
         title: "Blade",
         message,
-        action: { label: "Reply", callback: () => sendWithStats(message) },
+        action: { label: nudgeType === "error_detected" ? "Diagnose" : "Reply", callback: () => sendWithStats(replyText) },
       });
-      // Speak it aloud if TTS enabled
       if (tts.enabled) {
         tts.speak(message);
       }
