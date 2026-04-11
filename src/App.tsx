@@ -135,6 +135,7 @@ export default function App() {
   const runtimeCenter = useRuntimes();
 
   const [pulseThought, setPulseThought] = useState<string | null>(null);
+  const [activeThread, setActiveThread] = useState<{ title: string; project: string } | null>(null);
   const [voiceDraft, setVoiceDraft] = useState<string | null>(null);
   const voiceSendRef = useRef<(text: string) => void>(() => {});
   const voiceMode = useVoiceMode({
@@ -311,6 +312,17 @@ export default function App() {
     });
     return () => { unlisten.then((fn) => fn()); };
   }, [tts.enabled]);
+
+  // THREAD — load working memory state on startup + listen for updates
+  useEffect(() => {
+    invoke<{ title: string; content: string; project: string } | null>("blade_thread_get")
+      .then((t) => { if (t) setActiveThread({ title: t.title, project: t.project }); })
+      .catch(() => {});
+    const unlisten = listen<{ title: string; project: string }>("thread_updated", (event) => {
+      setActiveThread(event.payload);
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
 
   const hideWindow = useCallback(() => {
     getCurrentWindow().hide();
@@ -552,6 +564,24 @@ export default function App() {
         onClearAll={notifications.clearAll}
         onAction={(r) => { openRoute(r as Route); setNotificationsOpen(false); }}
       />
+      {/* THREAD status — Blade's active working memory context */}
+      {activeThread && route === "chat" && (
+        <div
+          className="px-3 py-1 flex items-center gap-2 border-b border-blade-border/20 bg-blade-surface/20 cursor-pointer hover:bg-blade-surface/40 transition-colors"
+          onClick={() => invoke("blade_thread_get").then((t: unknown) => {
+            const thread = t as { title: string; content: string; project: string } | null;
+            if (thread) sendWithStats(`Show me what you're currently tracking in your working memory. Thread: "${thread.title}" — ${thread.content}`);
+          }).catch(() => {})}
+          title="Click to see Blade's active working memory"
+        >
+          <div className="w-1 h-1 rounded-full bg-blade-accent/50 flex-shrink-0" />
+          <p className="text-[10px] text-blade-muted leading-none">
+            <span className="text-blade-accent/70 font-medium">{activeThread.project}</span>
+            <span className="mx-1 opacity-40">·</span>
+            {activeThread.title}
+          </p>
+        </div>
+      )}
       {/* Pulse banner — Blade's unsolicited thought, surfaced when window opens */}
       {pulseThought && route === "chat" && (
         <div className="px-3 py-1.5 flex items-center gap-2 border-b border-blade-border/30 bg-blade-surface/40">

@@ -40,6 +40,23 @@ pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
                 "bytes": ctx.len(),
                 "tier": &config.god_mode_tier,
             }));
+
+            // SIGNAL BUS: embed interesting snapshots into vector store
+            // so Blade can semantically recall "what was happening when X"
+            if ctx.len() > 100 {
+                let store = app.state::<crate::embeddings::SharedVectorStore>();
+                let store_clone = store.inner().clone();
+                let ctx_clone = ctx.clone();
+                let ts = chrono::Utc::now().timestamp().to_string();
+                tokio::spawn(async move {
+                    crate::embeddings::auto_embed_exchange(
+                        &store_clone,
+                        &ctx_clone[..ctx_clone.len().min(800)],
+                        "",
+                        &format!("godmode-{}", ts),
+                    );
+                });
+            }
         }
     });
 }
