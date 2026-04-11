@@ -42,6 +42,19 @@ pub fn start_pulse(app: tauri::AppHandle) {
                         // Persist the last thought so the UI can display it on open
                         let thought_path = crate::config::blade_config_dir().join("last_pulse.txt");
                         let _ = std::fs::write(&thought_path, &thought);
+
+                        // Write to activity timeline so history accumulates
+                        let db_path = crate::config::blade_config_dir().join("blade.db");
+                        if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                            let _ = crate::db::timeline_record(
+                                &conn,
+                                "pulse",
+                                &thought[..thought.len().min(80)],
+                                &thought,
+                                "BLADE",
+                                "{}",
+                            );
+                        }
                     }
                 }
             }
