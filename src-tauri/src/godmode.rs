@@ -116,6 +116,7 @@ fn build_machine_context(tier: &str) -> String {
     if tier == "intermediate" || tier == "extreme" {
         if let Some(s) = clipboard_section() { sections.push(s); }
         if let Some(s) = active_window_section() { sections.push(s); }
+        if let Some(s) = active_errors_section() { sections.push(s); }
     }
 
     // Extreme: inject behavioral directive
@@ -326,6 +327,44 @@ fn active_window_section() -> Option<String> {
     if !win.window_title.is_empty() { parts.push(format!("Window: {}", win.window_title)); }
     if parts.is_empty() { return None; }
     Some(format!("### Active Window\n{}", parts.join("\n")))
+}
+
+/// Detect error/exception patterns in clipboard and active window title.
+/// Surfaces active debugging context so BLADE can proactively help.
+fn active_errors_section() -> Option<String> {
+    let mut found: Vec<String> = Vec::new();
+
+    // Check clipboard for error/traceback patterns
+    if let Ok(mut clipboard) = arboard::Clipboard::new() {
+        if let Ok(text) = clipboard.get_text() {
+            let lower = text.to_lowercase();
+            let is_error = lower.contains("traceback") || lower.contains("error:") ||
+                lower.contains("exception") || lower.contains("panicked at") ||
+                lower.contains("cannot read") || lower.contains("typeerror") ||
+                lower.contains("syntaxerror") || lower.contains("nameerror") ||
+                lower.contains("valueerror") || lower.contains("attributeerror") ||
+                lower.contains("nullpointerexception") || lower.contains("segfault") ||
+                lower.contains("fatal:") || lower.contains("undefined is not");
+
+            if is_error {
+                let preview = &text[..text.len().min(300)];
+                found.push(format!("**Clipboard contains error/traceback:**\n```\n{}\n```", preview));
+            }
+        }
+    }
+
+    // Check active window title for error signals
+    if let Ok(win) = crate::context::get_active_window() {
+        let title_lower = win.window_title.to_lowercase();
+        if title_lower.contains("error") || title_lower.contains("failed") ||
+            title_lower.contains("exception") || title_lower.contains("crash") {
+            found.push(format!("**Active window suggests error:** {}", win.window_title));
+        }
+    }
+
+    if found.is_empty() { return None; }
+
+    Some(format!("### Active Errors Detected\n{}", found.join("\n\n")))
 }
 
 /// Scan common code directories for git repos and show their status.
