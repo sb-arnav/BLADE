@@ -121,16 +121,21 @@ fn parse_tool_calls(tool_calls: &[serde_json::Value]) -> Vec<ToolCall> {
                 .as_str()
                 .unwrap_or("unknown_tool");
 
-            // Some Groq/Llama models return the name with arguments embedded,
-            // e.g. `blade_glob{"pattern":"**/*.ts"}` instead of a separate
-            // arguments field. Split on the first `{` to clean it up.
-            let (name, embedded_args) = if let Some(pos) = raw_name.find('{') {
-                let n = raw_name[..pos].trim().to_string();
-                let a = serde_json::from_str::<serde_json::Value>(&raw_name[pos..]).ok();
-                (n, a)
-            } else {
-                (raw_name.to_string(), None)
-            };
+            // Some Groq/Llama models corrupt the tool name by appending extra
+            // characters or the arguments JSON directly to it, e.g.:
+            //   blade_glob{"pattern":"**/*.ts"}
+            //   blade_bash[]{"command":"..."}
+            // Extract: (a) the clean name = only [a-zA-Z0-9_] chars from the
+            // start, (b) the first {...} block as embedded args if present.
+            let clean_name: String = raw_name
+                .chars()
+                .take_while(|c| c.is_alphanumeric() || *c == '_')
+                .collect();
+            let name = if clean_name.is_empty() { raw_name.to_string() } else { clean_name };
+
+            let embedded_args = raw_name
+                .find('{')
+                .and_then(|pos| serde_json::from_str::<serde_json::Value>(&raw_name[pos..]).ok());
 
             // Prefer the explicit arguments field; fall back to embedded args.
             let arguments = call["function"]["arguments"]
