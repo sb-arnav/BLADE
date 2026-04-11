@@ -235,6 +235,16 @@ export function QuickAsk() {
             Esc
           </kbd>
         )}
+
+        <button
+          onClick={hide}
+          className="flex-shrink-0 w-5 h-5 rounded flex items-center justify-center text-blade-muted/30 hover:text-blade-muted transition-colors"
+          title="Close (Esc)"
+        >
+          <svg viewBox="0 0 16 16" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M4 4l8 8M12 4l-8 8" />
+          </svg>
+        </button>
       </div>
 
       {/* Divider + response area — only rendered when there's something to show */}

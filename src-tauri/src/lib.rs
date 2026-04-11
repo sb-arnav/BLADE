@@ -366,8 +366,9 @@ pub fn run() {
                 let _ = window.set_focus();
             }
 
-            // Create the Quick Ask floating widget window
-            let _quickask = tauri::WebviewWindowBuilder::new(
+            // Create the Quick Ask floating widget window — always hidden on startup
+            // (window-state plugin can restore it as visible, so force-hide after build)
+            let quickask = tauri::WebviewWindowBuilder::new(
                 app,
                 "quickask",
                 tauri::WebviewUrl::App("quickask.html".into()),
@@ -381,6 +382,8 @@ pub fn run() {
             .center()
             .visible(false)
             .build()?;
+            // Force hidden regardless of any restored window state
+            let _ = quickask.hide();
 
             let startup_config = config::load_config();
             let manager = setup_manager.clone();
