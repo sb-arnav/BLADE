@@ -104,6 +104,24 @@ pub fn build_system_prompt_with_recall(
         }
     }
 
+    // Activity timeline — recent history of what BLADE has observed
+    {
+        let db_path = crate::config::blade_config_dir().join("blade.db");
+        if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+            if let Ok(events) = crate::db::timeline_recent(&conn, 8, None) {
+                if !events.is_empty() {
+                    let lines: Vec<String> = events.into_iter().map(|e| {
+                        let dt = chrono::DateTime::from_timestamp(e.timestamp, 0)
+                            .map(|d| d.with_timezone(&chrono::Local).format("%-H:%M").to_string())
+                            .unwrap_or_else(|| "?".to_string());
+                        format!("- [{}] **{}**: {}", dt, e.event_type, &e.title[..e.title.len().min(80)])
+                    }).collect();
+                    parts.push(format!("## Recent Activity\n\n{}", lines.join("\n")));
+                }
+            }
+        }
+    }
+
     // Obsidian vault — tell Blade where to read/write notes
     if !config.obsidian_vault_path.is_empty() {
         parts.push(format!(
