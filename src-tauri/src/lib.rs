@@ -4,6 +4,7 @@ mod deeplearn;
 mod discord;
 mod obsidian;
 mod pulse;
+mod reminders;
 mod skill_engine;
 mod telegram;
 mod thread;
@@ -405,6 +406,11 @@ pub fn run() {
             obsidian::obsidian_append_note,
             obsidian::obsidian_today_note,
             obsidian::obsidian_vault_configured,
+            reminders::reminder_add,
+            reminders::reminder_add_natural,
+            reminders::reminder_list,
+            reminders::reminder_delete,
+            reminders::reminder_parse_time,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
@@ -488,6 +494,9 @@ pub fn run() {
 
             // Create today's Obsidian daily note if vault is configured
             obsidian::ensure_daily_note();
+
+            // Start reminder loop — checks every 30s for due reminders
+            reminders::start_reminder_loop(app.handle().clone());
 
             // Alt+Space → toggle Quick Ask floating widget
             let handle = app.handle().clone();

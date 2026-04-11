@@ -1,0 +1,271 @@
+// src-tauri/src/reminders.rs
+// BLADE Reminders — time-based alerts with full context.
+//
+// Users can set reminders through conversation ("remind me about X in 30min")
+// or through the UI. Reminders fire as OS notifications + TTS + Discord.
+// Stored in SQLite, survive restarts.
+//
+// BLADE's AI can also extract reminder intent from conversation automatically
+// via extract_reminder_from_message() — called after each assistant response.
+
+use rusqlite::params;
+use serde::{Deserialize, Serialize};
+use tauri::Emitter;
+
+// ── DB helpers ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Reminder {
+    pub id: String,
+    pub title: String,
+    pub note: String,
+    pub fire_at: i64, // unix timestamp
+    pub fired: bool,
+    pub created_at: i64,
+}
+
+fn open_db() -> Result<rusqlite::Connection, String> {
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())
+}
+
+fn ensure_table(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS reminders (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            note TEXT NOT NULL DEFAULT '',
+            fire_at INTEGER NOT NULL,
+            fired INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_reminders_fire_at ON reminders(fire_at) WHERE fired = 0;"
+    )
+}
+
+pub fn list_pending() -> Vec<Reminder> {
+    let Ok(conn) = open_db() else { return vec![] };
+    let _ = ensure_table(&conn);
+    let Ok(mut stmt) = conn.prepare(
+        "SELECT id, title, note, fire_at, fired, created_at FROM reminders WHERE fired = 0 ORDER BY fire_at ASC"
+    ) else { return vec![] };
+
+    stmt.query_map([], |row| {
+        Ok(Reminder {
+            id: row.get(0)?,
+            title: row.get(1)?,
+            note: row.get(2)?,
+            fire_at: row.get(3)?,
+            fired: row.get::<_, i64>(4)? != 0,
+            created_at: row.get(5)?,
+        })
+    })
+    .map(|rows| rows.flatten().collect())
+    .unwrap_or_default()
+}
+
+fn mark_fired(conn: &rusqlite::Connection, id: &str) {
+    let _ = conn.execute("UPDATE reminders SET fired = 1 WHERE id = ?1", params![id]);
+}
+
+// ── Background loop ───────────────────────────────────────────────────────────
+
+pub fn start_reminder_loop(app: tauri::AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+
+            let now = chrono::Utc::now().timestamp();
+            let due: Vec<Reminder> = list_pending()
+                .into_iter()
+                .filter(|r| r.fire_at <= now)
+                .collect();
+
+            for reminder in due {
+                fire_reminder(&app, &reminder).await;
+            }
+        }
+    });
+}
+
+async fn fire_reminder(app: &tauri::AppHandle, reminder: &Reminder) {
+    // Mark fired first to avoid double-fire
+    if let Ok(conn) = open_db() {
+        let _ = ensure_table(&conn);
+        mark_fired(&conn, &reminder.id);
+    }
+
+    // OS notification
+    {
+        use tauri_plugin_notification::NotificationExt;
+        let body = if reminder.note.is_empty() {
+            reminder.title.clone()
+        } else {
+            format!("{}\n{}", reminder.title, &reminder.note[..reminder.note.len().min(100)])
+        };
+        let _ = app.notification()
+            .builder()
+            .title("BLADE Reminder")
+            .body(body)
+            .show();
+    }
+
+    // Emit to frontend
+    let _ = app.emit("blade_reminder_fired", serde_json::json!({
+        "id": &reminder.id,
+        "title": &reminder.title,
+        "note": &reminder.note,
+        "timestamp": chrono::Utc::now().timestamp(),
+    }));
+
+    // TTS
+    let spoken = if reminder.note.is_empty() {
+        format!("Reminder: {}", reminder.title)
+    } else {
+        format!("Reminder: {}. {}", reminder.title, reminder.note)
+    };
+    crate::tts::speak(&spoken);
+
+    // Discord
+    let discord_msg = format!("**Reminder:** {}\n{}", reminder.title, reminder.note);
+    let discord_clone = discord_msg.clone();
+    tauri::async_runtime::spawn(async move {
+        crate::discord::post_to_discord(&discord_clone, true, 0x57F287).await; // green
+    });
+
+    // Timeline
+    if let Ok(conn) = open_db() {
+        let _ = crate::db::timeline_record(
+            &conn,
+            "reminder",
+            &reminder.title,
+            &reminder.note,
+            "BLADE",
+            "{}",
+        );
+    }
+
+    log::info!("[reminders] fired: {}", reminder.title);
+}
+
+// ── Natural language time parser ──────────────────────────────────────────────
+
+/// Parse simple relative time expressions like "30 minutes", "2 hours", "tomorrow 9am".
+/// Returns unix timestamp or None if unparseable.
+pub fn parse_time_expression(expr: &str) -> Option<i64> {
+    let lower = expr.to_lowercase();
+    let now = chrono::Utc::now().timestamp();
+
+    // "in X minutes/hours/days"
+    if let Some(mins) = extract_quantity_unit(&lower, &["minute", "min", "m"]) {
+        return Some(now + mins * 60);
+    }
+    if let Some(hours) = extract_quantity_unit(&lower, &["hour", "hr", "h"]) {
+        return Some(now + hours * 3600);
+    }
+    if let Some(days) = extract_quantity_unit(&lower, &["day", "d"]) {
+        return Some(now + days * 86400);
+    }
+
+    // "tomorrow" → next day 09:00
+    if lower.contains("tomorrow") {
+        let tomorrow = chrono::Local::now()
+            .date_naive()
+            .succ_opt()?
+            .and_hms_opt(9, 0, 0)?;
+        let ts = chrono::Local.from_local_datetime(&tomorrow).single()?.timestamp();
+        return Some(ts);
+    }
+
+    // "tonight" → today 20:00
+    if lower.contains("tonight") {
+        let tonight = chrono::Local::now()
+            .date_naive()
+            .and_hms_opt(20, 0, 0)?;
+        let ts = chrono::Local.from_local_datetime(&tonight).single()?.timestamp();
+        return Some(ts);
+    }
+
+    None
+}
+
+fn extract_quantity_unit(text: &str, unit_variants: &[&str]) -> Option<i64> {
+    // Match patterns: "30 minutes", "in 30 minutes", "30min", "2h"
+    for unit in unit_variants {
+        // Try "NUMBER unit"
+        for part in text.split_whitespace() {
+            if part.ends_with(unit) {
+                let num_str = part.trim_end_matches(unit);
+                if let Ok(n) = num_str.parse::<i64>() {
+                    return Some(n);
+                }
+            }
+        }
+        // Try "NUMBER" before "unit"
+        let words: Vec<&str> = text.split_whitespace().collect();
+        for (i, word) in words.iter().enumerate() {
+            if word.starts_with(unit) || *word == *unit {
+                if i > 0 {
+                    if let Ok(n) = words[i - 1].parse::<i64>() {
+                        return Some(n);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+// ── Tauri commands ────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn reminder_add(title: String, note: String, fire_at: i64) -> Result<String, String> {
+    if title.trim().is_empty() {
+        return Err("Reminder title cannot be empty".to_string());
+    }
+    if fire_at <= chrono::Utc::now().timestamp() {
+        return Err("Reminder time must be in the future".to_string());
+    }
+
+    let id = uuid::Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().timestamp();
+    let conn = open_db()?;
+    ensure_table(&conn).map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT INTO reminders (id, title, note, fire_at, fired, created_at) VALUES (?1, ?2, ?3, ?4, 0, ?5)",
+        params![id, title.trim(), note.trim(), fire_at, now],
+    ).map_err(|e| e.to_string())?;
+
+    Ok(id)
+}
+
+#[tauri::command]
+pub fn reminder_add_natural(
+    title: String,
+    note: String,
+    time_expression: String,
+) -> Result<String, String> {
+    let fire_at = parse_time_expression(&time_expression)
+        .ok_or_else(|| format!("Couldn't understand time '{}'. Try '30 minutes' or '2 hours'.", time_expression))?;
+
+    reminder_add(title, note, fire_at)
+}
+
+#[tauri::command]
+pub fn reminder_list() -> Vec<Reminder> {
+    list_pending()
+}
+
+#[tauri::command]
+pub fn reminder_delete(id: String) -> Result<(), String> {
+    let conn = open_db()?;
+    ensure_table(&conn).map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM reminders WHERE id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn reminder_parse_time(expression: String) -> Option<i64> {
+    parse_time_expression(&expression)
+}
