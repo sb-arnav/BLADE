@@ -59,5 +59,10 @@
     "longDescription": "Blade is a desktop AI workspace for chat, tools, MCP integrations, and persistent personal context.",
     "homepage": "https://github.com/sb-arnav/blade"
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": []
+    }
+  }
 }
