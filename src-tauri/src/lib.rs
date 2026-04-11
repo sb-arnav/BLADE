@@ -335,6 +335,7 @@ pub fn run() {
             pulse::pulse_get_last_thought,
             pulse::pulse_now,
             pulse::pulse_explain,
+            pulse::pulse_get_digest,
             journal::journal_get_recent,
             journal::journal_write_now,
             deeplearn::deeplearn_discover_sources,
