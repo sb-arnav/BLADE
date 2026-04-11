@@ -74,7 +74,7 @@ fn open_screen_overlay(app: tauri::AppHandle) -> Result<(), String> {
         return Ok(());
     }
 
-    tauri::WebviewWindowBuilder::new(
+    let overlay_builder = tauri::WebviewWindowBuilder::new(
         &app,
         "overlay",
         tauri::WebviewUrl::App("overlay.html".into()),
@@ -82,11 +82,14 @@ fn open_screen_overlay(app: tauri::AppHandle) -> Result<(), String> {
     .title("Screen Capture")
     .fullscreen(true)
     .decorations(false)
-    .transparent(true)
     .always_on_top(true)
-    .skip_taskbar(true)
-    .build()
-    .map_err(|e| e.to_string())?;
+    .skip_taskbar(true);
+
+    // transparent() requires macos-private-api feature on macOS
+    #[cfg(any(not(target_os = "macos"), feature = "macos-private-api"))]
+    let overlay_builder = overlay_builder.transparent(true);
+
+    overlay_builder.build().map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -372,7 +375,7 @@ pub fn run() {
 
             // Create the Quick Ask floating widget window — always hidden on startup
             // (window-state plugin can restore it as visible, so force-hide after build)
-            let quickask = tauri::WebviewWindowBuilder::new(
+            let quickask_builder = tauri::WebviewWindowBuilder::new(
                 app,
                 "quickask",
                 tauri::WebviewUrl::App("quickask.html".into()),
@@ -380,12 +383,16 @@ pub fn run() {
             .title("Blade Quick Ask")
             .inner_size(500.0, 72.0)
             .decorations(false)
-            .transparent(true)
             .always_on_top(true)
             .skip_taskbar(true)
             .center()
-            .visible(false)
-            .build()?;
+            .visible(false);
+
+            // transparent() requires macos-private-api feature on macOS
+            #[cfg(any(not(target_os = "macos"), feature = "macos-private-api"))]
+            let quickask_builder = quickask_builder.transparent(true);
+
+            let quickask = quickask_builder.build()?;
             // Force hidden regardless of any restored window state
             let _ = quickask.hide();
 
