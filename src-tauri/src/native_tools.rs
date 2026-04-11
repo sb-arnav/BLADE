@@ -238,6 +238,27 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
                 "required": ["query"]
             }),
         },
+        ToolDefinition {
+            name: "blade_update_thread".to_string(),
+            description: "Update your own working memory — the live context document Blade keeps about what it's currently tracking. Use this to record key decisions, switch active projects, note open loops, or explicitly remember something important across the conversation. This is Blade's scratchpad, always injected into the next session.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "content": {"type": "string", "description": "The new working memory content (max ~200 words, present-tense, dense)"},
+                    "title": {"type": "string", "description": "One-line summary of active context"},
+                    "project": {"type": "string", "description": "Project name this thread relates to (e.g. 'blade', 'staq', 'general')"}
+                },
+                "required": ["content"]
+            }),
+        },
+        ToolDefinition {
+            name: "blade_read_thread".to_string(),
+            description: "Read Blade's current working memory thread — what was tracked from the last session. Use at the start of a conversation to recall active context.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
     ]
 }
 
@@ -400,6 +421,29 @@ pub async fn execute(name: &str, args: &Value) -> (String, bool) {
             let name = args["name"].as_str().map(|s| s.to_string());
             let timeout_ms = args["timeout_ms"].as_u64();
             ui_wait(name, timeout_ms)
+        }
+        // ── THREAD: Blade's working memory ─────────────────────────────────────
+        "blade_update_thread" => {
+            let content = match args["content"].as_str() {
+                Some(c) => c.to_string(),
+                None => return ("Missing required argument: content".to_string(), true),
+            };
+            let title = args["title"].as_str().map(|s| s.to_string());
+            let project = args["project"].as_str().map(|s| s.to_string());
+            match crate::thread::write_thread(
+                &title.unwrap_or_else(|| "Active Context".to_string()),
+                &content,
+                &project.unwrap_or_else(|| "general".to_string()),
+            ) {
+                Ok(()) => ("Working memory updated.".to_string(), false),
+                Err(e) => (format!("Failed to update thread: {}", e), true),
+            }
+        }
+        "blade_read_thread" => {
+            match crate::thread::get_active_thread() {
+                Some(content) => (format!("Current working memory:\n\n{}", content), false),
+                None => ("No active thread — working memory is empty.".to_string(), false),
+            }
         }
         _ => (format!("Unknown native tool: {}", name), true),
     }

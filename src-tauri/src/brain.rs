@@ -28,6 +28,12 @@ pub fn build_system_prompt_with_recall(
         }
     }
 
+    // THREAD — Blade's working memory. Injected first (highest priority live context).
+    // This is what gives Blade continuity: it knows exactly where it left off.
+    if let Some(thread) = crate::thread::get_active_thread() {
+        parts.push(format!("## Working Memory (What Blade is tracking)\n\n{}", thread));
+    }
+
     // Character Bible — inject from SQLite (structured, compounding knowledge)
     let db_path = crate::config::blade_config_dir().join("blade.db");
     if let Ok(conn) = rusqlite::Connection::open(&db_path) {
@@ -43,6 +49,17 @@ pub fn build_system_prompt_with_recall(
     if let Some(persona) = load_persona() {
         if !persona.trim().is_empty() {
             parts.push(format!("## Additional User Context\n\n{}", persona));
+        }
+    }
+
+    // SKILL ENGINE — inject learned reflexes matching this query
+    if !user_query.is_empty() {
+        let skill_mods = crate::skill_engine::get_skill_injections(user_query);
+        if !skill_mods.is_empty() {
+            parts.push(format!(
+                "## Learned Reflexes\n\nYou have developed these patterns from past experience. Apply them:\n\n{}",
+                skill_mods
+            ));
         }
     }
 

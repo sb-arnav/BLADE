@@ -358,6 +358,33 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
             created_at INTEGER NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_vector_entries_source ON vector_entries(source_type, source_id);
+
+        -- ── BLADE NERVOUS SYSTEM ─────────────────────────────────────────────
+
+        -- THREAD: Blade's living working memory per project.
+        -- Auto-updated after every conversation. Injected into every system prompt.
+        -- This is what gives Blade continuity between sessions.
+        CREATE TABLE IF NOT EXISTS active_threads (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL DEFAULT 'Active Context',
+            content TEXT NOT NULL,
+            project TEXT NOT NULL DEFAULT 'general',
+            updated_at INTEGER NOT NULL,
+            turn_count INTEGER NOT NULL DEFAULT 0
+        );
+
+        -- SKILL ENGINE: raw tool loop patterns before they graduate to brain_skills.
+        -- When count >= 3, synthesize into a named skill with a prompt modifier.
+        CREATE TABLE IF NOT EXISTS skill_candidates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            query_hash TEXT NOT NULL,
+            query_example TEXT NOT NULL,
+            tool_sequence TEXT NOT NULL,
+            result_summary TEXT NOT NULL,
+            count INTEGER NOT NULL DEFAULT 1,
+            last_seen INTEGER NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_skill_candidates_hash ON skill_candidates(query_hash);
         ",
     )
     .map_err(|e| format!("DB error: {}", e))?;
@@ -1450,4 +1477,106 @@ pub fn brain_build_context(conn: &Connection, budget_tokens: usize) -> String {
     } else {
         result
     }
+}
+
+// ---------------------------------------------------------------------------
+// THREAD — working memory CRUD
+// ---------------------------------------------------------------------------
+
+pub fn thread_get(conn: &Connection) -> Option<String> {
+    conn.query_row(
+        "SELECT content FROM active_threads ORDER BY updated_at DESC LIMIT 1",
+        [],
+        |row| row.get::<_, String>(0),
+    )
+    .ok()
+    .filter(|s| !s.trim().is_empty())
+}
+
+pub fn thread_get_full(conn: &Connection) -> Option<(String, String, String)> {
+    conn.query_row(
+        "SELECT title, content, project FROM active_threads ORDER BY updated_at DESC LIMIT 1",
+        [],
+        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?)),
+    )
+    .ok()
+}
+
+pub fn thread_upsert(conn: &Connection, title: &str, content: &str, project: &str) -> Result<(), String> {
+    let now = chrono::Utc::now().timestamp_millis();
+    // Use project as the natural key
+    let id = format!("thread-{}", project.to_lowercase().replace(' ', "-"));
+    conn.execute(
+        "INSERT INTO active_threads(id, title, content, project, updated_at, turn_count)
+         VALUES(?1, ?2, ?3, ?4, ?5, 1)
+         ON CONFLICT(id) DO UPDATE SET
+             title = excluded.title,
+             content = excluded.content,
+             updated_at = excluded.updated_at,
+             turn_count = turn_count + 1",
+        params![id, title, content, project, now],
+    )
+    .map_err(|e| format!("DB error: {}", e))?;
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// SKILL ENGINE — candidate CRUD
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct SkillCandidateRow {
+    pub id: i64,
+    pub query_hash: String,
+    pub query_example: String,
+    pub tool_sequence: String,
+    pub result_summary: String,
+    pub count: i64,
+    pub last_seen: i64,
+}
+
+pub fn skill_candidate_record(
+    conn: &Connection,
+    query_hash: &str,
+    query_example: &str,
+    tool_sequence: &str,
+    result_summary: &str,
+) -> Result<(), String> {
+    let now = chrono::Utc::now().timestamp_millis();
+    conn.execute(
+        "INSERT INTO skill_candidates(query_hash, query_example, tool_sequence, result_summary, count, last_seen)
+         VALUES(?1, ?2, ?3, ?4, 1, ?5)
+         ON CONFLICT(query_hash) DO UPDATE SET
+             count = count + 1,
+             last_seen = excluded.last_seen",
+        params![query_hash, query_example, tool_sequence, result_summary, now],
+    )
+    .map_err(|e| format!("DB error: {}", e))?;
+    Ok(())
+}
+
+pub fn skill_candidates_ripe(conn: &Connection, threshold: i64) -> Result<Vec<SkillCandidateRow>, String> {
+    let mut stmt = conn.prepare(
+        "SELECT id, query_hash, query_example, tool_sequence, result_summary, count, last_seen
+         FROM skill_candidates WHERE count >= ?1 ORDER BY count DESC"
+    ).map_err(|e| format!("DB error: {}", e))?;
+    let rows = stmt.query_map(params![threshold], |row| {
+        Ok(SkillCandidateRow {
+            id: row.get(0)?,
+            query_hash: row.get(1)?,
+            query_example: row.get(2)?,
+            tool_sequence: row.get(3)?,
+            result_summary: row.get(4)?,
+            count: row.get(5)?,
+            last_seen: row.get(6)?,
+        })
+    }).map_err(|e| format!("DB error: {}", e))?
+    .filter_map(|r| r.ok()).collect();
+    Ok(rows)
+}
+
+pub fn skill_candidate_delete(conn: &Connection, id: i64) -> Result<(), String> {
+    conn.execute("DELETE FROM skill_candidates WHERE id=?1", params![id])
+        .map_err(|e| format!("DB error: {}", e))?;
+    Ok(())
 }
