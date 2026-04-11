@@ -121,7 +121,7 @@ export default function App() {
   const [focusMode, setFocusMode] = useState(false);
   const [workspaceIntent, setWorkspaceIntent] = useState<{ route: Route; title: string; note: string } | null>(null);
   const chat = useChat();
-  const tts = useTTS(chat.messages, chat.loading);
+  const tts = useTTS(chat.messages, chat.loading, config);
   const sound = useNotificationSound(chat.loading);
   const { stats, recordMessage } = useStats();
   const notifications = useNotifications();

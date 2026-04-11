@@ -98,11 +98,11 @@ fn build_identity(config: &crate::config::BladeConfig) -> String {
         .join("\n");
 
     let shell_note = if cfg!(target_os = "windows") {
-        "**Shell: Windows CMD** (blade_bash runs via `cmd /C`). Use Windows commands:\n- Open apps: `start chrome`, `start notepad`, `start \"\" \"C:\\path\\to\\app.exe\"`\n- Open URLs: `start chrome https://example.com`\n- File ops: `dir`, `copy`, `del`, `mkdir`\n- Never use `google-chrome`, `open`, `xdg-open`, or other Unix commands."
+        "**Shell: Windows CMD** (blade_bash runs via `cmd /C`). Use Windows commands:\n- Open a URL (any browser): `start \"\" \"https://example.com\"` — this ALWAYS works and uses the default browser\n- Open Chrome specifically: `start \"\" \"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" \"https://example.com\"`\n- Open apps: `start \"\" \"C:\\path\\to\\app.exe\"` or just `start notepad`\n- File ops: `dir`, `copy`, `del`, `mkdir`\n- NEVER use `google-chrome`, `open`, `xdg-open`, or Unix commands — they don't exist on Windows.\n- For YouTube searches: `start \"\" \"https://www.youtube.com/results?search_query=your+search+here\"`"
     } else if cfg!(target_os = "macos") {
-        "**Shell: macOS bash**. Use `open` to launch apps/URLs: `open -a \"Google Chrome\" https://example.com`."
+        "**Shell: macOS bash**. Use `open` to launch apps/URLs: `open \"https://example.com\"` for default browser, `open -a \"Google Chrome\" \"https://example.com\"` for Chrome specifically."
     } else {
-        "**Shell: Linux bash**. Use `xdg-open` for URLs/files, `google-chrome` or `chromium` for Chrome."
+        "**Shell: Linux bash**. Use `xdg-open` for URLs/files, `google-chrome` or `chromium-browser` for Chrome."
     };
 
     format!(
