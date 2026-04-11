@@ -85,6 +85,9 @@ async fn generate_pulse_thought(config: &crate::config::BladeConfig) -> Result<S
     let activity = crate::context::get_user_activity()
         .unwrap_or_default();
 
+    // Active working thread — what BLADE is tracking right now
+    let active_thread = crate::thread::get_active_thread().unwrap_or_default();
+
     // Pull semantically relevant recent memories based on current activity
     let db_path = crate::config::blade_config_dir().join("blade.db");
     let memory_summary = if let Ok(conn) = rusqlite::Connection::open(&db_path) {
@@ -98,12 +101,12 @@ async fn generate_pulse_thought(config: &crate::config::BladeConfig) -> Result<S
         crate::config::blade_config_dir().join("last_pulse.txt")
     ).unwrap_or_default();
 
-    let has_context = !machine_ctx.is_empty() || !activity.is_empty() || !memory_summary.is_empty();
+    let has_context = !machine_ctx.is_empty() || !activity.is_empty() || !memory_summary.is_empty() || !active_thread.is_empty();
     if !has_context {
         return Err("No context available for pulse".to_string());
     }
 
-    let prompt = build_pulse_prompt(&machine_ctx, &activity, &memory_summary, &last_thought, config);
+    let prompt = build_pulse_prompt(&machine_ctx, &activity, &active_thread, &memory_summary, &last_thought, config);
 
     // Use the cheapest/fastest available model for pulse — it's ambient, not critical
     let pulse_model = cheapest_model(&config.provider, &config.model);
@@ -124,6 +127,7 @@ fn cheapest_model(provider: &str, current_model: &str) -> String {
 fn build_pulse_prompt(
     machine_ctx: &str,
     activity: &str,
+    active_thread: &str,
     memory_summary: &str,
     last_thought: &str,
     config: &crate::config::BladeConfig,
@@ -145,6 +149,7 @@ fn build_pulse_prompt(
 
     let context_sections: Vec<String> = [
         if !activity.is_empty() { Some(format!("Current activity:\n{}", activity)) } else { None },
+        if !active_thread.trim().is_empty() { Some(format!("What Blade is actively tracking:\n{}", &active_thread[..active_thread.len().min(600)])) } else { None },
         if !machine_ctx.trim().is_empty() { Some(format!("Machine context:\n{}", &machine_ctx[..machine_ctx.len().min(800)])) } else { None },
         if !memory_summary.trim().is_empty() { Some(format!("What you know about this person:\n{}", &memory_summary[..memory_summary.len().min(500)])) } else { None },
     ]
