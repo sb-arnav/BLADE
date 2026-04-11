@@ -1,5 +1,6 @@
 mod agent_commands;
 mod ambient;
+mod pulse;
 mod godmode;
 mod native_tools;
 mod agents;
@@ -318,6 +319,8 @@ pub fn run() {
             memory::get_memory_log,
             router::classify_message,
             tray::set_tray_status,
+            pulse::pulse_get_last_thought,
+            pulse::pulse_now,
             open_screen_overlay,
             voice_local::whisper_model_available,
             voice_local::whisper_download_model,
@@ -419,6 +422,9 @@ pub fn run() {
 
             // Start ambient intelligence monitor
             ambient::start_ambient_monitor(app.handle().clone());
+
+            // Start Blade's pulse — the heartbeat that makes it alive
+            pulse::start_pulse(app.handle().clone());
 
             // Start god mode if enabled
             let startup_god_config = config::load_config();
