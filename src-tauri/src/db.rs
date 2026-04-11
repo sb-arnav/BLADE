@@ -347,6 +347,17 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
             reported_at INTEGER NOT NULL,
             resolved_at INTEGER
         );
+
+        -- Persistent vector store: embeddings survive app restarts
+        CREATE TABLE IF NOT EXISTS vector_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            content TEXT NOT NULL,
+            embedding BLOB NOT NULL,
+            source_type TEXT NOT NULL DEFAULT 'conversation',
+            source_id TEXT NOT NULL DEFAULT '',
+            created_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_vector_entries_source ON vector_entries(source_type, source_id);
         ",
     )
     .map_err(|e| format!("DB error: {}", e))?;

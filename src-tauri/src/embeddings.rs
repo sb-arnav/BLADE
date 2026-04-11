@@ -1,4 +1,5 @@
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
@@ -42,36 +43,104 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     dot / (mag_a * mag_b)
 }
 
+/// Serialize a Vec<f32> to raw bytes (little-endian f32 array)
+fn vec_to_blob(v: &[f32]) -> Vec<u8> {
+    v.iter().flat_map(|f| f.to_le_bytes()).collect()
+}
+
+/// Deserialize raw bytes back to Vec<f32>
+fn blob_to_vec(b: &[u8]) -> Vec<f32> {
+    b.chunks_exact(4)
+        .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+        .collect()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchResult {
     pub text: String,
     pub score: f32,
-    pub metadata: serde_json::Value,
-}
-
-/// Simple in-memory vector store (persisted to SQLite via db.rs)
-pub struct VectorStore {
-    entries: Vec<VectorEntry>,
+    pub source_type: String,
+    pub source_id: String,
 }
 
 struct VectorEntry {
-    text: String,
+    content: String,
     embedding: Vec<f32>,
-    metadata: serde_json::Value,
+    source_type: String,
+    source_id: String,
+}
+
+/// SQLite-backed vector store. Entries are persisted immediately on add
+/// and loaded from disk when the store is initialized.
+pub struct VectorStore {
+    entries: Vec<VectorEntry>,
+    db_path: std::path::PathBuf,
 }
 
 impl VectorStore {
+    /// Create a new VectorStore, loading any existing entries from SQLite.
     pub fn new() -> Self {
-        Self {
+        let db_path = crate::config::blade_config_dir().join("blade.db");
+        let mut store = Self {
             entries: Vec::new(),
+            db_path: db_path.clone(),
+        };
+        // Best-effort load — if db doesn't exist yet, start empty
+        if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+            let _ = store.load_from_db(&conn);
         }
+        store
     }
 
-    pub fn add(&mut self, text: String, embedding: Vec<f32>, metadata: serde_json::Value) {
+    fn load_from_db(&mut self, conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
+        let mut stmt = conn.prepare(
+            "SELECT content, embedding, source_type, source_id FROM vector_entries ORDER BY id ASC",
+        )?;
+        let entries = stmt.query_map([], |row| {
+            let content: String = row.get(0)?;
+            let blob: Vec<u8> = row.get(1)?;
+            let source_type: String = row.get(2)?;
+            let source_id: String = row.get(3)?;
+            Ok((content, blob, source_type, source_id))
+        })?;
+
+        for entry in entries.flatten() {
+            let (content, blob, source_type, source_id) = entry;
+            self.entries.push(VectorEntry {
+                content,
+                embedding: blob_to_vec(&blob),
+                source_type,
+                source_id,
+            });
+        }
+        Ok(())
+    }
+
+    /// Add a new entry. Persists to SQLite immediately (write-through).
+    pub fn add(
+        &mut self,
+        content: String,
+        embedding: Vec<f32>,
+        source_type: String,
+        source_id: String,
+    ) {
+        // Write to SQLite
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+        if let Ok(conn) = rusqlite::Connection::open(&self.db_path) {
+            let blob = vec_to_blob(&embedding);
+            let _ = conn.execute(
+                "INSERT INTO vector_entries (content, embedding, source_type, source_id, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![content, blob, source_type, source_id, now],
+            );
+        }
         self.entries.push(VectorEntry {
-            text,
+            content,
             embedding,
-            metadata,
+            source_type,
+            source_id,
         });
     }
 
@@ -88,12 +157,14 @@ impl VectorStore {
         scored
             .into_iter()
             .take(top_k)
+            .filter(|(score, _)| *score > 0.3) // skip low-relevance results
             .map(|(score, idx)| {
                 let entry = &self.entries[idx];
                 SearchResult {
-                    text: entry.text.clone(),
+                    text: entry.content.clone(),
                     score,
-                    metadata: entry.metadata.clone(),
+                    source_type: entry.source_type.clone(),
+                    source_id: entry.source_id.clone(),
                 }
             })
             .collect()
@@ -105,6 +176,59 @@ impl VectorStore {
 }
 
 pub type SharedVectorStore = Arc<Mutex<VectorStore>>;
+
+/// Embed a conversation exchange and store in the persistent vector store.
+/// Called after every response completes (fire-and-forget).
+pub fn auto_embed_exchange(store: &SharedVectorStore, user_msg: &str, assistant_msg: &str, conversation_id: &str) {
+    // Combine both sides into a single searchable chunk
+    let content = format!("User: {}\nAssistant: {}", user_msg, assistant_msg);
+    // Truncate to avoid embedding very long conversations
+    let content = if content.len() > 2000 {
+        content[..2000].to_string()
+    } else {
+        content
+    };
+
+    match embed_texts(&[content.clone()]) {
+        Ok(embeddings) => {
+            if let Some(embedding) = embeddings.into_iter().next() {
+                if let Ok(mut s) = store.lock() {
+                    s.add(content, embedding, "conversation".to_string(), conversation_id.to_string());
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("[embeddings] auto_embed failed: {}", e);
+        }
+    }
+}
+
+/// Semantic search across all stored exchanges. Returns formatted context string.
+pub fn recall_relevant(store: &SharedVectorStore, query: &str, top_k: usize) -> String {
+    let embeddings = match embed_texts(&[query.to_string()]) {
+        Ok(e) => e,
+        Err(_) => return String::new(),
+    };
+    let query_embedding = match embeddings.into_iter().next() {
+        Some(e) => e,
+        None => return String::new(),
+    };
+    let results = match store.lock() {
+        Ok(s) => s.search(&query_embedding, top_k),
+        Err(_) => return String::new(),
+    };
+
+    if results.is_empty() {
+        return String::new();
+    }
+
+    let formatted: Vec<String> = results
+        .into_iter()
+        .map(|r| format!("(relevance {:.0}%) {}", r.score * 100.0, r.text))
+        .collect();
+
+    formatted.join("\n\n")
+}
 
 // --- Tauri Commands ---
 
@@ -120,8 +244,19 @@ pub async fn embed_and_store(
         .next()
         .ok_or("No embedding generated")?;
 
+    let source_type = metadata
+        .get("source_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("manual")
+        .to_string();
+    let source_id = metadata
+        .get("source_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
     let mut s = store.lock().map_err(|e| e.to_string())?;
-    s.add(text, embedding, metadata);
+    s.add(text, embedding, source_type, source_id);
     Ok(())
 }
 
