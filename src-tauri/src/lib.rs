@@ -2,6 +2,7 @@ mod agent_commands;
 mod ambient;
 mod deeplearn;
 mod discord;
+mod obsidian;
 mod pulse;
 mod skill_engine;
 mod telegram;
@@ -399,6 +400,11 @@ pub fn run() {
             watcher::watcher_list_all,
             watcher::watcher_remove,
             watcher::watcher_toggle,
+            obsidian::obsidian_ensure_daily_note,
+            obsidian::obsidian_save_conversation,
+            obsidian::obsidian_append_note,
+            obsidian::obsidian_today_note,
+            obsidian::obsidian_vault_configured,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
@@ -479,6 +485,9 @@ pub fn run() {
 
             // Start URL/resource watcher loop
             watcher::start_watcher_loop(app.handle().clone());
+
+            // Create today's Obsidian daily note if vault is configured
+            obsidian::ensure_daily_note();
 
             // Alt+Space → toggle Quick Ask floating widget
             let handle = app.handle().clone();
