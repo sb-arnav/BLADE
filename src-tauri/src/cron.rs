@@ -14,6 +14,7 @@
 /// Schedule format (human): "every day at 9am", "every Monday", "every 30 minutes"
 /// Stored in SQLite. Background loop checks every 60 seconds.
 
+use chrono::{Datelike, Timelike};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -307,12 +308,14 @@ async fn fire_due_tasks(app: &tauri::AppHandle) {
     let Ok(conn) = open_db() else { return };
     let now = chrono::Utc::now().timestamp();
 
-    let due: Vec<CronTask> = conn.prepare(
-        "SELECT id, name, description, schedule_json, action_json, enabled, last_run, next_run, run_count, created_at
-         FROM cron_tasks WHERE enabled = 1 AND next_run <= ?1"
-    ).ok().and_then(|mut s| {
-        s.query_map(params![now], row_to_task).ok().map(|rows| rows.flatten().collect())
-    }).unwrap_or_default();
+    let due: Vec<CronTask> = (|| {
+        let mut s = conn.prepare(
+            "SELECT id, name, description, schedule_json, action_json, enabled, last_run, next_run, run_count, created_at
+             FROM cron_tasks WHERE enabled = 1 AND next_run <= ?1"
+        ).ok()?;
+        let rows = s.query_map(params![now], row_to_task).ok()?;
+        Some(rows.flatten().collect::<Vec<CronTask>>())
+    })().unwrap_or_default();
 
     for task in due {
         execute_task(&task, app).await;

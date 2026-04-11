@@ -54,6 +54,7 @@ mod ui_automation;
 mod voice;
 mod voice_local;
 
+use chrono::Timelike;
 use std::sync::Arc;
 use tauri::{Manager, WindowEvent};
 use tauri_plugin_autostart::MacosLauncher;

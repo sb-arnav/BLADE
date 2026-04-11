@@ -129,7 +129,7 @@ async fn generate_pulse_thought(config: &crate::config::BladeConfig) -> Result<S
         .unwrap_or_default();
 
     let activity = crate::context::get_user_activity()
-        .unwrap_or_default();
+        .ok().unwrap_or_default();
 
     // Active working thread — what BLADE is tracking right now
     let active_thread = crate::thread::get_active_thread().unwrap_or_default();
@@ -287,15 +287,17 @@ pub async fn pulse_get_digest(hidden_since: i64) -> Option<String> {
     let events_since = rusqlite::Connection::open(&db_path)
         .ok()
         .and_then(|conn| {
-            conn.prepare(
+            let mut stmt = conn.prepare(
                 "SELECT event_type, title, timestamp FROM activity_timeline WHERE timestamp > ?1 ORDER BY timestamp ASC LIMIT 15"
-            ).ok()?.query_map(rusqlite::params![hidden_since], |row| {
+            ).ok()?;
+            let rows = stmt.query_map(rusqlite::params![hidden_since], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
                     row.get::<_, i64>(2)?,
                 ))
-            }).ok()?.flatten().collect::<Vec<_>>().into()
+            }).ok()?;
+            Some(rows.flatten().collect::<Vec<_>>())
         })
         .unwrap_or_default();
 
@@ -492,7 +494,7 @@ pub async fn pulse_explain() -> Result<String, String> {
 
     // Gather the same context that was used to generate the thought
     let machine_ctx = crate::godmode::load_godmode_context().unwrap_or_default();
-    let activity = crate::context::get_user_activity().unwrap_or_default();
+    let activity = crate::context::get_user_activity().ok().unwrap_or_default();
     let active_thread = crate::thread::get_active_thread().unwrap_or_default();
     let db_path = crate::config::blade_config_dir().join("blade.db");
     let memory_summary = if let Ok(conn) = rusqlite::Connection::open(&db_path) {

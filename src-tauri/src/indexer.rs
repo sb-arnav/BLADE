@@ -536,18 +536,17 @@ pub fn project_summary_for_prompt(project: &str) -> String {
     };
 
     // Get top-level exports and public functions
-    let exports: Vec<String> = conn.prepare(
-        "SELECT name, symbol_type, file_path FROM code_symbols
-         WHERE project = ?1 AND (symbol_type LIKE 'export%' OR symbol_type = 'function' OR symbol_type = 'struct')
-         ORDER BY name LIMIT 30"
-    ).ok()
-    .and_then(|mut s| {
-        s.query_map(params![project], |r| {
+    let exports: Vec<String> = (|| {
+        let mut s = conn.prepare(
+            "SELECT name, symbol_type, file_path FROM code_symbols
+             WHERE project = ?1 AND (symbol_type LIKE 'export%' OR symbol_type = 'function' OR symbol_type = 'struct')
+             ORDER BY name LIMIT 30"
+        ).ok()?;
+        let rows = s.query_map(params![project], |r| {
             Ok(format!("{}({})", r.get::<_, String>(0)?, r.get::<_, String>(1)?))
-        }).ok()
-    })
-    .map(|rows| rows.flatten().collect())
-    .unwrap_or_default();
+        }).ok()?;
+        Some(rows.flatten().collect::<Vec<String>>())
+    })().unwrap_or_default();
 
     let meta: Option<(usize, usize)> = conn.query_row(
         "SELECT file_count, symbol_count FROM project_meta WHERE project = ?1",

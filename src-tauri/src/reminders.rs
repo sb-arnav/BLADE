@@ -173,7 +173,7 @@ pub fn parse_time_expression(expr: &str) -> Option<i64> {
             .date_naive()
             .succ_opt()?
             .and_hms_opt(9, 0, 0)?;
-        let ts = chrono::Local.from_local_datetime(&tomorrow).single()?.timestamp();
+        let ts = tomorrow.and_local_timezone(chrono::Local).single()?.timestamp();
         return Some(ts);
     }
 
@@ -182,7 +182,7 @@ pub fn parse_time_expression(expr: &str) -> Option<i64> {
         let tonight = chrono::Local::now()
             .date_naive()
             .and_hms_opt(20, 0, 0)?;
-        let ts = chrono::Local.from_local_datetime(&tonight).single()?.timestamp();
+        let ts = tonight.and_local_timezone(chrono::Local).single()?.timestamp();
         return Some(ts);
     }
 

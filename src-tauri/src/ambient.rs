@@ -139,7 +139,7 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
 
                     // Every ~10 min (20 ticks): ambient context update to frontend
                     if tick % 20 == 0 {
-                        let activity = crate::context::get_user_activity().unwrap_or_default();
+                        let activity = crate::context::get_user_activity().ok().unwrap_or_default();
                         if !activity.is_empty() {
                             let _ = app.emit("ambient_update", serde_json::json!({
                                 "activity": activity
@@ -196,7 +196,7 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
                             .unwrap_or(false)
                     };
 
-                    if let Some(thread) = thread_stale.then(|| crate::thread::get_active_thread().ok()).flatten() {
+                    if let Some(thread) = thread_stale.then(|| crate::thread::get_active_thread()).flatten() {
                         if !thread.trim().is_empty() {
                             stale_thread_nudged = true;
                             let headline = thread.lines().next().unwrap_or("your active thread").trim().to_string();

@@ -7,7 +7,7 @@
 /// Writes a live context file injected into every Blade conversation.
 
 use std::time::Duration;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
     let tier = tier.to_string();

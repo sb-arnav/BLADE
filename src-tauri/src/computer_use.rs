@@ -242,8 +242,7 @@ async fn call_vision_model(
     // Use vision message variant
     let messages = vec![ConversationMessage::UserWithImage {
         text: prompt.to_string(),
-        image_b64: screenshot_b64.to_string(),
-        media_type: "image/png".to_string(),
+        image_base64: screenshot_b64.to_string(),
     }];
 
     let turn = crate::providers::complete_turn(
