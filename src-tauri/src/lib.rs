@@ -2,6 +2,8 @@ mod agent_commands;
 mod ambient;
 mod deeplearn;
 mod pulse;
+mod skill_engine;
+mod thread;
 mod godmode;
 mod native_tools;
 mod agents;
@@ -324,6 +326,8 @@ pub fn run() {
             pulse::pulse_now,
             deeplearn::deeplearn_discover_sources,
             deeplearn::deeplearn_run,
+            thread::blade_thread_update,
+            thread::blade_thread_get,
             open_screen_overlay,
             voice_local::whisper_model_available,
             voice_local::whisper_download_model,

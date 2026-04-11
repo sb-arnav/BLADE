@@ -106,7 +106,7 @@ pub async fn send_message_stream(
         trace::log_trace(&entry);
         if result.is_ok() {
             let _ = app.emit("blade_status", "idle");
-            // Background: entity extraction + auto-embed for persistent memory
+            // Background: entity extraction + auto-embed + thread update for persistent memory
             // Note: streaming path — assistant text assembled by frontend via brain_extract_from_exchange
             let app2 = app.clone();
             let user_text_clone = last_user_text.clone();
@@ -177,11 +177,21 @@ pub async fn send_message_stream(
             }
             let _ = app.emit("chat_done", ());
             let _ = app.emit("blade_status", "idle");
-            // Background: entity extraction + auto-embed + capability gap detection
+            // Background: entity extraction + auto-embed + THREAD update + SKILL ENGINE + gap detection
             let app2 = app.clone();
+            let app3 = app.clone();
             let user_text = last_user_text.clone();
             let assistant_text = turn.content.clone();
             let store_clone = vector_store.inner().clone();
+            // Collect tool names used in this loop for skill pattern recording
+            let tools_used: Vec<String> = conversation.iter().filter_map(|m| {
+                if let crate::providers::ConversationMessage::Tool { tool_name, is_error, .. } = m {
+                    if !*is_error { Some(tool_name.clone()) } else { None }
+                } else { None }
+            }).collect();
+            let user_text_skill = user_text.clone();
+            let assistant_text_thread = assistant_text.clone();
+            let user_text_thread = user_text.clone();
             tokio::spawn(async move {
                 let n = brain::extract_entities_from_exchange(&user_text, &assistant_text).await;
                 if n > 0 {
@@ -189,6 +199,13 @@ pub async fn send_message_stream(
                 }
                 // Embed the full exchange for persistent semantic memory
                 crate::embeddings::auto_embed_exchange(&store_clone, &user_text, &assistant_text, "tool_loop");
+                // SKILL ENGINE: record successful tool pattern
+                if !tools_used.is_empty() {
+                    let result_summary = &assistant_text[..assistant_text.len().min(200)];
+                    crate::skill_engine::record_tool_pattern(&user_text_skill, &tools_used, result_summary);
+                    // Check if any candidates are ready to graduate to skills
+                    crate::skill_engine::maybe_synthesize_skills(app3).await;
+                }
                 // Capability gap detection — runs silently, fires webhook if gap found
                 if reports::detect_and_log(&user_text, &assistant_text) {
                     let _ = app2.emit("capability_gap_detected", serde_json::json!({
@@ -205,6 +222,8 @@ pub async fn send_message_stream(
                     }
                 }
             });
+            // THREAD: auto-update working memory (spawns its own background task)
+            crate::thread::auto_update_thread(app.clone(), user_text_thread, assistant_text_thread);
             return Ok(());
         }
 
