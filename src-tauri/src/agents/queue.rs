@@ -22,8 +22,14 @@ impl Default for AgentQueue {
         Self {
             agents: HashMap::new(),
             running: Vec::new(),
-            max_concurrent: 2,
+            max_concurrent: 5,
         }
+    }
+}
+
+impl AgentQueue {
+    pub fn set_max_concurrent(&mut self, n: usize) {
+        self.max_concurrent = n.max(1);
     }
 }
 

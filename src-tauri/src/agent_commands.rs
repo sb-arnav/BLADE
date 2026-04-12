@@ -273,7 +273,7 @@ pub async fn agent_create(
     let model = config.model.clone();
 
     tokio::spawn(async move {
-        run_agent_loop(
+        run_agent_loop_internal(
             &agent_id,
             &queue_clone,
             &mcp_clone,
@@ -368,7 +368,7 @@ pub async fn agent_create_desktop(
     Ok(id)
 }
 
-async fn run_agent_loop(
+pub(crate) async fn run_agent_loop_internal(
     agent_id: &str,
     queue: &SharedAgentQueue,
     mcp: &SharedMcpManager,
@@ -2634,7 +2634,7 @@ pub async fn agent_resume(
     } else {
         let mcp_clone = mcp.inner().clone();
         tokio::spawn(async move {
-            run_agent_loop(
+            run_agent_loop_internal(
                 &agent_id,
                 &queue_clone,
                 &mcp_clone,
