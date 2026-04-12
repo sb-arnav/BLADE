@@ -56,6 +56,7 @@ mod swarm;
 mod swarm_planner;
 mod swarm_commands;
 mod wake_word;
+mod soul_commands;
 mod trace;
 mod tray;
 mod ui_automation;
@@ -592,6 +593,11 @@ pub fn run() {
             wake_word::wake_word_start,
             wake_word::wake_word_stop,
             wake_word::wake_word_status,
+            soul_commands::soul_get_state,
+            soul_commands::soul_take_snapshot,
+            soul_commands::soul_delete_preference,
+            soul_commands::soul_update_bible_section,
+            soul_commands::soul_refresh_bible,
             screen_timeline_commands::timeline_search_cmd,
             screen_timeline_commands::timeline_browse_cmd,
             screen_timeline_commands::timeline_get_screenshot,

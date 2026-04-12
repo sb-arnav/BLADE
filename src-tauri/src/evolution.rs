@@ -649,6 +649,11 @@ pub fn start_evolution_loop(app: tauri::AppHandle) {
                 crate::research::run_research_cycle(&research_app).await;
             });
 
+            // Weekly soul snapshot — captures character state for transparency diff
+            tokio::spawn(async move {
+                crate::soul_commands::maybe_take_weekly_snapshot().await;
+            });
+
             // Check every 15 minutes
             tokio::time::sleep(std::time::Duration::from_secs(15 * 60)).await;
         }

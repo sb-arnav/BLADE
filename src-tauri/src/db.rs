@@ -476,6 +476,17 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
         );
         CREATE INDEX IF NOT EXISTS idx_swarm_tasks_swarm ON swarm_tasks(swarm_id);
         CREATE INDEX IF NOT EXISTS idx_swarm_tasks_status ON swarm_tasks(status);
+
+        -- ── SOUL SNAPSHOTS — weekly character state for diff/transparency ────
+        CREATE TABLE IF NOT EXISTS soul_snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at INTEGER NOT NULL,
+            character_bible TEXT NOT NULL DEFAULT '{}',
+            blade_soul TEXT NOT NULL DEFAULT '',
+            preferences TEXT NOT NULL DEFAULT '[]',
+            diff_summary TEXT NOT NULL DEFAULT ''
+        );
+        CREATE INDEX IF NOT EXISTS idx_soul_snap_ts ON soul_snapshots(created_at DESC);
         ",
     )
     .map_err(|e| format!("DB error: {}", e))?;
@@ -1756,4 +1767,64 @@ pub fn timeline_prune(conn: &Connection, days: i64) -> Result<usize, String> {
         params![cutoff],
     ).map_err(|e| format!("DB error: {}", e))?;
     Ok(n)
+}
+
+// ── Soul Snapshot functions ────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SoulSnapshot {
+    pub id: i64,
+    pub created_at: i64,
+    pub character_bible: String,
+    pub blade_soul: String,
+    pub preferences: String,
+    pub diff_summary: String,
+}
+
+pub fn soul_save_snapshot(
+    conn: &Connection,
+    character_bible: &str,
+    blade_soul: &str,
+    preferences: &str,
+    diff_summary: &str,
+) -> Result<i64, String> {
+    let now = chrono::Utc::now().timestamp();
+    conn.execute(
+        "INSERT INTO soul_snapshots(created_at, character_bible, blade_soul, preferences, diff_summary)
+         VALUES(?1, ?2, ?3, ?4, ?5)",
+        params![now, character_bible, blade_soul, preferences, diff_summary],
+    ).map_err(|e| format!("DB error: {}", e))?;
+    Ok(conn.last_insert_rowid())
+}
+
+pub fn soul_get_snapshots(conn: &Connection, limit: i64) -> Result<Vec<SoulSnapshot>, String> {
+    let mut stmt = conn.prepare(
+        "SELECT id, created_at, character_bible, blade_soul, preferences, diff_summary
+         FROM soul_snapshots ORDER BY created_at DESC LIMIT ?1"
+    ).map_err(|e| format!("DB error: {}", e))?;
+    let rows = stmt.query_map(params![limit], |row| Ok(SoulSnapshot {
+        id: row.get(0)?,
+        created_at: row.get(1)?,
+        character_bible: row.get(2)?,
+        blade_soul: row.get(3)?,
+        preferences: row.get(4)?,
+        diff_summary: row.get(5)?,
+    })).map_err(|e| format!("DB error: {}", e))?;
+    Ok(rows.filter_map(|r| r.ok()).collect())
+}
+
+pub fn soul_get_latest_snapshot(conn: &Connection) -> Option<SoulSnapshot> {
+    conn.query_row(
+        "SELECT id, created_at, character_bible, blade_soul, preferences, diff_summary
+         FROM soul_snapshots ORDER BY created_at DESC LIMIT 1",
+        [],
+        |row| Ok(SoulSnapshot {
+            id: row.get(0)?,
+            created_at: row.get(1)?,
+            character_bible: row.get(2)?,
+            blade_soul: row.get(3)?,
+            preferences: row.get(4)?,
+            diff_summary: row.get(5)?,
+        }),
+    ).ok()
 }
