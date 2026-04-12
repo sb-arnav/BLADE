@@ -168,6 +168,12 @@ fn build_system_prompt_inner(
     let mut parts: Vec<String> = Vec::new();
     let config = crate::config::load_config();
 
+    // ROLE INJECTION — active specialist mode shapes everything below
+    let role_injection = crate::roles::role_system_injection(&config.active_role);
+    if !role_injection.trim().is_empty() {
+        parts.push(role_injection);
+    }
+
     // Core identity — personalised with user name + style
     parts.push(build_identity(&config));
 

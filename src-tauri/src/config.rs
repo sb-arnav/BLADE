@@ -73,6 +73,8 @@ struct DiskConfig {
     wake_word_phrase: String,
     #[serde(default = "default_wake_word_sensitivity")]
     wake_word_sensitivity: u8,
+    #[serde(default = "default_active_role")]
+    active_role: String,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -87,6 +89,7 @@ fn default_timeline_interval() -> u32 { 30 }
 fn default_timeline_retention() -> u32 { 14 }
 fn default_wake_word_phrase() -> String { "hey blade".to_string() }
 fn default_wake_word_sensitivity() -> u8 { 3 }
+fn default_active_role() -> String { "engineering".to_string() }
 
 impl Default for DiskConfig {
     fn default() -> Self {
@@ -115,6 +118,7 @@ impl Default for DiskConfig {
             wake_word_enabled: false,
             wake_word_phrase: "hey blade".to_string(),
             wake_word_sensitivity: 3,
+            active_role: "engineering".to_string(),
             api_key: None,
         }
     }
@@ -169,6 +173,8 @@ pub struct BladeConfig {
     pub wake_word_phrase: String,
     #[serde(default = "default_wake_word_sensitivity")]
     pub wake_word_sensitivity: u8,
+    #[serde(default = "default_active_role")]
+    pub active_role: String,
 }
 
 impl BladeConfig {
@@ -205,6 +211,7 @@ impl Default for BladeConfig {
             wake_word_enabled: false,
             wake_word_phrase: "hey blade".to_string(),
             wake_word_sensitivity: 3,
+            active_role: "engineering".to_string(),
         }
     }
 }
@@ -299,6 +306,7 @@ pub fn load_config() -> BladeConfig {
         wake_word_enabled: disk.wake_word_enabled,
         wake_word_phrase: disk.wake_word_phrase,
         wake_word_sensitivity: disk.wake_word_sensitivity,
+        active_role: disk.active_role,
     }
 }
 
@@ -331,6 +339,7 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         wake_word_enabled: config.wake_word_enabled,
         wake_word_phrase: config.wake_word_phrase.clone(),
         wake_word_sensitivity: config.wake_word_sensitivity,
+        active_role: config.active_role.clone(),
         api_key: None,
     };
 
