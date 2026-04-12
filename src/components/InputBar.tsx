@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState, useMemo, KeyboardEvent, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 const SLASH_COMMANDS = [
   { cmd: "/clear", label: "Clear conversation", action: "clear" },
@@ -17,13 +18,14 @@ interface Props {
   onSend: (message: string, imageBase64?: string) => void;
   onSlashCommand?: (action: SlashAction) => void;
   disabled: boolean;
+  loading?: boolean;
   draftValue?: string | null;
   onDraftConsumed?: () => void;
   onPttMouseDown?: () => void;
   onPttMouseUp?: () => void;
 }
 
-export function InputBar({ onSend, onSlashCommand, disabled, draftValue, onDraftConsumed, onPttMouseDown, onPttMouseUp }: Props) {
+export function InputBar({ onSend, onSlashCommand, disabled, loading, draftValue, onDraftConsumed, onPttMouseDown, onPttMouseUp }: Props) {
   const [value, setValue] = useState("");
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
@@ -267,21 +269,34 @@ export function InputBar({ onSend, onSlashCommand, disabled, draftValue, onDraft
           }}
         />
 
-        {/* Send */}
-        <button
-          onClick={handleSend}
-          disabled={busy || !value.trim()}
-          className={`w-7 h-7 rounded-lg flex items-center justify-center mb-0.5 transition-all ${
-            value.trim() && !busy
-              ? "bg-blade-accent text-white hover:bg-blade-accent-hover"
-              : "text-blade-muted/30"
-          }`}
-          aria-label="Send"
-        >
-          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 19V5M5 12l7-7 7 7" />
-          </svg>
-        </button>
+        {/* Send / Stop */}
+        {loading ? (
+          <button
+            onClick={() => invoke("cancel_chat")}
+            className="w-7 h-7 rounded-lg flex items-center justify-center mb-0.5 bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-all"
+            aria-label="Stop"
+            title="Stop generating"
+          >
+            <svg viewBox="0 0 24 24" className="w-3 h-3" fill="currentColor">
+              <rect x="4" y="4" width="16" height="16" rx="2" />
+            </svg>
+          </button>
+        ) : (
+          <button
+            onClick={handleSend}
+            disabled={busy || !value.trim()}
+            className={`w-7 h-7 rounded-lg flex items-center justify-center mb-0.5 transition-all ${
+              value.trim() && !busy
+                ? "bg-blade-accent text-white hover:bg-blade-accent-hover"
+                : "text-blade-muted/30"
+            }`}
+            aria-label="Send"
+          >
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 19V5M5 12l7-7 7 7" />
+            </svg>
+          </button>
+        )}
       </div>
       <div className="flex items-center justify-between mt-1 px-1">
         <span className="text-2xs text-blade-muted/50">

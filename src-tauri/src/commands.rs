@@ -12,12 +12,66 @@ use crate::trace;
 use std::collections::HashMap as StdHashMap;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::Emitter;
 use tokio::sync::oneshot;
 use tokio::sync::Mutex;
 
 pub type SharedMcpManager = Arc<Mutex<McpManager>>;
 pub type ApprovalMap = Arc<Mutex<StdHashMap<String, oneshot::Sender<bool>>>>;
+
+/// Global cancel flag — set to true to abort the current chat inference.
+static CHAT_CANCEL: AtomicBool = AtomicBool::new(false);
+
+#[tauri::command]
+pub fn cancel_chat(app: tauri::AppHandle) {
+    CHAT_CANCEL.store(true, Ordering::SeqCst);
+    let _ = app.emit("chat_cancelled", ());
+    let _ = app.emit("blade_status", "idle");
+}
+
+/// Rough token estimate: 1 token ≈ 4 chars.
+fn estimate_tokens(conversation: &[ConversationMessage]) -> usize {
+    conversation.iter().map(|m| {
+        let chars = match m {
+            ConversationMessage::System(s) => s.len(),
+            ConversationMessage::User(s) => s.len(),
+            ConversationMessage::UserWithImage { text, .. } => text.len() + 1000,
+            ConversationMessage::Assistant { content, .. } => content.len(),
+            ConversationMessage::Tool { content, .. } => content.len(),
+        };
+        chars / 4
+    }).sum()
+}
+
+/// Truncate conversation to fit within token budget.
+/// Keeps: System prompt (always), last user message (always), drops oldest middle messages.
+fn truncate_to_budget(conversation: &mut Vec<ConversationMessage>, max_tokens: usize) {
+    while estimate_tokens(conversation) > max_tokens && conversation.len() > 3 {
+        // Remove second message (index 1) — keeps system prompt at 0 and recent messages
+        conversation.remove(1);
+    }
+}
+
+/// Classify API errors and return a recovery action.
+enum ErrorRecovery {
+    TruncateAndRetry,
+    SwitchModelAndRetry(String),
+    Fatal(String),
+}
+
+fn classify_api_error(err: &str) -> ErrorRecovery {
+    let lower = err.to_lowercase();
+    if lower.contains("too long") || lower.contains("maximum") || lower.contains("context length")
+        || lower.contains("token") && lower.contains("exceed") {
+        ErrorRecovery::TruncateAndRetry
+    } else if lower.contains("model") && (lower.contains("not found") || lower.contains("invalid") || lower.contains("does not exist")) {
+        // Try a safe fallback
+        ErrorRecovery::SwitchModelAndRetry("claude-haiku-4-5-20251001".to_string())
+    } else {
+        ErrorRecovery::Fatal(err.to_string())
+    }
+}
 const MAX_TOOL_RESULT_CHARS: usize = 12_000;
 
 #[tauri::command]
@@ -28,6 +82,9 @@ pub async fn send_message_stream(
     vector_store: tauri::State<'_, crate::embeddings::SharedVectorStore>,
     messages: Vec<ChatMessage>,
 ) -> Result<(), String> {
+    // Reset cancel flag at the start of every new request
+    CHAT_CANCEL.store(false, Ordering::SeqCst);
+
     let _ = app.emit("blade_status", "processing");
 
     let mut config = load_config();
@@ -130,6 +187,14 @@ pub async fn send_message_stream(
     let mut last_tool_signature = String::new();
     let mut repeat_count = 0u8;
     for iteration in 0..12 {
+        // Check cancellation before each iteration
+        if CHAT_CANCEL.load(Ordering::SeqCst) {
+            let _ = app.emit("chat_cancelled", ());
+            let _ = app.emit("chat_done", ());
+            let _ = app.emit("blade_status", "idle");
+            return Ok(());
+        }
+
         let span = trace::TraceSpan::new(
             &config.provider,
             &config.model,
@@ -149,8 +214,50 @@ pub async fn send_message_stream(
         let turn = match turn_result {
             Ok(t) => t,
             Err(e) => {
-                let _ = app.emit("blade_status", "error");
-                return Err(e);
+                match classify_api_error(&e) {
+                    ErrorRecovery::TruncateAndRetry => {
+                        // Truncate conversation to ~150k tokens and retry this iteration
+                        let _ = app.emit("blade_status", "processing");
+                        truncate_to_budget(&mut conversation, 140_000);
+                        let retry = providers::complete_turn(
+                            &config.provider,
+                            &config.api_key,
+                            &config.model,
+                            &conversation,
+                            &tools,
+                            config.base_url.as_deref(),
+                        ).await;
+                        match retry {
+                            Ok(t) => t,
+                            Err(e2) => {
+                                let _ = app.emit("blade_status", "error");
+                                return Err(format!("Context trimmed but still failed: {}", e2));
+                            }
+                        }
+                    }
+                    ErrorRecovery::SwitchModelAndRetry(fallback) => {
+                        let _ = app.emit("blade_status", "processing");
+                        let retry = providers::complete_turn(
+                            &config.provider,
+                            &config.api_key,
+                            &fallback,
+                            &conversation,
+                            &tools,
+                            config.base_url.as_deref(),
+                        ).await;
+                        match retry {
+                            Ok(t) => t,
+                            Err(e2) => {
+                                let _ = app.emit("blade_status", "error");
+                                return Err(format!("Model fallback also failed: {}", e2));
+                            }
+                        }
+                    }
+                    ErrorRecovery::Fatal(msg) => {
+                        let _ = app.emit("blade_status", "error");
+                        return Err(msg);
+                    }
+                }
             }
         };
 
@@ -328,9 +435,33 @@ pub async fn send_message_stream(
                     let mut manager = state.lock().await;
                     manager
                         .call_tool(&tool_call.name, tool_call.arguments.clone())
-                        .await?
+                        .await
                 };
-                (format_tool_result(&result), result.is_error)
+                match result {
+                    Ok(r) => (format_tool_result(&r), r.is_error),
+                    Err(e) => {
+                        // Tool call failed — try autoskills to acquire missing capability
+                        let gap = crate::autoskills::GapContext {
+                            user_request: &last_user_text,
+                            missing_capability: &tool_call.name,
+                            error: &e,
+                        };
+                        match crate::autoskills::try_acquire(&app, gap, &state).await {
+                            crate::autoskills::AutoskillResult::InstalledSilently { name, .. } => {
+                                // Retry the tool call with the newly installed server
+                                let retry = {
+                                    let mut manager = state.lock().await;
+                                    manager.call_tool(&tool_call.name, tool_call.arguments.clone()).await
+                                };
+                                match retry {
+                                    Ok(r) => (format_tool_result(&r), r.is_error),
+                                    Err(e2) => (format!("Tool failed even after installing {}: {}", name, e2), true),
+                                }
+                            }
+                            _ => (format!("Tool error: {}", e), true),
+                        }
+                    }
+                }
             };
 
             let _ = app.emit(
