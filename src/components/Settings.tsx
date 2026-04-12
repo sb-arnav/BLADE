@@ -1310,7 +1310,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
                   if (e.key !== "Enter" || !researchQuery.trim() || researchRunning) return;
                   setResearchRunning(true);
                   try {
-                    const result = await invoke<string>("research_query", { query: researchQuery.trim() });
+                    await invoke<string>("research_query", { query: researchQuery.trim() });
                     const fresh = await invoke<Array<{ id: number; query: string; results: string; source: string; created_at: number }>>("research_get_recent", { limit: 8 });
                     setResearchEntries(fresh);
                     setResearchQuery("");
