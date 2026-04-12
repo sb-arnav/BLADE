@@ -428,6 +428,23 @@ export default function App() {
       window.dispatchEvent(new CustomEvent("blade_wake_word_triggered"));
     });
 
+    // AUTOSKILLS — BLADE auto-installed a new capability
+    const unlistenAutoskillInstalled = listen<{ name: string; tool_count: number; message: string }>("autoskill_installed", (event) => {
+      notifications.add({
+        type: "success",
+        title: `Acquired: ${event.payload.name}`,
+        message: event.payload.message,
+      });
+    });
+
+    const unlistenAutoskillSuggestion = listen<{ name: string; message: string }>("autoskill_suggestion", (event) => {
+      notifications.add({
+        type: "info",
+        title: `Need credentials: ${event.payload.name}`,
+        message: event.payload.message,
+      });
+    });
+
     return () => {
       unlisten.then((fn) => fn());
       unlistenBriefing.then((fn) => fn());
@@ -439,6 +456,8 @@ export default function App() {
       unlistenAutoUpgraded.then((fn) => fn());
       unlistenEvolutionSuggestion.then((fn) => fn());
       unlistenWakeWord.then((fn) => fn());
+      unlistenAutoskillInstalled.then((fn) => fn());
+      unlistenAutoskillSuggestion.then((fn) => fn());
     };
   }, [tts.enabled]);
 
@@ -645,6 +664,7 @@ export default function App() {
     { id: "journal", label: "Read Blade's journal", description: "See what Blade has been writing about in its internal log", section: "Knowledge", action: () => invoke<string>("journal_get_recent", { days: 7 }).then((j) => { if (j) { sendWithStats(`Show me what you've written in your journal recently.\n\n${j}`); } else { sendWithStats("What have you been reflecting on lately? (Your journal is empty so far.)"); } }).catch(() => {}) },
     { id: "journal-write", label: "Write today's journal entry", description: "Force Blade to write tonight's journal entry now", section: "Knowledge", action: () => { void invoke("journal_write_now").then(() => notifications.add({ type: "success", title: "Journal written", message: "Today's entry is ready" })).catch(() => {}); } },
     { id: "reports", label: "Open capability reports", description: "Review what Blade could not do and why", section: "Knowledge", action: () => openRoute("reports") },
+    { id: "dashboard", label: "Open BLADE dashboard", description: "Mission control — status, agents, memory, cron, evolution at a glance", section: "Knowledge", action: () => openRoute("dashboard") },
     { id: "analytics", label: "Open analytics", description: "Inspect activity and usage trends", section: "Knowledge", action: () => openRoute("analytics") },
     { id: "activity", label: "Open activity feed", description: "See recent events across the app", section: "Knowledge", action: () => openRoute("activity") },
     { id: "comparison", label: "Compare models", description: "Inspect model behavior side by side", section: "Knowledge", action: () => openRoute("comparison") },

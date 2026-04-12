@@ -469,6 +469,7 @@ export function ChatWindow({
           onSend={onSend}
           onSlashCommand={onSlashCommand}
           disabled={loading}
+          loading={loading}
           draftValue={composerDraft}
           onDraftConsumed={() => setComposerDraft(null)}
           onPttMouseDown={voiceModeOnPttDown}
