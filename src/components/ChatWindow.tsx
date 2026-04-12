@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { ConversationSummary, Message, RuntimeDescriptor, ToolApprovalRequest, ToolExecution } from "../types";
 import { ActiveWindowInfo, ContextSuggestion } from "../hooks/useContextAwareness";
 import { detectClipboardType } from "../utils/clipboardDetect";
@@ -102,6 +103,24 @@ export function ChatWindow({
 }: Props) {
   const [search, setSearch] = useState("");
   const [composerDraft, setComposerDraft] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  const startRename = useCallback((conv: ConversationSummary, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRenamingId(conv.id);
+    setRenameValue(conv.title || "");
+    setTimeout(() => renameInputRef.current?.select(), 0);
+  }, []);
+
+  const commitRename = useCallback((id: string) => {
+    const title = renameValue.trim();
+    if (title && title.length <= 80) {
+      invoke("history_rename_conversation", { conversationId: id, title }).catch(() => {});
+    }
+    setRenamingId(null);
+  }, [renameValue]);
 
   const filteredConversations = useMemo(() => {
     if (!search.trim()) return conversations;
@@ -176,31 +195,53 @@ export function ChatWindow({
           {filteredConversations.map((conv) => {
             const isActive = conv.id === currentConversationId;
             return (
-              <button
+              <div
                 key={conv.id}
-                onClick={() => { onSwitchConversation(conv.id); toggleSidebar(false); }}
-                className={`group w-full text-left rounded-lg px-2.5 py-2 mb-0.5 transition-colors ${
+                className={`group relative rounded-lg px-2.5 py-2 mb-0.5 cursor-pointer transition-colors ${
                   isActive
                     ? "bg-blade-accent-muted text-blade-text"
                     : "text-blade-secondary hover:bg-blade-surface-hover hover:text-blade-text"
                 }`}
+                onClick={() => { if (renamingId !== conv.id) { onSwitchConversation(conv.id); toggleSidebar(false); } }}
               >
-                <p className="text-xs truncate">{conv.title || "New conversation"}</p>
+                {renamingId === conv.id ? (
+                  <input
+                    ref={renameInputRef}
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onBlur={() => commitRename(conv.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitRename(conv.id);
+                      if (e.key === "Escape") setRenamingId(null);
+                    }}
+                    className="w-full text-xs bg-blade-bg border border-blade-accent/40 rounded px-1.5 py-0.5 outline-none text-blade-text"
+                    onClick={(e) => e.stopPropagation()}
+                    autoFocus
+                  />
+                ) : (
+                  <p
+                    className="text-xs truncate"
+                    onDoubleClick={(e) => startRename(conv, e)}
+                    title="Double-click to rename"
+                  >
+                    {conv.title || "New conversation"}
+                  </p>
+                )}
                 <div className="flex items-center justify-between mt-0.5">
                   <span className="text-2xs text-blade-muted">
                     {formatTime(conv.updated_at)}
                     {conv.message_count ? <span className="ml-1.5 text-blade-muted/40">{conv.message_count}m</span> : null}
                   </span>
-                  {conversations.length > 1 && (
+                  {conversations.length > 1 && renamingId !== conv.id && (
                     <span
                       onClick={(e) => { e.stopPropagation(); onDeleteConversation(conv.id); }}
                       className="text-2xs text-blade-muted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
                     >
-                      delete
+                      del
                     </span>
                   )}
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
