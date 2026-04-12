@@ -534,6 +534,14 @@ export default function App() {
       }
     );
 
+    // Auto-title conversations after first exchange
+    const unlistenTitled = listen<{ conversation_id: string; title: string }>(
+      "conversation_titled",
+      (event) => {
+        chat.updateConversationTitle(event.payload.conversation_id, event.payload.title);
+      }
+    );
+
     return () => {
       unlisten.then((fn) => fn());
       unlistenBriefing.then((fn) => fn());
@@ -554,6 +562,7 @@ export default function App() {
       unlistenDelegateApproved.then((fn) => fn());
       unlistenDelegateDenied.then((fn) => fn());
       unlistenSmartInterrupt.then((fn) => fn());
+      unlistenTitled.then((fn) => fn());
     };
   }, [tts.enabled]);
 

@@ -22,10 +22,15 @@ export function useChat() {
   const requestStartRef = useRef<number>(0);
   const messagesRef = useRef<Message[]>([]);
   const bootstrappedRef = useRef(false);
+  const currentConversationIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+
+  useEffect(() => {
+    currentConversationIdRef.current = currentConversationId;
+  }, [currentConversationId]);
 
   const persistConversation = useCallback(
     async (conversationId: string, nextMessages: Message[]) => {
@@ -131,6 +136,15 @@ export function useChat() {
           userText: lastUser.content,
           assistantText: lastAssistant,
         }).catch(() => {});
+        // Auto-title after the FIRST exchange (2 messages: user + assistant)
+        const convId = currentConversationIdRef.current;
+        if (msgs.length === 2 && convId) {
+          invoke("auto_title_conversation", {
+            conversationId: convId,
+            userText: lastUser.content,
+            assistantText: lastAssistant,
+          }).catch(() => {});
+        }
       }
     });
 
@@ -333,6 +347,12 @@ export function useChat() {
     }
   }, [currentConversationId, createConversation]);
 
+  const updateConversationTitle = useCallback((id: string, title: string) => {
+    setConversations((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, title } : c))
+    );
+  }, []);
+
   return {
     messages,
     loading,
@@ -353,5 +373,6 @@ export function useChat() {
     clearMessages,
     newConversation,
     switchConversation,
+    updateConversationTitle,
   };
 }
