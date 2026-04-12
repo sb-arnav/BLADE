@@ -9,7 +9,7 @@
 /// payload `{ "text": "..." }` so the QuickAsk window can receive it.
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 static IS_RECORDING: AtomicBool = AtomicBool::new(false);
 

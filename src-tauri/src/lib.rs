@@ -143,7 +143,7 @@ fn parse_shortcut(s: &str) -> Option<Shortcut> {
 }
 
 /// Register all global shortcuts from config. Call on startup and after config change.
-fn register_all_shortcuts(app: &tauri::AppHandle) -> Result<(), tauri::Error> {
+fn register_all_shortcuts(app: &tauri::AppHandle) {
     let config = crate::config::load_config();
 
     // Quick Ask shortcut
@@ -154,15 +154,13 @@ fn register_all_shortcuts(app: &tauri::AppHandle) -> Result<(), tauri::Error> {
         toggle_quickask(&qa_handle);
     });
 
-    // Voice input shortcut
-    let voice_shortcut = parse_shortcut(&config.voice_shortcut)
+    // Voice input shortcut (Ctrl+Shift+V by default)
+    let voice_sc = parse_shortcut(&config.voice_shortcut)
         .unwrap_or_else(|| Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyV));
     let voice_handle = app.clone();
-    let _ = app.global_shortcut().on_shortcut(voice_shortcut, move |_app, _sc, _ev| {
+    let _ = app.global_shortcut().on_shortcut(voice_sc, move |_app, _sc, _ev| {
         voice_global::toggle_voice_input(&voice_handle);
     });
-
-    Ok(())
 }
 
 /// Tauri command: update a specific shortcut and re-register all shortcuts.
@@ -188,7 +186,7 @@ fn update_shortcuts(
 
     // Unregister all and re-register with new values
     let _ = app.global_shortcut().unregister_all();
-    register_all_shortcuts(&app).map_err(|e| e.to_string())?;
+    register_all_shortcuts(&app);
 
     Ok(())
 }
@@ -695,7 +693,7 @@ pub fn run() {
             reminders::start_reminder_loop(app.handle().clone());
 
             // Register shortcuts from config (or defaults)
-            register_all_shortcuts(app)?;
+            register_all_shortcuts(app.handle());
 
             tray::create_tray(app)?;
 
