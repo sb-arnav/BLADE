@@ -66,10 +66,12 @@ pub async fn send_message_stream(
         manager.get_tools().to_vec()
     };
 
-    let system_prompt = brain::build_system_prompt_with_recall(
+    let system_prompt = brain::build_system_prompt_for_model(
         &tool_snapshot,
         &last_user_text,
         Some(vector_store.inner()),
+        &config.provider,
+        &config.model,
     );
 
     // MCP tools + native built-in tools (bash, file ops, web fetch)

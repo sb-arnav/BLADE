@@ -4,16 +4,148 @@ use crate::mcp::McpTool;
 use std::fs;
 use std::path::PathBuf;
 
+// ── Model capability tiers ────────────────────────────────────────────────────
+// Different models need different prompting strategies.
+// Frontier models reason well from instructions alone.
+// Capable/Small models need examples, scaffolding, and simpler language.
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ModelTier {
+    /// Claude Sonnet/Opus 3.5+, GPT-4o (non-mini), Gemini 1.5 Pro/Ultra
+    /// → Trust the model. Current prompt works as-is.
+    Frontier,
+    /// Claude Haiku, GPT-4o-mini, Llama 3 70B, Gemini Flash, Mixtral 8x7B
+    /// → Add reasoning scaffold + few-shot tool examples.
+    Capable,
+    /// Llama 3 8B, Mistral 7B, Phi, Qwen small, most default Ollama models
+    /// → Heavy scaffolding, simplified instructions, explicit step-by-step.
+    Small,
+}
+
+pub fn model_tier(provider: &str, model: &str) -> ModelTier {
+    let m = model.to_lowercase();
+
+    // Explicitly frontier
+    if m.contains("opus") || m.contains("sonnet-4") || m.contains("sonnet-3-5") || m.contains("sonnet-3.5")
+        || m.contains("gpt-4o") && !m.contains("mini")
+        || m.contains("gemini-1.5-pro") || m.contains("gemini-ultra")
+        || m.contains("gpt-4-turbo") || m.contains("o1") || m.contains("o3")
+    {
+        return ModelTier::Frontier;
+    }
+
+    // Explicitly capable
+    if m.contains("haiku") || m.contains("gpt-4o-mini") || m.contains("4o-mini")
+        || m.contains("70b") || m.contains("gemini-2") || m.contains("gemini-flash")
+        || m.contains("mixtral") || m.contains("llama-3.1") || m.contains("llama-3.2")
+        || m.contains("llama-3.3") || m.contains("mistral-large") || m.contains("mistral-nemo")
+        || m.contains("command-r") || m.contains("deepseek-v")
+    {
+        return ModelTier::Capable;
+    }
+
+    // Ollama default → assume small unless we know better
+    if provider == "ollama" {
+        if m.contains("70b") || m.contains("72b") || m.contains("mixtral") || m.contains("command") {
+            return ModelTier::Capable;
+        }
+        return ModelTier::Small;
+    }
+
+    // Groq models: fast Llama variants
+    if provider == "groq" {
+        if m.contains("70b") || m.contains("llama-3.1") || m.contains("llama-3.3") {
+            return ModelTier::Capable;
+        }
+        return ModelTier::Capable; // Groq runs quantized but capable models
+    }
+
+    ModelTier::Capable // safe default
+}
+
+/// Reasoning scaffold injected for non-Frontier models.
+/// Teaches the model to think before acting, which dramatically improves
+/// tool call accuracy on smaller models.
+fn reasoning_scaffold(tier: &ModelTier) -> Option<String> {
+    match tier {
+        ModelTier::Frontier => None,
+        ModelTier::Capable => Some(
+            "## How to Handle Requests\n\n\
+             Before using any tool, think: What does the user need? Which single tool is the right first step? Then act.\n\n\
+             After each tool call, check if you have enough information to answer — or if another tool call is needed.\n\n\
+             **Tool call pattern for this session:**\n\
+             - Read/inspect first, then act (avoid blind writes)\n\
+             - `blade_bash` for shell commands, NOT for file reads (use `blade_read_file`)\n\
+             - `blade_ui_read` before `blade_ui_click` (know what you're clicking)\n\
+             - `blade_search_web` → pick URL → `blade_web_fetch` for research (don't open browser unless asked)".to_string()
+        ),
+        ModelTier::Small => Some(
+            "## Step-by-Step Instructions\n\n\
+             ALWAYS follow this process:\n\
+             1. Read the request carefully\n\
+             2. Pick ONE tool to use first\n\
+             3. Look at the tool result\n\
+             4. Decide if you need another tool or can answer now\n\
+             5. Give a short final answer\n\n\
+             NEVER use more than 3 tools in a row without checking in with the user.\n\
+             NEVER guess at file paths — use `blade_list_dir` to look first.\n\
+             NEVER use `blade_bash` to read files — use `blade_read_file`.\n\n\
+             **Tool call examples:**\n\
+             - User: \"What's in my downloads?\" → call `blade_list_dir` with path \"downloads\"\n\
+             - User: \"Search for X\" → call `blade_search_web` with query \"X\"\n\
+             - User: \"Open YouTube\" → call `blade_open_url` with url \"https://youtube.com\"\n\
+             - User: \"Run my tests\" → call `blade_bash` with command \"npm test\" (or the right test command)".to_string()
+        ),
+    }
+}
+
+/// For Small tier models: trim the system prompt to fit in limited context windows.
+/// Removes lower-priority sections when total length exceeds budget.
+fn trim_for_small_model(parts: &mut Vec<String>, budget: usize) {
+    let total: usize = parts.iter().map(|p| p.len()).sum();
+    if total <= budget {
+        return;
+    }
+    // Drop from the end (lower priority sections) until we fit
+    let separator_len = "\n\n---\n\n".len();
+    while parts.len() > 2 {
+        let total: usize = parts.iter().map(|p| p.len()).sum::<usize>()
+            + parts.len().saturating_sub(1) * separator_len;
+        if total <= budget { break; }
+        parts.pop();
+    }
+}
+
 /// Build the system prompt that gives Blade its personality and context.
 /// Optionally accepts the current user message to inject semantically relevant memories.
 pub fn build_system_prompt(tools: &[McpTool]) -> String {
     build_system_prompt_with_recall(tools, "", None)
 }
 
+pub fn build_system_prompt_for_model(
+    tools: &[McpTool],
+    user_query: &str,
+    vector_store: Option<&crate::embeddings::SharedVectorStore>,
+    provider: &str,
+    model: &str,
+) -> String {
+    let tier = model_tier(provider, model);
+    build_system_prompt_inner(tools, user_query, vector_store, &tier)
+}
+
 pub fn build_system_prompt_with_recall(
     tools: &[McpTool],
     user_query: &str,
     vector_store: Option<&crate::embeddings::SharedVectorStore>,
+) -> String {
+    build_system_prompt_inner(tools, user_query, vector_store, &ModelTier::Frontier)
+}
+
+fn build_system_prompt_inner(
+    tools: &[McpTool],
+    user_query: &str,
+    vector_store: Option<&crate::embeddings::SharedVectorStore>,
+    tier: &ModelTier,
 ) -> String {
     let mut parts: Vec<String> = Vec::new();
     let config = crate::config::load_config();
@@ -201,6 +333,19 @@ pub fn build_system_prompt_with_recall(
             config.obsidian_vault_path,
             config.obsidian_vault_path
         ));
+    }
+
+    // MODEL SCAFFOLD — inject reasoning strategy for non-Frontier models.
+    // This is the "intelligence amplifier": weak models get explicit thinking patterns
+    // and concrete tool call examples, closing the gap to Frontier performance.
+    if let Some(scaffold) = reasoning_scaffold(tier) {
+        parts.push(scaffold);
+    }
+
+    // For Small models, trim aggressively to fit limited context windows (4–8k tokens).
+    // ~16k chars ≈ 4k tokens (rough 1 token per 4 chars).
+    if *tier == ModelTier::Small {
+        trim_for_small_model(&mut parts, 14_000);
     }
 
     parts.join("\n\n---\n\n")
