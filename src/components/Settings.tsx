@@ -12,7 +12,7 @@ import { WatcherPanel } from "./WatcherPanel";
 import { RemindersPanel } from "./RemindersPanel";
 import { SkillsPanel } from "./SkillsPanel";
 
-type SettingsTab = "provider" | "memory" | "mcp" | "integrations" | "about";
+type SettingsTab = "provider" | "memory" | "mcp" | "integrations" | "about" | "privacy";
 
 interface ProviderEntry {
   id: string;
@@ -162,6 +162,7 @@ const TABS: { id: SettingsTab; label: string }[] = [
   { id: "integrations", label: "Integrations" },
   { id: "memory", label: "Memory" },
   { id: "mcp", label: "MCP" },
+  { id: "privacy", label: "Privacy" },
   { id: "about", label: "About" },
 ];
 
@@ -1111,6 +1112,81 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             <p className="text-xs text-blade-muted">
               Stored locally and injected into Blade&apos;s system prompt.
             </p>
+          </div>
+        </section>
+        </>}
+
+        {tab === "privacy" && <>
+        {/* Privacy & Trust panel */}
+        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
+          <div>
+            <h2 className="text-base font-semibold">Privacy & Data</h2>
+            <p className="text-sm text-blade-muted">Exactly what BLADE stores and what leaves your machine.</p>
+          </div>
+
+          {/* Local only */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-green-400">
+              <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="currentColor">
+                <path d="M8 1a5 5 0 1 0 0 10A5 5 0 0 0 8 1zm0 9a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/>
+                <path d="M8 3a1 1 0 0 0-1 1v3.586l-1.293 1.293a1 1 0 0 0 1.414 1.414l1.586-1.586A1 1 0 0 0 9 8V4a1 1 0 0 0-1-1z"/>
+              </svg>
+              Stays on your machine
+            </div>
+            {[
+              ["Conversation memory", "SQLite at ~/.blade/blade.db — never uploaded anywhere"],
+              ["Execution history", "Every shell command you've run, stored locally"],
+              ["Embeddings & semantic memory", "Vector store on disk — fastembed runs 100% locally"],
+              ["Codebase index", "Function/symbol index stored in ~/.blade/ — never leaves"],
+              ["API keys", "Stored in your OS keychain or local config — BLADE has no servers to send them to"],
+              ["God mode snapshots", "Screenshots and window context are only processed by your configured provider, then discarded"],
+            ].map(([label, desc]) => (
+              <div key={label} className="flex items-start gap-3 rounded-xl border border-blade-border bg-blade-bg/50 px-3 py-2.5">
+                <svg viewBox="0 0 16 16" className="w-4 h-4 mt-0.5 text-green-400 shrink-0" fill="currentColor">
+                  <path d="M13.354 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
+                </svg>
+                <div>
+                  <div className="text-sm font-medium">{label}</div>
+                  <div className="text-xs text-blade-muted">{desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Leaves device */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-400">
+              <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="currentColor">
+                <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 13A6 6 0 1 1 8 2a6 6 0 0 1 0 12z"/>
+                <path d="M7.5 4a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0v-4a.5.5 0 0 1 .5-.5zm0 6a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5z"/>
+              </svg>
+              Sent to your AI provider
+            </div>
+            {[
+              ["Your messages", "Sent to the provider you configure (Anthropic, OpenAI, Groq, Gemini, or your local Ollama). BLADE uses your own API key — no middleman, no proxy."],
+              ["Tool results (if using tools)", "When BLADE uses tools (search results, file contents), those results are included in the API call to your provider so the model can reason about them."],
+            ].map(([label, desc]) => (
+              <div key={label} className="flex items-start gap-3 rounded-xl border border-amber-900/30 bg-amber-900/10 px-3 py-2.5">
+                <svg viewBox="0 0 16 16" className="w-4 h-4 mt-0.5 text-amber-400 shrink-0" fill="currentColor">
+                  <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 13A6 6 0 1 1 8 2a6 6 0 0 1 0 12z"/>
+                  <path d="M7.5 4a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0v-4a.5.5 0 0 1 .5-.5zm0 6a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5z"/>
+                </svg>
+                <div>
+                  <div className="text-sm font-medium">{label}</div>
+                  <div className="text-xs text-blade-muted">{desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* No telemetry */}
+          <div className="rounded-xl border border-blade-border bg-blade-bg/50 px-3 py-3 text-xs text-blade-muted leading-relaxed">
+            <span className="text-white font-medium">No telemetry, no analytics, no BLADE servers.</span> BLADE is a native app. It talks to your AI provider — that's it. The developers cannot see your conversations, keys, or usage.
+          </div>
+
+          {/* BLADE.md control */}
+          <div className="rounded-xl border border-blade-border bg-blade-bg/50 px-3 py-2.5 text-xs text-blade-muted leading-relaxed">
+            <span className="text-white font-medium">Control BLADE with BLADE.md:</span> Create a file at <code className="bg-blade-border px-1 py-0.5 rounded">~/.blade/BLADE.md</code> to give BLADE workspace-level instructions — restrict what it can access, require confirmation before file writes, set tone, etc.
           </div>
         </section>
         </>}
