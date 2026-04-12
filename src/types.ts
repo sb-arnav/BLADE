@@ -64,6 +64,7 @@ export interface McpTool {
 export interface ToolExecution {
   id: string;
   tool_name: string;
+  arguments?: string;
   risk: ToolPermission;
   status: "executing" | "completed";
   is_error?: boolean;

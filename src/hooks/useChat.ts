@@ -148,10 +148,11 @@ export function useChat() {
       }
     });
 
-    const unlistenToolExecuting = listen<{ name: string; risk: string }>("tool_executing", (event) => {
+    const unlistenToolExecuting = listen<{ name: string; arguments?: string; risk: string }>("tool_executing", (event) => {
       const execution: ToolExecution = {
         id: crypto.randomUUID(),
         tool_name: event.payload.name,
+        arguments: event.payload.arguments,
         risk: (event.payload.risk as ToolExecution["risk"]) ?? "Ask",
         status: "executing",
         started_at: Date.now(),
