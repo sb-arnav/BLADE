@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useCallback, useRef, useState, useEffect } from "react";
+import React, { Suspense, lazy, useCallback, useRef, useState, useEffect, Component } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
@@ -21,6 +21,36 @@ import { VoiceOrb } from "./components/VoiceOrb";
 import { useRuntimes } from "./hooks/useRuntimes";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
+
+// ── Error boundary ────────────────────────────────────────────────────────────
+interface EBState { error: Error | null }
+class ErrorBoundary extends Component<{ children: React.ReactNode }, EBState> {
+  state: EBState = { error: null };
+  static getDerivedStateFromError(error: Error): EBState { return { error }; }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error("[BLADE] Render crash:", error, info.componentStack);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="fixed inset-0 bg-blade-bg flex flex-col items-center justify-center gap-4 p-6">
+          <div className="w-2 h-2 rounded-full bg-red-400" />
+          <p className="text-sm font-semibold text-blade-text">Something crashed</p>
+          <p className="text-2xs text-blade-muted text-center max-w-xs break-words font-mono">
+            {this.state.error.message}
+          </p>
+          <button
+            onClick={() => this.setState({ error: null })}
+            className="px-4 py-1.5 rounded-lg bg-blade-surface border border-blade-border text-xs text-blade-secondary hover:text-blade-text transition-colors"
+          >
+            Reload UI
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs";
 
@@ -925,6 +955,7 @@ export default function App() {
   }
 
   return (
+    <ErrorBoundary>
     <div className="h-screen flex flex-col bg-blade-bg text-blade-text relative">
       {isDragging && (
         <div className="absolute inset-0 z-50 bg-blade-bg/90 backdrop-blur-sm flex items-center justify-center border-2 border-dashed border-blade-accent/40 rounded-xl m-2 pointer-events-none animate-fade-in">
@@ -1029,5 +1060,6 @@ export default function App() {
       </div>
       <VoiceOrb status={voiceMode.status} mode={voiceMode.mode} />
     </div>
+    </ErrorBoundary>
   );
 }
