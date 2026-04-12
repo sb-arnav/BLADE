@@ -421,6 +421,15 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
             created_at INTEGER NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_evolution_status ON evolution_suggestions(status);
+
+        CREATE TABLE IF NOT EXISTS research_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            query TEXT NOT NULL,
+            results TEXT NOT NULL DEFAULT '',
+            source TEXT NOT NULL DEFAULT 'auto',
+            created_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_research_created ON research_log(created_at DESC);
         ",
     )
     .map_err(|e| format!("DB error: {}", e))?;

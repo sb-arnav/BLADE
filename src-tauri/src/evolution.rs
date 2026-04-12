@@ -562,6 +562,13 @@ pub fn start_evolution_loop(app: tauri::AppHandle) {
 
         loop {
             run_evolution_cycle(&app).await;
+
+            // Ambient research — runs inside the evolution loop but throttled internally to 30 min
+            let research_app = app.clone();
+            tokio::spawn(async move {
+                crate::research::run_research_cycle(&research_app).await;
+            });
+
             // Check every 15 minutes
             tokio::time::sleep(std::time::Duration::from_secs(15 * 60)).await;
         }

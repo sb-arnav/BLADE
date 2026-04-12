@@ -375,6 +375,17 @@ fn build_system_prompt_inner(
         }
     }
 
+    // AMBIENT RESEARCH — what BLADE has been looking up in the background
+    {
+        let research_ctx = crate::research::research_context_for_prompt();
+        if !research_ctx.is_empty() {
+            parts.push(format!(
+                "## Background Research\n\nBLADE has been researching these topics autonomously. Reference when relevant:\n\n{}",
+                research_ctx
+            ));
+        }
+    }
+
     // CODE HEALTH — proactive scan results from indexed projects
     {
         let health_summaries = crate::health::health_summary_all();
