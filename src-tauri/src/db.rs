@@ -1530,6 +1530,56 @@ pub fn brain_get_reactions(conn: &Connection, limit: i64) -> Result<Vec<BrainRea
 
 /// Builds the character bible context string for injection into the system prompt.
 /// Respects a soft token budget (1 token ≈ 4 chars).
+/// L0 Memory — always-loaded critical facts. Max ~170 tokens.
+/// Inspired by MemPalace's "wake-up payload" — the handful of facts
+/// that should ALWAYS be in context, regardless of budget pressure.
+/// These survive even aggressive context compression.
+pub fn brain_l0_critical_facts(conn: &Connection) -> String {
+    let mut facts: Vec<String> = Vec::new();
+
+    // Identity (most critical — who is this person?)
+    let identity = brain_get_identity(conn).unwrap_or_default();
+    let name = identity.get("name").cloned().unwrap_or_default();
+    let role = identity.get("role").cloned().unwrap_or_default();
+    let location = identity.get("location").cloned().unwrap_or_default();
+    if !name.is_empty() {
+        let mut who = format!("User: {}", name);
+        if !role.is_empty() { who.push_str(&format!(", {}", role)); }
+        if !location.is_empty() { who.push_str(&format!(", {}", location)); }
+        facts.push(who);
+    }
+
+    // Top-confidence preferences (max 3)
+    if let Ok(prefs) = brain_get_preferences(conn) {
+        let top: Vec<String> = prefs.iter()
+            .filter(|p| p.confidence > 0.8)
+            .take(3)
+            .map(|p| format!("• {}", p.text))
+            .collect();
+        if !top.is_empty() {
+            facts.push(format!("Key preferences:\n{}", top.join("\n")));
+        }
+    }
+
+    // Most recent critical memory (max 2)
+    if let Ok(memories) = brain_get_memories(conn, 50) {
+        let critical: Vec<String> = memories.iter()
+            .filter(|m| m.text.len() < 120) // short = distilled = important
+            .take(2)
+            .map(|m| format!("• {}", m.text))
+            .collect();
+        if !critical.is_empty() {
+            facts.push(format!("Critical context:\n{}", critical.join("\n")));
+        }
+    }
+
+    if facts.is_empty() {
+        return String::new();
+    }
+
+    format!("## L0 — Always-On Context\n{}", facts.join("\n"))
+}
+
 pub fn brain_build_context(conn: &Connection, budget_tokens: usize) -> String {
     let budget_chars = budget_tokens * 4;
     let mut parts: Vec<String> = Vec::new();
