@@ -61,6 +61,12 @@ struct DiskConfig {
     quick_ask_shortcut: String,
     #[serde(default = "default_voice_shortcut")]
     voice_shortcut: String,
+    #[serde(default)]
+    screen_timeline_enabled: bool,
+    #[serde(default = "default_timeline_interval")]
+    timeline_capture_interval: u32,
+    #[serde(default = "default_timeline_retention")]
+    timeline_retention_days: u32,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -71,6 +77,8 @@ fn default_voice_mode() -> String { "off".to_string() }
 fn default_tts_voice() -> String { "system".to_string() }
 fn default_quick_ask_shortcut() -> String { "Alt+Space".to_string() }
 fn default_voice_shortcut() -> String { "Ctrl+Shift+V".to_string() }
+fn default_timeline_interval() -> u32 { 30 }
+fn default_timeline_retention() -> u32 { 14 }
 
 impl Default for DiskConfig {
     fn default() -> Self {
@@ -93,6 +101,9 @@ impl Default for DiskConfig {
             tts_voice: "system".to_string(),
             quick_ask_shortcut: "Alt+Space".to_string(),
             voice_shortcut: "Ctrl+Shift+V".to_string(),
+            screen_timeline_enabled: false,
+            timeline_capture_interval: 30,
+            timeline_retention_days: 14,
             api_key: None,
         }
     }
@@ -135,6 +146,12 @@ pub struct BladeConfig {
     pub quick_ask_shortcut: String,
     #[serde(default = "default_voice_shortcut")]
     pub voice_shortcut: String,
+    #[serde(default)]
+    pub screen_timeline_enabled: bool,
+    #[serde(default = "default_timeline_interval")]
+    pub timeline_capture_interval: u32,
+    #[serde(default = "default_timeline_retention")]
+    pub timeline_retention_days: u32,
 }
 
 impl BladeConfig {
@@ -165,6 +182,9 @@ impl Default for BladeConfig {
             tts_voice: "system".to_string(),
             quick_ask_shortcut: "Alt+Space".to_string(),
             voice_shortcut: "Ctrl+Shift+V".to_string(),
+            screen_timeline_enabled: false,
+            timeline_capture_interval: 30,
+            timeline_retention_days: 14,
         }
     }
 }
@@ -253,6 +273,9 @@ pub fn load_config() -> BladeConfig {
         tts_voice: disk.tts_voice,
         quick_ask_shortcut: disk.quick_ask_shortcut,
         voice_shortcut: disk.voice_shortcut,
+        screen_timeline_enabled: disk.screen_timeline_enabled,
+        timeline_capture_interval: disk.timeline_capture_interval,
+        timeline_retention_days: disk.timeline_retention_days,
     }
 }
 
@@ -279,6 +302,9 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         tts_voice: config.tts_voice.clone(),
         quick_ask_shortcut: config.quick_ask_shortcut.clone(),
         voice_shortcut: config.voice_shortcut.clone(),
+        screen_timeline_enabled: config.screen_timeline_enabled,
+        timeline_capture_interval: config.timeline_capture_interval,
+        timeline_retention_days: config.timeline_retention_days,
         api_key: None,
     };
 
