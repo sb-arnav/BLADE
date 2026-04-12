@@ -813,7 +813,13 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
       setUpdateStatus(`Blade ${update.version} is ready. Restart to finish updating.`);
     } catch (cause) {
       setUpdateStatus(null);
-      setUpdateError(typeof cause === "string" ? cause : String(cause));
+      const msg = cause instanceof Error ? cause.message : typeof cause === "string" ? cause : String(cause);
+      // Provide a more actionable message for the common "can't fetch JSON" case
+      if (msg.includes("valid release JSON") || msg.includes("fetch")) {
+        setUpdateError(`Update check failed: ${msg}. This can happen right after a release is published — try again in a minute, or download directly from github.com/sb-arnav/blade/releases`);
+      } else {
+        setUpdateError(msg);
+      }
     } finally {
       setCheckingForUpdates(false);
     }
