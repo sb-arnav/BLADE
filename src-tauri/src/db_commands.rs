@@ -568,8 +568,23 @@ pub fn brain_set_skill_active(state: tauri::State<'_, SharedDb>, id: String, act
 
 #[tauri::command]
 pub fn brain_add_reaction(state: tauri::State<'_, SharedDb>, id: String, message_id: String, polarity: i64, content: String, context_json: String) -> Result<(), String> {
-    let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
-    db::brain_add_reaction(&conn, &id, &message_id, polarity, &content, &context_json)
+    let reaction_count = {
+        let conn = state.lock().map_err(|e| format!("Lock error: {}", e))?;
+        db::brain_add_reaction(&conn, &id, &message_id, polarity, &content, &context_json)?;
+        // Count total reactions to decide whether to consolidate
+        conn.query_row("SELECT COUNT(*) FROM brain_reactions", [], |r| r.get::<_, i64>(0))
+            .unwrap_or(0)
+    };
+    // Auto-consolidate every 5 reactions — fire-and-forget so we don't block the UI
+    if reaction_count % 5 == 0 {
+        tauri::async_runtime::spawn(async move {
+            match crate::character::consolidate_reactions_to_preferences().await {
+                Ok(n) if n > 0 => log::info!("[brain] auto-consolidated {} reactions → preferences", n),
+                _ => {}
+            }
+        });
+    }
+    Ok(())
 }
 
 #[tauri::command]
