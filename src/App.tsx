@@ -1083,6 +1083,8 @@ export default function App() {
               voiceModeOnPttDown={voiceMode.onPttMouseDown}
               voiceModeOnPttUp={voiceMode.onPttMouseUp}
               thinkingText={chat.thinkingText}
+              onOpenNotifications={() => setNotificationsOpen(true)}
+              unreadNotificationCount={notifications.unreadCount}
             />
           )}
         </Suspense>
