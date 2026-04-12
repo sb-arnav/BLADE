@@ -260,9 +260,9 @@ pub fn compute_level() -> EvolutionLevel {
     }
 
     // Voice configured
-    if config.tts_enabled {
+    if config.voice_mode != "off" && !config.voice_mode.is_empty() {
         score += 1;
-        breakdown.push("Voice (TTS) active".to_string());
+        breakdown.push("Voice active".to_string());
     }
 
     // Evolution suggestions installed
@@ -625,7 +625,7 @@ pub fn evolution_dismiss_suggestion(id: String) -> Result<(), String> {
 /// Called from frontend when user provides their API key for a suggestion.
 #[tauri::command]
 pub async fn evolution_install_suggestion(
-    state: tauri::State<'_, crate::mcp::SharedMcpManager>,
+    state: tauri::State<'_, crate::commands::SharedMcpManager>,
     id: String,
     token_key: String,
     token_value: String,
@@ -634,10 +634,10 @@ pub async fn evolution_install_suggestion(
     let db_path = crate::config::blade_config_dir().join("blade.db");
     let conn = rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())?;
 
-    let (name, package, command_str, args_json): (String, String, String, Option<String>) = conn.query_row(
-        "SELECT capability, mcp_package, 'npx', NULL FROM evolution_suggestions WHERE id = ?1",
+    let (name, package): (String, String) = conn.query_row(
+        "SELECT capability, mcp_package FROM evolution_suggestions WHERE id = ?1",
         rusqlite::params![id],
-        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        |row| Ok((row.get(0)?, row.get(1)?)),
     ).map_err(|e| format!("Suggestion not found: {}", e))?;
 
     // Find the catalog entry
@@ -652,7 +652,7 @@ pub async fn evolution_install_suggestion(
 
     // Register MCP server
     let mcp_config = crate::mcp::McpServerConfig {
-        command: command_str,
+        command: entry.command.to_string(),
         args: entry.args.iter().map(|s| s.to_string()).collect(),
         env: env.clone(),
     };
