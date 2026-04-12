@@ -32,6 +32,9 @@ export function useKeyboard(actions: KeyboardActions) {
       if (key === 'escape') {
         if (actions.onEscape) {
           actions.onEscape();
+        } else if (isEditable) {
+          // Blur the input instead of hiding — prevents accidental window hide while typing
+          (target as HTMLElement).blur();
         } else {
           actions.onHideWindow?.();
         }
