@@ -18,6 +18,7 @@ pub struct ConversationSummary {
     pub title: String,
     pub created_at: u64,
     pub updated_at: u64,
+    pub message_count: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -80,6 +81,7 @@ pub fn list_conversations() -> Result<Vec<ConversationSummary>, String> {
             title: conversation.title,
             created_at: conversation.created_at,
             updated_at: conversation.updated_at,
+            message_count: conversation.messages.len(),
         });
     }
 
@@ -143,10 +145,12 @@ pub fn save_conversation(
     let raw = serde_json::to_string_pretty(&conversation).map_err(|e| e.to_string())?;
     write_blade_file(&path, &raw)?;
 
+    let count = conversation.messages.len();
     Ok(ConversationSummary {
         id: conversation.id,
         title,
         created_at,
         updated_at,
+        message_count: count,
     })
 }
