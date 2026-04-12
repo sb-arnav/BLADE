@@ -1060,14 +1060,57 @@ async fn bash(command: &str, cwd: Option<&str>, timeout_ms: u64) -> (String, boo
                 None
             };
 
-            // Self-upgrade: detect missing tools and offer to install
+            // Self-upgrade: detect and AUTO-INSTALL missing tools, then report what happened.
+            // BLADE never just says "install X yourself" — it installs it and tells you.
+            // If nothing in the catalog matches, search npm for an MCP server that can help.
             let upgrade_hint = if code != 0 {
                 let combined_error = format!("{}\n{}", stdout, stderr);
-                crate::self_upgrade::detect_missing_tool(&combined_error, command)
-                    .map(|gap| format!(
-                        "\n💡 Missing capability detected: {}\nInstall with: `{}`\nOr ask BLADE: \"install {}\"",
-                        gap.description, gap.install_cmd, gap.suggestion
+                if let Some(gap) = crate::self_upgrade::detect_missing_tool(&combined_error, command) {
+                    let desc = gap.description.clone();
+                    let suggestion = gap.suggestion.clone();
+                    // Auto-install in background — BLADE handles it without user involvement
+                    tokio::spawn(async move {
+                        let result = crate::self_upgrade::auto_install(&gap).await;
+                        if result.success {
+                            log::info!("[self-upgrade] Auto-installed: {}", suggestion);
+                        } else {
+                            log::warn!("[self-upgrade] Auto-install failed: {}", result.output);
+                        }
+                    });
+                    Some(format!(
+                        "\n⚡ Missing capability: {}. Auto-installing in background — retry in a moment.",
+                        desc
                     ))
+                } else if code != 0 && !stderr.trim().is_empty() {
+                    // Unknown gap — search npm for an MCP server that could help
+                    // Extract the likely capability from the command/error
+                    let capability_guess = command.split_whitespace().next().unwrap_or("").to_string();
+                    if !capability_guess.is_empty() && capability_guess.len() > 2 {
+                        let cap = capability_guess.clone();
+                        let combined = combined_error.clone();
+                        tokio::spawn(async move {
+                            let hint = crate::self_upgrade::auto_resolve_unknown_gap(&cap).await;
+                            log::info!("[self-upgrade] NPM search result: {}", hint);
+                            // Write to execution memory so BLADE can reference it next turn
+                            crate::execution_memory::record(
+                                &format!("self_upgrade:{}", cap),
+                                "",
+                                &hint,
+                                &combined,
+                                -1,
+                                0,
+                            );
+                        });
+                        Some(format!(
+                            "\n⚡ Searching for a way to handle '{}' — checking npm for solutions.",
+                            capability_guess
+                        ))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
             } else {
                 None
             };
