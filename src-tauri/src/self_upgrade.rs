@@ -181,6 +181,109 @@ pub async fn auto_install(gap: &CapabilityGap) -> InstallResult {
     }
 }
 
+/// Search npm registry for MCP servers matching a capability description.
+/// Returns a list of (package_name, description) pairs BLADE can try to install.
+/// Called when detect_missing_tool returns None — BLADE looks outside the catalog.
+pub async fn search_npm_for_mcp(capability: &str) -> Vec<(String, String)> {
+    // Search npm for MCP-related packages
+    let query = format!("mcp-server {}", capability);
+    let url = format!(
+        "https://registry.npmjs.org/-/v1/search?text={}&size=5",
+        urlencoding_simple(&query)
+    );
+
+    let client = match reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(8))
+        .build()
+    {
+        Ok(c) => c,
+        Err(_) => return vec![],
+    };
+
+    let resp = match client.get(&url).header("User-Agent", "BLADE/0.4").send().await {
+        Ok(r) => r,
+        Err(_) => return vec![],
+    };
+
+    let json: serde_json::Value = match resp.json().await {
+        Ok(j) => j,
+        Err(_) => return vec![],
+    };
+
+    let objects = match json["objects"].as_array() {
+        Some(a) => a,
+        None => return vec![],
+    };
+
+    let mut results = Vec::new();
+    for obj in objects {
+        let name = obj["package"]["name"].as_str().unwrap_or("").to_string();
+        let desc = obj["package"]["description"].as_str().unwrap_or("").to_string();
+        // Only include packages that look like MCP servers
+        let lower_name = name.to_lowercase();
+        if lower_name.contains("mcp") || lower_name.contains("model-context") || lower_name.contains("server-") {
+            results.push((name, desc));
+        }
+    }
+    results
+}
+
+fn urlencoding_simple(s: &str) -> String {
+    s.chars().map(|c| match c {
+        ' ' => '+'.to_string(),
+        'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
+        _ => format!("%{:02X}", c as u8),
+    }).collect()
+}
+
+/// Attempt to resolve an unknown capability gap by searching npm and auto-installing.
+/// Returns a hint string describing what BLADE did or what to try.
+/// This is the "outside the box" path — when nothing in the catalog matches.
+pub async fn auto_resolve_unknown_gap(capability: &str) -> String {
+    log::info!("[self-upgrade] Searching for MCP server to handle: {}", capability);
+
+    let candidates = search_npm_for_mcp(capability).await;
+
+    if candidates.is_empty() {
+        return format!(
+            "No MCP server found for '{}'. Trying alternative approach: delegate to Claude Code or use blade_bash to research and install manually.",
+            capability
+        );
+    }
+
+    // Try the first candidate that looks safe (not a scoped private package)
+    for (pkg, desc) in &candidates {
+        if pkg.starts_with('@') && !pkg.starts_with("@modelcontextprotocol") {
+            continue; // Skip unknown scoped packages
+        }
+
+        log::info!("[self-upgrade] Trying candidate: {} — {}", pkg, desc);
+
+        let install_cmd = format!("npm install -g {} 2>&1", pkg);
+        let output = tokio::process::Command::new("sh")
+            .args(["-c", &install_cmd])
+            .output()
+            .await;
+
+        match output {
+            Ok(out) if out.status.success() => {
+                return format!(
+                    "Auto-installed '{}' ({}) to handle '{}'. Retry the original request.",
+                    pkg, desc, capability
+                );
+            }
+            _ => continue,
+        }
+    }
+
+    // Couldn't install any candidate — return the best option for BLADE to try manually
+    let (best_pkg, best_desc) = &candidates[0];
+    format!(
+        "Found '{}' ({}) for '{}'. Run: `npm install -g {}` then configure it as an MCP server.",
+        best_pkg, best_desc, capability, best_pkg
+    )
+}
+
 // ── PENTEST MODE ───────────────────────────────────────────────────────────────
 //
 // Full Kali Linux offensive security tooling, with a mandatory ownership gate.
