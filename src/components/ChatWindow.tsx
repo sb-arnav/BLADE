@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { ConversationSummary, Message, RuntimeDescriptor, ToolApprovalRequest, ToolExecution } from "../types";
 import { ActiveWindowInfo, ContextSuggestion } from "../hooks/useContextAwareness";
 import { detectClipboardType } from "../utils/clipboardDetect";
+import { copyConversation } from "../utils/exportConversation";
 import { MessageList } from "./MessageList";
 import { InputBar } from "./InputBar";
 import { SearchInput } from "./SearchInput";
@@ -172,6 +173,14 @@ export function ChatWindow({
   }, [voiceDraft, onVoiceDraftConsumed]);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [exportCopied, setExportCopied] = useState(false);
+
+  const handleExportConversation = useCallback(async () => {
+    const currentConv = conversations.find((c) => c.id === currentConversationId);
+    await copyConversation(messages, currentConv?.title);
+    setExportCopied(true);
+    setTimeout(() => setExportCopied(false), 1800);
+  }, [messages, conversations, currentConversationId]);
 
   const toggleSidebar = (open: boolean) => {
     setSidebarOpen(open);
@@ -213,15 +222,35 @@ export function ChatWindow({
       >
         <div className="flex items-center justify-between px-3 py-2.5">
           <span className="text-2xs font-medium tracking-widest uppercase text-blade-muted">History</span>
-          <button
-            onClick={() => { onNewConversation(); toggleSidebar(false); }}
-            className="w-6 h-6 rounded-md flex items-center justify-center text-blade-muted hover:text-blade-secondary hover:bg-blade-surface-hover transition-colors"
-            title="New conversation"
-          >
-            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-1">
+            {messages.length > 0 && (
+              <button
+                onClick={handleExportConversation}
+                className="w-6 h-6 rounded-md flex items-center justify-center text-blade-muted hover:text-blade-secondary hover:bg-blade-surface-hover transition-colors"
+                title={exportCopied ? "Copied!" : "Copy conversation as markdown"}
+              >
+                {exportCopied ? (
+                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-blade-accent" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                  </svg>
+                )}
+              </button>
+            )}
+            <button
+              onClick={() => { onNewConversation(); toggleSidebar(false); }}
+              className="w-6 h-6 rounded-md flex items-center justify-center text-blade-muted hover:text-blade-secondary hover:bg-blade-surface-hover transition-colors"
+              title="New conversation"
+            >
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
+          </div>
         </div>
         <div className="px-2 pb-1.5">
           <SearchInput value={search} onChange={setSearch} placeholder="Search conversations…" />
@@ -312,8 +341,8 @@ export function ChatWindow({
       {/* Main */}
       <div className="flex flex-col flex-1 min-w-0">
         {/* Header */}
-        <div className="flex items-center justify-between h-10 px-4 border-b border-blade-border/50 shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center justify-between h-10 px-3 border-b border-blade-border/50 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={() => toggleSidebar(true)}
               className="text-blade-muted hover:text-blade-secondary transition-colors shrink-0"
@@ -323,7 +352,7 @@ export function ChatWindow({
                 <path d="M3.5 7h17M3.5 12h17M3.5 17h17" />
               </svg>
             </button>
-            <span className="text-xs text-blade-secondary truncate">
+            <span className="text-xs text-blade-secondary truncate max-w-[120px]">
               {conversations.find((c) => c.id === currentConversationId)?.title ?? "New conversation"}
             </span>
             {provider && (
@@ -341,7 +370,44 @@ export function ChatWindow({
               </button>
             )}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
+            {/* Runtime status indicator */}
+            {runtimeStrip.length > 0 && onOpenOperators && (
+              <button
+                onClick={onOpenOperators}
+                className="relative h-7 px-2 rounded-md text-2xs flex items-center gap-1.5 text-blade-muted hover:text-blade-secondary hover:bg-blade-surface transition-colors"
+                title="Operators"
+              >
+                {(() => {
+                  const hasIssue = runtimeStrip.some(r => !r.installed || !r.authenticated);
+                  const activeTasks = runtimeStrip.reduce((s, r) => s + r.active_tasks, 0);
+                  if (activeTasks > 0) return <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />;
+                  if (hasIssue) return <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />;
+                  return <span className="w-1.5 h-1.5 rounded-full bg-blade-muted/40" />;
+                })()}
+                <span className="font-mono">ops</span>
+                {runtimeStrip.reduce((s, r) => s + r.active_tasks, 0) > 0 && (
+                  <span className="text-emerald-400">{runtimeStrip.reduce((s, r) => s + r.active_tasks, 0)}</span>
+                )}
+              </button>
+            )}
+            {/* Voice status pill — only when active */}
+            {voiceModeStatus && !["idle", "off"].includes(voiceModeStatus) && (
+              <span className={`h-7 px-2 rounded-md text-2xs flex items-center gap-1 ${
+                voiceModeStatus === "listening" ? "text-emerald-400" :
+                voiceModeStatus === "recording" || voiceModeStatus === "detecting" ? "text-red-400" :
+                voiceModeStatus === "processing" ? "text-amber-400" :
+                voiceModeStatus === "error" ? "text-red-500" : "text-blade-muted"
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  voiceModeStatus === "listening" ? "bg-emerald-400 animate-pulse" :
+                  voiceModeStatus === "recording" || voiceModeStatus === "detecting" ? "bg-red-400 animate-pulse" :
+                  voiceModeStatus === "processing" ? "bg-amber-400 animate-pulse" :
+                  "bg-blade-muted"
+                }`} />
+                {voiceModeStatus}
+              </span>
+            )}
             {onOpenNotifications && (
               <button
                 onClick={onOpenNotifications}
@@ -397,66 +463,6 @@ export function ChatWindow({
             </button>
           </div>
         </div>
-        <div className="px-4 py-2 border-b border-blade-border/30 shrink-0 bg-blade-bg/80">
-          <div className="max-w-2xl mx-auto flex flex-wrap items-center gap-2 text-2xs text-blade-muted">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-blade-border bg-blade-surface/70 px-2.5 py-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              Blade is live
-            </span>
-            {runtimeStrip.map((runtime) => (
-              <span
-                key={runtime.id}
-                className={`inline-flex items-center rounded-full border px-2.5 py-1 ${
-                  !runtime.installed
-                    ? "border-amber-500/20 bg-amber-500/10 text-amber-200"
-                    : !runtime.authenticated
-                      ? "border-orange-500/20 bg-orange-500/10 text-orange-200"
-                      : runtime.active_tasks > 0
-                        ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-200"
-                        : "border-blade-border bg-blade-surface/70"
-                }`}
-              >
-                {runtime.name}
-                {!runtime.installed
-                  ? " · install"
-                  : !runtime.authenticated
-                    ? " · auth"
-                    : runtime.active_tasks > 0
-                      ? ` · ${runtime.active_tasks} live`
-                      : " · ready"}
-              </span>
-            ))}
-            {voiceModeStatus && !["idle", "off"].includes(voiceModeStatus) && (
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${
-                voiceModeStatus === "listening"
-                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                  : voiceModeStatus === "recording" || voiceModeStatus === "detecting"
-                    ? "border-red-500/30 bg-red-500/10 text-red-300"
-                    : voiceModeStatus === "processing"
-                      ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
-                      : voiceModeStatus === "error"
-                        ? "border-red-500/40 bg-red-500/10 text-red-400"
-                        : "border-blade-border bg-blade-surface/70"
-              }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${
-                  voiceModeStatus === "listening" ? "bg-emerald-400 animate-pulse" :
-                  voiceModeStatus === "recording" || voiceModeStatus === "detecting" ? "bg-red-400 animate-pulse" :
-                  voiceModeStatus === "processing" ? "bg-amber-400 animate-pulse" :
-                  "bg-blade-muted"
-                }`} />
-                {voiceModeStatus}
-              </span>
-            )}
-            {onOpenOperators ? (
-              <button
-                onClick={onOpenOperators}
-                className="inline-flex items-center rounded-full border border-blade-accent/20 bg-[#16172a] px-2.5 py-1 text-[#c8cbff] hover:text-white transition-colors"
-              >
-                Operators
-              </button>
-            ) : null}
-          </div>
-        </div>
 
         {/* Error */}
         {error && (
@@ -476,6 +482,7 @@ export function ChatWindow({
           loading={loading}
           toolExecutions={toolExecutions}
           onQuickAction={setComposerDraft}
+          onRetry={!loading ? onRetry : undefined}
           activeWindow={activeWindow}
           contextSuggestions={contextSuggestions}
         />

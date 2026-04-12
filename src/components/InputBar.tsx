@@ -309,7 +309,7 @@ export function InputBar({ onSend, onSlashCommand, disabled, loading, draftValue
         <div className="flex items-center gap-2">
           {value.length > 300 && (
             <span className={`text-2xs font-mono ${value.length > 8000 ? "text-red-400/70" : value.length > 3000 ? "text-amber-400/60" : "text-blade-muted/40"}`}>
-              {value.length > 999 ? `${(value.length / 1000).toFixed(1)}k` : value.length}
+              {value.length > 999 ? `${(value.length / 1000).toFixed(1)}k` : value.length}c · ~{Math.round(value.length / 4)}t
             </span>
           )}
           <kbd className="text-2xs text-blade-muted/40 font-mono">Ctrl+K</kbd>
