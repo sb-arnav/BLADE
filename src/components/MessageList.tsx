@@ -284,10 +284,18 @@ const MessageBubble = memo(function MessageBubble({ msg }: { msg: Message }) {
 });
 
 
+const EXAMPLE_PROMPTS = [
+  { label: "Debug screen", prompt: "Take a screenshot and help me debug what you see" },
+  { label: "Last commit", prompt: "What changed in the last git commit?" },
+  { label: "Explain codebase", prompt: "Give me a quick overview of the current project structure" },
+  { label: "Research mode", prompt: "/research " },
+] as const;
+
 export function MessageList({
   messages,
   loading,
   toolExecutions,
+  onQuickAction,
   activeWindow,
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -330,20 +338,40 @@ export function MessageList({
       )}
       <div className="max-w-2xl mx-auto px-6 py-6 space-y-6">
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 select-none">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-blade-accent shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
-              <span className="text-xs font-semibold tracking-[0.3em] text-blade-muted uppercase">BLADE</span>
+          <div className="flex flex-col items-center justify-center min-h-[50vh] gap-5 select-none">
+            <div className="flex flex-col items-center gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-blade-accent shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
+                <span className="text-xs font-semibold tracking-[0.3em] text-blade-muted uppercase">BLADE</span>
+              </div>
+              <p className="text-blade-muted/50 text-[0.7rem] text-center max-w-[260px] leading-relaxed">
+                {focusLabel
+                  ? `Focused on ${focusLabel}`
+                  : "Screen · voice · tools · memory · always on"}
+              </p>
             </div>
-            <p className="text-blade-muted/50 text-[0.7rem] text-center max-w-[260px] leading-relaxed">
-              {focusLabel
-                ? `Focused on ${focusLabel}`
-                : "Screen · voice · tools · memory · always on"}
-            </p>
-            <div className="flex items-center gap-3 mt-2 text-[0.65rem] text-blade-muted/30 font-mono tracking-wider">
+            {onQuickAction && (
+              <div className="grid grid-cols-2 gap-1.5 w-full max-w-[340px]">
+                {EXAMPLE_PROMPTS.map((ex) => (
+                  <button
+                    key={ex.label}
+                    onClick={() => onQuickAction(ex.prompt)}
+                    className="text-left px-3 py-2.5 rounded-lg border border-blade-border bg-blade-surface/60 hover:bg-blade-surface hover:border-blade-border-hover transition-colors group"
+                  >
+                    <span className="text-[0.7rem] font-medium text-blade-secondary group-hover:text-blade-text transition-colors block">
+                      {ex.label}
+                    </span>
+                    <span className="text-[0.65rem] text-blade-muted/50 truncate block mt-0.5">
+                      {ex.prompt.startsWith("/") ? ex.prompt : ex.prompt.slice(0, 38) + "…"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-3 text-[0.65rem] text-blade-muted/30 font-mono tracking-wider">
               <span>/ commands</span>
               <span>·</span>
-              <span>Ctrl+K palette</span>
+              <span>Ctrl+K</span>
               <span>·</span>
               <span>paste image</span>
             </div>

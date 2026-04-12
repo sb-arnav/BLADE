@@ -366,17 +366,23 @@ export function ChatWindow({
                       : " · ready"}
               </span>
             ))}
-            {voiceModeStatus && voiceModeStatus !== "off" && (
+            {voiceModeStatus && !["idle", "off"].includes(voiceModeStatus) && (
               <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${
                 voiceModeStatus === "listening"
                   ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                  : voiceModeStatus === "speaking"
-                    ? "border-indigo-500/30 bg-indigo-500/10 text-indigo-300"
-                    : "border-blade-border bg-blade-surface/70"
+                  : voiceModeStatus === "recording" || voiceModeStatus === "detecting"
+                    ? "border-red-500/30 bg-red-500/10 text-red-300"
+                    : voiceModeStatus === "processing"
+                      ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
+                      : voiceModeStatus === "error"
+                        ? "border-red-500/40 bg-red-500/10 text-red-400"
+                        : "border-blade-border bg-blade-surface/70"
               }`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${
                   voiceModeStatus === "listening" ? "bg-emerald-400 animate-pulse" :
-                  voiceModeStatus === "speaking"  ? "bg-indigo-400 animate-pulse" : "bg-blade-muted"
+                  voiceModeStatus === "recording" || voiceModeStatus === "detecting" ? "bg-red-400 animate-pulse" :
+                  voiceModeStatus === "processing" ? "bg-amber-400 animate-pulse" :
+                  "bg-blade-muted"
                 }`} />
                 {voiceModeStatus}
               </span>
