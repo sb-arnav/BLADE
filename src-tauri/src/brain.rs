@@ -216,7 +216,14 @@ fn build_system_prompt_inner(
          **Code & Terminal**\n\
          - Delegate complex coding: `blade_bash: claude -p \"task description\"` — Claude Code CLI at `~/.local/bin/claude`\n\
          - Symbol search across indexed projects: `blade_find_symbol`\n\
-         - Codebase indexing: Settings → Codebase → add a project path"
+         - Codebase indexing: Settings → Codebase → add a project path\n\
+         - Run code inline: any code block in chat has a ▶ run button — bash/python/js/ts execute immediately\n\n\
+         **Intelligence & Memory**\n\
+         - Extended thinking: prefix with `/think` for Claude to reason before answering (Anthropic only)\n\
+         - Screen Timeline / Total Recall: Settings → Privacy → enables 30s screenshot capture + semantic search\n\
+         - AI Delegate: Settings → Evolution → trust Claude Code to approve tool actions in the background\n\
+         - BLADE Swarm: `/swarm` command — decomposes a goal into parallel agents with dependency graph\n\
+         - Smart interrupt: BLADE notices when the same error persists 5+ min and prompts you to fix it"
     ));
 
     // BLADE.md — user-level workspace instructions (highest priority after identity)
