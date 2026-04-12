@@ -116,58 +116,58 @@ pub fn research_context_for_prompt() -> String {
 // Topic extraction — no LLM call, pure heuristic
 // ---------------------------------------------------------------------------
 
-/// Extract 1-2 search queries from the current work context.
-/// Uses the active thread title + brain context as signals.
+/// Extract up to 3 search queries from the current work context using multi-query expansion.
+/// Generates a broader, a narrower, and a lateral variant per topic to maximise recall.
+/// No LLM call — pure heuristic to keep this fast and free.
 pub fn extract_research_queries(thread: &str, brain_ctx: &str) -> Vec<String> {
     let mut queries = Vec::new();
 
-    // Priority 1: active thread — first meaningful line is the "topic"
-    if !thread.trim().is_empty() {
-        let first_line = thread
+    // ── Core topic: first meaningful line of the active thread ──────────────
+    let core_topic = if !thread.trim().is_empty() {
+        thread
             .lines()
             .find(|l| l.trim().len() > 10)
             .unwrap_or("")
-            .trim();
+            .trim()
+            .trim_start_matches('#')
+            .trim_start_matches('*')
+            .trim_end_matches('*')
+            .trim()
+            .to_string()
+    } else {
+        String::new()
+    };
 
-        if first_line.len() >= 10 {
-            // Trim title markup like "# Title" or "**Title**"
-            let clean = first_line
-                .trim_start_matches('#')
-                .trim_start_matches('*')
-                .trim_end_matches('*')
-                .trim();
-            if clean.len() >= 6 {
-                queries.push(format!("{} 2025", &clean[..clean.len().min(70)]));
-            }
-        }
+    if core_topic.len() >= 6 {
+        let short = &core_topic[..core_topic.len().min(60)];
+        // Variant 1 (broad): topic + year for freshness
+        queries.push(format!("{} 2025", short));
+        // Variant 2 (narrower): best practices / implementation
+        queries.push(format!("{} implementation best practices", short));
     }
 
-    // Priority 2: extract capitalized multi-char words from brain context
-    // (project names, tech stacks, product names)
-    if queries.len() < 2 {
-        let src = if !brain_ctx.is_empty() { brain_ctx } else { thread };
-        let tech_words: Vec<&str> = src
-            .split_whitespace()
-            .filter(|w| {
-                let w = w.trim_matches(|c: char| !c.is_alphanumeric());
-                let first = w.chars().next().unwrap_or(' ');
-                // Capitalized, 4+ chars, not common English words
-                first.is_uppercase()
-                    && w.len() >= 4
-                    && !matches!(
-                        w.to_lowercase().as_str(),
-                        "this" | "that" | "with" | "from" | "have" | "been"
-                            | "they" | "your" | "will" | "when" | "what"
-                            | "blade" | "user" | "the" | "and" | "for"
-                    )
-            })
-            .take(4)
-            .collect();
+    // ── Lateral: extract notable tech terms from brain/thread combined ──────
+    let src = format!("{} {}", thread, brain_ctx);
+    let stop: &[&str] = &[
+        "this", "that", "with", "from", "have", "been", "they", "your",
+        "will", "when", "what", "blade", "user", "the", "and", "for",
+        "are", "was", "has", "its", "into", "all", "can", "you",
+    ];
+    let tech_words: Vec<&str> = src
+        .split_whitespace()
+        .filter(|w| {
+            let clean = w.trim_matches(|c: char| !c.is_alphanumeric());
+            let first = clean.chars().next().unwrap_or(' ');
+            first.is_uppercase()
+                && clean.len() >= 4
+                && !stop.contains(&clean.to_lowercase().as_str())
+        })
+        .take(5)
+        .collect();
 
-        if tech_words.len() >= 2 {
-            let term = tech_words[..tech_words.len().min(3)].join(" ");
-            queries.push(format!("{} tutorial OR documentation OR best practices", term));
-        }
+    if tech_words.len() >= 2 && queries.len() < 3 {
+        let term = tech_words[..tech_words.len().min(3)].join(" ");
+        queries.push(format!("{} alternative tools 2025", term));
     }
 
     queries
@@ -204,7 +204,7 @@ pub async fn run_research_cycle(app: &tauri::AppHandle) {
 
     let mut researched: Vec<String> = Vec::new();
 
-    for query in queries.iter().take(2) {
+    for query in queries.iter().take(3) {
         let (results_str, is_err) = crate::native_tools::execute(
             "blade_search_web",
             &serde_json::json!({ "query": query, "max_results": 4 }),
