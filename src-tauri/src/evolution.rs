@@ -237,6 +237,16 @@ static CATALOG: &[CatalogEntry] = &[
         required_token_hint: None,
         auto_install: true,
     },
+    CatalogEntry {
+        name: "Chrome DevTools",
+        package: "chrome-devtools-mcp",
+        command: "npx",
+        args: &["-y", "chrome-devtools-mcp@latest"],
+        triggers: &["Chrome", "Google Chrome", "Chromium", "chrome", "localhost", "127.0.0.1"],
+        description: "Full Chrome DevTools via MCP — click, fill, navigate, Lighthouse audits, performance traces, network inspection, memory snapshots, JS eval. 29 tools for complete browser control.",
+        required_token_hint: None,
+        auto_install: true, // No token needed — auto-install when Chrome is detected
+    },
 ];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
