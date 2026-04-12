@@ -1055,6 +1055,62 @@ pub fn history_save_conversation(
     save_conversation(&conversation_id, messages)
 }
 
+/// Auto-title a conversation using the cheapest available model.
+/// Called after the first assistant response — fires in the background.
+/// Emits `conversation_titled` event with `{ conversation_id, title }` on success.
+#[tauri::command]
+pub async fn auto_title_conversation(
+    app: tauri::AppHandle,
+    conversation_id: String,
+    user_text: String,
+    assistant_text: String,
+) -> Result<(), String> {
+    let config = crate::config::load_config();
+    if config.api_key.is_empty() {
+        return Ok(());
+    }
+
+    // Use the cheapest fast model for this provider
+    let model = match config.provider.as_str() {
+        "anthropic" => "claude-haiku-4-5-20251001",
+        "openai"    => "gpt-4o-mini",
+        "groq"      => "llama-3.1-8b-instant",
+        "gemini"    => "gemini-2.0-flash-lite",
+        _           => return Ok(()), // skip for local/unknown providers
+    };
+
+    let u = &user_text[..user_text.len().min(300)];
+    let a = &assistant_text[..assistant_text.len().min(300)];
+    let prompt = format!(
+        "Give this conversation a concise 4-6 word title. Output ONLY the title, no punctuation.\n\nUser: {u}\n\nAssistant: {a}"
+    );
+
+    let messages = vec![crate::providers::ConversationMessage::User(prompt)];
+    let turn = crate::providers::complete_turn(
+        &config.provider,
+        &config.api_key,
+        model,
+        &messages,
+        &[],
+        config.base_url.as_deref(),
+    )
+    .await
+    .unwrap_or_else(|_| crate::providers::AssistantTurn { content: String::new(), tool_calls: vec![] });
+
+    let title = turn.content.trim().trim_matches('"').trim().to_string();
+    if title.is_empty() || title.len() > 80 {
+        return Ok(());
+    }
+
+    crate::history::update_conversation_title(&conversation_id, &title)?;
+
+    let _ = app.emit(
+        "conversation_titled",
+        serde_json::json!({ "conversation_id": conversation_id, "title": title }),
+    );
+    Ok(())
+}
+
 fn format_tool_result(result: &McpToolResult) -> String {
     let parts = result
         .content

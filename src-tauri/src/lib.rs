@@ -344,6 +344,7 @@ pub fn run() {
             commands::history_list_conversations,
             commands::history_load_conversation,
             commands::history_save_conversation,
+            commands::auto_title_conversation,
             commands::history_delete_conversation,
             // Database commands
             db_commands::db_list_conversations,

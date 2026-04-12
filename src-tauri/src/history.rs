@@ -93,6 +93,18 @@ pub fn load_conversation(conversation_id: &str) -> Result<StoredConversation, St
     serde_json::from_str(&raw).map_err(|e| e.to_string())
 }
 
+pub fn update_conversation_title(conversation_id: &str, title: &str) -> Result<(), String> {
+    let path = conversation_path(conversation_id);
+    if !path.exists() {
+        return Ok(());
+    }
+    let mut conv = load_conversation(conversation_id)?;
+    conv.title = title.to_string();
+    let raw = serde_json::to_string_pretty(&conv).map_err(|e| e.to_string())?;
+    write_blade_file(&path, &raw)?;
+    Ok(())
+}
+
 pub fn delete_conversation(conversation_id: &str) -> Result<(), String> {
     let path = conversation_path(conversation_id);
     if path.exists() {
