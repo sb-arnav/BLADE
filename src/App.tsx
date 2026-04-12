@@ -22,7 +22,7 @@ import { useRuntimes } from "./hooks/useRuntimes";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard";
 
 const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
 const Canvas = lazy(() => import("./components/Canvas"));
@@ -56,6 +56,7 @@ const BackgroundAgentsPanel = lazy(() => import("./components/BackgroundAgentsPa
 const ScreenTimeline = lazy(() => import("./components/ScreenTimeline").then((m) => ({ default: m.ScreenTimeline })));
 const SwarmView = lazy(() => import("./components/SwarmView").then((m) => ({ default: m.SwarmView })));
 const SoulView = lazy(() => import("./components/SoulView").then((m) => ({ default: m.SoulView })));
+const DashboardView = lazy(() => import("./components/Dashboard").then((m) => ({ default: m.Dashboard })));
 
 function ShellFallback({ label = "Loading workspace..." }: { label?: string }) {
   return (
@@ -755,6 +756,7 @@ export default function App() {
     "screen-timeline": <ScreenTimeline onBack={() => openRoute("chat")} />,
     "swarm": <SwarmView onBack={() => openRoute("chat")} />,
     "soul": <SoulView onBack={() => openRoute("chat")} />,
+    "dashboard": <DashboardView onBack={() => openRoute("chat")} onNavigate={(r) => openRoute(r as Route)} />,
   };
 
   if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {
