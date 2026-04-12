@@ -22,7 +22,7 @@ import { useRuntimes } from "./hooks/useRuntimes";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs";
 
 const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
 const Canvas = lazy(() => import("./components/Canvas"));
@@ -57,6 +57,7 @@ const ScreenTimeline = lazy(() => import("./components/ScreenTimeline").then((m)
 const SwarmView = lazy(() => import("./components/SwarmView").then((m) => ({ default: m.SwarmView })));
 const SoulView = lazy(() => import("./components/SoulView").then((m) => ({ default: m.SoulView })));
 const DashboardView = lazy(() => import("./components/Dashboard").then((m) => ({ default: m.Dashboard })));
+const SkillPackView = lazy(() => import("./components/SkillPackView").then((m) => ({ default: m.SkillPackView })));
 
 function ShellFallback({ label = "Loading workspace..." }: { label?: string }) {
   return (
@@ -665,6 +666,7 @@ export default function App() {
     { id: "journal-write", label: "Write today's journal entry", description: "Force Blade to write tonight's journal entry now", section: "Knowledge", action: () => { void invoke("journal_write_now").then(() => notifications.add({ type: "success", title: "Journal written", message: "Today's entry is ready" })).catch(() => {}); } },
     { id: "reports", label: "Open capability reports", description: "Review what Blade could not do and why", section: "Knowledge", action: () => openRoute("reports") },
     { id: "dashboard", label: "Open BLADE dashboard", description: "Mission control — status, agents, memory, cron, evolution at a glance", section: "Knowledge", action: () => openRoute("dashboard") },
+    { id: "skill-packs", label: "Install skill packs", description: "Browse and install domain MCP tools for your active role", section: "Knowledge", action: () => openRoute("skill-packs") },
     { id: "analytics", label: "Open analytics", description: "Inspect activity and usage trends", section: "Knowledge", action: () => openRoute("analytics") },
     { id: "activity", label: "Open activity feed", description: "See recent events across the app", section: "Knowledge", action: () => openRoute("activity") },
     { id: "comparison", label: "Compare models", description: "Inspect model behavior side by side", section: "Knowledge", action: () => openRoute("comparison") },
@@ -777,6 +779,7 @@ export default function App() {
     "swarm": <SwarmView onBack={() => openRoute("chat")} />,
     "soul": <SoulView onBack={() => openRoute("chat")} />,
     "dashboard": <DashboardView onBack={() => openRoute("chat")} onNavigate={(r) => openRoute(r as Route)} />,
+    "skill-packs": <SkillPackView onBack={() => openRoute("chat")} />,
   };
 
   if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {
