@@ -22,7 +22,7 @@ import { useRuntimes } from "./hooks/useRuntimes";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline";
 
 const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
 const Canvas = lazy(() => import("./components/Canvas"));
@@ -53,6 +53,7 @@ const CharacterBible = lazy(() => import("./components/CharacterBible").then((m)
 const CapabilityReports = lazy(() => import("./components/CapabilityReports").then((m) => ({ default: m.CapabilityReports })));
 const ComputerUsePanel = lazy(() => import("./components/ComputerUsePanel").then((m) => ({ default: m.ComputerUsePanel })));
 const BackgroundAgentsPanel = lazy(() => import("./components/BackgroundAgentsPanel").then((m) => ({ default: m.BackgroundAgentsPanel })));
+const ScreenTimeline = lazy(() => import("./components/ScreenTimeline").then((m) => ({ default: m.ScreenTimeline })));
 
 function ShellFallback({ label = "Loading workspace..." }: { label?: string }) {
   return (
@@ -743,6 +744,7 @@ export default function App() {
     ),
     "computer-use": <ComputerUsePanel onDismiss={() => openRoute("chat")} />,
     "bg-agents": <BackgroundAgentsPanel onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} />,
+    "screen-timeline": <ScreenTimeline onBack={() => openRoute("chat")} />,
   };
 
   if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {

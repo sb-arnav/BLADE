@@ -10,6 +10,14 @@ use std::time::Duration;
 use tauri::{Emitter, Manager};
 
 pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
+    // Start Total Recall screen timeline if enabled
+    {
+        let config = crate::config::load_config();
+        if config.screen_timeline_enabled {
+            crate::screen_timeline::start_timeline_capture_loop(app.clone());
+        }
+    }
+
     let tier = tier.to_string();
     tauri::async_runtime::spawn(async move {
         let mut first_run = true;

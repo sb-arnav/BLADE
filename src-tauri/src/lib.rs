@@ -50,6 +50,8 @@ mod reports;
 mod router;
 mod runtimes;
 mod screen;
+mod screen_timeline;
+mod screen_timeline_commands;
 mod trace;
 mod tray;
 mod ui_automation;
@@ -583,6 +585,14 @@ pub fn run() {
             research::research_get_recent,
             research::research_query,
             research::research_clear,
+            screen_timeline_commands::timeline_search_cmd,
+            screen_timeline_commands::timeline_browse_cmd,
+            screen_timeline_commands::timeline_get_screenshot,
+            screen_timeline_commands::timeline_get_thumbnail,
+            screen_timeline_commands::timeline_get_config,
+            screen_timeline_commands::timeline_set_config,
+            screen_timeline_commands::timeline_get_stats_cmd,
+            screen_timeline_commands::timeline_cleanup,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
@@ -686,6 +696,9 @@ pub fn run() {
             let startup_god_config = config::load_config();
             if startup_god_config.god_mode {
                 godmode::start_god_mode(app.handle().clone(), &startup_god_config.god_mode_tier);
+            } else if startup_god_config.screen_timeline_enabled {
+                // Timeline can run independently of god mode
+                screen_timeline::start_timeline_capture_loop(app.handle().clone());
             }
 
             // EVOLUTION ENGINE — BLADE's self-improvement loop.

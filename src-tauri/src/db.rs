@@ -430,6 +430,52 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
             created_at INTEGER NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_research_created ON research_log(created_at DESC);
+
+        -- ── TOTAL RECALL — Screen Timeline ───────────────────────────────────
+        -- Screenshot every N seconds. Fingerprint dedup skips identical frames.
+        -- Description + embedding enable semantic search ("what was I looking at?")
+        CREATE TABLE IF NOT EXISTS screen_timeline (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp INTEGER NOT NULL,
+            screenshot_path TEXT NOT NULL,
+            thumbnail_path TEXT NOT NULL DEFAULT '',
+            window_title TEXT NOT NULL DEFAULT '',
+            app_name TEXT NOT NULL DEFAULT '',
+            description TEXT NOT NULL DEFAULT '',
+            embedding_id TEXT,
+            fingerprint INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_screen_tl_ts ON screen_timeline(timestamp DESC);
+
+        -- ── BLADE SWARM — Parallel Multi-Agent Orchestration ─────────────────
+        CREATE TABLE IF NOT EXISTS swarms (
+            id TEXT PRIMARY KEY,
+            goal TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'planning',
+            scratchpad TEXT NOT NULL DEFAULT '{}',
+            final_result TEXT,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS swarm_tasks (
+            id TEXT PRIMARY KEY,
+            swarm_id TEXT NOT NULL REFERENCES swarms(id),
+            title TEXT NOT NULL,
+            goal TEXT NOT NULL,
+            task_type TEXT NOT NULL DEFAULT 'code',
+            depends_on TEXT NOT NULL DEFAULT '[]',
+            agent_id TEXT,
+            status TEXT NOT NULL DEFAULT 'pending',
+            result TEXT,
+            scratchpad_key TEXT,
+            created_at INTEGER NOT NULL,
+            started_at INTEGER,
+            completed_at INTEGER,
+            error TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_swarm_tasks_swarm ON swarm_tasks(swarm_id);
+        CREATE INDEX IF NOT EXISTS idx_swarm_tasks_status ON swarm_tasks(status);
         ",
     )
     .map_err(|e| format!("DB error: {}", e))?;
