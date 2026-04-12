@@ -12,7 +12,7 @@ use base64::Engine as _;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // ---------------------------------------------------------------------------
 // Types
