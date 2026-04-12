@@ -390,14 +390,33 @@ export function MessageList({
         {(activeTools.length > 0 || recentCompleted.length > 0) && (
           <div className="flex justify-start animate-fade-in">
             <div className="pl-3 border-l-2 border-blade-border space-y-1">
-              {activeTools.map((tool) => (
-                <div key={tool.id} className="flex items-center gap-2 py-0.5 text-xs text-blade-muted">
-                  <div className={`w-1 h-1 rounded-full animate-pulse-slow ${
-                    tool.risk === "Blocked" ? "bg-red-400" : tool.risk === "Ask" ? "bg-amber-400" : "bg-blade-accent"
-                  }`} />
-                  <span className="font-mono text-2xs">{tool.tool_name}</span>
-                </div>
-              ))}
+              {activeTools.map((tool) => {
+                // Parse argument preview: extract the first key's value from JSON
+                let argPreview: string | null = null;
+                if (tool.arguments) {
+                  try {
+                    const parsed = JSON.parse(tool.arguments);
+                    const vals = Object.values(parsed);
+                    if (vals.length > 0) {
+                      const v = String(vals[0]);
+                      argPreview = v.length > 40 ? v.slice(0, 38) + "…" : v;
+                    }
+                  } catch {
+                    argPreview = tool.arguments.slice(0, 40);
+                  }
+                }
+                return (
+                  <div key={tool.id} className="flex items-center gap-2 py-0.5 text-xs text-blade-muted">
+                    <div className={`w-1 h-1 rounded-full animate-pulse-slow shrink-0 ${
+                      tool.risk === "Blocked" ? "bg-red-400" : tool.risk === "Ask" ? "bg-amber-400" : "bg-blade-accent"
+                    }`} />
+                    <span className="font-mono text-2xs shrink-0">{tool.tool_name}</span>
+                    {argPreview && (
+                      <span className="text-2xs text-blade-muted/40 font-mono truncate max-w-[200px]">{argPreview}</span>
+                    )}
+                  </div>
+                );
+              })}
               {recentCompleted.map((tool) => (
                 <div key={tool.id} className="flex items-center gap-2 py-0.5 text-xs text-blade-muted/50">
                   <span className={`text-2xs ${tool.is_error ? "text-red-400/60" : "text-emerald-400/60"}`}>
