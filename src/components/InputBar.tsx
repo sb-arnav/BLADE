@@ -306,9 +306,14 @@ export function InputBar({ onSend, onSlashCommand, disabled, loading, draftValue
         <span className="text-2xs text-blade-muted/50">
           {recording ? "Recording... click mic to stop" : "Type, speak, paste, or capture your screen"}
         </span>
-        <kbd className="text-2xs text-blade-muted/40 font-mono">
-          \u2318K
-        </kbd>
+        <div className="flex items-center gap-2">
+          {value.length > 300 && (
+            <span className={`text-2xs font-mono ${value.length > 8000 ? "text-red-400/70" : value.length > 3000 ? "text-amber-400/60" : "text-blade-muted/40"}`}>
+              {value.length > 999 ? `${(value.length / 1000).toFixed(1)}k` : value.length}
+            </span>
+          )}
+          <kbd className="text-2xs text-blade-muted/40 font-mono">Ctrl+K</kbd>
+        </div>
       </div>
     </div>
   );
