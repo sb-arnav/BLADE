@@ -67,6 +67,12 @@ struct DiskConfig {
     timeline_capture_interval: u32,
     #[serde(default = "default_timeline_retention")]
     timeline_retention_days: u32,
+    #[serde(default)]
+    wake_word_enabled: bool,
+    #[serde(default = "default_wake_word_phrase")]
+    wake_word_phrase: String,
+    #[serde(default = "default_wake_word_sensitivity")]
+    wake_word_sensitivity: u8,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -79,6 +85,8 @@ fn default_quick_ask_shortcut() -> String { "Alt+Space".to_string() }
 fn default_voice_shortcut() -> String { "Ctrl+Shift+V".to_string() }
 fn default_timeline_interval() -> u32 { 30 }
 fn default_timeline_retention() -> u32 { 14 }
+fn default_wake_word_phrase() -> String { "hey blade".to_string() }
+fn default_wake_word_sensitivity() -> u8 { 3 }
 
 impl Default for DiskConfig {
     fn default() -> Self {
@@ -104,6 +112,9 @@ impl Default for DiskConfig {
             screen_timeline_enabled: false,
             timeline_capture_interval: 30,
             timeline_retention_days: 14,
+            wake_word_enabled: false,
+            wake_word_phrase: "hey blade".to_string(),
+            wake_word_sensitivity: 3,
             api_key: None,
         }
     }
@@ -152,6 +163,12 @@ pub struct BladeConfig {
     pub timeline_capture_interval: u32,
     #[serde(default = "default_timeline_retention")]
     pub timeline_retention_days: u32,
+    #[serde(default)]
+    pub wake_word_enabled: bool,
+    #[serde(default = "default_wake_word_phrase")]
+    pub wake_word_phrase: String,
+    #[serde(default = "default_wake_word_sensitivity")]
+    pub wake_word_sensitivity: u8,
 }
 
 impl BladeConfig {
@@ -185,6 +202,9 @@ impl Default for BladeConfig {
             screen_timeline_enabled: false,
             timeline_capture_interval: 30,
             timeline_retention_days: 14,
+            wake_word_enabled: false,
+            wake_word_phrase: "hey blade".to_string(),
+            wake_word_sensitivity: 3,
         }
     }
 }
@@ -276,6 +296,9 @@ pub fn load_config() -> BladeConfig {
         screen_timeline_enabled: disk.screen_timeline_enabled,
         timeline_capture_interval: disk.timeline_capture_interval,
         timeline_retention_days: disk.timeline_retention_days,
+        wake_word_enabled: disk.wake_word_enabled,
+        wake_word_phrase: disk.wake_word_phrase,
+        wake_word_sensitivity: disk.wake_word_sensitivity,
     }
 }
 
@@ -305,6 +328,9 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         screen_timeline_enabled: config.screen_timeline_enabled,
         timeline_capture_interval: config.timeline_capture_interval,
         timeline_retention_days: config.timeline_retention_days,
+        wake_word_enabled: config.wake_word_enabled,
+        wake_word_phrase: config.wake_word_phrase.clone(),
+        wake_word_sensitivity: config.wake_word_sensitivity,
         api_key: None,
     };
 
