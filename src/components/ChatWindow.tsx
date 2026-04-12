@@ -128,6 +128,36 @@ export function ChatWindow({
     return conversations.filter((c) => (c.title || "").toLowerCase().includes(q));
   }, [conversations, search]);
 
+  // Group conversations by recency when not searching
+  const groupedConversations = useMemo(() => {
+    if (search.trim()) return [{ label: null as string | null, items: filteredConversations }];
+    const now = Date.now();
+    const todayStart   = new Date(); todayStart.setHours(0,0,0,0);
+    const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+    const weekStart    = new Date(todayStart); weekStart.setDate(weekStart.getDate() - 7);
+
+    const today: typeof conversations = [];
+    const yesterday: typeof conversations = [];
+    const thisWeek: typeof conversations = [];
+    const older: typeof conversations = [];
+
+    for (const c of filteredConversations) {
+      const ts = c.updated_at > 1e10 ? c.updated_at : c.updated_at * 1000; // handle both ms and s
+      if (ts >= todayStart.getTime()) today.push(c);
+      else if (ts >= yesterdayStart.getTime()) yesterday.push(c);
+      else if (ts >= weekStart.getTime()) thisWeek.push(c);
+      else older.push(c);
+    }
+    void now;
+
+    return [
+      { label: "Today" as string | null, items: today },
+      { label: "Yesterday" as string | null, items: yesterday },
+      { label: "This week" as string | null, items: thisWeek },
+      { label: "Older" as string | null, items: older },
+    ].filter((g) => g.items.length > 0);
+  }, [filteredConversations, search]);
+
   // Merge external voice draft into composer draft
   useEffect(() => {
     if (voiceDraft) {
@@ -192,58 +222,67 @@ export function ChatWindow({
           <SearchInput value={search} onChange={setSearch} placeholder="Search conversations…" />
         </div>
         <div className="flex-1 overflow-y-auto px-1.5 pb-2">
-          {filteredConversations.map((conv) => {
-            const isActive = conv.id === currentConversationId;
-            return (
-              <div
-                key={conv.id}
-                className={`group relative rounded-lg px-2.5 py-2 mb-0.5 cursor-pointer transition-colors ${
-                  isActive
-                    ? "bg-blade-accent-muted text-blade-text"
-                    : "text-blade-secondary hover:bg-blade-surface-hover hover:text-blade-text"
-                }`}
-                onClick={() => { if (renamingId !== conv.id) { onSwitchConversation(conv.id); toggleSidebar(false); } }}
-              >
-                {renamingId === conv.id ? (
-                  <input
-                    ref={renameInputRef}
-                    value={renameValue}
-                    onChange={(e) => setRenameValue(e.target.value)}
-                    onBlur={() => commitRename(conv.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") commitRename(conv.id);
-                      if (e.key === "Escape") setRenamingId(null);
-                    }}
-                    className="w-full text-xs bg-blade-bg border border-blade-accent/40 rounded px-1.5 py-0.5 outline-none text-blade-text"
-                    onClick={(e) => e.stopPropagation()}
-                    autoFocus
-                  />
-                ) : (
-                  <p
-                    className="text-xs truncate"
-                    onDoubleClick={(e) => startRename(conv, e)}
-                    title="Double-click to rename"
-                  >
-                    {conv.title || "New conversation"}
-                  </p>
-                )}
-                <div className="flex items-center justify-between mt-0.5">
-                  <span className="text-2xs text-blade-muted">
-                    {formatTime(conv.updated_at)}
-                    {conv.message_count ? <span className="ml-1.5 text-blade-muted/40">{conv.message_count}m</span> : null}
-                  </span>
-                  {conversations.length > 1 && renamingId !== conv.id && (
-                    <span
-                      onClick={(e) => { e.stopPropagation(); onDeleteConversation(conv.id); }}
-                      className="text-2xs text-blade-muted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
-                    >
-                      del
-                    </span>
-                  )}
+          {groupedConversations.map((group) => (
+            <div key={group.label ?? "results"}>
+              {group.label && (
+                <div className="px-2 pt-3 pb-1 text-[9px] font-semibold uppercase tracking-[0.2em] text-blade-muted/40">
+                  {group.label}
                 </div>
-              </div>
-            );
-          })}
+              )}
+              {group.items.map((conv) => {
+                const isActive = conv.id === currentConversationId;
+                return (
+                  <div
+                    key={conv.id}
+                    className={`group relative rounded-lg px-2.5 py-2 mb-0.5 cursor-pointer transition-colors ${
+                      isActive
+                        ? "bg-blade-accent-muted text-blade-text"
+                        : "text-blade-secondary hover:bg-blade-surface-hover hover:text-blade-text"
+                    }`}
+                    onClick={() => { if (renamingId !== conv.id) { onSwitchConversation(conv.id); toggleSidebar(false); } }}
+                  >
+                    {renamingId === conv.id ? (
+                      <input
+                        ref={renameInputRef}
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onBlur={() => commitRename(conv.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") commitRename(conv.id);
+                          if (e.key === "Escape") setRenamingId(null);
+                        }}
+                        className="w-full text-xs bg-blade-bg border border-blade-accent/40 rounded px-1.5 py-0.5 outline-none text-blade-text"
+                        onClick={(e) => e.stopPropagation()}
+                        autoFocus
+                      />
+                    ) : (
+                      <p
+                        className="text-xs truncate"
+                        onDoubleClick={(e) => startRename(conv, e)}
+                        title="Double-click to rename"
+                      >
+                        {conv.title || "New conversation"}
+                      </p>
+                    )}
+                    <div className="flex items-center justify-between mt-0.5">
+                      <span className="text-2xs text-blade-muted">
+                        {formatTime(conv.updated_at)}
+                        {conv.message_count ? <span className="ml-1.5 text-blade-muted/40">{conv.message_count}m</span> : null}
+                      </span>
+                      {conversations.length > 1 && renamingId !== conv.id && (
+                        <span
+                          onClick={(e) => { e.stopPropagation(); onDeleteConversation(conv.id); }}
+                          className="text-2xs text-blade-muted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                        >
+                          del
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
         <div className="border-t border-blade-border px-3 py-2 space-y-1">
           {(streakDays || totalMessages) ? (
