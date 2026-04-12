@@ -141,6 +141,24 @@ pub fn build_system_prompt_with_recall(
     build_system_prompt_inner(tools, user_query, vector_store, &ModelTier::Frontier)
 }
 
+/// Hard budget for the assembled system prompt.
+/// ~150k chars ≈ 37.5k tokens — leaves plenty of room for the conversation
+/// inside a 200k context window.
+const SYSTEM_PROMPT_CHAR_BUDGET: usize = 150_000;
+
+/// Drop sections from the end of `parts` until the total char count is under
+/// the budget. The first `keep` entries are never removed (they are the
+/// highest-priority always-on sections).
+fn enforce_budget(parts: &mut Vec<String>, keep: usize) {
+    loop {
+        let total: usize = parts.iter().map(|p| p.len()).sum();
+        if total <= SYSTEM_PROMPT_CHAR_BUDGET || parts.len() <= keep {
+            break;
+        }
+        parts.pop();
+    }
+}
+
 fn build_system_prompt_inner(
     tools: &[McpTool],
     user_query: &str,
@@ -152,6 +170,38 @@ fn build_system_prompt_inner(
 
     // Core identity — personalised with user name + style
     parts.push(build_identity(&config));
+
+    // BLADE SELF-KNOWLEDGE — what BLADE already has built in.
+    // Critical: without this, BLADE invents external tools/scripts for features it already has.
+    // Always keep this (index 1).
+    parts.push(format!(
+        "## BLADE Built-In Features\n\n\
+         Before writing code, installing packages, or building any external tool, check this list.\n\
+         If BLADE already has the capability, USE IT — don't reinvent it.\n\n\
+         **Messaging & Notifications**\n\
+         - Telegram bot bridge: Settings → Integrations → Telegram → paste a BotFather token. \
+           BLADE becomes the bot instantly. No Node.js code, no separate server.\n\
+         - Discord webhook: Settings → Integrations → Discord → paste webhook URL.\n\
+         - OS push notifications: `blade_notify` tool — fires native desktop notification immediately.\n\
+         - Reminders with TTS: `blade_set_reminder` — fires at scheduled time as notification + voice.\n\n\
+         **UI & Input**\n\
+         - Global voice input: Ctrl+Shift+V from anywhere → transcribes via Whisper → fills QuickAsk.\n\
+         - QuickAsk: Alt+Space — opens BLADE from any app.\n\
+         - God Mode: Settings → God Mode — injects live screen/window/clipboard context into every prompt.\n\n\
+         **Automation**\n\
+         - Cron / scheduled tasks: Settings → Cron — schedule recurring BLADE tasks in plain English.\n\
+         - Background agents: Operator Center (sidebar) — spawn Claude Code, Aider, or Goose as workers.\n\
+         - Computer use: `blade_computer_use` — autonomous multi-step desktop automation.\n\n\
+         **Storage & Config**\n\
+         - Config dir: `~/Library/Application Support/blade/` (macOS) | `%APPDATA%\\blade\\` (Windows) | `~/.config/blade/` (Linux)\n\
+         - Database: `blade.db` in the config dir (SQLite — all memory, timeline, preferences)\n\
+         - BLADE.md: drop a `BLADE.md` file in the config dir to give BLADE workspace-level instructions\n\
+         - API keys: `blade_set_api_key` tool — stores in OS keychain, no manual settings needed\n\n\
+         **Code & Terminal**\n\
+         - Delegate complex coding: `blade_bash: claude -p \"task description\"` — Claude Code CLI at `~/.local/bin/claude`\n\
+         - Symbol search across indexed projects: `blade_find_symbol`\n\
+         - Codebase indexing: Settings → Codebase → add a project path"
+    ));
 
     // BLADE.md — user-level workspace instructions (highest priority after identity)
     if let Some(blade_md) = load_blade_md() {
@@ -192,15 +242,29 @@ fn build_system_prompt_inner(
 
     // CODEBASE INDEX — inject structural knowledge of known projects.
     // BLADE knows the shape of every project it has touched. Claude Code doesn't.
+    // Cap per-project summary to 4k chars and total section to 25k chars to avoid
+    // blowing the token budget when large projects are indexed.
     {
+        const MAX_PROJECT_CHARS: usize = 4_000;
+        const MAX_INDEX_TOTAL_CHARS: usize = 25_000;
         let known_projects = crate::indexer::list_indexed_projects();
         if !known_projects.is_empty() {
             let mut summaries = Vec::new();
+            let mut total_index_chars = 0usize;
             for proj in &known_projects {
-                let s = crate::indexer::project_summary_for_prompt(&proj.project);
-                if !s.is_empty() {
-                    summaries.push(s);
+                if total_index_chars >= MAX_INDEX_TOTAL_CHARS {
+                    summaries.push(format!("...({} more projects indexed, use `blade_find_symbol` to search them)", known_projects.len().saturating_sub(summaries.len())));
+                    break;
                 }
+                let s = crate::indexer::project_summary_for_prompt(&proj.project);
+                if s.is_empty() { continue; }
+                let capped = if s.len() > MAX_PROJECT_CHARS {
+                    format!("{}\n...(truncated — use `blade_find_symbol` for full index)", &s[..MAX_PROJECT_CHARS])
+                } else {
+                    s
+                };
+                total_index_chars += capped.len();
+                summaries.push(capped);
             }
             if !summaries.is_empty() {
                 parts.push(format!(
@@ -281,9 +345,15 @@ fn build_system_prompt_inner(
     }
 
     // God Mode — live machine context (files, apps, downloads)
+    // Cap to 3k chars — god mode snapshots can be large (OCR text, file lists)
     if let Some(gm) = crate::godmode::load_godmode_context() {
         if !gm.trim().is_empty() {
-            parts.push(gm);
+            let capped_gm = if gm.len() > 3_000 {
+                format!("{}\n...(god mode context truncated)", &gm[..3_000])
+            } else {
+                gm
+            };
+            parts.push(capped_gm);
         }
     }
 
@@ -347,6 +417,11 @@ fn build_system_prompt_inner(
     if *tier == ModelTier::Small {
         trim_for_small_model(&mut parts, 14_000);
     }
+
+    // Hard budget cap for all model tiers.
+    // Keep the first 4 parts (identity, self-knowledge, BLADE.md, thread) always.
+    // Drop from the end until we're under SYSTEM_PROMPT_CHAR_BUDGET (~37k tokens).
+    enforce_budget(&mut parts, 4);
 
     parts.join("\n\n---\n\n")
 }
