@@ -1,5 +1,5 @@
+import React, { memo, useCallback, useEffect, useRef, useState, Component } from "react";
 import { Message, ToolExecution } from "../types";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ActiveWindowInfo, ContextSuggestion } from "../hooks/useContextAwareness";
 import ReactMarkdown from "react-markdown";
@@ -193,6 +193,21 @@ function shouldShowDateSeparator(messages: Message[], index: number): boolean {
   const prev = new Date(messages[index - 1].timestamp).toDateString();
   const curr = new Date(messages[index].timestamp).toDateString();
   return prev !== curr;
+}
+
+class MessageBoundary extends Component<{ children: React.ReactNode }, { error: boolean }> {
+  state = { error: false };
+  static getDerivedStateFromError() { return { error: true }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="pl-3 border-l-2 border-red-500/20 text-2xs text-red-400/60 font-mono py-1">
+          [render error — message could not be displayed]
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 const MessageBubble = memo(function MessageBubble({ msg, isLast, onRetry }: { msg: Message; isLast?: boolean; onRetry?: () => void }) {
@@ -396,7 +411,9 @@ export function MessageList({
               {shouldShowDateSeparator(messages, idx) && (
                 <DateSeparator timestamp={msg.timestamp} />
               )}
-              <MessageBubble msg={msg} isLast={isLastAssistant} onRetry={isLastAssistant ? onRetry : undefined} />
+              <MessageBoundary>
+                <MessageBubble msg={msg} isLast={isLastAssistant} onRetry={isLastAssistant ? onRetry : undefined} />
+              </MessageBoundary>
             </div>
           );
         })}
