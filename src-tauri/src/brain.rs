@@ -168,6 +168,16 @@ fn build_system_prompt_inner(
     let mut parts: Vec<String> = Vec::new();
     let config = crate::config::load_config();
 
+    // L0 MEMORY — always-on critical facts (MemPalace wake-up layer).
+    // Injected first, before everything. Never budget-cut (index 0 is protected).
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+        let l0 = crate::db::brain_l0_critical_facts(&conn);
+        if !l0.trim().is_empty() {
+            parts.push(l0);
+        }
+    }
+
     // ROLE INJECTION — active specialist mode shapes everything below
     let role_injection = crate::roles::role_system_injection(&config.active_role);
     if !role_injection.trim().is_empty() {
