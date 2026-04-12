@@ -1,5 +1,6 @@
 mod agent_commands;
 mod ambient;
+mod evolution;
 mod background_agent;
 mod cron;
 mod execution_memory;
@@ -572,6 +573,12 @@ pub fn run() {
             reminders::reminder_list,
             reminders::reminder_delete,
             reminders::reminder_parse_time,
+            evolution::evolution_get_level,
+            evolution::evolution_get_suggestions,
+            evolution::evolution_dismiss_suggestion,
+            evolution::evolution_install_suggestion,
+            evolution::evolution_run_now,
+            evolution::evolution_log_capability_gap,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
@@ -676,6 +683,10 @@ pub fn run() {
             if startup_god_config.god_mode {
                 godmode::start_god_mode(app.handle().clone(), &startup_god_config.god_mode_tier);
             }
+
+            // EVOLUTION ENGINE — BLADE's self-improvement loop.
+            // Watches what you use and progressively wires BLADE into your stack.
+            evolution::start_evolution_loop(app.handle().clone());
 
             // Auto-start Telegram bot if a token was previously saved
             let tg_app = app.handle().clone();

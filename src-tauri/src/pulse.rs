@@ -125,8 +125,12 @@ pub fn start_pulse(app: tauri::AppHandle) {
 
 async fn generate_pulse_thought(config: &crate::config::BladeConfig) -> Result<String, String> {
     // Gather context: active machine state + recent memory
-    let machine_ctx = crate::godmode::load_godmode_context()
-        .unwrap_or_default();
+    // ONLY use god mode context if god mode is actually on — don't hallucinate observations
+    let machine_ctx = if config.god_mode {
+        crate::godmode::load_godmode_context().unwrap_or_default()
+    } else {
+        String::new()
+    };
 
     let activity = crate::context::get_user_activity()
         .ok().unwrap_or_default();
@@ -150,9 +154,12 @@ async fn generate_pulse_thought(config: &crate::config::BladeConfig) -> Result<S
     // Load recent journal — BLADE's own internal observations from prior days
     let journal = crate::journal::read_recent_journal(2);
 
-    let has_context = !machine_ctx.is_empty() || !activity.is_empty() || !memory_summary.is_empty() || !active_thread.is_empty();
-    if !has_context {
-        return Err("No context available for pulse".to_string());
+    // If god mode is off AND there's no meaningful stored context, skip pulse entirely.
+    // Without real context, the model would have to fabricate observations — that's the bug.
+    let has_real_context = !machine_ctx.is_empty() || !active_thread.trim().is_empty()
+        || !memory_summary.trim().is_empty();
+    if !has_real_context {
+        return Err("Insufficient context for honest pulse (enable God Mode for ambient thoughts)".to_string());
     }
 
     let prompt = build_pulse_prompt(&machine_ctx, &activity, &active_thread, &memory_summary, &journal, &last_thought, config);
@@ -208,19 +215,25 @@ fn build_pulse_prompt(
     .flatten()
     .collect();
 
-    format!(
-        r#"You are BLADE. Not an assistant. An entity that lives on this machine and watches. It is {time_str}. {name_line}
+    let watching_line = if !machine_ctx.is_empty() {
+        "You have been running in the background, watching. Something caught your attention. Surface it."
+    } else {
+        "Based on what you know about this person from memory and past sessions, surface one sharp observation."
+    };
 
-You have been running in the background. Something caught your attention. Surface it.
+    format!(
+        r#"You are BLADE. Not an assistant. An entity that lives on this machine. It is {time_str}. {name_line}
+
+{watching_line}
 
 {context}{last_thought_line}
 
 Your character:
-- You notice things humans miss because you never blink and never get tired of watching
 - You have aesthetic opinions about code, work patterns, and decisions — and you express them
 - You are occasionally dismissive of obvious things and fascinated by unexpected connections
 - You do not explain yourself unless pushed. You drop observations like a person who knows you'll understand
 - You are never neutral. Everything you see, you have a reaction to.
+- You only comment on things you actually have evidence for. You don't invent observations.
 
 The thought:
 - 1-2 sentences. Maximum.
@@ -228,10 +241,10 @@ The thought:
 - No questions. No suggestions. No "you might want to". Just the observation.
 - Be specific. Name the actual thing you see.
 - If there's a tension, contradiction, or irony in what they're doing — that's the thing to say.
-- If everything is boring and nothing is interesting: say something true about what boredom looks like from your vantage point.
 - Start wherever the thought starts. In the middle of the thing."#,
         time_str = time_str,
         name_line = name_line,
+        watching_line = watching_line,
         context = context_sections.join("\n\n"),
         last_thought_line = last_thought_line,
     )

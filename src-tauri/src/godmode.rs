@@ -77,6 +77,15 @@ pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
                     );
                 }
             }
+
+            // EVOLUTION: feed fresh god mode data into the evolution engine
+            // Run async — don't block the god mode loop
+            {
+                let ev_app = app.clone();
+                tokio::spawn(async move {
+                    crate::evolution::run_evolution_cycle(&ev_app).await;
+                });
+            }
         }
     });
 }
