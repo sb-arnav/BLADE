@@ -1,7 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type CSSProperties, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
-
-// ── Types ──────────────────────────────────────────────────────────────────
 
 interface EvolutionLevel {
   level: number;
@@ -63,7 +61,23 @@ interface DashboardData {
   snapshotCount: number;
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+interface Props {
+  onBack: () => void;
+  onNavigate: (route: string) => void;
+}
+
+const palette = {
+  bg: "#0a0a0a",
+  panel: "#10150f",
+  panelAlt: "#0d120d",
+  green: "#00ff41",
+  amber: "#ffb000",
+  red: "#ff0040",
+  line: "rgba(0, 255, 65, 0.24)",
+  dim: "rgba(0, 255, 65, 0.54)",
+  muted: "rgba(164, 255, 188, 0.74)",
+  glow: "rgba(0, 255, 65, 0.18)",
+} as const;
 
 function fmt(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -90,113 +104,191 @@ function countdown(ts: number | null): string {
   return `${Math.floor(diff / 86400)}d`;
 }
 
-// ── Sub-components ─────────────────────────────────────────────────────────
+function tickStyle(delay = "0s"): CSSProperties {
+  return {
+    animation: `dashboard-tick 1.1s steps(2, end) infinite`,
+    animationDelay: delay,
+  };
+}
 
-function StatusPill({
+function PixelStatus({
   active,
   label,
-  dim,
+  color = palette.green,
 }: {
   active: boolean;
   label: string;
-  dim?: boolean;
+  color?: string;
 }) {
+  const inactiveColor = "rgba(0, 255, 65, 0.18)";
+
   return (
     <div
-      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium border transition-colors ${
-        active
-          ? "border-blade-accent/40 bg-blade-accent/10 text-blade-accent"
-          : dim
-          ? "border-blade-border/40 bg-transparent text-blade-muted/40"
-          : "border-blade-border bg-blade-surface text-blade-muted"
-      }`}
+      className="flex min-h-[2.25rem] items-center gap-2 border px-2 py-1 uppercase tracking-[0.22em]"
+      style={{
+        borderColor: active ? color : palette.line,
+        backgroundColor: active ? `${color}12` : "rgba(0,0,0,0.18)",
+        boxShadow: active ? `inset 0 0 0 1px ${color}33, 0 0 12px ${color}22` : "none",
+        color: active ? color : palette.muted,
+      }}
     >
-      <div
-        className={`w-1.5 h-1.5 rounded-full ${
-          active ? "bg-blade-accent animate-pulse" : "bg-blade-muted/30"
-        }`}
-      />
-      {label}
+      <div className="grid grid-cols-2 gap-[2px] shrink-0">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <span
+            key={i}
+            className="block h-[6px] w-[6px]"
+            style={{
+              backgroundColor: active ? color : inactiveColor,
+              opacity: active ? 1 : 0.55,
+              animation: active ? "dashboard-blink 1.6s steps(2, end) infinite" : undefined,
+              animationDelay: `${i * 0.08}s`,
+            }}
+          />
+        ))}
+      </div>
+      <span className="text-[10px] font-bold">{label}</span>
     </div>
   );
 }
 
-function Card({
+function SectionFrame({
   title,
   children,
   className = "",
 }: {
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
 }) {
   return (
-    <div className={`bg-blade-surface border border-blade-border rounded-lg p-4 ${className}`}>
-      <div className="text-[10px] uppercase tracking-widest text-blade-muted mb-3">{title}</div>
-      {children}
+    <section
+      className={`relative overflow-hidden border p-4 ${className}`}
+      style={{
+        borderColor: palette.line,
+        background: `linear-gradient(180deg, ${palette.panel} 0%, ${palette.panelAlt} 100%)`,
+        boxShadow: `inset 0 0 0 1px rgba(0, 255, 65, 0.06), 0 0 18px ${palette.glow}`,
+      }}
+    >
+      <div
+        className="pointer-events-none absolute inset-0 opacity-30"
+        style={{
+          background:
+            "repeating-linear-gradient(180deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 3px)",
+        }}
+      />
+      <div className="relative">
+        <div className="mb-4 text-[11px] font-bold uppercase tracking-[0.28em]" style={{ color: palette.amber }}>
+          {`=== ${title} ===`}
+        </div>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function StatLine({
+  label,
+  value,
+  accent = palette.green,
+}: {
+  label: string;
+  value: ReactNode;
+  accent?: string;
+}) {
+  return (
+    <div
+      className="flex items-end justify-between gap-4 border-b pb-2 text-[11px] uppercase tracking-[0.18em]"
+      style={{ borderColor: "rgba(0, 255, 65, 0.14)" }}
+    >
+      <span style={{ color: palette.muted }}>{label}</span>
+      <span className="text-right text-base font-bold tabular-nums" style={{ color: accent, ...tickStyle() }}>
+        {value}
+      </span>
     </div>
   );
 }
 
 function AgentRow({ agent }: { agent: BackgroundAgent }) {
   const statusColor = {
-    Running: "text-blade-accent",
-    Completed: "text-green-400",
-    Failed: "text-red-400",
-    Cancelled: "text-blade-muted",
+    Running: palette.green,
+    Completed: palette.amber,
+    Failed: palette.red,
+    Cancelled: "rgba(160, 255, 180, 0.5)",
   }[agent.status];
 
-  const typeIcon = {
-    "claude-code": "⚡",
-    "aider": "🔧",
-    "goose": "🪿",
-  }[agent.agent_type] ?? "🤖";
-
   return (
-    <div className="flex items-start gap-3 py-2 border-b border-blade-border/40 last:border-0">
-      <span className="text-sm shrink-0 mt-0.5">{typeIcon}</span>
-      <div className="flex-1 min-w-0">
-        <div className="text-xs text-blade-text truncate">{agent.task}</div>
-        <div className="text-[10px] text-blade-muted mt-0.5">
-          {agent.agent_type} · started {relTime(agent.started_at)}
+    <div
+      className="grid grid-cols-[5rem_minmax(0,1fr)_6.5rem] gap-3 border-b px-2 py-2 text-[11px] uppercase tracking-[0.14em]"
+      style={{ borderColor: "rgba(0, 255, 65, 0.14)" }}
+    >
+      <div style={{ color: palette.amber }}>
+        <div>PID {agent.id.slice(0, 4)}</div>
+        <div className="mt-1 text-[10px]" style={{ color: palette.muted }}>
+          {agent.agent_type}
         </div>
       </div>
-      <div className={`text-[10px] font-medium shrink-0 ${statusColor}`}>
-        {agent.status === "Running" && (
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-blade-accent animate-pulse mr-1" />
-        )}
-        {agent.status}
+      <div className="min-w-0">
+        <div className="truncate font-bold" style={{ color: "#d5ffd8" }}>
+          {agent.task}
+        </div>
+        <div className="mt-1 truncate text-[10px]" style={{ color: palette.dim }}>
+          CWD {agent.cwd}
+        </div>
+      </div>
+      <div className="text-right">
+        <div className="flex items-center justify-end gap-2 font-bold" style={{ color: statusColor }}>
+          <span
+            className="block h-2.5 w-2.5 shrink-0"
+            style={{
+              backgroundColor: statusColor,
+              boxShadow: `0 0 10px ${statusColor}66`,
+              animation: agent.status === "Running" ? "dashboard-blink 1.1s steps(2, end) infinite" : undefined,
+            }}
+          />
+          <span>{agent.status}</span>
+        </div>
+        <div className="mt-1 text-[10px]" style={{ color: palette.muted }}>
+          {relTime(agent.started_at)}
+        </div>
       </div>
     </div>
   );
 }
 
 function CronRow({ task }: { task: CronTask }) {
+  const cronColor = task.enabled ? palette.green : palette.red;
+
   return (
-    <div className="flex items-center gap-3 py-2 border-b border-blade-border/40 last:border-0">
+    <div
+      className="grid grid-cols-[1.2rem_minmax(0,1fr)_6rem] gap-3 border-b px-2 py-2 text-[11px] uppercase tracking-[0.14em]"
+      style={{ borderColor: "rgba(0, 255, 65, 0.14)" }}
+    >
       <div
-        className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-          task.enabled ? "bg-blade-accent" : "bg-blade-muted/30"
-        }`}
+        className="mt-[2px] h-3 w-3"
+        style={{
+          backgroundColor: cronColor,
+          opacity: task.enabled ? 1 : 0.85,
+          boxShadow: `0 0 10px ${cronColor}55`,
+        }}
       />
-      <div className="flex-1 min-w-0">
-        <div className="text-xs text-blade-text truncate">{task.name}</div>
-        <div className="text-[10px] text-blade-muted mt-0.5">
-          run {task.run_count}× · last {relTime(task.last_run)}
+      <div className="min-w-0">
+        <div className="truncate font-bold" style={{ color: "#d5ffd8" }}>
+          {`*/${Math.max(1, task.run_count || 1)} * * * * ${task.name}`}
+        </div>
+        <div className="mt-1 truncate text-[10px]" style={{ color: palette.dim }}>
+          {task.description || `last ${relTime(task.last_run)}`}
         </div>
       </div>
-      <div className="text-[10px] font-mono text-blade-accent shrink-0">
-        {task.enabled ? `in ${countdown(task.next_run)}` : "paused"}
+      <div className="text-right">
+        <div className="font-bold" style={{ color: cronColor, ...tickStyle("0.2s") }}>
+          {task.enabled ? `IN ${countdown(task.next_run)}` : "PAUSED"}
+        </div>
+        <div className="mt-1 text-[10px]" style={{ color: palette.muted }}>
+          RUN {task.run_count}X
+        </div>
       </div>
     </div>
   );
-}
-
-// ── Main dashboard ─────────────────────────────────────────────────────────
-
-interface Props {
-  onBack: () => void;
-  onNavigate: (route: string) => void;
 }
 
 export function Dashboard({ onBack, onNavigate }: Props) {
@@ -213,7 +305,6 @@ export function Dashboard({ onBack, onNavigate }: Props) {
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now());
 
-  // Tick every second for live countdowns
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
@@ -253,219 +344,333 @@ export function Dashboard({ onBack, onNavigate }: Props) {
   const enabledCrons = data.crons.filter((c) => c.enabled);
   const level = data.level;
   const cfg = data.config;
+  const xpBlockCount = 20;
+  const xpProgress = Math.min(100, ((level?.score ?? 0) % 10) * 10);
+  const xpFilledBlocks = Math.round((xpProgress / 100) * xpBlockCount);
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center text-blade-muted text-sm">
-        Loading…
+      <div
+        className="flex h-full items-center justify-center font-mono text-sm uppercase tracking-[0.3em]"
+        style={{
+          color: palette.green,
+          backgroundColor: palette.bg,
+          textShadow: `0 0 10px ${palette.green}88`,
+        }}
+      >
+        Booting dashboard...
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col bg-blade-bg text-blade-text">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-blade-border shrink-0">
-        <button onClick={onBack} className="text-blade-muted hover:text-blade-text transition-colors text-sm">
-          ← Back
+    <div
+      className="relative flex h-full flex-col overflow-hidden font-mono"
+      style={{
+        background:
+          "radial-gradient(circle at top, rgba(0,255,65,0.1) 0%, rgba(0,255,65,0.02) 18%, rgba(10,10,10,1) 55%), #0a0a0a",
+        color: palette.green,
+      }}
+    >
+      <style>{`
+        @keyframes dashboard-blink {
+          0%, 49% { opacity: 1; }
+          50%, 100% { opacity: 0.45; }
+        }
+        @keyframes dashboard-tick {
+          0%, 20% { transform: translateY(0); opacity: 0.9; }
+          21% { transform: translateY(-1px); opacity: 1; }
+          22%, 100% { transform: translateY(0); opacity: 0.9; }
+        }
+        @keyframes dashboard-flicker {
+          0%, 100% { opacity: 0.18; }
+          50% { opacity: 0.24; }
+        }
+      `}</style>
+
+      <div
+        className="pointer-events-none absolute inset-0 opacity-40"
+        style={{
+          background:
+            "repeating-linear-gradient(180deg, rgba(255,255,255,0.045) 0px, rgba(255,255,255,0.045) 1px, transparent 1px, transparent 4px)",
+          animation: "dashboard-flicker 4s linear infinite",
+        }}
+      />
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          boxShadow: "inset 0 0 90px rgba(0, 0, 0, 0.72)",
+        }}
+      />
+
+      <header
+        className="relative z-10 flex shrink-0 items-center gap-3 border-b px-4 py-3"
+        style={{ borderColor: palette.line, backgroundColor: "rgba(10, 16, 10, 0.92)" }}
+      >
+        <button
+          onClick={onBack}
+          className="border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] transition-colors"
+          style={{ borderColor: palette.line, color: palette.amber }}
+        >
+          &lt; Back
         </button>
-        <div className="flex-1">
-          <div className="text-sm font-semibold">Dashboard</div>
-          <div className="text-[10px] text-blade-muted">Mission control — everything BLADE is doing right now</div>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-bold uppercase tracking-[0.32em]" style={{ color: "#d5ffd8" }}>
+            BLADE Dashboard
+          </div>
+          <div className="mt-1 text-[10px] uppercase tracking-[0.2em]" style={{ color: palette.dim }}>
+            Mission control online | auto-refresh 10s | CRT telemetry feed
+          </div>
         </div>
         <button
           onClick={load}
-          className="text-[10px] text-blade-muted hover:text-blade-text transition-colors px-2"
+          className="border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] transition-colors"
+          style={{ borderColor: palette.line, color: palette.green }}
         >
           Refresh
         </button>
-      </div>
+      </header>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-4 pt-3 space-y-3">
+      <div className="relative z-10 flex-1 overflow-y-auto px-4 pb-4 pt-3">
+        <div className="space-y-3">
+          <SectionFrame title="BLADE STATUS">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(16rem,0.85fr)]">
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-end justify-between gap-4 border-b pb-3" style={{ borderColor: palette.line }}>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.22em]" style={{ color: palette.amber }}>
+                      LEVEL
+                    </div>
+                    <div
+                      className="mt-1 text-5xl font-bold leading-none tabular-nums"
+                      style={{ color: palette.green, textShadow: `0 0 16px ${palette.green}88`, ...tickStyle() }}
+                    >
+                      {level?.level ?? 0}
+                    </div>
+                  </div>
+                  <div className="min-w-[14rem] flex-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] uppercase tracking-[0.18em]">
+                      <span style={{ color: "#d5ffd8" }}>{`XP ${(level?.score ?? 0).toLocaleString()}`}</span>
+                      <span style={{ color: palette.amber }}>
+                        {level?.next_unlock ? `NEXT ${level.next_unlock}` : "NEXT UNKNOWN"}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid grid-cols-10 gap-1 sm:grid-cols-20">
+                      {Array.from({ length: xpBlockCount }).map((_, index) => {
+                        const filled = index < xpFilledBlocks;
+                        return (
+                          <div
+                            key={index}
+                            className="h-4 border"
+                            style={{
+                              borderColor: filled ? `${palette.green}99` : "rgba(0, 255, 65, 0.14)",
+                              backgroundColor: filled ? palette.green : "rgba(0, 255, 65, 0.05)",
+                              boxShadow: filled ? `0 0 10px ${palette.green}55` : "none",
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                    <div className="mt-2 text-[10px] uppercase tracking-[0.18em]" style={{ color: palette.muted }}>
+                      Progress to next checkpoint: {xpProgress}%
+                    </div>
+                  </div>
+                </div>
 
-        {/* Level + status pills */}
-        <Card title="BLADE Status">
-          <div className="flex items-center gap-4 mb-3">
-            <div className="text-3xl font-bold text-blade-accent tabular-nums">
-              {level?.level ?? 0}
-            </div>
-            <div>
-              <div className="text-xs text-blade-text font-medium">
-                Level {level?.level ?? 0} · {level?.score ?? 0} pts
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  <PixelStatus active={!!cfg?.god_mode} label="God Mode" color={palette.amber} />
+                  <PixelStatus active={data.wakeWordActive} label="Wake Word" />
+                  <PixelStatus active={!!cfg?.screen_timeline_enabled} label="Total Recall" />
+                  <PixelStatus active={runningAgents.length > 0} label={`${runningAgents.length} Agents`} />
+                  <PixelStatus active={enabledCrons.length > 0} label={`${enabledCrons.length} Crons`} />
+                  <PixelStatus
+                    active={false}
+                    label={cfg ? `${cfg.provider} / ${cfg.model.split("-").slice(0, 2).join("-")}` : "No Model"}
+                    color={palette.red}
+                  />
+                </div>
               </div>
-              {level?.next_unlock && (
-                <div className="text-[10px] text-blade-muted mt-0.5">
-                  Next: {level.next_unlock}
+
+              <div
+                className="border p-3"
+                style={{ borderColor: palette.line, backgroundColor: "rgba(0, 0, 0, 0.22)" }}
+              >
+                <div className="text-[10px] uppercase tracking-[0.22em]" style={{ color: palette.amber }}>
+                  LEVEL LOG
+                </div>
+                {level && level.breakdown.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {level.breakdown.map((item, i) => (
+                      <span
+                        key={i}
+                        className="border px-2 py-1 text-[10px] uppercase tracking-[0.16em]"
+                        style={{
+                          borderColor: palette.line,
+                          color: palette.green,
+                          backgroundColor: "rgba(0, 255, 65, 0.08)",
+                        }}
+                      >
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-3 text-[11px] uppercase tracking-[0.16em]" style={{ color: palette.muted }}>
+                    No score events recorded.
+                  </div>
+                )}
+              </div>
+            </div>
+          </SectionFrame>
+
+          <div className="grid gap-3 lg:grid-cols-2">
+            <SectionFrame title="MEMORY">
+              <div className="space-y-3">
+                <StatLine label="Preferences Learned" value={data.prefCount} />
+                <StatLine label="Soul Snapshots" value={data.snapshotCount} accent={palette.amber} />
+              </div>
+              <button
+                onClick={() => onNavigate("soul")}
+                className="mt-4 border px-3 py-2 text-[11px] font-bold uppercase tracking-[0.2em]"
+                style={{ borderColor: palette.line, color: palette.green }}
+              >
+                Open Soul &gt;
+              </button>
+            </SectionFrame>
+
+            <SectionFrame title="TOTAL RECALL">
+              {cfg?.screen_timeline_enabled && data.timeline ? (
+                <div className="space-y-3">
+                  <StatLine label="Screenshots" value={data.timeline.total_entries.toLocaleString()} />
+                  <StatLine label="Disk Usage" value={fmt(data.timeline.disk_bytes)} accent={palette.amber} />
+                  <StatLine label="Last Capture" value={relTime(data.timeline.newest_timestamp)} />
+                </div>
+              ) : (
+                <div className="text-[11px] uppercase tracking-[0.16em]" style={{ color: palette.muted }}>
+                  {cfg?.screen_timeline_enabled ? "No captures yet." : "Disabled. Enable in settings."}
                 </div>
               )}
-            </div>
-            {/* XP bar */}
-            <div className="flex-1">
-              <div className="h-1.5 bg-blade-border rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blade-accent transition-all duration-500"
-                  style={{ width: `${Math.min(100, ((level?.score ?? 0) % 10) * 10)}%` }}
-                />
-              </div>
-            </div>
+              <button
+                onClick={() => onNavigate("screen-timeline")}
+                className="mt-4 border px-3 py-2 text-[11px] font-bold uppercase tracking-[0.2em]"
+                style={{ borderColor: palette.line, color: palette.green }}
+              >
+                Open Timeline &gt;
+              </button>
+            </SectionFrame>
           </div>
 
-          {/* Active subsystems */}
-          <div className="flex flex-wrap gap-2">
-            <StatusPill active={!!cfg?.god_mode} label="God Mode" />
-            <StatusPill active={data.wakeWordActive} label="Wake Word" />
-            <StatusPill active={!!cfg?.screen_timeline_enabled} label="Total Recall" />
-            <StatusPill active={runningAgents.length > 0} label={`${runningAgents.length} agents`} />
-            <StatusPill active={enabledCrons.length > 0} label={`${enabledCrons.length} crons`} />
-            <StatusPill
-              active={false}
-              label={cfg ? `${cfg.provider} / ${cfg.model.split("-").slice(0, 2).join("-")}` : "no model"}
-            />
-          </div>
-
-          {/* Level breakdown */}
-          {level && level.breakdown.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {level.breakdown.map((item, i) => (
-                <span
-                  key={i}
-                  className="text-[9px] px-1.5 py-0.5 rounded bg-blade-accent/10 text-blade-accent border border-blade-accent/20"
-                >
-                  {item}
-                </span>
-              ))}
-            </div>
-          )}
-        </Card>
-
-        {/* 2-col grid */}
-        <div className="grid grid-cols-2 gap-3">
-
-          {/* Memory */}
-          <Card title="Memory">
-            <div className="space-y-2">
-              <div className="flex justify-between items-baseline">
-                <span className="text-[10px] text-blade-muted">Preferences learned</span>
-                <span className="text-sm font-semibold text-blade-text tabular-nums">{data.prefCount}</span>
-              </div>
-              <div className="flex justify-between items-baseline">
-                <span className="text-[10px] text-blade-muted">Soul snapshots</span>
-                <span className="text-sm font-semibold text-blade-text tabular-nums">{data.snapshotCount}</span>
-              </div>
-            </div>
-            <button
-              onClick={() => onNavigate("soul")}
-              className="mt-3 w-full text-[10px] text-blade-muted hover:text-blade-accent transition-colors text-left"
-            >
-              View SOUL →
-            </button>
-          </Card>
-
-          {/* Total Recall */}
-          <Card title="Total Recall">
-            {cfg?.screen_timeline_enabled && data.timeline ? (
-              <div className="space-y-2">
-                <div className="flex justify-between items-baseline">
-                  <span className="text-[10px] text-blade-muted">Screenshots</span>
-                  <span className="text-sm font-semibold text-blade-text tabular-nums">
-                    {data.timeline.total_entries.toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex justify-between items-baseline">
-                  <span className="text-[10px] text-blade-muted">Disk</span>
-                  <span className="text-sm font-semibold text-blade-text">{fmt(data.timeline.disk_bytes)}</span>
-                </div>
-                <div className="flex justify-between items-baseline">
-                  <span className="text-[10px] text-blade-muted">Last capture</span>
-                  <span className="text-xs text-blade-secondary">{relTime(data.timeline.newest_timestamp)}</span>
-                </div>
+          <SectionFrame title={`ACTIVE AGENTS [${data.agents.length}]`}>
+            {data.agents.length === 0 ? (
+              <div className="text-[11px] uppercase tracking-[0.16em]" style={{ color: palette.muted }}>
+                No agents running. Launch a swarm or spawn a background agent.
               </div>
             ) : (
-              <div className="text-xs text-blade-muted italic">
-                {cfg?.screen_timeline_enabled ? "No captures yet." : "Disabled — enable in Settings."}
+              <div className="border" style={{ borderColor: palette.line, backgroundColor: "rgba(0, 0, 0, 0.22)" }}>
+                <div
+                  className="grid grid-cols-[5rem_minmax(0,1fr)_6.5rem] gap-3 border-b px-2 py-2 text-[10px] font-bold uppercase tracking-[0.24em]"
+                  style={{ borderColor: palette.line, color: palette.amber }}
+                >
+                  <div>PID / TYPE</div>
+                  <div>Agent Task / CWD</div>
+                  <div className="text-right">Status</div>
+                </div>
+                {data.agents.slice(0, 6).map((a) => (
+                  <AgentRow key={a.id} agent={a} />
+                ))}
               </div>
             )}
-            <button
-              onClick={() => onNavigate("screen-timeline")}
-              className="mt-3 w-full text-[10px] text-blade-muted hover:text-blade-accent transition-colors text-left"
-            >
-              View timeline →
-            </button>
-          </Card>
+            {data.agents.length > 6 && (
+              <div className="mt-3 text-[10px] uppercase tracking-[0.18em]" style={{ color: palette.muted }}>
+                +{data.agents.length - 6} more processes queued off-screen
+              </div>
+            )}
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                onClick={() => onNavigate("swarm")}
+                className="border px-3 py-2 text-[11px] font-bold uppercase tracking-[0.2em]"
+                style={{ borderColor: palette.line, color: palette.green }}
+              >
+                Open Swarm &gt;
+              </button>
+              <button
+                onClick={() => onNavigate("bg-agents")}
+                className="border px-3 py-2 text-[11px] font-bold uppercase tracking-[0.2em]"
+                style={{ borderColor: palette.line, color: palette.amber }}
+              >
+                Background Agents &gt;
+              </button>
+            </div>
+          </SectionFrame>
+
+          <SectionFrame title={`CRON QUEUE [${data.crons.length}]`}>
+            {data.crons.length === 0 ? (
+              <div className="text-[11px] uppercase tracking-[0.16em]" style={{ color: palette.muted }}>
+                No scheduled tasks. Add one in the cron panel.
+              </div>
+            ) : (
+              <div className="border" style={{ borderColor: palette.line, backgroundColor: "rgba(0, 0, 0, 0.22)" }}>
+                <div
+                  className="grid grid-cols-[1.2rem_minmax(0,1fr)_6rem] gap-3 border-b px-2 py-2 text-[10px] font-bold uppercase tracking-[0.24em]"
+                  style={{ borderColor: palette.line, color: palette.amber }}
+                >
+                  <div>#</div>
+                  <div>Crontab Entry</div>
+                  <div className="text-right">Next Run</div>
+                </div>
+                {data.crons.slice(0, 5).map((c) => (
+                  <CronRow key={c.id} task={c} />
+                ))}
+              </div>
+            )}
+            {data.crons.length > 5 && (
+              <div className="mt-3 text-[10px] uppercase tracking-[0.18em]" style={{ color: palette.muted }}>
+                +{data.crons.length - 5} more scheduled entries
+              </div>
+            )}
+          </SectionFrame>
+
+          {level?.next_unlock && (
+            <SectionFrame title="EVOLUTION NEXT UNLOCK">
+              <div className="flex flex-wrap items-end justify-between gap-3 border-b pb-3" style={{ borderColor: palette.line }}>
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.22em]" style={{ color: palette.amber }}>
+                    Unlock Target
+                  </div>
+                  <div className="mt-2 text-lg font-bold uppercase tracking-[0.14em]" style={{ color: "#d5ffd8" }}>
+                    {level.next_unlock}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[10px] uppercase tracking-[0.22em]" style={{ color: palette.muted }}>
+                    Remaining
+                  </div>
+                  <div className="mt-2 text-2xl font-bold tabular-nums" style={{ color: palette.green, ...tickStyle("0.15s") }}>
+                    {10 - (level.score % 10)} PTS
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-10 gap-1">
+                {Array.from({ length: 10 }).map((_, index) => {
+                  const filled = index < level.score % 10;
+                  return (
+                    <div
+                      key={index}
+                      className="h-5 border"
+                      style={{
+                        borderColor: filled ? `${palette.amber}99` : "rgba(255, 176, 0, 0.2)",
+                        backgroundColor: filled ? palette.amber : "rgba(255, 176, 0, 0.08)",
+                        boxShadow: filled ? `0 0 10px ${palette.amber}44` : "none",
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </SectionFrame>
+          )}
+
+          <span className="hidden">{now}</span>
         </div>
-
-        {/* Active agents */}
-        <Card title={`Agents (${data.agents.length})`}>
-          {data.agents.length === 0 ? (
-            <div className="text-xs text-blade-muted italic">
-              No agents running. Launch a swarm or spawn a background agent.
-            </div>
-          ) : (
-            <div>
-              {data.agents.slice(0, 6).map((a) => (
-                <AgentRow key={a.id} agent={a} />
-              ))}
-              {data.agents.length > 6 && (
-                <div className="text-[10px] text-blade-muted pt-2">
-                  +{data.agents.length - 6} more
-                </div>
-              )}
-            </div>
-          )}
-          <div className="flex gap-3 mt-3">
-            <button
-              onClick={() => onNavigate("swarm")}
-              className="text-[10px] text-blade-muted hover:text-blade-accent transition-colors"
-            >
-              Open Swarm →
-            </button>
-            <button
-              onClick={() => onNavigate("bg-agents")}
-              className="text-[10px] text-blade-muted hover:text-blade-accent transition-colors"
-            >
-              Background agents →
-            </button>
-          </div>
-        </Card>
-
-        {/* Cron queue */}
-        <Card title={`Scheduled tasks (${data.crons.length})`}>
-          {data.crons.length === 0 ? (
-            <div className="text-xs text-blade-muted italic">
-              No scheduled tasks. Add one in the Cron panel.
-            </div>
-          ) : (
-            <div>
-              {data.crons.slice(0, 5).map((c) => (
-                <CronRow key={c.id} task={c} />
-              ))}
-              {data.crons.length > 5 && (
-                <div className="text-[10px] text-blade-muted pt-2">
-                  +{data.crons.length - 5} more
-                </div>
-              )}
-            </div>
-          )}
-        </Card>
-
-        {/* Evolution breakdown */}
-        {level?.next_unlock && (
-          <Card title="Evolution — next unlock">
-            <div className="text-xs text-blade-secondary">{level.next_unlock}</div>
-            <div className="mt-2 h-1 bg-blade-border rounded-full overflow-hidden">
-              <div
-                className="h-full bg-blade-accent/60 transition-all duration-500"
-                style={{ width: `${Math.min(100, ((level.score % 10) / 10) * 100)}%` }}
-              />
-            </div>
-            <div className="text-[10px] text-blade-muted mt-1">
-              {10 - (level.score % 10)} pts to next level
-            </div>
-          </Card>
-        )}
-
-        {/* Hidden ticker to force re-render for countdown */}
-        <span className="hidden">{now}</span>
       </div>
     </div>
   );
