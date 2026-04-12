@@ -183,14 +183,51 @@ pub async fn send_message_stream(
         return Err("No API key configured. Go to settings.".to_string());
     }
 
-    // Smart routing: auto-select best model for the task
+    // Smart routing: resolve best provider + model for this task type.
+    // If the user configured e.g. "code tasks → Anthropic", this picks that provider + its key.
+    // Falls back to active provider if the routed provider has no stored key.
+    let mut use_extended_thinking = false;
     if let Some(last_user_msg) = messages.iter().rev().find(|m| m.role == "user") {
         let has_image = last_user_msg.image_base64.is_some();
         let task = crate::router::classify_task(&last_user_msg.content, has_image);
-        if let Some(suggested) = crate::router::suggest_model(&config.provider, &task) {
-            config.model = suggested;
+        // Flag complex tasks on Anthropic for extended thinking
+        if task == crate::router::TaskType::Complex && config.provider == "anthropic" {
+            use_extended_thinking = true;
+        }
+        let (provider, api_key, model) = crate::config::resolve_provider_for_task(&config, &task);
+        config.provider = provider;
+        config.api_key = api_key;
+        config.model = model;
+    }
+
+    // Context-length aware routing: if conversation is already very long,
+    // switch to a long-context model rather than hitting a context-overflow error later.
+    // Gemini Flash (1M tokens) is the safest bet for huge contexts at low cost.
+    {
+        let rough_tokens = messages.iter().map(|m| {
+            m.content.len() / 4 + m.image_base64.as_ref().map(|_| 2000).unwrap_or(0)
+        }).sum::<usize>();
+        if rough_tokens > 80_000 {
+            // Long conversation — route to long-context model if available
+            let gemini_key = crate::config::get_provider_key("gemini");
+            if !gemini_key.is_empty() && config.provider != "gemini" {
+                config.provider = "gemini".to_string();
+                config.api_key = gemini_key;
+                config.model = "gemini-2.0-flash".to_string();
+            } else if config.provider == "anthropic" {
+                // Stay on Anthropic but use the higher-context Sonnet, not Haiku
+                if config.model.contains("haiku") {
+                    config.model = "claude-sonnet-4-20250514".to_string();
+                }
+            }
         }
     }
+
+    // Emit routing decision so the UI can show which model/provider is active for this request
+    let _ = app.emit("chat_routing", serde_json::json!({
+        "provider": &config.provider,
+        "model": &config.model,
+    }));
 
     // Token-efficient mode: downgrade to faster/cheaper model
     if config.token_efficient {
@@ -222,15 +259,45 @@ pub async fn send_message_stream(
     );
 
     // MCP tools + native built-in tools (bash, file ops, web fetch)
-    let mut tools: Vec<ToolDefinition> = tool_snapshot
-        .iter()
-        .map(|tool| ToolDefinition {
-            name: tool.qualified_name.clone(),
-            description: tool.description.clone(),
-            input_schema: tool.input_schema.clone(),
-        })
-        .collect();
-    tools.extend(crate::native_tools::tool_definitions());
+    // Prune to ≤60 tools total — beyond that, accuracy degrades as the model
+    // gets confused by irrelevant tool noise. Score MCP tools by relevance to
+    // the current task; native tools are always included (they're always needed).
+    let native_tools = crate::native_tools::tool_definitions();
+    let max_mcp_tools = 60usize.saturating_sub(native_tools.len());
+
+    let mcp_tools: Vec<ToolDefinition> = if tool_snapshot.len() > max_mcp_tools {
+        // Score each tool by keyword overlap with the user message
+        let query_lower = last_user_text.to_lowercase();
+        let mut scored: Vec<(usize, ToolDefinition)> = tool_snapshot
+            .iter()
+            .map(|tool| {
+                let haystack = format!("{} {}", tool.qualified_name, tool.description).to_lowercase();
+                let score = query_lower
+                    .split_whitespace()
+                    .filter(|w| w.len() > 3 && haystack.contains(*w))
+                    .count();
+                (score, ToolDefinition {
+                    name: tool.qualified_name.clone(),
+                    description: tool.description.clone(),
+                    input_schema: tool.input_schema.clone(),
+                })
+            })
+            .collect();
+        scored.sort_by(|a, b| b.0.cmp(&a.0));
+        scored.into_iter().take(max_mcp_tools).map(|(_, t)| t).collect()
+    } else {
+        tool_snapshot
+            .iter()
+            .map(|tool| ToolDefinition {
+                name: tool.qualified_name.clone(),
+                description: tool.description.clone(),
+                input_schema: tool.input_schema.clone(),
+            })
+            .collect()
+    };
+
+    let mut tools = mcp_tools;
+    tools.extend(native_tools);
 
     let conversation = providers::build_conversation(messages, Some(system_prompt));
 
@@ -242,15 +309,27 @@ pub async fn send_message_stream(
     // No tools configured and no images → stream directly (fast path, best UX)
     if tools.is_empty() && !has_image {
         let span = trace::TraceSpan::new(&config.provider, &config.model, "stream_text");
-        let result = providers::stream_text(
-            &app,
-            &config.provider,
-            &config.api_key,
-            &config.model,
-            &conversation,
-            config.base_url.as_deref(),
-        )
-        .await;
+        let result = if use_extended_thinking && config.provider == "anthropic" {
+            providers::stream_text_thinking(
+                &app,
+                &config.provider,
+                &config.api_key,
+                &config.model,
+                &conversation,
+                8000, // 8K thinking budget — good balance of depth vs cost
+            )
+            .await
+        } else {
+            providers::stream_text(
+                &app,
+                &config.provider,
+                &config.api_key,
+                &config.model,
+                &conversation,
+                config.base_url.as_deref(),
+            )
+            .await
+        };
         let entry = span.finish(result.is_ok(), result.as_ref().err().cloned());
         trace::log_trace(&entry);
         if result.is_ok() {
@@ -358,8 +437,42 @@ pub async fn send_message_stream(
                         }
                     }
                     ErrorRecovery::Fatal(msg) => {
-                        let _ = app.emit("blade_status", "error");
-                        return Err(msg);
+                        // Before giving up: try the configured fallback provider
+                        let fallback_provider = load_config().task_routing.fallback.clone();
+                        if let Some(fb_prov) = fallback_provider {
+                            if fb_prov != config.provider {
+                                let fb_key = crate::config::get_provider_key(&fb_prov);
+                                if !fb_key.is_empty() || fb_prov == "ollama" {
+                                    let fb_model = crate::router::suggest_model(&fb_prov, &crate::router::TaskType::Complex)
+                                        .unwrap_or_else(|| config.model.clone());
+                                    let _ = app.emit("blade_status", "processing");
+                                    let _ = app.emit("blade_notification", serde_json::json!({
+                                        "type": "info",
+                                        "message": format!("Switching to {} (fallback)", fb_prov)
+                                    }));
+                                    let retry = providers::complete_turn(
+                                        &fb_prov, &fb_key, &fb_model,
+                                        &conversation, &tools, None,
+                                    ).await;
+                                    match retry {
+                                        Ok(t) => t,
+                                        Err(e2) => {
+                                            let _ = app.emit("blade_status", "error");
+                                            return Err(format!("Primary ({}) and fallback ({}) both failed: {} / {}", config.provider, fb_prov, msg, e2));
+                                        }
+                                    }
+                                } else {
+                                    let _ = app.emit("blade_status", "error");
+                                    return Err(msg);
+                                }
+                            } else {
+                                let _ = app.emit("blade_status", "error");
+                                return Err(msg);
+                            }
+                        } else {
+                            let _ = app.emit("blade_status", "error");
+                            return Err(msg);
+                        }
                     }
                 }
             }
@@ -492,25 +605,80 @@ pub async fn send_message_stream(
             }
 
             if risk == permissions::ToolRisk::Ask {
-                let approval_id = format!("approval-{}", tool_call.id);
-                let (tx, rx) = oneshot::channel::<bool>();
-                {
-                    let mut map = approvals.lock().await;
-                    map.insert(approval_id.clone(), tx);
-                }
-                let _ = app.emit(
-                    "tool_approval_needed",
-                    serde_json::json!({
-                        "approval_id": &approval_id,
-                        "name": &tool_call.name,
-                        "arguments": &tool_call.arguments,
-                        "risk": "Ask",
-                    }),
-                );
-                let approved = tokio::time::timeout(std::time::Duration::from_secs(60), rx)
-                    .await
-                    .unwrap_or(Ok(false))
-                    .unwrap_or(false);
+                // Check if an AI delegate should handle this approval
+                let delegate = config.trusted_ai_delegate.clone();
+                let approved = if !delegate.is_empty() && delegate != "none" {
+                    let context = format!(
+                        "BLADE is completing: {}\nWorking on behalf of the user's active session.",
+                        last_user_text
+                    );
+                    let decision = crate::ai_delegate::request_approval(
+                        &delegate,
+                        &tool_call.name,
+                        &tool_call.arguments,
+                        &context,
+                    ).await;
+                    match decision {
+                        crate::ai_delegate::DelegateDecision::Approved { reasoning } => {
+                            let _ = app.emit("ai_delegate_approved", serde_json::json!({
+                                "tool": &tool_call.name,
+                                "delegate": &delegate,
+                                "reasoning": reasoning,
+                            }));
+                            true
+                        }
+                        crate::ai_delegate::DelegateDecision::Denied { reasoning } => {
+                            let _ = app.emit("ai_delegate_denied", serde_json::json!({
+                                "tool": &tool_call.name,
+                                "delegate": &delegate,
+                                "reasoning": reasoning,
+                            }));
+                            false
+                        }
+                        crate::ai_delegate::DelegateDecision::Unavailable => {
+                            // Delegate unavailable — fall back to UI approval
+                            let approval_id = format!("approval-{}", tool_call.id);
+                            let (tx, rx) = oneshot::channel::<bool>();
+                            {
+                                let mut map = approvals.lock().await;
+                                map.insert(approval_id.clone(), tx);
+                            }
+                            let _ = app.emit(
+                                "tool_approval_needed",
+                                serde_json::json!({
+                                    "approval_id": &approval_id,
+                                    "name": &tool_call.name,
+                                    "arguments": &tool_call.arguments,
+                                    "risk": "Ask",
+                                }),
+                            );
+                            tokio::time::timeout(std::time::Duration::from_secs(60), rx)
+                                .await
+                                .unwrap_or(Ok(false))
+                                .unwrap_or(false)
+                        }
+                    }
+                } else {
+                    let approval_id = format!("approval-{}", tool_call.id);
+                    let (tx, rx) = oneshot::channel::<bool>();
+                    {
+                        let mut map = approvals.lock().await;
+                        map.insert(approval_id.clone(), tx);
+                    }
+                    let _ = app.emit(
+                        "tool_approval_needed",
+                        serde_json::json!({
+                            "approval_id": &approval_id,
+                            "name": &tool_call.name,
+                            "arguments": &tool_call.arguments,
+                            "risk": "Ask",
+                        }),
+                    );
+                    tokio::time::timeout(std::time::Duration::from_secs(60), rx)
+                        .await
+                        .unwrap_or(Ok(false))
+                        .unwrap_or(false)
+                };
                 if !approved {
                     conversation.push(ConversationMessage::Tool {
                         tool_call_id: tool_call.id,

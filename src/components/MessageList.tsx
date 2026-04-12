@@ -1,5 +1,6 @@
 import { Message, ToolExecution } from "../types";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { ActiveWindowInfo, ContextSuggestion } from "../hooks/useContextAwareness";
 import ReactMarkdown from "react-markdown";
 import TypingIndicator from "./TypingIndicator";
@@ -80,9 +81,29 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
 }
 
 function CodeBlock({ className, children }: { className?: string; children: React.ReactNode }) {
+  const [runOutput, setRunOutput] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
   const codeRef = useRef<HTMLElement>(null);
   const code = String(children).replace(/\n$/, "");
   const lang = className?.replace("language-", "") ?? "";
+  const isRunnable = ["bash", "sh", "shell", "python", "py", "javascript", "js", "typescript", "ts", ""].includes(lang);
+
+  const handleRun = useCallback(async () => {
+    setRunning(true);
+    setRunOutput(null);
+    try {
+      let cmd = code;
+      if (lang === "python" || lang === "py") cmd = `python3 -c ${JSON.stringify(code)}`;
+      else if (lang === "javascript" || lang === "js") cmd = `node -e ${JSON.stringify(code)}`;
+      else if (lang === "typescript" || lang === "ts") cmd = `npx ts-node -e ${JSON.stringify(code)}`;
+      const result = await invoke<string>("run_code_block", { command: cmd });
+      setRunOutput(result);
+    } catch (e) {
+      setRunOutput(`Error: ${e}`);
+    } finally {
+      setRunning(false);
+    }
+  }, [code, lang]);
 
   useEffect(() => {
     if (!codeRef.current) return;
@@ -105,11 +126,41 @@ function CodeBlock({ className, children }: { className?: string; children: Reac
     <div className="rounded-lg overflow-hidden border border-blade-border bg-[#0c0c0f]">
       <div className="flex items-center justify-between px-3 py-1.5 bg-blade-surface/50">
         <span className="text-2xs text-blade-muted font-mono">{lang || "code"}</span>
-        <CopyButton text={code} />
+        <div className="flex items-center gap-1.5">
+          {isRunnable && (
+            <button
+              onClick={handleRun}
+              disabled={running}
+              className="text-2xs text-blade-muted hover:text-blade-accent transition-colors disabled:opacity-50 flex items-center gap-1"
+              title="Run this code"
+            >
+              {running ? (
+                <span className="w-2 h-2 rounded-full bg-blade-accent animate-pulse" />
+              ) : (
+                <svg viewBox="0 0 16 16" className="w-3 h-3" fill="currentColor">
+                  <path d="M3 2.5l10 5.5-10 5.5V2.5z"/>
+                </svg>
+              )}
+              {running ? "running" : "run"}
+            </button>
+          )}
+          <CopyButton text={code} />
+        </div>
       </div>
       <pre className="!m-0 !border-0 !rounded-none overflow-x-auto px-3 py-3">
         <code ref={codeRef} className="text-[0.8rem] leading-relaxed" />
       </pre>
+      {runOutput !== null && (
+        <div className="border-t border-blade-border bg-blade-bg/70 px-3 py-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-2xs text-blade-muted font-mono uppercase tracking-wide">output</span>
+            <button onClick={() => setRunOutput(null)} className="text-2xs text-blade-muted/50 hover:text-blade-muted">✕</button>
+          </div>
+          <pre className="text-[0.75rem] text-blade-text/80 whitespace-pre-wrap font-mono leading-relaxed max-h-40 overflow-y-auto">
+            {runOutput}
+          </pre>
+        </div>
+      )}
     </div>
   );
 }

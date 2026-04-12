@@ -155,6 +155,12 @@ const PROVIDER_MATRIX: ProviderEntry[] = [
   },
   {
     id: "ollama",
+    name: "Ollama — Hermes 3",
+    model: "hermes3",
+    badges: ["local", "no api key", "best tool-calling", "agent-optimised"],
+  },
+  {
+    id: "ollama",
     name: "Ollama",
     model: "llama3.2",
     badges: ["local", "offline", "no api key"],
@@ -515,6 +521,74 @@ function KeyVault({ activeProvider }: { activeProvider: string }) {
   );
 }
 
+interface TaskRouting {
+  code?: string | null;
+  vision?: string | null;
+  fast?: string | null;
+  creative?: string | null;
+  fallback?: string | null;
+}
+
+const ROUTING_TASKS = [
+  { key: "code" as const, label: "Code & debugging", hint: "Claude / GPT-4o excel here" },
+  { key: "vision" as const, label: "Screenshots & images", hint: "Gemini Flash is cheap + good" },
+  { key: "fast" as const, label: "Quick replies", hint: "Groq is 10× faster for simple asks" },
+  { key: "creative" as const, label: "Writing & brainstorming", hint: "Any strong model works" },
+  { key: "fallback" as const, label: "Fallback (when primary fails)", hint: "Retried automatically on rate-limit or outage" },
+];
+
+const ROUTABLE_PROVIDERS = [
+  { id: "", label: "— Active provider —" },
+  { id: "anthropic", label: "Anthropic (Claude)" },
+  { id: "openai", label: "OpenAI (GPT)" },
+  { id: "gemini", label: "Google Gemini" },
+  { id: "groq", label: "Groq (Llama — fast)" },
+  { id: "ollama", label: "Ollama / Hermes 3 (local, private)" },
+];
+
+function RoutingPanel() {
+  const [routing, setRouting] = useState<TaskRouting>({});
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    invoke<TaskRouting>("get_task_routing").then(setRouting).catch(() => {});
+  }, []);
+
+  const update = (key: keyof TaskRouting, value: string) => {
+    const next = { ...routing, [key]: value || null };
+    setRouting(next);
+    invoke("set_task_routing", { routing: next })
+      .then(() => { setSaved(true); setTimeout(() => setSaved(false), 1500); })
+      .catch(() => {});
+  };
+
+  return (
+    <div className="space-y-2">
+      {ROUTING_TASKS.map((task) => (
+        <div key={task.key} className="flex items-center gap-3 rounded-xl border border-blade-border px-3 py-2">
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-medium text-blade-text">{task.label}</div>
+            <div className="text-[10px] text-blade-muted/60">{task.hint}</div>
+          </div>
+          <select
+            value={routing[task.key] ?? ""}
+            onChange={(e) => update(task.key, e.target.value)}
+            className="text-xs bg-blade-bg border border-blade-border rounded-lg px-2 py-1 outline-none text-blade-text"
+          >
+            {ROUTABLE_PROVIDERS.map((p) => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </select>
+        </div>
+      ))}
+      {saved && <p className="text-[10px] text-green-400">Saved</p>}
+      <p className="text-[10px] text-blade-muted/50">
+        Routing uses stored keys. The brain/soul context is injected regardless — BLADE stays coherent across providers.
+      </p>
+    </div>
+  );
+}
+
 export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
   const [tab, setTab] = useState<SettingsTab>("evolution");
   const [evolutionLevel, setEvolutionLevel] = useState<EvolutionLevel | null>(null);
@@ -550,6 +624,16 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
   const [checkingForUpdates, setCheckingForUpdates] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [bladeSourcePath, setBladeSourcePath] = useState(config.blade_source_path ?? "");
+  const [jitroGoal, setJitroGoal] = useState("");
+  const [jitroRunning, setJitroRunning] = useState(false);
+  const [jitroStatus, setJitroStatus] = useState<string | null>(null);
+  const [timelineEnabled, setTimelineEnabled] = useState(config.screen_timeline_enabled ?? false);
+  const [timelineInterval, setTimelineInterval] = useState(config.timeline_capture_interval ?? 30);
+  const [timelineRetention, setTimelineRetention] = useState(config.timeline_retention_days ?? 14);
+  const [aiDelegate, setAiDelegate] = useState(config.trusted_ai_delegate ?? "");
+  const [delegateCheckResult, setDelegateCheckResult] = useState<{ available: boolean } | null>(null);
+  const [introduceStatus, setIntroduceStatus] = useState<string | null>(null);
 
   useEffect(() => {
     setProvider(config.provider);
@@ -562,6 +646,10 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
     setQuickAskShortcut(config.quick_ask_shortcut ?? "Alt+Space");
     setVoiceShortcut(config.voice_shortcut ?? "Ctrl+Shift+V");
     setObsidianVaultPath(config.obsidian_vault_path ?? "");
+    setTimelineEnabled(config.screen_timeline_enabled ?? false);
+    setTimelineInterval(config.timeline_capture_interval ?? 30);
+    setTimelineRetention(config.timeline_retention_days ?? 14);
+    setAiDelegate(config.trusted_ai_delegate ?? "");
   }, [config]);
 
   // Load evolution data whenever the tab is visible
@@ -835,6 +923,25 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             )}
           </div>
 
+          {/* Hermes 3 setup guide — shown when Ollama + hermes3 is selected */}
+          {provider === "ollama" && model === "hermes3" && (
+            <div className="rounded-xl border border-blade-accent/30 bg-blade-accent/5 px-3 py-3 space-y-2">
+              <p className="text-xs font-semibold text-blade-accent">Hermes 3 — Local Tool-Calling AI</p>
+              <p className="text-[11px] text-blade-muted leading-relaxed">
+                Hermes 3 (NousResearch) is the best open-source model for tool use and agent tasks. It runs 100% locally via Ollama.
+                BLADE automatically routes complex agent tasks to Hermes when you use this provider.
+              </p>
+              <div className="rounded-lg bg-blade-bg border border-blade-border px-2.5 py-1.5">
+                <p className="text-[10px] text-blade-muted mb-1">If you haven&apos;t pulled the model yet, run this once:</p>
+                <code className="text-xs font-mono text-blade-accent">ollama pull hermes3</code>
+              </div>
+              <p className="text-[10px] text-blade-muted/60">
+                Make sure Ollama is running before starting a conversation. Default port is 11434.
+                For a bigger context window, try <code className="font-mono">hermes3:8b</code> or <code className="font-mono">hermes3:70b</code>.
+              </p>
+            </div>
+          )}
+
           {/* Base URL — shown for openai-compat providers or when custom */}
           {(baseUrl || selectedEntry?.name === "Custom") && provider !== "ollama" && (
             <label className="space-y-1.5 block">
@@ -1064,6 +1171,14 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
           <KeyVault activeProvider={provider} />
         </section>
 
+        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+          <div>
+            <h2 className="text-sm font-semibold">Smart Routing</h2>
+            <p className="text-xs text-blade-muted mt-0.5">Route different task types to different providers. Code → Claude, quick replies → Groq, vision → Gemini. One brain, best model per job.</p>
+          </div>
+          <RoutingPanel />
+        </section>
+
         <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
           <div>
             <h2 className="text-base font-semibold">Provider Guide</h2>
@@ -1222,13 +1337,20 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
               <p className="text-sm text-blade-muted">BLADE saw you using these — connect them to unlock full control.</p>
             </div>
             <div className="space-y-3">
-              {evolutionSuggestions.map((s) => (
-                <div key={s.id} className="rounded-xl border border-blade-border bg-blade-bg/60 p-3 space-y-2">
+              {evolutionSuggestions.map((s) => {
+                const isRuleMutation = !s.package; // empty package = prompt rule suggestion, not MCP install
+                return (
+                <div key={s.id} className={`rounded-xl border bg-blade-bg/60 p-3 space-y-2 ${isRuleMutation ? "border-amber-500/30" : "border-blade-border"}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <div className="text-sm font-medium">{s.name}</div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-sm font-medium">{s.name}</div>
+                        {isRuleMutation && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">rule</span>
+                        )}
+                      </div>
                       <div className="text-xs text-blade-muted mt-0.5">{s.description}</div>
-                      <div className="text-xs text-blade-muted/60 mt-1">Detected via: {s.trigger_app}</div>
+                      {!isRuleMutation && <div className="text-xs text-blade-muted/60 mt-1">Detected via: {s.trigger_app}</div>}
                     </div>
                     <button
                       onClick={async () => {
@@ -1241,7 +1363,15 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
                     </button>
                   </div>
 
-                  {s.required_token_hint && (
+                  {isRuleMutation && (
+                    <div className="rounded-lg bg-amber-500/5 border border-amber-500/20 p-2">
+                      <div className="text-[10px] text-amber-400/80 mb-1.5">Proposed rule (from failure analysis):</div>
+                      <div className="text-xs font-mono text-blade-text/80 whitespace-pre-wrap">{s.description}</div>
+                      <div className="mt-2 text-[10px] text-blade-muted/60">Copy this rule and ask BLADE to add it to its system prompt, or dismiss if not relevant.</div>
+                    </div>
+                  )}
+
+                  {!isRuleMutation && s.required_token_hint && (
                     <div className="space-y-1.5">
                       <div className="text-xs text-amber-400/80">Needs: {s.required_token_hint}</div>
                       <div className="flex gap-2">
@@ -1256,7 +1386,6 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
                           onClick={async () => {
                             const token = suggestionTokens[s.id] ?? "";
                             if (!token) return;
-                            // Derive env key from token hint (first word before space/parenthesis)
                             const envKey = s.required_token_hint?.split(/[\s(]/)[0] ?? "TOKEN";
                             try {
                               const toolCount = await invoke<number>("evolution_install_suggestion", {
@@ -1278,7 +1407,8 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}
@@ -1392,6 +1522,82 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             </button>
           )}
         </section>
+
+        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
+          <div>
+            <h2 className="text-base font-semibold">AI Friends — Delegate Permissions</h2>
+            <p className="text-sm text-blade-muted">
+              When BLADE needs permission for a risky action in the background, it can ask another AI instead of interrupting you. The delegate reviews the request and approves or blocks it.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-blade-muted uppercase tracking-wide">Trusted AI Delegate</label>
+            <div className="flex gap-2">
+              <select
+                value={aiDelegate}
+                onChange={async (e) => {
+                  const val = e.target.value;
+                  setAiDelegate(val);
+                  setDelegateCheckResult(null);
+                  await invoke("save_config_field", { key: "trusted_ai_delegate", value: val });
+                }}
+                className="flex-1 rounded-xl border border-blade-border bg-blade-bg px-3 py-2 text-sm outline-none focus:border-blade-accent"
+              >
+                <option value="">None — always ask me</option>
+                <option value="claude-code">Claude Code CLI</option>
+              </select>
+              {aiDelegate === "claude-code" && (
+                <button
+                  onClick={async () => {
+                    const result = await invoke<{ available: boolean }>("ai_delegate_check").catch(() => null);
+                    setDelegateCheckResult(result);
+                  }}
+                  className="px-3 py-2 rounded-xl border border-blade-border text-sm hover:border-blade-muted transition-colors"
+                >
+                  Check
+                </button>
+              )}
+            </div>
+            {delegateCheckResult !== null && (
+              <p className={`text-xs ${delegateCheckResult.available ? "text-green-400" : "text-red-400"}`}>
+                {delegateCheckResult.available ? "Claude Code found and available" : "Claude Code not found — install with: npm install -g @anthropic-ai/claude-code"}
+              </p>
+            )}
+          </div>
+
+          {aiDelegate === "claude-code" && (
+            <div className="space-y-3">
+              <div className="rounded-xl border border-blade-accent/20 bg-blade-accent/5 px-3 py-3 space-y-2">
+                <p className="text-xs font-semibold text-blade-accent">Make Friends</p>
+                <p className="text-[11px] text-blade-muted leading-relaxed">
+                  Introduce BLADE to Claude Code so it recognizes future approval requests. This saves BLADE&apos;s identity to Claude Code&apos;s memory — next time BLADE asks for permission, Claude Code won&apos;t be clueless about who it is.
+                </p>
+                <button
+                  onClick={async () => {
+                    setIntroduceStatus("Introducing BLADE to Claude Code…");
+                    try {
+                      const result = await invoke<string>("ai_delegate_introduce");
+                      setIntroduceStatus(result);
+                    } catch (e) {
+                      setIntroduceStatus(`Error: ${e}`);
+                    }
+                  }}
+                  className="w-full py-1.5 rounded-lg bg-blade-accent text-white text-xs font-medium hover:opacity-90 transition-opacity"
+                >
+                  Introduce BLADE to Claude Code
+                </button>
+                {introduceStatus && (
+                  <p className="text-[11px] text-blade-muted/80 leading-relaxed">{introduceStatus}</p>
+                )}
+              </div>
+
+              <div className="text-[11px] text-blade-muted/60 leading-relaxed">
+                <span className="text-blade-text font-medium">How it works:</span> When BLADE runs a background agent and needs to write a file, delete something, or make a network request, it asks Claude Code: &quot;Hey, I&apos;m BLADE, I was doing X and need to do Y. Should I?&quot; — Claude Code approves or blocks, and BLADE proceeds accordingly.
+              </div>
+            </div>
+          )}
+        </section>
         </>}
 
         {tab === "privacy" && <>
@@ -1467,6 +1673,120 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             <span className="text-white font-medium">Control BLADE with BLADE.md:</span> Create a file at <code className="bg-blade-border px-1 py-0.5 rounded">~/.blade/BLADE.md</code> to give BLADE workspace-level instructions — restrict what it can access, require confirmation before file writes, set tone, etc.
           </div>
         </section>
+
+        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
+          <div>
+            <h2 className="text-base font-semibold">Total Recall — Screen Timeline</h2>
+            <p className="text-sm text-blade-muted">
+              Captures a screenshot every N seconds during God Mode, describes it with vision AI, and makes it semantically searchable. "What error was I looking at 10 minutes ago?"
+            </p>
+          </div>
+
+          {/* Enable toggle */}
+          <div className="flex items-center justify-between rounded-xl border border-blade-border bg-blade-bg/50 px-3 py-2.5">
+            <div>
+              <div className="text-sm font-medium">Enable screen timeline</div>
+              <div className="text-xs text-blade-muted">Screenshots processed by your configured AI provider only</div>
+            </div>
+            <button
+              onClick={async () => {
+                const next = !timelineEnabled;
+                setTimelineEnabled(next);
+                await invoke("set_config", {
+                  config: {
+                    ...config,
+                    screen_timeline_enabled: next,
+                    timeline_capture_interval: timelineInterval,
+                    timeline_retention_days: timelineRetention,
+                  },
+                });
+              }}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${timelineEnabled ? "bg-blade-accent" : "bg-blade-border"}`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${timelineEnabled ? "translate-x-4" : "translate-x-1"}`} />
+            </button>
+          </div>
+
+          {timelineEnabled && (
+            <div className="space-y-3">
+              {/* Capture interval */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-blade-muted uppercase tracking-wide">Capture interval</label>
+                  <span className="text-xs text-blade-text font-mono">{timelineInterval}s</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {[15, 30, 60, 120].map((s) => (
+                    <button
+                      key={s}
+                      onClick={async () => {
+                        setTimelineInterval(s);
+                        await invoke("set_config", {
+                          config: {
+                            ...config,
+                            screen_timeline_enabled: timelineEnabled,
+                            timeline_capture_interval: s,
+                            timeline_retention_days: timelineRetention,
+                          },
+                        });
+                      }}
+                      className={`flex-1 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                        timelineInterval === s
+                          ? "border-blade-accent bg-blade-accent/10 text-blade-accent"
+                          : "border-blade-border text-blade-muted hover:border-blade-muted"
+                      }`}
+                    >
+                      {s >= 60 ? `${s / 60}m` : `${s}s`}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-blade-muted/60">
+                  {timelineInterval === 15 ? "~200MB/day — very detailed but high disk usage" :
+                   timelineInterval === 30 ? "~100MB/day — recommended balance" :
+                   timelineInterval === 60 ? "~50MB/day — lighter, less granular" :
+                   "~25MB/day — minimal footprint"}
+                </p>
+              </div>
+
+              {/* Retention */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-blade-muted uppercase tracking-wide">Keep screenshots for</label>
+                <div className="flex items-center gap-2">
+                  {[7, 14, 30].map((d) => (
+                    <button
+                      key={d}
+                      onClick={async () => {
+                        setTimelineRetention(d);
+                        await invoke("set_config", {
+                          config: {
+                            ...config,
+                            screen_timeline_enabled: timelineEnabled,
+                            timeline_capture_interval: timelineInterval,
+                            timeline_retention_days: d,
+                          },
+                        });
+                      }}
+                      className={`flex-1 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                        timelineRetention === d
+                          ? "border-blade-accent bg-blade-accent/10 text-blade-accent"
+                          : "border-blade-border text-blade-muted hover:border-blade-muted"
+                      }`}
+                    >
+                      {d} days
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-blade-muted/60">
+                  Older screenshots are deleted automatically. Stored at <code className="bg-blade-border px-1 rounded">~/.blade/screenshots/</code>
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-xl border border-blade-border bg-blade-bg/50 px-3 py-2.5 text-xs text-blade-muted leading-relaxed">
+            <span className="text-white font-medium">Requires God Mode.</span> Timeline capture only runs while God Mode is active. Screenshots never leave your machine — only the text description is sent to your AI provider for embedding.
+          </div>
+        </section>
         </>}
 
         {tab === "about" && <>
@@ -1497,6 +1817,71 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
               <div className="text-sm mt-1">OS Keychain (Credential Manager)</div>
             </div>
           </div>
+        </section>
+
+        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
+          <div>
+            <h2 className="text-base font-semibold">JITRO — Self-Coding</h2>
+            <p className="text-sm text-blade-muted">
+              BLADE can write features into itself. Point it at its own source repo and describe what you want built.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-blade-muted uppercase tracking-wide">Source path</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={bladeSourcePath}
+                onChange={(e) => setBladeSourcePath(e.target.value)}
+                placeholder="~/blade  (auto-detected if left blank)"
+                className="flex-1 rounded-xl border border-blade-border bg-blade-bg px-3 py-2 text-sm outline-none focus:border-blade-accent"
+              />
+              <button
+                onClick={async () => {
+                  await invoke("save_config_field", { key: "blade_source_path", value: bladeSourcePath });
+                  setJitroStatus("Path saved");
+                  setTimeout(() => setJitroStatus(null), 1500);
+                }}
+                className="px-3 py-2 rounded-xl border border-blade-border text-sm hover:border-blade-muted transition-colors"
+              >Save</button>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-blade-muted uppercase tracking-wide">Feature to build</label>
+            <textarea
+              value={jitroGoal}
+              onChange={(e) => setJitroGoal(e.target.value)}
+              placeholder="Describe a feature you want BLADE to add to itself..."
+              rows={3}
+              className="w-full rounded-xl border border-blade-border bg-blade-bg px-3 py-2 text-sm outline-none focus:border-blade-accent resize-none"
+            />
+            <button
+              disabled={jitroRunning || !jitroGoal.trim()}
+              onClick={async () => {
+                setJitroRunning(true);
+                setJitroStatus(null);
+                try {
+                  await invoke("blade_self_code", {
+                    feature: jitroGoal.trim(),
+                    sourcePath: bladeSourcePath || null,
+                  });
+                  setJitroStatus("JITRO agent spawned — watch Background Agents for progress");
+                  setJitroGoal("");
+                } catch (e) {
+                  setJitroStatus(`Error: ${e}`);
+                } finally {
+                  setJitroRunning(false);
+                }
+              }}
+              className="w-full py-2 rounded-xl bg-blade-accent text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+            >
+              {jitroRunning ? "Spawning…" : "Spawn JITRO"}
+            </button>
+            {jitroStatus && <p className="text-xs text-green-400">{jitroStatus}</p>}
+          </div>
+          <p className="text-[11px] text-blade-muted/60 leading-relaxed">
+            JITRO spawns a background Claude Code agent that reads CLAUDE.md, implements the feature, and runs <code className="bg-blade-border px-1 rounded">cargo check</code>. You'll get a notification when it's done.
+          </p>
         </section>
 
         <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">

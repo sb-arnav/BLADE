@@ -523,9 +523,12 @@ async fn auto_install_mcp(entry: &CatalogEntry) -> Result<usize, String> {
     Ok(1)
 }
 
+static EVOLUTION_TICK: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 /// Main evolution loop — run this periodically (every god mode cycle or every 15 min).
 /// Detects apps, matches catalog, suggests/installs capabilities, emits events.
 pub async fn run_evolution_cycle(app: &tauri::AppHandle) {
+    let tick = EVOLUTION_TICK.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let apps = detect_apps_in_use();
     if apps.is_empty() { return; }
 
@@ -609,6 +612,12 @@ pub async fn run_evolution_cycle(app: &tauri::AppHandle) {
         let _ = app.emit("evolution_suggestion", suggestion);
     }
 
+    // Hermes pattern: analyze failures and propose prompt mutations
+    // Run every other cycle (hour) to avoid burning tokens on every 15min tick
+    if tick % 2 == 0 {
+        evolve_from_failures(app).await;
+    }
+
     // Check if we leveled up
     let new_level = compute_level();
     if new_level.level > prev_level.level {
@@ -631,6 +640,126 @@ pub async fn run_evolution_cycle(app: &tauri::AppHandle) {
             );
         }
     }
+}
+
+/// Hermes pattern: analyze recent failures, generate rule/prompt mutation suggestions.
+///
+/// Pulls failed bash executions from execution memory, groups by failure type,
+/// and uses the LLM to propose rules that would prevent recurrence.
+/// Suggestions surface in the Evolution view for human review — never auto-applied.
+async fn evolve_from_failures(app: &tauri::AppHandle) {
+    let config = crate::config::load_config();
+    if config.api_key.is_empty() && config.provider != "ollama" {
+        return;
+    }
+
+    // Pull recent failed commands (last 7 days, non-zero exit, has stderr)
+    let failures: Vec<(String, String)> = {
+        let path = crate::config::blade_config_dir().join("execmem.db");
+        let Ok(conn) = rusqlite::Connection::open(&path) else { return };
+        let cutoff = chrono::Utc::now().timestamp() - 7 * 86400;
+        let mut stmt = match conn.prepare(
+            "SELECT command, stderr FROM executions WHERE exit_code != 0 AND stderr != '' AND timestamp > ?1 ORDER BY timestamp DESC LIMIT 40"
+        ) { Ok(s) => s, Err(_) => return };
+        stmt.query_map(rusqlite::params![cutoff], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .ok()
+        .map(|rows| rows.flatten().collect())
+        .unwrap_or_default()
+    };
+
+    if failures.len() < 3 {
+        return; // Not enough signal yet
+    }
+
+    // Build a compact failure digest — group by first word of command (the binary)
+    let mut by_binary: std::collections::HashMap<String, Vec<String>> = Default::default();
+    for (cmd, stderr) in &failures {
+        let binary = cmd.split_whitespace().next().unwrap_or("?").to_string();
+        by_binary
+            .entry(binary)
+            .or_default()
+            .push(format!("$ {}\n{}", &cmd[..cmd.len().min(80)], &stderr[..stderr.len().min(120)]));
+    }
+
+    // Only analyze binaries with 3+ failures — clear patterns
+    let recurring: Vec<String> = by_binary
+        .into_iter()
+        .filter(|(_, v)| v.len() >= 3)
+        .flat_map(|(_, v)| v.into_iter().take(4))
+        .collect();
+
+    if recurring.is_empty() {
+        return;
+    }
+
+    let known = known_suggestion_ids();
+    let digest = recurring.join("\n---\n");
+    let digest_hash = {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        digest[..digest.len().min(200)].hash(&mut h);
+        h.finish()
+    };
+    let suggestion_id = format!("rule_mutation:{}", digest_hash);
+    if known.contains(&suggestion_id) {
+        return; // Already suggested this pattern
+    }
+
+    // Ask the LLM to propose a rule
+    let prompt = format!(
+        "You are analyzing repeated failures of a desktop AI agent called BLADE. \
+        Based on these recurring command failures, propose ONE short rule (1-2 sentences) \
+        to add to BLADE's system prompt that would prevent these failures. \
+        Be specific and actionable. Output only the rule text, nothing else.\n\n\
+        Failures:\n{}",
+        &digest[..digest.len().min(1200)]
+    );
+
+    let msgs = vec![crate::providers::ConversationMessage::User(prompt)];
+
+    // For local analysis, prefer Hermes 3 — it's specifically trained for agent reasoning
+    // and function-use patterns, making it ideal for the GEPA failure analysis task.
+    // Fall back to cheapest cloud model if Ollama isn't running.
+    let (analysis_provider, analysis_key, analysis_model) = if config.provider == "ollama" {
+        // Try Hermes 3 first (best for agent pattern analysis), fall back to configured model
+        ("ollama".to_string(), String::new(), "hermes3".to_string())
+    } else {
+        let cheap = match config.provider.as_str() {
+            "anthropic" => "claude-haiku-4-5-20251001",
+            "openai" => "gpt-4o-mini",
+            "gemini" => "gemini-2.0-flash",
+            "groq" => "llama-3.1-8b-instant",
+            _ => &config.model,
+        };
+        (config.provider.clone(), config.api_key.clone(), cheap.to_string())
+    };
+
+    let rule_text = match crate::providers::complete_turn(
+        &analysis_provider, &analysis_key, &analysis_model, &msgs, &[], config.base_url.as_deref()
+    ).await {
+        Ok(t) if !t.content.trim().is_empty() => t.content.trim().to_string(),
+        _ => return,
+    };
+
+    // Surface as a "prompt rule" suggestion — no mcp_package, type is "rule"
+    let suggestion = EvolutionSuggestion {
+        id: suggestion_id,
+        name: format!("Add rule from {} failure pattern(s)", failures.len()),
+        package: String::new(), // Not an MCP install — empty signals "prompt mutation"
+        description: rule_text.clone(),
+        trigger_app: "execution_failures".to_string(),
+        required_token_hint: None,
+        auto_install: false,
+        status: "pending".to_string(),
+        created_at: chrono::Utc::now().timestamp(),
+    };
+
+    let _ = save_suggestion(&suggestion);
+    let _ = app.emit("evolution_suggestion", &suggestion);
+
+    log::info!("Evolution: proposed rule from {} failure(s): {}", failures.len(), &rule_text[..rule_text.len().min(80)]);
 }
 
 /// Start the evolution background loop.

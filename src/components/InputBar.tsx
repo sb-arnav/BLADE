@@ -1,6 +1,5 @@
 import { useCallback, useRef, useState, useMemo, KeyboardEvent, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 
 const SLASH_COMMANDS = [
   { cmd: "/clear", label: "Clear conversation", action: "clear" },
@@ -10,6 +9,11 @@ const SLASH_COMMANDS = [
   { cmd: "/focus", label: "Enter focus mode", action: "focus" },
   { cmd: "/export", label: "Export conversation", action: "export" },
   { cmd: "/help", label: "Show keyboard shortcuts", action: "help" },
+  { cmd: "/memory", label: "Search your memory", action: "memory" },
+  { cmd: "/research", label: "Deep research mode", action: "research" },
+  { cmd: "/think", label: "Think deeply about this (extended reasoning)", action: "think" },
+  { cmd: "/swarm", label: "Spawn parallel agent swarm", action: "swarm" },
+  { cmd: "/timeline", label: "Open screen timeline", action: "timeline" },
 ] as const;
 
 type SlashAction = (typeof SLASH_COMMANDS)[number]["action"];

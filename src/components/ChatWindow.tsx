@@ -45,6 +45,7 @@ interface Props {
   voiceModeStatus?: string;
   voiceModeOnPttDown?: () => void;
   voiceModeOnPttUp?: () => void;
+  thinkingText?: string | null;
 }
 
 function formatTime(timestamp: number): string {
@@ -90,13 +91,14 @@ export function ChatWindow({
   onStopTTS,
   activeWindow,
   contextSuggestions,
-  onOpenWorkspace,
   runtimes,
   onOpenOperators,
   voiceDraft,
   onVoiceDraftConsumed,
+  voiceModeStatus,
   voiceModeOnPttDown,
   voiceModeOnPttUp,
+  thinkingText,
 }: Props) {
   const [search, setSearch] = useState("");
   const [composerDraft, setComposerDraft] = useState<string | null>(null);
@@ -135,34 +137,6 @@ export function ChatWindow({
     command: "$",
     text: "T",
   };
-  const contextLabel = activeWindow?.title?.trim() || activeWindow?.process_name?.trim() || null;
-  const visibleSuggestions = (contextSuggestions ?? []).slice(0, 3);
-  const workspaceActions = [
-    {
-      id: "terminal",
-      label: "Open terminal",
-      description: "Run commands with Blade alongside you",
-      action: () => onOpenWorkspace?.("terminal"),
-    },
-    {
-      id: "files",
-      label: "Open files",
-      description: "Browse code, docs, and local context",
-      action: () => onOpenWorkspace?.("files"),
-    },
-    {
-      id: "canvas",
-      label: "Open canvas",
-      description: "Think visually with Blade",
-      action: () => onOpenWorkspace?.("canvas"),
-    },
-    {
-      id: "agents",
-      label: "Open operators",
-      description: "Route work across Blade, Claude, and Codex",
-      action: () => onOpenWorkspace?.("agents"),
-    },
-  ] as const;
   const runtimeStrip = (runtimes ?? []).slice(0, 4);
 
   return (
@@ -351,25 +325,21 @@ export function ChatWindow({
                       : " · ready"}
               </span>
             ))}
-            {contextLabel ? (
-              <button
-                onClick={() => setComposerDraft(`Help me with what I'm doing in ${contextLabel}.\n\nCurrent goal:\nWhat I'm trying to do:\nWhere I'm stuck:\n`)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-blade-border bg-blade-surface/70 px-2.5 py-1 hover:border-blade-accent/30 hover:text-blade-secondary transition-colors"
-                title="Use the app in focus as context"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-blade-accent" />
-                In focus: {contextLabel.length > 42 ? `${contextLabel.slice(0, 42)}...` : contextLabel}
-              </button>
-            ) : null}
-            <span className="inline-flex items-center rounded-full border border-blade-border bg-blade-surface/70 px-2.5 py-1">
-              Voice
-            </span>
-            <span className="inline-flex items-center rounded-full border border-blade-border bg-blade-surface/70 px-2.5 py-1">
-              Screen
-            </span>
-            <span className="inline-flex items-center rounded-full border border-blade-border bg-blade-surface/70 px-2.5 py-1">
-              Tools
-            </span>
+            {voiceModeStatus && voiceModeStatus !== "off" && (
+              <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${
+                voiceModeStatus === "listening"
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                  : voiceModeStatus === "speaking"
+                    ? "border-indigo-500/30 bg-indigo-500/10 text-indigo-300"
+                    : "border-blade-border bg-blade-surface/70"
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  voiceModeStatus === "listening" ? "bg-emerald-400 animate-pulse" :
+                  voiceModeStatus === "speaking"  ? "bg-indigo-400 animate-pulse" : "bg-blade-muted"
+                }`} />
+                {voiceModeStatus}
+              </span>
+            )}
             {onOpenOperators ? (
               <button
                 onClick={onOpenOperators}
@@ -379,34 +349,6 @@ export function ChatWindow({
               </button>
             ) : null}
           </div>
-          {messages.length === 0 && visibleSuggestions.length > 0 ? (
-            <div className="max-w-2xl mx-auto mt-2 flex flex-wrap gap-2">
-              {visibleSuggestions.map((suggestion) => (
-                <button
-                  key={suggestion.id}
-                  onClick={() => setComposerDraft(suggestion.prompt)}
-                  className="text-2xs rounded-full border border-blade-border bg-blade-surface/60 px-2.5 py-1 text-blade-secondary hover:border-blade-accent/30 hover:text-blade-text transition-colors"
-                >
-                  <span className="mr-1">{suggestion.icon}</span>
-                  {suggestion.label}
-                </button>
-              ))}
-            </div>
-          ) : null}
-          {messages.length === 0 ? (
-            <div className="max-w-2xl mx-auto mt-3 grid gap-2 sm:grid-cols-2">
-              {workspaceActions.map((workspace) => (
-                <button
-                  key={workspace.id}
-                  onClick={workspace.action}
-                  className="rounded-xl border border-blade-border bg-blade-surface/50 px-3 py-2 text-left hover:border-blade-accent/30 transition-colors"
-                >
-                  <div className="text-xs text-blade-secondary">{workspace.label}</div>
-                  <div className="mt-1 text-2xs text-blade-muted">{workspace.description}</div>
-                </button>
-              ))}
-            </div>
-          ) : null}
         </div>
 
         {/* Error */}
@@ -461,6 +403,19 @@ export function ChatWindow({
                   {action.label}
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Extended thinking indicator — shown when Claude is reasoning */}
+        {thinkingText && loading && (
+          <div className="mx-3 mb-1.5 px-3 py-2 rounded-xl border border-blade-accent/20 bg-blade-accent/5 flex items-start gap-2">
+            <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full bg-blade-accent animate-pulse" />
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold text-blade-accent/70 uppercase tracking-wide mb-0.5">Thinking</p>
+              <p className="text-[11px] text-blade-muted/70 leading-relaxed line-clamp-2">
+                {thinkingText.slice(-200)}
+              </p>
             </div>
           </div>
         )}

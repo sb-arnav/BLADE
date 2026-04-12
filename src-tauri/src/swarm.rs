@@ -380,11 +380,25 @@ pub fn build_task_context(swarm: &Swarm, task: &SwarmTask) -> String {
         parts.push(format!("# Context from prerequisite tasks\n{}", dep_results.join("\n\n")));
     }
 
-    // Scratchpad
+    // Scratchpad — includes any results from other agents
     if let Some(key) = &task.scratchpad_key {
         if let Some(val) = swarm.scratchpad.get(key) {
             parts.push(format!("# Shared scratchpad ({})\n{}", key, val));
         }
+    }
+
+    // Failure annotations (evo-hq pattern) — warn about what other agents tried and failed,
+    // so this agent doesn't repeat their mistakes
+    let failures: Vec<String> = swarm.scratchpad
+        .iter()
+        .filter(|(k, _)| k.starts_with("_failed:"))
+        .map(|(_, v)| format!("- {}", v))
+        .collect();
+    if !failures.is_empty() {
+        parts.push(format!(
+            "# Known failures to avoid\nOther agents in this swarm already tried these approaches and failed. Do NOT repeat them:\n{}",
+            failures.join("\n")
+        ));
     }
 
     parts.join("\n\n")

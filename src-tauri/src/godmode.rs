@@ -6,8 +6,66 @@
 ///
 /// Writes a live context file injected into every Blade conversation.
 
+use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 use tauri::{Emitter, Manager};
+
+/// Tracks the last error signature seen by God Mode for smart interrupt detection.
+struct StuckErrorState {
+    fingerprint: String,     // hash/preview of the error
+    first_seen: i64,         // unix timestamp when first detected
+    scan_count: u32,         // how many consecutive scans with same error
+    interrupted: bool,       // already fired interrupt for this session
+}
+
+static STUCK_ERROR: OnceLock<Mutex<Option<StuckErrorState>>> = OnceLock::new();
+
+fn stuck_error() -> &'static Mutex<Option<StuckErrorState>> {
+    STUCK_ERROR.get_or_init(|| Mutex::new(None))
+}
+
+/// Check if the user appears stuck on the same error and emit smart_interrupt if so.
+/// Called after each god mode scan that found errors.
+fn check_smart_interrupt(app: &tauri::AppHandle, error_preview: &str) {
+    let now = chrono::Utc::now().timestamp();
+    // Use first 120 chars as fingerprint
+    let fingerprint = error_preview[..error_preview.len().min(120)].to_string();
+
+    let mut guard = match stuck_error().lock() {
+        Ok(g) => g,
+        Err(_) => return,
+    };
+
+    match guard.as_mut() {
+        Some(state) if state.fingerprint == fingerprint => {
+            state.scan_count += 1;
+            let elapsed = now - state.first_seen;
+            // Fire interrupt after 5+ minutes (300s) and at least 2 scans, once per error session
+            if elapsed >= 300 && state.scan_count >= 2 && !state.interrupted {
+                state.interrupted = true;
+                let preview = error_preview[..error_preview.len().min(200)].to_string();
+                let elapsed_min = elapsed / 60;
+                let _ = app.emit("smart_interrupt", serde_json::json!({
+                    "error_preview": preview,
+                    "elapsed_minutes": elapsed_min,
+                    "suggested_prompt": format!(
+                        "I've been stuck on this for {} minutes — can you help?\n\n```\n{}\n```",
+                        elapsed_min, preview
+                    ),
+                }));
+            }
+        }
+        _ => {
+            // New error or different error — reset state
+            *guard = Some(StuckErrorState {
+                fingerprint,
+                first_seen: now,
+                scan_count: 1,
+                interrupted: false,
+            });
+        }
+    }
+}
 
 pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
     // Start Total Recall screen timeline if enabled
@@ -43,6 +101,18 @@ pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
             let ctx = build_machine_context(&config.god_mode_tier);
             let path = crate::config::blade_config_dir().join("godmode_context.md");
             let _ = std::fs::write(&path, &ctx);
+
+            // SMART INTERRUPT: detect if user is stuck on the same error
+            if config.god_mode_tier == "intermediate" || config.god_mode_tier == "extreme" {
+                if let Some(error_section) = extract_error_from_context(&ctx) {
+                    check_smart_interrupt(&app, &error_section);
+                } else {
+                    // No current error — clear stuck state
+                    if let Ok(mut guard) = stuck_error().lock() {
+                        *guard = None;
+                    }
+                }
+            }
 
             let _ = app.emit("godmode_update", serde_json::json!({
                 "bytes": ctx.len(),
@@ -96,6 +166,19 @@ pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
             }
         }
     });
+}
+
+/// Extract the error preview from a godmode context string, if an error section exists.
+fn extract_error_from_context(ctx: &str) -> Option<String> {
+    if let Some(pos) = ctx.find("### Active Errors Detected") {
+        let section = &ctx[pos..];
+        let end = section.find("\n\n## ").unwrap_or(section.len());
+        let content = section[..end].trim().to_string();
+        if content.len() > 30 {
+            return Some(content);
+        }
+    }
+    None
 }
 
 pub fn stop_god_mode() {

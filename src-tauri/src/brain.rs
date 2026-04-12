@@ -226,6 +226,21 @@ fn build_system_prompt_inner(
         }
     }
 
+    // PROJECT CLAUDE.md — auto-detected from active window's project directory.
+    // When the user is working in a project with a CLAUDE.md (or BLADE.md), inject it.
+    // This gives BLADE full project context without any manual setup — just like Claude Code.
+    if let Some((proj_path, proj_instructions)) = load_project_instructions() {
+        let proj_dir = std::path::Path::new(&proj_path)
+            .parent()
+            .and_then(|p| p.file_name())
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "project".to_string());
+        parts.push(format!(
+            "## Active Project Instructions ({})\n\nYou are currently working in the `{}` project. These are its operating rules:\n\n{}",
+            proj_path, proj_dir, proj_instructions
+        ));
+    }
+
     // THREAD — Blade's working memory. Injected first (highest priority live context).
     // This is what gives Blade continuity: it knows exactly where it left off.
     if let Some(thread) = crate::thread::get_active_thread() {
@@ -355,6 +370,20 @@ fn build_system_prompt_inner(
         parts.push(format!("## Right Now\n\n{}", activity));
     }
 
+    // CLIPBOARD INTELLIGENCE — pre-computed analysis of what the user copied.
+    // This runs asynchronously the moment the clipboard changes, so the answer
+    // is ready instantly. User copies an error → they ask about it → we already know.
+    if let Some(pf) = crate::clipboard::get_latest_prefetch() {
+        let age = chrono::Utc::now().timestamp() - pf.prefetched_at;
+        if age < 300 {
+            parts.push(format!(
+                "## Clipboard (pre-analyzed)\n\nThe user recently copied:\n```\n{}\n```\n\nPre-computed analysis: {}",
+                pf.content_preview,
+                pf.analysis,
+            ));
+        }
+    }
+
     // Context notes
     if let Some(context) = load_context_notes() {
         parts.push(format!("## Context\n\n{}", context));
@@ -389,6 +418,12 @@ fn build_system_prompt_inner(
                 }
             }
         }
+    }
+
+    // GIT CONTEXT — auto-detect active git repo from window title and inject branch + recent commits.
+    // No setup needed. The moment you're in a git project, BLADE knows where you are.
+    if let Some(git_ctx) = git_context_for_active_project() {
+        parts.push(git_ctx);
     }
 
     // AMBIENT RESEARCH — what BLADE has been looking up in the background
@@ -513,6 +548,136 @@ fn load_blade_md() -> Option<String> {
     let blade_dir = crate::config::blade_config_dir();
     let path = blade_dir.join("BLADE.md");
     fs::read_to_string(path).ok()
+}
+
+/// Walk from `start_dir` up to filesystem root looking for CLAUDE.md or BLADE.md.
+/// Returns (path, content) of the first one found.
+fn find_project_instructions(start_dir: &std::path::Path) -> Option<(String, String)> {
+    let candidate_names = ["CLAUDE.md", "BLADE.md", ".claude/CLAUDE.md"];
+    let mut dir = start_dir.to_path_buf();
+    let home = dirs::home_dir().unwrap_or_default();
+
+    // Don't walk above home dir — avoid reading system files
+    for _ in 0..10 {
+        for name in &candidate_names {
+            let candidate = dir.join(name);
+            if candidate.is_file() {
+                if let Ok(content) = fs::read_to_string(&candidate) {
+                    if !content.trim().is_empty() {
+                        return Some((candidate.to_string_lossy().to_string(), content));
+                    }
+                }
+            }
+        }
+        if dir == home || !dir.pop() {
+            break;
+        }
+    }
+    None
+}
+
+/// Try to extract a directory path from a window title.
+/// VS Code: "filename.rs — /path/to/project [group]" → "/path/to/project"
+/// Terminal: "/path/to/project" in title
+fn extract_dir_from_window_title(title: &str) -> Option<std::path::PathBuf> {
+    // Look for absolute paths in the title
+    let separators = [" — ", " - ", ": ", " ("];
+    for sep in &separators {
+        if let Some(idx) = title.find(sep) {
+            let rest = &title[idx + sep.len()..];
+            // Extract the path-like part (up to first space or bracket)
+            let end = rest.find(|c: char| c == ' ' || c == '[' || c == '(').unwrap_or(rest.len());
+            let candidate = rest[..end].trim();
+            let p = std::path::Path::new(candidate);
+            if p.is_dir() {
+                return Some(p.to_path_buf());
+            }
+            // Maybe it's a file — return parent dir
+            if p.is_file() {
+                return p.parent().map(|d| d.to_path_buf());
+            }
+        }
+    }
+    // Fallback: try the whole title as a path
+    let p = std::path::Path::new(title.trim());
+    if p.is_dir() { return Some(p.to_path_buf()); }
+    None
+}
+
+/// Load project-level CLAUDE.md from the user's active working directory.
+/// Returns None if not in a project, if the file doesn't differ from BLADE.md,
+/// or if the file is too large to be useful.
+fn load_project_instructions() -> Option<(String, String)> {
+    // Get active window to find project dir
+    let win = crate::context::get_active_window().ok()?;
+    let title = &win.window_title;
+
+    let dir = extract_dir_from_window_title(title)?;
+    let (path, content) = find_project_instructions(&dir)?;
+
+    // Don't inject if it's enormous (malformed CLAUDE.md protection)
+    if content.len() > 20_000 {
+        return Some((path, content[..20_000].to_string()));
+    }
+    Some((path, content))
+}
+
+/// Run a git command in a directory and return stdout (trimmed).
+fn git_run(dir: &std::path::Path, args: &[&str]) -> Option<String> {
+    let out = std::process::Command::new("git")
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .ok()?;
+    if out.status.success() {
+        let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if s.is_empty() { None } else { Some(s) }
+    } else {
+        None
+    }
+}
+
+/// Detect the git repo of the user's active project and inject branch + recent commits.
+/// Returns None if no git repo can be found, silently skipped on failure.
+fn git_context_for_active_project() -> Option<String> {
+    let win = crate::context::get_active_window().ok()?;
+    let dir = extract_dir_from_window_title(&win.window_title)?;
+
+    // Find git root by running `git rev-parse --show-toplevel`
+    let root_str = git_run(&dir, &["rev-parse", "--show-toplevel"])?;
+    let root = std::path::PathBuf::from(&root_str);
+
+    let branch = git_run(&root, &["rev-parse", "--abbrev-ref", "HEAD"])
+        .unwrap_or_else(|| "unknown".to_string());
+
+    // Last 5 commit subjects
+    let log = git_run(&root, &["log", "--oneline", "-5"])
+        .unwrap_or_default();
+
+    // Files changed vs HEAD (uncommitted)
+    let dirty = git_run(&root, &["status", "--short"])
+        .map(|s| {
+            let lines: Vec<&str> = s.lines().take(8).collect();
+            lines.join("\n")
+        })
+        .unwrap_or_default();
+
+    let repo_name = root.file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "repo".to_string());
+
+    let mut sections = vec![
+        format!("**Repo**: `{}` ({})", repo_name, root_str),
+        format!("**Branch**: `{}`", branch),
+    ];
+    if !log.is_empty() {
+        sections.push(format!("**Recent commits**:\n{}", log));
+    }
+    if !dirty.is_empty() {
+        sections.push(format!("**Uncommitted changes**:\n{}", dirty));
+    }
+
+    Some(format!("## Active Git Repo\n\n{}", sections.join("\n")))
 }
 
 const BLADE_IDENTITY: &str = r#"# You are Blade
