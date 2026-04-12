@@ -433,7 +433,7 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
 
         -- ── TOTAL RECALL — Screen Timeline ───────────────────────────────────
         -- Screenshot every N seconds. Fingerprint dedup skips identical frames.
-        -- Description + embedding enable semantic search ("what was I looking at?")
+        -- Description + embedding enable semantic search for screen history
         CREATE TABLE IF NOT EXISTS screen_timeline (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp INTEGER NOT NULL,
