@@ -52,6 +52,9 @@ mod runtimes;
 mod screen;
 mod screen_timeline;
 mod screen_timeline_commands;
+mod swarm;
+mod swarm_planner;
+mod swarm_commands;
 mod trace;
 mod tray;
 mod ui_automation;
@@ -593,6 +596,14 @@ pub fn run() {
             screen_timeline_commands::timeline_set_config,
             screen_timeline_commands::timeline_get_stats_cmd,
             screen_timeline_commands::timeline_cleanup,
+            swarm_commands::swarm_create,
+            swarm_commands::swarm_list,
+            swarm_commands::swarm_get,
+            swarm_commands::swarm_pause,
+            swarm_commands::swarm_resume,
+            swarm_commands::swarm_cancel,
+            swarm_commands::swarm_write_scratchpad,
+            swarm_commands::swarm_read_scratchpad,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
