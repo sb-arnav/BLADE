@@ -1079,6 +1079,7 @@ export default function App() {
               onOpenOperators={() => openRoute("agents")}
               voiceDraft={voiceDraft}
               onVoiceDraftConsumed={() => setVoiceDraft(null)}
+              voiceModeStatus={voiceMode.status}
               voiceModeOnPttDown={voiceMode.onPttMouseDown}
               voiceModeOnPttUp={voiceMode.onPttMouseUp}
               thinkingText={chat.thinkingText}
