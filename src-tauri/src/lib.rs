@@ -1,5 +1,6 @@
 mod agent_commands;
 mod autoskills;
+mod git_style;
 mod roles;
 mod ambient;
 mod evolution;
@@ -313,6 +314,9 @@ pub fn run() {
             roles::roles_list,
             roles::roles_get_active,
             roles::roles_set_active,
+            git_style::git_style_mine,
+            git_style::git_style_get,
+            git_style::git_style_clear,
             commands::toggle_god_mode,
             commands::get_config,
             config::get_all_provider_keys,

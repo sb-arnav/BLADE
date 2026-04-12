@@ -48,9 +48,99 @@ fn estimate_tokens(conversation: &[ConversationMessage]) -> usize {
 /// Keeps: System prompt (always), last user message (always), drops oldest middle messages.
 fn truncate_to_budget(conversation: &mut Vec<ConversationMessage>, max_tokens: usize) {
     while estimate_tokens(conversation) > max_tokens && conversation.len() > 3 {
-        // Remove second message (index 1) — keeps system prompt at 0 and recent messages
         conversation.remove(1);
     }
+}
+
+/// Smart context compression — inspired by MemPalace's AAAK pattern.
+/// Instead of dropping old turns, summarizes them into a compact block.
+/// Keeps: system prompt + compressed summary + last 8 turns verbatim.
+async fn compress_conversation_smart(
+    conversation: &mut Vec<ConversationMessage>,
+    max_tokens: usize,
+    provider: &str,
+    api_key: &str,
+    model: &str,
+    base_url: Option<&str>,
+) {
+    if estimate_tokens(conversation) <= max_tokens {
+        return;
+    }
+
+    let keep_recent = 8usize;
+    let system_count = conversation.iter()
+        .filter(|m| matches!(m, ConversationMessage::System(_)))
+        .count();
+
+    if conversation.len() <= system_count + keep_recent {
+        // Nothing to compress — just truncate as fallback
+        truncate_to_budget(conversation, max_tokens);
+        return;
+    }
+
+    let compress_end = conversation.len().saturating_sub(keep_recent);
+    let compress_start = system_count;
+
+    if compress_end <= compress_start {
+        truncate_to_budget(conversation, max_tokens);
+        return;
+    }
+
+    // Build text of the turns to compress
+    let to_compress: Vec<String> = conversation[compress_start..compress_end]
+        .iter()
+        .filter_map(|m| match m {
+            ConversationMessage::User(s) => Some(format!("User: {}", &s[..s.len().min(500)])),
+            ConversationMessage::Assistant { content, .. } => {
+                if content.is_empty() { None }
+                else { Some(format!("Assistant: {}", &content[..content.len().min(500)])) }
+            }
+            ConversationMessage::Tool { tool_name, content, .. } => {
+                Some(format!("Tool[{}] result: {}", tool_name, &content[..content.len().min(200)]))
+            }
+            _ => None,
+        })
+        .collect();
+
+    if to_compress.is_empty() {
+        truncate_to_budget(conversation, max_tokens);
+        return;
+    }
+
+    let summary_prompt = format!(
+        "Summarize this earlier conversation in 3-6 sentences. Preserve: key decisions made, \
+         code written or changed, errors encountered and resolved, facts established. \
+         Be dense and specific — this replaces the full history.\n\n{}",
+        to_compress.join("\n")
+    );
+
+    // Use cheapest model for compression
+    let cheap = match provider {
+        "anthropic" => "claude-haiku-4-5-20251001",
+        "openai" => "gpt-4o-mini",
+        "gemini" => "gemini-2.0-flash",
+        "groq" => "llama-3.1-8b-instant",
+        _ => model,
+    };
+
+    let summary_msgs = vec![ConversationMessage::User(summary_prompt)];
+    let summary = match crate::providers::complete_turn(
+        provider, api_key, cheap, &summary_msgs, &[], base_url
+    ).await {
+        Ok(t) => t.content,
+        Err(_) => {
+            // Compression failed — fall back to hard truncation
+            truncate_to_budget(conversation, max_tokens);
+            return;
+        }
+    };
+
+    // Replace compressed range with a single summary message
+    let summary_msg = ConversationMessage::User(
+        format!("[Earlier conversation summary]\n{}", summary)
+    );
+    conversation.drain(compress_start..compress_end);
+    conversation.insert(compress_start, summary_msg);
 }
 
 /// Classify API errors and return a recovery action.
@@ -184,6 +274,16 @@ pub async fn send_message_stream(
 
     // Tools configured → non-streaming tool loop
     let mut conversation = conversation;
+    // Proactive compression before entering the loop — keep under 140k tokens
+    compress_conversation_smart(
+        &mut conversation,
+        140_000,
+        &config.provider,
+        &config.api_key,
+        &config.model,
+        config.base_url.as_deref(),
+    ).await;
+
     let mut last_tool_signature = String::new();
     let mut repeat_count = 0u8;
     for iteration in 0..12 {
@@ -216,9 +316,13 @@ pub async fn send_message_stream(
             Err(e) => {
                 match classify_api_error(&e) {
                     ErrorRecovery::TruncateAndRetry => {
-                        // Truncate conversation to ~150k tokens and retry this iteration
+                        // Smart compress then retry
                         let _ = app.emit("blade_status", "processing");
-                        truncate_to_budget(&mut conversation, 140_000);
+                        compress_conversation_smart(
+                            &mut conversation, 120_000,
+                            &config.provider, &config.api_key, &config.model,
+                            config.base_url.as_deref(),
+                        ).await;
                         let retry = providers::complete_turn(
                             &config.provider,
                             &config.api_key,
