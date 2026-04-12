@@ -1,6 +1,79 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
+import { useState, useEffect } from "react";
 
 const appWindow = getCurrentWindow();
+
+interface BladeRole {
+  id: string;
+  name: string;
+  icon: string;
+  tagline: string;
+}
+
+const ROLES: BladeRole[] = [
+  { id: "engineering", name: "Engineering", icon: "⚙", tagline: "Build, ship, debug" },
+  { id: "research",    name: "Research",    icon: "◎", tagline: "Deep dive, synthesize" },
+  { id: "marketing",  name: "Marketing",   icon: "◈", tagline: "Copy, reach, convert" },
+  { id: "operations", name: "Operations",  icon: "▦", tagline: "Organize, delegate" },
+  { id: "trading",    name: "Trading",     icon: "▲", tagline: "Analyze, position" },
+  { id: "security",   name: "Security",    icon: "◆", tagline: "Find it first" },
+];
+
+function RoleSwitcher() {
+  const [activeRole, setActiveRole] = useState("engineering");
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    invoke<BladeRole>("roles_get_active").then((r) => setActiveRole(r.id)).catch(() => {});
+  }, []);
+
+  const switchRole = async (id: string) => {
+    try {
+      await invoke("roles_set_active", { id });
+      setActiveRole(id);
+      setOpen(false);
+    } catch {}
+  };
+
+  const current = ROLES.find((r) => r.id === activeRole) ?? ROLES[0];
+
+  return (
+    <div className="relative" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] text-blade-muted hover:text-blade-text hover:bg-blade-surface transition-colors"
+        title={current.tagline}
+      >
+        <span className="font-mono text-blade-accent">{current.icon}</span>
+        <span className="tracking-wide">{current.name.toUpperCase()}</span>
+        <span className="text-blade-muted/40 ml-0.5">▾</span>
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-50 bg-blade-surface border border-blade-border rounded-lg shadow-xl overflow-hidden min-w-[160px]">
+          {ROLES.map((role) => (
+            <button
+              key={role.id}
+              onClick={() => switchRole(role.id)}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[10px] transition-colors ${
+                role.id === activeRole
+                  ? "bg-blade-accent/10 text-blade-accent"
+                  : "text-blade-muted hover:text-blade-text hover:bg-blade-surface-hover"
+              }`}
+            >
+              <span className="font-mono w-3 text-center">{role.icon}</span>
+              <div>
+                <div className="font-medium">{role.name}</div>
+                <div className="text-[9px] text-blade-muted/60">{role.tagline}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function TitleBar() {
   const minimize = async () => {
@@ -27,7 +100,9 @@ export function TitleBar() {
         </span>
       </div>
 
-      <div className="flex-1 h-full" data-tauri-drag-region />
+      <div className="flex-1 h-full flex items-center justify-center" data-tauri-drag-region>
+        <RoleSwitcher />
+      </div>
 
       <div className="flex items-center gap-0.5 shrink-0" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
         <button

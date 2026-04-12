@@ -1,5 +1,6 @@
 mod agent_commands;
 mod autoskills;
+mod roles;
 mod ambient;
 mod evolution;
 mod research;
@@ -309,6 +310,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::send_message_stream,
             commands::cancel_chat,
+            roles::roles_list,
+            roles::roles_get_active,
+            roles::roles_set_active,
             commands::toggle_god_mode,
             commands::get_config,
             config::get_all_provider_keys,
