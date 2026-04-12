@@ -50,6 +50,7 @@ interface Props {
   loading: boolean;
   toolExecutions: ToolExecution[];
   onQuickAction?: (prompt: string) => void;
+  onRetry?: () => void;
   activeWindow?: ActiveWindowInfo | null;
   contextSuggestions?: ContextSuggestion[];
 }
@@ -194,7 +195,7 @@ function shouldShowDateSeparator(messages: Message[], index: number): boolean {
   return prev !== curr;
 }
 
-const MessageBubble = memo(function MessageBubble({ msg }: { msg: Message }) {
+const MessageBubble = memo(function MessageBubble({ msg, isLast, onRetry }: { msg: Message; isLast?: boolean; onRetry?: () => void }) {
   const [hovered, setHovered] = useState(false);
   const [copied, setCopied] = useState(false);
   const isUser = msg.role === "user";
@@ -275,6 +276,15 @@ const MessageBubble = memo(function MessageBubble({ msg }: { msg: Message }) {
               </span>
             )}
             {!isUser && msg.content && <CopyButton text={msg.content} label="copy" />}
+            {!isUser && isLast && onRetry && (
+              <button
+                onClick={onRetry}
+                className="text-2xs text-blade-muted hover:text-blade-accent transition-colors font-mono"
+                title="Regenerate response"
+              >
+                ↻
+              </button>
+            )}
             {!isUser && <MessageReactions messageId={msg.id} messageContent={msg.content} visible={hovered} />}
           </div>
         )}
@@ -285,10 +295,12 @@ const MessageBubble = memo(function MessageBubble({ msg }: { msg: Message }) {
 
 
 const EXAMPLE_PROMPTS = [
-  { label: "Debug screen", prompt: "Take a screenshot and help me debug what you see" },
-  { label: "Last commit", prompt: "What changed in the last git commit?" },
-  { label: "Explain codebase", prompt: "Give me a quick overview of the current project structure" },
-  { label: "Research mode", prompt: "/research " },
+  { label: "Debug screen", prompt: "Take a screenshot and help me debug what you see", icon: "⊡" },
+  { label: "Last commit", prompt: "What changed in the last git commit?", icon: "⌥" },
+  { label: "Explain codebase", prompt: "Give me a quick overview of the current project structure", icon: "◈" },
+  { label: "Research", prompt: "/research ", icon: "◎" },
+  { label: "Swarm agents", prompt: "/swarm ", icon: "⊕" },
+  { label: "Screen timeline", prompt: "/timeline", icon: "◷" },
 ] as const;
 
 export function MessageList({
@@ -296,6 +308,7 @@ export function MessageList({
   loading,
   toolExecutions,
   onQuickAction,
+  onRetry,
   activeWindow,
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -351,18 +364,16 @@ export function MessageList({
               </p>
             </div>
             {onQuickAction && (
-              <div className="grid grid-cols-2 gap-1.5 w-full max-w-[340px]">
+              <div className="grid grid-cols-3 gap-1.5 w-full max-w-[360px]">
                 {EXAMPLE_PROMPTS.map((ex) => (
                   <button
                     key={ex.label}
                     onClick={() => onQuickAction(ex.prompt)}
-                    className="text-left px-3 py-2.5 rounded-lg border border-blade-border bg-blade-surface/60 hover:bg-blade-surface hover:border-blade-border-hover transition-colors group"
+                    className="text-left px-2.5 py-2 rounded-lg border border-blade-border bg-blade-surface/60 hover:bg-blade-surface hover:border-blade-accent/20 transition-colors group"
                   >
-                    <span className="text-[0.7rem] font-medium text-blade-secondary group-hover:text-blade-text transition-colors block">
+                    <span className="text-[0.7rem] text-blade-muted/60 font-mono block mb-0.5">{ex.icon}</span>
+                    <span className="text-[0.7rem] font-medium text-blade-secondary group-hover:text-blade-text transition-colors block leading-tight">
                       {ex.label}
-                    </span>
-                    <span className="text-[0.65rem] text-blade-muted/50 truncate block mt-0.5">
-                      {ex.prompt.startsWith("/") ? ex.prompt : ex.prompt.slice(0, 38) + "…"}
                     </span>
                   </button>
                 ))}
@@ -378,14 +389,17 @@ export function MessageList({
           </div>
         )}
 
-        {messages.map((msg, idx) => (
-          <div key={msg.id}>
-            {shouldShowDateSeparator(messages, idx) && (
-              <DateSeparator timestamp={msg.timestamp} />
-            )}
-            <MessageBubble msg={msg} />
-          </div>
-        ))}
+        {messages.map((msg, idx) => {
+          const isLastAssistant = msg.role === "assistant" && idx === messages.length - 1;
+          return (
+            <div key={msg.id}>
+              {shouldShowDateSeparator(messages, idx) && (
+                <DateSeparator timestamp={msg.timestamp} />
+              )}
+              <MessageBubble msg={msg} isLast={isLastAssistant} onRetry={isLastAssistant ? onRetry : undefined} />
+            </div>
+          );
+        })}
 
         {(activeTools.length > 0 || recentCompleted.length > 0) && (
           <div className="flex justify-start animate-fade-in">
