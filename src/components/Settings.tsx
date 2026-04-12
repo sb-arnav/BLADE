@@ -507,6 +507,12 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
     config.god_mode ? (config.god_mode_tier ?? "normal") : "off"
   );
   const [voiceMode, setVoiceMode] = useState(config.voice_mode ?? "off");
+  const [ttsVoice, setTtsVoice] = useState(config.tts_voice ?? "system");
+  const [quickAskShortcut, setQuickAskShortcut] = useState(config.quick_ask_shortcut ?? "Alt+Space");
+  const [voiceShortcut, setVoiceShortcut] = useState(config.voice_shortcut ?? "Ctrl+Shift+V");
+  const [shortcutStatus, setShortcutStatus] = useState<string | null>(null);
+  const [shortcutError, setShortcutError] = useState<string | null>(null);
+  const [ttsVoices, setTtsVoices] = useState<Array<{ id: string; label: string; description: string; provider: string }>>([]);
   const [obsidianVaultPath, setObsidianVaultPath] = useState(config.obsidian_vault_path ?? "");
   const [persona, setPersona] = useState("");
   const [contextNotes, setContextNotes] = useState("");
@@ -524,6 +530,9 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
     setBaseUrl(config.base_url ?? "");
     setGodModeTier(config.god_mode ? (config.god_mode_tier ?? "normal") : "off");
     setVoiceMode(config.voice_mode ?? "off");
+    setTtsVoice(config.tts_voice ?? "system");
+    setQuickAskShortcut(config.quick_ask_shortcut ?? "Alt+Space");
+    setVoiceShortcut(config.voice_shortcut ?? "Ctrl+Shift+V");
     setObsidianVaultPath(config.obsidian_vault_path ?? "");
   }, [config]);
 
@@ -545,6 +554,28 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
 
     loadBrain();
   }, []);
+
+  // Load TTS voices on mount
+  useEffect(() => {
+    invoke<Array<{ id: string; label: string; description: string; provider: string }>>("tts_list_voices")
+      .then(setTtsVoices)
+      .catch(() => {});
+  }, []);
+
+  const handleSaveShortcuts = async () => {
+    setShortcutStatus("Saving shortcuts...");
+    setShortcutError(null);
+    try {
+      await invoke("update_shortcuts", {
+        quickAsk: quickAskShortcut,
+        voice: voiceShortcut,
+      });
+      setShortcutStatus("Shortcuts saved. Active immediately.");
+    } catch (cause) {
+      setShortcutStatus(null);
+      setShortcutError(typeof cause === "string" ? cause : String(cause));
+    }
+  };
 
   const handleTest = async () => {
     setStatus("Testing connection...");
@@ -581,6 +612,9 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
         god_mode_tier: godModeTierVal,
         voice_mode: voiceMode,
         obsidian_vault_path: obsidianVaultPath || undefined,
+        tts_voice: ttsVoice,
+        quick_ask_shortcut: quickAskShortcut,
+        voice_shortcut: voiceShortcut,
         onboarded: true,
       };
       setStatus("Settings saved.");
@@ -863,6 +897,82 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
                 Always-on uses your microphone continuously. Speech is sent to Whisper (via Groq). Say "Hey Blade" to trigger auto-send — otherwise your words fill the input box for you to review.
               </p>
             )}
+          </div>
+
+          {/* TTS Voice */}
+          {(voiceMode === "tts" || voiceMode === "always-on") && ttsVoices.length > 0 && (
+            <div className="space-y-2">
+              <div>
+                <p className="text-sm font-medium">Voice</p>
+                <p className="text-xs text-blade-muted mt-0.5">
+                  OpenAI voices require an OpenAI API key. System voices use your OS speech engine (no key needed).
+                </p>
+              </div>
+              <select
+                value={ttsVoice}
+                onChange={(e) => setTtsVoice(e.target.value)}
+                className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none"
+              >
+                <optgroup label="OpenAI (cloud, best quality)">
+                  {ttsVoices.filter(v => v.provider === "openai").map(v => (
+                    <option key={v.id} value={v.id}>{v.label} — {v.description}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="System (offline, no key)">
+                  {ttsVoices.filter(v => v.provider === "system").map(v => (
+                    <option key={v.id} value={v.id}>{v.label} — {v.description}</option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
+          )}
+
+          {/* Shortcuts */}
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-medium">Keyboard Shortcuts</p>
+              <p className="text-xs text-blade-muted mt-0.5">
+                Global hotkeys work system-wide — even when BLADE is in the background.
+                Format: <code className="font-mono text-[10px] bg-blade-surface px-1 rounded">Ctrl+Shift+V</code>,{" "}
+                <code className="font-mono text-[10px] bg-blade-surface px-1 rounded">Alt+Space</code>
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="space-y-1 block">
+                <span className="text-xs text-blade-muted uppercase tracking-wide">Quick Ask</span>
+                <input
+                  type="text"
+                  value={quickAskShortcut}
+                  onChange={(e) => setQuickAskShortcut(e.target.value)}
+                  className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm font-mono outline-none"
+                  placeholder="Alt+Space"
+                />
+              </label>
+              <label className="space-y-1 block">
+                <span className="text-xs text-blade-muted uppercase tracking-wide">Voice Input</span>
+                <input
+                  type="text"
+                  value={voiceShortcut}
+                  onChange={(e) => setVoiceShortcut(e.target.value)}
+                  className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm font-mono outline-none"
+                  placeholder="Ctrl+Shift+V"
+                />
+              </label>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleSaveShortcuts}
+                className="px-4 py-1.5 rounded-lg bg-blade-accent/20 hover:bg-blade-accent/30 text-blade-accent text-sm border border-blade-accent/30 transition-colors"
+              >
+                Apply Shortcuts
+              </button>
+              {shortcutStatus && <span className="text-xs text-emerald-400">{shortcutStatus}</span>}
+              {shortcutError && <span className="text-xs text-red-400">{shortcutError}</span>}
+            </div>
+            <p className="text-xs text-blade-muted/60">
+              Voice input shortcut toggles recording. First press starts mic, second press transcribes and opens Quick Ask pre-filled with your speech.
+            </p>
           </div>
 
           {/* Obsidian Vault */}

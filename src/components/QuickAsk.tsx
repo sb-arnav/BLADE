@@ -43,6 +43,18 @@ export function QuickAsk() {
     };
   }, []);
 
+  // Listen for global voice transcript — pre-fill input
+  useEffect(() => {
+    const unlisten = listen<{ text: string }>("voice_transcript_ready", (event) => {
+      const text = event.payload.text.trim();
+      if (text) {
+        setQuery(text);
+        setTimeout(() => inputRef.current?.focus(), 30);
+      }
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
+
   // Listen to streaming tokens
   useEffect(() => {
     let active = true;

@@ -55,6 +55,12 @@ struct DiskConfig {
     voice_mode: String,
     #[serde(default)]
     obsidian_vault_path: String,
+    #[serde(default = "default_tts_voice")]
+    tts_voice: String,
+    #[serde(default = "default_quick_ask_shortcut")]
+    quick_ask_shortcut: String,
+    #[serde(default = "default_voice_shortcut")]
+    voice_shortcut: String,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -62,6 +68,9 @@ struct DiskConfig {
 
 fn default_god_mode_tier() -> String { "normal".to_string() }
 fn default_voice_mode() -> String { "off".to_string() }
+fn default_tts_voice() -> String { "system".to_string() }
+fn default_quick_ask_shortcut() -> String { "Alt+Space".to_string() }
+fn default_voice_shortcut() -> String { "Ctrl+Shift+V".to_string() }
 
 impl Default for DiskConfig {
     fn default() -> Self {
@@ -81,6 +90,9 @@ impl Default for DiskConfig {
             god_mode_tier: "normal".to_string(),
             voice_mode: "off".to_string(),
             obsidian_vault_path: String::new(),
+            tts_voice: "system".to_string(),
+            quick_ask_shortcut: "Alt+Space".to_string(),
+            voice_shortcut: "Ctrl+Shift+V".to_string(),
             api_key: None,
         }
     }
@@ -117,6 +129,12 @@ pub struct BladeConfig {
     pub voice_mode: String,
     #[serde(default)]
     pub obsidian_vault_path: String,
+    #[serde(default = "default_tts_voice")]
+    pub tts_voice: String,
+    #[serde(default = "default_quick_ask_shortcut")]
+    pub quick_ask_shortcut: String,
+    #[serde(default = "default_voice_shortcut")]
+    pub voice_shortcut: String,
 }
 
 impl BladeConfig {
@@ -144,6 +162,9 @@ impl Default for BladeConfig {
             god_mode_tier: "normal".to_string(),
             voice_mode: "off".to_string(),
             obsidian_vault_path: String::new(),
+            tts_voice: "system".to_string(),
+            quick_ask_shortcut: "Alt+Space".to_string(),
+            voice_shortcut: "Ctrl+Shift+V".to_string(),
         }
     }
 }
@@ -229,6 +250,9 @@ pub fn load_config() -> BladeConfig {
         god_mode_tier: disk.god_mode_tier,
         voice_mode: disk.voice_mode,
         obsidian_vault_path: disk.obsidian_vault_path,
+        tts_voice: disk.tts_voice,
+        quick_ask_shortcut: disk.quick_ask_shortcut,
+        voice_shortcut: disk.voice_shortcut,
     }
 }
 
@@ -252,6 +276,9 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         god_mode_tier: config.god_mode_tier.clone(),
         voice_mode: config.voice_mode.clone(),
         obsidian_vault_path: config.obsidian_vault_path.clone(),
+        tts_voice: config.tts_voice.clone(),
+        quick_ask_shortcut: config.quick_ask_shortcut.clone(),
+        voice_shortcut: config.voice_shortcut.clone(),
         api_key: None,
     };
 
