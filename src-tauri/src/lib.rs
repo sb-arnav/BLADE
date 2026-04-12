@@ -52,6 +52,7 @@ mod trace;
 mod tray;
 mod ui_automation;
 mod voice;
+mod voice_global;
 mod voice_local;
 
 use chrono::Timelike;
@@ -83,6 +84,113 @@ pub(crate) fn toggle_quickask(app: &tauri::AppHandle) {
             let _ = window.set_focus();
         }
     }
+}
+
+/// Parse a human-readable shortcut string into a Tauri Shortcut.
+/// Supported format: "Modifier+Modifier+Key", e.g. "Ctrl+Shift+V", "Alt+Space"
+fn parse_shortcut(s: &str) -> Option<Shortcut> {
+    let parts: Vec<&str> = s.split('+').collect();
+    let mut mods = Modifiers::empty();
+    let mut key_code: Option<Code> = None;
+
+    for part in &parts {
+        match part.trim().to_lowercase().as_str() {
+            "ctrl" | "control" => mods |= Modifiers::CONTROL,
+            "shift" => mods |= Modifiers::SHIFT,
+            "alt" | "option" => mods |= Modifiers::ALT,
+            "super" | "meta" | "cmd" | "command" => mods |= Modifiers::SUPER,
+            key => {
+                key_code = match key {
+                    "space" => Some(Code::Space),
+                    "enter" | "return" => Some(Code::Enter),
+                    "escape" | "esc" => Some(Code::Escape),
+                    "tab" => Some(Code::Tab),
+                    "backspace" => Some(Code::Backspace),
+                    "delete" => Some(Code::Delete),
+                    "a" => Some(Code::KeyA), "b" => Some(Code::KeyB),
+                    "c" => Some(Code::KeyC), "d" => Some(Code::KeyD),
+                    "e" => Some(Code::KeyE), "f" => Some(Code::KeyF),
+                    "g" => Some(Code::KeyG), "h" => Some(Code::KeyH),
+                    "i" => Some(Code::KeyI), "j" => Some(Code::KeyJ),
+                    "k" => Some(Code::KeyK), "l" => Some(Code::KeyL),
+                    "m" => Some(Code::KeyM), "n" => Some(Code::KeyN),
+                    "o" => Some(Code::KeyO), "p" => Some(Code::KeyP),
+                    "q" => Some(Code::KeyQ), "r" => Some(Code::KeyR),
+                    "s" => Some(Code::KeyS), "t" => Some(Code::KeyT),
+                    "u" => Some(Code::KeyU), "v" => Some(Code::KeyV),
+                    "w" => Some(Code::KeyW), "x" => Some(Code::KeyX),
+                    "y" => Some(Code::KeyY), "z" => Some(Code::KeyZ),
+                    "0" => Some(Code::Digit0), "1" => Some(Code::Digit1),
+                    "2" => Some(Code::Digit2), "3" => Some(Code::Digit3),
+                    "4" => Some(Code::Digit4), "5" => Some(Code::Digit5),
+                    "6" => Some(Code::Digit6), "7" => Some(Code::Digit7),
+                    "8" => Some(Code::Digit8), "9" => Some(Code::Digit9),
+                    "f1" => Some(Code::F1), "f2" => Some(Code::F2),
+                    "f3" => Some(Code::F3), "f4" => Some(Code::F4),
+                    "f5" => Some(Code::F5), "f6" => Some(Code::F6),
+                    "f7" => Some(Code::F7), "f8" => Some(Code::F8),
+                    "f9" => Some(Code::F9), "f10" => Some(Code::F10),
+                    "f11" => Some(Code::F11), "f12" => Some(Code::F12),
+                    _ => None,
+                };
+            }
+        }
+    }
+
+    let code = key_code?;
+    let modifiers = if mods.is_empty() { None } else { Some(mods) };
+    Some(Shortcut::new(modifiers, code))
+}
+
+/// Register all global shortcuts from config. Call on startup and after config change.
+fn register_all_shortcuts(app: &tauri::AppHandle) -> Result<(), tauri::Error> {
+    let config = crate::config::load_config();
+
+    // Quick Ask shortcut
+    let qa_shortcut = parse_shortcut(&config.quick_ask_shortcut)
+        .unwrap_or_else(|| Shortcut::new(Some(Modifiers::ALT), Code::Space));
+    let qa_handle = app.clone();
+    let _ = app.global_shortcut().on_shortcut(qa_shortcut, move |_app, _sc, _ev| {
+        toggle_quickask(&qa_handle);
+    });
+
+    // Voice input shortcut
+    let voice_shortcut = parse_shortcut(&config.voice_shortcut)
+        .unwrap_or_else(|| Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyV));
+    let voice_handle = app.clone();
+    let _ = app.global_shortcut().on_shortcut(voice_shortcut, move |_app, _sc, _ev| {
+        voice_global::toggle_voice_input(&voice_handle);
+    });
+
+    Ok(())
+}
+
+/// Tauri command: update a specific shortcut and re-register all shortcuts.
+#[tauri::command]
+fn update_shortcuts(
+    app: tauri::AppHandle,
+    quick_ask: Option<String>,
+    voice: Option<String>,
+) -> Result<(), String> {
+    let mut config = crate::config::load_config();
+    if let Some(s) = quick_ask { config.quick_ask_shortcut = s; }
+    if let Some(s) = voice { config.voice_shortcut = s; }
+
+    // Validate both shortcuts parse before saving
+    if parse_shortcut(&config.quick_ask_shortcut).is_none() {
+        return Err(format!("Invalid shortcut: {}", config.quick_ask_shortcut));
+    }
+    if parse_shortcut(&config.voice_shortcut).is_none() {
+        return Err(format!("Invalid shortcut: {}", config.voice_shortcut));
+    }
+
+    crate::config::save_config(&config).map_err(|e| e.to_string())?;
+
+    // Unregister all and re-register with new values
+    let _ = app.global_shortcut().unregister_all();
+    register_all_shortcuts(&app).map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -414,6 +522,8 @@ pub fn run() {
             tts::tts_speak,
             tts::tts_stop,
             tts::tts_available,
+            tts::tts_list_voices,
+            update_shortcuts,
             discord::discord_connect,
             discord::discord_disconnect,
             discord::discord_status,
@@ -584,14 +694,8 @@ pub fn run() {
             // Start reminder loop — checks every 30s for due reminders
             reminders::start_reminder_loop(app.handle().clone());
 
-            // Alt+Space → toggle Quick Ask floating widget
-            let handle = app.handle().clone();
-            let _ = app.global_shortcut().on_shortcut(
-                Shortcut::new(Some(Modifiers::ALT), Code::Space),
-                move |_app, _shortcut, _event| {
-                    toggle_quickask(&handle);
-                },
-            );
+            // Register shortcuts from config (or defaults)
+            register_all_shortcuts(app)?;
 
             tray::create_tray(app)?;
 

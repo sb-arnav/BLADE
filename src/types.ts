@@ -29,6 +29,9 @@ export interface BladeConfig {
   god_mode_tier?: string; // "normal" | "intermediate" | "extreme"
   voice_mode?: string;    // "off" | "push-to-talk" | "always-on"
   obsidian_vault_path?: string;
+  tts_voice?: string;
+  quick_ask_shortcut?: string;
+  voice_shortcut?: string;
 }
 
 export interface ConversationSummary {

@@ -416,6 +416,9 @@ pub fn set_config(
     god_mode_tier: Option<String>,
     voice_mode: Option<String>,
     obsidian_vault_path: Option<String>,
+    tts_voice: Option<String>,
+    quick_ask_shortcut: Option<String>,
+    voice_shortcut: Option<String>,
 ) -> Result<(), String> {
     let mut config = load_config();
     config.provider = provider;
@@ -432,6 +435,9 @@ pub fn set_config(
     if let Some(v) = god_mode_tier { config.god_mode_tier = v; }
     if let Some(v) = voice_mode { config.voice_mode = v; }
     if let Some(v) = obsidian_vault_path { config.obsidian_vault_path = v; }
+    if let Some(v) = tts_voice { config.tts_voice = v; }
+    if let Some(v) = quick_ask_shortcut { config.quick_ask_shortcut = v; }
+    if let Some(v) = voice_shortcut { config.voice_shortcut = v; }
     save_config(&config)
 }
 
