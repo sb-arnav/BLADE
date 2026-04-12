@@ -37,8 +37,10 @@ fn looks_like_error(text: &str) -> bool {
 }
 
 pub fn start_ambient_monitor(app: tauri::AppHandle) {
-    // Detect multiple monitors immediately at startup
+    // Detect multiple monitors immediately at startup and on hot-plug changes
+    let mut last_monitor_count: usize = 0;
     if let Ok(monitors) = xcap::Monitor::all() {
+        last_monitor_count = monitors.len();
         if monitors.len() > 1 {
             let _ = app.emit("multiple_monitors_detected", serde_json::json!({
                 "count": monitors.len(),
@@ -59,10 +61,40 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
         let mut session_start = std::time::Instant::now();
         let mut long_session_nudged = false;
         let mut stale_thread_nudged = false;
+        let mut monitor_count = last_monitor_count;
 
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
             tick += 1;
+
+            // Hot-plug monitor detection — fire whenever count changes
+            if let Ok(monitors) = xcap::Monitor::all() {
+                let new_count = monitors.len();
+                if new_count != monitor_count {
+                    if new_count > monitor_count && new_count > 1 {
+                        // New monitor connected
+                        let _ = app.emit("multiple_monitors_detected", serde_json::json!({
+                            "count": new_count,
+                            "message": format!(
+                                "New monitor detected ({} total). Want me to move to it? I'll stay there and watch your main screen for you.",
+                                new_count
+                            )
+                        }));
+                    } else if new_count < monitor_count {
+                        // Monitor disconnected — if BLADE was on it, clear the dedicated setting
+                        let config = crate::config::load_config();
+                        if config.blade_dedicated_monitor >= new_count as i32 {
+                            let mut cfg = config;
+                            cfg.blade_dedicated_monitor = -1;
+                            let _ = crate::config::save_config(&cfg);
+                        }
+                        let _ = app.emit("monitor_disconnected", serde_json::json!({
+                            "count": new_count
+                        }));
+                    }
+                    monitor_count = new_count;
+                }
+            }
 
             // Proactively detect errors in clipboard — nudge if BLADE sees something new
             if let Ok(mut clipboard) = arboard::Clipboard::new() {

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, type CSSProperties, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { AgentPixelWorld } from "./AgentPixelWorld";
 
 interface EvolutionLevel {
   level: number;
@@ -561,12 +562,9 @@ export function Dashboard({ onBack, onNavigate }: Props) {
           </div>
 
           <SectionFrame title={`ACTIVE AGENTS [${data.agents.length}]`}>
-            {data.agents.length === 0 ? (
-              <div className="text-[11px] uppercase tracking-[0.16em]" style={{ color: palette.muted }}>
-                No agents running. Launch a swarm or spawn a background agent.
-              </div>
-            ) : (
-              <div className="border" style={{ borderColor: palette.line, backgroundColor: "rgba(0, 0, 0, 0.22)" }}>
+            <AgentPixelWorld agents={data.agents} height={120} />
+            {data.agents.length > 0 && (
+              <div className="mt-3 border" style={{ borderColor: palette.line, backgroundColor: "rgba(0, 0, 0, 0.22)" }}>
                 <div
                   className="grid grid-cols-[5rem_minmax(0,1fr)_6.5rem] gap-3 border-b px-2 py-2 text-[10px] font-bold uppercase tracking-[0.24em]"
                   style={{ borderColor: palette.line, color: palette.amber }}

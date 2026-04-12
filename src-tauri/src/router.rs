@@ -144,6 +144,14 @@ pub fn suggest_model(provider: &str, task: &TaskType) -> Option<String> {
             TaskType::Vision => Some("gemini-2.0-flash".to_string()),
             TaskType::Creative => Some("gemini-2.5-pro-preview-06-05".to_string()),
         },
+        // Ollama: prefer Hermes 3 for tool-heavy tasks (it has native function-calling training)
+        // and a lighter model for simple queries. Falls back to whatever the user set if unknown.
+        "ollama" => match task {
+            TaskType::Code | TaskType::Complex => Some("hermes3".to_string()),
+            TaskType::Simple => Some("hermes3".to_string()),
+            TaskType::Creative => Some("hermes3".to_string()),
+            TaskType::Vision => None, // Vision varies too much; use user's configured model
+        },
         _ => None,
     }
 }

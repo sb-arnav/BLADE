@@ -42,6 +42,7 @@ const TemplateManager = lazy(() => import("./components/TemplateManager"));
 const Terminal = lazy(() => import("./components/Terminal").then((m) => ({ default: m.Terminal })));
 const ThemePicker = lazy(() => import("./components/ThemePicker").then((m) => ({ default: m.ThemePicker })));
 const ShortcutHelp = lazy(() => import("./components/ShortcutHelp"));
+const BranchNavigator = lazy(() => import("./components/BranchNavigator"));
 const WorkflowBuilder = lazy(() => import("./components/WorkflowBuilder"));
 const EmailAssistant = lazy(() => import("./components/EmailAssistant").then((m) => ({ default: m.EmailAssistant })));
 const DocumentGenerator = lazy(() => import("./components/DocumentGenerator"));
@@ -127,6 +128,7 @@ export default function App() {
   const [templateManagerOpen, setTemplateManagerOpen] = useState(false);
   const [themePickerOpen, setThemePickerOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
+  const [branchOpen, setBranchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [workspaceIntent, setWorkspaceIntent] = useState<{ route: Route; title: string; note: string } | null>(null);
@@ -265,13 +267,19 @@ export default function App() {
     }
   }, [proactive.suggestions.length]);
 
-  // Multi-monitor detection
+  // Multi-monitor detection — offer to claim the second screen as BLADE's JARVIS display
   useEffect(() => {
     const unlisten = listen<{ count: number; message: string }>("multiple_monitors_detected", (event) => {
       notifications.add({
         type: "info",
         title: `${event.payload.count} monitors detected`,
         message: event.payload.message,
+        action: {
+          label: "Claim Monitor 2 →",
+          callback: () => {
+            invoke("move_to_monitor", { monitorIndex: 1 }).catch(() => {});
+          },
+        },
       });
       if (tts.enabled) tts.speak(event.payload.message);
     });
@@ -446,6 +454,86 @@ export default function App() {
       });
     });
 
+    // Provider fallback notification — emitted when BLADE auto-switches to fallback provider
+    const unlistenFallback = listen<{ type: string; message: string }>("blade_notification", (event) => {
+      notifications.add({ type: event.payload.type as "info" | "success" | "error", title: "BLADE", message: event.payload.message });
+    });
+
+    // Monitor disconnected — clear dedicated monitor setting notification
+    const unlistenMonitorOff = listen<{ count: number }>("monitor_disconnected", (event) => {
+      notifications.add({ type: "info", title: "Monitor disconnected", message: `Down to ${event.payload.count} monitor${event.payload.count !== 1 ? "s" : ""}. Dedicated screen cleared.` });
+    });
+
+    // JITRO — self-coding started
+    const unlistenSelfCode = listen<{ agent_id: string; feature: string; source_path: string }>(
+      "blade_self_code_started",
+      (event) => {
+        notifications.add({
+          type: "info",
+          title: "BLADE is coding itself",
+          message: `Working on: "${event.payload.feature.slice(0, 80)}" — Agent ${event.payload.agent_id.slice(0, 8)}`,
+          action: { label: "Watch agents", callback: () => openRoute("bg-agents") },
+        });
+      }
+    );
+
+    // Clipboard pre-analysis ready — subtle indicator that BLADE already has the answer
+    const unlistenClipPrefetch = listen<{ content_type: string; preview: string }>(
+      "clipboard_prefetch_ready",
+      (event) => {
+        const { content_type, preview } = event.payload;
+        const label = content_type === "error" ? "error" : content_type === "code" ? "code snippet" : "content";
+        notifications.add({
+          type: "info",
+          title: "Ready to help",
+          message: `Pre-analyzed ${label}: "${preview.slice(0, 60)}…" — ask me about it`,
+          action: { label: "Ask now", callback: () => sendWithStats(`What do you make of what I just copied?`) },
+        });
+      }
+    );
+
+    // AI delegate decisions — show brief notification when Claude Code approves/denies for BLADE
+    const unlistenDelegateApproved = listen<{ tool: string; delegate: string; reasoning: string }>(
+      "ai_delegate_approved",
+      (event) => {
+        notifications.add({
+          type: "info",
+          title: `${event.payload.delegate} approved`,
+          message: `Approved "${event.payload.tool}": ${event.payload.reasoning.slice(0, 80)}`,
+        });
+      }
+    );
+    const unlistenDelegateDenied = listen<{ tool: string; delegate: string; reasoning: string }>(
+      "ai_delegate_denied",
+      (event) => {
+        notifications.add({
+          type: "warning",
+          title: `${event.payload.delegate} denied action`,
+          message: `Blocked "${event.payload.tool}": ${event.payload.reasoning.slice(0, 80)}`,
+        });
+      }
+    );
+
+    // Smart interrupt — user stuck on same error for 5+ minutes
+    const unlistenSmartInterrupt = listen<{ error_preview: string; elapsed_minutes: number; suggested_prompt: string }>(
+      "smart_interrupt",
+      (event) => {
+        const { elapsed_minutes, suggested_prompt } = event.payload;
+        notifications.add({
+          type: "warning",
+          title: `Stuck for ${elapsed_minutes}m — want help?`,
+          message: "BLADE noticed the same error is still in your environment. Click to ask now.",
+          action: {
+            label: "Debug it",
+            callback: () => {
+              openRoute("chat");
+              sendWithStats(suggested_prompt);
+            },
+          },
+        });
+      }
+    );
+
     return () => {
       unlisten.then((fn) => fn());
       unlistenBriefing.then((fn) => fn());
@@ -459,6 +547,13 @@ export default function App() {
       unlistenWakeWord.then((fn) => fn());
       unlistenAutoskillInstalled.then((fn) => fn());
       unlistenAutoskillSuggestion.then((fn) => fn());
+      unlistenFallback.then((fn) => fn());
+      unlistenMonitorOff.then((fn) => fn());
+      unlistenSelfCode.then((fn) => fn());
+      unlistenClipPrefetch.then((fn) => fn());
+      unlistenDelegateApproved.then((fn) => fn());
+      unlistenDelegateDenied.then((fn) => fn());
+      unlistenSmartInterrupt.then((fn) => fn());
     };
   }, [tts.enabled]);
 
@@ -600,9 +695,24 @@ export default function App() {
       case "focus": setFocusMode(true); break;
       case "export": copyConversation(chat.messages, chat.currentConversation?.title); break;
       case "help": setShortcutHelpOpen(true); break;
+      case "memory":
+        chat.sendMessage("Search my memory and tell me the 5 most interesting things you know about me, my projects, and my recent work. Be specific.");
+        break;
+      case "research":
+        chat.sendMessage("Enter deep research mode. For the next question I ask, break it into sub-questions, search each one thoroughly, then synthesize a comprehensive answer with sources.");
+        break;
+      case "think":
+        chat.sendMessage("Think deeply and carefully about the last message in our conversation. Show your reasoning step by step before giving your final answer.");
+        break;
+      case "swarm":
+        openRoute("agents");
+        break;
+      case "timeline":
+        openRoute("screen-timeline");
+        break;
     }
     activity.track("message", `Slash command: /${action}`, "");
-  }, [chat, activity]);
+  }, [chat, activity, openRoute]);
 
   const sendWithStats = useCallback((content: string, imageBase64?: string) => {
     recordMessage();
@@ -635,7 +745,7 @@ export default function App() {
   useKeyboard({
     onNewConversation: () => chat.newConversation(),
     onSettings: () => setRoute((r) => r === "settings" ? "chat" : "settings"),
-    onToggleSidebar: undefined,
+    onToggleSidebar: () => setBranchOpen((p) => !p),
     onFocusInput: () => inputRef.current?.focus(),
     onPalette: () => setPaletteOpen((p) => !p),
     onEscape: paletteOpen ? () => setPaletteOpen(false) : shortcutHelpOpen ? () => setShortcutHelpOpen(false) : notificationsOpen ? () => setNotificationsOpen(false) : undefined,
@@ -667,10 +777,12 @@ export default function App() {
     { id: "reports", label: "Open capability reports", description: "Review what Blade could not do and why", section: "Knowledge", action: () => openRoute("reports") },
     { id: "dashboard", label: "Open BLADE dashboard", description: "Mission control — status, agents, memory, cron, evolution at a glance", section: "Knowledge", action: () => openRoute("dashboard") },
     { id: "skill-packs", label: "Install skill packs", description: "Browse and install domain MCP tools for your active role", section: "Knowledge", action: () => openRoute("skill-packs") },
+    { id: "self-code", label: "Code a new BLADE feature (JITRO)", description: "Ask BLADE to add a feature to itself using Claude Code on its own source", section: "Knowledge", action: () => { const f = prompt("What feature should BLADE add to itself?"); if (f) invoke("blade_self_code", { feature: f }).then(() => notifications.add({ type: "success", title: "BLADE is coding itself", message: `Claude Code is working on: ${f.slice(0, 60)}` })).catch((e: unknown) => notifications.add({ type: "error", title: "Self-code failed", message: String(e) })); } },
     { id: "analytics", label: "Open analytics", description: "Inspect activity and usage trends", section: "Knowledge", action: () => openRoute("analytics") },
     { id: "activity", label: "Open activity feed", description: "See recent events across the app", section: "Knowledge", action: () => openRoute("activity") },
     { id: "comparison", label: "Compare models", description: "Inspect model behavior side by side", section: "Knowledge", action: () => openRoute("comparison") },
     { id: "insights", label: "Show conversation insights", description: "Surface metadata and patterns from the current thread", section: "Knowledge", action: () => setInsightsOpen(true) },
+    { id: "branches", label: "Conversation branches", description: "Fork the conversation and explore alternate paths", section: "Chat Core", shortcut: "Ctrl+B", action: () => setBranchOpen(true) },
 
     { id: "obsidian-daily", label: "Open today's Obsidian note", description: "Create or open today's daily note in your vault", section: "Knowledge", action: () => invoke("obsidian_ensure_daily_note").catch(() => {}) },
     { id: "obsidian-save", label: "Save conversation to Obsidian", description: "Write a summary of this conversation to your vault", section: "Knowledge", action: async () => {
@@ -833,6 +945,17 @@ export default function App() {
         <TemplateManager open={templateManagerOpen} onClose={() => setTemplateManagerOpen(false)} onUseTemplate={(content: string) => { sendWithStats(content); setTemplateManagerOpen(false); }} />
         <ThemePicker open={themePickerOpen} onClose={() => setThemePickerOpen(false)} />
         <ConversationInsightsPanel messages={chat.messages} open={insightsOpen} onClose={() => setInsightsOpen(false)} />
+        {chat.currentConversationId && (
+          <BranchNavigator
+            conversationId={chat.currentConversationId}
+            open={branchOpen}
+            onClose={() => setBranchOpen(false)}
+            onBranchSwitch={(_messages) => {
+              // Branch switching is handled by the BranchNavigator's internal hook state
+              setBranchOpen(false);
+            }}
+          />
+        )}
       </Suspense>
       <NotificationCenter
         open={notificationsOpen}
@@ -949,6 +1072,7 @@ export default function App() {
               onVoiceDraftConsumed={() => setVoiceDraft(null)}
               voiceModeOnPttDown={voiceMode.onPttMouseDown}
               voiceModeOnPttUp={voiceMode.onPttMouseUp}
+              thinkingText={chat.thinkingText}
             />
           )}
         </Suspense>

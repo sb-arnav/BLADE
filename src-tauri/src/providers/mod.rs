@@ -132,6 +132,23 @@ pub async fn stream_text(
     }
 }
 
+/// Stream with extended thinking (Claude only). Falls back to regular stream for other providers.
+pub async fn stream_text_thinking(
+    app: &tauri::AppHandle,
+    provider: &str,
+    api_key: &str,
+    model: &str,
+    messages: &[ConversationMessage],
+    budget_tokens: u32,
+) -> Result<(), String> {
+    if provider == "anthropic" {
+        anthropic::stream_text_with_thinking(app, api_key, model, messages, budget_tokens).await
+    } else {
+        // Other providers: regular stream (no thinking support yet)
+        stream_text(app, provider, api_key, model, messages, None).await
+    }
+}
+
 pub async fn test_connection(provider: &str, api_key: &str, model: &str, base_url: Option<&str>) -> Result<String, String> {
     if base_url.is_some() && provider != "ollama" {
         return openai::test(api_key, model, base_url).await;

@@ -204,6 +204,59 @@ Respond ONLY with a JSON array of objects:
     Ok(written)
 }
 
+/// Generate a behavioral rule immediately from a single disliked message.
+/// Called on 👎 without waiting for batch consolidation.
+#[tauri::command]
+pub async fn reaction_instant_rule(message_content: String) -> Result<String, String> {
+    let config = load_config();
+    if config.api_key.is_empty() && config.provider != "ollama" {
+        return Err("No API key".to_string());
+    }
+
+    let preview = &message_content[..message_content.len().min(400)];
+    let prompt = format!(
+        r#"A user just gave a thumbs-down to this AI response:
+
+---
+{preview}
+---
+
+In one sentence, write a specific behavioral rule to prevent this kind of response in the future.
+Format: "Do not [specific thing]" or "Always [specific thing instead]".
+Be concrete, not vague. Output ONLY the rule, nothing else."#
+    );
+
+    let messages = vec![ConversationMessage::User(prompt)];
+    let model = match config.provider.as_str() {
+        "anthropic" => "claude-haiku-4-5-20251001".to_string(),
+        "openai" => "gpt-4o-mini".to_string(),
+        "gemini" => "gemini-2.0-flash".to_string(),
+        "groq" => "llama-3.1-8b-instant".to_string(),
+        _ => config.model.clone(),
+    };
+
+    let turn = providers::complete_turn(
+        &config.provider,
+        &config.api_key,
+        &model,
+        &messages,
+        &[],
+        config.base_url.as_deref(),
+    )
+    .await?;
+
+    let rule = turn.content.trim().to_string();
+
+    // Persist rule as a high-confidence preference
+    let db_path = blade_config_dir().join("blade.db");
+    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+        let id = format!("pref-instant-{}", uuid::Uuid::new_v4());
+        let _ = crate::db::brain_upsert_preference(&conn, &id, &rule, 0.92, "instant_reaction");
+    }
+
+    Ok(rule)
+}
+
 #[tauri::command]
 pub fn get_character_bible() -> CharacterBible {
     load_bible()

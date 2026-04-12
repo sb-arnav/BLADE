@@ -32,6 +32,13 @@ export interface BladeConfig {
   tts_voice?: string;
   quick_ask_shortcut?: string;
   voice_shortcut?: string;
+  screen_timeline_enabled?: boolean;
+  timeline_capture_interval?: number;
+  timeline_retention_days?: number;
+  wake_word_enabled?: boolean;
+  blade_source_path?: string;
+  blade_dedicated_monitor?: number;
+  trusted_ai_delegate?: string;
 }
 
 export interface ConversationSummary {

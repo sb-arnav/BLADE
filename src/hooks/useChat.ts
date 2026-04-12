@@ -17,6 +17,7 @@ export function useChat() {
   const [clipboardText, setClipboardText] = useState<string | null>(null);
   const [pendingApproval, setPendingApproval] = useState<ToolApprovalRequest | null>(null);
   const [lastResponseTime, setLastResponseTime] = useState<number | null>(null);
+  const [thinkingText, setThinkingText] = useState<string | null>(null);
   const streamBuffer = useRef("");
   const requestStartRef = useRef<number>(0);
   const messagesRef = useRef<Message[]>([]);
@@ -110,6 +111,7 @@ export function useChat() {
       }
       setLoading(false);
       setToolExecutions([]);
+      setThinkingText(null);
 
       // Fire-and-forget: let the backend learn from the completed conversation
       invoke("learn_from_conversation", { messages: messagesRef.current }).catch(() => {});
@@ -157,6 +159,18 @@ export function useChat() {
       setPendingApproval(event.payload);
     });
 
+    // Extended thinking events from Anthropic
+    const thinkingBuffer = { current: "" };
+    const unlistenThinking = listen<string>("chat_thinking", (event) => {
+      if (!active) return;
+      thinkingBuffer.current += event.payload;
+      setThinkingText(thinkingBuffer.current);
+    });
+    const unlistenThinkingDone = listen("chat_thinking_done", () => {
+      if (!active) return;
+      thinkingBuffer.current = "";
+    });
+
     const unlistenClipboard = listen<string>("clipboard_changed", (event) => {
       const text = event.payload?.trim();
       if (text && text.length > 10 && text.length < 5000) {
@@ -168,6 +182,8 @@ export function useChat() {
       active = false;
       unlistenToken.then((fn) => fn());
       unlistenDone.then((fn) => fn());
+      unlistenThinking.then((fn) => fn());
+      unlistenThinkingDone.then((fn) => fn());
       unlistenToolExecuting.then((fn) => fn());
       unlistenToolCompleted.then((fn) => fn());
       unlistenApproval.then((fn) => fn());
@@ -331,6 +347,7 @@ export function useChat() {
     currentConversationId,
     currentConversation,
     lastResponseTime,
+    thinkingText,
     sendMessage,
     retryLastMessage,
     clearMessages,

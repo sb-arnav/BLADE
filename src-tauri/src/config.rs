@@ -7,6 +7,31 @@ use std::path::PathBuf;
 
 const KEYRING_SERVICE: &str = "blade-ai";
 
+/// Per-task-type provider routing.
+/// Each field is an optional provider name override — if set and the provider has a stored key,
+/// requests of that type use that provider. Otherwise falls back to the active provider.
+///
+/// This lets BLADE use Groq for quick replies, Anthropic for code, and Gemini for vision
+/// while feeling like one unified brain (the system prompt / soul is injected regardless).
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TaskRouting {
+    /// Provider for code tasks (code gen, debugging, refactoring)
+    #[serde(default)]
+    pub code: Option<String>,
+    /// Provider for vision tasks (screenshots, images)
+    #[serde(default)]
+    pub vision: Option<String>,
+    /// Provider for fast/simple tasks (one-liner answers, classification)
+    #[serde(default)]
+    pub fast: Option<String>,
+    /// Provider for creative tasks (writing, brainstorming)
+    #[serde(default)]
+    pub creative: Option<String>,
+    /// Fallback provider when the primary fails (rate limit, outage, quota)
+    #[serde(default)]
+    pub fallback: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SavedMcpServerConfig {
     pub name: String,
@@ -75,6 +100,14 @@ struct DiskConfig {
     wake_word_sensitivity: u8,
     #[serde(default = "default_active_role")]
     active_role: String,
+    #[serde(default)]
+    blade_source_path: String,
+    #[serde(default)]
+    trusted_ai_delegate: String,  // "claude-code" | "none" | ""
+    #[serde(default = "default_dedicated_monitor")]
+    blade_dedicated_monitor: i32,
+    #[serde(default)]
+    task_routing: TaskRouting,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -90,6 +123,7 @@ fn default_timeline_retention() -> u32 { 14 }
 fn default_wake_word_phrase() -> String { "hey blade".to_string() }
 fn default_wake_word_sensitivity() -> u8 { 3 }
 fn default_active_role() -> String { "engineering".to_string() }
+fn default_dedicated_monitor() -> i32 { -1 }
 
 impl Default for DiskConfig {
     fn default() -> Self {
@@ -119,6 +153,10 @@ impl Default for DiskConfig {
             wake_word_phrase: "hey blade".to_string(),
             wake_word_sensitivity: 3,
             active_role: "engineering".to_string(),
+            blade_source_path: String::new(),
+            trusted_ai_delegate: String::new(),
+            blade_dedicated_monitor: -1,
+            task_routing: TaskRouting::default(),
             api_key: None,
         }
     }
@@ -175,6 +213,14 @@ pub struct BladeConfig {
     pub wake_word_sensitivity: u8,
     #[serde(default = "default_active_role")]
     pub active_role: String,
+    #[serde(default)]
+    pub blade_source_path: String,
+    #[serde(default)]
+    pub trusted_ai_delegate: String,
+    #[serde(default = "default_dedicated_monitor")]
+    pub blade_dedicated_monitor: i32,
+    #[serde(default)]
+    pub task_routing: TaskRouting,
 }
 
 impl BladeConfig {
@@ -212,6 +258,10 @@ impl Default for BladeConfig {
             wake_word_phrase: "hey blade".to_string(),
             wake_word_sensitivity: 3,
             active_role: "engineering".to_string(),
+            blade_source_path: String::new(),
+            trusted_ai_delegate: String::new(),
+            blade_dedicated_monitor: -1,
+            task_routing: TaskRouting::default(),
         }
     }
 }
@@ -307,6 +357,10 @@ pub fn load_config() -> BladeConfig {
         wake_word_phrase: disk.wake_word_phrase,
         wake_word_sensitivity: disk.wake_word_sensitivity,
         active_role: disk.active_role,
+        blade_source_path: disk.blade_source_path,
+        trusted_ai_delegate: disk.trusted_ai_delegate,
+        blade_dedicated_monitor: disk.blade_dedicated_monitor,
+        task_routing: disk.task_routing,
     }
 }
 
@@ -340,6 +394,10 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         wake_word_phrase: config.wake_word_phrase.clone(),
         wake_word_sensitivity: config.wake_word_sensitivity,
         active_role: config.active_role.clone(),
+        blade_source_path: config.blade_source_path.clone(),
+        trusted_ai_delegate: config.trusted_ai_delegate.clone(),
+        blade_dedicated_monitor: config.blade_dedicated_monitor,
+        task_routing: config.task_routing.clone(),
         api_key: None,
     };
 
@@ -431,6 +489,82 @@ pub fn switch_provider(provider: String, model: Option<String>) -> Result<BladeC
     }
     save_config(&config)?;
     Ok(config)
+}
+
+/// Get a stored API key for any provider without switching to it.
+/// Used by the routing system to check if a provider has a key before routing to it.
+pub(crate) fn get_provider_key(provider: &str) -> String {
+    get_api_key_from_keyring(provider)
+}
+
+/// Resolve the best (provider, api_key, model) triple for a given task type.
+///
+/// Priority:
+///   1. Task-specific routing override (if set AND has a stored key)
+///   2. Active provider
+///
+/// The brain/soul system prompt is injected regardless — BLADE stays coherent
+/// no matter which model handles the request.
+pub fn resolve_provider_for_task(
+    config: &BladeConfig,
+    task_type: &crate::router::TaskType,
+) -> (String, String, String) {
+    use crate::router::TaskType;
+
+    let preferred = match task_type {
+        TaskType::Code => config.task_routing.code.as_deref(),
+        TaskType::Vision => config.task_routing.vision.as_deref(),
+        TaskType::Simple => config.task_routing.fast.as_deref(),
+        TaskType::Creative => config.task_routing.creative.as_deref(),
+        TaskType::Complex => None, // complex always goes to active provider (usually the best one)
+    };
+
+    if let Some(prov) = preferred {
+        if prov != config.provider {
+            let key = get_api_key_from_keyring(prov);
+            if !key.is_empty() || prov == "ollama" {
+                let model = crate::router::suggest_model(prov, task_type)
+                    .unwrap_or_else(|| config.model.clone());
+                return (prov.to_string(), key, model);
+            }
+        }
+    }
+
+    // Default: use active provider with task-appropriate model
+    let model = crate::router::suggest_model(&config.provider, task_type)
+        .unwrap_or_else(|| config.model.clone());
+    (config.provider.clone(), config.api_key.clone(), model)
+}
+
+/// Get the stored routing config.
+#[tauri::command]
+pub fn get_task_routing() -> TaskRouting {
+    load_config().task_routing
+}
+
+/// Save routing preferences.
+#[tauri::command]
+pub fn set_task_routing(routing: TaskRouting) -> Result<(), String> {
+    let mut config = load_config();
+    config.task_routing = routing;
+    save_config(&config)
+}
+
+/// Generic single-field config updater for simple string settings.
+/// Avoids round-tripping the full config just to change one path/flag.
+#[tauri::command]
+pub fn save_config_field(key: String, value: String) -> Result<(), String> {
+    let mut config = load_config();
+    match key.as_str() {
+        "blade_source_path" => config.blade_source_path = value,
+        "user_name" => config.user_name = value,
+        "obsidian_vault_path" => config.obsidian_vault_path = value,
+        "work_mode" => config.work_mode = value,
+        "response_style" => config.response_style = value,
+        "trusted_ai_delegate" => config.trusted_ai_delegate = value,
+        _ => return Err(format!("Unknown config field: {}", key)),
+    }
+    save_config(&config)
 }
 
 pub fn update_window_state(window_state: WindowState) -> Result<(), String> {

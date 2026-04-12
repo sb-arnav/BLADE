@@ -241,6 +241,109 @@ pub async fn stream_text(
     Ok(())
 }
 
+/// Stream with extended thinking enabled — Claude reasons before responding.
+/// Emits `chat_thinking` events with thinking text and `chat_token` with the final answer.
+pub async fn stream_text_with_thinking(
+    app: &tauri::AppHandle,
+    api_key: &str,
+    model: &str,
+    messages: &[ConversationMessage],
+    budget_tokens: u32,
+) -> Result<(), String> {
+    use futures::StreamExt;
+    use tauri::Emitter;
+
+    let client = Client::new();
+    let system = messages.iter().find_map(|m| match m {
+        ConversationMessage::System(c) => Some(c.clone()),
+        _ => None,
+    });
+    let msgs: Vec<serde_json::Value> = messages.iter().filter_map(serialize_simple).collect();
+
+    // Extended thinking requires max_tokens > budget_tokens
+    let max_tokens = (budget_tokens + 4096).max(8192);
+
+    let mut body = serde_json::json!({
+        "model": model,
+        "max_tokens": max_tokens,
+        "thinking": {
+            "type": "enabled",
+            "budget_tokens": budget_tokens
+        },
+        "messages": msgs,
+        "stream": true
+    });
+    if let Some(sys) = system {
+        body["system"] = serde_json::Value::String(sys);
+    }
+
+    let response = client
+        .post("https://api.anthropic.com/v1/messages")
+        .header("x-api-key", api_key)
+        .header("anthropic-version", "2023-06-01")
+        .header("content-type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body_text = response.text().await.unwrap_or_default();
+        // If extended thinking isn't supported on this model, fall back to normal stream
+        if body_text.contains("thinking") || status.as_u16() == 400 {
+            return stream_text(app, api_key, model, messages).await;
+        }
+        return Err(format!("Anthropic API error {}: {}", status, body_text));
+    }
+
+    let mut stream = response.bytes_stream();
+    let mut buffer = String::new();
+    let mut in_thinking_block = false;
+
+    while let Some(chunk) = stream.next().await {
+        let bytes = chunk.map_err(|e| format!("Stream error: {}", e))?;
+        buffer.push_str(&String::from_utf8_lossy(&bytes));
+
+        while let Some(pos) = buffer.find('\n') {
+            let line = buffer[..pos].to_string();
+            buffer = buffer[pos + 1..].to_string();
+
+            if let Some(data) = line.strip_prefix("data: ") {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
+                    match json["type"].as_str().unwrap_or_default() {
+                        "content_block_start" => {
+                            in_thinking_block = json["content_block"]["type"].as_str() == Some("thinking");
+                        }
+                        "content_block_stop" => {
+                            if in_thinking_block {
+                                in_thinking_block = false;
+                                let _ = app.emit("chat_thinking_done", ());
+                            }
+                        }
+                        "content_block_delta" => {
+                            let delta_type = json["delta"]["type"].as_str().unwrap_or_default();
+                            if delta_type == "thinking_delta" {
+                                if let Some(text) = json["delta"]["thinking"].as_str() {
+                                    let _ = app.emit("chat_thinking", text);
+                                }
+                            } else if delta_type == "text_delta" {
+                                if let Some(text) = json["delta"]["text"].as_str() {
+                                    let _ = app.emit("chat_token", text);
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
+    let _ = app.emit("chat_done", ());
+    Ok(())
+}
+
 pub async fn test(api_key: &str, model: &str) -> Result<String, String> {
     let client = Client::new();
     let body = serde_json::json!({

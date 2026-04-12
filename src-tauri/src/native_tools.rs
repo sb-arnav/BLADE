@@ -173,11 +173,11 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: "blade_screenshot".to_string(),
-            description: "LAST RESORT: take a screenshot. Prefer blade_ui_read for native apps. Only use this for games, canvas apps, or when ui_read returns nothing useful.".to_string(),
+            description: "LAST RESORT: take a screenshot. Prefer blade_ui_read for native apps. Only use this for games, canvas apps, or when ui_read returns nothing useful. When omitted, automatically captures the user's monitor (not BLADE's dedicated monitor if one is set).".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
-                    "monitor": {"type": "integer", "description": "Monitor index (0 = primary, default 0)"}
+                    "monitor": {"type": "integer", "description": "Monitor index (0 = primary). Omit to auto-select the user's screen."}
                 }
             }),
         },
@@ -470,7 +470,18 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
             };
             let cwd = args["cwd"].as_str();
             let timeout_ms = args["timeout_ms"].as_u64().unwrap_or(BASH_TIMEOUT_MS);
-            bash(command, cwd, timeout_ms).await
+            let result = bash(command, cwd, timeout_ms).await;
+            // Pre-analyze failures in the background so BLADE has the fix ready before the user asks.
+            // Only kick off if output looks like a real error (not just a non-zero exit with empty stderr).
+            if result.1 {
+                let err_text = &result.0;
+                if err_text.contains("[stderr]") || err_text.len() > 50 {
+                    if let Some(app_handle) = app {
+                        crate::clipboard::prefetch_bash_failure(command, err_text, app_handle.clone());
+                    }
+                }
+            }
+            result
         }
         "blade_read_file" => {
             let path = match args["path"].as_str() {
@@ -563,7 +574,21 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
             open_url(url).await
         }
         "blade_screenshot" => {
-            let monitor_idx = args["monitor"].as_u64().unwrap_or(0) as usize;
+            // If a specific monitor was explicitly requested, use it.
+            // Otherwise, default to the user's monitor — when BLADE has a dedicated screen,
+            // it should be watching the user's screen, not its own.
+            let monitor_idx = if args["monitor"].is_null() {
+                let config = crate::config::load_config();
+                if config.blade_dedicated_monitor >= 0 {
+                    // BLADE is on monitor N → watch the user's monitor (0 if BLADE is on 1, else 1)
+                    let blade_mon = config.blade_dedicated_monitor as usize;
+                    if blade_mon == 0 { 1 } else { 0 }
+                } else {
+                    0
+                }
+            } else {
+                args["monitor"].as_u64().unwrap_or(0) as usize
+            };
             screenshot(monitor_idx).await
         }
         "blade_mouse" => {
@@ -1119,10 +1144,35 @@ async fn bash(command: &str, cwd: Option<&str>, timeout_ms: u64) -> (String, boo
             let mut extras = Vec::new();
             if let Some(hint) = memory_hint { extras.push(hint); }
             if let Some(hint) = upgrade_hint { extras.push(hint); }
-            if extras.is_empty() {
-                (text, code != 0)
+
+            // deepagents pattern: large outputs → temp file.
+            // If the combined output exceeds 8k chars, spill the full content to a temp file
+            // and return a compact summary + path. Prevents enormous tool results from bloating
+            // the context window (one long `npm install` stdout can eat 50k tokens).
+            const LARGE_OUTPUT_THRESHOLD: usize = 8_000;
+            let combined_text = if extras.is_empty() {
+                text
             } else {
-                (format!("{}\n\n{}", text, extras.join("\n\n")), code != 0)
+                format!("{}\n\n{}", text, extras.join("\n\n"))
+            };
+
+            if combined_text.len() > LARGE_OUTPUT_THRESHOLD {
+                let tmp_dir = std::env::temp_dir().join("blade_outputs");
+                let _ = std::fs::create_dir_all(&tmp_dir);
+                let fname = format!("output_{}.txt", chrono::Utc::now().timestamp_millis());
+                let tmp_path = tmp_dir.join(&fname);
+                if std::fs::write(&tmp_path, &combined_text).is_ok() {
+                    let path_str = tmp_path.to_string_lossy().to_string();
+                    let preview = &combined_text[..combined_text.len().min(1_500)];
+                    (format!(
+                        "{}\n\n[Output truncated — {} chars total. Full output saved to: {}]\n[Use blade_read_file to read it if needed]",
+                        preview, combined_text.len(), path_str
+                    ), code != 0)
+                } else {
+                    (combined_text, code != 0)
+                }
+            } else {
+                (combined_text, code != 0)
             }
         }
         Ok(Err(e)) => (format!("Command error: {}", e), true),
@@ -1346,6 +1396,17 @@ fn set_clipboard(text: &str) -> (String, bool) {
         Ok(_) => (format!("Copied {} chars to clipboard.", text.len()), false),
         Err(e) => (format!("Clipboard error: {}", e), true),
     }
+}
+
+/// Run a code block from the chat UI and return output as a string.
+/// Used by the "Run" button on code blocks.
+#[tauri::command]
+pub async fn run_code_block(command: String) -> Result<String, String> {
+    let (output, is_error) = bash(&command, None, 30_000).await;
+    if is_error && output.contains("not found") || output.contains("command not found") {
+        return Ok(format!("[Error] {}", output));
+    }
+    Ok(output)
 }
 
 async fn open_url(url: &str) -> (String, bool) {

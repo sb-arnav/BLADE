@@ -103,6 +103,10 @@ export default function MessageReactions({
           // Every 5 reactions, synthesize into behavioral preferences (limbic loop)
           void invoke("consolidate_reactions_to_preferences").catch(() => {});
         });
+        // 👎 → immediately generate a specific behavioral rule (don't wait for batch)
+        if (emoji === "\u{1F44E}") {
+          void invoke<string>("reaction_instant_rule", { messageContent }).catch(() => {});
+        }
       }
     },
     [messageId, messageContent, toggleReaction],

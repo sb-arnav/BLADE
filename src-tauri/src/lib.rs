@@ -57,6 +57,8 @@ mod screen_timeline;
 mod screen_timeline_commands;
 mod swarm;
 mod swarm_planner;
+mod ai_delegate;
+mod self_code;
 mod swarm_commands;
 mod wake_word;
 mod soul_commands;
@@ -322,6 +324,9 @@ pub fn run() {
             config::get_all_provider_keys,
             config::store_provider_key,
             config::switch_provider,
+            config::get_task_routing,
+            config::set_task_routing,
+            config::save_config_field,
             commands::debug_config,
             commands::reset_onboarding,
             commands::set_config,
@@ -377,6 +382,10 @@ pub fn run() {
             brain::set_context,
             clipboard::get_clipboard,
             clipboard::set_clipboard,
+            clipboard::get_clipboard_prefetch,
+            native_tools::run_code_block,
+            ai_delegate::ai_delegate_introduce,
+            ai_delegate::ai_delegate_check,
             discovery::run_discovery,
             discovery::discover_mcp_servers,
             permissions::classify_mcp_tool,
@@ -390,6 +399,10 @@ pub fn run() {
             voice::voice_transcribe_blob,
             screen::capture_screen,
             screen::capture_screen_region,
+            screen::get_monitors,
+            screen::move_to_monitor,
+            self_code::blade_self_code,
+            self_code::blade_source_path_resolve,
             memory::learn_from_conversation,
             managed_agents::run_managed_agent,
             runtimes::discover_ai_runtimes,
@@ -462,6 +475,7 @@ pub fn run() {
             context::get_user_activity,
             character::consolidate_character,
             character::consolidate_reactions_to_preferences,
+            character::reaction_instant_rule,
             character::blade_get_soul,
             character::get_character_bible,
             character::update_character_section,

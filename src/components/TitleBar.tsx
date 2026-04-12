@@ -1,4 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { useState, useEffect } from "react";
 
@@ -75,6 +76,36 @@ function RoleSwitcher() {
   );
 }
 
+function ModelBadge() {
+  const [routing, setRouting] = useState<{ provider: string; model: string } | null>(null);
+
+  useEffect(() => {
+    const unlisten = listen<{ provider: string; model: string }>("chat_routing", (e) => {
+      setRouting(e.payload);
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
+
+  if (!routing) return null;
+
+  // Show a compact model name (strip long prefixes)
+  const shortModel = routing.model
+    .replace(/^claude-/, "")
+    .replace(/^gpt-/, "")
+    .replace(/^gemini-/, "")
+    .replace(/-\d{8}$/, "")       // strip date suffixes
+    .replace(/^accounts\/.*\/models\//, "");  // strip Fireworks prefixes
+
+  return (
+    <span
+      className="text-[9px] font-mono text-blade-muted/50 tracking-wide px-1.5 py-0.5 rounded border border-blade-border/30 hidden sm:inline"
+      title={`${routing.provider} / ${routing.model}`}
+    >
+      {shortModel}
+    </span>
+  );
+}
+
 export function TitleBar() {
   const minimize = async () => {
     try { await appWindow.minimize(); } catch {}
@@ -100,8 +131,9 @@ export function TitleBar() {
         </span>
       </div>
 
-      <div className="flex-1 h-full flex items-center justify-center" data-tauri-drag-region>
+      <div className="flex-1 h-full flex items-center justify-center gap-2" data-tauri-drag-region>
         <RoleSwitcher />
+        <ModelBadge />
       </div>
 
       <div className="flex items-center gap-0.5 shrink-0" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>

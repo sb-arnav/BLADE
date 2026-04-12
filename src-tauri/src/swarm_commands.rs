@@ -173,6 +173,17 @@ async fn coordinator_loop(
                             None,
                             Some(&error),
                         );
+
+                        // evo-hq pattern: annotate failure to shared scratchpad so
+                        // other agents avoid repeating the same mistake
+                        let failure_key = format!("_failed:{}", &task.id[..task.id.len().min(8)]);
+                        let failure_note = format!(
+                            "Task '{}' failed: {}. Avoid this approach.",
+                            task.title, &error[..error.len().min(200)]
+                        );
+                        swarm.scratchpad.insert(failure_key, failure_note);
+                        swarm::update_swarm_scratchpad(swarm_id, &swarm.scratchpad);
+
                         let _ = app.emit("swarm_task_failed", serde_json::json!({
                             "swarm_id": swarm_id,
                             "task_id": &task.id,
