@@ -143,8 +143,6 @@ export default function App() {
   const voiceCommands = useVoiceCommands();
   const runtimeCenter = useRuntimes();
 
-  const [pulseThought, setPulseThought] = useState<string | null>(null);
-  const [activeThread, setActiveThread] = useState<{ title: string; project: string } | null>(null);
   const [voiceDraft, setVoiceDraft] = useState<string | null>(null);
   const voiceSendRef = useRef<(text: string) => void>(() => {});
   const voiceMode = useVoiceMode({
@@ -312,12 +310,12 @@ export default function App() {
   useEffect(() => {
     // Load last thought on startup
     invoke<string | null>("pulse_get_last_thought").then((t) => {
-      if (t) setPulseThought(t);
+      void t;
     }).catch(() => {});
 
     const unlisten = listen<{ thought: string; timestamp: number }>("blade_pulse", (event) => {
       const { thought } = event.payload;
-      setPulseThought(thought);
+      void thought;
       notifications.add({
         type: "info",
         title: "Blade",
@@ -330,9 +328,7 @@ export default function App() {
 
     // MORNING BRIEFING — richer once-per-day context summary
     const unlistenBriefing = listen<{ briefing: string; date: string }>("blade_briefing", (event) => {
-      const { briefing } = event.payload;
-      // Show as pulse thought (same banner, just longer)
-      setPulseThought(briefing);
+      void event.payload;
     });
 
     // REMINDERS — fire notification + toast when a scheduled reminder fires
@@ -579,9 +575,7 @@ export default function App() {
         // Ask Blade what happened while we were away
         invoke<string | null>("pulse_get_digest", { hiddenSince: since })
           .then((digest) => {
-            if (digest) {
-              setPulseThought(digest);
-            }
+            void digest;
           })
           .catch(() => {});
       }
@@ -675,10 +669,9 @@ export default function App() {
   // THREAD — load working memory state on startup + listen for updates
   useEffect(() => {
     invoke<{ title: string; content: string; project: string } | null>("blade_thread_get")
-      .then((t) => { if (t) setActiveThread({ title: t.title, project: t.project }); })
       .catch(() => {});
-    const unlisten = listen<{ title: string; project: string }>("thread_updated", (event) => {
-      setActiveThread(event.payload);
+    const unlisten = listen<{ title: string; project: string }>("thread_updated", () => {
+      // thread tracking is internal only; no banner displayed
     });
     return () => { unlisten.then((fn) => fn()); };
   }, []);
@@ -802,7 +795,7 @@ export default function App() {
       const id = chat.currentConversation?.id ?? "unknown";
       await invoke("obsidian_save_conversation", { title, summary, conversationId: id }).catch(() => {});
     }},
-    { id: "pulse", label: "Pulse — ask Blade what it's thinking", description: "Trigger an unsolicited thought from Blade's background mind", section: "System", action: () => invoke<string>("pulse_now").then((t) => setPulseThought(t)).catch(() => {}) },
+    { id: "pulse", label: "Pulse — ask Blade what it's thinking", description: "Trigger an unsolicited thought from Blade's background mind", section: "System", action: () => invoke<string>("pulse_now").then((t) => { if (t) sendWithStats(t); }).catch(() => {}) },
     { id: "pulse-explain", label: "Why? — explain the last pulse thought", description: "Ask Blade to reveal the reasoning behind its last observation", section: "System", action: () => invoke<string>("pulse_explain").then((e) => sendWithStats(`Explain your reasoning: ${e}`)).catch(() => {}) },
     { id: "deeplearn", label: "Deep Learn — let Blade read your digital life", description: "Re-run Blade's ingestion of your shell history, git, notes, and conversations", section: "System", action: () => openRoute("deeplearn") },
     { id: "settings", label: "Open settings", description: "Configure providers, memory, and Blade behavior", section: "System", shortcut: "Ctrl+,", action: () => openRoute("settings") },
@@ -888,7 +881,7 @@ export default function App() {
     "deeplearn": (
       <DeepLearn
         onComplete={(summary) => {
-          if (summary) setPulseThought(`I just read your life. ${summary.slice(0, 120)}${summary.length > 120 ? "…" : ""}`);
+          void summary;
           openRoute("chat");
         }}
         onSkip={() => openRoute("chat")}
@@ -976,61 +969,6 @@ export default function App() {
         onClearAll={notifications.clearAll}
         onAction={(r) => { openRoute(r as Route); setNotificationsOpen(false); }}
       />
-      {/* THREAD status — Blade's active working memory context */}
-      {activeThread && route === "chat" && (
-        <div
-          className="px-3 py-1 flex items-center gap-2 border-b border-blade-border/20 bg-blade-surface/20 cursor-pointer hover:bg-blade-surface/40 transition-colors"
-          onClick={() => invoke("blade_thread_get").then((t: unknown) => {
-            const thread = t as { title: string; content: string; project: string } | null;
-            if (thread) sendWithStats(`Show me what you're currently tracking in your working memory. Thread: "${thread.title}" — ${thread.content}`);
-          }).catch(() => {})}
-          title="Click to see Blade's active working memory"
-        >
-          <div className="w-1 h-1 rounded-full bg-blade-accent/50 flex-shrink-0" />
-          <p className="text-[10px] text-blade-muted leading-none">
-            <span className="text-blade-accent/70 font-medium">{activeThread.project}</span>
-            <span className="mx-1 opacity-40">·</span>
-            {activeThread.title}
-          </p>
-        </div>
-      )}
-      {/* Pulse banner — Blade's unsolicited thought, surfaced when window opens */}
-      {pulseThought && route === "chat" && (
-        <div className="px-3 py-1.5 flex items-center gap-2 border-b border-blade-border/30 bg-blade-surface/40">
-          <div className="w-1.5 h-1.5 rounded-full bg-blade-accent/60 animate-pulse flex-shrink-0" />
-          <p
-            className="flex-1 text-[11px] text-blade-secondary leading-snug cursor-pointer hover:text-blade-text transition-colors"
-            onClick={() => {
-              sendWithStats(`You just said: "${pulseThought}" — expand on this.`);
-              setPulseThought(null);
-            }}
-            title="Click to discuss with Blade"
-          >
-            {pulseThought}
-          </p>
-          <button
-            onClick={() => {
-              invoke<string>("pulse_explain")
-                .then((explanation) => {
-                  sendWithStats(`Why did you surface that thought? Expand: "${pulseThought}"\n\nYour explanation: ${explanation}`);
-                  setPulseThought(null);
-                })
-                .catch(() => sendWithStats(`Why did you say "${pulseThought}"?`));
-            }}
-            className="text-blade-muted hover:text-blade-accent text-[10px] flex-shrink-0 px-1 leading-none transition-colors"
-            title="Why did Blade say this?"
-          >
-            why?
-          </button>
-          <button
-            onClick={() => setPulseThought(null)}
-            className="text-blade-muted hover:text-blade-text text-xs flex-shrink-0 leading-none"
-            title="Dismiss"
-          >
-            ×
-          </button>
-        </div>
-      )}
       <div className="flex-1 min-h-0">
         <Suspense fallback={<ShellFallback label={route === "settings" ? "Loading settings..." : "Loading Blade..."} />}>
           {route === "settings" ? (
