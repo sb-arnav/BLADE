@@ -409,6 +409,18 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
             active INTEGER NOT NULL DEFAULT 1,
             created_at INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS evolution_suggestions (
+            id TEXT PRIMARY KEY,
+            app_trigger TEXT NOT NULL DEFAULT '',
+            capability TEXT NOT NULL,
+            mcp_package TEXT NOT NULL DEFAULT '',
+            description TEXT NOT NULL DEFAULT '',
+            token_hint TEXT,
+            auto_install INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_evolution_status ON evolution_suggestions(status);
         ",
     )
     .map_err(|e| format!("DB error: {}", e))?;

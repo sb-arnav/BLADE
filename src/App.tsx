@@ -379,6 +379,46 @@ export default function App() {
       }
     );
 
+    // EVOLUTION — BLADE leveled up after wiring in a new capability
+    const unlistenLevelUp = listen<{ level: number; score: number; next_unlock: string | null }>(
+      "blade_leveled_up",
+      (event) => {
+        const { level, next_unlock } = event.payload;
+        notifications.add({
+          type: "success",
+          title: `BLADE reached Level ${level}`,
+          message: next_unlock ?? "New capabilities unlocked.",
+          action: { label: "View", callback: () => { /* open settings */ } },
+        });
+      }
+    );
+
+    // EVOLUTION — BLADE auto-installed something (no token needed)
+    const unlistenAutoUpgraded = listen<{ installed: string[]; message: string }>(
+      "blade_auto_upgraded",
+      (event) => {
+        notifications.add({
+          type: "info",
+          title: "BLADE upgraded itself",
+          message: event.payload.message,
+        });
+      }
+    );
+
+    // EVOLUTION — new suggestion surfaced (app detected, needs a token)
+    const unlistenEvolutionSuggestion = listen<{ name: string; description: string; trigger_app: string }>(
+      "evolution_suggestion",
+      (event) => {
+        const { name, description, trigger_app } = event.payload;
+        notifications.add({
+          type: "info",
+          title: `New capability: ${name}`,
+          message: `Detected via ${trigger_app} — ${description}`,
+          action: { label: "Connect", callback: () => { /* open settings → evolution */ } },
+        });
+      }
+    );
+
     return () => {
       unlisten.then((fn) => fn());
       unlistenBriefing.then((fn) => fn());
@@ -386,6 +426,9 @@ export default function App() {
       unlistenReminderCreated.then((fn) => fn());
       unlistenSkillLearned.then((fn) => fn());
       unlistenWatcher.then((fn) => fn());
+      unlistenLevelUp.then((fn) => fn());
+      unlistenAutoUpgraded.then((fn) => fn());
+      unlistenEvolutionSuggestion.then((fn) => fn());
     };
   }, [tts.enabled]);
 

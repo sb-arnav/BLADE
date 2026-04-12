@@ -12,7 +12,26 @@ import { WatcherPanel } from "./WatcherPanel";
 import { RemindersPanel } from "./RemindersPanel";
 import { SkillsPanel } from "./SkillsPanel";
 
-type SettingsTab = "provider" | "memory" | "mcp" | "integrations" | "about" | "privacy";
+type SettingsTab = "provider" | "memory" | "mcp" | "integrations" | "about" | "privacy" | "evolution";
+
+interface EvolutionLevel {
+  level: number;
+  score: number;
+  breakdown: string[];
+  next_unlock: string | null;
+}
+
+interface EvolutionSuggestion {
+  id: string;
+  name: string;
+  package: string;
+  description: string;
+  trigger_app: string;
+  required_token_hint: string | null;
+  auto_install: boolean;
+  status: string;
+  created_at: number;
+}
 
 interface ProviderEntry {
   id: string;
@@ -158,6 +177,7 @@ interface Props {
 }
 
 const TABS: { id: SettingsTab; label: string }[] = [
+  { id: "evolution", label: "Evolution" },
   { id: "provider", label: "Provider" },
   { id: "integrations", label: "Integrations" },
   { id: "memory", label: "Memory" },
@@ -496,7 +516,11 @@ function KeyVault({ activeProvider }: { activeProvider: string }) {
 }
 
 export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
-  const [tab, setTab] = useState<SettingsTab>("provider");
+  const [tab, setTab] = useState<SettingsTab>("evolution");
+  const [evolutionLevel, setEvolutionLevel] = useState<EvolutionLevel | null>(null);
+  const [evolutionSuggestions, setEvolutionSuggestions] = useState<EvolutionSuggestion[]>([]);
+  const [evolutionRunning, setEvolutionRunning] = useState(false);
+  const [suggestionTokens, setSuggestionTokens] = useState<Record<string, string>>({});
   const [provider, setProvider] = useState(config.provider);
   const [apiKey, setApiKey] = useState(config.api_key);
   const [model, setModel] = useState(config.model);
@@ -536,6 +560,24 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
     setVoiceShortcut(config.voice_shortcut ?? "Ctrl+Shift+V");
     setObsidianVaultPath(config.obsidian_vault_path ?? "");
   }, [config]);
+
+  // Load evolution data whenever the tab is visible
+  useEffect(() => {
+    if (tab !== "evolution") return;
+    const load = async () => {
+      try {
+        const [level, suggestions] = await Promise.all([
+          invoke<EvolutionLevel>("evolution_get_level"),
+          invoke<EvolutionSuggestion[]>("evolution_get_suggestions"),
+        ]);
+        setEvolutionLevel(level);
+        setEvolutionSuggestions(suggestions);
+      } catch {
+        // non-fatal
+      }
+    };
+    load();
+  }, [tab]);
 
   useEffect(() => {
     const loadBrain = async () => {
@@ -1114,6 +1156,137 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             </p>
           </div>
         </section>
+        </>}
+
+        {tab === "evolution" && <>
+        {/* Evolution Dashboard */}
+        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="text-base font-semibold">BLADE Evolution</h2>
+              <p className="text-sm text-blade-muted">BLADE watches what you use and wires itself in automatically.</p>
+            </div>
+            <button
+              onClick={async () => {
+                setEvolutionRunning(true);
+                try {
+                  await invoke("evolution_run_now");
+                  const [level, suggestions] = await Promise.all([
+                    invoke<EvolutionLevel>("evolution_get_level"),
+                    invoke<EvolutionSuggestion[]>("evolution_get_suggestions"),
+                  ]);
+                  setEvolutionLevel(level);
+                  setEvolutionSuggestions(suggestions);
+                } finally {
+                  setEvolutionRunning(false);
+                }
+              }}
+              disabled={evolutionRunning}
+              className="px-3 py-1.5 rounded-lg bg-blade-bg border border-blade-border text-xs hover:border-blade-muted transition-colors disabled:opacity-50"
+            >
+              {evolutionRunning ? "Scanning..." : "Scan now"}
+            </button>
+          </div>
+
+          {/* Level badge */}
+          {evolutionLevel && (
+            <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-violet-950/60 to-blade-bg border border-violet-800/40">
+              <div className="flex-shrink-0 w-16 h-16 rounded-2xl bg-violet-900/50 border border-violet-700/50 flex items-center justify-center">
+                <span className="text-2xl font-bold text-violet-300">L{evolutionLevel.level}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-white">Level {evolutionLevel.level} — Score {evolutionLevel.score}</div>
+                <div className="text-xs text-blade-muted mt-1 flex flex-wrap gap-1">
+                  {evolutionLevel.breakdown.map((item, i) => (
+                    <span key={i} className="bg-blade-surface border border-blade-border rounded px-1.5 py-0.5">{item}</span>
+                  ))}
+                </div>
+                {evolutionLevel.next_unlock && (
+                  <div className="text-xs text-violet-400 mt-2">{evolutionLevel.next_unlock}</div>
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Pending suggestions */}
+        {evolutionSuggestions.length > 0 && (
+          <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+            <div>
+              <h2 className="text-base font-semibold">Detected capabilities</h2>
+              <p className="text-sm text-blade-muted">BLADE saw you using these — connect them to unlock full control.</p>
+            </div>
+            <div className="space-y-3">
+              {evolutionSuggestions.map((s) => (
+                <div key={s.id} className="rounded-xl border border-blade-border bg-blade-bg/60 p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="text-sm font-medium">{s.name}</div>
+                      <div className="text-xs text-blade-muted mt-0.5">{s.description}</div>
+                      <div className="text-xs text-blade-muted/60 mt-1">Detected via: {s.trigger_app}</div>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        await invoke("evolution_dismiss_suggestion", { id: s.id });
+                        setEvolutionSuggestions((prev) => prev.filter((x) => x.id !== s.id));
+                      }}
+                      className="flex-shrink-0 text-blade-muted/50 hover:text-blade-muted text-xs"
+                    >
+                      dismiss
+                    </button>
+                  </div>
+
+                  {s.required_token_hint && (
+                    <div className="space-y-1.5">
+                      <div className="text-xs text-amber-400/80">Needs: {s.required_token_hint}</div>
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          placeholder="Paste token / key here"
+                          value={suggestionTokens[s.id] ?? ""}
+                          onChange={(e) => setSuggestionTokens((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                          className="flex-1 bg-blade-bg border border-blade-border rounded-lg px-2.5 py-1.5 text-xs outline-none min-w-0"
+                        />
+                        <button
+                          onClick={async () => {
+                            const token = suggestionTokens[s.id] ?? "";
+                            if (!token) return;
+                            // Derive env key from token hint (first word before space/parenthesis)
+                            const envKey = s.required_token_hint?.split(/[\s(]/)[0] ?? "TOKEN";
+                            try {
+                              const toolCount = await invoke<number>("evolution_install_suggestion", {
+                                id: s.id, tokenKey: envKey, tokenValue: token,
+                              });
+                              setEvolutionSuggestions((prev) => prev.filter((x) => x.id !== s.id));
+                              const level = await invoke<EvolutionLevel>("evolution_get_level");
+                              setEvolutionLevel(level);
+                              setStatus(`${s.name} connected — ${toolCount} tool(s) available`);
+                            } catch (e) {
+                              setError(String(e));
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-violet-700 hover:bg-violet-600 text-white text-xs transition-colors flex-shrink-0"
+                        >
+                          Connect
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {evolutionSuggestions.length === 0 && evolutionLevel && (
+          <section className="bg-blade-surface border border-blade-border rounded-2xl p-4">
+            <p className="text-sm text-blade-muted text-center">
+              {config.god_mode
+                ? "No new capabilities detected yet — BLADE is watching."
+                : "Enable God Mode so BLADE can see what you use and suggest integrations."}
+            </p>
+          </section>
+        )}
         </>}
 
         {tab === "privacy" && <>
