@@ -60,8 +60,8 @@ pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
 
             // ACTIVITY TIMELINE: persist this snapshot as a timeline event
             {
-                let db_state = app.state::<crate::db_commands::SharedDb>();
-                if let Ok(conn) = db_state.lock() {
+                let db_inner = app.state::<crate::db_commands::SharedDb>().inner().clone();
+                if let Ok(conn) = db_inner.lock() {
                     // Extract active window title from context for a meaningful title
                     let title = ctx.lines()
                         .find(|l| l.starts_with("**Active:**") || l.contains("Active Window"))

@@ -112,7 +112,7 @@ pub fn search(query: &str, limit: usize) -> Vec<ExecutionRecord> {
              LIMIT ?2",
         )?;
         let rows = stmt.query_map(params![query, limit as i64], row_to_record)?;
-        Ok(rows.filter_map(|r| r.ok()).collect())
+        Ok::<Vec<ExecutionRecord>, rusqlite::Error>(rows.filter_map(|r| r.ok()).collect())
     })();
 
     match fts_results {
@@ -201,8 +201,8 @@ pub fn recall_on_error(error_text: &str) -> Option<String> {
 
     let results = search(&query, 5);
     // Only inject if we found something where BLADE actually succeeded after the error
-    let relevant: Vec<_> = results
-        .iter()
+    let relevant: Vec<ExecutionRecord> = results
+        .into_iter()
         .filter(|r| r.exit_code == 0 || r.stderr.contains(&query[..query.len().min(30)]))
         .take(3)
         .collect();

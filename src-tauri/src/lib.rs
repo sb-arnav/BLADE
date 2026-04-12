@@ -105,8 +105,7 @@ fn open_screen_overlay(app: tauri::AppHandle) -> Result<(), String> {
     .always_on_top(true)
     .skip_taskbar(true);
 
-    // transparent() requires macos-private-api feature on macOS
-    #[cfg(any(not(target_os = "macos"), feature = "macos-private-api"))]
+    // transparent() requires macosPrivateApi in tauri.conf.json on macOS (configured there)
     let overlay_builder = overlay_builder.transparent(true);
 
     overlay_builder.build().map_err(|e| e.to_string())?;
@@ -488,8 +487,7 @@ pub fn run() {
             .center()
             .visible(false);
 
-            // transparent() requires macos-private-api feature on macOS
-            #[cfg(any(not(target_os = "macos"), feature = "macos-private-api"))]
+            // transparent() requires macosPrivateApi in tauri.conf.json on macOS (configured there)
             let quickask_builder = quickask_builder.transparent(true);
 
             let quickask = quickask_builder.build()?;
