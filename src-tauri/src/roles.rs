@@ -271,9 +271,27 @@ pub fn get_role(id: &str) -> Option<BladeRole> {
 }
 
 pub fn role_system_injection(active_role: &str) -> String {
-    get_role(active_role)
+    let base = get_role(active_role)
         .map(|r| r.system_injection)
-        .unwrap_or_default()
+        .unwrap_or_default();
+
+    // For Engineering mode, append git style context from any indexed projects
+    if active_role == "engineering" {
+        let config = crate::config::load_config();
+        // Try to find a style wiki for the most recently active project
+        let style = if !config.obsidian_vault_path.is_empty() {
+            crate::git_style::style_context_for_repo(&config.obsidian_vault_path)
+        } else {
+            String::new()
+        };
+        if style.is_empty() {
+            base
+        } else {
+            format!("{}\n{}", base, style)
+        }
+    } else {
+        base
+    }
 }
 
 #[tauri::command]
