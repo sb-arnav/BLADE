@@ -137,7 +137,8 @@ async fn poll_loop(app: tauri::AppHandle, mut state: BotState) {
     loop {
         // Check if we should keep running (token still valid in our state)
         {
-            let s = status().read().await;
+            let status_arc = status();
+            let s = status_arc.read().await;
             if !s.running {
                 break;
             }
@@ -155,7 +156,8 @@ async fn poll_loop(app: tauri::AppHandle, mut state: BotState) {
                 let msg = format!("Telegram poll error: {}", e);
                 log::warn!("{}", msg);
                 {
-                    let mut s = status().write().await;
+                    let status_arc = status();
+                    let mut s = status_arc.write().await;
                     s.error = Some(msg);
                 }
                 tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
@@ -176,7 +178,8 @@ async fn poll_loop(app: tauri::AppHandle, mut state: BotState) {
             let msg = body.description.unwrap_or_else(|| "Unknown error".to_string());
             log::error!("Telegram API not ok: {}", msg);
             {
-                let mut s = status().write().await;
+                let status_arc = status();
+                let mut s = status_arc.write().await;
                 s.error = Some(format!("Telegram error: {}", msg));
                 s.running = false;
             }
@@ -275,7 +278,8 @@ async fn poll_loop(app: tauri::AppHandle, mut state: BotState) {
 
             state.messages_handled += 1;
             {
-                let mut s = status().write().await;
+                let status_arc = status();
+                let mut s = status_arc.write().await;
                 s.messages_handled = state.messages_handled;
                 s.error = None;
             }
@@ -286,7 +290,8 @@ async fn poll_loop(app: tauri::AppHandle, mut state: BotState) {
     }
 
     {
-        let mut s = status().write().await;
+        let status_arc = status();
+        let mut s = status_arc.write().await;
         s.running = false;
     }
 }
@@ -402,7 +407,8 @@ pub async fn telegram_start(app: tauri::AppHandle, token: String) -> Result<(), 
     };
 
     {
-        let mut s = status().write().await;
+        let status_arc = status();
+        let mut s = status_arc.write().await;
         s.running = true;
         s.token_set = true;
         s.error = None;
@@ -418,11 +424,13 @@ pub async fn telegram_start(app: tauri::AppHandle, token: String) -> Result<(), 
 #[tauri::command]
 pub async fn telegram_stop() -> Result<(), String> {
     {
-        let mut s = status().write().await;
+        let status_arc = status();
+        let mut s = status_arc.write().await;
         s.running = false;
     }
 
-    let mut h = handle().lock().await;
+    let handle_arc = handle();
+    let mut h = handle_arc.lock().await;
     if let Some(task) = h.take() {
         task.abort();
     }
@@ -440,7 +448,8 @@ pub async fn telegram_disconnect() -> Result<(), String> {
     telegram_stop().await?;
     delete_token().ok(); // best-effort
     {
-        let mut s = status().write().await;
+        let status_arc = status();
+        let mut s = status_arc.write().await;
         s.token_set = false;
         s.messages_handled = 0;
     }
@@ -463,7 +472,8 @@ pub async fn auto_start_if_configured(app: tauri::AppHandle) {
         log::info!("Telegram: auto-starting bot with saved token");
         if let Err(e) = telegram_start(app, token).await {
             log::warn!("Telegram: auto-start failed: {}", e);
-            let mut s = status().write().await;
+            let status_arc = status();
+            let mut s = status_arc.write().await;
             s.error = Some(e);
             s.token_set = true; // token is still there, just failed to connect
         }
