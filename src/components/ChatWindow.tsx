@@ -47,6 +47,8 @@ interface Props {
   voiceModeOnPttDown?: () => void;
   voiceModeOnPttUp?: () => void;
   thinkingText?: string | null;
+  onOpenNotifications?: () => void;
+  unreadNotificationCount?: number;
 }
 
 function formatTime(timestamp: number): string {
@@ -100,6 +102,8 @@ export function ChatWindow({
   voiceModeOnPttDown,
   voiceModeOnPttUp,
   thinkingText,
+  onOpenNotifications,
+  unreadNotificationCount,
 }: Props) {
   const [search, setSearch] = useState("");
   const [composerDraft, setComposerDraft] = useState<string | null>(null);
@@ -337,6 +341,22 @@ export function ChatWindow({
             )}
           </div>
           <div className="flex items-center gap-1">
+            {onOpenNotifications && (
+              <button
+                onClick={onOpenNotifications}
+                className="relative w-7 h-7 rounded-md flex items-center justify-center text-blade-muted hover:text-blade-secondary hover:bg-blade-surface transition-colors"
+                title="Notifications"
+              >
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+                {(unreadNotificationCount ?? 0) > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-blade-accent text-white text-[8px] font-bold flex items-center justify-center leading-none">
+                    {unreadNotificationCount! > 9 ? "9+" : unreadNotificationCount}
+                  </span>
+                )}
+              </button>
+            )}
             <button
               onClick={ttsSpeaking ? onStopTTS : onToggleTTS}
               className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
