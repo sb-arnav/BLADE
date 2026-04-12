@@ -1055,6 +1055,20 @@ pub fn history_save_conversation(
     save_conversation(&conversation_id, messages)
 }
 
+#[tauri::command]
+pub fn history_rename_conversation(
+    app: tauri::AppHandle,
+    conversation_id: String,
+    title: String,
+) -> Result<(), String> {
+    crate::history::update_conversation_title(&conversation_id, &title)?;
+    let _ = app.emit(
+        "conversation_titled",
+        serde_json::json!({ "conversation_id": conversation_id, "title": title }),
+    );
+    Ok(())
+}
+
 /// Auto-title a conversation using the cheapest available model.
 /// Called after the first assistant response — fires in the background.
 /// Emits `conversation_titled` event with `{ conversation_id, title }` on success.
