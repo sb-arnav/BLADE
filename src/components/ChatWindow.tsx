@@ -109,6 +109,7 @@ export function ChatWindow({
   const [composerDraft, setComposerDraft] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [thinkingExpanded, setThinkingExpanded] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   const startRename = useCallback((conv: ConversationSummary, e: React.MouseEvent) => {
@@ -515,13 +516,25 @@ export function ChatWindow({
 
         {/* Extended thinking indicator — shown when Claude is reasoning */}
         {thinkingText && loading && (
-          <div className="mx-3 mb-1.5 px-3 py-2 rounded-xl border border-blade-accent/20 bg-blade-accent/5 flex items-start gap-2">
-            <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full bg-blade-accent animate-pulse" />
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold text-blade-accent/70 uppercase tracking-wide mb-0.5">Thinking</p>
-              <p className="text-[11px] text-blade-muted/70 leading-relaxed line-clamp-2">
-                {thinkingText.slice(-200)}
-              </p>
+          <div className="mx-3 mb-1.5 px-3 py-2 rounded-xl border border-blade-accent/20 bg-blade-accent/5">
+            <div className="flex items-start gap-2">
+              <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full bg-blade-accent animate-pulse" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <p className="text-[10px] font-semibold text-blade-accent/70 uppercase tracking-wide">Thinking</p>
+                  {thinkingText.length > 200 && (
+                    <button
+                      onClick={() => setThinkingExpanded((e) => !e)}
+                      className="text-[9px] text-blade-accent/50 hover:text-blade-accent/80 transition-colors font-mono"
+                    >
+                      {thinkingExpanded ? "collapse" : `+${thinkingText.length - 200} chars`}
+                    </button>
+                  )}
+                </div>
+                <p className={`text-[11px] text-blade-muted/70 leading-relaxed font-mono ${thinkingExpanded ? "" : "line-clamp-2"}`}>
+                  {thinkingExpanded ? thinkingText : thinkingText.slice(-200)}
+                </p>
+              </div>
             </div>
           </div>
         )}
