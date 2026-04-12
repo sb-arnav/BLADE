@@ -1,95 +1,116 @@
 <div align="center">
 
-<img src="src-tauri/icons/128x128@2x.png" width="96" height="96" alt="Blade" />
+<img src="src-tauri/icons/128x128@2x.png" width="96" height="96" alt="BLADE" />
 
 # BLADE
 
-**Personal AI that lives on your machine.**
+**The AI that watches, learns, and works — while others just talk.**
 
-Not a chat window. An operating intelligence — wired into your files, apps, terminal, and memory.
+Not a chat window. An operating intelligence wired into your screen, files, apps, and memory. Runs 5 agents in parallel. Remembers everything you've looked at. Sees your screen. Controls your desktop. Fully local.
 
-[![Release](https://img.shields.io/github/v/release/sb-arnav/blade?style=flat-square&label=latest&color=0f0f0f)](https://github.com/sb-arnav/blade/releases/latest)
-[![License](https://img.shields.io/github/license/sb-arnav/blade?style=flat-square&color=0f0f0f)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f0f0f?style=flat-square)](https://github.com/sb-arnav/blade/releases/latest)
+[![Release](https://img.shields.io/github/v/release/sb-arnav/BLADE?style=flat-square&label=latest&color=0f0f0f)](https://github.com/sb-arnav/BLADE/releases/latest)
+[![License](https://img.shields.io/github/license/sb-arnav/BLADE?style=flat-square&color=0f0f0f)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f0f0f?style=flat-square)](https://github.com/sb-arnav/BLADE/releases/latest)
 [![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-0f0f0f?style=flat-square)](https://tauri.app)
+[![Rust](https://img.shields.io/badge/backend-Rust-0f0f0f?style=flat-square)](https://www.rust-lang.org)
 
-[**Download**](https://slayerblade.site/blade) · [Releases](https://github.com/sb-arnav/blade/releases) · [Report a bug](https://github.com/sb-arnav/blade/issues)
+[**Download**](https://slayerblade.site/blade) · [Releases](https://github.com/sb-arnav/BLADE/releases) · [Report a bug](https://github.com/sb-arnav/BLADE/issues)
 
 </div>
 
 ---
 
-## What makes it different
+## Why BLADE exists
 
-Most AI tools reset every session. Blade compounds. It stores everything — shell commands, file reads, conversations, tool results — and pulls from that history automatically. The second week is smarter than the first.
+Every AI tool on the market runs one agent at a time, forgets everything between sessions, and has no idea what's on your screen. BLADE is what happens when you refuse to accept that.
 
-| Feature | Blade | Claude Code | ChatGPT |
-|---------|:-----:|:-----------:|:-------:|
-| Persistent cross-session memory | ✓ | ✗ | ✗ |
-| Execution history recall | ✓ | ✗ | ✗ |
-| Native desktop (not browser) | ✓ | CLI only | ✗ |
-| Global voice input | ✓ | ✗ | ✗ |
-| Background agents | ✓ | ✗ | ✗ |
-| MCP tool network | ✓ | ✓ | ✗ |
-| God Mode (live screen context) | ✓ | ✗ | ✗ |
-| Codebase indexing | ✓ | ✓ | ✗ |
-| Multi-provider (any API key) | ✓ | ✗ | ✗ |
-| Local inference (Ollama) | ✓ | ✗ | ✗ |
-| Pentest mode | ✓ | ✗ | ✗ |
-| Learns from reactions | ✓ | ✗ | ✗ |
+- **Hermes Agent** — lives in your Telegram DMs. No screen awareness, no native desktop, no computer use.
+- **OpenClaw** — a WhatsApp chatbot with 355K stars and 9 CVEs. No screen control, flat Markdown memory.
+- **Screenpipe** — great screen recorder, that's it. No agents, no chat, no tools.
+- **Jan / LM Studio** — polished model launchers. No agents, no memory, no automation.
+- **Open Interpreter** — runs code in a terminal. Blind to your screen, no parallelism.
+
+**BLADE does all of it. Natively. In one app.**
 
 ---
 
-## Features
+## What makes it different
 
-### 🧠 Permanent Memory
-Every command, file read, and conversation is embedded and stored locally. When something breaks again, Blade searches past executions for what worked before — automatically.
+| Capability | BLADE | Hermes Agent | OpenClaw | Screenpipe | Jan | Open Interpreter | Claude Code |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Native desktop app (not daemon/CLI) | ✓ | ✗ | ✗ | ✗ | ✓ | ✗ | CLI |
+| Parallel multi-agent swarms (5 agents at once) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Screen timeline / Total Recall | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ |
+| Computer use (click, type, OCR, UI control) | ✓ | ✗ | ✗ | ✗ | ✗ | partial | ✗ |
+| God Mode (live screen + clipboard context) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Persistent vector memory (BM25 + vector, RRF) | ✓ | partial | ✗ | FTS5 | ✗ | ✗ | ✗ |
+| Auto-evolving MCP tool catalog | ✓ | partial | ✗ | ✗ | ✗ | ✗ | ✓ |
+| Background agent spawning (Claude Code, Aider, Goose) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Global voice input | ✓ | partial | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Built with Tauri (not Electron) | ✓ | N/A | ✗ | ✓ | ✗ | N/A | N/A |
+| Any LLM provider + local (Ollama) | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ |
+| Zero telemetry, fully local | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ |
+| Free and open source | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
 
-### 🎙️ Global Voice Input
-Press `Ctrl+Shift+V` from anywhere on your desktop. Blade records. Press again — it transcribes via Whisper and opens QuickAsk pre-filled with your words. No window switching, no copy-paste.
+---
 
-### 👁️ God Mode
-Background context injection. Blade captures your active window, clipboard, and running apps periodically, then injects this into every AI call. The model always knows what you're working on — without being told.
+## Core Features
 
-### 🤖 Background Agents
-Spawn Claude Code, Aider, or Goose as background workers. Blade stays the orchestrator — one command surface, multiple specialists working in parallel.
+### BLADE Swarm — Parallel Multi-Agent Orchestration
+Give BLADE a complex goal. It decomposes it into a DAG of sub-tasks and runs up to 5 specialized agents simultaneously. Agents share a scratchpad — findings from one feed directly into the next. When all tasks complete, BLADE synthesizes a final result.
 
-### ⏰ BLADE Cron
-Schedule recurring autonomous tasks: *"every Monday at 9am, check GitHub notifications and send me only what matters."* Blade runs while you sleep.
+No other desktop AI runs more than one agent at a time. BLADE runs a fleet.
 
-### 🔌 MCP Tool Network
-Connect any MCP server — browser automation, terminal, files, databases, APIs. Blade orchestrates them as a unified toolkit.
+### Total Recall — Screen Timeline with Semantic Search
+BLADE captures a screenshot every 30 seconds, fingerprints it (identical frames are skipped), runs a vision model description on it, and embeds everything for semantic search.
 
-### 🎯 Codebase Indexer
-Indexes every function, class, and symbol across your projects. Find any symbol instantly. No re-reading files — Blade already knows your code.
+*"What error was I debugging Tuesday?"* — finds the exact screenshot in seconds.
 
-### 🔒 Pentest Mode
-Security testing with mandatory ownership verification. Uses Groq or Ollama — never your Anthropic key. Kali tools, nmap, sqlmap, metasploit — gated behind an explicit authorization record.
+This is Rewind.ai, open-source, built into BLADE. Rewind charges $30/month. BLADE is free.
 
-### 💡 Learns From You
-Thumbs up or down on any response. Every 5 reactions, Blade extracts behavioral preferences and bakes them into every future reply automatically.
+### God Mode — Live Screen Context
+Runs in the background, capturing your active window title, clipboard contents, and running apps every N minutes. Every AI call gets this context injected automatically. The model knows what you're working on without being told.
 
-### ⚡ Multi-Provider + Smart Routing
-OpenAI, Anthropic, Google Gemini, Groq, Ollama, or any OpenAI-compatible endpoint. Smart routing selects the right model tier per task. Model-adaptive prompting means even small models (Llama 8B, GPT-4o mini) get scaffolded to punch above their weight.
+### Computer Use — Desktop Agent
+BLADE can see your screen and control it. Click buttons, fill forms, read UI elements with OCR, navigate apps, take screenshots and reason about them. 40+ desktop action types.
+
+### Persistent Memory — Compounds Over Time
+Every conversation, command, and tool result is embedded locally and indexed with hybrid BM25 + vector search (Reciprocal Rank Fusion). The second week is smarter than the first.
+
+### Background Agents
+Spawn Claude Code, Aider, or Goose as background workers with one command. BLADE stays the orchestrator — one surface, multiple specialists.
+
+### Auto-Evolving MCP Catalog
+BLADE ships with 20+ MCP servers pre-catalogued and auto-installs them as you use new apps — Git, Chrome, Linear, Figma, Slack, databases, terminals. The toolkit grows without you touching a config file.
+
+### Global Voice Input
+`Ctrl+Shift+V` from anywhere — record, transcribe via Whisper, auto-fill QuickAsk. No window switching.
+
+### BLADE Cron
+Schedule recurring autonomous tasks: *"every Monday at 9am, summarize my GitHub notifications and brief me on what matters."* Runs while you sleep.
+
+### Evolution Engine
+Background research loop that monitors AI news, suggests new MCP tools to install, and runs a morning briefing pulse. BLADE is always improving itself.
+
+### Pentest Mode
+Security testing with mandatory ownership verification. Uses Groq or Ollama — never your Anthropic key. Kali tools, nmap, sqlmap, metasploit — all gated behind an explicit authorization record.
 
 ---
 
 ## Install
 
-Download the latest build from [slayerblade.site/blade](https://slayerblade.site/blade) or directly:
-
 | Platform | Download |
 |----------|----------|
-| **macOS** (Apple Silicon) | [`.dmg` ↗](https://github.com/sb-arnav/blade/releases/latest/download/Blade_0.4.0_aarch64.dmg) |
-| **macOS** (Intel) | [`.dmg` ↗](https://github.com/sb-arnav/blade/releases/latest/download/Blade_0.4.0_x64.dmg) |
-| **Windows** | [`.exe` ↗](https://github.com/sb-arnav/blade/releases/latest/download/Blade_0.4.0_x64-setup.exe) |
-| **Linux** | [`.AppImage` ↗](https://github.com/sb-arnav/blade/releases/latest/download/blade_0.4.0_amd64.AppImage) |
+| **macOS** (Apple Silicon) | [`.dmg` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.4.0_aarch64.dmg) |
+| **macOS** (Intel) | [`.dmg` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.4.0_x64.dmg) |
+| **Windows** | [`.exe` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.4.0_x64-setup.exe) |
+| **Linux** | [`.AppImage` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/blade_0.4.0_amd64.AppImage) |
 
-> **macOS note:** If you see "Blade is damaged and can't be opened", run this in Terminal after installing:
+> **macOS note:** If you see "Blade is damaged and can't be opened", run:
 > ```bash
 > xattr -cr /Applications/Blade.app
 > ```
-> This removes the quarantine flag macOS adds to downloaded apps. Blade isn't notarized yet (no Apple Developer certificate). Right-click → Open no longer bypasses this on macOS Sequoia.
+> This clears the quarantine flag. BLADE isn't notarized yet.
 
 Installed builds auto-update from GitHub Releases.
 
@@ -97,12 +118,14 @@ Installed builds auto-update from GitHub Releases.
 
 ## Quick Start
 
-1. Install and launch Blade
-2. The setup wizard picks your provider and API key
-3. **`Alt+Space`** — QuickAsk from anywhere
-4. **`Ctrl+Shift+V`** — Voice input from anywhere
+1. Download and launch BLADE
+2. The setup wizard guides you through provider + API key
+3. **`Alt+Space`** — QuickAsk from anywhere on your desktop
+4. **`Ctrl+Shift+V`** — Global voice input
+5. Enable **God Mode** in settings for live screen context
+6. Enable **Total Recall** in settings to start building your screen timeline
 
-**Slash commands** — type `/` in chat: `/clear` `/new` `/screenshot` `/voice` `/focus` `/init` `/help`
+**Slash commands** — type `/` in chat: `/clear` `/new` `/screenshot` `/voice` `/focus` `/swarm` `/init` `/help`
 
 ---
 
@@ -111,14 +134,13 @@ Installed builds auto-update from GitHub Releases.
 Requires Node 20.19+ and Rust stable.
 
 ```bash
-git clone https://github.com/sb-arnav/blade.git && cd blade
+git clone https://github.com/sb-arnav/BLADE.git && cd BLADE
 npm install
 npm run tauri dev      # dev mode with hot-reload
 npm run tauri build    # release binary
 ```
 
 **Ubuntu/Debian system deps:**
-
 ```bash
 sudo apt-get install -y \
   libwebkit2gtk-4.1-dev libgtk-3-dev \
@@ -131,27 +153,44 @@ sudo apt-get install -y \
 ## Architecture
 
 ```
-blade/
-├── src/                    # React + Vite frontend
-│   ├── components/         # Chat, Settings, QuickAsk, God Mode UI
-│   └── hooks/              # State
-└── src-tauri/src/          # Rust backend
-    ├── brain.rs            # System prompt builder + model-adaptive prompting
-    ├── commands.rs         # Message loop + tool execution
-    ├── db.rs               # SQLite (memory, timeline, preferences, embeddings)
-    ├── embeddings.rs       # Local semantic search (fastembed AllMiniLML6V2)
-    ├── native_tools.rs     # 20+ built-in tools (bash, file, web, UI automation)
-    ├── mcp.rs              # MCP client + tool orchestration
-    ├── godmode.rs          # Screen + window context capture
-    ├── voice_global.rs     # Global push-to-talk shortcut
-    ├── tts.rs              # TTS (system voices + OpenAI nova/alloy/shimmer)
-    ├── runtimes.rs         # Background agents + security engagements
-    ├── indexer.rs          # Codebase symbol indexing
-    ├── character.rs        # Preference learning from reactions
-    └── providers/          # Anthropic, OpenAI, Gemini, Groq, Ollama
+BLADE/
+├── src/                         # React + Vite frontend
+│   ├── components/
+│   │   ├── SwarmView.tsx        # DAG visualization for parallel agents
+│   │   ├── ScreenTimeline.tsx   # Total Recall thumbnail grid + search
+│   │   ├── GodMode.tsx          # Screen context UI
+│   │   └── ...                  # Chat, Settings, QuickAsk, Agents
+│   └── hooks/
+│       ├── useSwarm.ts          # Swarm state + real-time events
+│       ├── useScreenTimeline.ts # Timeline browse + semantic search
+│       └── ...
+└── src-tauri/src/               # Rust backend
+    ├── swarm.rs                 # SwarmTask DAG — parallel multi-agent orchestration
+    ├── swarm_commands.rs        # Coordinator loop — dependency resolution + agent spawning
+    ├── swarm_planner.rs         # LLM goal decomposition + DAG synthesis
+    ├── screen_timeline.rs       # Screenshot capture, fingerprint dedup, vision description
+    ├── screen_timeline_commands.rs  # Timeline search, browse, config
+    ├── godmode.rs               # Live screen + clipboard context injection
+    ├── brain.rs                 # System prompt builder + model-adaptive prompting
+    ├── commands.rs              # Message loop + tool execution
+    ├── db.rs                    # SQLite (memory, swarms, timeline, embeddings)
+    ├── embeddings.rs            # Local semantic search (fastembed AllMiniLML6V2, BM25+vector RRF)
+    ├── native_tools.rs          # 20+ built-in tools (bash, file, web, UI automation)
+    ├── mcp.rs                   # MCP client + auto-evolving tool catalog
+    ├── evolution.rs             # Background research loop + MCP catalog (20+ servers)
+    ├── computer_use.rs          # Vision loop — click, type, OCR, screenshot
+    ├── runtimes.rs              # Multi-runtime OperatorCenter (Claude, Goose, Aider)
+    ├── background_agent.rs      # Background agent spawning
+    ├── voice_global.rs          # Global push-to-talk + Whisper transcription
+    ├── tts.rs                   # TTS (system voices + OpenAI nova/alloy/shimmer)
+    ├── indexer.rs               # Codebase symbol indexing
+    ├── character.rs             # Preference learning from reactions
+    ├── cron.rs                  # Scheduled autonomous tasks
+    ├── pulse.rs                 # Morning briefing engine
+    └── providers/               # Anthropic, OpenAI, Gemini, Groq, Ollama
 ```
 
-All storage is local: `~/.blade/blade.db` (SQLite). No cloud sync, no telemetry. API calls go directly to your provider using your own key.
+All data is local: `~/.blade/blade.db` (SQLite), `~/.blade/screenshots/` (Total Recall). No cloud sync, no telemetry. API calls go directly to your configured provider using your own key.
 
 ---
 
@@ -159,12 +198,24 @@ All storage is local: `~/.blade/blade.db` (SQLite). No cloud sync, no telemetry.
 
 | Data | Where it goes |
 |------|--------------|
-| Conversations, memory, embeddings | Local only (`~/.blade/`) |
+| Conversations, memory, embeddings | Local only — `~/.blade/` |
+| Screenshots (Total Recall) | Local only — `~/.blade/screenshots/` |
 | API keys | OS keychain or local config |
 | Your messages | Sent to **your configured provider** with **your API key** |
-| Analytics / telemetry | None — Blade has no servers |
+| Analytics / telemetry | None — BLADE has no servers |
 
-Create `~/.blade/BLADE.md` to give Blade workspace-level instructions (restrict access, require confirmation, set tone, etc.)
+Create `~/.blade/BLADE.md` to give BLADE workspace-level instructions (restrict access, require confirmation, set tone, etc.)
+
+---
+
+## Roadmap
+
+- [ ] "Hey BLADE" wake word (local Whisper + Vosk) — always-on voice
+- [ ] SOUL.md diff — weekly transparency report on what BLADE has learned about you
+- [ ] God Mode privacy controls — per-app allowlist, blur sensitive areas
+- [ ] OpenHands integration as 6th background agent target
+- [ ] MCP marketplace — community tool discovery without config files
+- [ ] Offline TTS — Piper / Coqui for 100% local voice
 
 ---
 
