@@ -225,7 +225,7 @@ pub async fn voice_transcribe_blob(audio_base64: String, file_ext: String) -> Re
     Ok(json["text"].as_str().unwrap_or("").trim().to_string())
 }
 
-fn encode_wav(samples: &[f32], channels: u16, sample_rate: u32) -> Result<Vec<u8>, String> {
+pub(crate) fn encode_wav(samples: &[f32], channels: u16, sample_rate: u32) -> Result<Vec<u8>, String> {
     let mut cursor = std::io::Cursor::new(Vec::new());
 
     let spec = hound::WavSpec {

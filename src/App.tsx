@@ -421,6 +421,11 @@ export default function App() {
       }
     );
 
+    // WAKE WORD — "Hey BLADE" detected → start voice recording as if Ctrl+Shift+V was pressed
+    const unlistenWakeWord = listen("wake_word_detected", () => {
+      window.dispatchEvent(new CustomEvent("blade_wake_word_triggered"));
+    });
+
     return () => {
       unlisten.then((fn) => fn());
       unlistenBriefing.then((fn) => fn());
@@ -431,6 +436,7 @@ export default function App() {
       unlistenLevelUp.then((fn) => fn());
       unlistenAutoUpgraded.then((fn) => fn());
       unlistenEvolutionSuggestion.then((fn) => fn());
+      unlistenWakeWord.then((fn) => fn());
     };
   }, [tts.enabled]);
 

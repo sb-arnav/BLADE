@@ -55,6 +55,7 @@ mod screen_timeline_commands;
 mod swarm;
 mod swarm_planner;
 mod swarm_commands;
+mod wake_word;
 mod trace;
 mod tray;
 mod ui_automation;
@@ -588,6 +589,9 @@ pub fn run() {
             research::research_get_recent,
             research::research_query,
             research::research_clear,
+            wake_word::wake_word_start,
+            wake_word::wake_word_stop,
+            wake_word::wake_word_status,
             screen_timeline_commands::timeline_search_cmd,
             screen_timeline_commands::timeline_browse_cmd,
             screen_timeline_commands::timeline_get_screenshot,
@@ -710,6 +714,11 @@ pub fn run() {
             } else if startup_god_config.screen_timeline_enabled {
                 // Timeline can run independently of god mode
                 screen_timeline::start_timeline_capture_loop(app.handle().clone());
+            }
+
+            // Start wake word listener if enabled
+            if startup_god_config.wake_word_enabled {
+                wake_word::start_wake_word_listener(app.handle().clone());
             }
 
             // EVOLUTION ENGINE — BLADE's self-improvement loop.
