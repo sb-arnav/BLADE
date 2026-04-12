@@ -85,7 +85,11 @@ Download the latest build from [slayerblade.site/blade](https://slayerblade.site
 | **Windows** | [`.exe` ↗](https://github.com/sb-arnav/blade/releases/latest/download/Blade_0.4.0_x64-setup.exe) |
 | **Linux** | [`.AppImage` ↗](https://github.com/sb-arnav/blade/releases/latest/download/blade_0.4.0_amd64.AppImage) |
 
-> **macOS note:** On first launch, right-click → Open. Gatekeeper blocks unsigned apps by default.
+> **macOS note:** If you see "Blade is damaged and can't be opened", run this in Terminal after installing:
+> ```bash
+> xattr -cr /Applications/Blade.app
+> ```
+> This removes the quarantine flag macOS adds to downloaded apps. Blade isn't notarized yet (no Apple Developer certificate). Right-click → Open no longer bypasses this on macOS Sequoia.
 
 Installed builds auto-update from GitHub Releases.
 
