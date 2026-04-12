@@ -1,6 +1,7 @@
 mod agent_commands;
 mod ambient;
 mod evolution;
+mod research;
 mod background_agent;
 mod cron;
 mod execution_memory;
@@ -579,6 +580,9 @@ pub fn run() {
             evolution::evolution_install_suggestion,
             evolution::evolution_run_now,
             evolution::evolution_log_capability_gap,
+            research::research_get_recent,
+            research::research_query,
+            research::research_clear,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state

@@ -1,0 +1,286 @@
+/// BLADE AMBIENT RESEARCH ENGINE
+///
+/// Every 30 minutes, BLADE silently researches topics it detects from
+/// your active work context — the thread you're tracking, the apps
+/// you have open, the questions you've been asking.
+///
+/// Results are stored in the research_log table and injected into:
+/// - Pulse thoughts ("I found something relevant while you were working")
+/// - System prompt context ("Recent research: ...")
+/// - The Evolution dashboard
+///
+/// This is not search-on-demand. This is BLADE staying current on your behalf.
+
+use rusqlite::params;
+use serde::{Deserialize, Serialize};
+use tauri::Emitter;
+
+const RESEARCH_THROTTLE_SECS: i64 = 30 * 60; // at most once per 30 min
+const RESEARCH_CONTEXT_CHARS: usize = 3_000;  // max chars to include in system prompt
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResearchEntry {
+    pub id: i64,
+    pub query: String,
+    pub results: String,
+    pub source: String,
+    pub created_at: i64,
+}
+
+// ---------------------------------------------------------------------------
+// DB helpers
+// ---------------------------------------------------------------------------
+
+fn open_db() -> Option<rusqlite::Connection> {
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    rusqlite::Connection::open(&db_path).ok()
+}
+
+pub fn last_research_at() -> Option<i64> {
+    let conn = open_db()?;
+    conn.query_row(
+        "SELECT MAX(created_at) FROM research_log WHERE source = 'auto'",
+        [],
+        |row| row.get::<_, Option<i64>>(0),
+    )
+    .ok()
+    .flatten()
+}
+
+fn save_research(query: &str, results: &str, source: &str) -> bool {
+    let conn = match open_db() {
+        Some(c) => c,
+        None => return false,
+    };
+    let now = chrono::Utc::now().timestamp();
+    conn.execute(
+        "INSERT INTO research_log (query, results, source, created_at) VALUES (?1, ?2, ?3, ?4)",
+        params![query, results, source, now],
+    )
+    .is_ok()
+}
+
+/// Load recent research entries for context injection.
+pub fn get_recent_research(limit: usize) -> Vec<ResearchEntry> {
+    let conn = match open_db() {
+        Some(c) => c,
+        None => return vec![],
+    };
+    let mut stmt = match conn.prepare(
+        "SELECT id, query, results, source, created_at FROM research_log ORDER BY created_at DESC LIMIT ?1",
+    ) {
+        Ok(s) => s,
+        Err(_) => return vec![],
+    };
+    stmt.query_map(params![limit as i64], |row| {
+        Ok(ResearchEntry {
+            id: row.get(0)?,
+            query: row.get(1)?,
+            results: row.get(2)?,
+            source: row.get(3)?,
+            created_at: row.get(4)?,
+        })
+    })
+    .ok()
+    .map(|rows| rows.flatten().collect())
+    .unwrap_or_default()
+}
+
+/// Format recent research as a concise context string for system prompts.
+pub fn research_context_for_prompt() -> String {
+    let entries = get_recent_research(3);
+    if entries.is_empty() {
+        return String::new();
+    }
+
+    let lines: Vec<String> = entries
+        .iter()
+        .map(|e| {
+            let dt = chrono::DateTime::from_timestamp(e.created_at, 0)
+                .map(|d| d.with_timezone(&chrono::Local).format("%-H:%M").to_string())
+                .unwrap_or_else(|| "?".to_string());
+            let snippet = &e.results[..e.results.len().min(300)];
+            format!("**[{}] {}**\n{}", dt, e.query, snippet)
+        })
+        .collect();
+
+    let full = lines.join("\n\n");
+    if full.len() > RESEARCH_CONTEXT_CHARS {
+        format!("{}\n...(research log truncated)", &full[..RESEARCH_CONTEXT_CHARS])
+    } else {
+        full
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Topic extraction — no LLM call, pure heuristic
+// ---------------------------------------------------------------------------
+
+/// Extract 1-2 search queries from the current work context.
+/// Uses the active thread title + brain context as signals.
+pub fn extract_research_queries(thread: &str, brain_ctx: &str) -> Vec<String> {
+    let mut queries = Vec::new();
+
+    // Priority 1: active thread — first meaningful line is the "topic"
+    if !thread.trim().is_empty() {
+        let first_line = thread
+            .lines()
+            .find(|l| l.trim().len() > 10)
+            .unwrap_or("")
+            .trim();
+
+        if first_line.len() >= 10 {
+            // Trim title markup like "# Title" or "**Title**"
+            let clean = first_line
+                .trim_start_matches('#')
+                .trim_start_matches('*')
+                .trim_end_matches('*')
+                .trim();
+            if clean.len() >= 6 {
+                queries.push(format!("{} 2025", &clean[..clean.len().min(70)]));
+            }
+        }
+    }
+
+    // Priority 2: extract capitalized multi-char words from brain context
+    // (project names, tech stacks, product names)
+    if queries.len() < 2 {
+        let src = if !brain_ctx.is_empty() { brain_ctx } else { thread };
+        let tech_words: Vec<&str> = src
+            .split_whitespace()
+            .filter(|w| {
+                let w = w.trim_matches(|c: char| !c.is_alphanumeric());
+                let first = w.chars().next().unwrap_or(' ');
+                // Capitalized, 4+ chars, not common English words
+                first.is_uppercase()
+                    && w.len() >= 4
+                    && !matches!(
+                        w.to_lowercase().as_str(),
+                        "this" | "that" | "with" | "from" | "have" | "been"
+                            | "they" | "your" | "will" | "when" | "what"
+                            | "blade" | "user" | "the" | "and" | "for"
+                    )
+            })
+            .take(4)
+            .collect();
+
+        if tech_words.len() >= 2 {
+            let term = tech_words[..tech_words.len().min(3)].join(" ");
+            queries.push(format!("{} tutorial OR documentation OR best practices", term));
+        }
+    }
+
+    queries
+}
+
+// ---------------------------------------------------------------------------
+// Main research cycle
+// ---------------------------------------------------------------------------
+
+/// Run a single research cycle. Called from the evolution loop every 15 min,
+/// but internally throttled to 30 min to avoid burning API quota.
+pub async fn run_research_cycle(app: &tauri::AppHandle) {
+    // Throttle
+    let now = chrono::Utc::now().timestamp();
+    if let Some(last) = last_research_at() {
+        if now - last < RESEARCH_THROTTLE_SECS {
+            return;
+        }
+    }
+
+    // Get context
+    let thread = crate::thread::get_active_thread().unwrap_or_default();
+    let brain_ctx = {
+        let db_path = crate::config::blade_config_dir().join("blade.db");
+        rusqlite::Connection::open(&db_path)
+            .map(|c| crate::db::brain_build_context(&c, 150))
+            .unwrap_or_default()
+    };
+
+    let queries = extract_research_queries(&thread, &brain_ctx);
+    if queries.is_empty() {
+        return;
+    }
+
+    let mut researched: Vec<String> = Vec::new();
+
+    for query in queries.iter().take(2) {
+        let (results_str, is_err) = crate::native_tools::execute(
+            "blade_search_web",
+            &serde_json::json!({ "query": query, "max_results": 4 }),
+            None,
+        )
+        .await;
+
+        if !is_err && results_str.len() > 80 {
+            if save_research(query, &results_str, "auto") {
+                researched.push(query.clone());
+
+                // Also push to activity timeline so it shows up in briefings/pulse
+                let db_path = crate::config::blade_config_dir().join("blade.db");
+                if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                    let _ = crate::db::timeline_record(
+                        &conn,
+                        "research",
+                        &format!("Researched: {}", &query[..query.len().min(60)]),
+                        &results_str[..results_str.len().min(600)],
+                        "BLADE",
+                        "{}",
+                    );
+                }
+            }
+        }
+    }
+
+    if !researched.is_empty() {
+        log::info!("[research] Completed: {:?}", researched);
+        let _ = app.emit(
+            "blade_research_update",
+            serde_json::json!({ "queries": researched }),
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tauri commands
+// ---------------------------------------------------------------------------
+
+/// Get recent research entries for the frontend
+#[tauri::command]
+pub fn research_get_recent(limit: Option<usize>) -> Vec<ResearchEntry> {
+    get_recent_research(limit.unwrap_or(10))
+}
+
+/// Trigger a manual research cycle on a specific query
+#[tauri::command]
+pub async fn research_query(query: String) -> Result<String, String> {
+    let (results, is_err) = crate::native_tools::execute(
+        "blade_search_web",
+        &serde_json::json!({ "query": &query, "max_results": 5 }),
+        None,
+    )
+    .await;
+
+    if is_err {
+        return Err(results);
+    }
+
+    save_research(&query, &results, "manual");
+
+    Ok(results)
+}
+
+/// Clear old research entries (older than N days)
+#[tauri::command]
+pub fn research_clear(older_than_days: Option<i64>) -> Result<usize, String> {
+    let conn = open_db().ok_or("DB unavailable")?;
+    let cutoff =
+        chrono::Utc::now().timestamp() - older_than_days.unwrap_or(7) * 86400;
+    let deleted = conn
+        .execute(
+            "DELETE FROM research_log WHERE created_at < ?1",
+            params![cutoff],
+        )
+        .map_err(|e| e.to_string())?;
+    Ok(deleted)
+}

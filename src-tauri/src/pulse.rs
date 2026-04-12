@@ -154,15 +154,19 @@ async fn generate_pulse_thought(config: &crate::config::BladeConfig) -> Result<S
     // Load recent journal — BLADE's own internal observations from prior days
     let journal = crate::journal::read_recent_journal(2);
 
+    // Load what BLADE has been researching in the background
+    let recent_research = crate::research::research_context_for_prompt();
+
     // If god mode is off AND there's no meaningful stored context, skip pulse entirely.
     // Without real context, the model would have to fabricate observations — that's the bug.
+    // Recent research counts as real context — BLADE was doing work on your behalf.
     let has_real_context = !machine_ctx.is_empty() || !active_thread.trim().is_empty()
-        || !memory_summary.trim().is_empty();
+        || !memory_summary.trim().is_empty() || !recent_research.is_empty();
     if !has_real_context {
         return Err("Insufficient context for honest pulse (enable God Mode for ambient thoughts)".to_string());
     }
 
-    let prompt = build_pulse_prompt(&machine_ctx, &activity, &active_thread, &memory_summary, &journal, &last_thought, config);
+    let prompt = build_pulse_prompt(&machine_ctx, &activity, &active_thread, &memory_summary, &journal, &last_thought, &recent_research, config);
 
     // Use the cheapest/fastest available model for pulse — it's ambient, not critical
     let pulse_model = cheapest_model(&config.provider, &config.model);
@@ -187,6 +191,7 @@ fn build_pulse_prompt(
     memory_summary: &str,
     journal: &str,
     last_thought: &str,
+    recent_research: &str,
     config: &crate::config::BladeConfig,
 ) -> String {
     let name_line = if !config.user_name.is_empty() {
@@ -210,6 +215,7 @@ fn build_pulse_prompt(
         if !machine_ctx.trim().is_empty() { Some(format!("Machine context:\n{}", &machine_ctx[..machine_ctx.len().min(800)])) } else { None },
         if !memory_summary.trim().is_empty() { Some(format!("What you know about this person:\n{}", &memory_summary[..memory_summary.len().min(500)])) } else { None },
         if !journal.trim().is_empty() { Some(format!("Your own recent journal entries:\n{}", &journal[..journal.len().min(600)])) } else { None },
+        if !recent_research.trim().is_empty() { Some(format!("What you've been researching in the background:\n{}", &recent_research[..recent_research.len().min(600)])) } else { None },
     ]
     .into_iter()
     .flatten()
@@ -370,11 +376,8 @@ pub async fn maybe_morning_briefing(app: tauri::AppHandle) {
         }
     }
 
-    // Only fire in morning (5am–12pm local) — don't interrupt afternoon sessions
-    let hour = now.hour();
-    if hour < 5 || hour >= 12 {
-        return;
-    }
+    // Fire on first open of any day — no hour restriction.
+    // (The original 5am-12pm gate was wrong for night-shift schedules.)
 
     // Build briefing prompt
     let thread = crate::thread::get_active_thread().unwrap_or_default();

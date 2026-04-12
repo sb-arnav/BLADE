@@ -521,6 +521,9 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
   const [evolutionSuggestions, setEvolutionSuggestions] = useState<EvolutionSuggestion[]>([]);
   const [evolutionRunning, setEvolutionRunning] = useState(false);
   const [suggestionTokens, setSuggestionTokens] = useState<Record<string, string>>({});
+  const [researchEntries, setResearchEntries] = useState<Array<{ id: number; query: string; results: string; source: string; created_at: number }>>([]);
+  const [researchQuery, setResearchQuery] = useState("");
+  const [researchRunning, setResearchRunning] = useState(false);
   const [provider, setProvider] = useState(config.provider);
   const [apiKey, setApiKey] = useState(config.api_key);
   const [model, setModel] = useState(config.model);
@@ -566,12 +569,14 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
     if (tab !== "evolution") return;
     const load = async () => {
       try {
-        const [level, suggestions] = await Promise.all([
+        const [level, suggestions, research] = await Promise.all([
           invoke<EvolutionLevel>("evolution_get_level"),
           invoke<EvolutionSuggestion[]>("evolution_get_suggestions"),
+          invoke<Array<{ id: number; query: string; results: string; source: string; created_at: number }>>("research_get_recent", { limit: 8 }),
         ]);
         setEvolutionLevel(level);
         setEvolutionSuggestions(suggestions);
+        setResearchEntries(research);
       } catch {
         // non-fatal
       }
@@ -1287,6 +1292,106 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             </p>
           </section>
         )}
+
+        {/* Research Log */}
+        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold">Intelligence Feed</h2>
+              <p className="text-xs text-blade-muted">What BLADE has been researching while you work</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                className="text-xs bg-blade-bg border border-blade-border rounded-lg px-2 py-1 w-40 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                placeholder="Search anything..."
+                value={researchQuery}
+                onChange={(e) => setResearchQuery(e.target.value)}
+                onKeyDown={async (e) => {
+                  if (e.key !== "Enter" || !researchQuery.trim() || researchRunning) return;
+                  setResearchRunning(true);
+                  try {
+                    const result = await invoke<string>("research_query", { query: researchQuery.trim() });
+                    const fresh = await invoke<Array<{ id: number; query: string; results: string; source: string; created_at: number }>>("research_get_recent", { limit: 8 });
+                    setResearchEntries(fresh);
+                    setResearchQuery("");
+                  } catch {
+                    // ignore
+                  } finally {
+                    setResearchRunning(false);
+                  }
+                }}
+              />
+              <button
+                className="text-xs px-3 py-1 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-medium transition-colors disabled:opacity-40"
+                disabled={!researchQuery.trim() || researchRunning}
+                onClick={async () => {
+                  if (!researchQuery.trim() || researchRunning) return;
+                  setResearchRunning(true);
+                  try {
+                    await invoke<string>("research_query", { query: researchQuery.trim() });
+                    const fresh = await invoke<Array<{ id: number; query: string; results: string; source: string; created_at: number }>>("research_get_recent", { limit: 8 });
+                    setResearchEntries(fresh);
+                    setResearchQuery("");
+                  } catch {
+                    // ignore
+                  } finally {
+                    setResearchRunning(false);
+                  }
+                }}
+              >
+                {researchRunning ? "..." : "Search"}
+              </button>
+            </div>
+          </div>
+
+          {researchEntries.length === 0 ? (
+            <p className="text-xs text-blade-muted text-center py-4">
+              BLADE will research topics from your active work every 30 minutes.<br />
+              Or search anything manually above.
+            </p>
+          ) : (
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {researchEntries.map((entry) => {
+                const dt = new Date(entry.created_at * 1000);
+                const timeStr = dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+                // Extract top 2 result lines from the raw text
+                const lines = entry.results.split("\n").filter(l => l.trim().length > 0).slice(0, 6);
+                return (
+                  <div key={entry.id} className="border border-blade-border rounded-xl bg-blade-bg/60 p-3 space-y-1.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-xs font-semibold text-violet-300">{entry.query}</span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {entry.source === "auto" ? (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-violet-900/40 text-violet-400 rounded-full">auto</span>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-blue-900/40 text-blue-400 rounded-full">manual</span>
+                        )}
+                        <span className="text-[10px] text-blade-muted">{timeStr}</span>
+                      </div>
+                    </div>
+                    <div className="text-[11px] text-blade-muted leading-relaxed font-mono whitespace-pre-wrap">
+                      {lines.join("\n")}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {researchEntries.length > 0 && (
+            <button
+              className="text-[11px] text-blade-muted hover:text-red-400 transition-colors"
+              onClick={async () => {
+                try {
+                  await invoke("research_clear", { olderThanDays: 0 });
+                  setResearchEntries([]);
+                } catch { /* ignore */ }
+              }}
+            >
+              Clear all research
+            </button>
+          )}
+        </section>
         </>}
 
         {tab === "privacy" && <>
