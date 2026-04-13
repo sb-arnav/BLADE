@@ -451,6 +451,12 @@ fn build_system_prompt_inner(
         parts.push(social_summary);
     }
 
+    // Prediction Engine — anticipatory intelligence: upcoming patterns and suggestions
+    let pred_ctx = crate::prediction_engine::get_prediction_context();
+    if !pred_ctx.is_empty() {
+        parts.push(pred_ctx);
+    }
+
     // Document Library — inject summary of ingested documents
     let lib_ctx = crate::document_intelligence::get_library_context();
     if !lib_ctx.is_empty() {
@@ -464,6 +470,12 @@ fn build_system_prompt_inner(
     let forged = crate::tool_forge::get_tool_usage_for_prompt();
     if !forged.is_empty() {
         parts.push(forged);
+    }
+
+    // Emotional Intelligence — adapt tone based on user's detected emotional state
+    let emotional = crate::emotional_intelligence::get_emotional_context();
+    if !emotional.is_empty() {
+        parts.push(emotional);
     }
 
     // MCP tools (native tools are described in identity already)

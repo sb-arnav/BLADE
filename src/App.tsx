@@ -52,7 +52,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, EBState> {
   }
 }
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar" | "workflow-builder" | "code-sandbox" | "persona" | "negotiation" | "financial" | "context-engine" | "reasoning" | "social-graph" | "health" | "documents" | "habits" | "knowledge-graph" | "meetings";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar" | "workflow-builder" | "code-sandbox" | "persona" | "negotiation" | "financial" | "context-engine" | "reasoning" | "social-graph" | "health" | "documents" | "habits" | "knowledge-graph" | "meetings" | "predictions" | "emotional-intel";
 
 const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
 const Canvas = lazy(() => import("./components/Canvas"));
@@ -107,6 +107,8 @@ const DocumentView = lazy(() => import("./components/DocumentView").then(m => ({
 const HabitView = lazy(() => import("./components/HabitView").then(m => ({ default: m.HabitView })));
 const KnowledgeGraphView = lazy(() => import("./components/KnowledgeGraphView").then(m => ({ default: m.KnowledgeGraphView })));
 const MeetingView = lazy(() => import("./components/MeetingView").then(m => ({ default: m.MeetingView })));
+const PredictionView = lazy(() => import("./components/PredictionView").then(m => ({ default: m.PredictionView })));
+const EmotionalIntelligenceView = lazy(() => import("./components/EmotionalIntelligenceView").then(m => ({ default: m.EmotionalIntelligenceView })));
 
 function ShellFallback({ label = "Loading workspace..." }: { label?: string }) {
   return (
@@ -960,6 +962,8 @@ export default function App() {
     "habits": <HabitView onBack={() => openRoute("chat")} />,
     "knowledge-graph": <KnowledgeGraphView onBack={() => openRoute("chat")} />,
     "meetings": <MeetingView onBack={() => openRoute("chat")} />,
+    "predictions": <PredictionView onBack={() => openRoute("chat")} />,
+    "emotional-intel": <EmotionalIntelligenceView onBack={() => openRoute("chat")} />,
   };
 
   if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {
