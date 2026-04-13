@@ -211,6 +211,7 @@ async fn coordinator_loop(
                 &config.provider,
                 &config.api_key,
                 &config.model,
+                config.base_url.as_deref(),
                 &swarm.goal,
                 tasks,
             )
@@ -311,6 +312,7 @@ pub async fn swarm_create(
         &config.provider,
         &config.api_key,
         &config.model,
+        config.base_url.as_deref(),
         &swarm_id,
         &goal,
     )

@@ -123,10 +123,10 @@ fn build_agent_command(agent_type: &str, task: &str, _cwd: &str) -> Option<(Stri
         }
         "bash" => {
             // Raw bash script — for when BLADE writes a script and runs it
-            Some((
-                "bash".to_string(),
-                vec!["-c".to_string(), task.to_string()],
-            ))
+            #[cfg(target_os = "windows")]
+            return Some(("cmd".to_string(), vec!["/C".to_string(), task.to_string()]));
+            #[cfg(not(target_os = "windows"))]
+            Some(("bash".to_string(), vec!["-c".to_string(), task.to_string()]))
         }
         _ => None,
     }
@@ -145,7 +145,12 @@ pub async fn agent_spawn(
     let work_dir = cwd.clone().unwrap_or_else(|| {
         dirs::home_dir()
             .map(|h| h.to_string_lossy().to_string())
-            .unwrap_or_else(|| "/tmp".to_string())
+            .unwrap_or_else(|| {
+                #[cfg(target_os = "windows")]
+                return std::env::var("TEMP").unwrap_or_else(|_| "C:\\Temp".to_string());
+                #[cfg(not(target_os = "windows"))]
+                "/tmp".to_string()
+            })
     });
 
     let (cmd, args) = build_agent_command(&agent_type, &task, &work_dir)

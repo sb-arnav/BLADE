@@ -1030,6 +1030,7 @@ export default function App() {
               pendingApproval={chat.pendingApproval}
               onRespondApproval={chat.respondToApproval}
               onDeleteConversation={chat.deleteConversation}
+              onUpdateConversationTitle={chat.updateConversationTitle}
               onRetry={chat.retryLastMessage}
               onSlashCommand={handleSlashCommand}
               provider={config?.provider}

@@ -26,6 +26,7 @@ interface Props {
   pendingApproval: ToolApprovalRequest | null;
   onRespondApproval: (approved: boolean) => void;
   onDeleteConversation: (id: string) => void;
+  onUpdateConversationTitle?: (id: string, title: string) => void;
   onRetry: () => void;
   onSlashCommand?: (action: string) => void;
   provider?: string;
@@ -82,6 +83,7 @@ export function ChatWindow({
   pendingApproval,
   onRespondApproval,
   onDeleteConversation,
+  onUpdateConversationTitle,
   onRetry,
   onSlashCommand,
   provider,
@@ -126,9 +128,10 @@ export function ChatWindow({
     const title = renameValue.trim();
     if (title && title.length <= 80) {
       invoke("history_rename_conversation", { conversationId: id, title }).catch(() => {});
+      onUpdateConversationTitle?.(id, title);
     }
     setRenamingId(null);
-  }, [renameValue]);
+  }, [renameValue, onUpdateConversationTitle]);
 
   const filteredConversations = useMemo(() => {
     if (!search.trim()) return conversations;
