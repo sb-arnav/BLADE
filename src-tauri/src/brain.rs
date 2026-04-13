@@ -369,6 +369,11 @@ fn build_system_prompt_inner(
         }
     }
 
+    // Security expertise injection — activate when user is doing security work
+    if !user_query.is_empty() && crate::kali::is_security_context(user_query) {
+        parts.push(format!("## Security Expertise\n\n{}", crate::kali::security_system_prompt()));
+    }
+
     // MCP tools (native tools are described in identity already)
     if !tools.is_empty() {
         let tool_list: Vec<String> = tools

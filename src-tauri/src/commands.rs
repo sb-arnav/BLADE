@@ -659,6 +659,12 @@ pub async fn send_message_stream(
                         }
                     }
                 }
+                // SELF-CRITIQUE: background quality check — rebuild if score < 7
+                if let Some(improved) = crate::self_critique::maybe_critique(&user_text, &assistant_text).await {
+                    let _ = app2.emit("response_improved", serde_json::json!({
+                        "improved": improved,
+                    }));
+                }
             });
             // THREAD: auto-update working memory (spawns its own background task)
             crate::thread::auto_update_thread(app.clone(), user_text_thread.clone(), assistant_text_thread);
