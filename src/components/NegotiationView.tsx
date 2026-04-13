@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -49,26 +49,6 @@ function VerdictModal({ verdict, onClose }: { verdict: string; onClose: () => vo
           <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none">✕</button>
         </div>
         <div className="text-gray-200 text-sm leading-relaxed whitespace-pre-wrap font-mono">{verdict}</div>
-        <button
-          onClick={onClose}
-          className="mt-6 w-full bg-green-900/40 border border-green-700 text-green-400 font-mono text-xs py-2 hover:bg-green-900/60 transition-colors"
-        >
-          CLOSE
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function BudgetModal({ content, onClose }: { content: string; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-black border border-gray-700 rounded max-w-lg w-full p-6">
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-green-400 font-mono text-sm uppercase tracking-widest">// Budget Recommendation</span>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none">✕</button>
-        </div>
-        <div className="text-gray-200 text-sm leading-relaxed whitespace-pre-wrap font-mono">{content}</div>
         <button
           onClick={onClose}
           className="mt-6 w-full bg-green-900/40 border border-green-700 text-green-400 font-mono text-xs py-2 hover:bg-green-900/60 transition-colors"
@@ -586,7 +566,7 @@ function NegotiationPanel() {
               <textarea
                 rows={2}
                 className="bg-black border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700 resize-none"
-                placeholder='e.g. "I need at least $120k or I\'ll have to consider other offers"'
+                placeholder={`e.g. "I need at least $120k or I'll have to consider other offers"`}
                 value={userMove}
                 onChange={(e) => setUserMove(e.target.value)}
               />
