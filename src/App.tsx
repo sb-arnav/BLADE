@@ -52,7 +52,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, EBState> {
   }
 }
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar" | "workflow-builder" | "code-sandbox" | "persona" | "negotiation" | "financial" | "context-engine" | "reasoning" | "social-graph" | "health" | "documents";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar" | "workflow-builder" | "code-sandbox" | "persona" | "negotiation" | "financial" | "context-engine" | "reasoning" | "social-graph" | "health" | "documents" | "habits" | "knowledge-graph" | "meetings";
 
 const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
 const Canvas = lazy(() => import("./components/Canvas"));
@@ -104,6 +104,9 @@ const ReasoningView = lazy(() => import("./components/ReasoningView").then(m => 
 const SocialGraphView = lazy(() => import("./components/SocialGraphView").then(m => ({ default: m.SocialGraphView })));
 const HealthView = lazy(() => import("./components/HealthView").then(m => ({ default: m.HealthView })));
 const DocumentView = lazy(() => import("./components/DocumentView").then(m => ({ default: m.DocumentView })));
+const HabitView = lazy(() => import("./components/HabitView").then(m => ({ default: m.HabitView })));
+const KnowledgeGraphView = lazy(() => import("./components/KnowledgeGraphView").then(m => ({ default: m.KnowledgeGraphView })));
+const MeetingView = lazy(() => import("./components/MeetingView").then(m => ({ default: m.MeetingView })));
 
 function ShellFallback({ label = "Loading workspace..." }: { label?: string }) {
   return (
@@ -954,6 +957,9 @@ export default function App() {
     "social-graph": <SocialGraphView onBack={() => openRoute("chat")} />,
     "health": <HealthView onBack={() => openRoute("chat")} />,
     "documents": <DocumentView onBack={() => openRoute("chat")} />,
+    "habits": <HabitView onBack={() => openRoute("chat")} />,
+    "knowledge-graph": <KnowledgeGraphView onBack={() => openRoute("chat")} />,
+    "meetings": <MeetingView onBack={() => openRoute("chat")} />,
   };
 
   if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {

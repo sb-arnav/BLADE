@@ -394,6 +394,14 @@ fn build_system_prompt_inner(
         parts.push(memory_ctx);
     }
 
+    // Knowledge graph — semantic concept network (related concepts and their connections)
+    if !user_query.is_empty() {
+        let graph_ctx = crate::knowledge_graph::get_graph_context(user_query);
+        if !graph_ctx.is_empty() {
+            parts.push(graph_ctx);
+        }
+    }
+
     // World model — inject current machine state (git, processes, ports, TODOs, system load)
     let world_summary = crate::world_model::get_world_summary();
     if !world_summary.is_empty() {
@@ -416,6 +424,18 @@ fn build_system_prompt_inner(
     let health_ctx = crate::health_tracker::get_health_context();
     if !health_ctx.is_empty() {
         parts.push(health_ctx);
+    }
+
+    // Habit Engine — inject today's habit status (streaks, completions, alerts)
+    let habits = crate::habit_engine::get_habits_context();
+    if !habits.is_empty() {
+        parts.push(habits);
+    }
+
+    // Meeting Intelligence — inject open action items so BLADE knows what's pending
+    let meeting_action_ctx = crate::meeting_intelligence::get_action_item_context();
+    if !meeting_action_ctx.is_empty() {
+        parts.push(meeting_action_ctx);
     }
 
     // Social Graph — inject contact profile if the query mentions a known person,
