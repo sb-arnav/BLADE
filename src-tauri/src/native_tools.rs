@@ -1409,6 +1409,41 @@ pub async fn run_code_block(command: String) -> Result<String, String> {
     Ok(output)
 }
 
+/// Run a shell command in an optional working directory.
+/// Used by the ProjectDashboard to execute npm/yarn/pnpm scripts.
+#[tauri::command]
+pub async fn run_shell(command: String, cwd: Option<String>) -> Result<String, String> {
+    let (output, _is_error) = bash(&command, cwd.as_deref(), 60_000).await;
+    Ok(output)
+}
+
+/// Quick one-shot AI completion for lightweight summarization/analysis tasks.
+/// Used by RSS reader, analytics panels, etc. Returns plain text response.
+#[tauri::command]
+pub async fn ask_ai(prompt: String) -> Result<String, String> {
+    let config = crate::config::load_config();
+    if config.api_key.is_empty() && config.provider != "ollama" {
+        return Err("No API key configured".to_string());
+    }
+    use crate::providers::{ChatMessage, build_conversation, complete_turn};
+    let messages = vec![ChatMessage {
+        role: "user".to_string(),
+        content: prompt,
+        image_base64: None,
+    }];
+    let conversation = build_conversation(messages, None);
+    let turn = complete_turn(
+        &config.provider,
+        &config.api_key,
+        &config.model,
+        &conversation,
+        &[],
+        config.base_url.as_deref(),
+    )
+    .await?;
+    Ok(turn.content.trim().to_string())
+}
+
 async fn open_url(url: &str) -> (String, bool) {
     // Validate it looks like a URL before passing to the OS
     if !url.starts_with("http://") && !url.starts_with("https://") {

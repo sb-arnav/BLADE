@@ -437,7 +437,7 @@ export function useScheduledTasks() {
       case "file":
         if (task.outputFilePath) {
           try {
-            await invoke("write_file", {
+            await invoke("file_write", {
               path: task.outputFilePath,
               content: `# ${task.name}\n_Generated: ${new Date().toISOString()}_\n\n${result}`,
             });

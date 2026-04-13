@@ -157,6 +157,12 @@ pub async fn auto_install(gap: &CapabilityGap) -> InstallResult {
     let cmd = &gap.install_cmd;
     log::info!("[self-upgrade] Installing: {}", gap.suggestion);
 
+    #[cfg(target_os = "windows")]
+    let output = tokio::process::Command::new("cmd")
+        .args(["/C", cmd])
+        .output()
+        .await;
+    #[cfg(not(target_os = "windows"))]
     let output = tokio::process::Command::new("sh")
         .args(["-c", cmd])
         .output()
@@ -259,7 +265,13 @@ pub async fn auto_resolve_unknown_gap(capability: &str) -> String {
 
         log::info!("[self-upgrade] Trying candidate: {} — {}", pkg, desc);
 
-        let install_cmd = format!("npm install -g {} 2>&1", pkg);
+        let install_cmd = format!("npm install -g {}", pkg);
+        #[cfg(target_os = "windows")]
+        let output = tokio::process::Command::new("cmd")
+            .args(["/C", &install_cmd])
+            .output()
+            .await;
+        #[cfg(not(target_os = "windows"))]
         let output = tokio::process::Command::new("sh")
             .args(["-c", &install_cmd])
             .output()

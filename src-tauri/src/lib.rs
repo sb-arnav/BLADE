@@ -389,6 +389,8 @@ pub fn run() {
             clipboard::set_clipboard,
             clipboard::get_clipboard_prefetch,
             native_tools::run_code_block,
+            native_tools::run_shell,
+            native_tools::ask_ai,
             ai_delegate::ai_delegate_introduce,
             ai_delegate::ai_delegate_check,
             discovery::run_discovery,
