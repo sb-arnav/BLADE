@@ -52,7 +52,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, EBState> {
   }
 }
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar" | "workflow-builder" | "code-sandbox" | "persona";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar" | "workflow-builder" | "code-sandbox" | "persona" | "negotiation" | "financial" | "context-engine";
 
 const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
 const Canvas = lazy(() => import("./components/Canvas"));
@@ -97,6 +97,9 @@ const SidecarView = lazy(() => import("./components/SidecarView").then(m => ({ d
 const WorkflowBuilderView = lazy(() => import("./components/WorkflowBuilderView").then(m => ({ default: m.WorkflowBuilderView })));
 const CodeSandboxView = lazy(() => import("./components/CodeSandboxView").then(m => ({ default: m.CodeSandboxView })));
 const PersonaView = lazy(() => import("./components/PersonaView").then(m => ({ default: m.PersonaView })));
+const NegotiationView = lazy(() => import("./components/NegotiationView").then(m => ({ default: m.NegotiationView })));
+const FinancialView = lazy(() => import("./components/FinancialView").then(m => ({ default: m.FinancialView })));
+const ContextEngineView = lazy(() => import("./components/ContextEngineView").then(m => ({ default: m.ContextEngineView })));
 
 function ShellFallback({ label = "Loading workspace..." }: { label?: string }) {
   return (
@@ -940,6 +943,9 @@ export default function App() {
     "workflow-builder": <WorkflowBuilderView onBack={() => openRoute("chat")} />,
     "code-sandbox": <CodeSandboxView onBack={() => openRoute("chat")} />,
     "persona": <PersonaView onBack={() => openRoute("chat")} />,
+    "negotiation": <NegotiationView onBack={() => openRoute("chat")} />,
+    "financial": <FinancialView onBack={() => openRoute("chat")} />,
+    "context-engine": <ContextEngineView onBack={() => openRoute("chat")} />,
   };
 
   if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {

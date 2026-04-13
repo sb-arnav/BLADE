@@ -406,6 +406,12 @@ fn build_system_prompt_inner(
         parts.push(accountability_ctx);
     }
 
+    // Financial Brain — inject spending summary when meaningful data exists
+    let fin = crate::financial_brain::get_financial_context();
+    if !fin.is_empty() {
+        parts.push(fin);
+    }
+
     // Forged tools — inject custom tools BLADE has built at runtime
     let forged = crate::tool_forge::get_tool_usage_for_prompt();
     if !forged.is_empty() {
