@@ -124,7 +124,7 @@ export function useVoiceMode({ config, onTranscription }: VoiceModeOptions) {
       if (finalText) onTranscription(finalText, shouldAutoSend ?? false);
     } catch (e) {
       setErrorMsg(typeof e === "string" ? e : "Transcription failed");
-      setTimeout(() => setErrorMsg(null), 4000);
+      setTimeout(() => setErrorMsg(null), 8000);
     }
     setStatus(mode === "always-on" ? "listening" : "idle");
   }, [mode, isExtremeGodMode, onTranscription]);
@@ -203,7 +203,7 @@ export function useVoiceMode({ config, onTranscription }: VoiceModeOptions) {
 
     } catch (e) {
       setErrorMsg("Microphone access denied");
-      setTimeout(() => setErrorMsg(null), 4000);
+      setTimeout(() => setErrorMsg(null), 8000);
       setStatus("error");
     }
   }, [mode, transcribeAndRoute]);
@@ -217,7 +217,7 @@ export function useVoiceMode({ config, onTranscription }: VoiceModeOptions) {
       await invoke("voice_start_recording");
     } catch (e) {
       setErrorMsg(typeof e === "string" ? e : "Mic not available");
-      setTimeout(() => setErrorMsg(null), 4000);
+      setTimeout(() => setErrorMsg(null), 8000);
       pttActiveRef.current = false;
       setStatus("idle");
     }
@@ -234,7 +234,7 @@ export function useVoiceMode({ config, onTranscription }: VoiceModeOptions) {
       if (trimmed) onTranscription(trimmed, true); // push-to-talk always auto-sends
     } catch (e) {
       setErrorMsg(typeof e === "string" ? e : "Transcription failed");
-      setTimeout(() => setErrorMsg(null), 4000);
+      setTimeout(() => setErrorMsg(null), 8000);
     }
     setStatus("idle");
   }, [onTranscription]);

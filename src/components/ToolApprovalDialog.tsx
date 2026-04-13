@@ -65,10 +65,10 @@ export function ToolApprovalDialog({ request, onRespond }: Props) {
       <div className="fixed inset-0 bg-black/50 backdrop-blur-[2px]" onClick={() => onRespond(false)} />
 
       <div className={`relative w-full max-w-sm mx-4 rounded-2xl shadow-2xl overflow-hidden animate-fade-in border ${risk.border} ${risk.bg}`}>
-        {/* Timer progress bar */}
+        {/* Timer progress bar — turns red in last 15s */}
         <div className="h-0.5 bg-blade-border/30">
           <div
-            className="h-full bg-amber-400/60 transition-all duration-1000 ease-linear"
+            className={`h-full transition-all duration-1000 ease-linear ${secondsLeft <= 15 ? "bg-red-500/70" : "bg-amber-400/60"}`}
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -79,7 +79,7 @@ export function ToolApprovalDialog({ request, onRespond }: Props) {
             <span className={`w-2 h-2 rounded-full ${risk.dot} animate-pulse`} />
             <span className="text-xs font-semibold text-blade-text">BLADE wants permission</span>
           </div>
-          <span className="text-2xs text-blade-muted font-mono tabular-nums">{secondsLeft}s</span>
+          <span className={`text-2xs font-mono tabular-nums ${secondsLeft <= 15 ? "text-red-400 animate-pulse" : "text-blade-muted"}`}>{secondsLeft}s</span>
         </div>
 
         {/* Tool */}
