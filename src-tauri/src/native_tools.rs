@@ -1427,7 +1427,7 @@ pub async fn ask_ai(prompt: String) -> Result<String, String> {
         return Err("No API key configured".to_string());
     }
     let model = match config.provider.as_str() {
-        "anthropic" => "claude-haiku-4-5".to_string(),
+        "anthropic" => "claude-haiku-4-5-20251001".to_string(),
         "openai" => "gpt-4o-mini".to_string(),
         "gemini" => "gemini-2.0-flash-lite".to_string(),
         "groq" => "llama-3.1-8b-instant".to_string(),
