@@ -72,7 +72,13 @@ pub fn detect_available_agents() -> Vec<String> {
 }
 
 fn which_bin(name: &str) -> bool {
-    std::process::Command::new("which")
+    // Windows uses `where`, Unix uses `which`
+    #[cfg(target_os = "windows")]
+    let cmd = "where";
+    #[cfg(not(target_os = "windows"))]
+    let cmd = "which";
+
+    std::process::Command::new(cmd)
         .arg(name)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
