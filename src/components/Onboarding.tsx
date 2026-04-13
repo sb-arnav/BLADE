@@ -19,6 +19,14 @@ const PROVIDERS = [
     keyUrl: "https://console.groq.com/keys",
   },
   {
+    id: "openrouter",
+    name: "OpenRouter",
+    description: "One key, 200+ models — free models available",
+    model: "meta-llama/llama-3.3-70b-instruct:free",
+    needsKey: true,
+    keyUrl: "https://openrouter.ai/settings/keys",
+  },
+  {
     id: "openai",
     name: "OpenAI",
     description: "GPT-4o mini, reliable",
@@ -187,8 +195,13 @@ export function Onboarding({ onComplete }: Props) {
             )}
             {testError && (
               <div className="space-y-3">
-                <div className="px-3.5 py-2.5 rounded-lg bg-red-500/8 border border-red-500/15 text-red-400 text-xs">
-                  {testError}
+                <div className="px-3.5 py-2.5 rounded-lg bg-red-500/8 border border-red-500/15 text-red-400 text-xs space-y-1.5">
+                  <div>{testError}</div>
+                  {(testError.includes("credits") || testError.includes("402") || testError.includes("afford")) && (
+                    <div className="text-amber-400/80 pt-1 border-t border-red-500/10">
+                      Tip: OpenRouter free models (e.g. <span className="font-mono">meta-llama/llama-3.3-70b-instruct:free</span>) work without any credits. Change the model in settings after connecting.
+                    </div>
+                  )}
                 </div>
                 <button
                   onClick={() => setStep("key")}

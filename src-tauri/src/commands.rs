@@ -176,7 +176,7 @@ async fn compress_conversation_smart(
         "openai" => "gpt-4o-mini",
         "gemini" => "gemini-2.0-flash",
         "groq" => "llama-3.1-8b-instant",
-        "openrouter" => "anthropic/claude-haiku-4.5",
+        "openrouter" => "meta-llama/llama-3.3-70b-instruct:free",
         _ => model,
     };
 
@@ -265,7 +265,7 @@ fn safe_fallback_model(provider: &str) -> &'static str {
         "openai"      => "gpt-4o-mini",
         "gemini"      => "gemini-2.0-flash",
         "groq"        => "llama-3.3-70b-versatile",
-        "openrouter"  => "anthropic/claude-haiku-4.5",
+        "openrouter"  => "meta-llama/llama-3.3-70b-instruct:free",
         _             => "gpt-4o-mini", // OpenAI-compat default
     }
 }
@@ -342,7 +342,7 @@ pub async fn send_message_stream(
             ("anthropic", m) if m.contains("sonnet") || m.contains("opus") => "claude-haiku-4-5-20251001".to_string(),
             ("openai", m) if m == "gpt-4o" || m.contains("gpt-4-") => "gpt-4o-mini".to_string(),
             ("gemini", m) if m.contains("pro") || m.contains("1.5") => "gemini-2.0-flash".to_string(),
-            ("openrouter", m) if m.contains("sonnet") || m.contains("opus") || m.contains("gpt-4o") && !m.contains("mini") => "anthropic/claude-haiku-4.5".to_string(),
+            ("openrouter", _m) => config.model.clone(), // don't override — user picked it
             _ => config.model.clone(),
         };
     }
@@ -1327,7 +1327,7 @@ pub async fn auto_title_conversation(
         "openai"     => "gpt-4o-mini",
         "groq"       => "llama-3.1-8b-instant",
         "gemini"     => "gemini-2.0-flash-lite",
-        "openrouter" => "anthropic/claude-haiku-4.5",
+        "openrouter" => "meta-llama/llama-3.3-70b-instruct:free",
         _            => return Ok(()), // skip for local/unknown providers (ollama etc.)
     };
 

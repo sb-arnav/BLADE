@@ -76,8 +76,8 @@ const PROVIDER_MATRIX: ProviderEntry[] = [
   {
     id: "openrouter",
     name: "OpenRouter",
-    model: "anthropic/claude-sonnet-4.5",
-    badges: ["200+ models", "one key", "frontier access"],
+    model: "meta-llama/llama-3.3-70b-instruct:free",
+    badges: ["200+ models", "free models", "one key"],
     keyPlaceholder: "sk-or-v1-...",
   },
   {
