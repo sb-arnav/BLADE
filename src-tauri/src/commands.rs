@@ -315,13 +315,23 @@ pub async fn send_message_stream(
         manager.get_tools().to_vec()
     };
 
-    let system_prompt = brain::build_system_prompt_for_model(
+    let mut system_prompt = brain::build_system_prompt_for_model(
         &tool_snapshot,
         &last_user_text,
         Some(vector_store.inner()),
         &config.provider,
         &config.model,
     );
+
+    // Context Engine — smart RAG injection.
+    // Appended after the main prompt so it always fits without displacing identity.
+    if !last_user_text.is_empty() {
+        let smart_ctx = crate::context_engine::assemble_smart_context(&last_user_text, 2000).await;
+        if !smart_ctx.is_empty() {
+            system_prompt.push_str("\n\n---\n\n");
+            system_prompt.push_str(&smart_ctx);
+        }
+    }
 
     // MCP tools + native built-in tools (bash, file ops, web fetch)
     // Prune to ≤60 tools total — beyond that, accuracy degrades as the model
