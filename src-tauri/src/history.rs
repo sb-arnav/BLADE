@@ -132,7 +132,17 @@ pub fn save_conversation(
         .map(|conversation| conversation.created_at)
         .unwrap_or_else(now_ms);
     let updated_at = now_ms();
-    let title = title_from_messages(&messages);
+
+    // Preserve any existing title (e.g. from auto_title_conversation).
+    // Only generate a fallback from the first user message if there is no prior title,
+    // or the existing title is still the empty/default placeholder.
+    let generated = title_from_messages(&messages);
+    let title = existing
+        .as_ref()
+        .map(|c| c.title.as_str())
+        .filter(|t| !t.is_empty() && *t != "New chat")
+        .unwrap_or(&generated)
+        .to_string();
 
     let conversation = StoredConversation {
         id: conversation_id.to_string(),

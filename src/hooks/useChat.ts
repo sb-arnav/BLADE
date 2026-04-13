@@ -54,12 +54,22 @@ export function useChat() {
     });
     setCurrentConversationId(conversation.id);
     setMessages(conversation.messages);
+    // Reset transient state so it doesn't bleed across conversations
+    setToolExecutions([]);
+    setError(null);
+    setPendingApproval(null);
+    setThinkingText(null);
   }, []);
 
   const createConversation = useCallback(async () => {
     const conversationId = crypto.randomUUID();
     setCurrentConversationId(conversationId);
     setMessages([]);
+    // Reset transient state for the new conversation
+    setToolExecutions([]);
+    setError(null);
+    setPendingApproval(null);
+    setThinkingText(null);
     await persistConversation(conversationId, []);
     return conversationId;
   }, [persistConversation]);
