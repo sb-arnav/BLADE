@@ -355,6 +355,7 @@ pub async fn agent_create_desktop(
     let provider = config.provider.clone();
     let api_key = config.api_key.clone();
     let model = config.model.clone();
+    let base_url = config.base_url.clone();
 
     tokio::spawn(async move {
         run_desktop_agent_loop(
@@ -364,6 +365,7 @@ pub async fn agent_create_desktop(
             &provider,
             &api_key,
             &model,
+            base_url,
         )
         .await;
     });
@@ -434,6 +436,7 @@ async fn run_desktop_agent_loop(
     provider: &str,
     api_key: &str,
     model: &str,
+    base_url: Option<String>,
 ) {
     use tauri::Emitter;
 
@@ -475,7 +478,7 @@ async fn run_desktop_agent_loop(
             break;
         }
 
-        let result = execute_desktop_iteration(agent_id, queue, provider, api_key, model).await;
+        let result = execute_desktop_iteration(agent_id, queue, provider, api_key, model, base_url.as_deref()).await;
 
         let mut q = queue.lock().await;
         let Some(agent) = q.get_mut(agent_id) else {
@@ -604,6 +607,7 @@ async fn execute_desktop_iteration(
     provider: &str,
     api_key: &str,
     model: &str,
+    base_url: Option<&str>,
 ) -> Result<DesktopIterationResult, String> {
     let (
         goal,
@@ -1042,7 +1046,7 @@ Respond with ONLY valid JSON matching one of these shapes:
         });
     }
     let conversation = providers::build_conversation(messages, None);
-    let turn = providers::complete_turn(provider, api_key, model, &conversation, &[], None).await?;
+    let turn = providers::complete_turn(provider, api_key, model, &conversation, &[], base_url).await?;
     let decision = parse_desktop_decision(&turn.content)?;
 
     if let Some(summary) = detect_repeated_desktop_action(queue, agent_id, &decision.action).await?
@@ -2632,6 +2636,7 @@ pub async fn agent_resume(
                 &provider,
                 &api_key,
                 &model,
+                base_url,
             )
             .await;
         });
@@ -2674,7 +2679,7 @@ pub async fn agent_respond_desktop_action(
 ) -> Result<(), String> {
     use tauri::Emitter;
 
-    let (step_id, pending_json, provider, api_key, model) = {
+    let (step_id, pending_json, provider, api_key, model, base_url) = {
         let config = load_config();
         let mut q = queue.lock().await;
         let agent = q.get_mut(&agent_id).ok_or("Agent not found".to_string())?;
@@ -2714,6 +2719,7 @@ pub async fn agent_respond_desktop_action(
             provider,
             config.api_key.clone(),
             model,
+            config.base_url.clone(),
         )
     };
 
@@ -2822,6 +2828,7 @@ pub async fn agent_respond_desktop_action(
             &provider,
             &api_key,
             &model,
+            base_url,
         )
         .await;
     });
