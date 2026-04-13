@@ -52,7 +52,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, EBState> {
   }
 }
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar" | "workflow-builder" | "code-sandbox" | "persona" | "negotiation" | "financial" | "context-engine";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar" | "workflow-builder" | "code-sandbox" | "persona" | "negotiation" | "financial" | "context-engine" | "reasoning" | "social-graph" | "health" | "documents";
 
 const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
 const Canvas = lazy(() => import("./components/Canvas"));
@@ -100,6 +100,10 @@ const PersonaView = lazy(() => import("./components/PersonaView").then(m => ({ d
 const NegotiationView = lazy(() => import("./components/NegotiationView").then(m => ({ default: m.NegotiationView })));
 const FinancialView = lazy(() => import("./components/FinancialView").then(m => ({ default: m.FinancialView })));
 const ContextEngineView = lazy(() => import("./components/ContextEngineView").then(m => ({ default: m.ContextEngineView })));
+const ReasoningView = lazy(() => import("./components/ReasoningView").then(m => ({ default: m.ReasoningView })));
+const SocialGraphView = lazy(() => import("./components/SocialGraphView").then(m => ({ default: m.SocialGraphView })));
+const HealthView = lazy(() => import("./components/HealthView").then(m => ({ default: m.HealthView })));
+const DocumentView = lazy(() => import("./components/DocumentView").then(m => ({ default: m.DocumentView })));
 
 function ShellFallback({ label = "Loading workspace..." }: { label?: string }) {
   return (
@@ -946,6 +950,10 @@ export default function App() {
     "negotiation": <NegotiationView onBack={() => openRoute("chat")} />,
     "financial": <FinancialView onBack={() => openRoute("chat")} />,
     "context-engine": <ContextEngineView onBack={() => openRoute("chat")} />,
+    "reasoning": <ReasoningView onBack={() => openRoute("chat")} />,
+    "social-graph": <SocialGraphView onBack={() => openRoute("chat")} />,
+    "health": <HealthView onBack={() => openRoute("chat")} />,
+    "documents": <DocumentView onBack={() => openRoute("chat")} />,
   };
 
   if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {
