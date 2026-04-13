@@ -358,6 +358,14 @@ fn build_system_prompt_inner(
         parts.push(format!("## Your Own Character (Who You Are)\n\n{}", soul));
     }
 
+    // PERSONA ENGINE — learned relationship depth, communication traits, tonal guidance
+    {
+        let persona_ctx = crate::persona_engine::get_persona_context();
+        if !persona_ctx.trim().is_empty() {
+            parts.push(persona_ctx);
+        }
+    }
+
     // SKILL ENGINE — inject learned reflexes matching this query
     if !user_query.is_empty() {
         let skill_mods = crate::skill_engine::get_skill_injections(user_query);
