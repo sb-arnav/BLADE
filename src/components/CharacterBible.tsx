@@ -4,7 +4,7 @@
 import { useRef, useState } from "react";
 import { KnowledgeGraphView } from "./KnowledgeGraphView";
 import { UseCharacterBibleResult, useCharacterBible } from "../hooks/useCharacterBible";
-import { BrainNode, BrainPreference, BrainSkill } from "../types";
+import { BrainPreference, BrainSkill } from "../types";
 
 type Tab = "identity" | "graph" | "skills";
 
@@ -177,66 +177,10 @@ function PreferenceRow({
 
 // ── Graph Tab ─────────────────────────────────────────────────────────────────
 
-function GraphTab({ brain }: { brain: UseCharacterBibleResult }) {
-  const [selected, setSelected] = useState<BrainNode | null>(null);
-
-  const nodeMemories = selected
-    ? brain.memories.filter((m) => {
-        try { return (JSON.parse(m.entities_json) as string[]).includes(selected.id); } catch { return false; }
-      })
-    : [];
-
+function GraphTab() {
   return (
-    <div className="flex h-full">
-      <div className="flex-1 min-w-0">
-        <KnowledgeGraphView
-          nodes={brain.nodes}
-          edges={brain.edges}
-          onNodeClick={setSelected}
-        />
-      </div>
-
-      {selected && (
-        <div className="w-72 border-l border-blade-border bg-blade-bg flex flex-col">
-          <div className="p-4 border-b border-blade-border flex items-center justify-between">
-            <div>
-              <div className="text-sm font-medium text-blade-text">{selected.label}</div>
-              <div className="text-2xs text-blade-muted mt-0.5 uppercase tracking-widest">{selected.kind}</div>
-            </div>
-            <button onClick={() => setSelected(null)} className="text-blade-muted hover:text-blade-text text-lg leading-none">×</button>
-          </div>
-          {selected.summary && (
-            <div className="px-4 py-3 border-b border-blade-border">
-              <p className="text-xs text-blade-secondary">{selected.summary}</p>
-            </div>
-          )}
-          <div className="px-4 py-2 border-b border-blade-border">
-            <span className="text-2xs text-blade-muted">Mentioned {selected.mention_count}× · last {relTime(selected.last_seen_at)}</span>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="text-2xs uppercase tracking-widest text-blade-muted mb-2">Related memories</div>
-            {nodeMemories.length === 0 ? (
-              <p className="text-xs text-blade-muted/60">No memories reference this entity yet.</p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {nodeMemories.map((m) => (
-                  <div key={m.id} className="text-xs text-blade-secondary p-2 rounded border border-blade-border/50 bg-blade-surface/50">
-                    {m.text}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="p-3 border-t border-blade-border">
-            <button
-              onClick={() => brain.deleteNode(selected.id).then(() => setSelected(null))}
-              className="w-full text-2xs text-rose-400/70 hover:text-rose-400 py-1.5 rounded border border-rose-500/20 hover:border-rose-500/40 transition-colors"
-            >
-              Remove node
-            </button>
-          </div>
-        </div>
-      )}
+    <div className="h-full">
+      <KnowledgeGraphView onBack={() => {}} />
     </div>
   );
 }
@@ -435,7 +379,7 @@ export function CharacterBible({ onBack }: Props) {
         ) : tab === "identity" ? (
           <IdentityTab brain={brain} />
         ) : tab === "graph" ? (
-          <GraphTab brain={brain} />
+          <GraphTab />
         ) : (
           <SkillsTab brain={brain} />
         )}

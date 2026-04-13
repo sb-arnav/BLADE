@@ -466,7 +466,7 @@ export function AccountabilityView({ onBack }: { onBack: () => void }) {
             ) : (
               <div className="space-y-2">
                 {dailyActions.map((action) => {
-                  const { dot, color } = energyDot(action.energy_level);
+                  const { dot } = energyDot(action.energy_level);
                   return (
                     <div
                       key={action.id}

@@ -204,7 +204,6 @@ export function SidecarView({ onBack }: { onBack: () => void }) {
   const [addError, setAddError] = useState<string | null>(null);
 
   // Server form
-  const [showServer, setShowServer] = useState(false);
   const [serverPort, setServerPort] = useState("7878");
   const [serverSecret, setServerSecret] = useState("");
   const [serverRunning, setServerRunning] = useState(false);

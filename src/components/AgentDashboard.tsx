@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type CSSProperties, type ReactNode } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 interface AgentAuthority {
@@ -479,7 +479,7 @@ export function AgentDashboard({ onBack }: { onBack: () => void }) {
             </div>
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2">
-                {agents.map((agent, idx) => {
+                {agents.map((agent) => {
                   const selected = chainAgents.includes(agent.agent_type);
                   const chainIdx = chainAgents.indexOf(agent.agent_type);
                   return (
