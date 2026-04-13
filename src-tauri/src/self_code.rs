@@ -109,7 +109,7 @@ pub async fn blade_self_code(
         status: "spawned".to_string(),
         message: format!(
             "Claude Code is working on: \"{}\"\nSource: {}\nAgent ID: {}",
-            &feature[..feature.len().min(80)],
+            crate::safe_slice(&feature, 80),
             resolved_path,
             agent_id
         ),

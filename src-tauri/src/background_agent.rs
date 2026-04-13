@@ -192,7 +192,7 @@ pub async fn agent_spawn(
         serde_json::json!({
             "id": id,
             "agent_type": agent_type,
-            "task": &task[..task.len().min(100)],
+            "task": crate::safe_slice(&task, 100),
         }),
     );
 

@@ -131,7 +131,7 @@ async fn summarise_change(
         return format!("Content changed at {}", url);
     }
 
-    let preview = &new_content[..new_content.len().min(2000)];
+    let preview = crate::safe_slice(&new_content, 2000);
     let prompt = format!(
         "The webpage at {} ({}) has changed. Here is the current content (truncated):\n\n{}\n\nIn one or two concise sentences, describe the most notable change or what this page currently shows. Be specific.",
         url,
@@ -231,7 +231,7 @@ pub fn start_watcher_loop(app: tauri::AppHandle) {
                     use tauri_plugin_notification::NotificationExt;
                     let _ = app.notification()
                         .builder()
-                        .title(format!("BLADE Watch: {}", &label[..label.len().min(40)]))
+                        .title(format!("BLADE Watch: {}", crate::safe_slice(&label, 40)))
                         .body(summary.clone())
                         .show();
 
@@ -250,7 +250,7 @@ pub fn start_watcher_loop(app: tauri::AppHandle) {
                         let _ = crate::db::timeline_record(
                             &conn,
                             "watcher_alert",
-                            &format!("Change: {}", &label[..label.len().min(60)]),
+                            &format!("Change: {}", crate::safe_slice(&label, 60)),
                             &alert,
                             &w.url,
                             "{}",

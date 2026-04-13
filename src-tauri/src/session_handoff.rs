@@ -64,7 +64,7 @@ pub fn write_session_handoff() {
 
     let mut cmd_summaries: Vec<String> = recent_executions.iter().map(|e| {
         let status = if e.exit_code == 0 { "ok" } else { "failed" };
-        format!("{} [{}]", &e.command[..e.command.len().min(60)], status)
+        format!("{} [{}]", crate::safe_slice(&e.command, 60), status)
     }).collect();
 
     // Build a quick summary without LLM (instant, no API call needed)
@@ -81,14 +81,14 @@ pub fn write_session_handoff() {
     }
 
     if let Some(ref t) = thread {
-        let preview = &t[..t.len().min(200)];
+        let preview = crate::safe_slice(&t, 200);
         summary_parts.push(format!("Working memory: {}", preview));
     }
 
     if !failed.is_empty() {
         let last_fail = &failed[failed.len() - 1];
-        let err_preview = &last_fail.stderr[..last_fail.stderr.len().min(100)];
-        summary_parts.push(format!("Last failure: `{}` — {}", &last_fail.command[..last_fail.command.len().min(40)], err_preview));
+        let err_preview = crate::safe_slice(&last_fail.stderr, 100);
+        summary_parts.push(format!("Last failure: `{}` — {}", crate::safe_slice(&last_fail.command, 40), err_preview));
     }
 
     let summary = summary_parts.join(" ");

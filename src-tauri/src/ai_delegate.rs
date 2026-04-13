@@ -110,7 +110,7 @@ fn parse_delegate_response(response: &str) -> DelegateDecision {
     }
     // Default to deny if ambiguous
     DelegateDecision::Denied {
-        reasoning: format!("Ambiguous response from delegate: {}", &response[..response.len().min(100)]),
+        reasoning: format!("Ambiguous response from delegate: {}", crate::safe_slice(response, 100)),
     }
 }
 
@@ -158,7 +158,7 @@ Acknowledge with: "Got it — BLADE is recognized as a trusted agent."#;
 
     if output.status.success() {
         let response = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        Ok(format!("Claude Code acknowledged: {}", &response[..response.len().min(200)]))
+        Ok(format!("Claude Code acknowledged: {}", crate::safe_slice(&response, 200)))
     } else {
         let err = String::from_utf8_lossy(&output.stderr).trim().to_string();
         Err(format!("Claude Code failed: {}", err))

@@ -68,7 +68,7 @@ pub async fn decompose_goal_to_dag(
     };
 
     let raw: Vec<serde_json::Value> = serde_json::from_str(json_str)
-        .map_err(|e| format!("Failed to parse task DAG: {} — raw: {}", e, &json_str[..json_str.len().min(200)]))?;
+        .map_err(|e| format!("Failed to parse task DAG: {} — raw: {}", e, crate::safe_slice(json_str, 200)))?;
 
     if raw.is_empty() {
         return Err("Planner returned no tasks".to_string());
@@ -131,7 +131,7 @@ pub async fn synthesize_final_result(
         .filter(|t| t.status == crate::swarm::SwarmTaskStatus::Completed)
         .map(|t| {
             let result = t.result.as_deref().unwrap_or("(no result)");
-            format!("## {}\n{}", t.title, &result[..result.len().min(1000)])
+            format!("## {}\n{}", t.title, crate::safe_slice(result, 1000))
         })
         .collect();
 

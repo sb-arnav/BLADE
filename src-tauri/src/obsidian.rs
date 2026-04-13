@@ -101,7 +101,7 @@ fn append_to_daily(section_header: &str, content: &str) {
 
 /// Append a pulse thought to today's note under "## BLADE Pulse".
 pub fn log_pulse_thought(thought: &str) {
-    let short = &thought[..thought.len().min(200)];
+    let short = crate::safe_slice(&thought, 200);
     append_to_daily("BLADE Pulse", short);
 }
 
@@ -142,7 +142,7 @@ pub fn save_conversation(title: &str, summary: &str, conversation_id: &str) {
         .split_whitespace()
         .collect::<Vec<_>>()
         .join("-");
-    let safe_title = &safe_title[..safe_title.len().min(60)];
+    let safe_title = crate::safe_slice(&safe_title, 60);
     let filename = format!("{}-{}.md", date, safe_title);
     let path = conv_dir.join(&filename);
 

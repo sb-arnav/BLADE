@@ -134,8 +134,8 @@ Rules:
 Respond ONLY with valid JSON (no markdown, no explanation):
 {{"title": "one-line summary of active context", "content": "the thread doc", "project": "project name"}}"#,
         current = current_display,
-        user = &user_msg[..user_msg.len().min(500)],
-        assistant = &assistant_msg[..assistant_msg.len().min(500)],
+        user = crate::safe_slice(&user_msg, 500),
+        assistant = crate::safe_slice(&assistant_msg, 500),
         max_words = THREAD_MAX_WORDS,
     )
 }

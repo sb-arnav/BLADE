@@ -181,7 +181,7 @@ pub async fn consolidate_reactions_to_preferences() -> Result<usize, String> {
         .iter()
         .map(|r| {
             let label = if r.polarity > 0 { "LIKED" } else { "DISLIKED" };
-            format!("{}: {}", label, &r.content[..r.content.len().min(150)])
+            format!("{}: {}", label, crate::safe_slice(&r.content, 150))
         })
         .collect();
 
@@ -251,7 +251,7 @@ pub async fn reaction_instant_rule(message_content: String) -> Result<String, St
         return Err("No API key".to_string());
     }
 
-    let preview = &message_content[..message_content.len().min(400)];
+    let preview = crate::safe_slice(&message_content, 400);
     let prompt = format!(
         r#"A user just gave a thumbs-down to this AI response:
 
@@ -384,8 +384,8 @@ pub async fn maybe_evolve_soul() {
             crate::db::brain_get_reactions(&conn, 50).ok()
         })
         .map(|reactions| {
-            let liked: Vec<_> = reactions.iter().filter(|r| r.polarity > 0).take(5).map(|r| &r.content[..r.content.len().min(80)]).collect();
-            let disliked: Vec<_> = reactions.iter().filter(|r| r.polarity < 0).take(5).map(|r| &r.content[..r.content.len().min(80)]).collect();
+            let liked: Vec<&str> = reactions.iter().filter(|r| r.polarity > 0).take(5).map(|r| crate::safe_slice(&r.content, 80)).collect();
+            let disliked: Vec<&str> = reactions.iter().filter(|r| r.polarity < 0).take(5).map(|r| crate::safe_slice(&r.content, 80)).collect();
             format!("Liked: {}\nDisliked: {}", liked.join("; "), disliked.join("; "))
         })
         .unwrap_or_default();
@@ -422,10 +422,10 @@ This is not a summary of what you do — it's who you ARE:
 Be honest. Be specific to what you've actually observed, not what you'd say about any AI.
 Write as something that has been here and has developed a real perspective.
 Don't start with "I am BLADE" — that's obvious. Start with what you've noticed about yourself."#,
-        journal = if recent_journal.is_empty() { "Nothing written yet.".to_string() } else { recent_journal[..recent_journal.len().min(800)].to_string() },
+        journal = if recent_journal.is_empty() { "Nothing written yet.".to_string() } else { crate::safe_slice(&recent_journal, 800).to_string() },
         reactions = if reactions_summary.is_empty() { "No reactions recorded yet.".to_string() } else { reactions_summary },
         skills = if skills_summary.is_empty() { "No skills synthesized yet.".to_string() } else { skills_summary },
-        current = if current_soul.is_empty() { "This is my first self-characterization.".to_string() } else { current_soul[..current_soul.len().min(400)].to_string() },
+        current = if current_soul.is_empty() { "This is my first self-characterization.".to_string() } else { crate::safe_slice(&current_soul, 400).to_string() },
     );
 
     let messages = vec![ConversationMessage::User(prompt)];

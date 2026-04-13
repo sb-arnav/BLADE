@@ -372,7 +372,7 @@ pub fn build_task_context(swarm: &Swarm, task: &SwarmTask) -> String {
         .filter_map(|dep_id| {
             swarm.tasks.iter().find(|t| &t.id == dep_id)
                 .and_then(|t| t.result.as_ref())
-                .map(|r| format!("## Result from '{}'\n{}", dep_id, &r[..r.len().min(800)]))
+                .map(|r| format!("## Result from '{}'\n{}", dep_id, crate::safe_slice(r, 800)))
         })
         .collect();
 

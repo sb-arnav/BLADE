@@ -72,6 +72,15 @@ mod voice_local;
 use chrono::Timelike;
 use std::sync::Arc;
 use tauri::{Manager, WindowEvent};
+
+/// Safely truncate a string at a char boundary.
+/// Unlike `&s[..n]`, this never panics on non-ASCII (emoji, CJK, etc.).
+#[allow(dead_code)]
+pub(crate) fn safe_slice(s: &str, n: usize) -> &str {
+    if s.len() <= n { return s; }
+    let end = s.char_indices().nth(n).map(|(i, _)| i).unwrap_or(s.len());
+    &s[..end]
+}
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
 use tauri_plugin_log::{Target, TargetKind};

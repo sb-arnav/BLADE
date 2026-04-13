@@ -99,7 +99,7 @@ pub fn research_context_for_prompt() -> String {
             let dt = chrono::DateTime::from_timestamp(e.created_at, 0)
                 .map(|d| d.with_timezone(&chrono::Local).format("%-H:%M").to_string())
                 .unwrap_or_else(|| "?".to_string());
-            let snippet = &e.results[..e.results.len().min(300)];
+            let snippet = crate::safe_slice(&e.results, 300);
             format!("**[{}] {}**\n{}", dt, e.query, snippet)
         })
         .collect();
@@ -140,7 +140,7 @@ pub fn extract_research_queries(thread: &str, brain_ctx: &str) -> Vec<String> {
     };
 
     if core_topic.len() >= 6 {
-        let short = &core_topic[..core_topic.len().min(60)];
+        let short = crate::safe_slice(&core_topic, 60);
         // Variant 1 (broad): topic + year for freshness
         queries.push(format!("{} 2025", short));
         // Variant 2 (narrower): best practices / implementation
@@ -223,8 +223,8 @@ pub async fn run_research_cycle(app: &tauri::AppHandle) {
                     let _ = crate::db::timeline_record(
                         &conn,
                         "research",
-                        &format!("Researched: {}", &query[..query.len().min(60)]),
-                        &results_str[..results_str.len().min(600)],
+                        &format!("Researched: {}", crate::safe_slice(&query, 60)),
+                        crate::safe_slice(&results_str, 600),
                         "BLADE",
                         "{}",
                     );

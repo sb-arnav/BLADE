@@ -84,8 +84,8 @@ pub fn record(
     duration_ms: i64,
 ) {
     // Truncate massive outputs — we care about the signal, not the full log
-    let stdout = &stdout[..stdout.len().min(8000)];
-    let stderr = &stderr[..stderr.len().min(4000)];
+    let stdout = crate::safe_slice(&stdout, 8000);
+    let stderr = crate::safe_slice(&stderr, 4000);
 
     let Ok(conn) = open_db() else { return };
     let now = chrono::Utc::now().timestamp();
@@ -169,12 +169,12 @@ fn format_results(records: &[ExecutionRecord]) -> String {
         }
 
         if !r.stdout.is_empty() {
-            let preview = &r.stdout[..r.stdout.len().min(300)];
+            let preview = crate::safe_slice(&r.stdout, 300);
             lines.push(format!("   out: {}", preview.replace('\n', " ↵ ")));
         }
 
         if !r.stderr.is_empty() {
-            let preview = &r.stderr[..r.stderr.len().min(300)];
+            let preview = crate::safe_slice(&r.stderr, 300);
             lines.push(format!("   err: {}", preview.replace('\n', " ↵ ")));
         }
 
@@ -203,7 +203,7 @@ pub fn recall_on_error(error_text: &str) -> Option<String> {
     // Only inject if we found something where BLADE actually succeeded after the error
     let relevant: Vec<ExecutionRecord> = results
         .into_iter()
-        .filter(|r| r.exit_code == 0 || r.stderr.contains(&query[..query.len().min(30)]))
+        .filter(|r| r.exit_code == 0 || r.stderr.contains(crate::safe_slice(&query, 30)))
         .take(3)
         .collect();
 

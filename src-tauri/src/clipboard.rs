@@ -37,7 +37,7 @@ fn prefetch_cache() -> &'static Mutex<Option<ClipboardPrefetch>> {
 
 fn content_hash(text: &str) -> u64 {
     let mut h = std::collections::hash_map::DefaultHasher::new();
-    text[..text.len().min(500)].hash(&mut h);
+    crate::safe_slice(text, 500).hash(&mut h);
     h.finish()
 }
 
@@ -130,15 +130,15 @@ async fn prefetch_analysis(text: String, kind: ClipboardContentType, app: AppHan
     let prompt = match kind {
         ClipboardContentType::Error => format!(
             "The user just copied this error message. In 2-4 sentences, explain what caused it and the most likely fix. Be direct and practical.\n\nError:\n{}",
-            &text[..text.len().min(1500)]
+            crate::safe_slice(&text, 1500)
         ),
         ClipboardContentType::Code => format!(
             "The user just copied this code snippet. In 2-3 sentences, describe what it does and flag any obvious issues or improvements.\n\nCode:\n{}",
-            &text[..text.len().min(1200)]
+            crate::safe_slice(&text, 1200)
         ),
         ClipboardContentType::Url => format!(
             "The user just copied this URL. Briefly describe what it likely points to (1 sentence). URL: {}",
-            &text[..text.len().min(500)]
+            crate::safe_slice(&text, 500)
         ),
         _ => return,
     };
@@ -162,7 +162,7 @@ async fn prefetch_analysis(text: String, kind: ClipboardContentType, app: AppHan
             // Notify frontend so it can show a subtle "ready" indicator
             let _ = app.emit("clipboard_prefetch_ready", serde_json::json!({
                 "content_type": format!("{:?}", kind).to_lowercase(),
-                "preview": &text[..text.len().min(60)],
+                "preview": crate::safe_slice(&text, 60),
             }));
         }
         _ => {}
@@ -218,7 +218,7 @@ pub fn start_clipboard_watcher(app: AppHandle) {
 /// The result is stored in the prefetch cache so BLADE has the fix ready before the user asks.
 pub fn prefetch_bash_failure(command: &str, stderr: &str, app: AppHandle) {
     if stderr.trim().len() < 30 { return; }
-    let combined = format!("$ {}\n{}", &command[..command.len().min(120)], &stderr[..stderr.len().min(1500)]);
+    let combined = format!("$ {}\n{}", crate::safe_slice(command, 120), crate::safe_slice(stderr, 1500));
     if should_prefetch(&combined, &ClipboardContentType::Error) {
         let text = combined;
         let app_clone = app.clone();

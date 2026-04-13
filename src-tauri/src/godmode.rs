@@ -29,7 +29,7 @@ fn stuck_error() -> &'static Mutex<Option<StuckErrorState>> {
 fn check_smart_interrupt(app: &tauri::AppHandle, error_preview: &str) {
     let now = chrono::Utc::now().timestamp();
     // Use first 120 chars as fingerprint
-    let fingerprint = error_preview[..error_preview.len().min(120)].to_string();
+    let fingerprint = crate::safe_slice(&error_preview, 120).to_string();
 
     let mut guard = match stuck_error().lock() {
         Ok(g) => g,
@@ -43,7 +43,7 @@ fn check_smart_interrupt(app: &tauri::AppHandle, error_preview: &str) {
             // Fire interrupt after 5+ minutes (300s) and at least 2 scans, once per error session
             if elapsed >= 300 && state.scan_count >= 2 && !state.interrupted {
                 state.interrupted = true;
-                let preview = error_preview[..error_preview.len().min(200)].to_string();
+                let preview = crate::safe_slice(&error_preview, 200).to_string();
                 let elapsed_min = elapsed / 60;
                 let _ = app.emit("smart_interrupt", serde_json::json!({
                     "error_preview": preview,
@@ -129,7 +129,7 @@ pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
                 tokio::spawn(async move {
                     crate::embeddings::auto_embed_exchange(
                         &store_clone,
-                        &ctx_clone[..ctx_clone.len().min(800)],
+                        crate::safe_slice(&ctx_clone, 800),
                         "",
                         &format!("godmode-{}", ts),
                     );
@@ -144,7 +144,7 @@ pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
                         .find(|l| l.starts_with("**Active:**") || l.contains("Active Window"))
                         .map(|l| l.replace("**Active:**", "").trim().to_string())
                         .unwrap_or_else(|| "Machine snapshot".to_string());
-                    let snippet = &ctx[..ctx.len().min(1000)];
+                    let snippet = crate::safe_slice(&ctx, 1000);
                     let _ = crate::db::timeline_record(
                         &conn,
                         "god_mode",
@@ -447,7 +447,7 @@ fn active_errors_section() -> Option<String> {
                 lower.contains("fatal:") || lower.contains("undefined is not");
 
             if is_error {
-                let preview = &text[..text.len().min(300)];
+                let preview = crate::safe_slice(&text, 300);
                 found.push(format!("**Clipboard contains error/traceback:**\n```\n{}\n```", preview));
             }
         }

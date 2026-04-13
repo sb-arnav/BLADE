@@ -176,7 +176,7 @@ pub async fn auto_install(gap: &CapabilityGap) -> InstallResult {
             InstallResult {
                 tool: gap.suggestion.clone(),
                 success: out.status.success(),
-                output: combined[..combined.len().min(2000)].to_string(),
+                output: crate::safe_slice(&combined, 2000).to_string(),
             }
         }
         Err(e) => InstallResult {

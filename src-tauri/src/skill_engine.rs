@@ -42,7 +42,7 @@ pub fn record_tool_pattern(user_query: &str, tool_names: &[String], result_summa
     let query_hash = format!("{:x}", hasher.finish());
 
     let tool_sequence = serde_json::to_string(tool_names).unwrap_or_default();
-    let summary = &result_summary[..result_summary.len().min(200)];
+    let summary = crate::safe_slice(&result_summary, 200);
 
     let db_path = crate::config::blade_config_dir().join("blade.db");
     if let Ok(conn) = rusqlite::Connection::open(&db_path) {
@@ -206,9 +206,9 @@ Respond ONLY with valid JSON (no markdown):
   "prompt_modifier": "behavioral instruction to inject (20-40 words, guides Blade's approach)"
 }}"#,
         candidate.count,
-        &candidate.query_example[..candidate.query_example.len().min(200)],
+        crate::safe_slice(&candidate.query_example, 200),
         tool_names.join(" → "),
-        &candidate.result_summary[..candidate.result_summary.len().min(200)],
+        crate::safe_slice(&candidate.result_summary, 200),
     );
 
     let messages = vec![ConversationMessage::User(prompt)];

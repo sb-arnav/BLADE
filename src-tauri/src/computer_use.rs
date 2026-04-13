@@ -268,7 +268,7 @@ async fn call_vision_model(
     };
 
     serde_json::from_str::<ComputerAction>(&json_str)
-        .map_err(|e| format!("Failed to parse action JSON: {} — raw: {}", e, &json_str[..json_str.len().min(200)]))
+        .map_err(|e| format!("Failed to parse action JSON: {} — raw: {}", e, crate::safe_slice(&json_str, 200)))
 }
 
 async fn execute_action(action: &ComputerAction) -> Result<(), String> {

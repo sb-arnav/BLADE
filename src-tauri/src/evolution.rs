@@ -693,7 +693,7 @@ async fn evolve_from_failures(app: &tauri::AppHandle) {
         by_binary
             .entry(binary)
             .or_default()
-            .push(format!("$ {}\n{}", &cmd[..cmd.len().min(80)], &stderr[..stderr.len().min(120)]));
+            .push(format!("$ {}\n{}", crate::safe_slice(&cmd, 80), crate::safe_slice(&stderr, 120)));
     }
 
     // Only analyze binaries with 3+ failures — clear patterns
@@ -712,7 +712,7 @@ async fn evolve_from_failures(app: &tauri::AppHandle) {
     let digest_hash = {
         use std::hash::{Hash, Hasher};
         let mut h = std::collections::hash_map::DefaultHasher::new();
-        digest[..digest.len().min(200)].hash(&mut h);
+        crate::safe_slice(&digest, 200).hash(&mut h);
         h.finish()
     };
     let suggestion_id = format!("rule_mutation:{}", digest_hash);
@@ -727,7 +727,7 @@ async fn evolve_from_failures(app: &tauri::AppHandle) {
         to add to BLADE's system prompt that would prevent these failures. \
         Be specific and actionable. Output only the rule text, nothing else.\n\n\
         Failures:\n{}",
-        &digest[..digest.len().min(1200)]
+        crate::safe_slice(&digest, 1200)
     );
 
     let msgs = vec![crate::providers::ConversationMessage::User(prompt)];
@@ -773,7 +773,7 @@ async fn evolve_from_failures(app: &tauri::AppHandle) {
     let _ = save_suggestion(&suggestion);
     let _ = app.emit("evolution_suggestion", &suggestion);
 
-    log::info!("Evolution: proposed rule from {} failure(s): {}", failures.len(), &rule_text[..rule_text.len().min(80)]);
+    log::info!("Evolution: proposed rule from {} failure(s): {}", failures.len(), crate::safe_slice(&rule_text, 80));
 }
 
 /// Start the evolution background loop.
@@ -934,7 +934,7 @@ pub fn evolution_log_capability_gap(capability: String, user_request: String) ->
         let _ = crate::db::timeline_record(
             &conn,
             "capability_gap",
-            &format!("Blocked on: {}", &capability[..capability.len().min(80)]),
+            &format!("Blocked on: {}", crate::safe_slice(&capability, 80)),
             &user_request,
             "BLADE",
             &serde_json::json!({"capability": capability}).to_string(),
