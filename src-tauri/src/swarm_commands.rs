@@ -44,6 +44,7 @@ async fn spawn_task_agent(
         &config.provider,
         &config.api_key,
         &config.model,
+        config.base_url.as_deref(),
         &enriched_goal,
         &tools,
     )
@@ -67,6 +68,7 @@ async fn spawn_task_agent(
     let provider = config.provider.clone();
     let api_key = config.api_key.clone();
     let model = config.model.clone();
+    let base_url = config.base_url.clone();
     let aid = agent_id.clone();
 
     tokio::spawn(async move {
@@ -78,6 +80,7 @@ async fn spawn_task_agent(
             &provider,
             &api_key,
             &model,
+            base_url,
         )
         .await;
     });

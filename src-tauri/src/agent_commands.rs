@@ -251,6 +251,7 @@ pub async fn agent_create(
         &config.provider,
         &config.api_key,
         &config.model,
+        config.base_url.as_deref(),
         &goal,
         &tools,
     )
@@ -271,6 +272,7 @@ pub async fn agent_create(
     let provider = config.provider.clone();
     let api_key = config.api_key.clone();
     let model = config.model.clone();
+    let base_url = config.base_url.clone();
 
     tokio::spawn(async move {
         run_agent_loop_internal(
@@ -281,6 +283,7 @@ pub async fn agent_create(
             &provider,
             &api_key,
             &model,
+            base_url,
         )
         .await;
     });
@@ -376,6 +379,7 @@ pub(crate) async fn run_agent_loop_internal(
     provider: &str,
     api_key: &str,
     model: &str,
+    base_url: Option<String>,
 ) {
     use tauri::Emitter;
 
@@ -396,7 +400,7 @@ pub(crate) async fn run_agent_loop_internal(
             let mut q = queue.lock().await;
             if let Some(agent) = q.get_mut(agent_id) {
                 if let Err(e) =
-                    executor::execute_next_step(agent, mcp, app, provider, api_key, model).await
+                    executor::execute_next_step(agent, mcp, app, provider, api_key, model, base_url.as_deref()).await
                 {
                     agent.fail(e);
                     break;
@@ -2594,7 +2598,7 @@ pub async fn agent_resume(
         q.resume(&agent_id);
     }
 
-    let (is_desktop_agent, provider, api_key, model) = {
+    let (is_desktop_agent, provider, api_key, model, base_url) = {
         let config = load_config();
         let q = queue.lock().await;
         let agent = q.get(&agent_id);
@@ -2613,7 +2617,7 @@ pub async fn agent_resume(
         let model = agent
             .and_then(|agent| agent.context.get("model").cloned())
             .unwrap_or_else(|| config.model.clone());
-        (is_desktop_agent, provider, config.api_key.clone(), model)
+        (is_desktop_agent, provider, config.api_key.clone(), model, config.base_url.clone())
     };
 
     let queue_clone = queue.inner().clone();
@@ -2642,6 +2646,7 @@ pub async fn agent_resume(
                 &provider,
                 &api_key,
                 &model,
+                base_url,
             )
             .await;
         });
