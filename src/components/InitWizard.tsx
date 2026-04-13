@@ -131,7 +131,7 @@ export function InitWizard({ onComplete, isReinit = false }: Props) {
       bladeEmail: "",
     });
     if (userName.trim()) {
-      await invoke("set_persona", { name: userName.trim() }).catch(() => {});
+      await invoke("set_persona", { content: `Name: ${userName.trim()}` }).catch(() => {});
     }
     // Run environment discovery silently in background
     invoke("run_discovery").catch(() => {});
