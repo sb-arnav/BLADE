@@ -176,10 +176,11 @@ async fn generate_pulse_thought(config: &crate::config::BladeConfig) -> Result<S
 
 fn cheapest_model(provider: &str, current_model: &str) -> String {
     match provider {
-        "anthropic" => "claude-haiku-4-5-20251001".to_string(),
-        "openai" => "gpt-4o-mini".to_string(),
-        "gemini" => "gemini-2.0-flash".to_string(),
-        "groq" => "llama-3.1-8b-instant".to_string(),
+        "anthropic"  => "claude-haiku-4-5-20251001".to_string(),
+        "openai"     => "gpt-4o-mini".to_string(),
+        "gemini"     => "gemini-2.0-flash".to_string(),
+        "groq"       => "llama-3.1-8b-instant".to_string(),
+        "openrouter" => "anthropic/claude-haiku-4.5".to_string(),
         _ => current_model.to_string(),
     }
 }

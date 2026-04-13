@@ -117,10 +117,11 @@ async fn prefetch_analysis(text: String, kind: ClipboardContentType, app: AppHan
     // Use cheapest available model for prefetch — speed matters more than quality here
     let (provider, key, model) = {
         let m = match config.provider.as_str() {
-            "anthropic" => "claude-haiku-4-5-20251001",
-            "openai" => "gpt-4o-mini",
-            "gemini" => "gemini-2.0-flash",
-            "groq" => "llama-3.1-8b-instant",
+            "anthropic"  => "claude-haiku-4-5-20251001",
+            "openai"     => "gpt-4o-mini",
+            "gemini"     => "gemini-2.0-flash",
+            "groq"       => "llama-3.1-8b-instant",
+            "openrouter" => "anthropic/claude-haiku-4.5",
             _ => &config.model,
         };
         (config.provider.clone(), config.api_key.clone(), m.to_string())

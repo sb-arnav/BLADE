@@ -577,8 +577,21 @@ pub async fn run_evolution_cycle(app: &tauri::AppHandle) {
                     let _ = save_suggestion(&suggestion);
                 }
                 Err(e) => {
-                    // Fall through to suggestion if auto-install fails
+                    // Auto-install failed (e.g. npx not found) — surface as a manual suggestion
                     log::warn!("Evolution auto-install failed for {}: {}", entry.name, e);
+                    let suggestion = EvolutionSuggestion {
+                        id: suggestion_id,
+                        name: entry.name.to_string(),
+                        package: entry.package.to_string(),
+                        description: entry.description.to_string(),
+                        trigger_app: trigger_app.clone(),
+                        required_token_hint: Some(format!("Auto-install failed ({}). Install Node.js/npx to enable auto-install, or add manually.", e)),
+                        auto_install: false,
+                        status: "pending".to_string(),
+                        created_at: chrono::Utc::now().timestamp(),
+                    };
+                    let _ = save_suggestion(&suggestion);
+                    new_suggestions.push(suggestion);
                 }
             }
         } else {
@@ -727,10 +740,11 @@ async fn evolve_from_failures(app: &tauri::AppHandle) {
         ("ollama".to_string(), String::new(), "hermes3".to_string())
     } else {
         let cheap = match config.provider.as_str() {
-            "anthropic" => "claude-haiku-4-5-20251001",
-            "openai" => "gpt-4o-mini",
-            "gemini" => "gemini-2.0-flash",
-            "groq" => "llama-3.1-8b-instant",
+            "anthropic"  => "claude-haiku-4-5-20251001",
+            "openai"     => "gpt-4o-mini",
+            "gemini"     => "gemini-2.0-flash",
+            "groq"       => "llama-3.1-8b-instant",
+            "openrouter" => "anthropic/claude-haiku-4.5",
             _ => &config.model,
         };
         (config.provider.clone(), config.api_key.clone(), cheap.to_string())
