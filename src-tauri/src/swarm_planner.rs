@@ -33,6 +33,7 @@ pub async fn decompose_goal_to_dag(
     provider: &str,
     api_key: &str,
     model: &str,
+    base_url: Option<&str>,
     swarm_id: &str,
     goal: &str,
 ) -> Result<Vec<SwarmTask>, String> {
@@ -47,7 +48,7 @@ pub async fn decompose_goal_to_dag(
     }];
     let conversation = build_conversation(messages, None);
 
-    let turn = complete_turn(provider, api_key, model, &conversation, &[], None).await?;
+    let turn = complete_turn(provider, api_key, model, &conversation, &[], base_url).await?;
 
     let content = turn.content.trim();
 
@@ -119,6 +120,7 @@ pub async fn synthesize_final_result(
     provider: &str,
     api_key: &str,
     model: &str,
+    base_url: Option<&str>,
     goal: &str,
     tasks: &[crate::swarm::SwarmTask],
 ) -> String {
@@ -154,7 +156,7 @@ pub async fn synthesize_final_result(
     }];
     let conversation = build_conversation(messages, None);
 
-    match complete_turn(provider, api_key, model, &conversation, &[], None).await {
+    match complete_turn(provider, api_key, model, &conversation, &[], base_url).await {
         Ok(turn) => turn.content.trim().to_string(),
         Err(e) => format!("Synthesis failed: {}", e),
     }
