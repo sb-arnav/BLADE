@@ -665,6 +665,16 @@ pub async fn send_message_stream(
                         "improved": improved,
                     }));
                 }
+                // Record activity for dream mode
+                crate::dream_mode::record_user_activity();
+                // Detect knowledge gaps from this conversation
+                crate::autonomous_research::detect_gaps_from_conversation(&user_text, &assistant_text).await;
+                // Record conversation event for causal graph
+                crate::causal_graph::record_event(
+                    "conversation",
+                    crate::safe_slice(&user_text, 200),
+                    serde_json::json!({"response_len": assistant_text.len()}),
+                );
             });
             // THREAD: auto-update working memory (spawns its own background task)
             crate::thread::auto_update_thread(app.clone(), user_text_thread.clone(), assistant_text_thread);

@@ -8,6 +8,7 @@ import { MessageList } from "./MessageList";
 import { InputBar } from "./InputBar";
 import { SearchInput } from "./SearchInput";
 import { ToolApprovalDialog } from "./ToolApprovalDialog";
+import { InsightsBar } from "./InsightsBar";
 
 interface Props {
   messages: Message[];
@@ -179,6 +180,7 @@ export function ChatWindow({
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [exportCopied, setExportCopied] = useState(false);
+  const [showInsightsBar, setShowInsightsBar] = useState(false);
 
   const handleExportConversation = useCallback(async () => {
     const currentConv = conversations.find((c) => c.id === currentConversationId);
@@ -343,7 +345,8 @@ export function ChatWindow({
         </div>
       </div>
 
-      {/* Main */}
+      {/* Main + optional InsightsBar */}
+      <div className="flex flex-1 min-w-0 overflow-hidden">
       <div className="flex flex-col flex-1 min-w-0">
         {/* Header */}
         <div className="flex items-center justify-between h-10 px-3 border-b border-blade-border/50 shrink-0">
@@ -376,6 +379,19 @@ export function ChatWindow({
             )}
           </div>
           <div className="flex items-center gap-0.5">
+            {/* InsightsBar toggle */}
+            <button
+              onClick={() => setShowInsightsBar((v) => !v)}
+              className={`h-7 px-2 rounded-md text-2xs flex items-center gap-1 transition-colors ${
+                showInsightsBar
+                  ? "text-blade-accent bg-blade-accent/10"
+                  : "text-blade-muted hover:text-blade-secondary hover:bg-blade-surface"
+              }`}
+              title={showInsightsBar ? "Hide Intel bar" : "Show Intel bar"}
+            >
+              <span style={{ fontSize: "11px" }}>◧</span>
+              <span>Intel</span>
+            </button>
             {/* Runtime status indicator */}
             {runtimeStrip.length > 0 && onOpenOperators && (
               <button
@@ -561,6 +577,17 @@ export function ChatWindow({
           onPttMouseDown={voiceModeOnPttDown}
           onPttMouseUp={voiceModeOnPttUp}
         />
+      </div>
+
+      {/* InsightsBar — collapsible intelligence sidebar */}
+      {showInsightsBar && (
+        <InsightsBar onNavigate={(route) => {
+          // Best-effort: try to use the onOpenSettings callback as a fallback
+          // route navigation is handled by the parent (App.tsx) in production
+          void route;
+          onOpenSettings();
+        }} />
+      )}
       </div>
 
       {pendingApproval && (

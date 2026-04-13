@@ -15,7 +15,7 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
     vec![
         ToolDefinition {
             name: "blade_bash".to_string(),
-            description: "Execute a shell command and return stdout + stderr. Use for: running code, tests, git, npm/cargo/pip, file listing, system info, anything needing a shell. Prefer this over asking the user to run commands.".to_string(),
+            description: "Execute a shell command and return stdout + stderr. Use for: running code, tests, git, npm/cargo/pip, file listing, system info, anything needing a shell. Prefer this over asking the user to run commands. Custom tools forged by BLADE live in ~/.blade/tools/ and can be called directly via bash (e.g. `python3 ~/.blade/tools/my_tool.py [args]`).".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
