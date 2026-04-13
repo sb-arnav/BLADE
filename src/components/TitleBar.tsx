@@ -24,17 +24,23 @@ const ROLES: BladeRole[] = [
 function RoleSwitcher() {
   const [activeRole, setActiveRole] = useState("engineering");
   const [open, setOpen] = useState(false);
+  const [switching, setSwitching] = useState(false);
 
   useEffect(() => {
     invoke<BladeRole>("roles_get_active").then((r) => setActiveRole(r.id)).catch(() => {});
   }, []);
 
   const switchRole = async (id: string) => {
+    setSwitching(true);
     try {
       await invoke("roles_set_active", { id });
       setActiveRole(id);
       setOpen(false);
-    } catch {}
+    } catch {
+      // revert optimistic state on failure — nothing to do since we didn't update yet
+    } finally {
+      setSwitching(false);
+    }
   };
 
   const current = ROLES.find((r) => r.id === activeRole) ?? ROLES[0];
@@ -42,12 +48,17 @@ function RoleSwitcher() {
   return (
     <div className="relative" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => !switching && setOpen((o) => !o)}
         className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] text-blade-muted hover:text-blade-text hover:bg-blade-surface transition-colors"
-        title={current.tagline}
+        title={switching ? "Switching role..." : current.tagline}
+        disabled={switching}
       >
-        <span className="font-mono text-blade-accent">{current.icon}</span>
-        <span className="tracking-wide">{current.name.toUpperCase()}</span>
+        {switching ? (
+          <span className="w-2 h-2 rounded-full bg-blade-accent/50 animate-pulse" />
+        ) : (
+          <span className="font-mono text-blade-accent">{current.icon}</span>
+        )}
+        <span className={`tracking-wide ${switching ? "text-blade-muted/50" : ""}`}>{current.name.toUpperCase()}</span>
         <span className="text-blade-muted/40 ml-0.5">▾</span>
       </button>
 
@@ -98,7 +109,7 @@ function ModelBadge() {
 
   return (
     <span
-      className="text-[9px] font-mono text-blade-muted/50 tracking-wide px-1.5 py-0.5 rounded border border-blade-border/30 hidden sm:inline"
+      className="text-[9px] font-mono text-blade-muted/50 tracking-wide px-1.5 py-0.5 rounded border border-blade-border/30"
       title={`${routing.provider} / ${routing.model}`}
     >
       {shortModel}

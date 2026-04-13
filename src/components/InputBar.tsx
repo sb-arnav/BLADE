@@ -146,7 +146,7 @@ export function InputBar({ onSend, onSlashCommand, disabled, loading, draftValue
         }
       } catch (e) {
         setInputError(typeof e === "string" ? e : "Transcription failed");
-        setTimeout(() => setInputError(null), 4000);
+        setTimeout(() => setInputError(null), 8000);
       }
       setTranscribing(false);
     } else {
@@ -155,7 +155,7 @@ export function InputBar({ onSend, onSlashCommand, disabled, loading, draftValue
         setRecording(true);
       } catch (e) {
         setInputError(typeof e === "string" ? e : "Mic not available");
-        setTimeout(() => setInputError(null), 4000);
+        setTimeout(() => setInputError(null), 8000);
       }
     }
   }, [recording]);
@@ -168,7 +168,7 @@ export function InputBar({ onSend, onSlashCommand, disabled, loading, draftValue
       onSend("What's on my screen?", png);
     } catch (e) {
       setInputError(typeof e === "string" ? e : "Screenshot failed");
-      setTimeout(() => setInputError(null), 4000);
+      setTimeout(() => setInputError(null), 8000);
     }
     setCapturing(false);
   }, [onSend]);
@@ -307,8 +307,8 @@ export function InputBar({ onSend, onSlashCommand, disabled, loading, draftValue
           {recording ? "Recording... click mic to stop" : "Type, speak, paste, or capture your screen"}
         </span>
         <div className="flex items-center gap-2">
-          {value.length > 300 && (
-            <span className={`text-2xs font-mono ${value.length > 8000 ? "text-red-400/70" : value.length > 3000 ? "text-amber-400/60" : "text-blade-muted/40"}`}>
+          {value.length > 0 && (
+            <span className={`text-2xs font-mono ${value.length > 8000 ? "text-red-400/70" : value.length > 3000 ? "text-amber-400/60" : value.length > 300 ? "text-blade-muted/40" : "text-blade-muted/20"}`}>
               {value.length > 999 ? `${(value.length / 1000).toFixed(1)}k` : value.length}c · ~{Math.round(value.length / 4)}t
             </span>
           )}

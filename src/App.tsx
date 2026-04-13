@@ -1058,7 +1058,7 @@ export default function App() {
           )}
         </Suspense>
       </div>
-      <VoiceOrb status={voiceMode.status} mode={voiceMode.mode} />
+      <VoiceOrb status={voiceMode.status} mode={voiceMode.mode} onDismissError={voiceMode.stopEverything} />
     </div>
     </ErrorBoundary>
   );

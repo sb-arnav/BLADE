@@ -117,7 +117,9 @@ export function ChatWindow({
     e.stopPropagation();
     setRenamingId(conv.id);
     setRenameValue(conv.title || "");
-    setTimeout(() => renameInputRef.current?.select(), 0);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => renameInputRef.current?.select());
+    });
   }, []);
 
   const commitRename = useCallback((id: string) => {
