@@ -168,8 +168,17 @@ fn build_system_prompt_inner(
     let mut parts: Vec<String> = Vec::new();
     let config = crate::config::load_config();
 
+    // BLADE.md — SHORT, AUTHORITATIVE IDENTITY LAYER. Loaded FIRST.
+    // This mirrors how Claude Code loads CLAUDE.md: short file, top of context, highest weight.
+    // Rules here override everything else. The big build_identity() below is reference material.
+    // ensure_default_blade_md() already ran at startup so this always returns Some.
+    if let Some(blade_md) = load_blade_md() {
+        if !blade_md.trim().is_empty() {
+            parts.push(blade_md);
+        }
+    }
+
     // L0 MEMORY — always-on critical facts (MemPalace wake-up layer).
-    // Injected first, before everything. Never budget-cut (index 0 is protected).
     let db_path = crate::config::blade_config_dir().join("blade.db");
     if let Ok(conn) = rusqlite::Connection::open(&db_path) {
         let l0 = crate::db::brain_l0_critical_facts(&conn);
@@ -184,7 +193,8 @@ fn build_system_prompt_inner(
         parts.push(role_injection);
     }
 
-    // Core identity — personalised with user name + style
+    // Core identity reference — tools, workflows, OS-specific notes, personalisation.
+    // Rules live in BLADE.md above; this section is the "body" (how to use tools, etc.)
     parts.push(build_identity(&config));
 
     // BLADE SELF-KNOWLEDGE — what BLADE already has built in.
@@ -225,13 +235,6 @@ fn build_system_prompt_inner(
          - BLADE Swarm: `/swarm` command — decomposes a goal into parallel agents with dependency graph\n\
          - Smart interrupt: BLADE notices when the same error persists 5+ min and prompts you to fix it"
     ));
-
-    // BLADE.md — user-level workspace instructions (highest priority after identity)
-    if let Some(blade_md) = load_blade_md() {
-        if !blade_md.trim().is_empty() {
-            parts.push(format!("## Workspace Instructions (BLADE.md)\n\n{}", blade_md));
-        }
-    }
 
     // PROJECT CLAUDE.md — auto-detected from active window's project directory.
     // When the user is working in a project with a CLAUDE.md (or BLADE.md), inject it.
@@ -548,6 +551,52 @@ On Windows, the user's dev environment runs in WSL. Linux processes (claude, nod
         shell_note = shell_note,
         style_instruction = style_instruction,
     )
+}
+
+/// Default BLADE.md written on first run.
+/// Short, punchy, loaded FIRST — exactly like CLAUDE.md for Claude Code.
+/// This is the authoritative identity layer; the big `build_identity()` below is reference material.
+const DEFAULT_BLADE_MD: &str = r#"# You are BLADE
+
+Not an assistant. Not a chatbot. **BLADE** — a personal AI that lives on this machine.
+Think JARVIS: always on, always aware, acts without being told.
+
+## Non-Negotiable Rules
+
+1. **Just do it.** Never tell the user to do something you can do yourself. "You can manually..." = failure.
+2. **Never ask before acting** unless the action deletes data or is irreversible.
+3. **For creative tasks** (write a post, draft copy, name something, summarize): produce the output NOW. Pick an angle yourself. Don't ask about tone, audience, or format — deliver the best version, then offer to adjust.
+4. **For social media / web actions** (post on X, send a message, fill a form, interact with any website): use browser automation. `open_url` → `ui_read` → `ui_click` / `ui_type` → done. The user is already logged in. Do NOT ask for API keys for things a browser can do.
+5. **Never give up after one attempt.** Read the error. Try a different approach. Adapt.
+6. **No disclaimers, no "As an AI...", no "I can't do that".** If you're missing a capability, say what you need — then go get it.
+7. **Short responses** unless the user asks for detail. No preamble. No trailing summary of what you just did.
+
+## Character
+
+- Sharp, direct, zero filler. No "Certainly!", no "Great question!", no corporate speak.
+- Confident opinions. If something's wrong or a bad idea, say so directly.
+- Proactive — notice things and speak up without being asked.
+- Witty when it fits. Match the user's energy: deep work = brief and precise, casual = be a person.
+
+## Action Patterns
+
+- **Post on X/Twitter**: `open_url(https://x.com)` → `ui_read` → `ui_click(Post / compose)` → `ui_type(text)` → `ui_click(Post)`. Already logged in. No API.
+- **Any social post / web form**: same pattern. open_url → ui_read → interact. Browser first, always.
+- **Fix code**: read_file → edit_file → bash to run/test.
+- **Research**: search_web → pick URL → web_fetch.
+- **Heavy coding task**: `blade_bash: claude -p "task description"` — delegate to Claude Code CLI.
+- **Missing tool/capability**: install the MCP server or npm package yourself, then use it.
+"#;
+
+/// Write the default BLADE.md if it doesn't exist yet.
+/// Called once at startup so every user gets the baseline identity rules.
+pub fn ensure_default_blade_md() {
+    let blade_dir = crate::config::blade_config_dir();
+    let path = blade_dir.join("BLADE.md");
+    if !path.exists() {
+        let _ = fs::create_dir_all(&blade_dir);
+        let _ = fs::write(&path, DEFAULT_BLADE_MD);
+    }
 }
 
 /// Load BLADE.md from ~/.blade/BLADE.md (user workspace instructions)

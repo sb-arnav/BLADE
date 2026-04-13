@@ -241,6 +241,9 @@ pub fn run() {
         Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
     let setup_manager = mcp_manager.clone();
 
+    // Ensure default BLADE.md exists (identity/rules file, loaded first in every prompt)
+    brain::ensure_default_blade_md();
+
     // Initialize database
     let db_conn = db::init_db().expect("Failed to initialize database");
     let shared_db = Arc::new(std::sync::Mutex::new(db_conn));
