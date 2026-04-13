@@ -332,6 +332,7 @@ function CronPanel() {
   const [actionPayload, setActionPayload] = useState("");
   const [cwd, setCwd] = useState("");
   const [saving, setSaving] = useState(false);
+  const [cronError, setCronError] = useState<string | null>(null);
 
   const load = () => {
     invoke<CronTask[]>("cron_list").then(setTasks).catch(() => {});
@@ -342,6 +343,7 @@ function CronPanel() {
   const handleAdd = async () => {
     if (!name.trim() || !schedule.trim() || !actionPayload.trim()) return;
     setSaving(true);
+    setCronError(null);
     try {
       await invoke("cron_add", {
         name: name.trim(),
@@ -356,7 +358,7 @@ function CronPanel() {
       setName(""); setSchedule(""); setActionPayload(""); setCwd("");
       load();
     } catch (e) {
-      console.error("cron_add failed:", e);
+      setCronError(typeof e === "string" ? e : "Invalid schedule — try: 'daily at 9am', 'every hour', 'every monday at 3pm'");
     }
     setSaving(false);
   };
@@ -440,8 +442,11 @@ function CronPanel() {
               onChange={(e) => setCwd(e.target.value)}
             />
           )}
+          {cronError && (
+            <p className="text-2xs text-red-400 bg-red-500/8 border border-red-500/15 rounded-lg px-2.5 py-1.5">{cronError}</p>
+          )}
           <div className="flex justify-end gap-2 pt-1">
-            <button onClick={() => { setAdding(false); setName(""); setSchedule(""); setActionPayload(""); }} className="text-xs text-blade-muted hover:text-blade-secondary px-3 py-1 transition-colors">Cancel</button>
+            <button onClick={() => { setAdding(false); setName(""); setSchedule(""); setActionPayload(""); setCronError(null); }} className="text-xs text-blade-muted hover:text-blade-secondary px-3 py-1 transition-colors">Cancel</button>
             <button
               onClick={handleAdd}
               disabled={saving || !name.trim() || !schedule.trim() || !actionPayload.trim()}
@@ -478,9 +483,9 @@ function KeyVault({ activeProvider }: { activeProvider: string }) {
 
   const handleStore = async (providerId: string) => {
     const key = keys[providerId] ?? "";
-    if (!key || key.includes("...")) return; // don't re-save masked value
+    if (!key.trim() || key.includes("...")) return; // don't re-save masked or empty value
     try {
-      await invoke("store_provider_key", { provider: providerId, apiKey: key });
+      await invoke("store_provider_key", { provider: providerId, apiKey: key.trim() });
       setSaved((s) => ({ ...s, [providerId]: true }));
       setTimeout(() => setSaved((s) => ({ ...s, [providerId]: false })), 2000);
     } catch {}

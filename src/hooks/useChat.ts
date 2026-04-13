@@ -245,6 +245,7 @@ export function useChat() {
 
   const sendMessage = useCallback(
     async (content: string, imageBase64?: string) => {
+      if (!content?.trim() && !imageBase64) return;
       const conversationId = currentConversationId ?? (await createConversation());
       const userMsg: Message = {
         id: crypto.randomUUID(),
@@ -282,6 +283,7 @@ export function useChat() {
             })),
         });
       } catch (cause) {
+        streamBuffer.current = "";
         setError(typeof cause === "string" ? cause : String(cause));
         setLoading(false);
       }
