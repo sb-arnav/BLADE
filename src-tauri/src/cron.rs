@@ -338,9 +338,20 @@ async fn execute_task(task: &CronTask, app: &tauri::AppHandle) {
             // Run a shell command
             let cmd = task.action.content.clone();
             let cwd = task.action.cwd.clone();
-            let output = tokio::process::Command::new("sh")
-                .args(["-c", &cmd])
-                .current_dir(cwd.as_deref().unwrap_or("/tmp"))
+            #[cfg(target_os = "windows")]
+            let default_cwd = std::env::var("TEMP").unwrap_or_else(|_| "C:\\Temp".to_string());
+            #[cfg(not(target_os = "windows"))]
+            let default_cwd = "/tmp".to_string();
+            #[cfg(target_os = "windows")]
+            let mut proc = tokio::process::Command::new("cmd");
+            #[cfg(target_os = "windows")]
+            let proc = proc.args(["/C", &cmd]);
+            #[cfg(not(target_os = "windows"))]
+            let mut proc = tokio::process::Command::new("sh");
+            #[cfg(not(target_os = "windows"))]
+            let proc = proc.args(["-c", &cmd]);
+            let output = proc
+                .current_dir(cwd.as_deref().unwrap_or(&default_cwd))
                 .output()
                 .await;
 
