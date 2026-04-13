@@ -416,7 +416,7 @@ fn read_git_commits() -> Vec<String> {
     let mut chunks = Vec::new();
 
     for repo in repos.iter().take(10) {
-        let output = std::process::Command::new("git")
+        let output = crate::cmd_util::silent_cmd("git")
             .args(["-C", &repo, "log", "--oneline", "--no-merges", "-200"])
             .output();
 

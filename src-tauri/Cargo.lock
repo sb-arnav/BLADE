@@ -563,7 +563,7 @@ dependencies = [
 
 [[package]]
 name = "blade"
-version = "0.4.0"
+version = "0.4.8"
 dependencies = [
  "aes-gcm",
  "arboard",

@@ -594,13 +594,13 @@ fn which_exists(cmd: &str) -> bool {
 /// Run the command in a subprocess and return a SidecarResponse.
 async fn execute_command(req: &SidecarRequest) -> SidecarResponse {
     #[cfg(unix)]
-    let output = std::process::Command::new("bash")
+    let output = crate::cmd_util::silent_cmd("bash")
         .arg("-c")
         .arg(&req.command)
         .output();
 
     #[cfg(windows)]
-    let output = std::process::Command::new("cmd")
+    let output = crate::cmd_util::silent_cmd("cmd")
         .args(["/C", &req.command])
         .output();
 

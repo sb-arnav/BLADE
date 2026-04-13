@@ -837,7 +837,7 @@ fn load_project_instructions() -> Option<(String, String)> {
 
 /// Run a git command in a directory and return stdout (trimmed).
 fn git_run(dir: &std::path::Path, args: &[&str]) -> Option<String> {
-    let out = std::process::Command::new("git")
+    let out = crate::cmd_util::silent_cmd("git")
         .args(args)
         .current_dir(dir)
         .output()

@@ -254,7 +254,7 @@ async fn test_tool(script_path: &str, language: &str) -> Result<String, String> 
         _ => ("python3", vec![script_path, "--help"]),
     };
 
-    let output = std::process::Command::new(program)
+    let output = crate::cmd_util::silent_cmd(program)
         .args(&args)
         .output()
         .map_err(|e| format!("Failed to run test: {}", e))?;
@@ -322,7 +322,7 @@ pub async fn forge_tool(capability: &str) -> Result<ForgedTool, String> {
     // Make executable on Unix
     #[cfg(unix)]
     {
-        std::process::Command::new("chmod")
+        crate::cmd_util::silent_cmd("chmod")
             .args(["755", &script_path_str])
             .status()
             .ok();

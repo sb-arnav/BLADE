@@ -95,7 +95,7 @@ fn find_git_root(start: &str) -> Option<String> {
 
 fn scan_git_repo(repo_path: &str) -> Option<GitRepoState> {
     // Get current branch
-    let branch = std::process::Command::new("git")
+    let branch = crate::cmd_util::silent_cmd("git")
         .args(["-C", repo_path, "branch", "--show-current"])
         .output()
         .ok()
@@ -104,7 +104,7 @@ fn scan_git_repo(repo_path: &str) -> Option<GitRepoState> {
         .unwrap_or_else(|| "unknown".to_string());
 
     // Get status --porcelain for uncommitted/untracked
-    let status_out = std::process::Command::new("git")
+    let status_out = crate::cmd_util::silent_cmd("git")
         .args(["-C", repo_path, "status", "--porcelain"])
         .output()
         .ok()
@@ -123,7 +123,7 @@ fn scan_git_repo(repo_path: &str) -> Option<GitRepoState> {
     }
 
     // Get ahead count from -sb
-    let sb_out = std::process::Command::new("git")
+    let sb_out = crate::cmd_util::silent_cmd("git")
         .args(["-C", repo_path, "status", "-sb"])
         .output()
         .ok()
@@ -144,7 +144,7 @@ fn scan_git_repo(repo_path: &str) -> Option<GitRepoState> {
         .unwrap_or(0);
 
     // Last commit
-    let last_commit = std::process::Command::new("git")
+    let last_commit = crate::cmd_util::silent_cmd("git")
         .args(["-C", repo_path, "log", "--oneline", "-1"])
         .output()
         .ok()
@@ -241,7 +241,7 @@ fn scan_open_ports() -> Vec<PortInfo> {
     {
         // netstat -ano outputs lines like:
         //   TCP    0.0.0.0:3000           0.0.0.0:0              LISTENING       12345
-        let out = std::process::Command::new("netstat")
+        let out = crate::cmd_util::silent_cmd("netstat")
             .args(["-ano"])
             .output()
             .ok()
@@ -293,14 +293,14 @@ fn scan_open_ports() -> Vec<PortInfo> {
     #[cfg(not(target_os = "windows"))]
     {
         // Try ss first, fall back to netstat
-        let out = std::process::Command::new("ss")
+        let out = crate::cmd_util::silent_cmd("ss")
             .args(["-tlnp"])
             .output()
             .ok()
             .filter(|o| o.status.success())
             .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
             .or_else(|| {
-                std::process::Command::new("netstat")
+                crate::cmd_util::silent_cmd("netstat")
                     .args(["-tlnp"])
                     .output()
                     .ok()
@@ -372,7 +372,7 @@ fn get_process_name_by_pid_windows(pid: u32) -> String {
     if pid == 0 {
         return "unknown".to_string();
     }
-    std::process::Command::new("tasklist")
+    crate::cmd_util::silent_cmd("tasklist")
         .args(["/FI", &format!("PID eq {}", pid), "/FO", "CSV", "/NH"])
         .output()
         .ok()
@@ -493,7 +493,7 @@ fn scan_system_load() -> SystemLoad {
 
 #[cfg(target_os = "windows")]
 fn get_memory_stats() -> (u64, u64) {
-    let out = std::process::Command::new("wmic")
+    let out = crate::cmd_util::silent_cmd("wmic")
         .args(["OS", "get", "FreePhysicalMemory,TotalVisibleMemorySize", "/VALUE"])
         .output()
         .ok()
@@ -541,7 +541,7 @@ fn get_memory_stats() -> (u64, u64) {
 #[cfg(target_os = "macos")]
 fn get_memory_stats() -> (u64, u64) {
     // vm_stat gives pages; sysctl gives total
-    let total_bytes: u64 = std::process::Command::new("sysctl")
+    let total_bytes: u64 = crate::cmd_util::silent_cmd("sysctl")
         .args(["-n", "hw.memsize"])
         .output()
         .ok()
@@ -575,7 +575,7 @@ fn get_disk_free_gb() -> f64 {
             .map(|c| format!("{}", c.as_os_str().to_string_lossy()))
             .unwrap_or_else(|| "C:".to_string());
 
-        std::process::Command::new("wmic")
+        crate::cmd_util::silent_cmd("wmic")
             .args(["logicaldisk", &format!("where DeviceID='{}'", drive), "get", "FreeSpace", "/VALUE"])
             .output()
             .ok()
@@ -593,7 +593,7 @@ fn get_disk_free_gb() -> f64 {
 
     #[cfg(not(target_os = "windows"))]
     {
-        std::process::Command::new("df")
+        crate::cmd_util::silent_cmd("df")
             .args(["-k", &home])
             .output()
             .ok()
@@ -635,7 +635,7 @@ fn scan_processes() -> Vec<ProcessInfo> {
 
     #[cfg(target_os = "windows")]
     {
-        let out = std::process::Command::new("tasklist")
+        let out = crate::cmd_util::silent_cmd("tasklist")
             .args(["/FO", "CSV", "/NH"])
             .output()
             .ok()
@@ -672,7 +672,7 @@ fn scan_processes() -> Vec<ProcessInfo> {
 
     #[cfg(not(target_os = "windows"))]
     {
-        let out = std::process::Command::new("ps")
+        let out = crate::cmd_util::silent_cmd("ps")
             .args(["aux"])
             .output()
             .ok()

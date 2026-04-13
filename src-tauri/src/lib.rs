@@ -1,5 +1,6 @@
 mod accountability;
 mod agent_commands;
+mod cmd_util;
 mod autoskills;
 mod git_style;
 mod multimodal;

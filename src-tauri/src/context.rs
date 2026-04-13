@@ -156,7 +156,7 @@ Get-Process |
   ConvertTo-Json -Compress
 "#;
 
-    let output = std::process::Command::new("powershell")
+    let output = crate::cmd_util::silent_cmd("powershell")
         .args(["-NoProfile", "-Command", script])
         .output()
         .map_err(|e| format!("Failed to list open windows: {}", e))?;
@@ -195,7 +195,7 @@ fn focus_window_windows(title_contains: &str) -> Result<(), String> {
         escaped
     );
 
-    let output = std::process::Command::new("powershell")
+    let output = crate::cmd_util::silent_cmd("powershell")
         .args(["-NoProfile", "-Command", &script])
         .output()
         .map_err(|e| format!("Failed to focus window: {}", e))?;

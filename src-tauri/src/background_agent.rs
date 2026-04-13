@@ -78,7 +78,7 @@ fn which_bin(name: &str) -> bool {
     #[cfg(not(target_os = "windows"))]
     let cmd = "which";
 
-    std::process::Command::new(cmd)
+    crate::cmd_util::silent_cmd(cmd)
         .arg(name)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
