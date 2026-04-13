@@ -237,7 +237,7 @@ async fn synthesize_identity(
         .map(|c| c.as_str())
         .collect::<Vec<_>>()
         .join("\n\n---\n\n");
-    let sample = &sample[..sample.len().min(8000)];
+    let sample = crate::safe_slice(&sample, 8000);
 
     let prompt = format!(
         r#"You are reading someone's digital life — their shell history, git commits, notes, and code. Your job is to build a deep psychological and professional model of who this person is.
@@ -301,7 +301,7 @@ JSON:"#,
         .trim();
 
     let parsed: serde_json::Value = serde_json::from_str(raw)
-        .map_err(|e| format!("Synthesis parse error: {} — raw: {}", e, &raw[..raw.len().min(200)]))?;
+        .map_err(|e| format!("Synthesis parse error: {} — raw: {}", e, crate::safe_slice(&raw, 200)))?;
 
     let preferences = parsed["preferences"]
         .as_array()
@@ -424,7 +424,7 @@ fn read_git_commits() -> Vec<String> {
             if out.status.success() {
                 let log = String::from_utf8_lossy(&out.stdout).to_string();
                 if !log.trim().is_empty() {
-                    chunks.push(format!("Git commits from {}:\n{}", repo, &log[..log.len().min(3000)]));
+                    chunks.push(format!("Git commits from {}:\n{}", repo, crate::safe_slice(&log, 3000)));
                 }
             }
         }
@@ -465,7 +465,7 @@ fn read_vscode_settings() -> Vec<String> {
                 String::new()
             };
 
-            let mut chunk = format!("VS Code / Cursor settings:\n{}", &content[..content.len().min(2000)]);
+            let mut chunk = format!("VS Code / Cursor settings:\n{}", crate::safe_slice(&content, 2000));
             if !extensions.is_empty() {
                 chunk.push_str(&format!("\n\nExtensions installed:\n{}", extensions));
             }
@@ -503,7 +503,7 @@ fn read_obsidian_vault(vault_path: &str) -> Vec<String> {
                     if let Ok(content) = std::fs::read_to_string(&path) {
                         if !content.trim().is_empty() {
                             let name = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
-                            chunks.push(format!("Obsidian daily note ({}):\n{}", name, &content[..content.len().min(1500)]));
+                            chunks.push(format!("Obsidian daily note ({}):\n{}", name, crate::safe_slice(&content, 1500)));
                         }
                     }
                 }
@@ -527,7 +527,7 @@ fn read_obsidian_vault(vault_path: &str) -> Vec<String> {
                     .file_stem()
                     .map(|s| s.to_string_lossy().to_string())
                     .unwrap_or_default();
-                chunks.push(format!("Obsidian note ({}):\n{}", name, &content[..content.len().min(1000)]));
+                chunks.push(format!("Obsidian note ({}):\n{}", name, crate::safe_slice(&content, 1000)));
             }
         }
     }
@@ -562,7 +562,7 @@ fn read_blade_conversations(db_path: &std::path::Path) -> Vec<String> {
         .map(|chunk| {
             let text = chunk
                 .iter()
-                .map(|(role, content)| format!("{}: {}", role, &content[..content.len().min(300)]))
+                .map(|(role, content)| format!("{}: {}", role, crate::safe_slice(content, 300)))
                 .collect::<Vec<_>>()
                 .join("\n");
             format!("Past Blade conversation:\n{}", text)
@@ -607,7 +607,7 @@ fn read_project_readmes() -> Vec<String> {
                             .and_then(|d| d.file_name())
                             .map(|n| n.to_string_lossy().to_string())
                             .unwrap_or_default();
-                        format!("Project README ({}):\n{}", name, &content[..content.len().min(1500)])
+                        format!("Project README ({}):\n{}", name, crate::safe_slice(&content, 1500))
                     })
                 })
                 .collect();

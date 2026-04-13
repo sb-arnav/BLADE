@@ -111,7 +111,7 @@ pub fn start_pulse(app: tauri::AppHandle) {
                             let _ = crate::db::timeline_record(
                                 &conn,
                                 "pulse",
-                                &thought[..thought.len().min(80)],
+                                crate::safe_slice(&thought, 80),
                                 &thought,
                                 "BLADE",
                                 "{}",
@@ -213,11 +213,11 @@ fn build_pulse_prompt(
 
     let context_sections: Vec<String> = [
         if !activity.is_empty() { Some(format!("Current activity:\n{}", activity)) } else { None },
-        if !active_thread.trim().is_empty() { Some(format!("What Blade is actively tracking:\n{}", &active_thread[..active_thread.len().min(600)])) } else { None },
-        if !machine_ctx.trim().is_empty() { Some(format!("Machine context:\n{}", &machine_ctx[..machine_ctx.len().min(800)])) } else { None },
-        if !memory_summary.trim().is_empty() { Some(format!("What you know about this person:\n{}", &memory_summary[..memory_summary.len().min(500)])) } else { None },
-        if !journal.trim().is_empty() { Some(format!("Your own recent journal entries:\n{}", &journal[..journal.len().min(600)])) } else { None },
-        if !recent_research.trim().is_empty() { Some(format!("What you've been researching in the background:\n{}", &recent_research[..recent_research.len().min(600)])) } else { None },
+        if !active_thread.trim().is_empty() { Some(format!("What Blade is actively tracking:\n{}", crate::safe_slice(&active_thread, 600))) } else { None },
+        if !machine_ctx.trim().is_empty() { Some(format!("Machine context:\n{}", crate::safe_slice(&machine_ctx, 800))) } else { None },
+        if !memory_summary.trim().is_empty() { Some(format!("What you know about this person:\n{}", crate::safe_slice(&memory_summary, 500))) } else { None },
+        if !journal.trim().is_empty() { Some(format!("Your own recent journal entries:\n{}", crate::safe_slice(&journal, 600))) } else { None },
+        if !recent_research.trim().is_empty() { Some(format!("What you've been researching in the background:\n{}", crate::safe_slice(&recent_research, 600))) } else { None },
     ]
     .into_iter()
     .flatten()
@@ -330,7 +330,7 @@ pub async fn pulse_get_digest(hidden_since: i64) -> Option<String> {
         let dt = chrono::DateTime::from_timestamp(*ts, 0)
             .map(|d| d.format("%-H:%M").to_string())
             .unwrap_or_else(|| "?".to_string());
-        format!("[{}] {}: {}", dt, typ, &title[..title.len().min(60)])
+        format!("[{}] {}: {}", dt, typ, crate::safe_slice(&title, 60))
     }).collect();
 
     let prompt = format!(
@@ -401,7 +401,7 @@ pub async fn maybe_morning_briefing(app: tauri::AppHandle) {
                     let dt = chrono::DateTime::from_timestamp(e.timestamp, 0)
                         .map(|d| d.format("%-H:%M").to_string())
                         .unwrap_or_else(|| "?".to_string());
-                    format!("- [{}] {}: {}", dt, e.event_type, &e.title[..e.title.len().min(70)])
+                    format!("- [{}] {}: {}", dt, e.event_type, crate::safe_slice(&e.title, 70))
                 }).collect::<Vec<_>>().join("\n")
             })
             .unwrap_or_default()
@@ -436,7 +436,7 @@ Voice: Direct. Slightly harsh if necessary. Like a co-founder who's been watchin
 No "Good morning". No headers. No numbered lists. Start in the middle of the observation."#,
         date = today,
         name_line = name_line,
-        thread = if thread.is_empty() { "Nothing tracked yet.".to_string() } else { thread[..thread.len().min(400)].to_string() },
+        thread = if thread.is_empty() { "Nothing tracked yet.".to_string() } else { crate::safe_slice(&thread, 400).to_string() },
         events = if recent_events.is_empty() { "No recent events.".to_string() } else { recent_events },
         memory = if memory_summary.is_empty() { "No memory yet.".to_string() } else { memory_summary },
     );
@@ -521,9 +521,9 @@ pub async fn pulse_explain() -> Result<String, String> {
     } else { String::new() };
 
     let context_summary = [
-        if !activity.is_empty() { format!("Current activity: {}", &activity[..activity.len().min(300)]) } else { String::new() },
-        if !active_thread.is_empty() { format!("Active thread: {}", &active_thread[..active_thread.len().min(200)]) } else { String::new() },
-        if !memory_summary.is_empty() { format!("Memory: {}", &memory_summary[..memory_summary.len().min(200)]) } else { String::new() },
+        if !activity.is_empty() { format!("Current activity: {}", crate::safe_slice(&activity, 300)) } else { String::new() },
+        if !active_thread.is_empty() { format!("Active thread: {}", crate::safe_slice(&active_thread, 200)) } else { String::new() },
+        if !memory_summary.is_empty() { format!("Memory: {}", crate::safe_slice(&memory_summary, 200)) } else { String::new() },
     ].iter().filter(|s| !s.is_empty()).cloned().collect::<Vec<_>>().join("\n");
 
     let prompt = format!(

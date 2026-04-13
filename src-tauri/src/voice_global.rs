@@ -66,7 +66,7 @@ async fn transcribe_and_emit(app: tauri::AppHandle) {
     }
 
     let _ = app.emit("voice_transcript_ready", serde_json::json!({ "text": text }));
-    log::info!("[voice_global] transcript: {}", &text[..text.len().min(80)]);
+    log::info!("[voice_global] transcript: {}", crate::safe_slice(&text, 80));
 }
 
 /// Returns whether global voice recording is active.

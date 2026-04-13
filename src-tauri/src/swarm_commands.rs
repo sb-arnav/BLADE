@@ -158,10 +158,11 @@ async fn coordinator_loop(
                                 "swarm_id": swarm_id, "key": key
                             }));
                         }
+                        let result_end = result.char_indices().nth(200).map(|(i, _)| i).unwrap_or(result.len());
                         let _ = app.emit("swarm_task_completed", serde_json::json!({
                             "swarm_id": swarm_id,
                             "task_id": &task.id,
-                            "result_preview": &result[..result.len().min(200)],
+                            "result_preview": &result[..result_end],
                         }));
                     }
                     Some(AgentStatus::Failed) => {
@@ -179,10 +180,11 @@ async fn coordinator_loop(
 
                         // evo-hq pattern: annotate failure to shared scratchpad so
                         // other agents avoid repeating the same mistake
-                        let failure_key = format!("_failed:{}", &task.id[..task.id.len().min(8)]);
+                        let failure_key = format!("_failed:{}", crate::safe_slice(&task.id, 8));
+                        let error_end = error.char_indices().nth(200).map(|(i, _)| i).unwrap_or(error.len());
                         let failure_note = format!(
                             "Task '{}' failed: {}. Avoid this approach.",
-                            task.title, &error[..error.len().min(200)]
+                            task.title, &error[..error_end]
                         );
                         swarm.scratchpad.insert(failure_key, failure_note);
                         swarm::update_swarm_scratchpad(swarm_id, &swarm.scratchpad);
@@ -223,7 +225,7 @@ async fn coordinator_loop(
             swarm::update_swarm_status(swarm_id, &SwarmStatus::Completed, Some(&final_result));
             let _ = app.emit("swarm_completed", serde_json::json!({
                 "swarm_id": swarm_id,
-                "final_result_preview": &final_result[..final_result.len().min(300)],
+                "final_result_preview": &final_result[..final_result.char_indices().nth(300).map(|(i, _)| i).unwrap_or(final_result.len())],
             }));
             break;
         }

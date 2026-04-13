@@ -441,7 +441,7 @@ fn build_system_prompt_inner(
                         let dt = chrono::DateTime::from_timestamp(e.timestamp, 0)
                             .map(|d| d.with_timezone(&chrono::Local).format("%-H:%M").to_string())
                             .unwrap_or_else(|| "?".to_string());
-                        format!("- [{}] **{}**: {}", dt, e.event_type, &e.title[..e.title.len().min(80)])
+                        format!("- [{}] **{}**: {}", dt, e.event_type, crate::safe_slice(&e.title, 80))
                     }).collect();
                     parts.push(format!("## Recent Activity\n\n{}", lines.join("\n")));
                 }
@@ -819,8 +819,8 @@ pub async fn extract_entities_from_exchange(
 
     let exchange = format!(
         "User: {}\n\nAssistant: {}",
-        &user_text[..user_text.len().min(800)],
-        &assistant_text[..assistant_text.len().min(1200)],
+        crate::safe_slice(&user_text, 800),
+        crate::safe_slice(&assistant_text, 1200),
     );
 
     let prompt = format!(

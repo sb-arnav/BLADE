@@ -94,8 +94,8 @@ pub fn detect_and_log(
     let severity = derive_severity(user_request);
 
     // Truncate fields to avoid huge DB entries
-    let req_short = &user_request[..user_request.len().min(500)];
-    let resp_short = &blade_response[..blade_response.len().min(800)];
+    let req_short = crate::safe_slice(&user_request, 500);
+    let resp_short = crate::safe_slice(&blade_response, 800);
 
     let _ = db::report_capability_gap(
         &conn,

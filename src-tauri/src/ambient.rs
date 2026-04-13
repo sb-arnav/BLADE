@@ -102,7 +102,7 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
                     if looks_like_error(&text) {
                         use std::hash::{Hash, Hasher};
                         let mut h = std::collections::hash_map::DefaultHasher::new();
-                        text[..text.len().min(500)].hash(&mut h);
+                        crate::safe_slice(&text, 500).hash(&mut h);
                         let hash = h.finish();
                         if hash != last_error_hash {
                             last_error_hash = hash;
@@ -110,7 +110,7 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
                             let _ = app.emit("proactive_nudge", serde_json::json!({
                                 "message": format!("I see an error in your clipboard: {}. Want me to diagnose it?", headline),
                                 "type": "error_detected",
-                                "raw": &text[..text.len().min(800)],
+                                "raw": crate::safe_slice(&text, 800),
                             }));
                         }
                     }
@@ -134,7 +134,7 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
                             let title = if w.window_title.is_empty() {
                                 w.app_name.clone()
                             } else {
-                                format!("{} — {}", w.app_name, &w.window_title[..w.window_title.len().min(60)])
+                                format!("{} — {}", w.app_name, crate::safe_slice(&w.window_title, 60))
                             };
                             let _ = crate::db::timeline_record(
                                 &conn,
@@ -235,7 +235,7 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
                             let _ = app.emit("proactive_nudge", serde_json::json!({
                                 "message": format!(
                                     "Your thread '{}' hasn't moved in two hours. Still relevant, or should I update it?",
-                                    &headline[..headline.len().min(60)]
+                                    crate::safe_slice(&headline, 60)
                                 ),
                                 "type": "stale_thread",
                             }));

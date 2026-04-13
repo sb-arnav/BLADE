@@ -101,7 +101,7 @@ async fn fire_reminder(app: &tauri::AppHandle, reminder: &Reminder) {
         let body = if reminder.note.is_empty() {
             reminder.title.clone()
         } else {
-            format!("{}\n{}", reminder.title, &reminder.note[..reminder.note.len().min(100)])
+            format!("{}\n{}", reminder.title, crate::safe_slice(&reminder.note, 100))
         };
         let _ = app.notification()
             .builder()

@@ -103,13 +103,13 @@ async fn compress_conversation_smart(
     let to_compress: Vec<String> = conversation[compress_start..compress_end]
         .iter()
         .filter_map(|m| match m {
-            ConversationMessage::User(s) => Some(format!("User: {}", &s[..s.len().min(500)])),
+            ConversationMessage::User(s) => Some(format!("User: {}", crate::safe_slice(s, 500))),
             ConversationMessage::Assistant { content, .. } => {
                 if content.is_empty() { None }
-                else { Some(format!("Assistant: {}", &content[..content.len().min(500)])) }
+                else { Some(format!("Assistant: {}", crate::safe_slice(content, 500))) }
             }
             ConversationMessage::Tool { tool_name, content, .. } => {
-                Some(format!("Tool[{}] result: {}", tool_name, &content[..content.len().min(200)]))
+                Some(format!("Tool[{}] result: {}", tool_name, crate::safe_slice(content, 200)))
             }
             _ => None,
         })
@@ -639,7 +639,7 @@ pub async fn send_message_stream(
                 crate::embeddings::auto_embed_exchange(&store_clone, &user_text, &assistant_text, "tool_loop");
                 // SKILL ENGINE: record successful tool pattern
                 if !tools_used.is_empty() {
-                    let result_summary = &assistant_text[..assistant_text.len().min(200)];
+                    let result_summary = crate::safe_slice(&assistant_text, 200);
                     crate::skill_engine::record_tool_pattern(&user_text_skill, &tools_used, result_summary);
                     // Check if any candidates are ready to graduate to skills
                     crate::skill_engine::maybe_synthesize_skills(app3).await;
@@ -647,7 +647,7 @@ pub async fn send_message_stream(
                 // Capability gap detection — runs silently, fires webhook if gap found
                 if reports::detect_and_log(&user_text, &assistant_text) {
                     let _ = app2.emit("capability_gap_detected", serde_json::json!({
-                        "user_request": &user_text[..user_text.len().min(120)],
+                        "user_request": crate::safe_slice(&user_text, 120),
                     }));
                     // Deliver to webhook asynchronously
                     let db_path = crate::config::blade_config_dir().join("blade.db");
@@ -667,8 +667,8 @@ pub async fn send_message_stream(
             {
                 let db_path = crate::config::blade_config_dir().join("blade.db");
                 if let Ok(conn) = rusqlite::Connection::open(&db_path) {
-                    let title = &user_text_thread[..user_text_thread.len().min(80)];
-                    let content = &assistant_text_timeline[..assistant_text_timeline.len().min(500)];
+                    let title = crate::safe_slice(&user_text_thread, 80);
+                    let content = crate::safe_slice(&assistant_text_timeline, 500);
                     let _ = crate::db::timeline_record(&conn, "conversation", title, content, "BLADE", "{}");
                 }
             }
@@ -1215,8 +1215,8 @@ pub async fn auto_title_conversation(
         _            => return Ok(()), // skip for local/unknown providers (ollama etc.)
     };
 
-    let u = &user_text[..user_text.len().min(300)];
-    let a = &assistant_text[..assistant_text.len().min(300)];
+    let u = crate::safe_slice(&user_text, 300);
+    let a = crate::safe_slice(&assistant_text, 300);
     let prompt = format!(
         "Give this conversation a concise 4-6 word title. Output ONLY the title, no punctuation.\n\nUser: {u}\n\nAssistant: {a}"
     );

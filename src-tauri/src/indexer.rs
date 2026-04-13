@@ -587,7 +587,7 @@ pub fn blade_find_symbol(query: String, project: Option<String>) -> String {
         return format!("No symbols found matching '{}'", query);
     }
     results.iter().map(|s| {
-        let doc = if s.docstring.is_empty() { String::new() } else { format!(" // {}", &s.docstring[..s.docstring.len().min(60)]) };
+        let doc = if s.docstring.is_empty() { String::new() } else { format!(" // {}", crate::safe_slice(&s.docstring, 60)) };
         format!("{}:{} [{}] {}{}", s.file_path, s.line_number, s.symbol_type, s.signature, doc)
     }).collect::<Vec<_>>().join("\n")
 }

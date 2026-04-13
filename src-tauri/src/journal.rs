@@ -85,7 +85,7 @@ pub async fn maybe_write_journal() {
                 let dt = chrono::DateTime::from_timestamp(e.timestamp, 0)
                     .map(|d| d.format("%-H:%M").to_string())
                     .unwrap_or_else(|| "?".to_string());
-                format!("[{}] {}: {}", dt, e.event_type, &e.title[..e.title.len().min(60)])
+                format!("[{}] {}: {}", dt, e.event_type, crate::safe_slice(&e.title, 60))
             }).collect::<Vec<_>>().join("\n")
         })
         .unwrap_or_default();
@@ -130,9 +130,9 @@ Voice: First-person, present. Direct. Occasionally wry. You have opinions about 
 Start with "Day {date}." then the entry. No preamble. No headers."#,
         date = date,
         timeline = if timeline_summary.is_empty() { "Nothing recorded today.".to_string() } else { timeline_summary },
-        thread = if thread.is_empty() { "No active thread.".to_string() } else { thread[..thread.len().min(300)].to_string() },
+        thread = if thread.is_empty() { "No active thread.".to_string() } else { crate::safe_slice(&thread, 300).to_string() },
         memory = if memory_ctx.is_empty() { "Still learning.".to_string() } else { memory_ctx },
-        prev = if prev_journal.is_empty() { "No prior entries.".to_string() } else { prev_journal[..prev_journal.len().min(600)].to_string() },
+        prev = if prev_journal.is_empty() { "No prior entries.".to_string() } else { crate::safe_slice(&prev_journal, 600).to_string() },
     );
 
     use crate::providers::ConversationMessage;

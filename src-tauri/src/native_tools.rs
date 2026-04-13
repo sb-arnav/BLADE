@@ -804,7 +804,7 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
                     results
                 };
                 let text = filtered.iter().map(|s| {
-                    let doc = if s.docstring.is_empty() { String::new() } else { format!(" // {}", &s.docstring[..s.docstring.len().min(60)]) };
+                    let doc = if s.docstring.is_empty() { String::new() } else { format!(" // {}", crate::safe_slice(&s.docstring, 60)) };
                     format!("{}:{} [{}] {}{}", s.file_path, s.line_number, s.symbol_type, s.signature, doc)
                 }).collect::<Vec<_>>().join("\n");
                 (text, false)
@@ -852,7 +852,7 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
                     Ok(id) => (format!(
                         "Agent '{}' spawned with id {}. Task: \"{}\"\n\
                          The agent is running in the background. Use blade_agent_status with this id to check progress.",
-                        agent_type, id, &task[..task.len().min(80)]
+                        agent_type, id, crate::safe_slice(&task, 80)
                     ), false),
                     Err(e) => (format!("Failed to spawn agent: {}", e), true),
                 }
@@ -904,7 +904,7 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
                                 crate::background_agent::AgentStatus::Failed => "FAILED",
                                 crate::background_agent::AgentStatus::Cancelled => "CANCELLED",
                             };
-                            format!("[{}] {} — {} ({})", s, a.id, &a.task[..a.task.len().min(60)], a.agent_type)
+                            format!("[{}] {} — {} ({})", s, a.id, crate::safe_slice(&a.task, 60), a.agent_type)
                         }).collect();
                         (lines.join("\n"), false)
                     }
@@ -1163,7 +1163,7 @@ async fn bash(command: &str, cwd: Option<&str>, timeout_ms: u64) -> (String, boo
                 let tmp_path = tmp_dir.join(&fname);
                 if std::fs::write(&tmp_path, &combined_text).is_ok() {
                     let path_str = tmp_path.to_string_lossy().to_string();
-                    let preview = &combined_text[..combined_text.len().min(1_500)];
+                    let preview = crate::safe_slice(&combined_text, 1_500);
                     (format!(
                         "{}\n\n[Output truncated — {} chars total. Full output saved to: {}]\n[Use blade_read_file to read it if needed]",
                         preview, combined_text.len(), path_str

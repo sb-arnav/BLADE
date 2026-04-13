@@ -261,7 +261,7 @@ pub fn auto_embed_exchange(store: &SharedVectorStore, user_msg: &str, assistant_
     // Build a short context prefix — topic label for the embedding model
     // Heuristic: take first 100 chars of user message as the topic signal
     let topic = user_msg.trim();
-    let topic_short = &topic[..topic.len().min(100)];
+    let topic_short = crate::safe_slice(&topic, 100);
     let context_prefix = format!("This is a conversation about: {}. ", topic_short);
 
     // Combine with context prefix prepended
