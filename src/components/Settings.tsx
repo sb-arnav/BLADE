@@ -74,6 +74,13 @@ const PROVIDER_MATRIX: ProviderEntry[] = [
     keyPlaceholder: "gsk_...",
   },
   {
+    id: "openrouter",
+    name: "OpenRouter",
+    model: "anthropic/claude-sonnet-4-5",
+    badges: ["200+ models", "one key", "frontier access"],
+    keyPlaceholder: "sk-or-v1-...",
+  },
+  {
     id: "openai",
     name: "DeepSeek",
     model: "deepseek-chat",
@@ -211,6 +218,7 @@ function matchProviderEntry(cfg: { provider: string; model: string; base_url?: s
 const KEY_PROVIDERS = [
   { id: "anthropic", label: "Anthropic (Claude)", placeholder: "sk-ant-..." },
   { id: "openai", label: "OpenAI (GPT)", placeholder: "sk-..." },
+  { id: "openrouter", label: "OpenRouter (200+ models)", placeholder: "sk-or-v1-..." },
   { id: "gemini", label: "Google Gemini", placeholder: "AIza..." },
   { id: "groq", label: "Groq (Llama)", placeholder: "gsk_..." },
 ];
@@ -546,6 +554,7 @@ const ROUTABLE_PROVIDERS = [
   { id: "", label: "— Active provider —" },
   { id: "anthropic", label: "Anthropic (Claude)" },
   { id: "openai", label: "OpenAI (GPT)" },
+  { id: "openrouter", label: "OpenRouter (200+ models)" },
   { id: "gemini", label: "Google Gemini" },
   { id: "groq", label: "Groq (Llama — fast)" },
   { id: "ollama", label: "Ollama / Hermes 3 (local, private)" },

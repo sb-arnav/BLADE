@@ -60,6 +60,23 @@ pub fn model_tier(provider: &str, model: &str) -> ModelTier {
         return ModelTier::Capable; // Groq runs quantized but capable models
     }
 
+    // OpenRouter: model ID is usually "provider/model-name" — classify by the model part
+    if provider == "openrouter" {
+        let model_part = m.split('/').last().unwrap_or(&m);
+        // Frontier-tier via OpenRouter
+        if model_part.contains("opus") || model_part.contains("sonnet-4")
+            || model_part.contains("sonnet-3-5") || model_part.contains("sonnet-3.5")
+            || model_part.contains("gpt-4o") && !model_part.contains("mini")
+            || model_part.contains("gemini-1.5-pro")
+            || model_part.contains("o1") || model_part.contains("o3")
+            || model_part.contains("deepseek-r1") || model_part.contains("qwen-2.5-72b")
+        {
+            return ModelTier::Frontier;
+        }
+        // Everything else on OpenRouter is at least capable
+        return ModelTier::Capable;
+    }
+
     ModelTier::Capable // safe default
 }
 

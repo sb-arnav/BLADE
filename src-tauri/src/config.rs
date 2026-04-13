@@ -441,7 +441,7 @@ pub fn set_api_key_for_provider(
 /// and masked previews (never the full key). Also returns the active provider.
 #[tauri::command]
 pub fn get_all_provider_keys() -> serde_json::Value {
-    let providers = ["anthropic", "openai", "gemini", "groq", "ollama"];
+    let providers = ["anthropic", "openai", "openrouter", "gemini", "groq", "ollama"];
     let config = load_config();
 
     let keys: Vec<serde_json::Value> = providers.iter().map(|p| {
