@@ -85,6 +85,8 @@ pub fn build_conversation(
     conversation
 }
 
+const OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1";
+
 pub async fn complete_turn(
     provider: &str,
     api_key: &str,
@@ -104,6 +106,7 @@ pub async fn complete_turn(
         "openai" => openai::complete(api_key, model, messages, tools, base_url).await,
         "anthropic" => anthropic::complete(api_key, model, messages, tools).await,
         "ollama" => ollama::complete(model, messages).await,
+        "openrouter" => openai::complete(api_key, model, messages, tools, Some(OPENROUTER_BASE_URL)).await,
         _ => Err(format!("Unknown provider: {}", provider)),
     }
 }
@@ -128,6 +131,7 @@ pub async fn stream_text(
         "openai" => openai::stream_text(app, api_key, model, messages, base_url).await,
         "anthropic" => anthropic::stream_text(app, api_key, model, messages).await,
         "ollama" => ollama::stream_text(app, model, messages).await,
+        "openrouter" => openai::stream_text(app, api_key, model, messages, Some(OPENROUTER_BASE_URL)).await,
         _ => Err(format!("Unknown provider: {}", provider)),
     }
 }
@@ -159,6 +163,7 @@ pub async fn test_connection(provider: &str, api_key: &str, model: &str, base_ur
         "openai" => openai::test(api_key, model, base_url).await,
         "anthropic" => anthropic::test(api_key, model).await,
         "ollama" => ollama::test(model).await,
+        "openrouter" => openai::test(api_key, model, Some(OPENROUTER_BASE_URL)).await,
         _ => Err(format!("Unknown provider: {}", provider)),
     }
 }
