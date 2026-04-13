@@ -269,7 +269,8 @@ pub fn auto_embed_exchange(store: &SharedVectorStore, user_msg: &str, assistant_
     let content = format!("{}{}", context_prefix, raw);
     // Truncate to avoid embedding very long conversations
     let content = if content.len() > 2200 {
-        content[..2200].to_string()
+        let end = content.char_indices().nth(2200).map(|(i, _)| i).unwrap_or(content.len());
+        content[..end].to_string()
     } else {
         content
     };

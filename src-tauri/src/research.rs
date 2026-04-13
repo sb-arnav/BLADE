@@ -106,7 +106,8 @@ pub fn research_context_for_prompt() -> String {
 
     let full = lines.join("\n\n");
     if full.len() > RESEARCH_CONTEXT_CHARS {
-        format!("{}\n...(research log truncated)", &full[..RESEARCH_CONTEXT_CHARS])
+        let end = full.char_indices().nth(RESEARCH_CONTEXT_CHARS).map(|(i, _)| i).unwrap_or(full.len());
+        format!("{}\n...(research log truncated)", &full[..end])
     } else {
         full
     }
