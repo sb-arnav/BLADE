@@ -6,7 +6,7 @@
 ///
 /// This is the difference between a tool and an entity.
 
-use chrono::Timelike;
+
 use std::time::Duration;
 use tauri::Emitter;
 
@@ -509,7 +509,7 @@ pub async fn pulse_explain() -> Result<String, String> {
     }
 
     // Gather the same context that was used to generate the thought
-    let machine_ctx = crate::godmode::load_godmode_context().unwrap_or_default();
+    let _machine_ctx = crate::godmode::load_godmode_context().unwrap_or_default();
     let activity = crate::context::get_user_activity().ok().unwrap_or_default();
     let active_thread = crate::thread::get_active_thread().unwrap_or_default();
     let db_path = crate::config::blade_config_dir().join("blade.db");

@@ -8,7 +8,7 @@
 /// This is not onboarding. This is Blade's first act of intelligence.
 
 use serde::{Deserialize, Serialize};
-use std::cmp::Reverse;
+
 use tauri::Emitter;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

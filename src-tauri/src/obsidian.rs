@@ -59,7 +59,7 @@ pub fn ensure_daily_note() {
     }
 
     let config = crate::config::load_config();
-    let user = if !config.user_name.is_empty() { &config.user_name } else { "You" };
+    let _user = if !config.user_name.is_empty() { &config.user_name } else { "You" };
     let date = today_str();
 
     let content = format!(
@@ -146,7 +146,7 @@ pub fn save_conversation(title: &str, summary: &str, conversation_id: &str) {
     let filename = format!("{}-{}.md", date, safe_title);
     let path = conv_dir.join(&filename);
 
-    let config = crate::config::load_config();
+    let _config = crate::config::load_config();
     let content = format!(
         "---\ndate: {date}\ntags: [conversation, blade]\nconversation_id: {conversation_id}\n---\n\n# {title}\n\n{summary}\n",
         date = date,

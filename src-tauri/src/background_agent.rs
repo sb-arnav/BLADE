@@ -82,7 +82,7 @@ fn which_bin(name: &str) -> bool {
 }
 
 /// Build the command args for a given agent type + task
-fn build_agent_command(agent_type: &str, task: &str, cwd: &str) -> Option<(String, Vec<String>)> {
+fn build_agent_command(agent_type: &str, task: &str, _cwd: &str) -> Option<(String, Vec<String>)> {
     match agent_type {
         "claude-code" | "claude" => {
             // Claude Code CLI: `claude -p "task" --output-format stream-json`

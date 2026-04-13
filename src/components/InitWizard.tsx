@@ -48,6 +48,15 @@ const PROVIDERS = [
     placeholder: "sk-…",
   },
   {
+    id: "openrouter",
+    name: "OpenRouter",
+    badge: "200+ models · One key",
+    model: "anthropic/claude-sonnet-4.5",
+    needsKey: true,
+    keyUrl: "https://openrouter.ai/keys",
+    placeholder: "sk-or-v1-…",
+  },
+  {
     id: "ollama",
     name: "Ollama",
     badge: "Local · Offline",

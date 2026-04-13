@@ -2,7 +2,7 @@ pub mod loader;
 pub mod registry;
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+
 use std::path::PathBuf;
 
 /// Plugin manifest (blade-plugin.json)

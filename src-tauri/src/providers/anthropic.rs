@@ -217,28 +217,36 @@ pub async fn stream_text(
     let mut stream = response.bytes_stream();
     let mut buffer = String::new();
 
-    while let Some(chunk) = stream.next().await {
-        let bytes = chunk.map_err(|e| format!("Stream error: {}", e))?;
-        buffer.push_str(&String::from_utf8_lossy(&bytes));
+    let result: Result<(), String> = async {
+        while let Some(chunk) = stream.next().await {
+            let bytes = chunk.map_err(|e| format!("Stream error: {}", e))?;
+            buffer.push_str(&String::from_utf8_lossy(&bytes));
 
-        while let Some(pos) = buffer.find('\n') {
-            let line = buffer[..pos].to_string();
-            buffer = buffer[pos + 1..].to_string();
+            while let Some(pos) = buffer.find('\n') {
+                let line = buffer[..pos].to_string();
+                buffer = buffer[pos + 1..].to_string();
 
-            if let Some(data) = line.strip_prefix("data: ") {
-                if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
-                    if json["type"] == "content_block_delta" {
-                        if let Some(text) = json["delta"]["text"].as_str() {
-                            let _ = app.emit("chat_token", text);
+                if let Some(data) = line.strip_prefix("data: ") {
+                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
+                        if json["type"] == "error" {
+                            let msg = json["error"]["message"].as_str().unwrap_or("Unknown stream error");
+                            return Err(format!("Anthropic stream error: {}", msg));
+                        }
+                        if json["type"] == "content_block_delta" {
+                            if let Some(text) = json["delta"]["text"].as_str() {
+                                let _ = app.emit("chat_token", text);
+                            }
                         }
                     }
                 }
             }
         }
-    }
+        Ok(())
+    }.await;
 
+    // Always emit chat_done so the frontend never gets stuck in loading state
     let _ = app.emit("chat_done", ());
-    Ok(())
+    result
 }
 
 /// Stream with extended thinking enabled — Claude reasons before responding.
@@ -301,47 +309,55 @@ pub async fn stream_text_with_thinking(
     let mut buffer = String::new();
     let mut in_thinking_block = false;
 
-    while let Some(chunk) = stream.next().await {
-        let bytes = chunk.map_err(|e| format!("Stream error: {}", e))?;
-        buffer.push_str(&String::from_utf8_lossy(&bytes));
+    let result: Result<(), String> = async {
+        while let Some(chunk) = stream.next().await {
+            let bytes = chunk.map_err(|e| format!("Stream error: {}", e))?;
+            buffer.push_str(&String::from_utf8_lossy(&bytes));
 
-        while let Some(pos) = buffer.find('\n') {
-            let line = buffer[..pos].to_string();
-            buffer = buffer[pos + 1..].to_string();
+            while let Some(pos) = buffer.find('\n') {
+                let line = buffer[..pos].to_string();
+                buffer = buffer[pos + 1..].to_string();
 
-            if let Some(data) = line.strip_prefix("data: ") {
-                if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
-                    match json["type"].as_str().unwrap_or_default() {
-                        "content_block_start" => {
-                            in_thinking_block = json["content_block"]["type"].as_str() == Some("thinking");
+                if let Some(data) = line.strip_prefix("data: ") {
+                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
+                        if json["type"] == "error" {
+                            let msg = json["error"]["message"].as_str().unwrap_or("Unknown stream error");
+                            return Err(format!("Anthropic stream error: {}", msg));
                         }
-                        "content_block_stop" => {
-                            if in_thinking_block {
-                                in_thinking_block = false;
-                                let _ = app.emit("chat_thinking_done", ());
+                        match json["type"].as_str().unwrap_or_default() {
+                            "content_block_start" => {
+                                in_thinking_block = json["content_block"]["type"].as_str() == Some("thinking");
                             }
-                        }
-                        "content_block_delta" => {
-                            let delta_type = json["delta"]["type"].as_str().unwrap_or_default();
-                            if delta_type == "thinking_delta" {
-                                if let Some(text) = json["delta"]["thinking"].as_str() {
-                                    let _ = app.emit("chat_thinking", text);
-                                }
-                            } else if delta_type == "text_delta" {
-                                if let Some(text) = json["delta"]["text"].as_str() {
-                                    let _ = app.emit("chat_token", text);
+                            "content_block_stop" => {
+                                if in_thinking_block {
+                                    in_thinking_block = false;
+                                    let _ = app.emit("chat_thinking_done", ());
                                 }
                             }
+                            "content_block_delta" => {
+                                let delta_type = json["delta"]["type"].as_str().unwrap_or_default();
+                                if delta_type == "thinking_delta" {
+                                    if let Some(text) = json["delta"]["thinking"].as_str() {
+                                        let _ = app.emit("chat_thinking", text);
+                                    }
+                                } else if delta_type == "text_delta" {
+                                    if let Some(text) = json["delta"]["text"].as_str() {
+                                        let _ = app.emit("chat_token", text);
+                                    }
+                                }
+                            }
+                            _ => {}
                         }
-                        _ => {}
                     }
                 }
             }
         }
-    }
+        Ok(())
+    }.await;
 
+    // Always emit chat_done so the frontend never gets stuck in loading state
     let _ = app.emit("chat_done", ());
-    Ok(())
+    result
 }
 
 pub async fn test(api_key: &str, model: &str) -> Result<String, String> {

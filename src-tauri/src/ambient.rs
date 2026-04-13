@@ -58,7 +58,7 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
         let mut idle_nudged = false;
         let mut tick: u64 = 0;
         let mut last_error_hash: u64 = 0;
-        let mut session_start = std::time::Instant::now();
+        let session_start = std::time::Instant::now();
         let mut long_session_nudged = false;
         let mut stale_thread_nudged = false;
         let mut monitor_count = last_monitor_count;
