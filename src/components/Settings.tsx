@@ -82,6 +82,14 @@ const PROVIDER_MATRIX: ProviderEntry[] = [
   },
   {
     id: "openai",
+    name: "Nvidia NIM",
+    model: "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+    baseUrl: "https://integrate.api.nvidia.com/v1",
+    badges: ["free tier", "Llama/Mistral/MiniMax", "OpenAI-compat"],
+    keyPlaceholder: "nvapi-...",
+  },
+  {
+    id: "openai",
     name: "DeepSeek",
     model: "deepseek-chat",
     baseUrl: "https://api.deepseek.com/v1",
