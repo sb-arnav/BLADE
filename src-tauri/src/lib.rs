@@ -91,6 +91,9 @@ mod workflow_builder;
 mod context_engine;
 mod financial_brain;
 mod reasoning_engine;
+mod social_graph;
+mod health_tracker;
+mod document_intelligence;
 
 use chrono::Timelike;
 use std::sync::Arc;
@@ -823,6 +826,37 @@ pub fn run() {
             reasoning_engine::reasoning_test_hypothesis,
             reasoning_engine::reasoning_socratic,
             reasoning_engine::reasoning_get_traces,
+            // Social Graph — personal CRM with emotional intelligence
+            social_graph::social_add_contact,
+            social_graph::social_get_contact,
+            social_graph::social_search_contacts,
+            social_graph::social_update_contact,
+            social_graph::social_delete_contact,
+            social_graph::social_list_contacts,
+            social_graph::social_log_interaction,
+            social_graph::social_get_interactions,
+            social_graph::social_analyze_interaction,
+            social_graph::social_get_insights,
+            social_graph::social_how_to_approach,
+            // Health Tracker — wellbeing intelligence
+            health_tracker::health_log,
+            health_tracker::health_get_today,
+            health_tracker::health_update_today,
+            health_tracker::health_get_logs,
+            health_tracker::health_get_stats,
+            health_tracker::health_get_insights,
+            health_tracker::health_get_context,
+            health_tracker::health_correlate_productivity,
+            health_tracker::health_streak_info,
+            // Document Intelligence — deep document reading and Q&A library
+            document_intelligence::doc_ingest,
+            document_intelligence::doc_search,
+            document_intelligence::doc_get,
+            document_intelligence::doc_list,
+            document_intelligence::doc_delete,
+            document_intelligence::doc_answer_question,
+            document_intelligence::doc_cross_synthesis,
+            document_intelligence::doc_generate_study_notes,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
@@ -979,6 +1013,9 @@ pub fn run() {
 
             // Accountability loop — nudges every 6 hours if check-ins are overdue or KRs are behind
             accountability::start_accountability_loop(app.handle().clone());
+
+            // Health Tracker — wellbeing nudges every 2 hours
+            health_tracker::start_health_nudge_loop(app.handle().clone());
 
             // Sidecar monitor — ping registered devices every 5 minutes
             sidecar::start_sidecar_monitor(app.handle().clone());

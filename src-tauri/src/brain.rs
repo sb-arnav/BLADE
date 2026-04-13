@@ -412,6 +412,34 @@ fn build_system_prompt_inner(
         parts.push(fin);
     }
 
+    // Health Tracker — inject today's wellbeing state so BLADE can adapt its tone
+    let health_ctx = crate::health_tracker::get_health_context();
+    if !health_ctx.is_empty() {
+        parts.push(health_ctx);
+    }
+
+    // Social Graph — inject contact profile if the query mentions a known person,
+    // plus a brief relationship-health summary
+    if !user_query.is_empty() {
+        let social_ctx = crate::social_graph::get_social_context(user_query);
+        if !social_ctx.is_empty() {
+            parts.push(social_ctx);
+        }
+    }
+    let social_summary = crate::social_graph::get_social_summary();
+    if !social_summary.is_empty() {
+        parts.push(social_summary);
+    }
+
+    // Document Library — inject summary of ingested documents
+    let lib_ctx = crate::document_intelligence::get_library_context();
+    if !lib_ctx.is_empty() {
+        parts.push(format!(
+            "## Document Library\n\n{}\n\nUse `doc_search` to find documents and `doc_answer_question` to query them.",
+            lib_ctx
+        ));
+    }
+
     // Forged tools — inject custom tools BLADE has built at runtime
     let forged = crate::tool_forge::get_tool_usage_for_prompt();
     if !forged.is_empty() {
