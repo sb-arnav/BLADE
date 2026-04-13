@@ -374,6 +374,24 @@ fn build_system_prompt_inner(
         parts.push(format!("## Security Expertise\n\n{}", crate::kali::security_system_prompt()));
     }
 
+    // Causal insights — inject if relevant to current query
+    let causal_ctx = crate::causal_graph::get_causal_context(user_query);
+    if !causal_ctx.is_empty() {
+        parts.push(causal_ctx);
+    }
+
+    // World model — inject current machine state (git, processes, ports, TODOs, system load)
+    let world_summary = crate::world_model::get_world_summary();
+    if !world_summary.is_empty() {
+        parts.push(world_summary);
+    }
+
+    // Forged tools — inject custom tools BLADE has built at runtime
+    let forged = crate::tool_forge::get_tool_usage_for_prompt();
+    if !forged.is_empty() {
+        parts.push(forged);
+    }
+
     // MCP tools (native tools are described in identity already)
     if !tools.is_empty() {
         let tool_list: Vec<String> = tools

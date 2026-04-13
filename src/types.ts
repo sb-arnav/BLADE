@@ -4,6 +4,7 @@ export interface Message {
   content: string;
   image_base64?: string;
   timestamp: number;
+  refined?: boolean;
 }
 
 export interface McpServerConfig {

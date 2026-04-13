@@ -278,6 +278,11 @@ const MessageBubble = memo(function MessageBubble({ msg, isLast, onRetry }: { ms
                 {msg.content}
               </ReactMarkdown>
             </div>
+            {msg.refined && (
+              <span style={{ fontSize: '10px', opacity: 0.5, marginLeft: '8px', letterSpacing: '0.05em' }}>
+                ✦ refined
+              </span>
+            )}
           </div>
         )}
         {hovered && (

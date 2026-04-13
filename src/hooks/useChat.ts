@@ -222,6 +222,26 @@ export function useChat() {
       }
     });
 
+    // Listen for self-critique improvements
+    const unlistenImproved = listen<{ improved: string }>("response_improved", (event) => {
+      if (!active) return;
+      setMessages(prev => {
+        const updated = [...prev];
+        // Find last assistant message and replace its content
+        for (let i = updated.length - 1; i >= 0; i--) {
+          if (updated[i].role === "assistant") {
+            updated[i] = {
+              ...updated[i],
+              content: event.payload.improved,
+              refined: true,
+            };
+            break;
+          }
+        }
+        return updated;
+      });
+    });
+
     return () => {
       active = false;
       unlistenToken.then((fn) => fn());
@@ -232,6 +252,7 @@ export function useChat() {
       unlistenToolCompleted.then((fn) => fn());
       unlistenApproval.then((fn) => fn());
       unlistenClipboard.then((fn) => fn());
+      unlistenImproved.then((fn) => fn());
     };
   }, []);
 

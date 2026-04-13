@@ -1,8 +1,11 @@
 mod agent_commands;
 mod autoskills;
 mod git_style;
+mod multimodal;
 mod roles;
 mod ambient;
+mod autonomous_research;
+mod dream_mode;
 mod evolution;
 mod research;
 mod background_agent;
@@ -26,8 +29,11 @@ mod tts;
 mod watcher;
 mod godmode;
 mod goal_engine;
+mod learning_engine;
 mod self_critique;
+mod tool_forge;
 mod native_tools;
+mod causal_graph;
 mod kali;
 mod agents;
 mod automation;
@@ -71,6 +77,7 @@ mod ui_automation;
 mod voice;
 mod voice_global;
 mod voice_local;
+mod world_model;
 
 use chrono::Timelike;
 use std::sync::Arc;
@@ -420,6 +427,13 @@ pub fn run() {
             screen::capture_screen_region,
             screen::get_monitors,
             screen::move_to_monitor,
+            multimodal::multimodal_analyze_file,
+            multimodal::multimodal_analyze_base64,
+            multimodal::multimodal_extract_code,
+            multimodal::multimodal_extract_diagram,
+            multimodal::multimodal_ocr,
+            multimodal::multimodal_analyze_ui,
+            multimodal::multimodal_supports_vision,
             self_code::blade_self_code,
             self_code::blade_source_path_resolve,
             memory::learn_from_conversation,
@@ -663,6 +677,10 @@ pub fn run() {
             goal_engine::goal_delete,
             goal_engine::goal_update_priority,
             goal_engine::goal_pursue_now,
+            learning_engine::learning_get_patterns,
+            learning_engine::learning_get_predictions,
+            learning_engine::learning_run_analysis,
+            learning_engine::learning_weekly_summary,
             self_critique::self_critique_response,
             self_critique::self_critique_history,
             self_critique::self_critique_deep_roast,
@@ -673,6 +691,25 @@ pub fn run() {
             kali::kali_explain_exploit,
             kali::kali_generate_payload,
             kali::kali_check_tools,
+            world_model::world_get_state,
+            world_model::world_get_summary,
+            world_model::world_refresh,
+            autonomous_research::research_list_gaps,
+            autonomous_research::research_add_gap,
+            autonomous_research::research_trigger_now,
+            dream_mode::dream_is_active,
+            dream_mode::dream_trigger_now,
+            dream_mode::dream_record_activity,
+            causal_graph::causal_get_insights,
+            causal_graph::causal_acknowledge,
+            causal_graph::causal_analyze,
+            causal_graph::causal_record_event,
+            causal_graph::causal_run_full_analysis,
+            // Tool Forge — self-expanding capability engine
+            tool_forge::forge_new_tool,
+            tool_forge::forge_list_tools,
+            tool_forge::forge_delete_tool,
+            tool_forge::forge_test_tool,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
@@ -797,6 +834,12 @@ pub fn run() {
             // GOAL ENGINE — autonomous AGI goal pursuit. Goals never fail.
             goal_engine::start_goal_engine(app.handle().clone());
 
+            // LEARNING ENGINE — behavioral pattern detection and proactive prediction.
+            learning_engine::start_learning_engine(app.handle().clone());
+
+            // CAUSAL ENGINE — temporal reasoning: blockers, regressions, progress patterns.
+            causal_graph::start_causal_engine(app.handle().clone());
+
             // Auto-start Telegram bot if a token was previously saved
             let tg_app = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -811,6 +854,15 @@ pub fn run() {
 
             // Start reminder loop — checks every 30s for due reminders
             reminders::start_reminder_loop(app.handle().clone());
+
+            // Start world model — situational awareness engine (updates every 60s)
+            world_model::start_world_model(app.handle().clone());
+
+            // Autonomous research — BLADE identifies and fills its own knowledge gaps
+            autonomous_research::start_autonomous_research(app.handle().clone());
+
+            // Dream mode — background consolidation when user is away
+            dream_mode::start_dream_monitor(app.handle().clone());
 
             // Register shortcuts from config (or defaults)
             register_all_shortcuts(app.handle());
