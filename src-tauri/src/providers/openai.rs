@@ -40,7 +40,8 @@ fn build_body(
     let mut body = serde_json::json!({
         "model": model,
         "messages": msgs,
-        "stream": false
+        "stream": false,
+        "max_tokens": 4096
     });
 
     if !tool_payload.is_empty() {
@@ -153,10 +154,17 @@ pub async fn complete(
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
         if status == 429 { return Err("Rate limited (429) — free tier maxed out. Wait or get a paid key at platform.openai.com/settings/billing.".to_string()); }
+        if status.as_u16() == 402 {
+            let msg = serde_json::from_str::<serde_json::Value>(&body)
+                .ok()
+                .and_then(|j| j["error"]["message"].as_str().map(|s| s.to_string()))
+                .unwrap_or_else(|| "Insufficient credits. Top up at openrouter.ai/settings/credits".to_string());
+            return Err(format!("Out of credits: {}", msg));
+        }
         if status == 403 && body.contains("RestrictedModelsError") {
             return Err("Vercel AI Gateway: free credits are restricted due to abuse. Top up at vercel.com/ai to use this model.".to_string());
         }
-        return Err(format!("OpenAI API error {}: {}", status, body));
+        return Err(format!("API error {}: {}", status, body));
     }
 
     let json: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
@@ -217,7 +225,8 @@ pub async fn stream_text(
     let body = serde_json::json!({
         "model": model,
         "messages": msgs,
-        "stream": true
+        "stream": true,
+        "max_tokens": 4096
     });
 
     let response = client
@@ -232,10 +241,17 @@ pub async fn stream_text(
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
         if status == 429 { return Err("Rate limited (429) — free tier maxed out. Wait or get a paid key at platform.openai.com/settings/billing.".to_string()); }
+        if status.as_u16() == 402 {
+            let msg = serde_json::from_str::<serde_json::Value>(&body)
+                .ok()
+                .and_then(|j| j["error"]["message"].as_str().map(|s| s.to_string()))
+                .unwrap_or_else(|| "Insufficient credits. Top up at openrouter.ai/settings/credits".to_string());
+            return Err(format!("Out of credits: {}", msg));
+        }
         if status == 403 && body.contains("RestrictedModelsError") {
             return Err("Vercel AI Gateway: free credits are restricted due to abuse. Top up at vercel.com/ai to use this model.".to_string());
         }
-        return Err(format!("OpenAI API error {}: {}", status, body));
+        return Err(format!("API error {}: {}", status, body));
     }
 
     let mut stream = response.bytes_stream();
@@ -297,10 +313,17 @@ pub async fn test(api_key: &str, model: &str, base_url: Option<&str>) -> Result<
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
         if status == 429 { return Err("Rate limited (429) — free tier maxed out. Wait or get a paid key at platform.openai.com/settings/billing.".to_string()); }
+        if status.as_u16() == 402 {
+            let msg = serde_json::from_str::<serde_json::Value>(&body)
+                .ok()
+                .and_then(|j| j["error"]["message"].as_str().map(|s| s.to_string()))
+                .unwrap_or_else(|| "Insufficient credits. Top up at openrouter.ai/settings/credits".to_string());
+            return Err(format!("Out of credits: {}", msg));
+        }
         if status == 403 && body.contains("RestrictedModelsError") {
             return Err("Vercel AI Gateway: free credits are restricted due to abuse. Top up at vercel.com/ai to use this model.".to_string());
         }
-        return Err(format!("OpenAI API error {}: {}", status, body));
+        return Err(format!("API error {}: {}", status, body));
     }
 
     let json: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
