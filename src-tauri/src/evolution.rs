@@ -776,7 +776,8 @@ async fn evolve_from_failures(app: &tauri::AppHandle) {
         &analysis_provider, &analysis_key, &analysis_model, &msgs, &[], config.base_url.as_deref()
     ).await {
         Ok(t) if !t.content.trim().is_empty() => t.content.trim().to_string(),
-        _ => return,
+        Ok(_) => return,
+        Err(e) => { crate::config::check_and_disable_on_402(&e); return; }
     };
 
     // Surface as a "prompt rule" suggestion — no mcp_package, type is "rule"

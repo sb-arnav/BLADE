@@ -685,6 +685,7 @@ Respond as JSON only, no other text:
     {
         Ok(t) => t,
         Err(e) => {
+            crate::config::check_and_disable_on_402(&e);
             log::warn!("learning_engine: prediction LLM call failed: {}", e);
             return Vec::new();
         }

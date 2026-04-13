@@ -92,7 +92,8 @@ async fn llm_call(system: &str, user_msg: &str) -> Result<String, String> {
         &[],
         base_url.as_deref(),
     )
-    .await?;
+    .await
+    .map_err(|e| { crate::config::check_and_disable_on_402(&e); e })?;
 
     Ok(turn.content)
 }

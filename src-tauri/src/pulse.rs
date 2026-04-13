@@ -72,8 +72,8 @@ pub fn start_pulse(app: tauri::AppHandle) {
 
             // Only pulse if provider + key are configured
             if !config.api_key.is_empty() || config.provider == "ollama" {
-                if let Ok(thought) = generate_pulse_thought(&config).await {
-                    if thought.len() >= MIN_PULSE_CHARS {
+                match generate_pulse_thought(&config).await {
+                    Ok(thought) if thought.len() >= MIN_PULSE_CHARS => {
                         last_pulse_at = std::time::Instant::now();
 
                         let _ = app.emit("blade_pulse", serde_json::json!({
@@ -121,6 +121,13 @@ pub fn start_pulse(app: tauri::AppHandle) {
                             );
                         }
                     }
+                    Err(ref e) if crate::config::check_and_disable_on_402(e) => {
+                        let _ = app.emit("background_ai_auto_disabled", serde_json::json!({
+                            "reason": "credits_exhausted",
+                            "message": "Out of credits — background AI auto-disabled. Re-enable in Settings → General."
+                        }));
+                    }
+                    _ => {}
                 }
             }
         }
@@ -272,7 +279,8 @@ async fn call_provider_for_thought(
         &[],
         config.base_url.as_deref(),
     )
-    .await?;
+    .await
+    .map_err(|e| { crate::config::check_and_disable_on_402(&e); e })?;
 
     let thought = turn.content.trim().to_string();
     if thought.is_empty() {
