@@ -13,6 +13,7 @@ pub async fn execute_next_step(
     provider: &str,
     api_key: &str,
     model: &str,
+    base_url: Option<&str>,
 ) -> Result<(), String> {
     let idx = agent.current_step;
     if idx >= agent.steps.len() {
@@ -94,7 +95,7 @@ pub async fn execute_next_step(
         }];
         let conversation = providers::build_conversation(messages, None);
 
-        match providers::complete_turn(provider, api_key, model, &conversation, &[], None).await {
+        match providers::complete_turn(provider, api_key, model, &conversation, &[], base_url).await {
             Ok(turn) => Ok(turn.content),
             Err(e) => Err(e),
         }

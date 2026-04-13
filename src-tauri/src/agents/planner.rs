@@ -7,6 +7,7 @@ pub async fn plan_steps(
     provider: &str,
     api_key: &str,
     model: &str,
+    base_url: Option<&str>,
     goal: &str,
     available_tools: &[McpTool],
 ) -> Result<Vec<AgentStep>, String> {
@@ -45,7 +46,7 @@ Respond ONLY with the JSON array, no other text."#,
     }];
     let conversation = providers::build_conversation(messages, None);
 
-    let turn = providers::complete_turn(provider, api_key, model, &conversation, &[], None).await?;
+    let turn = providers::complete_turn(provider, api_key, model, &conversation, &[], base_url).await?;
 
     // Parse the JSON response
     let content = turn.content.trim();
