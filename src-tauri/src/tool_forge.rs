@@ -447,14 +447,7 @@ pub async fn forge_if_needed(user_request: &str, error_message: &str) -> Option<
     }
 
     // Use cheap model for the triage decision
-    let cheap_model = match config.provider.as_str() {
-        "anthropic"  => "claude-haiku-4-5-20251001",
-        "openai"     => "gpt-4o-mini",
-        "gemini"     => "gemini-2.0-flash",
-        "groq"       => "llama-3.1-8b-instant",
-        "openrouter" => "anthropic/claude-haiku-4.5",
-        _            => &config.model,
-    };
+    let cheap_model = crate::config::cheap_model_for_provider(&config.provider, &config.model);
 
     let triage_prompt = format!(
         "Given this failed request: '{request}' with error: '{error}', \
@@ -471,7 +464,7 @@ pub async fn forge_if_needed(user_request: &str, error_message: &str) -> Option<
     let decision = match crate::providers::complete_turn(
         &config.provider,
         &config.api_key,
-        cheap_model,
+        &cheap_model,
         &messages,
         &[],
         config.base_url.as_deref(),

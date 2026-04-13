@@ -87,6 +87,9 @@ fn save_bible(bible: &CharacterBible) -> Result<(), String> {
 #[tauri::command]
 pub async fn consolidate_character() -> Result<String, String> {
     let config = load_config();
+    if !config.background_ai_enabled {
+        return Ok("Background AI disabled.".to_string());
+    }
     if config.api_key.is_empty() && config.provider != "ollama" {
         return Err("No API key for consolidation".to_string());
     }
@@ -130,10 +133,11 @@ Each field is a string with bullet points. Keep each section under 10 bullet poi
     }];
     let conversation = providers::build_conversation(messages, None);
 
+    let consolidate_model = crate::config::cheap_model_for_provider(&config.provider, &config.model);
     let turn = providers::complete_turn(
         &config.provider,
         &config.api_key,
-        &config.model,
+        &consolidate_model,
         &conversation,
         &[],
         config.base_url.as_deref(),
@@ -200,12 +204,7 @@ Respond ONLY with a JSON array of objects:
     );
 
     let messages = vec![ConversationMessage::User(prompt)];
-    let model = match config.provider.as_str() {
-        "anthropic" => "claude-haiku-4-5-20251001".to_string(),
-        "openai" => "gpt-4o-mini".to_string(),
-        "gemini" => "gemini-2.0-flash".to_string(),
-        _ => config.model.clone(),
-    };
+    let model = crate::config::cheap_model_for_provider(&config.provider, &config.model);
 
     let turn = providers::complete_turn(
         &config.provider,
@@ -265,13 +264,7 @@ Be concrete, not vague. Output ONLY the rule, nothing else."#
     );
 
     let messages = vec![ConversationMessage::User(prompt)];
-    let model = match config.provider.as_str() {
-        "anthropic" => "claude-haiku-4-5-20251001".to_string(),
-        "openai" => "gpt-4o-mini".to_string(),
-        "gemini" => "gemini-2.0-flash".to_string(),
-        "groq" => "llama-3.1-8b-instant".to_string(),
-        _ => config.model.clone(),
-    };
+    let model = crate::config::cheap_model_for_provider(&config.provider, &config.model);
 
     let turn = providers::complete_turn(
         &config.provider,
@@ -429,12 +422,7 @@ Don't start with "I am BLADE" — that's obvious. Start with what you've noticed
     );
 
     let messages = vec![ConversationMessage::User(prompt)];
-    let model = match config.provider.as_str() {
-        "anthropic" => "claude-haiku-4-5-20251001".to_string(),
-        "openai" => "gpt-4o-mini".to_string(),
-        "gemini" => "gemini-2.0-flash".to_string(),
-        _ => config.model.clone(),
-    };
+    let model = crate::config::cheap_model_for_provider(&config.provider, &config.model);
 
     if let Ok(turn) = providers::complete_turn(
         &config.provider,

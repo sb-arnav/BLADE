@@ -298,7 +298,8 @@ pub async fn test(api_key: &str, model: &str, base_url: Option<&str>) -> Result<
     let body = serde_json::json!({
         "model": model,
         "messages": [{"role": "user", "content": "Say hi in one word."}],
-        "stream": false
+        "stream": false,
+        "max_tokens": 10
     });
 
     let response = client

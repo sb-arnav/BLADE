@@ -223,15 +223,8 @@ pub fn load_goal(id: &str) -> Option<Goal> {
 // ── Provider helpers ──────────────────────────────────────────────────────────
 
 /// Pick the cheapest fast model for a given provider.
-fn cheap_model(provider: &str) -> &'static str {
-    match provider {
-        "anthropic" => "claude-haiku-4-5-20251001",
-        "openai" => "gpt-4o-mini",
-        "gemini" => "gemini-2.0-flash",
-        "groq" => "llama-3.1-8b-instant",
-        "openrouter" => "google/gemini-2.0-flash-lite",
-        _ => "gemini-2.0-flash",
-    }
+fn cheap_model(provider: &str) -> String {
+    crate::config::cheap_model_for_provider(provider, "")
 }
 
 /// Call the LLM with a single user message and return the text response.
@@ -244,7 +237,7 @@ async fn llm_call(prompt: &str, config: &crate::config::BladeConfig) -> Result<S
     let turn = complete_turn(
         &config.provider,
         &config.api_key,
-        model,
+        &model,
         &messages,
         &[],
         config.base_url.as_deref(),

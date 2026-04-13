@@ -100,14 +100,8 @@ fn save_session(session: &RoastSession) -> Result<(), String> {
 // Model selection — cheapest available per provider for critique work
 // ---------------------------------------------------------------------------
 
-fn cheap_model_for_provider(provider: &str) -> &'static str {
-    match provider {
-        "anthropic" => "claude-haiku-4-5-20251001",
-        "openai"    => "gpt-4o-mini",
-        "gemini"    => "gemini-2.0-flash",
-        "groq"      => "llama-3.1-8b-instant",
-        _           => "gemini-2.0-flash", // safe fallback
-    }
+fn cheap_model_for_provider(provider: &str) -> String {
+    crate::config::cheap_model_for_provider(provider, "")
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +164,7 @@ Respond ONLY as JSON:
 {{"score": N, "problems": ["problem1", "problem2"], "verdict": "one sentence", "should_rebuild": true/false}}"#
     );
 
-    let raw = llm_call(provider, api_key, model, base_url, system, &user_msg).await?;
+    let raw = llm_call(provider, api_key, &model, base_url, system, &user_msg).await?;
 
     // Strip markdown fences if the model wraps output in ```json ... ```
     let json_str = extract_json(&raw);
@@ -360,7 +354,7 @@ Respond ONLY as JSON:
         ConversationMessage::User(user_msg.clone()),
     ];
 
-    let raw = match complete_turn(provider, api_key, model, &messages, &[], base_url).await {
+    let raw = match complete_turn(provider, api_key, &model, &messages, &[], base_url).await {
         Ok(t) => t.content,
         Err(_) => return None,
     };

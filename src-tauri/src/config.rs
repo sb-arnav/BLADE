@@ -108,11 +108,14 @@ struct DiskConfig {
     blade_dedicated_monitor: i32,
     #[serde(default)]
     task_routing: TaskRouting,
+    #[serde(default = "default_background_ai_enabled")]
+    background_ai_enabled: bool,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
 }
 
+fn default_background_ai_enabled() -> bool { true }
 fn default_god_mode_tier() -> String { "normal".to_string() }
 fn default_voice_mode() -> String { "off".to_string() }
 fn default_tts_voice() -> String { "system".to_string() }
@@ -157,6 +160,7 @@ impl Default for DiskConfig {
             trusted_ai_delegate: String::new(),
             blade_dedicated_monitor: -1,
             task_routing: TaskRouting::default(),
+            background_ai_enabled: true,
             api_key: None,
         }
     }
@@ -221,6 +225,8 @@ pub struct BladeConfig {
     pub blade_dedicated_monitor: i32,
     #[serde(default)]
     pub task_routing: TaskRouting,
+    #[serde(default = "default_background_ai_enabled")]
+    pub background_ai_enabled: bool,
 }
 
 impl BladeConfig {
@@ -262,6 +268,7 @@ impl Default for BladeConfig {
             trusted_ai_delegate: String::new(),
             blade_dedicated_monitor: -1,
             task_routing: TaskRouting::default(),
+            background_ai_enabled: true,
         }
     }
 }
@@ -361,6 +368,7 @@ pub fn load_config() -> BladeConfig {
         trusted_ai_delegate: disk.trusted_ai_delegate,
         blade_dedicated_monitor: disk.blade_dedicated_monitor,
         task_routing: disk.task_routing,
+        background_ai_enabled: disk.background_ai_enabled,
     }
 }
 
@@ -398,6 +406,7 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         trusted_ai_delegate: config.trusted_ai_delegate.clone(),
         blade_dedicated_monitor: config.blade_dedicated_monitor,
         task_routing: config.task_routing.clone(),
+        background_ai_enabled: config.background_ai_enabled,
         api_key: None,
     };
 
@@ -567,6 +576,16 @@ pub fn save_config_field(key: String, value: String) -> Result<(), String> {
     save_config(&config)
 }
 
+/// Enable or disable all background AI calls globally.
+/// When disabled, all timer-driven LLM functions (pulse, proactive engine,
+/// character consolidation, etc.) skip their API calls immediately.
+#[tauri::command]
+pub fn toggle_background_ai(enabled: bool) -> Result<(), String> {
+    let mut config = load_config();
+    config.background_ai_enabled = enabled;
+    save_config(&config)
+}
+
 pub fn update_window_state(window_state: WindowState) -> Result<(), String> {
     // Don't save minimized/off-screen sentinel positions (Windows uses -32000)
     if window_state.x < -10000 || window_state.y < -10000 {
@@ -579,6 +598,22 @@ pub fn update_window_state(window_state: WindowState) -> Result<(), String> {
     let mut config = load_config();
     config.window_state = Some(window_state);
     save_config(&config)
+}
+
+/// Returns the cheapest suitable model for background/ambient LLM calls.
+/// For openrouter and ollama, returns the user's configured model — on BYOK it's
+/// free, and the user chose it deliberately. For other providers, returns a
+/// dedicated cheap model so the main model stays responsive.
+pub fn cheap_model_for_provider(provider: &str, user_model: &str) -> String {
+    match provider {
+        "anthropic"  => "claude-haiku-4-5-20251001".to_string(),
+        "openai"     => "gpt-4o-mini".to_string(),
+        "gemini"     => "gemini-2.0-flash".to_string(),
+        "groq"       => "llama-3.1-8b-instant".to_string(),
+        "openrouter" => user_model.to_string(),
+        "ollama"     => user_model.to_string(),
+        _            => user_model.to_string(),
+    }
 }
 
 pub fn write_blade_file(path: &PathBuf, contents: &str) -> Result<(), String> {

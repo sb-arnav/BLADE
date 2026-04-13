@@ -66,6 +66,9 @@ pub fn start_pulse(app: tauri::AppHandle) {
             }
 
             let config = crate::config::load_config();
+            if !config.background_ai_enabled {
+                continue;
+            }
 
             // Only pulse if provider + key are configured
             if !config.api_key.is_empty() || config.provider == "ollama" {
@@ -176,14 +179,7 @@ async fn generate_pulse_thought(config: &crate::config::BladeConfig) -> Result<S
 }
 
 fn cheapest_model(provider: &str, current_model: &str) -> String {
-    match provider {
-        "anthropic"  => "claude-haiku-4-5-20251001".to_string(),
-        "openai"     => "gpt-4o-mini".to_string(),
-        "gemini"     => "gemini-2.0-flash".to_string(),
-        "groq"       => "llama-3.1-8b-instant".to_string(),
-        "openrouter" => "anthropic/claude-haiku-4.5".to_string(),
-        _ => current_model.to_string(),
-    }
+    crate::config::cheap_model_for_provider(provider, current_model)
 }
 
 fn build_pulse_prompt(

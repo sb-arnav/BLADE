@@ -322,7 +322,7 @@ pub fn compute_level() -> EvolutionLevel {
         }
         // Check cron jobs
         if let Ok(n) = conn.query_row(
-            "SELECT COUNT(*) FROM settings WHERE key LIKE 'cron_%' AND value LIKE '%active%'",
+            "SELECT COUNT(*) FROM cron_tasks WHERE enabled = 1",
             [],
             |row| row.get::<_, i64>(0),
         ) {
@@ -496,7 +496,9 @@ fn save_suggestion(suggestion: &EvolutionSuggestion) -> Result<(), String> {
 
 /// Auto-install an MCP server that requires no token (e.g., puppeteer).
 /// Returns Ok(tool_count) on success.
-async fn auto_install_mcp(entry: &CatalogEntry) -> Result<usize, String> {
+async fn auto_install_mcp(entry: &CatalogEntry, app: &tauri::AppHandle) -> Result<usize, String> {
+    use tauri::Manager;
+
     // Check node/npx is available
     let npx_check = crate::cmd_util::silent_cmd("npx")
         .arg("--version")
@@ -520,17 +522,42 @@ async fn auto_install_mcp(entry: &CatalogEntry) -> Result<usize, String> {
     config.mcp_servers.push(config_entry);
     crate::config::save_config(&config)?;
 
-    Ok(1)
+    // Register with the live MCP manager and discover its tools
+    let mcp_config = crate::mcp::McpServerConfig {
+        command: entry.command.to_string(),
+        args: entry.args.iter().map(|s| s.to_string()).collect(),
+        env: std::collections::HashMap::new(),
+    };
+    let state = app.state::<crate::commands::SharedMcpManager>();
+    let mut manager = state.lock().await;
+    manager.register_server(entry.name.to_string(), mcp_config);
+    let tool_count = manager.discover_all_tools().await.unwrap_or_default().len();
+
+    Ok(tool_count)
 }
 
 static EVOLUTION_TICK: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static EVOLUTION_RUNNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// Main evolution loop — run this periodically (every god mode cycle or every 15 min).
 /// Detects apps, matches catalog, suggests/installs capabilities, emits events.
 pub async fn run_evolution_cycle(app: &tauri::AppHandle) {
+    let config = crate::config::load_config();
+    if !config.background_ai_enabled {
+        return;
+    }
+
+    // Guard against double-running if a previous cycle is still executing
+    if EVOLUTION_RUNNING.compare_exchange(false, true, std::sync::atomic::Ordering::SeqCst, std::sync::atomic::Ordering::Relaxed).is_err() {
+        return;
+    }
+
     let tick = EVOLUTION_TICK.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let apps = detect_apps_in_use();
-    if apps.is_empty() { return; }
+    if apps.is_empty() {
+        EVOLUTION_RUNNING.store(false, std::sync::atomic::Ordering::SeqCst);
+        return;
+    }
 
     let installed = already_installed_packages();
     let known = known_suggestion_ids();
@@ -560,7 +587,7 @@ pub async fn run_evolution_cycle(app: &tauri::AppHandle) {
 
         if entry.auto_install && entry.required_token_hint.is_none() {
             // Auto-install silently
-            match auto_install_mcp(entry).await {
+            match auto_install_mcp(entry, app).await {
                 Ok(_) => {
                     auto_installed.push(entry.name.to_string());
                     let suggestion = EvolutionSuggestion {
@@ -653,6 +680,8 @@ pub async fn run_evolution_cycle(app: &tauri::AppHandle) {
             );
         }
     }
+
+    EVOLUTION_RUNNING.store(false, std::sync::atomic::Ordering::SeqCst);
 }
 
 /// Hermes pattern: analyze recent failures, generate rule/prompt mutation suggestions.
@@ -739,15 +768,8 @@ async fn evolve_from_failures(app: &tauri::AppHandle) {
         // Try Hermes 3 first (best for agent pattern analysis), fall back to configured model
         ("ollama".to_string(), String::new(), "hermes3".to_string())
     } else {
-        let cheap = match config.provider.as_str() {
-            "anthropic"  => "claude-haiku-4-5-20251001",
-            "openai"     => "gpt-4o-mini",
-            "gemini"     => "gemini-2.0-flash",
-            "groq"       => "llama-3.1-8b-instant",
-            "openrouter" => "anthropic/claude-haiku-4.5",
-            _ => &config.model,
-        };
-        (config.provider.clone(), config.api_key.clone(), cheap.to_string())
+        let cheap = crate::config::cheap_model_for_provider(&config.provider, &config.model);
+        (config.provider.clone(), config.api_key.clone(), cheap)
     };
 
     let rule_text = match crate::providers::complete_turn(

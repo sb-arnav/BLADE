@@ -43,14 +43,8 @@ fn open_db() -> Result<rusqlite::Connection, String> {
     rusqlite::Connection::open(db_path()).map_err(|e| format!("DB open error: {}", e))
 }
 
-fn cheap_model(provider: &str) -> &'static str {
-    match provider {
-        "anthropic" => "claude-haiku-4-5-20251001",
-        "openai" => "gpt-4o-mini",
-        "gemini" => "gemini-2.0-flash",
-        "groq" => "llama-3.1-8b-instant",
-        _ => "gemini-2.0-flash",
-    }
+fn cheap_model(provider: &str) -> String {
+    crate::config::cheap_model_for_provider(provider, "")
 }
 
 async fn llm_call(system: &str, user_msg: &str) -> Result<String, String> {
@@ -67,7 +61,7 @@ async fn llm_call(system: &str, user_msg: &str) -> Result<String, String> {
         ConversationMessage::User(user_msg.to_string()),
     ];
 
-    let turn = complete_turn(provider, api_key, model, &messages, &[], base_url).await?;
+    let turn = complete_turn(provider, api_key, &model, &messages, &[], base_url).await?;
     Ok(turn.content)
 }
 
@@ -341,6 +335,11 @@ pub fn start_autonomous_research(app: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
+
+            let config = crate::config::load_config();
+            if !config.background_ai_enabled {
+                continue;
+            }
 
             // Only research when idle (no activity in last 5 minutes)
             let last = LAST_ACTIVITY_TS.load(Ordering::Relaxed);

@@ -1550,14 +1550,7 @@ pub async fn ask_ai(prompt: String) -> Result<String, String> {
     if config.api_key.is_empty() && config.provider != "ollama" {
         return Err("No API key configured".to_string());
     }
-    let model = match config.provider.as_str() {
-        "anthropic" => "claude-haiku-4-5-20251001".to_string(),
-        "openai" => "gpt-4o-mini".to_string(),
-        "gemini" => "gemini-2.0-flash-lite".to_string(),
-        "groq" => "llama-3.1-8b-instant".to_string(),
-        "openrouter" => "anthropic/claude-haiku-4.5".to_string(),
-        _ => config.model.clone(),
-    };
+    let model = crate::config::cheap_model_for_provider(&config.provider, &config.model);
     use crate::providers::{ChatMessage, build_conversation, complete_turn};
     let messages = vec![ChatMessage {
         role: "user".to_string(),

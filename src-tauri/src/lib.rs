@@ -909,6 +909,7 @@ pub fn run() {
             emotional_intelligence::emotion_get_context,
             // Browser Native — embedded browser sessions
             browser_native::browser_session_status,
+            config::toggle_background_ai,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
