@@ -81,7 +81,8 @@ pub fn start_pulse(app: tauri::AppHandle) {
                         // Update tray tooltip so even if window is hidden, something surfaces
                         if let Some(tray) = app.tray_by_id(crate::tray::TRAY_ID) {
                             let short = if thought.len() > 64 {
-                                format!("{}…", &thought[..64])
+                                let end = thought.char_indices().nth(64).map(|(i, _)| i).unwrap_or(thought.len());
+                                format!("{}…", &thought[..end])
                             } else {
                                 thought.clone()
                             };
@@ -453,7 +454,8 @@ No "Good morning". No headers. No numbered lists. Start in the middle of the obs
             {
                 use tauri_plugin_notification::NotificationExt;
                 let short = if briefing.len() > 120 {
-                    format!("{}…", &briefing[..120])
+                    let end = briefing.char_indices().nth(120).map(|(i, _)| i).unwrap_or(briefing.len());
+                    format!("{}…", &briefing[..end])
                 } else {
                     briefing.clone()
                 };

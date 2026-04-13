@@ -412,7 +412,8 @@ fn clipboard_section() -> Option<String> {
     if text.trim().is_empty() { return None; }
     // Truncate long content
     let preview = if text.len() > 400 {
-        format!("{}...", &text[..400])
+        let end = text.char_indices().nth(400).map(|(i, _)| i).unwrap_or(text.len());
+        format!("{}...", &text[..end])
     } else {
         text.clone()
     };

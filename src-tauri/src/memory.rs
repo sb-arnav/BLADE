@@ -54,7 +54,8 @@ Conversation:
 Key facts:"#,
         // Limit context to avoid token explosion
         if conversation_text.len() > 4000 {
-            &conversation_text[..4000]
+            let end = conversation_text.char_indices().nth(4000).map(|(i, _)| i).unwrap_or(conversation_text.len());
+            &conversation_text[..end]
         } else {
             &conversation_text
         }

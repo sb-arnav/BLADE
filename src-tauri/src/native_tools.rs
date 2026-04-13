@@ -1751,7 +1751,8 @@ fn expand_home(path: &str) -> String {
 
 fn truncate(s: String, max: usize) -> String {
     if s.len() > max {
-        format!("{}\n...[truncated at {} chars]", &s[..max], max)
+        let end = s.char_indices().nth(max).map(|(i, _)| i).unwrap_or(s.len());
+        format!("{}\n...[truncated at {} chars]", &s[..end], max)
     } else {
         s
     }
