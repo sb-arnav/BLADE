@@ -167,11 +167,11 @@ export function useChat() {
       setToolExecutions((prev) => [...prev, execution]);
     });
 
-    const unlistenToolCompleted = listen<{ name: string; is_error: boolean }>("tool_completed", (event) => {
+    const unlistenToolCompleted = listen<{ name: string; is_error: boolean; result?: string }>("tool_completed", (event) => {
       setToolExecutions((prev) =>
         prev.map((ex) =>
           ex.tool_name === event.payload.name && ex.status === "executing"
-            ? { ...ex, status: "completed" as const, is_error: event.payload.is_error, completed_at: Date.now() }
+            ? { ...ex, status: "completed" as const, is_error: event.payload.is_error, result: event.payload.result, completed_at: Date.now() }
             : ex
         )
       );

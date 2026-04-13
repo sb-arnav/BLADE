@@ -343,7 +343,7 @@ export function MessageList({
     const el = scrollRef.current;
     if (!el) return;
     const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    isNearBottomRef.current = distFromBottom < 300;
+    isNearBottomRef.current = distFromBottom < 80;
     setShowScrollBtn(distFromBottom > 200);
   }, []);
 
@@ -455,11 +455,20 @@ export function MessageList({
                 );
               })}
               {recentCompleted.map((tool) => (
-                <div key={tool.id} className="flex items-center gap-2 py-0.5 text-xs text-blade-muted/50">
-                  <span className={`text-2xs ${tool.is_error ? "text-red-400/60" : "text-emerald-400/60"}`}>
-                    {tool.is_error ? "\u2717" : "\u2713"}
-                  </span>
-                  <span className="font-mono text-2xs">{tool.tool_name}</span>
+                <div key={tool.id} className="py-0.5">
+                  <div className="flex items-center gap-2 text-xs text-blade-muted/50">
+                    <span className={`text-2xs shrink-0 ${tool.is_error ? "text-red-400/60" : "text-emerald-400/60"}`}>
+                      {tool.is_error ? "\u2717" : "\u2713"}
+                    </span>
+                    <span className="font-mono text-2xs">{tool.tool_name}</span>
+                  </div>
+                  {tool.result && (
+                    <div className={`mt-0.5 ml-4 text-2xs font-mono leading-relaxed whitespace-pre-wrap break-all max-h-16 overflow-hidden ${
+                      tool.is_error ? "text-red-400/50" : "text-blade-muted/40"
+                    }`}>
+                      {tool.result}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

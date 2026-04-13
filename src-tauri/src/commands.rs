@@ -834,11 +834,19 @@ pub async fn send_message_stream(
                 }
             };
 
+            // Emit a short preview of the result (first 300 chars) so the UI can show it
+            let result_preview: String = content.chars().take(300).collect();
+            let result_preview = if content.chars().count() > 300 {
+                format!("{}…", result_preview)
+            } else {
+                result_preview
+            };
             let _ = app.emit(
                 "tool_completed",
                 serde_json::json!({
                     "name": &tool_call.name,
                     "is_error": is_error,
+                    "result": result_preview,
                 }),
             );
 

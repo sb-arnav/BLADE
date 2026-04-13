@@ -417,13 +417,10 @@ pub fn validate_dag(tasks: &[SwarmTask]) -> Result<(), String> {
         }
     }
 
-    // Topological sort (Kahn's algorithm)
+    // Topological sort (Kahn's algorithm) — count how many predecessors each task has
     let mut in_degree: HashMap<&str, usize> = tasks.iter().map(|t| (t.id.as_str(), 0)).collect();
     for task in tasks {
-        for dep in &task.depends_on {
-            *in_degree.get_mut(dep.as_str()).unwrap_or(&mut 0) += 0; // just ensure key exists
-            // Increment in_degree of THIS task for each dep
-        }
+        // Each dependency adds one incoming edge to THIS task
         *in_degree.entry(task.id.as_str()).or_insert(0) += task.depends_on.len();
     }
 

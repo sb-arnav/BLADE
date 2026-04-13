@@ -68,6 +68,7 @@ export interface ToolExecution {
   risk: ToolPermission;
   status: "executing" | "completed";
   is_error?: boolean;
+  result?: string;
   started_at: number;
   completed_at?: number;
 }
