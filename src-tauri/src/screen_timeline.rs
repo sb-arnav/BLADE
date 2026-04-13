@@ -151,9 +151,10 @@ async fn describe_screenshot(image_base64: &str) -> String {
 
 fn best_vision_model(provider: &str, current: &str) -> String {
     match provider {
-        "anthropic" => "claude-haiku-4-5-20251001".to_string(), // cheapest with vision
-        "openai" => "gpt-4o-mini".to_string(),
-        "gemini" => "gemini-2.0-flash".to_string(),
+        "anthropic"  => "claude-haiku-4-5-20251001".to_string(), // cheapest with vision
+        "openai"     => "gpt-4o-mini".to_string(),
+        "gemini"     => "gemini-2.0-flash".to_string(),
+        "openrouter" => "anthropic/claude-haiku-4.5".to_string(),
         _ => current.to_string(),
     }
 }

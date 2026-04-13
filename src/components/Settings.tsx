@@ -759,6 +759,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
         provider, apiKey, model, baseUrl: baseUrl || null,
         godMode: godModeEnabled, godModeTier: godModeTierVal,
         voiceMode, obsidianVaultPath: obsidianVaultPath || null,
+        ttsVoice: ttsVoice || null,
       });
       const nextConfig: BladeConfig = {
         ...config,

@@ -268,9 +268,11 @@ If there is NO clear reminder intent, respond with exactly: null"#,
     use crate::providers::{self, ConversationMessage};
     let messages = vec![ConversationMessage::User(prompt)];
     let model = match config.provider.as_str() {
-        "anthropic" => "claude-haiku-4-5-20251001",
-        "openai" => "gpt-4o-mini",
-        "gemini" => "gemini-2.0-flash",
+        "anthropic"  => "claude-haiku-4-5-20251001",
+        "openai"     => "gpt-4o-mini",
+        "gemini"     => "gemini-2.0-flash",
+        "groq"       => "llama-3.1-8b-instant",
+        "openrouter" => "anthropic/claude-haiku-4.5",
         _ => &config.model,
     };
 

@@ -46,9 +46,22 @@ fn estimate_tokens(conversation: &[ConversationMessage]) -> usize {
 
 /// Truncate conversation to fit within token budget.
 /// Keeps: System prompt (always), last user message (always), drops oldest middle messages.
+/// Inserts a marker so the model knows history was removed (prevents hallucinated continuity).
 fn truncate_to_budget(conversation: &mut Vec<ConversationMessage>, max_tokens: usize) {
+    let mut removed_any = false;
     while estimate_tokens(conversation) > max_tokens && conversation.len() > 3 {
-        conversation.remove(1);
+        // Remove just after the system prompt block (index 1)
+        let first_non_system = conversation.iter().position(|m| !matches!(m, ConversationMessage::System(_))).unwrap_or(1);
+        if first_non_system >= conversation.len().saturating_sub(2) { break; }
+        conversation.remove(first_non_system);
+        removed_any = true;
+    }
+    // Insert a marker after the system block so the model knows context was cut
+    if removed_any {
+        let insert_at = conversation.iter().position(|m| !matches!(m, ConversationMessage::System(_))).unwrap_or(1);
+        conversation.insert(insert_at, ConversationMessage::User(
+            "[Earlier conversation history was truncated to fit the context window. Continue from the most recent messages below.]".to_string()
+        ));
     }
 }
 
@@ -286,6 +299,7 @@ pub async fn send_message_stream(
             ("anthropic", m) if m.contains("sonnet") || m.contains("opus") => "claude-haiku-4-5-20251001".to_string(),
             ("openai", m) if m == "gpt-4o" || m.contains("gpt-4-") => "gpt-4o-mini".to_string(),
             ("gemini", m) if m.contains("pro") || m.contains("1.5") => "gemini-2.0-flash".to_string(),
+            ("openrouter", m) if m.contains("sonnet") || m.contains("opus") || m.contains("gpt-4o") && !m.contains("mini") => "anthropic/claude-haiku-4.5".to_string(),
             _ => config.model.clone(),
         };
     }
@@ -1193,11 +1207,12 @@ pub async fn auto_title_conversation(
 
     // Use the cheapest fast model for this provider
     let model = match config.provider.as_str() {
-        "anthropic" => "claude-haiku-4-5-20251001",
-        "openai"    => "gpt-4o-mini",
-        "groq"      => "llama-3.1-8b-instant",
-        "gemini"    => "gemini-2.0-flash-lite",
-        _           => return Ok(()), // skip for local/unknown providers
+        "anthropic"  => "claude-haiku-4-5-20251001",
+        "openai"     => "gpt-4o-mini",
+        "groq"       => "llama-3.1-8b-instant",
+        "gemini"     => "gemini-2.0-flash-lite",
+        "openrouter" => "anthropic/claude-haiku-4.5",
+        _            => return Ok(()), // skip for local/unknown providers (ollama etc.)
     };
 
     let u = &user_text[..user_text.len().min(300)];
