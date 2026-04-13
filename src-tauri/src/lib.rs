@@ -708,7 +708,7 @@ pub fn run() {
                 pulse::maybe_morning_briefing(briefing_app).await;
             });
 
-            // Evening journal + weekly soul evolution
+            // Evening journal + weekly soul evolution + daily character consolidation
             tauri::async_runtime::spawn(async move {
                 loop {
                     let hour = chrono::Local::now().hour();
@@ -717,6 +717,10 @@ pub fn run() {
                         // Weekly: BLADE evolves its own self-characterization
                         character::maybe_evolve_soul().await;
                     }
+                    // Daily: merge accumulated raw context into the character bible.
+                    // Raw context grows from every conversation via learn_from_conversation.
+                    // Without periodic consolidation it accumulates forever and never shapes BLADE's behavior.
+                    let _ = character::consolidate_character().await;
                     // Check once per hour
                     tokio::time::sleep(tokio::time::Duration::from_secs(3600)).await;
                 }

@@ -15,6 +15,52 @@ pub struct CharacterBible {
     pub last_updated: String,
 }
 
+/// Extract the first valid JSON object from LLM output.
+/// Handles: plain JSON, ```json ... ``` fences, trailing prose after closing brace.
+fn extract_json_object(text: &str) -> &str {
+    // Try to strip markdown code fence first
+    if let Some(fence_start) = text.find("```json") {
+        let after = &text[fence_start + 7..];
+        // Skip optional newline after opening fence
+        let after = after.trim_start_matches('\n');
+        if let Some(fence_end) = after.find("```") {
+            return after[..fence_end].trim();
+        }
+    }
+    if let Some(fence_start) = text.find("```") {
+        let after = &text[fence_start + 3..];
+        let after = after.trim_start_matches('\n');
+        if let Some(fence_end) = after.find("```") {
+            return after[..fence_end].trim();
+        }
+    }
+
+    // Fall back to finding outermost braces — scan for matching } depth
+    if let Some(start) = text.find('{') {
+        let bytes = text.as_bytes();
+        let mut depth = 0usize;
+        let mut in_string = false;
+        let mut escape_next = false;
+        for (i, &b) in bytes[start..].iter().enumerate() {
+            if escape_next { escape_next = false; continue; }
+            match b {
+                b'\\' if in_string => escape_next = true,
+                b'"' => in_string = !in_string,
+                b'{' if !in_string => depth += 1,
+                b'}' if !in_string => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return &text[start..start + i + 1];
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    text
+}
+
 fn bible_path() -> PathBuf {
     blade_config_dir().join("character_bible.json")
 }
@@ -94,17 +140,9 @@ Each field is a string with bullet points. Keep each section under 10 bullet poi
     )
     .await?;
 
-    // Parse response
+    // Parse response — handle markdown code fences and trailing prose
     let content = turn.content.trim();
-    let json_str = if let Some(start) = content.find('{') {
-        if let Some(end) = content.rfind('}') {
-            &content[start..=end]
-        } else {
-            content
-        }
-    } else {
-        content
-    };
+    let json_str = extract_json_object(content);
 
     let mut bible: CharacterBible =
         serde_json::from_str(json_str).map_err(|e| format!("Failed to parse bible: {}", e))?;
