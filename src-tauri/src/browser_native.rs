@@ -2,9 +2,151 @@ use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 
 const CDP_BASE_URL: &str = "http://127.0.0.1:9222";
+
+fn managed_chromium_dir() -> PathBuf {
+    crate::config::blade_config_dir().join("chromium")
+}
+
+pub(crate) fn browser_profile_dir() -> PathBuf {
+    crate::config::blade_config_dir().join("browser_profile")
+}
+
+fn managed_chromium_binary() -> PathBuf {
+    let dir = managed_chromium_dir();
+    if cfg!(target_os = "windows") {
+        dir.join("chrome-win64").join("chrome.exe")
+    } else if cfg!(target_os = "macos") {
+        dir.join("chrome-mac-x64").join("Google Chrome for Testing.app")
+            .join("Contents").join("MacOS").join("Google Chrome for Testing")
+    } else {
+        dir.join("chrome-linux64").join("chrome")
+    }
+}
+
+async fn ensure_chromium() -> Result<PathBuf, String> {
+    let binary = managed_chromium_binary();
+    if binary.exists() {
+        return Ok(binary);
+    }
+    download_chromium(&managed_chromium_dir()).await?;
+    if binary.exists() {
+        Ok(binary)
+    } else {
+        Err("Chromium download completed but binary not found at expected path.".to_string())
+    }
+}
+
+async fn download_chromium(target_dir: &Path) -> Result<(), String> {
+    let platform = if cfg!(target_os = "windows") {
+        "win64"
+    } else if cfg!(target_os = "macos") {
+        // Detect ARM vs x64
+        if std::env::consts::ARCH == "aarch64" { "mac-arm64" } else { "mac-x64" }
+    } else {
+        "linux64"
+    };
+
+    // Fetch latest stable version manifest
+    let manifest_url = "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json";
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
+    let manifest: serde_json::Value = client
+        .get(manifest_url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch Chromium manifest: {}", e))?
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse Chromium manifest: {}", e))?;
+
+    // Find the chrome download URL for our platform
+    let download_url = manifest["channels"]["Stable"]["downloads"]["chrome"]
+        .as_array()
+        .and_then(|arr| {
+            arr.iter().find(|item| {
+                item["platform"].as_str() == Some(platform)
+            })
+        })
+        .and_then(|item| item["url"].as_str())
+        .ok_or_else(|| format!("No Chromium download found for platform: {}", platform))?
+        .to_string();
+
+    // Download zip to temp file
+    let zip_path = std::env::temp_dir().join("blade-chromium.zip");
+    let mut response = client
+        .get(&download_url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to download Chromium: {}", e))?;
+
+    let mut file = tokio::fs::File::create(&zip_path)
+        .await
+        .map_err(|e| format!("Failed to create temp file: {}", e))?;
+
+    use tokio::io::AsyncWriteExt;
+    while let Some(chunk) = response.chunk().await.map_err(|e| format!("Download error: {}", e))? {
+        file.write_all(&chunk).await.map_err(|e| format!("Write error: {}", e))?;
+    }
+    drop(file);
+
+    // Extract zip
+    std::fs::create_dir_all(target_dir)
+        .map_err(|e| format!("Failed to create chromium dir: {}", e))?;
+
+    let zip_file = std::fs::File::open(&zip_path)
+        .map_err(|e| format!("Failed to open zip: {}", e))?;
+    let mut archive = zip::ZipArchive::new(zip_file)
+        .map_err(|e| format!("Failed to read zip: {}", e))?;
+
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).map_err(|e| format!("Zip error: {}", e))?;
+        let outpath = target_dir.join(file.name());
+        if file.name().ends_with('/') {
+            std::fs::create_dir_all(&outpath).ok();
+        } else {
+            if let Some(parent) = outpath.parent() {
+                std::fs::create_dir_all(parent).ok();
+            }
+            let mut outfile = std::fs::File::create(&outpath)
+                .map_err(|e| format!("Failed to create file: {}", e))?;
+            std::io::copy(&mut file, &mut outfile)
+                .map_err(|e| format!("Failed to extract file: {}", e))?;
+
+            // chmod +x on unix
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if file.unix_mode().map(|m| m & 0o111 != 0).unwrap_or(false) {
+                    std::fs::set_permissions(&outpath, std::fs::Permissions::from_mode(0o755)).ok();
+                }
+            }
+        }
+    }
+
+    let _ = std::fs::remove_file(&zip_path);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn browser_session_status() -> Result<serde_json::Value, String> {
+    let running = browser_debugger_available().await;
+    let profile_path = browser_profile_dir();
+    let has_profile = profile_path.exists();
+    let chromium_ready = managed_chromium_binary().exists();
+    Ok(json!({
+        "running": running,
+        "has_profile": has_profile,
+        "chromium_ready": chromium_ready,
+        "profile_path": profile_path.to_string_lossy(),
+    }))
+}
 
 #[derive(Debug, Clone)]
 struct BrowserSession {
@@ -289,9 +431,9 @@ async fn ensure_browser_debugger() -> Result<(), String> {
         return Ok(());
     }
 
-    launch_browser_debugger()?;
+    launch_browser_debugger().await?;
     let started = std::time::Instant::now();
-    while started.elapsed() < std::time::Duration::from_secs(12) {
+    while started.elapsed() < std::time::Duration::from_secs(20) {
         if browser_debugger_available().await {
             return Ok(());
         }
@@ -308,62 +450,76 @@ async fn browser_debugger_available() -> bool {
         .unwrap_or(false)
 }
 
-fn launch_browser_debugger() -> Result<(), String> {
-    let profile_dir = std::env::temp_dir().join("blade-browser-cdp");
+async fn launch_browser_debugger() -> Result<(), String> {
+    // Use BLADE's managed Chromium binary with a persistent profile dir.
+    // If no managed Chromium, fall back to system browsers.
+    let profile_dir = browser_profile_dir();
     std::fs::create_dir_all(&profile_dir)
-        .map_err(|error| format!("Failed to create browser debug profile dir: {}", error))?;
+        .map_err(|e| format!("Failed to create browser profile dir: {}", e))?;
     let profile = profile_dir.to_string_lossy().to_string();
 
+    let args = [
+        format!("--remote-debugging-port=9222"),
+        format!("--user-data-dir={}", profile),
+        "--no-first-run".to_string(),
+        "--no-default-browser-check".to_string(),
+        "--disable-background-networking".to_string(),
+    ];
+
+    // Try managed Chromium first (auto-download if needed)
+    let managed = ensure_chromium().await;
+    if let Ok(binary) = managed {
+        let result = std::process::Command::new(&binary)
+            .args(&args)
+            .spawn();
+        if result.is_ok() {
+            return Ok(());
+        }
+    }
+
+    // Fall back to system-installed browsers
     #[cfg(target_os = "windows")]
     {
-        let commands = vec![
-            format!(
-                "start \"\" msedge --remote-debugging-port=9222 --user-data-dir=\"{}\"",
-                profile
-            ),
-            format!(
-                "start \"\" chrome --remote-debugging-port=9222 --user-data-dir=\"{}\"",
-                profile
-            ),
+        let binaries = [
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
         ];
-        for command in commands {
-            let status = std::process::Command::new("cmd")
-                .args(["/C", &command])
-                .status();
-            if matches!(status, Ok(s) if s.success()) {
+        for binary in &binaries {
+            let result = std::process::Command::new(binary).args(&args).spawn();
+            if result.is_ok() {
                 return Ok(());
             }
         }
-        return Err("Blade could not launch Edge or Chrome with remote debugging.".to_string());
+        return Err("No browser found. BLADE will download Chromium automatically next time.".to_string());
     }
 
     #[cfg(target_os = "linux")]
     {
-        let commands = vec![
-            "google-chrome",
-            "chromium-browser",
-            "chromium",
-            "microsoft-edge",
-        ];
-        for command in commands {
-            let status = std::process::Command::new(command)
-                .args(["--remote-debugging-port=9222", "--user-data-dir", &profile])
-                .spawn();
-            if status.is_ok() {
+        let binaries = ["google-chrome", "chromium-browser", "chromium", "microsoft-edge", "google-chrome-stable"];
+        for binary in &binaries {
+            let result = std::process::Command::new(binary).args(&args).spawn();
+            if result.is_ok() {
                 return Ok(());
             }
         }
-        return Err(
-            "Blade could not launch a Chromium-compatible browser with remote debugging."
-                .to_string(),
-        );
+        return Err("No browser found. BLADE will download Chromium automatically — try again in a moment.".to_string());
     }
 
     #[cfg(target_os = "macos")]
     {
-        return Err(
-            "Browser-native automation launcher is not implemented on macOS yet.".to_string(),
-        );
+        // Try system Chrome/Chromium first
+        let binaries = [
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium",
+        ];
+        for binary in &binaries {
+            let result = std::process::Command::new(binary).args(&args).spawn();
+            if result.is_ok() {
+                return Ok(());
+            }
+        }
+        return Err("No browser found. BLADE will download Chromium automatically — try again in a moment.".to_string());
     }
 }
 

@@ -23,6 +23,49 @@ pub type ApprovalMap = Arc<Mutex<StdHashMap<String, oneshot::Sender<bool>>>>;
 /// Global cancel flag — set to true to abort the current chat inference.
 static CHAT_CANCEL: AtomicBool = AtomicBool::new(false);
 
+// ---------------------------------------------------------------------------
+// Phase 4: Self-healing circuit breaker + exponential backoff
+// ---------------------------------------------------------------------------
+
+/// Ring-buffer of (error_kind, instant) for circuit-breaker tracking.
+static ERROR_HISTORY: std::sync::OnceLock<std::sync::Mutex<Vec<(String, std::time::Instant)>>> =
+    std::sync::OnceLock::new();
+
+fn error_history() -> &'static std::sync::Mutex<Vec<(String, std::time::Instant)>> {
+    ERROR_HISTORY.get_or_init(|| std::sync::Mutex::new(Vec::new()))
+}
+
+/// Record an error occurrence.
+fn record_error(kind: &str) {
+    if let Ok(mut h) = error_history().lock() {
+        h.push((kind.to_string(), std::time::Instant::now()));
+        // Keep at most 50 entries
+        if h.len() > 50 {
+            h.drain(0..10);
+        }
+    }
+}
+
+/// Returns true if the same error kind occurred ≥3 times in the last 5 minutes.
+fn is_circuit_broken(kind: &str) -> bool {
+    let Ok(h) = error_history().lock() else { return false };
+    let window = std::time::Duration::from_secs(300);
+    let now = std::time::Instant::now();
+    let count = h.iter().filter(|(k, t)| k == kind && now.duration_since(*t) < window).count();
+    count >= 3
+}
+
+/// Exponential backoff for retries: base * 2^min(attempt, 3), capped at 120s.
+/// `attempt` is the number of recent occurrences of this error kind in the last 5 min.
+fn backoff_secs(base: u64, kind: &str) -> u64 {
+    let Ok(h) = error_history().lock() else { return base };
+    let window = std::time::Duration::from_secs(300);
+    let now = std::time::Instant::now();
+    let attempt = h.iter().filter(|(k, t)| k == kind && now.duration_since(*t) < window).count();
+    let exp = attempt.min(3) as u32;
+    (base * 2u64.pow(exp)).min(120)
+}
+
 #[tauri::command]
 pub fn cancel_chat(app: tauri::AppHandle) {
     CHAT_CANCEL.store(true, Ordering::SeqCst);
@@ -321,6 +364,7 @@ pub async fn send_message_stream(
         Some(vector_store.inner()),
         &config.provider,
         &config.model,
+        messages.len(),
     );
 
     // Context Engine — smart RAG injection.
@@ -536,11 +580,17 @@ pub async fn send_message_stream(
                         }
                     }
                     ErrorRecovery::RateLimitRetry { secs } => {
+                        record_error("rate_limit");
+                        if is_circuit_broken("rate_limit") {
+                            let _ = app.emit("blade_status", "error");
+                            return Err("Rate limit circuit breaker tripped — too many rate limit errors in 5 minutes. Check your API quota or switch providers.".to_string());
+                        }
+                        let wait = backoff_secs(secs, "rate_limit");
                         let _ = app.emit("blade_notification", serde_json::json!({
                             "type": "info",
-                            "message": format!("Rate limited — retrying in {}s", secs)
+                            "message": format!("Rate limited — retrying in {}s", wait)
                         }));
-                        tokio::time::sleep(std::time::Duration::from_secs(secs)).await;
+                        tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
                         let _ = app.emit("blade_status", "processing");
                         let retry = providers::complete_turn(
                             &config.provider, &config.api_key, &config.model,
@@ -550,15 +600,21 @@ pub async fn send_message_stream(
                             Ok(t) => t,
                             Err(e2) => {
                                 let _ = app.emit("blade_status", "error");
-                                return Err(format!("Still rate limited after {}s wait: {}", secs, e2));
+                                return Err(format!("Still rate limited after {}s wait: {}", wait, e2));
                             }
                         }
                     }
                     ErrorRecovery::OverloadedRetry => {
+                        record_error("overloaded");
+                        if is_circuit_broken("overloaded") {
+                            let _ = app.emit("blade_status", "error");
+                            return Err("Server overload circuit breaker tripped — provider is consistently unavailable. Try again later or switch providers.".to_string());
+                        }
+                        let wait = backoff_secs(5, "overloaded");
                         let _ = app.emit("blade_notification", serde_json::json!({
-                            "type": "info", "message": "Server overloaded — retrying in 5s"
+                            "type": "info", "message": format!("Server overloaded — retrying in {}s", wait)
                         }));
-                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                        tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
                         let _ = app.emit("blade_status", "processing");
                         let retry = providers::complete_turn(
                             &config.provider, &config.api_key, &config.model,
@@ -568,7 +624,7 @@ pub async fn send_message_stream(
                             Ok(t) => t,
                             Err(e2) => {
                                 let _ = app.emit("blade_status", "error");
-                                return Err(format!("Server still overloaded: {}", e2));
+                                return Err(format!("Server still overloaded after {}s: {}", wait, e2));
                             }
                         }
                     }
