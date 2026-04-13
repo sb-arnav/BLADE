@@ -52,7 +52,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, EBState> {
   }
 }
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar";
 
 const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
 const Canvas = lazy(() => import("./components/Canvas"));
@@ -91,6 +91,9 @@ const DashboardView = lazy(() => import("./components/Dashboard").then((m) => ({
 const SkillPackView = lazy(() => import("./components/SkillPackView").then((m) => ({ default: m.SkillPackView })));
 const GoalView = lazy(() => import("./components/GoalView").then((m) => ({ default: m.GoalView })));
 const KaliView = lazy(() => import("./components/KaliView").then((m) => ({ default: m.KaliView })));
+const AgentDashboard = lazy(() => import("./components/AgentDashboard").then(m => ({ default: m.AgentDashboard })));
+const AccountabilityView = lazy(() => import("./components/AccountabilityView").then(m => ({ default: m.AccountabilityView })));
+const SidecarView = lazy(() => import("./components/SidecarView").then(m => ({ default: m.SidecarView })));
 
 function ShellFallback({ label = "Loading workspace..." }: { label?: string }) {
   return (
@@ -928,6 +931,9 @@ export default function App() {
     "skill-packs": <SkillPackView onBack={() => openRoute("chat")} />,
     "goals": <GoalView onBack={() => openRoute("chat")} />,
     "kali": <KaliView onBack={() => openRoute("chat")} />,
+    "agents-authority": <AgentDashboard onBack={() => openRoute("chat")} />,
+    "accountability": <AccountabilityView onBack={() => openRoute("chat")} />,
+    "sidecar": <SidecarView onBack={() => openRoute("chat")} />,
   };
 
   if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {
