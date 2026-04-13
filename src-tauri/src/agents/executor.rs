@@ -142,7 +142,8 @@ pub async fn execute_next_step(
 
 fn truncate(s: &str, max: usize) -> String {
     if s.len() > max {
-        format!("{}...", &s[..max])
+        let end = s.char_indices().nth(max).map(|(i, _)| i).unwrap_or(s.len());
+        format!("{}...", &s[..end])
     } else {
         s.to_string()
     }

@@ -40,7 +40,12 @@ fn derive_title(user_request: &str, blade_response: &str) -> String {
     }
     // Fall back to first 60 chars of user request
     let req = user_request.trim();
-    if req.len() > 60 { format!("Gap: {}…", &req[..57]) } else { format!("Gap: {req}") }
+    if req.len() > 60 {
+        let end = req.char_indices().nth(57).map(|(i, _)| i).unwrap_or(req.len());
+        format!("Gap: {}…", &req[..end])
+    } else {
+        format!("Gap: {req}")
+    }
 }
 
 fn derive_category(blade_response: &str) -> &'static str {

@@ -317,7 +317,8 @@ fn build_system_prompt_inner(
                 let s = crate::indexer::project_summary_for_prompt(&proj.project);
                 if s.is_empty() { continue; }
                 let capped = if s.len() > MAX_PROJECT_CHARS {
-                    format!("{}\n...(truncated — use `blade_find_symbol` for full index)", &s[..MAX_PROJECT_CHARS])
+                    let end = s.char_indices().nth(MAX_PROJECT_CHARS).map(|(i, _)| i).unwrap_or(s.len());
+                    format!("{}\n...(truncated — use `blade_find_symbol` for full index)", &s[..end])
                 } else {
                     s
                 };
@@ -421,7 +422,8 @@ fn build_system_prompt_inner(
     if let Some(gm) = crate::godmode::load_godmode_context() {
         if !gm.trim().is_empty() {
             let capped_gm = if gm.len() > 3_000 {
-                format!("{}\n...(god mode context truncated)", &gm[..3_000])
+                let end = gm.char_indices().nth(3_000).map(|(i, _)| i).unwrap_or(gm.len());
+                format!("{}\n...(god mode context truncated)", &gm[..end])
             } else {
                 gm
             };
