@@ -154,20 +154,13 @@ Do not hallucinate patterns not evidenced in the data."#,
 
     // Step 4: Call cheapest available model
     let config = crate::config::load_config();
-    let cheap_model = match config.provider.as_str() {
-        "anthropic"  => "claude-haiku-4-5-20251001",
-        "openai"     => "gpt-4o-mini",
-        "gemini"     => "gemini-2.0-flash",
-        "groq"       => "llama-3.1-8b-instant",
-        "openrouter" => "anthropic/claude-haiku-4.5",
-        _ => &config.model,
-    };
+    let cheap_model = crate::config::cheap_model_for_provider(&config.provider, &config.model);
 
     let messages = vec![crate::providers::ConversationMessage::User(analysis_prompt)];
     let style_guide = match crate::providers::complete_turn(
         &config.provider,
         &config.api_key,
-        cheap_model,
+        &cheap_model,
         &messages,
         &[],
         config.base_url.as_deref(),

@@ -72,14 +72,7 @@ Key facts:"#,
     // Use the cheapest available model — this is a background fact extraction task,
     // not the user-facing response. Running the full configured model here wastes
     // credits and slows startup for no quality gain.
-    let cheap_model = match config.provider.as_str() {
-        "anthropic" => "claude-haiku-4-5-20251001".to_string(),
-        "openai" => "gpt-4o-mini".to_string(),
-        "gemini" => "gemini-2.0-flash".to_string(),
-        "groq" => "llama-3.1-8b-instant".to_string(),
-        "openrouter" => "anthropic/claude-haiku-4.5".to_string(),
-        _ => config.model.clone(),
-    };
+    let cheap_model = crate::config::cheap_model_for_provider(&config.provider, &config.model);
     let result = crate::providers::complete_turn(
         &config.provider,
         &config.api_key,

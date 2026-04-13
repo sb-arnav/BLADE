@@ -40,6 +40,7 @@ export interface BladeConfig {
   blade_source_path?: string;
   blade_dedicated_monitor?: number;
   trusted_ai_delegate?: string;
+  background_ai_enabled?: boolean;
 }
 
 export interface ConversationSummary {

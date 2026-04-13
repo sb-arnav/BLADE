@@ -104,14 +104,7 @@ pub fn cache_context(query_hash: &str, ctx: AssembledContext) {
 // ── LLM helpers (mirrors memory_palace.rs pattern) ────────────────────────────
 
 fn cheap_model_for(provider: &str) -> String {
-    match provider {
-        "anthropic" => "claude-haiku-4-5".to_string(),
-        "openai" => "gpt-4o-mini".to_string(),
-        "gemini" => "gemini-2.0-flash".to_string(),
-        "groq" => "llama-3.1-8b-instant".to_string(),
-        "openrouter" => "google/gemini-2.0-flash".to_string(),
-        _ => "llama3".to_string(),
-    }
+    crate::config::cheap_model_for_provider(provider, "")
 }
 
 /// Resolve (provider, api_key, cheap_model) for latency-sensitive scoring calls.

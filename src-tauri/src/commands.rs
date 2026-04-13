@@ -171,18 +171,11 @@ async fn compress_conversation_smart(
     );
 
     // Use cheapest model for compression
-    let cheap = match provider {
-        "anthropic" => "claude-haiku-4-5-20251001",
-        "openai" => "gpt-4o-mini",
-        "gemini" => "gemini-2.0-flash",
-        "groq" => "llama-3.1-8b-instant",
-        "openrouter" => "meta-llama/llama-3.3-70b-instruct:free",
-        _ => model,
-    };
+    let cheap = crate::config::cheap_model_for_provider(provider, model);
 
     let summary_msgs = vec![ConversationMessage::User(summary_prompt)];
     let summary = match crate::providers::complete_turn(
-        provider, api_key, cheap, &summary_msgs, &[], base_url
+        provider, api_key, &cheap, &summary_msgs, &[], base_url
     ).await {
         Ok(t) => t.content,
         Err(_) => {

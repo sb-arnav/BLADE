@@ -74,18 +74,12 @@ async fn llm_call(system: &str, user_msg: &str) -> Result<String, String> {
         ConversationMessage::System(system.to_string()),
         ConversationMessage::User(user_msg.to_string()),
     ];
-    let turn = complete_turn(provider, api_key, model, &messages, &[], base_url).await?;
+    let turn = complete_turn(provider, api_key, &model, &messages, &[], base_url).await?;
     Ok(turn.content)
 }
 
-fn cheap_model(provider: &str) -> &'static str {
-    match provider {
-        "anthropic" => "claude-haiku-4-5-20251001",
-        "openai" => "gpt-4o-mini",
-        "gemini" => "gemini-2.0-flash",
-        "groq" => "llama-3.1-8b-instant",
-        _ => "gemini-2.0-flash",
-    }
+fn cheap_model(provider: &str) -> String {
+    crate::config::cheap_model_for_provider(provider, "")
 }
 
 // ── Dream tasks ───────────────────────────────────────────────────────────────
@@ -281,6 +275,18 @@ async fn task_weekly_meta_critique() -> String {
 // ── Dream session runner ──────────────────────────────────────────────────────
 
 pub async fn run_dream_session(app: tauri::AppHandle) -> DreamSession {
+    let config = crate::config::load_config();
+    if !config.background_ai_enabled {
+        return DreamSession {
+            id: uuid_v4(),
+            started_at: now_secs(),
+            ended_at: Some(now_secs()),
+            tasks_completed: Vec::new(),
+            insights: Vec::new(),
+            status: "skipped".to_string(),
+        };
+    }
+
     let id = uuid_v4();
     let started_at = now_secs();
     let mut tasks_completed: Vec<String> = Vec::new();

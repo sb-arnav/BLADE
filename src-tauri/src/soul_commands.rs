@@ -150,14 +150,7 @@ Focus on what's genuinely new or different, not what's the same."#,
         new_prefs_json,
     );
 
-    let model = match config.provider.as_str() {
-        "anthropic" => "claude-haiku-4-5-20251001".to_string(),
-        "openai" => "gpt-4o-mini".to_string(),
-        "gemini" => "gemini-2.0-flash".to_string(),
-        "groq" => "llama-3.3-70b-versatile".to_string(),
-        "openrouter" => "anthropic/claude-haiku-4.5".to_string(),
-        _ => config.model.clone(),
-    };
+    let model = crate::config::cheap_model_for_provider(&config.provider, &config.model);
 
     let messages = vec![ConversationMessage::User(prompt)];
     match providers::complete_turn(

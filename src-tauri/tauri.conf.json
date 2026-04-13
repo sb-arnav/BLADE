@@ -1,6 +1,6 @@
 {
   "productName": "Blade",
-  "version": "0.4.10",
+  "version": "0.4.11",
   "identifier": "site.slayerblade.blade",
   "build": {
     "beforeDevCommand": "npm run dev",

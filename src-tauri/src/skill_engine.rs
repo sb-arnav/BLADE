@@ -252,14 +252,7 @@ fn normalize_query(query: &str) -> String {
 }
 
 fn cheapest_model(provider: &str, current: &str) -> String {
-    match provider {
-        "anthropic"  => "claude-haiku-4-5-20251001".to_string(),
-        "openai"     => "gpt-4o-mini".to_string(),
-        "gemini"     => "gemini-2.0-flash".to_string(),
-        "groq"       => "llama-3.1-8b-instant".to_string(),
-        "openrouter" => "anthropic/claude-haiku-4.5".to_string(),
-        _ => current.to_string(),
-    }
+    crate::config::cheap_model_for_provider(provider, current)
 }
 
 /// Common English stop words to strip before hashing query type

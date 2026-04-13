@@ -66,14 +66,8 @@ fn open_conn() -> Option<rusqlite::Connection> {
 
 /// Select the cheapest model available for the current provider — all
 /// proactive checks run in background and cost should be near-zero.
-fn cheap_model(provider: &str) -> &'static str {
-    match provider {
-        "anthropic" => "claude-haiku-4-5-20251001",
-        "openai" => "gpt-4o-mini",
-        "gemini" => "gemini-2.0-flash",
-        "groq" => "llama-3.1-8b-instant",
-        _ => "gemini-2.0-flash",
-    }
+fn cheap_model(provider: &str) -> String {
+    crate::config::cheap_model_for_provider(provider, "")
 }
 
 async fn llm_call(system: &str, user_msg: &str) -> Result<String, String> {
@@ -93,7 +87,7 @@ async fn llm_call(system: &str, user_msg: &str) -> Result<String, String> {
     let turn = complete_turn(
         &provider,
         &api_key,
-        model,
+        &model,
         &messages,
         &[],
         base_url.as_deref(),
@@ -548,6 +542,11 @@ async fn proactive_loop(app: tauri::AppHandle) {
 
     loop {
         tokio::time::sleep(Duration::from_secs(300)).await; // every 5 minutes
+
+        let config = crate::config::load_config();
+        if !config.background_ai_enabled {
+            continue;
+        }
 
         let conn = match open_conn() {
             Some(c) => c,

@@ -942,6 +942,12 @@ pub fn start_learning_engine(app: tauri::AppHandle) {
         tokio::time::sleep(Duration::from_secs(5 * 60)).await;
 
         loop {
+            let config = crate::config::load_config();
+            if !config.background_ai_enabled {
+                tokio::time::sleep(Duration::from_secs(30 * 60)).await;
+                continue;
+            }
+
             let count = analyze_and_store_patterns().await;
             log::info!("learning_engine: analyzed {} patterns", count);
 
@@ -1055,14 +1061,7 @@ fn build_current_context() -> String {
 }
 
 fn cheapest_model_for_provider(provider: &str, current_model: &str) -> String {
-    match provider {
-        "anthropic"  => "claude-haiku-4-5-20251001".to_string(),
-        "openai"     => "gpt-4o-mini".to_string(),
-        "gemini"     => "gemini-2.0-flash".to_string(),
-        "groq"       => "llama-3.1-8b-instant".to_string(),
-        "openrouter" => "anthropic/claude-haiku-4.5".to_string(),
-        _            => current_model.to_string(),
-    }
+    crate::config::cheap_model_for_provider(provider, current_model)
 }
 
 /// Stable short hash of a string for use as a UUID fragment.

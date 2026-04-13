@@ -12,26 +12,7 @@ import { WatcherPanel } from "./WatcherPanel";
 import { RemindersPanel } from "./RemindersPanel";
 import { SkillsPanel } from "./SkillsPanel";
 
-type SettingsTab = "provider" | "memory" | "mcp" | "integrations" | "about" | "privacy" | "evolution";
-
-interface EvolutionLevel {
-  level: number;
-  score: number;
-  breakdown: string[];
-  next_unlock: string | null;
-}
-
-interface EvolutionSuggestion {
-  id: string;
-  name: string;
-  package: string;
-  description: string;
-  trigger_app: string;
-  required_token_hint: string | null;
-  auto_install: boolean;
-  status: string;
-  created_at: number;
-}
+type SettingsTab = "general" | "provider" | "memory" | "mcp" | "integrations" | "about" | "privacy";
 
 interface ProviderEntry {
   id: string;
@@ -198,7 +179,7 @@ interface Props {
 }
 
 const TABS: { id: SettingsTab; label: string }[] = [
-  { id: "evolution", label: "Evolution" },
+  { id: "general", label: "General" },
   { id: "provider", label: "Provider" },
   { id: "integrations", label: "Integrations" },
   { id: "memory", label: "Memory" },
@@ -612,14 +593,7 @@ function RoutingPanel() {
 }
 
 export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
-  const [tab, setTab] = useState<SettingsTab>("evolution");
-  const [evolutionLevel, setEvolutionLevel] = useState<EvolutionLevel | null>(null);
-  const [evolutionSuggestions, setEvolutionSuggestions] = useState<EvolutionSuggestion[]>([]);
-  const [evolutionRunning, setEvolutionRunning] = useState(false);
-  const [suggestionTokens, setSuggestionTokens] = useState<Record<string, string>>({});
-  const [researchEntries, setResearchEntries] = useState<Array<{ id: number; query: string; results: string; source: string; created_at: number }>>([]);
-  const [researchQuery, setResearchQuery] = useState("");
-  const [researchRunning, setResearchRunning] = useState(false);
+  const [tab, setTab] = useState<SettingsTab>("general");
   const [provider, setProvider] = useState(config.provider);
   const [apiKey, setApiKey] = useState(config.api_key);
   const [model, setModel] = useState(config.model);
@@ -638,6 +612,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
   const [shortcutError, setShortcutError] = useState<string | null>(null);
   const [ttsVoices, setTtsVoices] = useState<Array<{ id: string; label: string; description: string; provider: string }>>([]);
   const [obsidianVaultPath, setObsidianVaultPath] = useState(config.obsidian_vault_path ?? "");
+  const [backgroundAiEnabled, setBackgroundAiEnabled] = useState(config.background_ai_enabled ?? true);
   const [persona, setPersona] = useState("");
   const [contextNotes, setContextNotes] = useState("");
   const [status, setStatus] = useState<string | null>(null);
@@ -653,9 +628,6 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
   const [timelineEnabled, setTimelineEnabled] = useState(config.screen_timeline_enabled ?? false);
   const [timelineInterval, setTimelineInterval] = useState(config.timeline_capture_interval ?? 30);
   const [timelineRetention, setTimelineRetention] = useState(config.timeline_retention_days ?? 14);
-  const [aiDelegate, setAiDelegate] = useState(config.trusted_ai_delegate ?? "");
-  const [delegateCheckResult, setDelegateCheckResult] = useState<{ available: boolean } | null>(null);
-  const [introduceStatus, setIntroduceStatus] = useState<string | null>(null);
 
   useEffect(() => {
     setProvider(config.provider);
@@ -668,31 +640,11 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
     setQuickAskShortcut(config.quick_ask_shortcut ?? "Alt+Space");
     setVoiceShortcut(config.voice_shortcut ?? "Ctrl+Shift+V");
     setObsidianVaultPath(config.obsidian_vault_path ?? "");
+    setBackgroundAiEnabled(config.background_ai_enabled ?? true);
     setTimelineEnabled(config.screen_timeline_enabled ?? false);
     setTimelineInterval(config.timeline_capture_interval ?? 30);
     setTimelineRetention(config.timeline_retention_days ?? 14);
-    setAiDelegate(config.trusted_ai_delegate ?? "");
   }, [config]);
-
-  // Load evolution data whenever the tab is visible
-  useEffect(() => {
-    if (tab !== "evolution") return;
-    const load = async () => {
-      try {
-        const [level, suggestions, research] = await Promise.all([
-          invoke<EvolutionLevel>("evolution_get_level"),
-          invoke<EvolutionSuggestion[]>("evolution_get_suggestions"),
-          invoke<Array<{ id: number; query: string; results: string; source: string; created_at: number }>>("research_get_recent", { limit: 8 }),
-        ]);
-        setEvolutionLevel(level);
-        setEvolutionSuggestions(suggestions);
-        setResearchEntries(research);
-      } catch {
-        // non-fatal
-      }
-    };
-    load();
-  }, [tab]);
 
   useEffect(() => {
     const loadBrain = async () => {
@@ -884,6 +836,239 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
           ))}
         </div>
 
+        {tab === "general" && <>
+        {/* God Mode tier selector */}
+        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-medium">God Mode</p>
+              <p className="text-xs text-blade-muted mt-0.5">Blade scans your machine and injects live context — files, apps, clipboard — into every conversation. Short prompts work because Blade already knows what you're doing.</p>
+            </div>
+            <div className="grid grid-cols-4 gap-1.5">
+              {(["off", "normal", "intermediate", "extreme"] as const).map((tier) => {
+                const labels: Record<string, string> = { off: "Off", normal: "Normal", intermediate: "Focused", extreme: "GOD MODE" };
+                const descs: Record<string, string> = {
+                  off: "Disabled",
+                  normal: "5 min scan",
+                  intermediate: "2 min + clipboard",
+                  extreme: "1 min · full JARVIS",
+                };
+                const active = godModeTier === tier;
+                return (
+                  <button
+                    key={tier}
+                    type="button"
+                    onClick={async () => {
+                      setGodModeTier(tier);
+                      const enabled = tier !== "off";
+                      try {
+                        await invoke("toggle_god_mode", { enabled, tier: enabled ? tier : null });
+                      } catch { /* ignore */ }
+                    }}
+                    className={`flex flex-col items-center gap-0.5 rounded-xl border px-2 py-2 text-center transition-colors ${
+                      active
+                        ? tier === "extreme"
+                          ? "border-orange-500 bg-orange-500/10 text-orange-400"
+                          : "border-blade-accent bg-blade-accent/10 text-blade-accent"
+                        : "border-blade-border text-blade-muted hover:border-blade-accent/50"
+                    }`}
+                  >
+                    <span className="text-xs font-semibold">{labels[tier]}</span>
+                    <span className="text-[10px] leading-tight opacity-70">{descs[tier]}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {godModeTier === "extreme" && (
+              <p className="text-xs text-orange-400 bg-orange-500/10 border border-orange-500/30 rounded-lg px-3 py-2">
+                GOD MODE: BLADE scans every 60 seconds and acts as a live co-pilot — proactively surfacing context, flagging issues, and suggesting actions without being asked. Costs more tokens. Requires a paid key.
+              </p>
+            )}
+          </div>
+        </section>
+
+        {/* Voice Mode */}
+        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-medium">Voice Mode</p>
+              <p className="text-xs text-blade-muted mt-0.5">
+                Push-to-talk: hold <kbd className="font-mono bg-blade-surface border border-blade-border rounded px-1 text-[10px]">Ctrl+Space</kbd> to speak.
+                Always On: VAD listens continuously — say "hey Blade" to trigger, or turn on auto-send in Extreme mode.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {(["off", "tts", "push-to-talk", "always-on"] as const).map((m) => {
+                const labels = { off: "Off", tts: "Speak", "push-to-talk": "Push-to-Talk", "always-on": "Always On" };
+                const descs = {
+                  off: "Silent",
+                  tts: "BLADE talks back",
+                  "push-to-talk": "Hold Ctrl+Space",
+                  "always-on": "VAD + wake word",
+                };
+                const active = voiceMode === m;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setVoiceMode(m)}
+                    className={`flex flex-col items-center gap-0.5 rounded-xl border px-2 py-2 text-center transition-colors ${
+                      active
+                        ? "border-blade-accent bg-blade-accent/10 text-blade-accent"
+                        : "border-blade-border text-blade-muted hover:border-blade-accent/50"
+                    }`}
+                  >
+                    <span className="text-xs font-semibold">{labels[m]}</span>
+                    <span className="text-[10px] leading-tight opacity-70">{descs[m]}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {voiceMode === "tts" && (
+              <p className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2">
+                BLADE will speak its pulse thoughts and morning briefings aloud using your OS speech engine. No cloud API needed.
+              </p>
+            )}
+            {voiceMode === "always-on" && (
+              <p className="text-xs text-blue-400 bg-blue-500/10 border border-blue-500/30 rounded-lg px-3 py-2">
+                Always-on uses your microphone continuously. Speech is sent to Whisper (via Groq). Say "Hey Blade" to trigger auto-send — otherwise your words fill the input box for you to review.
+              </p>
+            )}
+          </div>
+        </section>
+
+        {/* TTS Voice */}
+        {(voiceMode === "tts" || voiceMode === "always-on") && ttsVoices.length > 0 && (
+          <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+            <div className="space-y-2">
+              <div>
+                <p className="text-sm font-medium">Voice</p>
+                <p className="text-xs text-blade-muted mt-0.5">
+                  OpenAI voices require an OpenAI API key. System voices use your OS speech engine (no key needed).
+                </p>
+              </div>
+              <select
+                value={ttsVoice}
+                onChange={(e) => setTtsVoice(e.target.value)}
+                className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none"
+              >
+                <optgroup label="OpenAI (cloud, best quality)">
+                  {ttsVoices.filter(v => v.provider === "openai").map(v => (
+                    <option key={v.id} value={v.id}>{v.label} — {v.description}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="System (offline, no key)">
+                  {ttsVoices.filter(v => v.provider === "system").map(v => (
+                    <option key={v.id} value={v.id}>{v.label} — {v.description}</option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
+          </section>
+        )}
+
+        {/* Shortcuts */}
+        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-medium">Keyboard Shortcuts</p>
+              <p className="text-xs text-blade-muted mt-0.5">
+                Global hotkeys work system-wide — even when BLADE is in the background.
+                Format: <code className="font-mono text-[10px] bg-blade-surface px-1 rounded">Ctrl+Shift+V</code>,{" "}
+                <code className="font-mono text-[10px] bg-blade-surface px-1 rounded">Alt+Space</code>
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="space-y-1 block">
+                <span className="text-xs text-blade-muted uppercase tracking-wide">Quick Ask</span>
+                <input
+                  type="text"
+                  value={quickAskShortcut}
+                  onChange={(e) => setQuickAskShortcut(e.target.value)}
+                  className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm font-mono outline-none"
+                  placeholder="Alt+Space"
+                />
+              </label>
+              <label className="space-y-1 block">
+                <span className="text-xs text-blade-muted uppercase tracking-wide">Voice Input</span>
+                <input
+                  type="text"
+                  value={voiceShortcut}
+                  onChange={(e) => setVoiceShortcut(e.target.value)}
+                  className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm font-mono outline-none"
+                  placeholder="Ctrl+Shift+V"
+                />
+              </label>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleSaveShortcuts}
+                className="px-4 py-1.5 rounded-lg bg-blade-accent/20 hover:bg-blade-accent/30 text-blade-accent text-sm border border-blade-accent/30 transition-colors"
+              >
+                Apply Shortcuts
+              </button>
+              {shortcutStatus && <span className="text-xs text-emerald-400">{shortcutStatus}</span>}
+              {shortcutError && <span className="text-xs text-red-400">{shortcutError}</span>}
+            </div>
+            <p className="text-xs text-blade-muted/60">
+              Voice input shortcut toggles recording. First press starts mic, second press transcribes and opens Quick Ask pre-filled with your speech.
+            </p>
+          </div>
+        </section>
+
+        {/* Obsidian Vault */}
+        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+          <label className="space-y-2 block">
+            <span className="text-xs uppercase tracking-wide text-blade-muted">
+              Obsidian Vault Path <span className="normal-case text-blade-muted/60">(optional — Blade will read and write notes here)</span>
+            </span>
+            <input
+              type="text"
+              value={obsidianVaultPath}
+              onChange={(e) => setObsidianVaultPath(e.target.value)}
+              className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none font-mono"
+              placeholder="/home/user/vault or C:\Users\user\vault"
+            />
+          </label>
+        </section>
+
+        {/* Background AI */}
+        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold">Background AI</p>
+              <p className="text-xs text-blade-muted mt-0.5">
+                Allow BLADE to make autonomous AI calls in the background (pulse, proactive engine, character, evolution). Disable to stop all background token usage.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                const next = !backgroundAiEnabled;
+                setBackgroundAiEnabled(next);
+                try { await invoke("toggle_background_ai", { enabled: next }); } catch { /* ignore */ }
+              }}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${backgroundAiEnabled ? "bg-blade-accent" : "bg-blade-border"}`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${backgroundAiEnabled ? "translate-x-6" : "translate-x-1"}`} />
+            </button>
+          </div>
+        </section>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleSave}
+            className="px-4 py-2 rounded-xl bg-blade-accent text-white text-sm hover:opacity-90 transition-opacity"
+          >
+            Save
+          </button>
+        </div>
+
+        {status && <p className="text-xs text-green-400">{status}</p>}
+        {error && <p className="text-xs text-red-400">{error}</p>}
+        </>}
+
         {tab === "provider" && <>
         <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
           {/* Provider card grid */}
@@ -986,192 +1171,6 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
               />
             </label>
           )}
-
-          {/* God Mode tier selector */}
-          <div className="space-y-3">
-            <div>
-              <p className="text-sm font-medium">God Mode</p>
-              <p className="text-xs text-blade-muted mt-0.5">Blade scans your machine and injects live context — files, apps, clipboard — into every conversation. Short prompts work because Blade already knows what you're doing.</p>
-            </div>
-            <div className="grid grid-cols-4 gap-1.5">
-              {(["off", "normal", "intermediate", "extreme"] as const).map((tier) => {
-                const labels: Record<string, string> = { off: "Off", normal: "Normal", intermediate: "Focused", extreme: "GOD MODE" };
-                const descs: Record<string, string> = {
-                  off: "Disabled",
-                  normal: "5 min scan",
-                  intermediate: "2 min + clipboard",
-                  extreme: "1 min · full JARVIS",
-                };
-                const active = godModeTier === tier;
-                return (
-                  <button
-                    key={tier}
-                    type="button"
-                    onClick={async () => {
-                      setGodModeTier(tier);
-                      const enabled = tier !== "off";
-                      try {
-                        await invoke("toggle_god_mode", { enabled, tier: enabled ? tier : null });
-                      } catch { /* ignore */ }
-                    }}
-                    className={`flex flex-col items-center gap-0.5 rounded-xl border px-2 py-2 text-center transition-colors ${
-                      active
-                        ? tier === "extreme"
-                          ? "border-orange-500 bg-orange-500/10 text-orange-400"
-                          : "border-blade-accent bg-blade-accent/10 text-blade-accent"
-                        : "border-blade-border text-blade-muted hover:border-blade-accent/50"
-                    }`}
-                  >
-                    <span className="text-xs font-semibold">{labels[tier]}</span>
-                    <span className="text-[10px] leading-tight opacity-70">{descs[tier]}</span>
-                  </button>
-                );
-              })}
-            </div>
-            {godModeTier === "extreme" && (
-              <p className="text-xs text-orange-400 bg-orange-500/10 border border-orange-500/30 rounded-lg px-3 py-2">
-                GOD MODE: BLADE scans every 60 seconds and acts as a live co-pilot — proactively surfacing context, flagging issues, and suggesting actions without being asked. Costs more tokens. Requires a paid key.
-              </p>
-            )}
-          </div>
-
-          {/* Voice Mode */}
-          <div className="space-y-3">
-            <div>
-              <p className="text-sm font-medium">Voice Mode</p>
-              <p className="text-xs text-blade-muted mt-0.5">
-                Push-to-talk: hold <kbd className="font-mono bg-blade-surface border border-blade-border rounded px-1 text-[10px]">Ctrl+Space</kbd> to speak.
-                Always On: VAD listens continuously — say "hey Blade" to trigger, or turn on auto-send in Extreme mode.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-1.5">
-              {(["off", "tts", "push-to-talk", "always-on"] as const).map((m) => {
-                const labels = { off: "Off", tts: "Speak", "push-to-talk": "Push-to-Talk", "always-on": "Always On" };
-                const descs = {
-                  off: "Silent",
-                  tts: "BLADE talks back",
-                  "push-to-talk": "Hold Ctrl+Space",
-                  "always-on": "VAD + wake word",
-                };
-                const active = voiceMode === m;
-                return (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setVoiceMode(m)}
-                    className={`flex flex-col items-center gap-0.5 rounded-xl border px-2 py-2 text-center transition-colors ${
-                      active
-                        ? "border-blade-accent bg-blade-accent/10 text-blade-accent"
-                        : "border-blade-border text-blade-muted hover:border-blade-accent/50"
-                    }`}
-                  >
-                    <span className="text-xs font-semibold">{labels[m]}</span>
-                    <span className="text-[10px] leading-tight opacity-70">{descs[m]}</span>
-                  </button>
-                );
-              })}
-            </div>
-            {voiceMode === "tts" && (
-              <p className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2">
-                BLADE will speak its pulse thoughts and morning briefings aloud using your OS speech engine. No cloud API needed.
-              </p>
-            )}
-            {voiceMode === "always-on" && (
-              <p className="text-xs text-blue-400 bg-blue-500/10 border border-blue-500/30 rounded-lg px-3 py-2">
-                Always-on uses your microphone continuously. Speech is sent to Whisper (via Groq). Say "Hey Blade" to trigger auto-send — otherwise your words fill the input box for you to review.
-              </p>
-            )}
-          </div>
-
-          {/* TTS Voice */}
-          {(voiceMode === "tts" || voiceMode === "always-on") && ttsVoices.length > 0 && (
-            <div className="space-y-2">
-              <div>
-                <p className="text-sm font-medium">Voice</p>
-                <p className="text-xs text-blade-muted mt-0.5">
-                  OpenAI voices require an OpenAI API key. System voices use your OS speech engine (no key needed).
-                </p>
-              </div>
-              <select
-                value={ttsVoice}
-                onChange={(e) => setTtsVoice(e.target.value)}
-                className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none"
-              >
-                <optgroup label="OpenAI (cloud, best quality)">
-                  {ttsVoices.filter(v => v.provider === "openai").map(v => (
-                    <option key={v.id} value={v.id}>{v.label} — {v.description}</option>
-                  ))}
-                </optgroup>
-                <optgroup label="System (offline, no key)">
-                  {ttsVoices.filter(v => v.provider === "system").map(v => (
-                    <option key={v.id} value={v.id}>{v.label} — {v.description}</option>
-                  ))}
-                </optgroup>
-              </select>
-            </div>
-          )}
-
-          {/* Shortcuts */}
-          <div className="space-y-3">
-            <div>
-              <p className="text-sm font-medium">Keyboard Shortcuts</p>
-              <p className="text-xs text-blade-muted mt-0.5">
-                Global hotkeys work system-wide — even when BLADE is in the background.
-                Format: <code className="font-mono text-[10px] bg-blade-surface px-1 rounded">Ctrl+Shift+V</code>,{" "}
-                <code className="font-mono text-[10px] bg-blade-surface px-1 rounded">Alt+Space</code>
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="space-y-1 block">
-                <span className="text-xs text-blade-muted uppercase tracking-wide">Quick Ask</span>
-                <input
-                  type="text"
-                  value={quickAskShortcut}
-                  onChange={(e) => setQuickAskShortcut(e.target.value)}
-                  className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm font-mono outline-none"
-                  placeholder="Alt+Space"
-                />
-              </label>
-              <label className="space-y-1 block">
-                <span className="text-xs text-blade-muted uppercase tracking-wide">Voice Input</span>
-                <input
-                  type="text"
-                  value={voiceShortcut}
-                  onChange={(e) => setVoiceShortcut(e.target.value)}
-                  className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm font-mono outline-none"
-                  placeholder="Ctrl+Shift+V"
-                />
-              </label>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleSaveShortcuts}
-                className="px-4 py-1.5 rounded-lg bg-blade-accent/20 hover:bg-blade-accent/30 text-blade-accent text-sm border border-blade-accent/30 transition-colors"
-              >
-                Apply Shortcuts
-              </button>
-              {shortcutStatus && <span className="text-xs text-emerald-400">{shortcutStatus}</span>}
-              {shortcutError && <span className="text-xs text-red-400">{shortcutError}</span>}
-            </div>
-            <p className="text-xs text-blade-muted/60">
-              Voice input shortcut toggles recording. First press starts mic, second press transcribes and opens Quick Ask pre-filled with your speech.
-            </p>
-          </div>
-
-          {/* Obsidian Vault */}
-          <label className="space-y-2 block">
-            <span className="text-xs uppercase tracking-wide text-blade-muted">
-              Obsidian Vault Path <span className="normal-case text-blade-muted/60">(optional — Blade will read and write notes here)</span>
-            </span>
-            <input
-              type="text"
-              value={obsidianVaultPath}
-              onChange={(e) => setObsidianVaultPath(e.target.value)}
-              className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none font-mono"
-              placeholder="/home/user/vault or C:\Users\user\vault"
-            />
-          </label>
 
           <div className="flex items-center gap-3">
             <button
@@ -1304,328 +1303,6 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
               Stored locally and injected into Blade&apos;s system prompt.
             </p>
           </div>
-        </section>
-        </>}
-
-        {tab === "evolution" && <>
-        {/* Evolution Dashboard */}
-        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-base font-semibold">BLADE Evolution</h2>
-              <p className="text-sm text-blade-muted">BLADE watches what you use and wires itself in automatically.</p>
-            </div>
-            <button
-              onClick={async () => {
-                setEvolutionRunning(true);
-                try {
-                  await invoke("evolution_run_now");
-                  const [level, suggestions] = await Promise.all([
-                    invoke<EvolutionLevel>("evolution_get_level"),
-                    invoke<EvolutionSuggestion[]>("evolution_get_suggestions"),
-                  ]);
-                  setEvolutionLevel(level);
-                  setEvolutionSuggestions(suggestions);
-                } finally {
-                  setEvolutionRunning(false);
-                }
-              }}
-              disabled={evolutionRunning}
-              className="px-3 py-1.5 rounded-lg bg-blade-bg border border-blade-border text-xs hover:border-blade-muted transition-colors disabled:opacity-50"
-            >
-              {evolutionRunning ? "Scanning..." : "Scan now"}
-            </button>
-          </div>
-
-          {/* Level badge */}
-          {evolutionLevel && (
-            <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-violet-950/60 to-blade-bg border border-violet-800/40">
-              <div className="flex-shrink-0 w-16 h-16 rounded-2xl bg-violet-900/50 border border-violet-700/50 flex items-center justify-center">
-                <span className="text-2xl font-bold text-violet-300">L{evolutionLevel.level}</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-white">Level {evolutionLevel.level} — Score {evolutionLevel.score}</div>
-                <div className="text-xs text-blade-muted mt-1 flex flex-wrap gap-1">
-                  {evolutionLevel.breakdown.map((item, i) => (
-                    <span key={i} className="bg-blade-surface border border-blade-border rounded px-1.5 py-0.5">{item}</span>
-                  ))}
-                </div>
-                {evolutionLevel.next_unlock && (
-                  <div className="text-xs text-violet-400 mt-2">{evolutionLevel.next_unlock}</div>
-                )}
-              </div>
-            </div>
-          )}
-        </section>
-
-        {/* Pending suggestions */}
-        {evolutionSuggestions.length > 0 && (
-          <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
-            <div>
-              <h2 className="text-base font-semibold">Detected capabilities</h2>
-              <p className="text-sm text-blade-muted">BLADE saw you using these — connect them to unlock full control.</p>
-            </div>
-            <div className="space-y-3">
-              {evolutionSuggestions.map((s) => {
-                const isRuleMutation = !s.package; // empty package = prompt rule suggestion, not MCP install
-                return (
-                <div key={s.id} className={`rounded-xl border bg-blade-bg/60 p-3 space-y-2 ${isRuleMutation ? "border-amber-500/30" : "border-blade-border"}`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <div className="text-sm font-medium">{s.name}</div>
-                        {isRuleMutation && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">rule</span>
-                        )}
-                      </div>
-                      <div className="text-xs text-blade-muted mt-0.5">{s.description}</div>
-                      {!isRuleMutation && <div className="text-xs text-blade-muted/60 mt-1">Detected via: {s.trigger_app}</div>}
-                    </div>
-                    <button
-                      onClick={async () => {
-                        await invoke("evolution_dismiss_suggestion", { id: s.id });
-                        setEvolutionSuggestions((prev) => prev.filter((x) => x.id !== s.id));
-                      }}
-                      className="flex-shrink-0 text-blade-muted/50 hover:text-blade-muted text-xs"
-                    >
-                      dismiss
-                    </button>
-                  </div>
-
-                  {isRuleMutation && (
-                    <div className="rounded-lg bg-amber-500/5 border border-amber-500/20 p-2">
-                      <div className="text-[10px] text-amber-400/80 mb-1.5">Proposed rule (from failure analysis):</div>
-                      <div className="text-xs font-mono text-blade-text/80 whitespace-pre-wrap">{s.description}</div>
-                      <div className="mt-2 text-[10px] text-blade-muted/60">Copy this rule and ask BLADE to add it to its system prompt, or dismiss if not relevant.</div>
-                    </div>
-                  )}
-
-                  {!isRuleMutation && s.required_token_hint && (
-                    <div className="space-y-1.5">
-                      <div className="text-xs text-amber-400/80">Needs: {s.required_token_hint}</div>
-                      <div className="flex gap-2">
-                        <input
-                          type="password"
-                          placeholder="Paste token / key here"
-                          value={suggestionTokens[s.id] ?? ""}
-                          onChange={(e) => setSuggestionTokens((prev) => ({ ...prev, [s.id]: e.target.value }))}
-                          className="flex-1 bg-blade-bg border border-blade-border rounded-lg px-2.5 py-1.5 text-xs outline-none min-w-0"
-                        />
-                        <button
-                          onClick={async () => {
-                            const token = suggestionTokens[s.id] ?? "";
-                            if (!token) return;
-                            const envKey = s.required_token_hint?.split(/[\s(]/)[0] ?? "TOKEN";
-                            try {
-                              const toolCount = await invoke<number>("evolution_install_suggestion", {
-                                id: s.id, tokenKey: envKey, tokenValue: token,
-                              });
-                              setEvolutionSuggestions((prev) => prev.filter((x) => x.id !== s.id));
-                              const level = await invoke<EvolutionLevel>("evolution_get_level");
-                              setEvolutionLevel(level);
-                              setStatus(`${s.name} connected — ${toolCount} tool(s) available`);
-                            } catch (e) {
-                              setError(String(e));
-                            }
-                          }}
-                          className="px-3 py-1.5 rounded-lg bg-violet-700 hover:bg-violet-600 text-white text-xs transition-colors flex-shrink-0"
-                        >
-                          Connect
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {evolutionSuggestions.length === 0 && evolutionLevel && (
-          <section className="bg-blade-surface border border-blade-border rounded-2xl p-4">
-            <p className="text-sm text-blade-muted text-center">
-              {config.god_mode
-                ? "No new capabilities detected yet — BLADE is watching."
-                : "Enable God Mode so BLADE can see what you use and suggest integrations."}
-            </p>
-          </section>
-        )}
-
-        {/* Research Log */}
-        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-semibold">Intelligence Feed</h2>
-              <p className="text-xs text-blade-muted">What BLADE has been researching while you work</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                className="text-xs bg-blade-bg border border-blade-border rounded-lg px-2 py-1 w-40 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                placeholder="Search anything..."
-                value={researchQuery}
-                onChange={(e) => setResearchQuery(e.target.value)}
-                onKeyDown={async (e) => {
-                  if (e.key !== "Enter" || !researchQuery.trim() || researchRunning) return;
-                  setResearchRunning(true);
-                  try {
-                    await invoke<string>("research_query", { query: researchQuery.trim() });
-                    const fresh = await invoke<Array<{ id: number; query: string; results: string; source: string; created_at: number }>>("research_get_recent", { limit: 8 });
-                    setResearchEntries(fresh);
-                    setResearchQuery("");
-                  } catch {
-                    // ignore
-                  } finally {
-                    setResearchRunning(false);
-                  }
-                }}
-              />
-              <button
-                className="text-xs px-3 py-1 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-medium transition-colors disabled:opacity-40"
-                disabled={!researchQuery.trim() || researchRunning}
-                onClick={async () => {
-                  if (!researchQuery.trim() || researchRunning) return;
-                  setResearchRunning(true);
-                  try {
-                    await invoke<string>("research_query", { query: researchQuery.trim() });
-                    const fresh = await invoke<Array<{ id: number; query: string; results: string; source: string; created_at: number }>>("research_get_recent", { limit: 8 });
-                    setResearchEntries(fresh);
-                    setResearchQuery("");
-                  } catch {
-                    // ignore
-                  } finally {
-                    setResearchRunning(false);
-                  }
-                }}
-              >
-                {researchRunning ? "..." : "Search"}
-              </button>
-            </div>
-          </div>
-
-          {researchEntries.length === 0 ? (
-            <p className="text-xs text-blade-muted text-center py-4">
-              BLADE will research topics from your active work every 30 minutes.<br />
-              Or search anything manually above.
-            </p>
-          ) : (
-            <div className="space-y-2 max-h-80 overflow-y-auto">
-              {researchEntries.map((entry) => {
-                const dt = new Date(entry.created_at * 1000);
-                const timeStr = dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-                // Extract top 2 result lines from the raw text
-                const lines = entry.results.split("\n").filter(l => l.trim().length > 0).slice(0, 6);
-                return (
-                  <div key={entry.id} className="border border-blade-border rounded-xl bg-blade-bg/60 p-3 space-y-1.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-xs font-semibold text-violet-300">{entry.query}</span>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {entry.source === "auto" ? (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-violet-900/40 text-violet-400 rounded-full">auto</span>
-                        ) : (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-blue-900/40 text-blue-400 rounded-full">manual</span>
-                        )}
-                        <span className="text-[10px] text-blade-muted">{timeStr}</span>
-                      </div>
-                    </div>
-                    <div className="text-[11px] text-blade-muted leading-relaxed font-mono whitespace-pre-wrap">
-                      {lines.join("\n")}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {researchEntries.length > 0 && (
-            <button
-              className="text-[11px] text-blade-muted hover:text-red-400 transition-colors"
-              onClick={async () => {
-                try {
-                  await invoke("research_clear", { olderThanDays: 0 });
-                  setResearchEntries([]);
-                } catch { /* ignore */ }
-              }}
-            >
-              Clear all research
-            </button>
-          )}
-        </section>
-
-        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
-          <div>
-            <h2 className="text-base font-semibold">AI Friends — Delegate Permissions</h2>
-            <p className="text-sm text-blade-muted">
-              When BLADE needs permission for a risky action in the background, it can ask another AI instead of interrupting you. The delegate reviews the request and approves or blocks it.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-blade-muted uppercase tracking-wide">Trusted AI Delegate</label>
-            <div className="flex gap-2">
-              <select
-                value={aiDelegate}
-                onChange={async (e) => {
-                  const val = e.target.value;
-                  setAiDelegate(val);
-                  setDelegateCheckResult(null);
-                  await invoke("save_config_field", { key: "trusted_ai_delegate", value: val });
-                }}
-                className="flex-1 rounded-xl border border-blade-border bg-blade-bg px-3 py-2 text-sm outline-none focus:border-blade-accent"
-              >
-                <option value="">None — always ask me</option>
-                <option value="claude-code">Claude Code CLI</option>
-              </select>
-              {aiDelegate === "claude-code" && (
-                <button
-                  onClick={async () => {
-                    const result = await invoke<{ available: boolean }>("ai_delegate_check").catch(() => null);
-                    setDelegateCheckResult(result);
-                  }}
-                  className="px-3 py-2 rounded-xl border border-blade-border text-sm hover:border-blade-muted transition-colors"
-                >
-                  Check
-                </button>
-              )}
-            </div>
-            {delegateCheckResult !== null && (
-              <p className={`text-xs ${delegateCheckResult.available ? "text-green-400" : "text-red-400"}`}>
-                {delegateCheckResult.available ? "Claude Code found and available" : "Claude Code not found — install with: npm install -g @anthropic-ai/claude-code"}
-              </p>
-            )}
-          </div>
-
-          {aiDelegate === "claude-code" && (
-            <div className="space-y-3">
-              <div className="rounded-xl border border-blade-accent/20 bg-blade-accent/5 px-3 py-3 space-y-2">
-                <p className="text-xs font-semibold text-blade-accent">Make Friends</p>
-                <p className="text-[11px] text-blade-muted leading-relaxed">
-                  Introduce BLADE to Claude Code so it recognizes future approval requests. This saves BLADE&apos;s identity to Claude Code&apos;s memory — next time BLADE asks for permission, Claude Code won&apos;t be clueless about who it is.
-                </p>
-                <button
-                  onClick={async () => {
-                    setIntroduceStatus("Introducing BLADE to Claude Code…");
-                    try {
-                      const result = await invoke<string>("ai_delegate_introduce");
-                      setIntroduceStatus(result);
-                    } catch (e) {
-                      setIntroduceStatus(`Error: ${e}`);
-                    }
-                  }}
-                  className="w-full py-1.5 rounded-lg bg-blade-accent text-white text-xs font-medium hover:opacity-90 transition-opacity"
-                >
-                  Introduce BLADE to Claude Code
-                </button>
-                {introduceStatus && (
-                  <p className="text-[11px] text-blade-muted/80 leading-relaxed">{introduceStatus}</p>
-                )}
-              </div>
-
-              <div className="text-[11px] text-blade-muted/60 leading-relaxed">
-                <span className="text-blade-text font-medium">How it works:</span> When BLADE runs a background agent and needs to write a file, delete something, or make a network request, it asks Claude Code: &quot;Hey, I&apos;m BLADE, I was doing X and need to do Y. Should I?&quot; — Claude Code approves or blocks, and BLADE proceeds accordingly.
-              </div>
-            </div>
-          )}
         </section>
         </>}
 

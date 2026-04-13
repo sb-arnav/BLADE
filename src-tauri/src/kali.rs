@@ -445,21 +445,14 @@ async fn llm_call(system: &str, user: &str) -> Result<String, String> {
     let base_url = cfg.base_url.as_deref();
 
     // Pick cheapest fast model per provider
-    let model: &str = match provider {
-        "anthropic" => "claude-haiku-4-5-20251001",
-        "openai" => "gpt-4o-mini",
-        "gemini" => "gemini-2.0-flash",
-        "groq" => "llama3-8b-8192",
-        "openrouter" => "anthropic/claude-haiku-4-5-20251001",
-        _ => &cfg.model,
-    };
+    let model = crate::config::cheap_model_for_provider(provider, &cfg.model);
 
     let messages = vec![
         ConversationMessage::System(system.to_string()),
         ConversationMessage::User(user.to_string()),
     ];
 
-    let turn = complete_turn(provider, api_key, model, &messages, &[], base_url).await?;
+    let turn = complete_turn(provider, api_key, &model, &messages, &[], base_url).await?;
     Ok(turn.content)
 }
 

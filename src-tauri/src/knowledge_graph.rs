@@ -149,14 +149,7 @@ fn row_to_edge(row: &rusqlite::Row) -> rusqlite::Result<KnowledgeEdge> {
 // ─── LLM helpers ──────────────────────────────────────────────────────────────
 
 fn cheap_model_for(provider: &str) -> String {
-    match provider {
-        "anthropic" => "claude-haiku-4-5".to_string(),
-        "openai" => "gpt-4o-mini".to_string(),
-        "gemini" => "gemini-2.0-flash".to_string(),
-        "groq" => "llama-3.1-8b-instant".to_string(),
-        "openrouter" => "google/gemini-2.0-flash".to_string(),
-        _ => "llama3".to_string(),
-    }
+    crate::config::cheap_model_for_provider(provider, "")
 }
 
 async fn llm_complete(prompt: &str) -> Result<String, String> {

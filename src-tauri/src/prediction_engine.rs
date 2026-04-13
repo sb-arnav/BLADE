@@ -90,14 +90,8 @@ fn strip_json_fences(s: &str) -> &str {
     s
 }
 
-fn cheap_model(provider: &str) -> &'static str {
-    match provider {
-        "anthropic" => "claude-haiku-4-5-20251001",
-        "openai" => "gpt-4o-mini",
-        "gemini" => "gemini-2.0-flash",
-        "groq" => "llama-3.1-8b-instant",
-        _ => "gemini-2.0-flash",
-    }
+fn cheap_model(provider: &str) -> String {
+    crate::config::cheap_model_for_provider(provider, "")
 }
 
 async fn llm_call(system: &str, user_msg: &str) -> Result<String, String> {
@@ -117,7 +111,7 @@ async fn llm_call(system: &str, user_msg: &str) -> Result<String, String> {
     let turn = complete_turn(
         &provider,
         &api_key,
-        model,
+        &model,
         &messages,
         &[],
         base_url.as_deref(),
