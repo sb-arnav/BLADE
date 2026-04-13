@@ -420,6 +420,19 @@ pub async fn send_message_stream(
                     let _ = app2.emit("brain_grew", serde_json::json!({ "new_entities": n }));
                 }
             });
+            // PREDICTION ENGINE: fire-and-forget contextual prediction (streaming path)
+            let pred_msg = last_user_text.clone();
+            tokio::spawn(async move {
+                let _ = crate::prediction_engine::contextual_prediction(&pred_msg).await;
+            });
+            // EMOTIONAL INTELLIGENCE: detect emotion from user message (streaming path)
+            {
+                let emotion_msg = last_user_text.clone();
+                let emotion_app = app.clone();
+                tokio::spawn(async move {
+                    crate::emotional_intelligence::process_message_emotion(&emotion_msg, emotion_app).await;
+                });
+            }
         } else {
             let _ = app.emit("blade_status", "error");
         }
@@ -702,6 +715,22 @@ pub async fn send_message_stream(
                     let content = crate::safe_slice(&assistant_text_timeline, 500);
                     let _ = crate::db::timeline_record(&conn, "conversation", title, content, "BLADE", "{}");
                 }
+            }
+
+            // PREDICTION ENGINE: fire-and-forget contextual prediction after each message
+            {
+                let pred_ctx = user_text_thread.clone();
+                tokio::spawn(async move {
+                    let _ = crate::prediction_engine::contextual_prediction(&pred_ctx).await;
+                });
+            }
+            // EMOTIONAL INTELLIGENCE: detect emotion from user message (tool loop path)
+            {
+                let emotion_msg = user_text_thread.clone();
+                let emotion_app = app.clone();
+                tokio::spawn(async move {
+                    crate::emotional_intelligence::process_message_emotion(&emotion_msg, emotion_app).await;
+                });
             }
 
             return Ok(());

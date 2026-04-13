@@ -97,6 +97,8 @@ mod document_intelligence;
 mod meeting_intelligence;
 mod habit_engine;
 mod knowledge_graph;
+mod emotional_intelligence;
+mod prediction_engine;
 
 use chrono::Timelike;
 use std::sync::Arc;
@@ -891,6 +893,19 @@ pub fn run() {
             knowledge_graph::graph_answer,
             knowledge_graph::graph_get_stats,
             knowledge_graph::graph_delete_node,
+            // Prediction Engine — anticipatory intelligence, pattern-based foresight
+            prediction_engine::prediction_get_pending,
+            prediction_engine::prediction_accept,
+            prediction_engine::prediction_dismiss,
+            prediction_engine::prediction_generate_now,
+            prediction_engine::prediction_contextual,
+            prediction_engine::prediction_get_patterns,
+            // Emotional Intelligence — adaptive empathy engine
+            emotional_intelligence::emotion_get_current,
+            emotional_intelligence::emotion_get_trend,
+            emotional_intelligence::emotion_get_readings,
+            emotional_intelligence::emotion_analyze_patterns,
+            emotional_intelligence::emotion_get_context,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
@@ -1059,6 +1074,9 @@ pub fn run() {
 
             // Proactive engine — monitors signals and acts before being asked
             proactive_engine::start_proactive_engine(app.handle().clone());
+
+            // Prediction engine — learns patterns and anticipates what you'll need
+            prediction_engine::start_prediction_loop(app.handle().clone());
 
             // Workflow Builder scheduler — checks every 60s for due scheduled workflows
             workflow_builder::start_workflow_scheduler(app.handle().clone());
