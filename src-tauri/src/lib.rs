@@ -94,6 +94,9 @@ mod reasoning_engine;
 mod social_graph;
 mod health_tracker;
 mod document_intelligence;
+mod meeting_intelligence;
+mod habit_engine;
+mod knowledge_graph;
 
 use chrono::Timelike;
 use std::sync::Arc;
@@ -857,6 +860,37 @@ pub fn run() {
             document_intelligence::doc_answer_question,
             document_intelligence::doc_cross_synthesis,
             document_intelligence::doc_generate_study_notes,
+            // Habit Engine — streak tracking, friction analysis, smart reminders
+            habit_engine::habit_create,
+            habit_engine::habit_list,
+            habit_engine::habit_get,
+            habit_engine::habit_complete,
+            habit_engine::habit_skip,
+            habit_engine::habit_get_logs,
+            habit_engine::habit_get_today,
+            habit_engine::habit_insights,
+            habit_engine::habit_suggest_design,
+            habit_engine::habit_get_context,
+            // Meeting Intelligence — capture, extract, and track meetings
+            meeting_intelligence::meeting_process,
+            meeting_intelligence::meeting_get,
+            meeting_intelligence::meeting_list,
+            meeting_intelligence::meeting_search,
+            meeting_intelligence::meeting_delete,
+            meeting_intelligence::meeting_get_action_items,
+            meeting_intelligence::meeting_complete_action,
+            meeting_intelligence::meeting_follow_up_email,
+            meeting_intelligence::meeting_compare,
+            meeting_intelligence::meeting_recurring_themes,
+            // Knowledge Graph — semantic concept network across all BLADE knowledge
+            knowledge_graph::graph_add_node,
+            knowledge_graph::graph_search_nodes,
+            knowledge_graph::graph_traverse,
+            knowledge_graph::graph_find_path,
+            knowledge_graph::graph_extract_from_text,
+            knowledge_graph::graph_answer,
+            knowledge_graph::graph_get_stats,
+            knowledge_graph::graph_delete_node,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
@@ -1016,6 +1050,9 @@ pub fn run() {
 
             // Health Tracker — wellbeing nudges every 2 hours
             health_tracker::start_health_nudge_loop(app.handle().clone());
+
+            // Habit Engine — checks every 15 min for due habits and fires reminders
+            habit_engine::start_habit_reminder_loop(app.handle().clone());
 
             // Sidecar monitor — ping registered devices every 5 minutes
             sidecar::start_sidecar_monitor(app.handle().clone());

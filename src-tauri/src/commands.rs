@@ -687,6 +687,9 @@ pub async fn send_message_stream(
                 );
                 // Memory palace auto-consolidation — crystallise substantive exchanges
                 crate::memory_palace::auto_consolidate_from_conversation(&user_text, &assistant_text).await;
+                // Knowledge graph — extract concepts and grow the semantic network
+                let full_exchange = format!("User: {}\n\nAssistant: {}", user_text, assistant_text);
+                crate::knowledge_graph::grow_graph_from_conversation(&full_exchange).await;
             });
             // THREAD: auto-update working memory (spawns its own background task)
             crate::thread::auto_update_thread(app.clone(), user_text_thread.clone(), assistant_text_thread);
