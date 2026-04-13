@@ -1,3 +1,4 @@
+mod accountability;
 mod agent_commands;
 mod autoskills;
 mod git_style;
@@ -32,8 +33,12 @@ mod goal_engine;
 mod learning_engine;
 mod self_critique;
 mod tool_forge;
+mod sidecar;
+mod proactive_engine;
 mod native_tools;
 mod causal_graph;
+mod memory_palace;
+mod authority_engine;
 mod kali;
 mod agents;
 mod automation;
@@ -705,11 +710,49 @@ pub fn run() {
             causal_graph::causal_analyze,
             causal_graph::causal_record_event,
             causal_graph::causal_run_full_analysis,
+            // Memory Palace — episodic long-term memory
+            memory_palace::memory_search,
+            memory_palace::memory_get_recent,
+            memory_palace::memory_recall,
+            memory_palace::memory_add_manual,
+            memory_palace::memory_delete,
+            memory_palace::memory_consolidate_now,
             // Tool Forge — self-expanding capability engine
             tool_forge::forge_new_tool,
             tool_forge::forge_list_tools,
             tool_forge::forge_delete_tool,
             tool_forge::forge_test_tool,
+            // Authority Engine — 9 specialist agents with auditable delegation
+            authority_engine::authority_get_agents,
+            authority_engine::authority_get_audit_log,
+            authority_engine::authority_get_delegations,
+            authority_engine::authority_delegate,
+            authority_engine::authority_route_and_run,
+            authority_engine::authority_run_chain,
+            // Sidecar — cross-device coordination
+            sidecar::sidecar_list_devices,
+            sidecar::sidecar_register_device,
+            sidecar::sidecar_remove_device,
+            sidecar::sidecar_ping_device,
+            sidecar::sidecar_run_command,
+            sidecar::sidecar_run_all,
+            sidecar::sidecar_start_server,
+            // Accountability — objectives, key results, daily actions, nudges
+            accountability::accountability_get_objectives,
+            accountability::accountability_create_objective,
+            accountability::accountability_update_kr,
+            accountability::accountability_daily_plan,
+            accountability::accountability_complete_action,
+            accountability::accountability_checkin,
+            accountability::accountability_progress_report,
+            accountability::accountability_get_daily_actions,
+            // Proactive Engine — autonomous initiative layer
+            proactive_engine::proactive_get_pending,
+            proactive_engine::proactive_accept,
+            proactive_engine::proactive_dismiss,
+            proactive_engine::proactive_get_rules,
+            proactive_engine::proactive_toggle_rule,
+            proactive_engine::proactive_trigger_check,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
@@ -863,6 +906,15 @@ pub fn run() {
 
             // Dream mode — background consolidation when user is away
             dream_mode::start_dream_monitor(app.handle().clone());
+
+            // Accountability loop — nudges every 6 hours if check-ins are overdue or KRs are behind
+            accountability::start_accountability_loop(app.handle().clone());
+
+            // Sidecar monitor — ping registered devices every 5 minutes
+            sidecar::start_sidecar_monitor(app.handle().clone());
+
+            // Proactive engine — monitors signals and acts before being asked
+            proactive_engine::start_proactive_engine(app.handle().clone());
 
             // Register shortcuts from config (or defaults)
             register_all_shortcuts(app.handle());

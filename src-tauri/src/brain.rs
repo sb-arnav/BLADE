@@ -380,10 +380,22 @@ fn build_system_prompt_inner(
         parts.push(causal_ctx);
     }
 
+    // Memory palace — relevant past experiences (episodic memory)
+    let memory_ctx = crate::memory_palace::get_memory_context(user_query);
+    if !memory_ctx.is_empty() {
+        parts.push(memory_ctx);
+    }
+
     // World model — inject current machine state (git, processes, ports, TODOs, system load)
     let world_summary = crate::world_model::get_world_summary();
     if !world_summary.is_empty() {
         parts.push(world_summary);
+    }
+
+    // Accountability context — active objectives and today's focus
+    let accountability_ctx = crate::accountability::get_accountability_context();
+    if !accountability_ctx.is_empty() {
+        parts.push(accountability_ctx);
     }
 
     // Forged tools — inject custom tools BLADE has built at runtime

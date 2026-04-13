@@ -675,6 +675,8 @@ pub async fn send_message_stream(
                     crate::safe_slice(&user_text, 200),
                     serde_json::json!({"response_len": assistant_text.len()}),
                 );
+                // Memory palace auto-consolidation — crystallise substantive exchanges
+                crate::memory_palace::auto_consolidate_from_conversation(&user_text, &assistant_text).await;
             });
             // THREAD: auto-update working memory (spawns its own background task)
             crate::thread::auto_update_thread(app.clone(), user_text_thread.clone(), assistant_text_thread);
