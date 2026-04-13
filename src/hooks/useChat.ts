@@ -19,6 +19,7 @@ export function useChat() {
   const [lastResponseTime, setLastResponseTime] = useState<number | null>(null);
   const [thinkingText, setThinkingText] = useState<string | null>(null);
   const streamBuffer = useRef("");
+  const streamRequestId = useRef<string>("");
   const requestStartRef = useRef<number>(0);
   const messagesRef = useRef<Message[]>([]);
   const bootstrappedRef = useRef(false);
@@ -92,7 +93,11 @@ export function useChat() {
 
     const unlistenToken = listen<string>("chat_token", (event) => {
       if (!active) return;
+      // Guard: if a new request started while tokens from the old one are still
+      // arriving, discard them so the new buffer isn't corrupted.
+      const myRequestId = streamRequestId.current;
       streamBuffer.current += event.payload;
+      if (streamRequestId.current !== myRequestId) return;
       const content = streamBuffer.current;
       setMessages((prev) => {
         const last = prev[prev.length - 1];
@@ -110,6 +115,7 @@ export function useChat() {
       if (!active) return;
       const assembledBuffer = streamBuffer.current;
       streamBuffer.current = "";
+      streamRequestId.current = "";
       if (requestStartRef.current > 0) {
         setLastResponseTime(Date.now() - requestStartRef.current);
         requestStartRef.current = 0;
@@ -265,6 +271,7 @@ export function useChat() {
       const nextMessages = [...messagesRef.current, userMsg, assistantMsg];
 
       streamBuffer.current = "";
+      streamRequestId.current = crypto.randomUUID();
       requestStartRef.current = Date.now();
       setLastResponseTime(null);
       setMessages(nextMessages);

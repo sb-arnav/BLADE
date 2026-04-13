@@ -120,6 +120,7 @@ async fn compress_conversation_smart(
         "openai" => "gpt-4o-mini",
         "gemini" => "gemini-2.0-flash",
         "groq" => "llama-3.1-8b-instant",
+        "openrouter" => "anthropic/claude-haiku-4.5",
         _ => model,
     };
 
