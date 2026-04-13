@@ -498,7 +498,7 @@ fn save_suggestion(suggestion: &EvolutionSuggestion) -> Result<(), String> {
 /// Returns Ok(tool_count) on success.
 async fn auto_install_mcp(entry: &CatalogEntry) -> Result<usize, String> {
     // Check node/npx is available
-    let npx_check = std::process::Command::new("npx")
+    let npx_check = crate::cmd_util::silent_cmd("npx")
         .arg("--version")
         .output();
     if npx_check.is_err() {

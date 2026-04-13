@@ -1,6 +1,22 @@
 use super::{AssistantTurn, ConversationMessage, ToolCall, ToolDefinition};
 use reqwest::Client;
 
+/// Resolve a base_url (e.g. "https://openrouter.ai/api/v1") to a full
+/// chat completions endpoint, or fall back to the OpenAI default.
+fn chat_url(base_url: Option<&str>) -> String {
+    match base_url {
+        Some(base) => {
+            let base = base.trim_end_matches('/');
+            if base.ends_with("/chat/completions") {
+                base.to_string()
+            } else {
+                format!("{}/chat/completions", base)
+            }
+        }
+        None => "https://api.openai.com/v1/chat/completions".to_string(),
+    }
+}
+
 fn build_body(
     model: &str,
     messages: &[ConversationMessage],
@@ -123,7 +139,7 @@ pub async fn complete(
 ) -> Result<AssistantTurn, String> {
     let client = Client::new();
     let body = build_body(model, messages, tools);
-    let url = base_url.unwrap_or("https://api.openai.com/v1/chat/completions");
+    let url = chat_url(base_url);
 
     let response = client
         .post(url)
@@ -196,7 +212,7 @@ pub async fn stream_text(
 
     let client = Client::new();
     let msgs: Vec<serde_json::Value> = messages.iter().filter_map(serialize_simple).collect();
-    let url = base_url.unwrap_or("https://api.openai.com/v1/chat/completions");
+    let url = chat_url(base_url);
 
     let body = serde_json::json!({
         "model": model,
@@ -262,7 +278,7 @@ pub async fn stream_text(
 
 pub async fn test(api_key: &str, model: &str, base_url: Option<&str>) -> Result<String, String> {
     let client = Client::new();
-    let url = base_url.unwrap_or("https://api.openai.com/v1/chat/completions");
+    let url = chat_url(base_url);
     let body = serde_json::json!({
         "model": model,
         "messages": [{"role": "user", "content": "Say hi in one word."}],

@@ -447,7 +447,7 @@ pub fn get_pentest_safe_provider() -> (String, String, String) {
     let config = crate::config::load_config();
 
     // Prefer Ollama (local, zero risk)
-    if let Ok(out) = std::process::Command::new("ollama").arg("list").output() {
+    if let Ok(out) = crate::cmd_util::silent_cmd("ollama").arg("list").output() {
         if out.status.success() {
             let listing = String::from_utf8_lossy(&out.stdout);
             // Find a capable model

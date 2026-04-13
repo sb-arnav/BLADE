@@ -363,7 +363,7 @@ fn executable_names(name: &str) -> Vec<OsString> {
 }
 
 fn version_from_command(binary: &str, args: &[&str]) -> Option<String> {
-    std::process::Command::new(binary)
+    crate::cmd_util::silent_cmd(binary)
         .args(args)
         .output()
         .ok()
@@ -381,7 +381,7 @@ fn version_from_command(binary: &str, args: &[&str]) -> Option<String> {
 }
 
 fn command_succeeds(binary: &str, args: &[&str]) -> bool {
-    std::process::Command::new(binary)
+    crate::cmd_util::silent_cmd(binary)
         .args(args)
         .output()
         .map(|output| output.status.success())
@@ -533,7 +533,7 @@ fn ollama_installed() -> bool {
 }
 
 fn list_ollama_models() -> Vec<String> {
-    let output = std::process::Command::new("ollama").arg("list").output();
+    let output = crate::cmd_util::silent_cmd("ollama").arg("list").output();
     let Ok(output) = output else {
         return Vec::new();
     };
@@ -727,7 +727,7 @@ fn list_open_interpreter_sessions(limit: usize) -> Vec<RuntimeSessionRef> {
 
 fn list_opencode_sessions(limit: usize) -> Vec<RuntimeSessionRef> {
     if let Some(binary) = opencode_binary_path() {
-        if let Ok(output) = std::process::Command::new(&binary)
+        if let Ok(output) = crate::cmd_util::silent_cmd(&binary)
             .arg("session")
             .arg("list")
             .arg("--format")
