@@ -148,11 +148,18 @@ export function useChat() {
       }
     });
 
-    const unlistenToolExecuting = listen<{ name: string; arguments?: string; risk: string }>("tool_executing", (event) => {
+    const unlistenToolExecuting = listen<{ name: string; arguments?: unknown; risk: string }>("tool_executing", (event) => {
+      // arguments arrives as a JSON Value (object) from Rust, not a string — normalize it
+      const rawArgs = event.payload.arguments;
+      const argsStr = rawArgs == null
+        ? undefined
+        : typeof rawArgs === "string"
+          ? rawArgs
+          : JSON.stringify(rawArgs);
       const execution: ToolExecution = {
         id: crypto.randomUUID(),
         tool_name: event.payload.name,
-        arguments: event.payload.arguments,
+        arguments: argsStr,
         risk: (event.payload.risk as ToolExecution["risk"]) ?? "Ask",
         status: "executing",
         started_at: Date.now(),
@@ -170,8 +177,14 @@ export function useChat() {
       );
     });
 
-    const unlistenApproval = listen<ToolApprovalRequest>("tool_approval_needed", (event) => {
-      setPendingApproval(event.payload);
+    const unlistenApproval = listen<Omit<ToolApprovalRequest, "arguments"> & { arguments: unknown }>("tool_approval_needed", (event) => {
+      const rawArgs = event.payload.arguments;
+      const argsStr = rawArgs == null
+        ? "{}"
+        : typeof rawArgs === "string"
+          ? rawArgs
+          : JSON.stringify(rawArgs);
+      setPendingApproval({ ...event.payload, arguments: argsStr });
     });
 
     // Extended thinking events from Anthropic
