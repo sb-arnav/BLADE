@@ -294,29 +294,37 @@ pub async fn stream_text(
     let mut stream = response.bytes_stream();
     let mut buffer = String::new();
 
-    while let Some(chunk) = stream.next().await {
-        let bytes = chunk.map_err(|e| format!("Stream error: {}", e))?;
-        buffer.push_str(&String::from_utf8_lossy(&bytes));
+    let result: Result<(), String> = async {
+        while let Some(chunk) = stream.next().await {
+            let bytes = chunk.map_err(|e| format!("Stream error: {}", e))?;
+            buffer.push_str(&String::from_utf8_lossy(&bytes));
 
-        while let Some(pos) = buffer.find('\n') {
-            let line = buffer[..pos].to_string();
-            buffer = buffer[pos + 1..].to_string();
+            while let Some(pos) = buffer.find('\n') {
+                let line = buffer[..pos].to_string();
+                buffer = buffer[pos + 1..].to_string();
 
-            if let Some(data) = line.strip_prefix("data: ") {
-                if data.trim() == "[DONE]" {
-                    break;
-                }
-                if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
-                    if let Some(text) = json["choices"][0]["delta"]["content"].as_str() {
-                        let _ = app.emit("chat_token", text);
+                if let Some(data) = line.strip_prefix("data: ") {
+                    if data.trim() == "[DONE]" {
+                        break;
+                    }
+                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
+                        if let Some(err) = json.get("error") {
+                            let msg = err["message"].as_str().unwrap_or("Unknown stream error");
+                            return Err(format!("Groq stream error: {}", msg));
+                        }
+                        if let Some(text) = json["choices"][0]["delta"]["content"].as_str() {
+                            let _ = app.emit("chat_token", text);
+                        }
                     }
                 }
             }
         }
-    }
+        Ok(())
+    }.await;
 
+    // Always emit chat_done so the frontend never gets stuck in loading state
     let _ = app.emit("chat_done", ());
-    Ok(())
+    result
 }
 
 pub async fn test(api_key: &str, model: &str) -> Result<String, String> {

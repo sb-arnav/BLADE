@@ -1,7 +1,7 @@
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    App, Manager,
+    App,
 };
 
 pub const TRAY_ID: &str = "blade_main";

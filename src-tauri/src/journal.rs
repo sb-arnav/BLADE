@@ -157,7 +157,7 @@ Start with "Day {date}." then the entry. No preamble. No headers."#,
             let _ = std::fs::write(&path, &entry);
 
             // Prune old journal entries beyond JOURNAL_MAX_ENTRIES
-            if let Ok(mut entries) = std::fs::read_dir(&journal_dir()) {
+            if let Ok(entries) = std::fs::read_dir(&journal_dir()) {
                 let mut names: Vec<_> = entries.flatten()
                     .filter_map(|e| {
                         let name = e.file_name().to_string_lossy().to_string();

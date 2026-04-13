@@ -36,7 +36,7 @@ pub async fn decompose_goal_to_dag(
     swarm_id: &str,
     goal: &str,
 ) -> Result<Vec<SwarmTask>, String> {
-    use crate::providers::{ChatMessage, ConversationMessage, build_conversation, complete_turn};
+    use crate::providers::{ChatMessage, build_conversation, complete_turn};
 
     let prompt = DECOMPOSE_PROMPT.replace("{GOAL}", goal);
 

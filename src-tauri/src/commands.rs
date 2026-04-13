@@ -208,7 +208,7 @@ fn safe_fallback_model(provider: &str) -> &'static str {
         "openai"      => "gpt-4o-mini",
         "gemini"      => "gemini-2.0-flash",
         "groq"        => "llama-3.3-70b-versatile",
-        "openrouter"  => "anthropic/claude-haiku-4-5",
+        "openrouter"  => "anthropic/claude-haiku-4.5",
         _             => "gpt-4o-mini", // OpenAI-compat default
     }
 }

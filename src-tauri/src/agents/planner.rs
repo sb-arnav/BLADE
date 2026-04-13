@@ -1,6 +1,6 @@
 use super::{AgentStep, StepStatus};
 use crate::mcp::McpTool;
-use crate::providers::{self, ChatMessage, ConversationMessage};
+use crate::providers::{self, ChatMessage};
 
 /// Ask the AI to break a goal into executable steps
 pub async fn plan_steps(
