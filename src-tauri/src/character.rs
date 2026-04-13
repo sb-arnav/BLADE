@@ -142,7 +142,8 @@ Each field is a string with bullet points. Keep each section under 10 bullet poi
         &[],
         config.base_url.as_deref(),
     )
-    .await?;
+    .await
+    .map_err(|e| { crate::config::check_and_disable_on_402(&e); e })?;
 
     // Parse response — handle markdown code fences and trailing prose
     let content = turn.content.trim();
@@ -214,7 +215,8 @@ Respond ONLY with a JSON array of objects:
         &[],
         config.base_url.as_deref(),
     )
-    .await?;
+    .await
+    .map_err(|e| { crate::config::check_and_disable_on_402(&e); e })?;
 
     let raw = turn.content.trim();
     // Strip markdown code fences if present
@@ -274,7 +276,8 @@ Be concrete, not vague. Output ONLY the rule, nothing else."#
         &[],
         config.base_url.as_deref(),
     )
-    .await?;
+    .await
+    .map_err(|e| { crate::config::check_and_disable_on_402(&e); e })?;
 
     let rule = turn.content.trim().to_string();
 
@@ -424,7 +427,7 @@ Don't start with "I am BLADE" — that's obvious. Start with what you've noticed
     let messages = vec![ConversationMessage::User(prompt)];
     let model = crate::config::cheap_model_for_provider(&config.provider, &config.model);
 
-    if let Ok(turn) = providers::complete_turn(
+    match providers::complete_turn(
         &config.provider,
         &config.api_key,
         &model,
@@ -432,11 +435,14 @@ Don't start with "I am BLADE" — that's obvious. Start with what you've noticed
         &[],
         config.base_url.as_deref(),
     ).await {
-        let soul = turn.content.trim().to_string();
-        if soul.len() > 100 {
-            let _ = fs::write(soul_path(), &soul);
-            let _ = fs::write(&marker, &today);
+        Ok(turn) => {
+            let soul = turn.content.trim().to_string();
+            if soul.len() > 100 {
+                let _ = fs::write(soul_path(), &soul);
+                let _ = fs::write(&marker, &today);
+            }
         }
+        Err(e) => { crate::config::check_and_disable_on_402(&e); }
     }
 }
 

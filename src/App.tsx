@@ -473,7 +473,7 @@ export default function App() {
           type: "info",
           title: `New capability: ${name}`,
           message: `Detected via ${trigger_app} — ${description}`,
-          action: { label: "Connect", callback: () => { /* open settings → evolution */ } },
+          action: { label: "View", callback: () => openRoute("dashboard") },
         });
       }
     );
@@ -498,6 +498,11 @@ export default function App() {
         title: `Need credentials: ${event.payload.name}`,
         message: event.payload.message,
       });
+    });
+
+    // Background AI auto-disabled on 402 (out of credits)
+    const unlistenBgAiDisabled = listen<{ message: string }>("background_ai_auto_disabled", (event) => {
+      notifications.add({ type: "warning", title: "Background AI disabled", message: event.payload.message });
     });
 
     // Provider fallback notification — emitted when BLADE auto-switches to fallback provider
@@ -601,6 +606,7 @@ export default function App() {
       unlistenWakeWord.then((fn) => fn());
       unlistenAutoskillInstalled.then((fn) => fn());
       unlistenAutoskillSuggestion.then((fn) => fn());
+      unlistenBgAiDisabled.then((fn) => fn());
       unlistenFallback.then((fn) => fn());
       unlistenMonitorOff.then((fn) => fn());
       unlistenSelfCode.then((fn) => fn());

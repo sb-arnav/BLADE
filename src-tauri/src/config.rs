@@ -586,6 +586,21 @@ pub fn toggle_background_ai(enabled: bool) -> Result<(), String> {
     save_config(&config)
 }
 
+/// If an LLM error indicates 402 (out of credits), auto-disable background_ai_enabled
+/// to prevent further wasted calls. Returns true if background AI was just disabled.
+pub fn check_and_disable_on_402(err_msg: &str) -> bool {
+    if err_msg.contains("Out of credits") {
+        let mut config = load_config();
+        if config.background_ai_enabled {
+            config.background_ai_enabled = false;
+            let _ = save_config(&config);
+            log::warn!("402 credits exhausted — auto-disabled background AI");
+            return true;
+        }
+    }
+    false
+}
+
 pub fn update_window_state(window_state: WindowState) -> Result<(), String> {
     // Don't save minimized/off-screen sentinel positions (Windows uses -32000)
     if window_state.x < -10000 || window_state.y < -10000 {

@@ -42,6 +42,7 @@ interface BladeConfig {
   god_mode: boolean;
   wake_word_enabled: boolean;
   screen_timeline_enabled: boolean;
+  background_ai_enabled: boolean;
   provider: string;
   model: string;
 }
@@ -116,23 +117,16 @@ function PixelStatus({
   active,
   label,
   color = palette.green,
+  onClick,
 }: {
   active: boolean;
   label: string;
   color?: string;
+  onClick?: () => void;
 }) {
   const inactiveColor = "rgba(0, 255, 65, 0.18)";
-
-  return (
-    <div
-      className="flex min-h-[2.25rem] items-center gap-2 border px-2 py-1 uppercase tracking-[0.22em]"
-      style={{
-        borderColor: active ? color : palette.line,
-        backgroundColor: active ? `${color}12` : "rgba(0,0,0,0.18)",
-        boxShadow: active ? `inset 0 0 0 1px ${color}33, 0 0 12px ${color}22` : "none",
-        color: active ? color : palette.muted,
-      }}
-    >
+  const inner = (
+    <>
       <div className="grid grid-cols-2 gap-[2px] shrink-0">
         {Array.from({ length: 4 }).map((_, i) => (
           <span
@@ -148,6 +142,36 @@ function PixelStatus({
         ))}
       </div>
       <span className="text-[10px] font-bold">{label}</span>
+    </>
+  );
+
+  const sharedStyle = {
+    borderColor: active ? color : palette.line,
+    backgroundColor: active ? `${color}12` : "rgba(0,0,0,0.18)",
+    boxShadow: active ? `inset 0 0 0 1px ${color}33, 0 0 12px ${color}22` : "none",
+    color: active ? color : palette.muted,
+  };
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex min-h-[2.25rem] w-full items-center gap-2 border px-2 py-1 uppercase tracking-[0.22em] transition-all hover:brightness-125"
+        style={{ ...sharedStyle, cursor: "pointer" }}
+        title={`Click to toggle ${label}`}
+      >
+        {inner}
+      </button>
+    );
+  }
+
+  return (
+    <div
+      className="flex min-h-[2.25rem] items-center gap-2 border px-2 py-1 uppercase tracking-[0.22em]"
+      style={sharedStyle}
+    >
+      {inner}
     </div>
   );
 }
@@ -424,6 +448,16 @@ export function Dashboard({ onBack, onNavigate }: Props) {
           </div>
         </div>
         <button
+          onClick={async () => {
+            try { await invoke("toggle_background_ai", { enabled: false }); load(); } catch { /* ignore */ }
+          }}
+          className="border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] transition-colors"
+          style={{ borderColor: palette.red, color: palette.red, backgroundColor: "rgba(255,0,64,0.08)" }}
+          title="Kill all background AI calls"
+        >
+          Kill BG AI
+        </button>
+        <button
           onClick={load}
           className="border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] transition-colors"
           style={{ borderColor: palette.line, color: palette.green }}
@@ -479,15 +513,38 @@ export function Dashboard({ onBack, onNavigate }: Props) {
                 </div>
 
                 <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                  <PixelStatus active={!!cfg?.god_mode} label="God Mode" color={palette.amber} />
+                  <PixelStatus
+                    active={!!cfg?.god_mode}
+                    label="God Mode"
+                    color={palette.amber}
+                    onClick={async () => {
+                      const next = !cfg?.god_mode;
+                      try { await invoke("toggle_god_mode", { enabled: next, tier: next ? "normal" : null }); load(); } catch { /* ignore */ }
+                    }}
+                  />
                   <PixelStatus active={data.wakeWordActive} label="Wake Word" />
-                  <PixelStatus active={!!cfg?.screen_timeline_enabled} label="Total Recall" />
+                  <PixelStatus
+                    active={!!cfg?.screen_timeline_enabled}
+                    label="Total Recall"
+                    onClick={async () => {
+                      const next = !cfg?.screen_timeline_enabled;
+                      try { await invoke("timeline_set_config", { enabled: next }); load(); } catch { /* ignore */ }
+                    }}
+                  />
                   <PixelStatus active={runningAgents.length > 0} label={`${runningAgents.length} Agents`} />
                   <PixelStatus active={enabledCrons.length > 0} label={`${enabledCrons.length} Crons`} />
                   <PixelStatus
-                    active={false}
+                    active={!!cfg?.background_ai_enabled}
+                    label="Background AI"
+                    onClick={async () => {
+                      const next = !cfg?.background_ai_enabled;
+                      try { await invoke("toggle_background_ai", { enabled: next }); load(); } catch { /* ignore */ }
+                    }}
+                  />
+                  <PixelStatus
+                    active={!!cfg?.provider}
                     label={cfg ? `${cfg.provider} / ${cfg.model.split("-").slice(0, 2).join("-")}` : "No Model"}
-                    color={palette.red}
+                    color={cfg?.provider ? palette.green : palette.red}
                   />
                 </div>
               </div>
