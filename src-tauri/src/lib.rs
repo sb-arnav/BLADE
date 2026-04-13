@@ -25,7 +25,10 @@ mod thread;
 mod tts;
 mod watcher;
 mod godmode;
+mod goal_engine;
+mod self_critique;
 mod native_tools;
+mod kali;
 mod agents;
 mod automation;
 mod brain;
@@ -654,6 +657,22 @@ pub fn run() {
             swarm_commands::swarm_cancel,
             swarm_commands::swarm_write_scratchpad,
             swarm_commands::swarm_read_scratchpad,
+            goal_engine::goal_add,
+            goal_engine::goal_list,
+            goal_engine::goal_complete,
+            goal_engine::goal_delete,
+            goal_engine::goal_update_priority,
+            goal_engine::goal_pursue_now,
+            self_critique::self_critique_response,
+            self_critique::self_critique_history,
+            self_critique::self_critique_deep_roast,
+            self_critique::self_critique_weekly_meta,
+            kali::kali_recon,
+            kali::kali_crack_hash,
+            kali::kali_analyze_ctf,
+            kali::kali_explain_exploit,
+            kali::kali_generate_payload,
+            kali::kali_check_tools,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
@@ -774,6 +793,9 @@ pub fn run() {
             // EVOLUTION ENGINE — BLADE's self-improvement loop.
             // Watches what you use and progressively wires BLADE into your stack.
             evolution::start_evolution_loop(app.handle().clone());
+
+            // GOAL ENGINE — autonomous AGI goal pursuit. Goals never fail.
+            goal_engine::start_goal_engine(app.handle().clone());
 
             // Auto-start Telegram bot if a token was previously saved
             let tg_app = app.handle().clone();

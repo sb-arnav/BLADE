@@ -52,7 +52,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, EBState> {
   }
 }
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali";
 
 const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
 const Canvas = lazy(() => import("./components/Canvas"));
@@ -89,6 +89,8 @@ const SwarmView = lazy(() => import("./components/SwarmView").then((m) => ({ def
 const SoulView = lazy(() => import("./components/SoulView").then((m) => ({ default: m.SoulView })));
 const DashboardView = lazy(() => import("./components/Dashboard").then((m) => ({ default: m.Dashboard })));
 const SkillPackView = lazy(() => import("./components/SkillPackView").then((m) => ({ default: m.SkillPackView })));
+const GoalView = lazy(() => import("./components/GoalView").then((m) => ({ default: m.GoalView })));
+const KaliView = lazy(() => import("./components/KaliView").then((m) => ({ default: m.KaliView })));
 
 function ShellFallback({ label = "Loading workspace..." }: { label?: string }) {
   return (
@@ -924,6 +926,8 @@ export default function App() {
     "soul": <SoulView onBack={() => openRoute("chat")} />,
     "dashboard": <DashboardView onBack={() => openRoute("chat")} onNavigate={(r) => openRoute(r as Route)} />,
     "skill-packs": <SkillPackView onBack={() => openRoute("chat")} />,
+    "goals": <GoalView onBack={() => openRoute("chat")} />,
+    "kali": <KaliView onBack={() => openRoute("chat")} />,
   };
 
   if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {
