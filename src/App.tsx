@@ -52,7 +52,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, EBState> {
   }
 }
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar" | "workflow-builder" | "code-sandbox" | "persona";
 
 const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
 const Canvas = lazy(() => import("./components/Canvas"));
@@ -94,6 +94,9 @@ const KaliView = lazy(() => import("./components/KaliView").then((m) => ({ defau
 const AgentDashboard = lazy(() => import("./components/AgentDashboard").then(m => ({ default: m.AgentDashboard })));
 const AccountabilityView = lazy(() => import("./components/AccountabilityView").then(m => ({ default: m.AccountabilityView })));
 const SidecarView = lazy(() => import("./components/SidecarView").then(m => ({ default: m.SidecarView })));
+const WorkflowBuilderView = lazy(() => import("./components/WorkflowBuilderView").then(m => ({ default: m.WorkflowBuilderView })));
+const CodeSandboxView = lazy(() => import("./components/CodeSandboxView").then(m => ({ default: m.CodeSandboxView })));
+const PersonaView = lazy(() => import("./components/PersonaView").then(m => ({ default: m.PersonaView })));
 
 function ShellFallback({ label = "Loading workspace..." }: { label?: string }) {
   return (
@@ -934,6 +937,9 @@ export default function App() {
     "agents-authority": <AgentDashboard onBack={() => openRoute("chat")} />,
     "accountability": <AccountabilityView onBack={() => openRoute("chat")} />,
     "sidecar": <SidecarView onBack={() => openRoute("chat")} />,
+    "workflow-builder": <WorkflowBuilderView onBack={() => openRoute("chat")} />,
+    "code-sandbox": <CodeSandboxView onBack={() => openRoute("chat")} />,
+    "persona": <PersonaView onBack={() => openRoute("chat")} />,
   };
 
   if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {

@@ -36,6 +36,7 @@ mod tool_forge;
 mod sidecar;
 mod proactive_engine;
 mod native_tools;
+mod code_sandbox;
 mod causal_graph;
 mod memory_palace;
 mod authority_engine;
@@ -76,13 +77,16 @@ mod self_code;
 mod swarm_commands;
 mod wake_word;
 mod soul_commands;
+mod persona_engine;
 mod trace;
 mod tray;
 mod ui_automation;
 mod voice;
 mod voice_global;
+mod voice_intelligence;
 mod voice_local;
 mod world_model;
+mod workflow_builder;
 
 use chrono::Timelike;
 use std::sync::Arc;
@@ -428,6 +432,12 @@ pub fn run() {
             voice::voice_stop_recording,
             voice::voice_transcribe,
             voice::voice_transcribe_blob,
+            voice_intelligence::voice_intel_start_session,
+            voice_intelligence::voice_intel_end_session,
+            voice_intelligence::voice_intel_add_segment,
+            voice_intelligence::voice_intel_analyze_emotion,
+            voice_intelligence::voice_intel_get_context,
+            voice_intelligence::voice_intel_get_session,
             screen::capture_screen,
             screen::capture_screen_region,
             screen::get_monitors,
@@ -753,6 +763,28 @@ pub fn run() {
             proactive_engine::proactive_get_rules,
             proactive_engine::proactive_toggle_rule,
             proactive_engine::proactive_trigger_check,
+            // Persona Engine — soul deepening, personal trait learning
+            persona_engine::persona_get_traits,
+            persona_engine::persona_get_relationship,
+            persona_engine::persona_update_trait,
+            persona_engine::persona_get_context,
+            persona_engine::persona_analyze_now,
+            persona_engine::persona_record_outcome,
+            persona_engine::persona_analyze_now_weekly,
+            // Code Sandbox — safe multi-language code execution
+            code_sandbox::sandbox_run,
+            code_sandbox::sandbox_run_explain,
+            code_sandbox::sandbox_fix_and_run,
+            code_sandbox::sandbox_detect_language,
+            // Workflow Builder — visual n8n-style automation
+            workflow_builder::workflow_list,
+            workflow_builder::workflow_get,
+            workflow_builder::workflow_create,
+            workflow_builder::workflow_update,
+            workflow_builder::workflow_delete,
+            workflow_builder::workflow_run_now,
+            workflow_builder::workflow_get_runs,
+            workflow_builder::workflow_generate_from_description,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
@@ -915,6 +947,9 @@ pub fn run() {
 
             // Proactive engine — monitors signals and acts before being asked
             proactive_engine::start_proactive_engine(app.handle().clone());
+
+            // Workflow Builder scheduler — checks every 60s for due scheduled workflows
+            workflow_builder::start_workflow_scheduler(app.handle().clone());
 
             // Register shortcuts from config (or defaults)
             register_all_shortcuts(app.handle());
