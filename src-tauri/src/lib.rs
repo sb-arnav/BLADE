@@ -906,6 +906,8 @@ pub fn run() {
             emotional_intelligence::emotion_get_readings,
             emotional_intelligence::emotion_analyze_patterns,
             emotional_intelligence::emotion_get_context,
+            // Browser Native — embedded browser sessions
+            browser_native::browser_session_status,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state

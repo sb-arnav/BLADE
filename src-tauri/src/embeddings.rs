@@ -308,6 +308,14 @@ pub fn recall_relevant(store: &SharedVectorStore, query: &str, top_k: usize) -> 
         return String::new();
     }
 
+    // RRF scores: max possible ~0.033 (rank 0 in both vector + keyword).
+    // Filter below 0.012 — requires appearing in roughly top-50 of at least one list.
+    // This prevents low-signal noise from cluttering the context.
+    let results: Vec<_> = results.into_iter().filter(|r| r.score >= 0.012).collect();
+    if results.is_empty() {
+        return String::new();
+    }
+
     let formatted: Vec<String> = results
         .into_iter()
         .map(|r| format!("(relevance {:.0}%) {}", r.score * 100.0, r.text))

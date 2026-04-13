@@ -77,6 +77,67 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "blade_browser_open".to_string(),
+            description: "Open a URL in BLADE's managed browser (Chromium with persistent login sessions). Use this for: posting on X/Twitter, interacting with YouTube, Reddit, any website. Sessions persist — if the user has logged in before, they're still logged in. Prefer over blade_open_url when you need to READ or INTERACT with the page.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "URL to navigate to, e.g. https://x.com"}
+                },
+                "required": ["url"]
+            }),
+        },
+        ToolDefinition {
+            name: "blade_browser_read".to_string(),
+            description: "Read the current page in BLADE's managed browser: returns title, URL, and visible interactive elements (buttons, inputs, links). Call after blade_browser_open to see what's on screen.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        ToolDefinition {
+            name: "blade_browser_click".to_string(),
+            description: "Click an element in BLADE's managed browser by CSS selector. Use after blade_browser_read to identify the right selector. Examples: '#compose-button', 'button[data-testid=\"tweetButton\"]', 'a[href*=\"youtube\"]'.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "selector": {"type": "string", "description": "CSS selector for the element to click"}
+                },
+                "required": ["selector"]
+            }),
+        },
+        ToolDefinition {
+            name: "blade_browser_type".to_string(),
+            description: "Type text into an input field in BLADE's managed browser by CSS selector. Use for search boxes, compose areas, form fields.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "selector": {"type": "string", "description": "CSS selector for the input field"},
+                    "text": {"type": "string", "description": "Text to type"}
+                },
+                "required": ["selector", "text"]
+            }),
+        },
+        ToolDefinition {
+            name: "blade_browser_screenshot".to_string(),
+            description: "Take a screenshot of the current page in BLADE's managed browser. Use when blade_browser_read doesn't give enough detail about layout.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        ToolDefinition {
+            name: "blade_browser_login".to_string(),
+            description: "Open BLADE's managed browser at a URL so the user can log in manually. Use this the first time BLADE needs to interact with a site. After login, sessions persist permanently.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "URL to open for login, e.g. https://x.com/login"}
+                },
+                "required": ["url"]
+            }),
+        },
+        ToolDefinition {
             name: "blade_web_fetch".to_string(),
             description: "Fetch a URL and return text content. Use for: reading docs, GitHub raw files, APIs, web pages, checking changelogs, downloading data.".to_string(),
             input_schema: json!({
@@ -541,6 +602,69 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
             };
             let cwd = args["cwd"].as_str();
             do_glob(pattern, cwd)
+        }
+        "blade_browser_open" => {
+            let url = match args["url"].as_str() {
+                Some(u) => u,
+                None => return ("Missing required argument: url".to_string(), true),
+            };
+            const SESSION: &str = "blade_chat";
+            match crate::browser_native::web_action_internal(SESSION, "navigate", url, "").await {
+                Ok(msg) => (msg, false),
+                Err(e) => (format!("Browser error: {}. Try blade_browser_login first if not logged in.", e), true),
+            }
+        }
+        "blade_browser_read" => {
+            const SESSION: &str = "blade_chat";
+            match crate::browser_native::browser_describe_page_internal(SESSION).await {
+                Ok(desc) => (desc, false),
+                Err(e) => (format!("Browser read error: {}", e), true),
+            }
+        }
+        "blade_browser_click" => {
+            let selector = match args["selector"].as_str() {
+                Some(s) => s,
+                None => return ("Missing required argument: selector".to_string(), true),
+            };
+            const SESSION: &str = "blade_chat";
+            match crate::browser_native::web_action_internal(SESSION, "click", selector, "").await {
+                Ok(msg) => (msg, false),
+                Err(e) => (format!("Click error: {}. Try blade_browser_read to find the right selector.", e), true),
+            }
+        }
+        "blade_browser_type" => {
+            let selector = match args["selector"].as_str() {
+                Some(s) => s,
+                None => return ("Missing required argument: selector".to_string(), true),
+            };
+            let text = match args["text"].as_str() {
+                Some(t) => t,
+                None => return ("Missing required argument: text".to_string(), true),
+            };
+            const SESSION: &str = "blade_chat";
+            match crate::browser_native::web_action_internal(SESSION, "type", selector, text).await {
+                Ok(msg) => (msg, false),
+                Err(e) => (format!("Type error: {}. Try blade_browser_read to find the right selector.", e), true),
+            }
+        }
+        "blade_browser_screenshot" => {
+            const SESSION: &str = "blade_chat";
+            match crate::browser_native::web_action_internal(SESSION, "screenshot", "", "").await {
+                Ok(msg) => (msg, false),
+                Err(e) => (format!("Browser screenshot error: {}", e), true),
+            }
+        }
+        "blade_browser_login" => {
+            let url = match args["url"].as_str() {
+                Some(u) => u,
+                None => return ("Missing required argument: url".to_string(), true),
+            };
+            // Open the managed browser visibly so user can log in
+            const SESSION: &str = "blade_chat";
+            match crate::browser_native::web_action_internal(SESSION, "navigate", url, "").await {
+                Ok(_) => (format!("Opened {} in BLADE's browser. Log in, then tell me when you're done and I'll continue.", url), false),
+                Err(e) => (format!("Could not open browser: {}", e), true),
+            }
         }
         "blade_web_fetch" => {
             let url = match args["url"].as_str() {

@@ -1607,9 +1607,13 @@ pub fn brain_build_context(conn: &Connection, budget_tokens: usize) -> String {
         }
     }
 
-    // Recent memories (trim to budget)
+    // Recent memories — filter out old low-confidence entries
     if let Ok(memories) = brain_get_memories(conn, 20) {
-        let mem_lines: Vec<String> = memories.iter().map(|m| format!("- {}", m.text)).collect();
+        let seven_days_ago = chrono::Utc::now().timestamp_millis() - (7 * 24 * 60 * 60 * 1000);
+        let mem_lines: Vec<String> = memories.iter()
+            .filter(|m| m.confidence >= 0.7 || m.created_at > seven_days_ago)
+            .map(|m| format!("- {}", m.text))
+            .collect();
         if !mem_lines.is_empty() {
             parts.push(format!("Known facts:\n{}", mem_lines.join("\n")));
         }
