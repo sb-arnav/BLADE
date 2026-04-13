@@ -38,45 +38,69 @@ fn keywords_to_catalog_name(capability: &str, error: &str) -> Vec<&'static str> 
     let combined = format!("{} {}", capability, error).to_lowercase();
     let mut matches = Vec::new();
 
+    // Generic "tool not found" errors → browser automation is the most common gap
+    if combined.contains("tool not found") || combined.contains("unknown tool")
+        || combined.contains("no tool named") || combined.contains("function not found")
+        || combined.contains("method not found") {
+        matches.push("Browser Automation (Puppeteer)");
+    }
+
     if combined.contains("browser") || combined.contains("puppeteer") || combined.contains("playwright")
         || combined.contains("scrape") || combined.contains("navigate") || combined.contains("click")
-        || combined.contains("open url") || combined.contains("web page") {
+        || combined.contains("open url") || combined.contains("web page") || combined.contains("screenshot")
+        || combined.contains("selenium") || combined.contains("headless") || combined.contains("automation") {
         matches.push("Browser Automation (Puppeteer)");
     }
     if combined.contains("github") || combined.contains("git hub") || combined.contains("pull request")
-        || combined.contains("repository") || combined.contains("issue") {
+        || combined.contains("repository") || combined.contains("pr ") || combined.contains("issue")
+        || combined.contains("commit") && combined.contains("push") {
         matches.push("GitHub");
     }
-    if combined.contains("slack") || combined.contains("message") && combined.contains("channel") {
+    if combined.contains("slack") || (combined.contains("message") && combined.contains("channel"))
+        || combined.contains("dm ") || combined.contains("workspace") && combined.contains("chat") {
         matches.push("Slack");
     }
-    if combined.contains("notion") {
+    if combined.contains("notion") || combined.contains("notion page") || combined.contains("notion database") {
         matches.push("Notion");
     }
-    if combined.contains("linear") || combined.contains("ticket") || combined.contains("sprint") {
+    if combined.contains("linear") || (combined.contains("ticket") && !combined.contains("github"))
+        || combined.contains("sprint") || combined.contains("backlog") {
         matches.push("Linear");
     }
-    if combined.contains("figma") || combined.contains("design") && combined.contains("token") {
+    if combined.contains("figma") || (combined.contains("design") && combined.contains("token"))
+        || combined.contains("figma file") {
         matches.push("Figma");
     }
-    if combined.contains("jira") || combined.contains("confluence") || combined.contains("atlassian") {
+    if combined.contains("jira") || combined.contains("confluence") || combined.contains("atlassian")
+        || combined.contains("bitbucket") {
         matches.push("Jira / Confluence");
     }
     if combined.contains("postgres") || combined.contains("postgresql") || combined.contains("database")
-        || combined.contains("sql") && !combined.contains("sqlite") {
+        || (combined.contains("sql") && !combined.contains("sqlite") && !combined.contains("mysql")) {
         matches.push("PostgreSQL");
     }
-    if combined.contains("supabase") {
+    if combined.contains("supabase") || combined.contains("supabase_url") {
         matches.push("Supabase");
     }
-    if combined.contains("vercel") || combined.contains("deploy") && combined.contains("preview") {
+    if combined.contains("vercel") || (combined.contains("deploy") && combined.contains("preview")) {
         matches.push("Vercel");
     }
-    if combined.contains("obsidian") || combined.contains("vault") && combined.contains("note") {
+    if combined.contains("obsidian") || (combined.contains("vault") && combined.contains("note")) {
         matches.push("Obsidian");
     }
     if combined.contains("spotify") || combined.contains("music") || combined.contains("playlist") {
         matches.push("Spotify");
+    }
+    if combined.contains("google calendar") || combined.contains("calendar event") || combined.contains("gcal") {
+        matches.push("Google Calendar");
+    }
+    if combined.contains("gmail") || combined.contains("send email") || combined.contains("google mail") {
+        matches.push("Gmail");
+    }
+    if combined.contains("filesystem") || combined.contains("file system")
+        || (combined.contains("read file") && combined.contains("permission"))
+        || combined.contains("fs.") {
+        matches.push("Filesystem");
     }
 
     matches
@@ -267,6 +291,27 @@ fn build_installable_catalog() -> HashMap<&'static str, InstallableEntry> {
         description: "Control Spotify from BLADE",
         required_token_hint: Some("SPOTIFY_CLIENT_ID + SPOTIFY_CLIENT_SECRET"),
         auto_install: false,
+    });
+    m.insert("Google Calendar", InstallableEntry {
+        command: "npx",
+        args: &["-y", "@google/calendar-mcp"],
+        description: "Create and read Google Calendar events from BLADE",
+        required_token_hint: Some("GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET (OAuth)"),
+        auto_install: false,
+    });
+    m.insert("Gmail", InstallableEntry {
+        command: "npx",
+        args: &["-y", "@google/gmail-mcp"],
+        description: "Read and send Gmail from BLADE",
+        required_token_hint: Some("GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET (OAuth)"),
+        auto_install: false,
+    });
+    m.insert("Filesystem", InstallableEntry {
+        command: "npx",
+        args: &["-y", "@modelcontextprotocol/server-filesystem", "--allowed-directories", "."],
+        description: "Extended filesystem access via MCP",
+        required_token_hint: None,
+        auto_install: true,
     });
     m
 }

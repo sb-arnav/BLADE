@@ -146,20 +146,70 @@ async fn compress_conversation_smart(
 /// Classify API errors and return a recovery action.
 enum ErrorRecovery {
     TruncateAndRetry,
-    SwitchModelAndRetry(String),
+    /// Switch to a safe fallback model for this provider and retry
+    SwitchModelAndRetry,
+    /// Rate limited — wait `secs` seconds then retry
+    RateLimitRetry { secs: u64 },
+    /// Server overloaded — brief pause then retry once
+    OverloadedRetry,
     Fatal(String),
 }
 
 fn classify_api_error(err: &str) -> ErrorRecovery {
     let lower = err.to_lowercase();
+
+    // Context window exceeded
     if lower.contains("too long") || lower.contains("maximum") || lower.contains("context length")
-        || lower.contains("token") && lower.contains("exceed") {
-        ErrorRecovery::TruncateAndRetry
-    } else if lower.contains("model") && (lower.contains("not found") || lower.contains("invalid") || lower.contains("does not exist")) {
-        // Try a safe fallback
-        ErrorRecovery::SwitchModelAndRetry("claude-haiku-4-5-20251001".to_string())
-    } else {
-        ErrorRecovery::Fatal(err.to_string())
+        || (lower.contains("token") && lower.contains("exceed")) {
+        return ErrorRecovery::TruncateAndRetry;
+    }
+
+    // Rate limited — extract retry-after if present, default 15s
+    if lower.contains("429") || lower.contains("rate limit") || lower.contains("too many requests")
+        || lower.contains("rate_limit") {
+        // Try to parse "please wait X seconds" from the error
+        let secs = err.split_whitespace()
+            .zip(err.split_whitespace().skip(1))
+            .find_map(|(_, next)| next.trim_end_matches('s').parse::<u64>().ok())
+            .unwrap_or(15)
+            .min(60); // cap at 60s
+        return ErrorRecovery::RateLimitRetry { secs };
+    }
+
+    // Server overloaded (Anthropic 529, generic 503)
+    if lower.contains("529") || lower.contains("overloaded") || lower.contains("503")
+        || lower.contains("service unavailable") || lower.contains("server error")
+        || lower.contains("temporarily") {
+        return ErrorRecovery::OverloadedRetry;
+    }
+
+    // Auth errors — clear message, no retry
+    if lower.contains("401") || lower.contains("403") || lower.contains("invalid api key")
+        || lower.contains("invalid_api_key") || lower.contains("authentication failed")
+        || lower.contains("unauthorized") || lower.contains("incorrect api key") {
+        return ErrorRecovery::Fatal(
+            "API key rejected — go to Settings to update it.".to_string()
+        );
+    }
+
+    // Model not found / invalid — switch to a safe model for this provider
+    if lower.contains("model") && (lower.contains("not found") || lower.contains("invalid")
+        || lower.contains("does not exist") || lower.contains("not supported")) {
+        return ErrorRecovery::SwitchModelAndRetry;
+    }
+
+    ErrorRecovery::Fatal(err.to_string())
+}
+
+/// Safe fallback model for a given provider when the configured model is invalid.
+fn safe_fallback_model(provider: &str) -> &'static str {
+    match provider {
+        "anthropic"   => "claude-haiku-4-5-20251001",
+        "openai"      => "gpt-4o-mini",
+        "gemini"      => "gemini-2.0-flash",
+        "groq"        => "llama-3.3-70b-versatile",
+        "openrouter"  => "anthropic/claude-haiku-4-5",
+        _             => "gpt-4o-mini", // OpenAI-compat default
     }
 }
 const MAX_TOOL_RESULT_CHARS: usize = 12_000;
@@ -397,6 +447,9 @@ pub async fn send_message_stream(
                     ErrorRecovery::TruncateAndRetry => {
                         // Smart compress then retry
                         let _ = app.emit("blade_status", "processing");
+                        let _ = app.emit("blade_notification", serde_json::json!({
+                            "type": "info", "message": "Context too long — compressing conversation and retrying"
+                        }));
                         compress_conversation_smart(
                             &mut conversation, 120_000,
                             &config.provider, &config.api_key, &config.model,
@@ -418,8 +471,13 @@ pub async fn send_message_stream(
                             }
                         }
                     }
-                    ErrorRecovery::SwitchModelAndRetry(fallback) => {
+                    ErrorRecovery::SwitchModelAndRetry => {
+                        let fallback = safe_fallback_model(&config.provider).to_string();
                         let _ = app.emit("blade_status", "processing");
+                        let _ = app.emit("blade_notification", serde_json::json!({
+                            "type": "info",
+                            "message": format!("Model '{}' not available — retrying with {}", config.model, fallback)
+                        }));
                         let retry = providers::complete_turn(
                             &config.provider,
                             &config.api_key,
@@ -429,10 +487,50 @@ pub async fn send_message_stream(
                             config.base_url.as_deref(),
                         ).await;
                         match retry {
+                            Ok(t) => {
+                                config.model = fallback; // keep using fallback for rest of session
+                                t
+                            }
+                            Err(e2) => {
+                                let _ = app.emit("blade_status", "error");
+                                return Err(format!("Model fallback ({}) also failed: {}", fallback, e2));
+                            }
+                        }
+                    }
+                    ErrorRecovery::RateLimitRetry { secs } => {
+                        let _ = app.emit("blade_notification", serde_json::json!({
+                            "type": "info",
+                            "message": format!("Rate limited — retrying in {}s", secs)
+                        }));
+                        tokio::time::sleep(std::time::Duration::from_secs(secs)).await;
+                        let _ = app.emit("blade_status", "processing");
+                        let retry = providers::complete_turn(
+                            &config.provider, &config.api_key, &config.model,
+                            &conversation, &tools, config.base_url.as_deref(),
+                        ).await;
+                        match retry {
                             Ok(t) => t,
                             Err(e2) => {
                                 let _ = app.emit("blade_status", "error");
-                                return Err(format!("Model fallback also failed: {}", e2));
+                                return Err(format!("Still rate limited after {}s wait: {}", secs, e2));
+                            }
+                        }
+                    }
+                    ErrorRecovery::OverloadedRetry => {
+                        let _ = app.emit("blade_notification", serde_json::json!({
+                            "type": "info", "message": "Server overloaded — retrying in 5s"
+                        }));
+                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                        let _ = app.emit("blade_status", "processing");
+                        let retry = providers::complete_turn(
+                            &config.provider, &config.api_key, &config.model,
+                            &conversation, &tools, config.base_url.as_deref(),
+                        ).await;
+                        match retry {
+                            Ok(t) => t,
+                            Err(e2) => {
+                                let _ = app.emit("blade_status", "error");
+                                return Err(format!("Server still overloaded: {}", e2));
                             }
                         }
                     }
