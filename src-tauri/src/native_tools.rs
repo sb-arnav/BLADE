@@ -1419,12 +1419,21 @@ pub async fn run_shell(command: String, cwd: Option<String>) -> Result<String, S
 
 /// Quick one-shot AI completion for lightweight summarization/analysis tasks.
 /// Used by RSS reader, analytics panels, etc. Returns plain text response.
+/// Uses the cheapest available model to avoid burning quota on background tasks.
 #[tauri::command]
 pub async fn ask_ai(prompt: String) -> Result<String, String> {
     let config = crate::config::load_config();
     if config.api_key.is_empty() && config.provider != "ollama" {
         return Err("No API key configured".to_string());
     }
+    let model = match config.provider.as_str() {
+        "anthropic" => "claude-haiku-4-5".to_string(),
+        "openai" => "gpt-4o-mini".to_string(),
+        "gemini" => "gemini-2.0-flash-lite".to_string(),
+        "groq" => "llama-3.1-8b-instant".to_string(),
+        "openrouter" => "anthropic/claude-haiku-4.5".to_string(),
+        _ => config.model.clone(),
+    };
     use crate::providers::{ChatMessage, build_conversation, complete_turn};
     let messages = vec![ChatMessage {
         role: "user".to_string(),
@@ -1435,7 +1444,7 @@ pub async fn ask_ai(prompt: String) -> Result<String, String> {
     let turn = complete_turn(
         &config.provider,
         &config.api_key,
-        &config.model,
+        &model,
         &conversation,
         &[],
         config.base_url.as_deref(),
