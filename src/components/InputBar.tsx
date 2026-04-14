@@ -324,14 +324,14 @@ export function InputBar({
 
   const showSuggestions = !loading && !value && smartSuggestions.length > 0 && !slashActive;
 
-  // Border state classes
+  // Border state classes — clean Apple focus ring, no glow
   const borderClass = recording
-    ? "border-red-500/40 shadow-glow-error"
+    ? "border-red-500/40"
     : isDragging
-    ? "border-blade-accent/50 shadow-glow-accent-sm"
+    ? "border-blade-accent/40"
     : isFocused
-    ? "border-blade-accent/40 shadow-inner-focus"
-    : "border-blade-border/50";
+    ? "border-blade-accent/50"
+    : "border-white/10";
 
   return (
     <div
@@ -341,9 +341,7 @@ export function InputBar({
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      {/* Spotlight overlay — dims the rest of the UI when input is focused */}
-      <div className={`input-spotlight-overlay ${isFocused ? "active" : ""}`} />
-      {/* Smart suggestion pills */}
+      {/* Smart suggestion pills — rounded-full, Apple-style */}
       {showSuggestions && (
         <div className="flex items-center gap-1.5 mb-2 flex-wrap animate-fade-up">
           {smartSuggestions.map((s) => (
@@ -352,14 +350,12 @@ export function InputBar({
               onClick={() => onSend(s.prompt)}
               disabled={busy}
               className="
-                px-2.5 py-1 rounded-full
-                border border-blade-border/50
-                bg-blade-surface/60 backdrop-blur-sm
-                text-2xs font-medium text-blade-muted
-                hover:text-blade-text hover:border-blade-accent/30 hover:bg-blade-surface
-                hover:shadow-glow-accent-sm
-                disabled:opacity-40
-                transition-all duration-200
+                px-3 py-1 rounded-full
+                border border-white/10
+                bg-blade-surface text-2xs font-medium text-blade-muted
+                hover:text-blade-text hover:border-white/20 hover:bg-blade-surface-2
+                disabled:opacity-30
+                transition-all duration-250
               "
             >
               {s.label}
@@ -368,25 +364,28 @@ export function InputBar({
         </div>
       )}
 
-      {/* Slash command palette — VS Code command palette style */}
+      {/* Slash command palette — Apple-style popup */}
       {slashActive && slashMatches.length > 0 && (
         <div
           ref={slashListRef}
           className="
-            absolute bottom-full left-3 right-3 mb-1.5 z-50
-            bg-blade-surface/98 backdrop-blur-xl
-            border border-blade-border
-            rounded-xl overflow-hidden
-            shadow-surface-xl
+            absolute bottom-full left-3 right-3 mb-2 z-50
+            rounded-2xl overflow-hidden
             animate-fade-up
             max-h-64 overflow-y-auto
           "
+          style={{
+            background: "rgba(44,44,46,0.96)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4)",
+          }}
         >
           {/* Palette header */}
-          <div className="flex items-center gap-2 px-3 py-2 border-b border-blade-border/60">
-            <span className="text-2xs font-mono text-blade-accent/70">/</span>
-            <span className="text-2xs text-blade-muted/60 font-medium">Commands</span>
-            <span className="ml-auto text-2xs text-blade-muted/40 font-mono">↑↓ navigate · ↵ run · esc close</span>
+          <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+            <span className="text-2xs font-mono text-blade-accent">/ Commands</span>
+            <span className="ml-auto text-2xs text-blade-muted/50">↑↓ · ↵ run · esc</span>
           </div>
 
           {slashMatches.map((cmd, i) => (
@@ -396,17 +395,17 @@ export function InputBar({
               onClick={() => executeSlash(cmd.action)}
               className={`
                 w-full text-left px-3 py-2.5 flex items-center gap-3
-                transition-all duration-100
+                transition-all duration-150
                 ${i === slashIndex
-                  ? "bg-blade-accent/10 border-l-2 border-blade-accent"
-                  : "border-l-2 border-transparent text-blade-secondary hover:bg-blade-surface-hover hover:text-blade-text"
+                  ? "bg-blade-accent/15"
+                  : "hover:bg-white/5"
                 }
               `}
             >
-              <span className={`text-[11px] font-mono w-4 text-center shrink-0 ${i === slashIndex ? "text-blade-accent" : "text-blade-muted/50"}`}>
+              <span className={`text-[11px] w-4 text-center shrink-0 ${i === slashIndex ? "text-blade-accent" : "text-blade-muted/50"}`}>
                 {cmd.icon}
               </span>
-              <span className={`text-2xs font-mono font-medium w-20 shrink-0 ${i === slashIndex ? "text-blade-accent" : "text-blade-secondary"}`}>
+              <span className={`text-2xs font-mono font-medium w-20 shrink-0 ${i === slashIndex ? "text-blade-accent" : "text-blade-muted"}`}>
                 {cmd.cmd}
               </span>
               <span className={`text-2xs ${i === slashIndex ? "text-blade-text" : "text-blade-muted/70"}`}>
@@ -437,15 +436,21 @@ export function InputBar({
         </div>
       )}
 
-      {/* Main input container */}
+      {/* Main input container — Apple search bar style */}
       <div
         className={`
-          flex items-end gap-2 rounded-xl
-          bg-blade-surface/80 backdrop-blur-sm
-          border transition-all duration-200
+          flex items-end gap-2 rounded-2xl
+          bg-blade-surface
+          border transition-all duration-250
           px-3 py-2.5
           ${borderClass}
         `}
+        style={{
+          boxShadow: isFocused
+            ? "0 0 0 3px rgba(88,86,214,0.12)"
+            : "inset 0 1px 2px rgba(0,0,0,0.2)",
+          transition: "box-shadow 250ms cubic-bezier(0.25,0.1,0.25,1), border-color 250ms cubic-bezier(0.25,0.1,0.25,1)",
+        }}
       >
         {/* Left icon buttons */}
         <div className="flex items-center gap-0.5 pb-0.5 shrink-0">
@@ -542,10 +547,11 @@ export function InputBar({
               <button
                 onClick={() => invoke("cancel_chat")}
                 className="
-                  w-7 h-7 rounded-lg flex items-center justify-center
+                  w-7 h-7 rounded-full flex items-center justify-center
                   bg-red-500/15 text-red-400
-                  hover:bg-red-500/25 hover:shadow-glow-error
-                  transition-all duration-150
+                  hover:bg-red-500/25
+                  transition-all duration-250
+                  active:scale-95
                 "
                 aria-label="Stop"
               >
@@ -557,10 +563,10 @@ export function InputBar({
               onClick={handleSend}
               disabled={!canSend}
               className={`
-                w-7 h-7 rounded-lg flex items-center justify-center
-                transition-all duration-200
+                w-7 h-7 rounded-full flex items-center justify-center
+                transition-all duration-250 active:scale-95
                 ${canSend
-                  ? "bg-blade-accent text-white hover:bg-blade-accent-hover hover:shadow-glow-accent-sm animate-send-pulse"
+                  ? "bg-blade-accent text-white hover:bg-blade-accent-hover"
                   : "text-blade-muted/20 bg-transparent"
                 }
               `}

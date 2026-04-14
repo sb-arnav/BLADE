@@ -3493,14 +3493,15 @@ fn summarize_runtime_output(lines: &[String], runtime_id: &str, exit_code: i32) 
 
     if found.is_empty() {
         // Fallback: last 5 non-empty output lines
-        found = lines
+        let mut tail: Vec<String> = lines
             .iter()
             .rev()
             .filter(|l| !l.trim().is_empty())
             .take(5)
-            .rev()
             .cloned()
             .collect();
+        tail.reverse();
+        found = tail;
     }
 
     if found.is_empty() {

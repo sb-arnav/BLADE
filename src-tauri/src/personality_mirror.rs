@@ -306,8 +306,7 @@ fn build_fallback_summary(p: &PersonalityProfile) -> String {
 
 #[tauri::command]
 pub async fn personality_analyze(app: tauri::AppHandle) -> Result<PersonalityProfile, String> {
-    use tauri::Manager;
-    let _ = app; // reserved for future event emission
+    let _ = &app; // reserved for future event emission
 
     // Load all conversations from history dir
     let history_dir = blade_config_dir().join("history");

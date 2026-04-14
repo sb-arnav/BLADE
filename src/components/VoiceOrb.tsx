@@ -1,23 +1,20 @@
 /**
  * VoiceOrb — the PRIMARY interface for talking to BLADE.
  *
- * A floating circle in the bottom-right corner that is ALWAYS visible.
- * It's not a secondary button — it's the front door.
+ * Apple Siri-style: a morphing gradient sphere. No particles, no orbiting dots.
+ * Clean, purposeful, minimal.
  *
  * States:
- *   idle        — subtle slow pulse, waiting
- *   listening   — active green pulse + waveform bars animate
- *   processing  — amber spinner ring
- *   speaking    — rhythmic blue pulse (BLADE is talking)
+ *   idle        — quiet sphere, gentle breathe
+ *   listening   — green blob morphs
+ *   processing  — spinner ring
+ *   speaking    — blue pulsing blob
  *   error       — red, click to dismiss
  *
  * Interactions:
  *   click           — start/stop voice conversation
- *   long-press      — push-to-talk (hold to record, release to send)
+ *   long-press      — push-to-talk
  *   drag            — move to any corner (persisted to localStorage)
- *
- * When voice is active, fires onOpenChat() so the chat panel auto-opens
- * to show the transcript.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -26,25 +23,20 @@ import type { VoiceStatus } from "../hooks/useVoiceMode";
 type Corner = "bottom-right" | "bottom-left" | "top-right" | "top-left";
 
 interface Props {
-  // Legacy voice mode (PTT / always-on background mode)
   status: VoiceStatus;
   mode: string;
   onDismissError?: () => void;
 
-  // Conversational voice mode (Phase 6)
   conversationState?: "idle" | "listening" | "thinking" | "speaking";
   isConversationActive?: boolean;
   onStartConversation?: () => Promise<void>;
   onStopConversation?: () => void;
 
-  // PTT handlers
   onPttDown?: () => void;
   onPttUp?: () => void;
 
-  // Opens chat panel to show transcript
   onOpenChat?: () => void;
 
-  // Last BLADE response for tooltip
   lastResponse?: string | null;
 }
 
@@ -79,81 +71,6 @@ function loadCorner(): Corner {
   return "bottom-right";
 }
 
-// Waveform bars — animate when voice is active
-function Waveform({ active, color }: { active: boolean; color: string }) {
-  const bars = [3, 5, 8, 6, 9, 5, 3];
-  return (
-    <div className="flex items-end gap-[1.5px] h-4">
-      {bars.map((base, i) => (
-        <div
-          key={i}
-          className={`w-[2px] rounded-full transition-all ${color}`}
-          style={{
-            height: active ? `${base + 2}px` : "3px",
-            animation: active ? `blade-waveform ${0.5 + i * 0.07}s ease-in-out infinite alternate` : "none",
-            animationDelay: `${i * 0.06}s`,
-            opacity: active ? 0.9 : 0.3,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
-/** Orbiting particles around the voice orb when active */
-function OrbParticles({ count = 8, radius = 32, color }: { count?: number; radius?: number; color: string }) {
-  return (
-    <>
-      {Array.from({ length: count }, (_, i) => {
-        const delay = (i / count) * -6; // stagger around the orbit
-        const size = i % 3 === 0 ? 3 : 2;
-        const orbitRadius = radius + (i % 3) * 6;
-        return (
-          <div
-            key={i}
-            className="absolute rounded-full pointer-events-none"
-            style={{
-              width: size,
-              height: size,
-              backgroundColor: color,
-              top: "50%",
-              left: "50%",
-              marginTop: -size / 2,
-              marginLeft: -size / 2,
-              opacity: 0.6 + (i % 3) * 0.15,
-              boxShadow: `0 0 ${size + 2}px ${color}`,
-              animation: `orb-particle-orbit ${2 + (i % 3) * 0.7}s linear infinite`,
-              animationDelay: `${delay}s`,
-              "--orbit-radius": `${orbitRadius}px`,
-            } as React.CSSProperties}
-          />
-        );
-      })}
-    </>
-  );
-}
-
-/** Sound wave ripples that radiate outward when speaking */
-function SoundWaveRipples({ color }: { color: string }) {
-  return (
-    <>
-      {[0, 1, 2].map((i) => (
-        <div
-          key={i}
-          className="absolute rounded-full pointer-events-none"
-          style={{
-            inset: 0,
-            border: `1.5px solid ${color}`,
-            opacity: 0,
-            animation: `orb-ripple-out 2s ease-out infinite`,
-            animationDelay: `${i * 0.65}s`,
-          }}
-        />
-      ))}
-    </>
-  );
-}
-
 export function VoiceOrb({
   status,
   mode,
@@ -172,6 +89,8 @@ export function VoiceOrb({
   const [tooltipText, setTooltipText] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isPttActive, setIsPttActive] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isPressed, setIsPressed] = useState(false);
 
   const orbRef = useRef<HTMLDivElement>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -196,7 +115,6 @@ export function VoiceOrb({
     }
   }, [isConversationActive, onOpenChat]);
 
-  // PTT auto-open chat
   useEffect(() => {
     if (isPttActive && onOpenChat) {
       onOpenChat();
@@ -209,8 +127,8 @@ export function VoiceOrb({
     dragStartRef.current = { x: e.clientX, y: e.clientY };
     didDragRef.current = false;
     pttModeRef.current = false;
+    setIsPressed(true);
 
-    // Long-press = PTT
     longPressTimer.current = setTimeout(() => {
       if (!didDragRef.current && mode === "push-to-talk") {
         pttModeRef.current = true;
@@ -235,9 +153,9 @@ export function VoiceOrb({
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    setIsPressed(false);
 
     if (pttModeRef.current) {
-      // Release PTT
       setIsPttActive(false);
       onPttUp?.();
       pttModeRef.current = false;
@@ -247,7 +165,6 @@ export function VoiceOrb({
     }
 
     if (isDragging) {
-      // Drop into nearest corner
       const newCorner = getCornerFromPosition(e.clientX, e.clientY);
       setCorner(newCorner);
       try { localStorage.setItem("blade-voice-orb-corner", newCorner); } catch {}
@@ -257,7 +174,6 @@ export function VoiceOrb({
       return;
     }
 
-    // Regular click — toggle conversation
     dragStartRef.current = null;
     didDragRef.current = false;
 
@@ -274,7 +190,6 @@ export function VoiceOrb({
   }, [isDragging, status, isConversationActive, onDismissError, onStopConversation, onStartConversation, onPttUp]);
 
   // ── Derive visual state ────────────────────────────────────────────────────
-  // Priority: conversation state > legacy voice status
   let orbState: "idle" | "listening" | "thinking" | "speaking" | "recording" | "processing" | "error" = "idle";
   if (status === "error") {
     orbState = "error";
@@ -290,60 +205,75 @@ export function VoiceOrb({
 
   const isActive = orbState !== "idle" && orbState !== "error";
 
-  // Colors and animations per state
-  // gradient: CSS gradient string for the orb core background
+  // State config — Apple color palette, no glow
   const stateConfig = {
-    idle:       { ring: "border-blade-border/30",    glow: "",                          dot: "bg-blade-muted/40",   waveColor: "bg-blade-muted/40",  label: "Click to talk",              gradient: "radial-gradient(circle, #1e1e2e 0%, #0f0f17 100%)",                                       particleColor: "#6366f1" },
-    listening:  { ring: "border-emerald-500/60",     glow: "shadow-emerald-500/20",     dot: "bg-emerald-400",      waveColor: "bg-emerald-400",     label: "Listening...",               gradient: "radial-gradient(circle, #052e16 0%, #064e3b 60%, #0f0f17 100%)",                           particleColor: "#34d399" },
-    thinking:   { ring: "border-amber-500/60",       glow: "shadow-amber-500/20",       dot: "bg-amber-400",        waveColor: "bg-amber-400",       label: "Thinking...",                gradient: "radial-gradient(circle, #2d1a00 0%, #451a03 60%, #0f0f17 100%)",                           particleColor: "#fbbf24" },
-    speaking:   { ring: "border-indigo-500/70",      glow: "shadow-indigo-500/25",      dot: "bg-indigo-400",       waveColor: "bg-indigo-400",      label: "Speaking",                   gradient: "radial-gradient(circle, #1e1b4b 0%, #312e81 55%, #0f0f17 100%)",                           particleColor: "#818cf8" },
-    recording:  { ring: "border-red-500/70",         glow: "shadow-red-500/20",         dot: "bg-red-500",          waveColor: "bg-red-400",         label: "Recording",                  gradient: "radial-gradient(circle, #2d0010 0%, #450a0a 60%, #0f0f17 100%)",                           particleColor: "#f87171" },
-    processing: { ring: "border-amber-400/60",       glow: "shadow-amber-400/20",       dot: "bg-amber-400",        waveColor: "bg-amber-400",       label: "Processing...",              gradient: "radial-gradient(circle, #2d1a00 0%, #451a03 60%, #0f0f17 100%)",                           particleColor: "#fbbf24" },
-    error:      { ring: "border-red-500/50",         glow: "",                          dot: "bg-red-500/70",       waveColor: "bg-red-400",         label: "Mic error — click to dismiss", gradient: "radial-gradient(circle, #1c0a0a 0%, #0f0f17 100%)",                                       particleColor: "#ef4444" },
+    idle:       {
+      gradient: "radial-gradient(circle at 35% 35%, #3a3a4c 0%, #1c1c1e 70%)",
+      shadow: "0 4px 16px rgba(0,0,0,0.4), 0 1px 4px rgba(0,0,0,0.3)",
+      ring: "rgba(255,255,255,0.08)",
+      label: "Click to talk",
+    },
+    listening:  {
+      gradient: "radial-gradient(circle at 35% 35%, #1e5c34 0%, #0d3320 50%, #030f08 100%)",
+      shadow: "0 4px 20px rgba(48,209,88,0.15), 0 1px 6px rgba(0,0,0,0.4)",
+      ring: "rgba(48,209,88,0.25)",
+      label: "Listening...",
+    },
+    thinking:   {
+      gradient: "radial-gradient(circle at 35% 35%, #4a3500 0%, #291e00 50%, #0a0800 100%)",
+      shadow: "0 4px 20px rgba(255,214,10,0.12), 0 1px 6px rgba(0,0,0,0.4)",
+      ring: "rgba(255,214,10,0.2)",
+      label: "Thinking...",
+    },
+    speaking:   {
+      gradient: "radial-gradient(circle at 35% 35%, #003878 0%, #001f4a 50%, #000815 100%)",
+      shadow: "0 4px 20px rgba(0,122,255,0.2), 0 1px 6px rgba(0,0,0,0.4)",
+      ring: "rgba(0,122,255,0.25)",
+      label: "Speaking",
+    },
+    recording:  {
+      gradient: "radial-gradient(circle at 35% 35%, #5c1010 0%, #360808 50%, #0f0202 100%)",
+      shadow: "0 4px 20px rgba(255,69,58,0.15), 0 1px 6px rgba(0,0,0,0.4)",
+      ring: "rgba(255,69,58,0.25)",
+      label: "Recording",
+    },
+    processing: {
+      gradient: "radial-gradient(circle at 35% 35%, #4a3500 0%, #291e00 50%, #0a0800 100%)",
+      shadow: "0 4px 20px rgba(255,214,10,0.12), 0 1px 6px rgba(0,0,0,0.4)",
+      ring: "rgba(255,214,10,0.2)",
+      label: "Processing...",
+    },
+    error:      {
+      gradient: "radial-gradient(circle at 35% 35%, #4a1010 0%, #2a0808 70%)",
+      shadow: "0 4px 16px rgba(255,69,58,0.12), 0 1px 4px rgba(0,0,0,0.4)",
+      ring: "rgba(255,69,58,0.2)",
+      label: "Error — click to dismiss",
+    },
   }[orbState];
 
-  // Pulse animation class per state
-  const pulseClass = {
-    idle:       "animate-pulse-slow",
-    listening:  "animate-ping",
-    thinking:   "",
-    speaking:   "animate-pulse",
-    recording:  "animate-ping",
-    processing: "",
-    error:      "",
-  }[orbState];
-
-  // Spinner ring for thinking/processing
   const showSpinner = orbState === "thinking" || orbState === "processing";
-
   const cornerStyle = getCornerStyle(corner);
+
+  // Scale: hover +5%, press -5%
+  const scale = isPressed ? 0.95 : isHovered ? 1.05 : 1;
 
   return (
     <>
-      {/* Orb keyframes */}
       <style>{`
-        @keyframes blade-waveform {
-          from { transform: scaleY(0.4); }
-          to   { transform: scaleY(1.6); }
+        @keyframes siri-morph {
+          0%,100% { border-radius: 50%; }
+          20%      { border-radius: 46% 54% 52% 48% / 50% 48% 52% 50%; }
+          40%      { border-radius: 52% 48% 48% 52% / 46% 52% 48% 54%; }
+          60%      { border-radius: 48% 52% 54% 46% / 52% 50% 50% 48%; }
+          80%      { border-radius: 54% 46% 50% 50% / 48% 54% 46% 52%; }
         }
-        @keyframes pulse-slow {
-          0%, 100% { opacity: 0.5; transform: scale(1); }
-          50%       { opacity: 0.8; transform: scale(1.05); }
+        @keyframes orb-idle-breathe {
+          0%,100% { transform: scale(1); opacity: 0.9; }
+          50%       { transform: scale(1.03); opacity: 1; }
         }
-        .animate-pulse-slow {
-          animation: pulse-slow 3s ease-in-out infinite;
-        }
-        @keyframes orb-breathe {
-          0%, 100% { transform: scale(1); }
-          50%       { transform: scale(1.02); }
-        }
-        @keyframes orb-particle-orbit {
-          0%   { transform: rotate(0deg) translateX(var(--orbit-radius, 32px)) rotate(0deg); }
-          100% { transform: rotate(360deg) translateX(var(--orbit-radius, 32px)) rotate(-360deg); }
-        }
-        @keyframes orb-ripple-out {
-          0%   { transform: scale(1);   opacity: 0.6; }
-          100% { transform: scale(2.8); opacity: 0; }
+        @keyframes orb-spin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
         }
       `}</style>
 
@@ -354,102 +284,118 @@ export function VoiceOrb({
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
         title={stateConfig.label}
       >
-        {/* Tooltip — last response or state hint */}
+        {/* Tooltip — last response */}
         {(showTooltip && tooltipText) && (
           <div
-            className="absolute bottom-full mb-3 right-0 max-w-[220px] bg-blade-surface/95 border border-blade-border/60 rounded-xl px-3 py-2 shadow-surface-xl backdrop-blur-md pointer-events-none animate-fade-in"
-            style={{ fontSize: "11px", lineHeight: "1.5", color: "var(--color-blade-text)" }}
+            className="absolute bottom-full mb-3 right-0 max-w-[220px] rounded-xl px-3 py-2.5 pointer-events-none animate-fade-in"
+            style={{
+              background: "rgba(44,44,46,0.95)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
+              fontSize: "11px",
+              lineHeight: "1.5",
+              color: "#ffffff",
+            }}
           >
-            <div className="text-blade-muted/40 text-[9px] uppercase tracking-[0.15em] font-semibold mb-0.5">BLADE said</div>
+            <div className="text-[9px] uppercase tracking-[0.12em] font-semibold mb-1" style={{ color: "#8e8e93" }}>
+              BLADE
+            </div>
             {tooltipText}
-            {/* Arrow */}
-            <div className="absolute bottom-[-5px] right-4 w-2.5 h-2.5 bg-blade-surface/95 border-r border-b border-blade-border/60 rotate-45" />
+            <div className="absolute bottom-[-5px] right-4 w-2.5 h-2.5 rotate-45"
+              style={{ background: "rgba(44,44,46,0.95)", border: "0 solid transparent", borderRight: "1px solid rgba(255,255,255,0.1)", borderBottom: "1px solid rgba(255,255,255,0.1)" }}
+            />
           </div>
         )}
 
-        {/* Label — only show when active */}
+        {/* State label — only when active */}
         {isActive && (
-          <div className="text-[9px] font-medium uppercase tracking-[0.18em] text-blade-muted/60 pointer-events-none">
+          <div className="text-[9px] font-medium tracking-[0.12em] pointer-events-none"
+            style={{ color: "#8e8e93", textTransform: "uppercase", letterSpacing: "0.12em" }}>
             {stateConfig.label}
           </div>
         )}
 
-        {/* Waveform — shown when listening or recording */}
-        {(orbState === "listening" || orbState === "recording") && (
-          <Waveform active={true} color={stateConfig.waveColor} />
-        )}
-
         {/* Main orb */}
-        <div className="relative flex items-center justify-center">
-          {/* Orbiting particles when active */}
-          {isActive && (
-            <OrbParticles count={orbState === "speaking" ? 10 : 7} radius={28} color={stateConfig.particleColor} />
-          )}
-
-          {/* Sound wave ripples when speaking */}
-          {orbState === "speaking" && (
-            <SoundWaveRipples color={stateConfig.particleColor} />
-          )}
-
-          {/* Outer glow ring — pings when active */}
-          {isActive && pulseClass && (
-            <div
-              className={`absolute w-14 h-14 rounded-full border ${stateConfig.ring} ${pulseClass} opacity-40`}
-              style={{ animationDuration: orbState === "listening" || orbState === "recording" ? "1s" : "2s" }}
-            />
-          )}
+        <div className="relative flex items-center justify-center"
+          style={{
+            transition: "transform 250ms cubic-bezier(0.25, 0.1, 0.25, 1)",
+            transform: `scale(${scale})`,
+          }}
+        >
+          {/* Outer ring — very subtle */}
+          <div
+            className="absolute w-12 h-12 rounded-full"
+            style={{
+              border: `1px solid ${stateConfig.ring}`,
+              transition: "border-color 400ms cubic-bezier(0.25, 0.1, 0.25, 1)",
+            }}
+          />
 
           {/* Spinner ring for thinking/processing */}
           {showSpinner && (
             <div
-              className={`absolute w-12 h-12 rounded-full border-2 border-transparent ${orbState === "thinking" ? "border-t-amber-400/80" : "border-t-amber-300/80"} animate-spin`}
-              style={{ animationDuration: "0.9s" }}
+              className="absolute w-12 h-12 rounded-full"
+              style={{
+                border: "1.5px solid transparent",
+                borderTopColor: "rgba(255,214,10,0.7)",
+                animation: "orb-spin 0.9s linear infinite",
+              }}
             />
           )}
 
-          {/* Core circle — gradient shifts per state */}
+          {/* Core sphere — Siri morphing blob */}
           <div
-            className={`w-10 h-10 rounded-full border-2 ${stateConfig.ring} backdrop-blur-sm shadow-surface-xl flex items-center justify-center transition-all duration-500 ${isActive ? stateConfig.glow + " shadow-lg" : ""}`}
+            className="w-10 h-10 flex items-center justify-center"
             style={{
               background: stateConfig.gradient,
-              animation: orbState === "idle" ? "orb-breathe 3.5s ease-in-out infinite" : undefined,
+              boxShadow: stateConfig.shadow,
+              animation: isActive
+                ? `siri-morph ${orbState === "listening" || orbState === "recording" ? "1.2s" : "2s"} ease-in-out infinite`
+                : "orb-idle-breathe 3.5s ease-in-out infinite",
+              transition: "background 400ms cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 400ms cubic-bezier(0.25, 0.1, 0.25, 1)",
             }}
           >
-            {/* Center indicator */}
+            {/* Center icon */}
             {orbState === "speaking" ? (
-              // Sound waves icon when speaking
-              <svg viewBox="0 0 24 24" className="w-4 h-4 text-blade-accent" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="rgba(0,122,255,0.9)" strokeWidth="2">
                 <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                <path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14" />
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
               </svg>
             ) : orbState === "thinking" || orbState === "processing" ? (
-              // Dots for thinking
               <div className="flex gap-0.5 items-center">
                 {[0, 1, 2].map((i) => (
                   <div
                     key={i}
-                    className="w-1 h-1 rounded-full bg-amber-400/80 animate-bounce"
-                    style={{ animationDelay: `${i * 0.12}s`, animationDuration: "0.8s" }}
+                    className="w-1 h-1 rounded-full animate-bounce"
+                    style={{
+                      backgroundColor: "rgba(255,214,10,0.8)",
+                      animationDelay: `${i * 0.12}s`,
+                      animationDuration: "0.8s",
+                    }}
                   />
                 ))}
               </div>
             ) : orbState === "error" ? (
-              <svg viewBox="0 0 24 24" className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="rgba(255,69,58,0.9)" strokeWidth="2">
                 <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
               </svg>
             ) : orbState === "listening" || orbState === "recording" ? (
-              // Mic icon when listening
-              <svg viewBox="0 0 24 24" className={`w-4 h-4 ${orbState === "recording" ? "text-red-400" : "text-emerald-400"}`} fill="none" stroke="currentColor" strokeWidth="2">
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none"
+                stroke={orbState === "recording" ? "rgba(255,69,58,0.9)" : "rgba(48,209,88,0.9)"}
+                strokeWidth="2">
                 <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
                 <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                 <line x1="12" y1="19" x2="12" y2="23" />
                 <line x1="8" y1="23" x2="16" y2="23" />
               </svg>
             ) : (
-              // Idle — subtle mic
-              <svg viewBox="0 0 24 24" className="w-4 h-4 text-blade-muted/50" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="rgba(142,142,147,0.6)" strokeWidth="1.5">
                 <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
                 <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                 <line x1="12" y1="19" x2="12" y2="23" />
@@ -458,18 +404,21 @@ export function VoiceOrb({
             )}
           </div>
 
-          {/* Idle breathing glow ring */}
-          {orbState === "idle" && (
-            <div
-              className={`absolute w-10 h-10 rounded-full ${pulseClass}`}
-              style={{ background: "radial-gradient(circle, rgba(99,102,241,0.06) 0%, transparent 70%)" }}
-            />
-          )}
+          {/* Subtle shadow under orb for depth */}
+          <div
+            className="absolute -bottom-2 w-8 h-2 rounded-full pointer-events-none"
+            style={{
+              background: "rgba(0,0,0,0.3)",
+              filter: "blur(4px)",
+              opacity: isActive ? 0.6 : 0.35,
+              transition: "opacity 400ms ease",
+            }}
+          />
         </div>
 
         {/* PTT hint */}
         {mode === "push-to-talk" && orbState === "idle" && (
-          <div className="text-[8px] text-blade-muted/30 pointer-events-none">hold</div>
+          <div className="text-[8px] pointer-events-none" style={{ color: "rgba(142,142,147,0.4)", letterSpacing: "0.08em" }}>hold</div>
         )}
       </div>
     </>

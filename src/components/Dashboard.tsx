@@ -105,25 +105,23 @@ interface Props {
   onNavigate: (route: string) => void;
 }
 
-// ── Palette ──────────────────────────────────────────────────────────────────
+// ── Apple color palette ───────────────────────────────────────────────────────
 
-const p = {
-  bg: "#07090a",
-  panel: "#0b0f10",
-  panelAlt: "#0e1314",
-  panelBright: "#111819",
-  green: "#00ff41",
-  cyan: "#00e5ff",
-  amber: "#ffb000",
-  red: "#ff0040",
-  violet: "#b388ff",
-  blue: "#448aff",
-  line: "rgba(0, 229, 255, 0.15)",
-  lineDim: "rgba(0, 229, 255, 0.08)",
-  dim: "rgba(0, 229, 255, 0.5)",
-  muted: "rgba(160, 220, 230, 0.6)",
-  glow: "rgba(0, 229, 255, 0.08)",
-  glowGreen: "rgba(0, 255, 65, 0.12)",
+const ap = {
+  bg:          "#000000",
+  surface:     "#1c1c1e",
+  surface2:    "#2c2c2e",
+  separator:   "rgba(255,255,255,0.08)",
+  text:        "#ffffff",
+  secondary:   "rgba(235,235,245,0.6)",
+  muted:       "#8e8e93",
+  green:       "#30d158",
+  blue:        "#007AFF",
+  purple:      "#5856D6",
+  orange:      "#ff9f0a",
+  red:         "#ff453a",
+  yellow:      "#ffd60a",
+  teal:        "#5ac8fa",
 } as const;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

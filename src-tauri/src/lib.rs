@@ -125,6 +125,7 @@ mod people_graph;
 mod auto_reply;
 mod streak_stats;
 mod hive;
+mod auto_fix;
 
 use chrono::Timelike;
 use std::sync::Arc;
@@ -1107,6 +1108,10 @@ pub fn run() {
             hive::hive_get_reports,
             hive::hive_approve_decision,
             hive::hive_set_autonomy,
+            // Auto-Fix Pipeline — autonomous CI repair engine
+            auto_fix::auto_fix_analyze,
+            auto_fix::auto_fix_execute,
+            auto_fix::auto_fix_full_pipeline,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
