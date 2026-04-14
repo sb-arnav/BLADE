@@ -410,6 +410,7 @@ fn play_audio_file(path: &std::path::Path) -> Option<()> {
 
 // ── OS-native TTS ─────────────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 fn launch_tts_process(text: &str, voice: &str) -> Option<Child> {
     launch_tts_process_speed(text, voice, 1.0)
 }

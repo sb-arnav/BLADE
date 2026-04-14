@@ -555,6 +555,28 @@ pub async fn big_agent_think(reports: Vec<TentacleReport>) -> Vec<Decision> {
 
     let mut decisions = Vec::new();
 
+    // ── People-graph enrichment ───────────────────────────────────────────────
+    // For every report that mentions a person (Slack, email), look them up in
+    // people_graph so cross-domain decisions can reference relationship context.
+    let mut people_context: Vec<String> = Vec::new();
+    for r in &reports {
+        let platform = tentacle_platform_from_id(&r.tentacle_id);
+        if platform == "slack" || platform == "email" || platform == "discord" {
+            // Heuristic: the sender field if present in details, else skip.
+            if let Some(sender) = r.details.get("sender").and_then(|v| v.as_str()) {
+                if let Some(person) = crate::people_graph::get_person(sender) {
+                    people_context.push(format!(
+                        "{} ({}; {}; topics: {})",
+                        person.name,
+                        person.relationship,
+                        person.communication_style,
+                        person.topics.join(", ")
+                    ));
+                }
+            }
+        }
+    }
+
     // Cross-domain pattern: Slack mention + GitHub/CI activity → connect them.
     let has_slack = by_platform.contains_key("slack");
     let has_github = by_platform.contains_key("github");
@@ -576,17 +598,22 @@ pub async fn big_agent_think(reports: Vec<TentacleReport>) -> Vec<Decision> {
             .unwrap_or_default();
 
         let context = format!(
-            "Slack: {}\nGitHub: {}\nCI: {}",
+            "Slack: {}\nGitHub: {}\nCI: {}\nPeople: {}",
             slack_summaries.join("; "),
             github_summaries.join("; "),
-            ci_summaries.join("; ")
+            ci_summaries.join("; "),
+            if people_context.is_empty() {
+                "none identified".to_string()
+            } else {
+                people_context.join(", ")
+            }
         );
 
         decisions.push(Decision::Inform {
             summary: format!(
                 "[Big Agent cross-domain] Activity detected across Slack + \
                  Dev channels. Context: {}",
-                crate::safe_slice(&context, 300)
+                crate::safe_slice(&context, 400)
             ),
         });
     }
@@ -818,6 +845,32 @@ async fn execute_decision(app: &AppHandle, decision: &Decision) {
             }));
         }
         Decision::Act { action, platform, reversible } => {
+            // Route through decision_gate before executing — BLADE's safety layer.
+            let signal = crate::decision_gate::Signal {
+                source: format!("hive:{}", platform),
+                description: action.clone(),
+                confidence: 0.75,
+                reversible: *reversible,
+                time_sensitive: false,
+            };
+            let perception = crate::perception_fusion::get_latest()
+                .unwrap_or_default();
+            let gate_outcome = crate::decision_gate::evaluate(&signal, &perception).await;
+            // Only execute if gate approves autonomously.
+            let should_exec = matches!(
+                gate_outcome,
+                crate::decision_gate::DecisionOutcome::ActAutonomously { .. }
+            );
+            if !should_exec {
+                log::info!("[Hive] decision_gate deferred Act on {}: {}", platform, crate::safe_slice(action, 60));
+                let _ = app.emit("hive_action_deferred", serde_json::json!({
+                    "type": "act",
+                    "platform": platform,
+                    "action": action,
+                    "reason": "decision_gate deferred"
+                }));
+                return;
+            }
             log::info!(
                 "[Hive] Act on {}: {} (reversible={})",
                 platform, crate::safe_slice(action, 80), reversible
@@ -863,7 +916,7 @@ fn feed_reports_to_memory(reports: &[TentacleReport]) {
             let id = uuid();
             let _ = conn.execute(
                 "INSERT OR IGNORE INTO typed_memories \
-                 (id, category, content, confidence, source, created_at, updated_at, access_count) \
+                 (id, category, content, confidence, source, created_at, last_accessed, access_count) \
                  VALUES (?1, ?2, ?3, 0.7, 'hive', ?4, ?4, 0)",
                 rusqlite::params![
                     id,

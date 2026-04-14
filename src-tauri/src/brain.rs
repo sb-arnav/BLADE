@@ -410,9 +410,9 @@ pub fn maybe_add_humor(
     None
 }
 
-/// Helper: count git branches in the active project. Returns 0 on failure.
+/// Helper: count git branches in the active project. Returns None on failure.
 fn brain_git_branch_count(window_title: &str) -> Option<usize> {
-    let dir = crate::brain_extract_dir_from_title(window_title)?;
+    let dir = extract_dir_from_window_title(window_title)?;
     let out = crate::cmd_util::silent_cmd("git")
         .args(&["branch", "--list"])
         .current_dir(&dir)
@@ -427,11 +427,6 @@ fn brain_git_branch_count(window_title: &str) -> Option<usize> {
     } else {
         None
     }
-}
-
-/// Public re-export of the dir extractor so brain helpers can use it.
-fn brain_extract_dir_from_title(title: &str) -> Option<std::path::PathBuf> {
-    extract_dir_from_window_title(title)
 }
 
 fn build_system_prompt_inner(

@@ -27,7 +27,6 @@
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use tauri::{Emitter, Manager};
-use rusqlite;
 
 static IS_RECORDING: AtomicBool = AtomicBool::new(false);
 
@@ -595,75 +594,69 @@ async fn save_voice_session_to_history(
         return;
     }
 
-    // Build a summary of what was discussed
-    let turns: Vec<serde_json::Value> = conv_history.iter().enumerate().map(|(i, msg)| {
-        let (role, content) = match msg {
-            crate::providers::ConversationMessage::User(t)      => ("user", t.as_str()),
-            crate::providers::ConversationMessage::Assistant(t) => ("assistant", t.as_str()),
-            crate::providers::ConversationMessage::System(t)    => ("system", t.as_str()),
-        };
-        serde_json::json!({
-            "id": format!("voice-{}-{}", session.session_id, i),
-            "role": role,
-            "content": crate::safe_slice(content, 2000),
-            "timestamp": session.started_at * 1000 + i as i64 * 2000,
-        })
+    let turn_count = conv_history.len();
+    let conversation_id = format!("voice-{}", session.session_id);
+    let started_at = session.started_at;
+    let conv_id_clone = conversation_id.clone();
+
+    // Build a compact turn list: only user + assistant (skip system)
+    let turns_data: Vec<(String, String, i64)> = conv_history.iter().enumerate().filter_map(|(i, msg)| {
+        match msg {
+            crate::providers::ConversationMessage::User(t) =>
+                Some(("user".to_string(), t.clone(), started_at * 1000 + i as i64 * 2000)),
+            crate::providers::ConversationMessage::Assistant { content, .. } =>
+                Some(("assistant".to_string(), content.clone(), started_at * 1000 + i as i64 * 2000)),
+            _ => None,
+        }
     }).collect();
 
-    let conversation_id = format!("voice-{}", session.session_id);
-    if let Err(e) = tauri::async_runtime::spawn_blocking({
-        let conversation_id = conversation_id.clone();
-        move || {
-            // Use the history module's DB writer
-            let db_path = crate::config::blade_config_dir().join("blade.db");
-            if let Ok(conn) = rusqlite::Connection::open(&db_path) {
-                // Ensure table exists — history module owns this schema
-                let _ = conn.execute_batch(
-                    "CREATE TABLE IF NOT EXISTS conversations (
-                        id TEXT PRIMARY KEY,
-                        title TEXT,
-                        created_at INTEGER,
-                        updated_at INTEGER,
-                        message_count INTEGER DEFAULT 0
-                    );
-                    CREATE TABLE IF NOT EXISTS messages (
-                        id TEXT PRIMARY KEY,
-                        conversation_id TEXT NOT NULL,
-                        role TEXT NOT NULL,
-                        content TEXT NOT NULL,
-                        timestamp INTEGER NOT NULL
-                    );"
-                );
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_millis() as i64;
-                let title = format!("Voice session ({})",
-                    chrono::DateTime::from_timestamp(now / 1000, 0)
-                        .map(|d| d.format("%b %d %H:%M").to_string())
-                        .unwrap_or_else(|| "unknown".to_string()));
-                let _ = conn.execute(
-                    "INSERT OR REPLACE INTO conversations (id, title, created_at, updated_at, message_count)
-                     VALUES (?1, ?2, ?3, ?3, ?4)",
-                    rusqlite::params![conversation_id, title, now, turns.len() as i64],
-                );
-            }
-        }
-    }).await {
-        log::warn!("[voice_conv] session save error: {:?}", e);
-    }
-
-    // Delegate to the history command
-    let _ = tauri::async_runtime::spawn({
-        let app = app.clone();
-        let conversation_id = conversation_id.clone();
-        async move {
-            let _ = app.emit("voice_session_saved", serde_json::json!({
-                "conversation_id": conversation_id,
-                "turn_count": conv_history.len(),
-            }));
+    let _ = tauri::async_runtime::spawn_blocking(move || {
+        let db_path = crate::config::blade_config_dir().join("blade.db");
+        let conn = match rusqlite::Connection::open(&db_path) {
+            Ok(c) => c,
+            Err(_) => return,
+        };
+        // Ensure tables exist
+        let _ = conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS conversations (
+                id TEXT PRIMARY KEY,
+                title TEXT,
+                created_at INTEGER,
+                updated_at INTEGER,
+                message_count INTEGER DEFAULT 0
+            );
+            CREATE TABLE IF NOT EXISTS messages (
+                id TEXT PRIMARY KEY,
+                conversation_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                timestamp INTEGER NOT NULL
+            );"
+        );
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as i64;
+        let title = format!("Voice session — {} turns", turns_data.len());
+        let _ = conn.execute(
+            "INSERT OR IGNORE INTO conversations (id, title, created_at, updated_at, message_count)
+             VALUES (?1, ?2, ?3, ?3, ?4)",
+            rusqlite::params![conv_id_clone, title, now, turns_data.len() as i64],
+        );
+        for (i, (role, content, ts)) in turns_data.iter().enumerate() {
+            let msg_id = format!("{}-msg-{}", conv_id_clone, i);
+            let _ = conn.execute(
+                "INSERT OR IGNORE INTO messages (id, conversation_id, role, content, timestamp)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                rusqlite::params![msg_id, conv_id_clone, role, content, ts],
+            );
         }
     }).await;
+
+    let _ = app.emit("voice_session_saved", serde_json::json!({
+        "conversation_id": conversation_id,
+        "turn_count": turn_count,
+    }));
 }
 
 /// Transcribe a buffer of f32 mono samples at `sample_rate` Hz.
