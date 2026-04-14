@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ConversationSummary, Message, RuntimeDescriptor, ToolApprovalRequest, ToolExecution } from "../types";
@@ -55,6 +55,159 @@ interface Props {
   onOpenNotifications?: () => void;
   unreadNotificationCount?: number;
 }
+
+// ─── Context Ribbon ──────────────────────────────────────────────────────────
+
+interface ContextRibbonProps {
+  provider: string | null;
+  model: string | null;
+  perceptionState: string | null;
+  godModeOn: boolean;
+  memoryCount: number | null;
+  toolCount: number | null;
+  lastResponseTime: number | null | undefined;
+  onOpenSettings: () => void;
+}
+
+function ContextRibbon({
+  provider,
+  model,
+  perceptionState,
+  godModeOn,
+  memoryCount,
+  toolCount,
+  lastResponseTime,
+  onOpenSettings,
+}: ContextRibbonProps) {
+  const modelShort = model
+    ? model.split("/").pop()?.split("-").slice(0, 3).join("-") ?? model
+    : null;
+
+  return (
+    <div className="flex items-center justify-between px-3 py-1 border-b border-blade-border/30 bg-blade-bg/60 shrink-0 min-h-[1.75rem] gap-2">
+      {/* Left: model + provider */}
+      <button
+        onClick={onOpenSettings}
+        className="flex items-center gap-1.5 text-blade-muted/60 hover:text-blade-muted transition-colors min-w-0"
+        title="Open settings"
+      >
+        <svg viewBox="0 0 24 24" className="w-2.5 h-2.5 shrink-0 opacity-60" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" />
+        </svg>
+        <span className="text-[0.65rem] font-mono truncate max-w-[140px]">
+          {provider && modelShort
+            ? `${provider} / ${modelShort}`
+            : provider ?? modelShort ?? "no model"}
+        </span>
+        {lastResponseTime != null && (
+          <span className="text-blade-muted/30 text-[0.6rem] font-mono shrink-0">
+            {lastResponseTime < 1000 ? `${lastResponseTime}ms` : `${(lastResponseTime / 1000).toFixed(1)}s`}
+          </span>
+        )}
+      </button>
+
+      {/* Center: perception / god mode */}
+      {godModeOn && perceptionState && (
+        <div className="flex items-center gap-1 text-emerald-400/50 text-[0.6rem] font-mono shrink-0">
+          <span className="w-1 h-1 rounded-full bg-emerald-400/50" />
+          <span className="truncate max-w-[120px]">Focused · {perceptionState}</span>
+        </div>
+      )}
+
+      {/* Right: memory + tool count */}
+      <div className="flex items-center gap-2 text-blade-muted/40 text-[0.6rem] font-mono shrink-0">
+        {memoryCount != null && (
+          <span title="Memories">{memoryCount} mem</span>
+        )}
+        {toolCount != null && toolCount > 0 && (
+          <span title="Available tools">{toolCount} tools</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Error Card ───────────────────────────────────────────────────────────────
+
+function classifyError(error: string): "provider" | "config" | "network" | "generic" {
+  const e = error.toLowerCase();
+  if (e.includes("api key") || e.includes("authentication") || e.includes("unauthorized") || e.includes("401")) return "config";
+  if (e.includes("rate limit") || e.includes("quota") || e.includes("overloaded") || e.includes("502") || e.includes("503")) return "provider";
+  if (e.includes("network") || e.includes("connection") || e.includes("timeout") || e.includes("fetch")) return "network";
+  return "generic";
+}
+
+interface ErrorCardProps {
+  error: string;
+  onRetry: () => void;
+  onOpenSettings: () => void;
+}
+
+function ErrorCard({ error, onRetry, onOpenSettings }: ErrorCardProps) {
+  const kind = classifyError(error);
+  return (
+    <div className="mx-4 mt-3 mb-1 rounded-xl border border-red-500/20 bg-red-500/5 animate-fade-in overflow-hidden">
+      <div className="flex items-start gap-2.5 px-3 py-2.5">
+        <div className="shrink-0 mt-0.5 w-4 h-4 rounded-full bg-red-500/15 flex items-center justify-center">
+          <svg viewBox="0 0 24 24" className="w-2.5 h-2.5 text-red-400" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M12 9v4M12 17h.01" />
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[0.7rem] font-semibold text-red-400/90 mb-0.5">
+            {kind === "provider" ? "Provider error" :
+             kind === "config" ? "Configuration error" :
+             kind === "network" ? "Network error" :
+             "Something went wrong"}
+          </p>
+          <p className="text-2xs text-red-400/60 break-words whitespace-pre-wrap leading-relaxed line-clamp-3" title={error}>
+            {error}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5 px-3 pb-2.5">
+        <button
+          onClick={onRetry}
+          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-2xs font-medium transition-colors"
+        >
+          <svg viewBox="0 0 24 24" className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M1 4v6h6M23 20v-6h-6" />
+            <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 0 1 3.51 15" />
+          </svg>
+          Retry
+        </button>
+        {(kind === "provider" || kind === "config") && (
+          <button
+            onClick={onOpenSettings}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blade-surface hover:bg-blade-surface-hover text-blade-muted hover:text-blade-secondary text-2xs font-medium transition-colors border border-blade-border"
+          >
+            {kind === "config" ? (
+              <>
+                <svg viewBox="0 0 24 24" className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3" />
+                </svg>
+                Open Settings
+              </>
+            ) : (
+              <>
+                <svg viewBox="0 0 24 24" className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="15 3 21 3 21 9" />
+                  <path d="M10 14L21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                </svg>
+                Switch Model
+              </>
+            )}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function formatTime(timestamp: number): string {
   const now = Date.now();
@@ -119,6 +272,16 @@ export function ChatWindow({
   const [renameValue, setRenameValue] = useState("");
   const [thinkingExpanded, setThinkingExpanded] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
+
+  // Live routing — updated by chat_routing event from Rust
+  const [liveRouting, setLiveRouting] = useState<{ provider: string; model: string } | null>(null);
+  // Live tool executing — name of the currently-executing tool (for typing indicator)
+  const [activeToolName, setActiveToolName] = useState<string | null>(null);
+  // Context ribbon counts — loaded once and kept fresh
+  const [memoryCount, setMemoryCount] = useState<number | null>(null);
+  const [toolCount, setToolCount] = useState<number | null>(null);
+  // God Mode perception state
+  const [perceptionState, setPerceptionState] = useState<string | null>(null);
 
   // Phase 6 — conversational voice mode
   const {
@@ -219,6 +382,50 @@ export function ChatWindow({
       if (godModeFadeTimer.current) clearTimeout(godModeFadeTimer.current);
     };
   }, []);
+
+  // Live routing — update ribbon when chat_routing fires
+  useEffect(() => {
+    const unlisten = listen<{ provider: string; model: string }>("chat_routing", (e) => {
+      setLiveRouting(e.payload);
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
+
+  // Track the name of the currently-executing tool for the typing indicator
+  useEffect(() => {
+    const unlistenExec = listen<{ name: string }>("tool_executing", (e) => {
+      setActiveToolName(e.payload.name);
+    });
+    const unlistenDone = listen<{ name: string }>("tool_completed", () => {
+      setActiveToolName(null);
+    });
+    return () => {
+      unlistenExec.then((fn) => fn());
+      unlistenDone.then((fn) => fn());
+    };
+  }, []);
+
+  // Clear activeToolName when loading stops
+  useEffect(() => {
+    if (!loading) setActiveToolName(null);
+  }, [loading]);
+
+  // Load memory + tool counts for the context ribbon
+  useEffect(() => {
+    invoke<{ id: string }[]>("brain_get_memories", { limit: 9999 })
+      .then((m) => setMemoryCount(m.length))
+      .catch(() => {});
+    invoke<{ name: string }[]>("mcp_get_tools")
+      .then((t) => setToolCount(t.length))
+      .catch(() => {});
+  }, []);
+
+  // Godmode perception label (e.g. active window + duration)
+  useEffect(() => {
+    if (!activeWindow) { setPerceptionState(null); return; }
+    const appName = activeWindow.title?.trim() || activeWindow.process_name?.trim() || null;
+    if (appName) setPerceptionState(appName);
+  }, [activeWindow]);
 
   const clipboardDetection = useMemo(
     () => clipboardText ? detectClipboardType(clipboardText) : null,
@@ -537,17 +744,25 @@ export function ChatWindow({
           </div>
         </div>
 
-        {/* Error */}
+        {/* Context ribbon */}
+        <ContextRibbon
+          provider={liveRouting?.provider ?? provider ?? null}
+          model={liveRouting?.model ?? model ?? null}
+          perceptionState={perceptionState}
+          godModeOn={!!activeWindow}
+          memoryCount={memoryCount}
+          toolCount={toolCount}
+          lastResponseTime={lastResponseTime}
+          onOpenSettings={onOpenSettings}
+        />
+
+        {/* Error card — actionable, not just red text */}
         {error && (
-          <div className="mx-4 mt-3 px-3 py-2 rounded-lg bg-red-500/8 border border-red-500/15 text-red-400 text-xs animate-fade-in flex items-center justify-between gap-2">
-            <span className="break-words whitespace-pre-wrap" title={error}>{error}</span>
-            <button
-              onClick={onRetry}
-              className="shrink-0 px-2 py-0.5 rounded-md bg-red-500/10 hover:bg-red-500/20 text-red-400 text-2xs transition-colors"
-            >
-              retry
-            </button>
-          </div>
+          <ErrorCard
+            error={error}
+            onRetry={onRetry}
+            onOpenSettings={onOpenSettings}
+          />
         )}
 
         <MessageList
@@ -558,6 +773,7 @@ export function ChatWindow({
           onRetry={!loading ? onRetry : undefined}
           activeWindow={activeWindow}
           contextSuggestions={contextSuggestions}
+          activeToolName={activeToolName}
         />
 
         {/* Smart clipboard bar */}
@@ -640,6 +856,15 @@ export function ChatWindow({
           onDraftConsumed={() => setComposerDraft(null)}
           onPttMouseDown={voiceModeOnPttDown}
           onPttMouseUp={voiceModeOnPttUp}
+          modelLabel={
+            liveRouting
+              ? `${liveRouting.provider} / ${liveRouting.model.split("/").pop()}`
+              : model
+              ? `${provider ?? ""} / ${model.split("/").pop()}`
+              : null
+          }
+          suggestions={contextSuggestions}
+          clipboardText={clipboardText}
         />
       </div>
 

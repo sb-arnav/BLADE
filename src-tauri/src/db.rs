@@ -447,6 +447,23 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
         );
         CREATE INDEX IF NOT EXISTS idx_screen_tl_ts ON screen_timeline(timestamp DESC);
 
+        -- ── AUDIO TIMELINE — always-on transcription (Omi-style) ─────────────
+        CREATE TABLE IF NOT EXISTS audio_timeline (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp INTEGER NOT NULL,
+            duration_secs INTEGER NOT NULL DEFAULT 30,
+            transcript TEXT NOT NULL DEFAULT '',
+            source TEXT NOT NULL DEFAULT 'mic',
+            action_items TEXT NOT NULL DEFAULT '[]',
+            decisions TEXT NOT NULL DEFAULT '[]',
+            mentions TEXT NOT NULL DEFAULT '[]',
+            topics TEXT NOT NULL DEFAULT '[]',
+            sentiment TEXT NOT NULL DEFAULT 'neutral',
+            meeting_id TEXT NOT NULL DEFAULT '',
+            embedding_id TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_audio_tl_ts ON audio_timeline(timestamp DESC);
+
         -- ── BLADE SWARM — Parallel Multi-Agent Orchestration ─────────────────
         CREATE TABLE IF NOT EXISTS swarms (
             id TEXT PRIMARY KEY,
@@ -502,6 +519,25 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
     conn.execute(
         "CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_fts USING fts5(title, content, tags, content=knowledge_entries, content_rowid=rowid);",
         [],
+    )
+    .map_err(|e| format!("DB error: {}", e))?;
+
+    // ── Typed Memory — Omi-inspired structured categories ─────────────────────
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS typed_memories (
+            id           TEXT PRIMARY KEY,
+            category     TEXT NOT NULL,
+            content      TEXT NOT NULL,
+            confidence   REAL NOT NULL DEFAULT 0.7,
+            source       TEXT NOT NULL DEFAULT 'manual',
+            created_at   INTEGER NOT NULL,
+            last_accessed INTEGER NOT NULL,
+            access_count INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_typed_memories_category
+            ON typed_memories (category);
+        CREATE INDEX IF NOT EXISTS idx_typed_memories_confidence
+            ON typed_memories (confidence DESC);",
     )
     .map_err(|e| format!("DB error: {}", e))?;
 

@@ -1064,3 +1064,598 @@ pub async fn execute_tool(name: &str, args: &serde_json::Value) -> Option<(Strin
     }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// Phase 10 — Decepticon-inspired chained security pipeline
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── Data Types ────────────────────────────────────────────────────────────────
+
+/// A complete security audit report produced by the three-stage pipeline.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SecurityReport {
+    pub scope: String,
+    pub started_at: i64,
+    pub finished_at: i64,
+    /// Stage 1 output: open ports, running services, exposed endpoints.
+    pub recon_findings: String,
+    /// Stage 2 output: CVE matches, risk scores, prioritised vulnerabilities.
+    pub analysis_findings: String,
+    /// Stage 3 output: human-readable report with remediation recommendations.
+    pub report: String,
+    /// Overall risk verdict: "critical" | "high" | "medium" | "low" | "clean"
+    pub risk_level: String,
+}
+
+/// A single dependency vulnerability found during `audit_dependencies`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DepVulnerability {
+    pub ecosystem: String,  // "npm" | "cargo" | "pip"
+    pub package: String,
+    pub installed_version: String,
+    pub vulnerable_versions: String,
+    pub severity: String,   // "critical" | "high" | "medium" | "low"
+    pub title: String,
+    pub cve: Option<String>,
+    pub url: Option<String>,
+    pub fix_version: Option<String>,
+}
+
+/// A single security issue found by code scan.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SecurityIssue {
+    pub file_path: String,
+    pub line_number: Option<u32>,
+    pub issue_type: String,   // "sql_injection" | "xss" | "cmd_injection" | "hardcoded_secret" | "insecure_crypto" | etc.
+    pub severity: String,     // "critical" | "high" | "medium" | "low"
+    pub description: String,
+    pub code_snippet: Option<String>,
+    pub fix_suggestion: String,
+}
+
+// ── Stage helpers ─────────────────────────────────────────────────────────────
+
+/// Call the LLM with a one-shot user message and return the assistant's text.
+async fn llm_one_shot(system: &str, user: &str) -> Result<String, String> {
+    use crate::providers::{complete_turn, ConversationMessage};
+    let config = crate::config::load_config();
+    if config.api_key.is_empty() && config.provider != "ollama" {
+        return Err("No API key configured. Set one in Settings.".to_string());
+    }
+    let messages = vec![
+        ConversationMessage::System(system.to_string()),
+        ConversationMessage::User(user.to_string()),
+    ];
+    let no_tools: Vec<ToolDefinition> = Vec::new();
+    let turn = complete_turn(
+        &config.provider,
+        &config.api_key,
+        &config.model,
+        &messages,
+        &no_tools,
+        config.base_url.as_deref(),
+    )
+    .await?;
+    Ok(turn.content)
+}
+
+/// Run `netstat -an` and return a compact text summary of open ports / listeners.
+async fn recon_network_summary() -> String {
+    match scan_network_connections().await {
+        Ok(conns) => {
+            let listeners: Vec<_> = conns.iter()
+                .filter(|c| c.state.to_uppercase() == "LISTEN" || c.state.to_uppercase() == "LISTENING")
+                .collect();
+            let established: Vec<_> = conns.iter()
+                .filter(|c| c.state.to_uppercase() == "ESTABLISHED")
+                .collect();
+            let suspicious: Vec<_> = conns.iter().filter(|c| c.suspicious).collect();
+
+            let mut parts = Vec::new();
+            parts.push(format!("Total connections: {}", conns.len()));
+            parts.push(format!("Listening ports ({}):", listeners.len()));
+            for l in listeners.iter().take(30) {
+                parts.push(format!("  {} {}", l.protocol.to_uppercase(), l.local_addr));
+            }
+            parts.push(format!("Established connections: {}", established.len()));
+            if !suspicious.is_empty() {
+                parts.push(format!("SUSPICIOUS ({}):", suspicious.len()));
+                for s in &suspicious {
+                    parts.push(format!(
+                        "  [!] {} → {} | {}",
+                        s.local_addr,
+                        s.remote_addr,
+                        s.reason.as_deref().unwrap_or("unknown reason")
+                    ));
+                }
+            }
+            parts.join("\n")
+        }
+        Err(e) => format!("Network scan unavailable: {}", e),
+    }
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
+
+/// Run a three-stage Decepticon-inspired security audit.
+///
+/// Stage 1 (Recon — SecurityRecon role): enumerate open ports, running services,
+///   exposed endpoints, and collect sensitive file findings.
+/// Stage 2 (Analyze — SecurityAnalyst role): correlate recon data against known
+///   vulnerability classes, score risk.
+/// Stage 3 (Report — SecurityAuditor role): produce human-readable findings with
+///   remediation steps.
+///
+/// Each stage feeds its output as context to the next (chained pipeline).
+/// Uses the configured provider/model; falls back gracefully if LLM is unavailable.
+pub async fn run_security_audit(scope: &str) -> Result<SecurityReport, String> {
+    use crate::agents::AgentRole;
+
+    let started_at = Utc::now().timestamp();
+
+    // ── Stage 1: Recon ───────────────────────────────────────────────────────
+    let network_data = recon_network_summary().await;
+    let sensitive_files = scan_sensitive_files();
+    let files_summary = if sensitive_files.is_empty() {
+        "No sensitive files detected.".to_string()
+    } else {
+        let lines: Vec<String> = sensitive_files.iter().take(40).map(|f| {
+            format!("  [{}] {} — {} (gitignore: {})", f.risk, f.path, f.note, f.in_gitignore)
+        }).collect();
+        format!("Sensitive files found ({}):\n{}", sensitive_files.len(), lines.join("\n"))
+    };
+
+    let recon_data = format!(
+        "=== Network Scan ===\n{}\n\n=== Sensitive Files ===\n{}",
+        network_data, files_summary
+    );
+
+    let recon_system = AgentRole::SecurityRecon.build_system_prompt(
+        "You are running Stage 1 of a security audit. Analyze the raw recon data below and \
+         produce a structured findings report: list every significant open port, listening service, \
+         exposed endpoint, and sensitive file. Flag anything that should not normally be exposed."
+    );
+    let recon_findings = llm_one_shot(&recon_system, &format!(
+        "Scope: {}\n\nRaw recon data:\n{}", scope, recon_data
+    )).await.unwrap_or_else(|e| format!("Recon LLM unavailable: {}\n\nRaw data:\n{}", e, recon_data));
+
+    // ── Stage 2: Analyze ─────────────────────────────────────────────────────
+    let analyst_system = AgentRole::SecurityAnalyst.build_system_prompt(
+        "You are running Stage 2 of a security audit. You receive structured recon findings and \
+         must produce a prioritised risk register. For each finding: assign a CVSS-based severity \
+         (critical/high/medium/low), identify the vulnerability class or relevant CVE if applicable, \
+         describe the attack vector, and note quick wins. End with an overall risk verdict: \
+         one of: critical, high, medium, low, or clean."
+    );
+    let analysis_findings = llm_one_shot(&analyst_system, &format!(
+        "Scope: {}\n\nStage 1 recon findings:\n{}", scope, recon_findings
+    )).await.unwrap_or_else(|e| format!("Analysis LLM unavailable: {}", e));
+
+    // Extract overall risk level from analyst output
+    let risk_level = {
+        let lower = analysis_findings.to_lowercase();
+        // Look for explicit verdict line first
+        let verdict_line = lower.lines()
+            .find(|l| l.contains("overall risk") || l.contains("risk verdict") || l.contains("verdict:"))
+            .unwrap_or("");
+        if verdict_line.contains("critical") || lower.contains("critical risk") {
+            "critical"
+        } else if verdict_line.contains("high") || lower.contains("high risk") {
+            "high"
+        } else if verdict_line.contains("medium") || lower.contains("medium risk") {
+            "medium"
+        } else if verdict_line.contains("low") || lower.contains("low risk") {
+            "low"
+        } else if lower.contains("clean") || lower.contains("no significant") {
+            "clean"
+        } else {
+            "medium"  // safe default
+        }
+    }.to_string();
+
+    // ── Stage 3: Report ──────────────────────────────────────────────────────
+    let auditor_system = AgentRole::SecurityAuditor.build_system_prompt(
+        "You are running Stage 3 of a security audit. You receive the recon findings and risk \
+         analysis from the previous two stages. Produce a clear, human-readable security report \
+         with: an executive summary, a table of findings ordered by severity, and concrete \
+         step-by-step remediation recommendations for each finding. Format the output as Markdown."
+    );
+    let report = llm_one_shot(&auditor_system, &format!(
+        "Scope: {}\n\nStage 1 recon findings:\n{}\n\nStage 2 risk analysis:\n{}",
+        scope, recon_findings, analysis_findings
+    )).await.unwrap_or_else(|e| format!("Report LLM unavailable: {}", e));
+
+    let finished_at = Utc::now().timestamp();
+
+    Ok(SecurityReport {
+        scope: scope.to_string(),
+        started_at,
+        finished_at,
+        recon_findings,
+        analysis_findings,
+        report,
+        risk_level,
+    })
+}
+
+/// Audit dependencies for a project directory.
+///
+/// Detects the project type from lock files and runs the appropriate
+/// package-manager audit tool, then parses the JSON output into
+/// `DepVulnerability` records.
+///
+/// Supported ecosystems:
+///   - Node.js: package-lock.json  → `npm audit --json`
+///   - Rust:    Cargo.lock         → `cargo audit --json`
+///   - Python:  requirements.txt   → LLM-assisted CVE lookup (no pip audit required)
+pub async fn audit_dependencies(project_path: &str) -> Result<Vec<DepVulnerability>, String> {
+    let path = std::path::Path::new(project_path);
+    let mut vulns: Vec<DepVulnerability> = Vec::new();
+
+    // ── Node.js ──────────────────────────────────────────────────────────────
+    if path.join("package-lock.json").exists() || path.join("package.json").exists() {
+        let output = crate::cmd_util::silent_tokio_cmd("npm")
+            .args(["audit", "--json"])
+            .current_dir(path)
+            .output()
+            .await;
+
+        match output {
+            Ok(o) => {
+                let raw = String::from_utf8_lossy(&o.stdout).to_string();
+                vulns.extend(parse_npm_audit_json(&raw));
+            }
+            Err(e) => {
+                // npm not available — fall back to LLM heuristics on package.json
+                let pkg_json = std::fs::read_to_string(path.join("package.json"))
+                    .unwrap_or_default();
+                if !pkg_json.is_empty() {
+                    let llm_vulns = llm_dep_audit("npm", &pkg_json).await;
+                    vulns.extend(llm_vulns);
+                } else {
+                    return Err(format!("npm audit failed and package.json unreadable: {}", e));
+                }
+            }
+        }
+    }
+
+    // ── Rust ─────────────────────────────────────────────────────────────────
+    if path.join("Cargo.lock").exists() {
+        let output = crate::cmd_util::silent_tokio_cmd("cargo")
+            .args(["audit", "--json"])
+            .current_dir(path)
+            .output()
+            .await;
+
+        match output {
+            Ok(o) => {
+                let raw = String::from_utf8_lossy(&o.stdout).to_string();
+                vulns.extend(parse_cargo_audit_json(&raw));
+            }
+            Err(_) => {
+                // cargo-audit not installed — LLM fallback on Cargo.lock
+                let cargo_lock = std::fs::read_to_string(path.join("Cargo.lock"))
+                    .unwrap_or_default();
+                if !cargo_lock.is_empty() {
+                    let llm_vulns = llm_dep_audit("cargo", &cargo_lock).await;
+                    vulns.extend(llm_vulns);
+                }
+            }
+        }
+    }
+
+    // ── Python ───────────────────────────────────────────────────────────────
+    if path.join("requirements.txt").exists() {
+        let reqs = std::fs::read_to_string(path.join("requirements.txt"))
+            .unwrap_or_default();
+        if !reqs.is_empty() {
+            let llm_vulns = llm_dep_audit("pip", &reqs).await;
+            vulns.extend(llm_vulns);
+        }
+    }
+
+    if vulns.is_empty() && !path.join("package-lock.json").exists()
+        && !path.join("Cargo.lock").exists()
+        && !path.join("requirements.txt").exists()
+    {
+        return Err(format!(
+            "No supported lock files found in '{}'. Expected: package-lock.json, Cargo.lock, or requirements.txt",
+            project_path
+        ));
+    }
+
+    Ok(vulns)
+}
+
+/// Parse `npm audit --json` output into `DepVulnerability` records.
+fn parse_npm_audit_json(raw: &str) -> Vec<DepVulnerability> {
+    let mut vulns = Vec::new();
+    let Ok(json) = serde_json::from_str::<serde_json::Value>(raw) else {
+        return vulns;
+    };
+
+    // npm audit v7+ format: { "vulnerabilities": { "<pkg>": { ... } } }
+    if let Some(vulnerabilities) = json.get("vulnerabilities").and_then(|v| v.as_object()) {
+        for (pkg_name, info) in vulnerabilities {
+            let severity = info.get("severity")
+                .and_then(|s| s.as_str())
+                .unwrap_or("unknown")
+                .to_string();
+            let installed = info.get("range")
+                .or_else(|| info.get("nodes").and_then(|n| n.get(0)))
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string();
+
+            // Each pkg may have multiple advisories under "via"
+            if let Some(via) = info.get("via").and_then(|v| v.as_array()) {
+                for advisory in via {
+                    // Direct advisory object
+                    if let Some(title) = advisory.get("title").and_then(|t| t.as_str()) {
+                        let cve = advisory.get("cves")
+                            .and_then(|c| c.as_array())
+                            .and_then(|arr| arr.first())
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+                        let url = advisory.get("url")
+                            .and_then(|u| u.as_str())
+                            .map(|s| s.to_string());
+                        let fix_version = info.get("fixAvailable")
+                            .and_then(|f| f.get("version"))
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+                        vulns.push(DepVulnerability {
+                            ecosystem: "npm".to_string(),
+                            package: pkg_name.clone(),
+                            installed_version: installed.clone(),
+                            vulnerable_versions: advisory.get("vulnerable_versions")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("*")
+                                .to_string(),
+                            severity: advisory.get("severity")
+                                .and_then(|s| s.as_str())
+                                .unwrap_or(&severity)
+                                .to_string(),
+                            title: title.to_string(),
+                            cve,
+                            url,
+                            fix_version,
+                        });
+                    }
+                }
+            }
+            // If no "via" advisories, emit a generic entry for the package
+            if info.get("via").and_then(|v| v.as_array()).map(|a| a.is_empty()).unwrap_or(true) {
+                vulns.push(DepVulnerability {
+                    ecosystem: "npm".to_string(),
+                    package: pkg_name.clone(),
+                    installed_version: installed,
+                    vulnerable_versions: "*".to_string(),
+                    severity,
+                    title: format!("Vulnerability in {}", pkg_name),
+                    cve: None,
+                    url: None,
+                    fix_version: None,
+                });
+            }
+        }
+    }
+
+    vulns
+}
+
+/// Parse `cargo audit --json` output into `DepVulnerability` records.
+fn parse_cargo_audit_json(raw: &str) -> Vec<DepVulnerability> {
+    let mut vulns = Vec::new();
+    let Ok(json) = serde_json::from_str::<serde_json::Value>(raw) else {
+        return vulns;
+    };
+
+    // cargo audit JSON: { "vulnerabilities": { "list": [ { "advisory": {...}, "package": {...} } ] } }
+    if let Some(list) = json
+        .get("vulnerabilities")
+        .and_then(|v| v.get("list"))
+        .and_then(|l| l.as_array())
+    {
+        for entry in list {
+            let advisory = entry.get("advisory").cloned().unwrap_or_default();
+            let package = entry.get("package").cloned().unwrap_or_default();
+
+            let pkg_name = package.get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string();
+            let installed = package.get("version")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string();
+            let title = advisory.get("title")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Security advisory")
+                .to_string();
+            let severity = advisory.get("cvss")
+                .and_then(|c| c.get("score"))
+                .and_then(|s| s.as_f64())
+                .map(|score| {
+                    if score >= 9.0 { "critical" }
+                    else if score >= 7.0 { "high" }
+                    else if score >= 4.0 { "medium" }
+                    else { "low" }
+                })
+                .unwrap_or("medium")
+                .to_string();
+            let cve = advisory.get("aliases")
+                .and_then(|a| a.as_array())
+                .and_then(|arr| arr.iter().find(|v| {
+                    v.as_str().map(|s| s.starts_with("CVE-")).unwrap_or(false)
+                }))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let url = advisory.get("url")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let patched = entry.get("versions")
+                .and_then(|v| v.get("patched"))
+                .and_then(|p| p.as_array())
+                .and_then(|arr| arr.first())
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+
+            vulns.push(DepVulnerability {
+                ecosystem: "cargo".to_string(),
+                package: pkg_name,
+                installed_version: installed,
+                vulnerable_versions: advisory.get("affected")
+                    .and_then(|a| a.get("ranges"))
+                    .and_then(|r| r.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|r| r.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    })
+                    .unwrap_or_else(|| "*".to_string()),
+                severity,
+                title,
+                cve,
+                url,
+                fix_version: patched,
+            });
+        }
+    }
+
+    vulns
+}
+
+/// Use the LLM to identify potential known vulnerabilities in a dependency list
+/// when a native audit tool is unavailable.
+async fn llm_dep_audit(ecosystem: &str, dep_manifest: &str) -> Vec<DepVulnerability> {
+    use crate::agents::AgentRole;
+
+    let system = AgentRole::SecurityAuditor.build_system_prompt(
+        "You are auditing software dependencies. Given a list of packages and versions, \
+         identify any that are known to have security vulnerabilities. For each vulnerable \
+         package respond with EXACTLY one JSON object per line (no markdown fences), with \
+         these fields: ecosystem, package, installed_version, vulnerable_versions, severity, \
+         title, cve (or null), url (or null), fix_version (or null). \
+         severity must be one of: critical, high, medium, low. \
+         Output only JSON lines, nothing else. If no vulnerabilities are found output: []"
+    );
+    let user = format!(
+        "Ecosystem: {}\n\nDependency manifest:\n{}\n\nList all known vulnerabilities as JSON lines.",
+        ecosystem,
+        &dep_manifest[..dep_manifest.len().min(4000)]
+    );
+
+    match llm_one_shot(&system, &user).await {
+        Ok(response) => {
+            let mut vulns = Vec::new();
+            // Try full JSON array first
+            if let Ok(arr) = serde_json::from_str::<Vec<DepVulnerability>>(&response.trim()) {
+                return arr;
+            }
+            // Fall back to JSONL
+            for line in response.lines() {
+                let trimmed = line.trim();
+                if trimmed.is_empty() || trimmed == "[]" {
+                    continue;
+                }
+                if let Ok(v) = serde_json::from_str::<DepVulnerability>(trimmed) {
+                    vulns.push(v);
+                }
+            }
+            vulns
+        }
+        Err(_) => Vec::new(),
+    }
+}
+
+/// Use the LLM (SecurityAuditor role) to review source code for security issues.
+///
+/// Checks for: SQL injection, XSS, command injection, hardcoded secrets,
+/// insecure cryptography, path traversal, SSRF, and insecure deserialization.
+/// Returns a list of `SecurityIssue` records with line numbers and fix suggestions.
+pub async fn scan_code_security(file_path: &str) -> Result<Vec<SecurityIssue>, String> {
+    use crate::agents::AgentRole;
+
+    let content = std::fs::read_to_string(file_path)
+        .map_err(|e| format!("Cannot read file '{}': {}", file_path, e))?;
+
+    if content.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // Truncate very large files to stay within context limits
+    let max_chars = 12_000usize;
+    let (code_slice, truncated) = if content.len() > max_chars {
+        (&content[..max_chars], true)
+    } else {
+        (content.as_str(), false)
+    };
+
+    let truncation_note = if truncated {
+        format!("\n\n[NOTE: File was truncated to {} characters for analysis]", max_chars)
+    } else {
+        String::new()
+    };
+
+    let system = AgentRole::SecurityAuditor.build_system_prompt(
+        "You are performing a security code review. Analyze the provided source code and \
+         identify security vulnerabilities. For each issue output EXACTLY one JSON object \
+         per line (no markdown fences, no commentary outside JSON), with these fields: \
+         file_path (string), line_number (integer or null), issue_type (string), \
+         severity (one of: critical, high, medium, low), description (string), \
+         code_snippet (string or null, the vulnerable line(s)), fix_suggestion (string). \
+         issue_type must be one of: sql_injection, xss, cmd_injection, hardcoded_secret, \
+         insecure_crypto, path_traversal, ssrf, insecure_deserialization, open_redirect, \
+         weak_auth, info_disclosure, other. \
+         If no issues are found output a single empty JSON array: []"
+    );
+
+    let user = format!(
+        "File: {}{}\n\nSource code:\n```\n{}\n```\n\nList all security issues as JSON lines.",
+        file_path, truncation_note, code_slice
+    );
+
+    let response = llm_one_shot(&system, &user).await
+        .map_err(|e| format!("LLM code scan failed: {}", e))?;
+
+    // Try full JSON array first
+    if let Ok(arr) = serde_json::from_str::<Vec<SecurityIssue>>(response.trim()) {
+        return Ok(arr);
+    }
+
+    // Fall back to JSONL parsing
+    let mut issues = Vec::new();
+    for line in response.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed == "[]" {
+            continue;
+        }
+        if let Ok(issue) = serde_json::from_str::<SecurityIssue>(trimmed) {
+            issues.push(issue);
+        }
+    }
+
+    Ok(issues)
+}
+
+// ── New Tauri Commands ────────────────────────────────────────────────────────
+
+/// Run a three-stage security audit on the given scope (IP, hostname, or "local").
+#[tauri::command]
+pub async fn security_run_audit(scope: String) -> Result<SecurityReport, String> {
+    run_security_audit(&scope).await
+}
+
+/// Audit dependencies in a project directory for known CVEs.
+#[tauri::command]
+pub async fn security_audit_deps(project_path: String) -> Result<Vec<DepVulnerability>, String> {
+    audit_dependencies(&project_path).await
+}
+
+/// Scan a source file for security vulnerabilities using LLM code review.
+#[tauri::command]
+pub async fn security_scan_code(file_path: String) -> Result<Vec<SecurityIssue>, String> {
+    scan_code_security(&file_path).await
+}
+

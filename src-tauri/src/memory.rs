@@ -383,6 +383,28 @@ CONVERSATION:
             }
         }
 
+        // Feed into Omi-style typed memory system. Map old categories to typed categories.
+        {
+            let typed_cat = match category.as_str() {
+                "preference" => crate::typed_memory::MemoryCategory::Preference,
+                "decision"   => crate::typed_memory::MemoryCategory::Decision,
+                "personal"   => crate::typed_memory::MemoryCategory::Fact,
+                "technical"  => crate::typed_memory::MemoryCategory::Skill,
+                _            => crate::typed_memory::MemoryCategory::Fact,
+            };
+            let confidence = match category.as_str() {
+                "decision" | "personal"    => 0.8,
+                "technical" | "preference" => 0.7,
+                _                          => 0.6,
+            };
+            let _ = crate::typed_memory::store_typed_memory(
+                typed_cat,
+                &text,
+                &source,
+                Some(confidence),
+            );
+        }
+
         facts.push(Fact { text, category, source: source.clone() });
     }
 
@@ -609,6 +631,43 @@ pub async fn weekly_memory_consolidation() -> String {
 
     if pruned_prefs > 0 {
         diff_lines.push(format!("Pruned {} stale behavioral preferences", pruned_prefs));
+    }
+
+    // ── 3b. Typed memory consolidation ────────────────────────────────────────
+    // Ensure the table exists first (it may not exist on first run).
+    crate::typed_memory::ensure_table(&conn);
+
+    // Prune very-low-confidence typed memories older than 30 days.
+    let pruned_typed: i64 = conn.execute(
+        "DELETE FROM typed_memories WHERE confidence < 0.3 AND created_at < ?1",
+        rusqlite::params![thirty_days_ago],
+    ).map(|n| n as i64).unwrap_or(0);
+
+    if pruned_typed > 0 {
+        diff_lines.push(format!("Pruned {} stale typed memories", pruned_typed));
+    }
+
+    // Boost confidence of frequently-accessed typed memories (accessed 5+ times → +0.05).
+    let boosted_typed: i64 = conn.execute(
+        "UPDATE typed_memories
+         SET confidence = MIN(confidence + 0.05, 0.97)
+         WHERE access_count >= 5 AND confidence < 0.90",
+        [],
+    ).map(|n| n as i64).unwrap_or(0);
+
+    if boosted_typed > 0 {
+        diff_lines.push(format!("Boosted {} high-access typed memories", boosted_typed));
+    }
+
+    // Count new typed memories from this week.
+    let new_typed: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM typed_memories WHERE created_at >= ?1",
+        rusqlite::params![one_week_ago],
+        |r| r.get(0),
+    ).unwrap_or(0);
+
+    if new_typed > 0 {
+        diff_lines.push(format!("Added {} new typed memories this week", new_typed));
     }
 
     // ── 4. Count new facts learned this week ──────────────────────────────────

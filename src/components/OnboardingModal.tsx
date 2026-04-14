@@ -2,6 +2,34 @@ import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
+// ─── Smart API key detection ──────────────────────────────────────────────
+
+function detectProvider(key: string): { provider: string; model: string } | null {
+  if (key.startsWith("sk-or-v1-")) return { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free" };
+  if (key.startsWith("sk-ant-")) return { provider: "anthropic", model: "claude-sonnet-4-20250514" };
+  if (key.startsWith("sk-")) return { provider: "openai", model: "gpt-4o-mini" };
+  if (key.startsWith("gsk_")) return { provider: "groq", model: "llama-3.3-70b-versatile" };
+  if (key.startsWith("AIza")) return { provider: "gemini", model: "gemini-2.0-flash" };
+  return null;
+}
+
+const PROVIDER_DETECT_LABELS: Record<string, string> = {
+  openrouter: "Detected OpenRouter key — set model to llama-3.3-70b (free)",
+  anthropic: "Detected Anthropic key — set model to Claude Sonnet 4",
+  openai: "Detected OpenAI key — set model to gpt-4o-mini",
+  groq: "Detected Groq key — set model to llama-3.3-70b",
+  gemini: "Detected Gemini key — set model to gemini-2.0-flash",
+};
+
+const PROVIDER_FREE_TIER: Record<string, string> = {
+  openrouter: "Free models available",
+  gemini: "Generous free tier",
+  groq: "Free tier available",
+  ollama: "Completely free (local)",
+  openai: "Paid only",
+  anthropic: "Paid only",
+};
+
 // ─── Provider setup step ───────────────────────────────────────────────────
 
 interface ProviderOption {
@@ -132,6 +160,7 @@ export function OnboardingModal({ onComplete }: Props) {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [detectedToast, setDetectedToast] = useState<string | null>(null);
 
   // ── Auto-scroll scan log ───────────────────────────────────────────────
 
@@ -366,12 +395,21 @@ export function OnboardingModal({ onComplete }: Props) {
                 }}
                 className="w-full bg-blade-surface border border-blade-border rounded-lg px-3.5 py-2.5 text-[0.8125rem] text-blade-text outline-none focus:border-blade-accent/50 transition-colors appearance-none"
               >
-                {PROVIDERS.map((p) => (
-                  <option key={p.id + p.name} value={p.id + "|" + p.name}>
-                    {p.name}
-                  </option>
-                ))}
+                {PROVIDERS.map((p) => {
+                  const freeTier = PROVIDER_FREE_TIER[p.id];
+                  const label = freeTier ? `${p.name}  —  ${freeTier}` : p.name;
+                  return (
+                    <option key={p.id + p.name} value={p.id + "|" + p.name}>
+                      {label}
+                    </option>
+                  );
+                })}
               </select>
+              {selectedProvider && PROVIDER_FREE_TIER[selectedProvider.id] && (
+                <p className={`text-2xs mt-1 ${!PROVIDER_FREE_TIER[selectedProvider.id].includes("Paid") ? "text-emerald-400/80" : "text-blade-muted/60"}`}>
+                  {PROVIDER_FREE_TIER[selectedProvider.id]}
+                </p>
+              )}
             </div>
 
             {/* API key */}
@@ -391,11 +429,29 @@ export function OnboardingModal({ onComplete }: Props) {
                 value={apiKey}
                 disabled={!selectedProvider.needsKey}
                 onChange={(e) => {
-                  setApiKey(e.target.value);
+                  const val = e.target.value;
+                  setApiKey(val);
                   setTestState("idle");
                   setTestMessage(null);
+                  const detected = detectProvider(val.trim());
+                  if (detected) {
+                    const matchedProvider = PROVIDERS.find(p => p.id === detected.provider);
+                    if (matchedProvider) {
+                      setSelectedProvider(matchedProvider);
+                    }
+                    setModel(detected.model);
+                    setDetectedToast(PROVIDER_DETECT_LABELS[detected.provider] ?? `Detected ${detected.provider}`);
+                    setTimeout(() => setDetectedToast(null), 4000);
+                  }
                 }}
               />
+              {/* Auto-detect toast */}
+              {detectedToast && (
+                <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-blade-accent/10 border border-blade-accent/30 text-blade-accent text-2xs">
+                  <svg viewBox="0 0 16 16" className="w-3 h-3 shrink-0" fill="currentColor"><path d="M13.354 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+                  {detectedToast}
+                </div>
+              )}
             </div>
 
             {/* Model name */}

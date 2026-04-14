@@ -107,3 +107,75 @@ pub fn timeline_cleanup() -> Result<(), String> {
     cleanup_old_screenshots(config.timeline_retention_days);
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// Audio Timeline commands
+// ---------------------------------------------------------------------------
+
+/// Unified semantic search across screenshots, audio transcripts, conversations,
+/// and knowledge graph facts. Returns results sorted by relevance.
+#[tauri::command]
+pub async fn timeline_search_everything(
+    store: tauri::State<'_, crate::embeddings::SharedVectorStore>,
+    query: String,
+    limit: Option<usize>,
+) -> Result<Vec<crate::audio_timeline::UnifiedSearchResult>, String> {
+    let results = crate::audio_timeline::search_everything(
+        store.inner(),
+        &query,
+        limit.unwrap_or(20),
+    )
+    .await;
+    Ok(results)
+}
+
+/// Browse or search audio timeline entries.
+#[tauri::command]
+pub async fn timeline_get_audio(
+    store: tauri::State<'_, crate::embeddings::SharedVectorStore>,
+    query: Option<String>,
+    from_ts: Option<i64>,
+    to_ts: Option<i64>,
+    offset: Option<usize>,
+    limit: Option<usize>,
+) -> Result<Vec<crate::audio_timeline::AudioTimelineEntry>, String> {
+    let lim = limit.unwrap_or(20);
+    if let Some(q) = query.filter(|q| !q.trim().is_empty()) {
+        Ok(crate::audio_timeline::audio_timeline_search(store.inner(), &q, lim))
+    } else {
+        Ok(crate::audio_timeline::audio_timeline_browse(from_ts, to_ts, lim, offset.unwrap_or(0)))
+    }
+}
+
+/// Generate (or retrieve) the meeting summary for a given meeting_id.
+/// Call this after a meeting ends or manually for any meeting_id.
+#[tauri::command]
+pub async fn timeline_meeting_summary(
+    meeting_id: String,
+) -> Result<crate::audio_timeline::MeetingSummary, String> {
+    crate::audio_timeline::generate_meeting_summary(&meeting_id).await
+}
+
+/// Get all extracted action items from audio timeline entries.
+#[tauri::command]
+pub fn timeline_get_action_items(limit: Option<usize>) -> Vec<serde_json::Value> {
+    crate::audio_timeline::get_all_action_items(limit.unwrap_or(50))
+}
+
+/// Enable or disable always-on audio capture. Starts the loop if not already running.
+#[tauri::command]
+pub fn timeline_set_audio_capture(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    let mut config = crate::config::load_config();
+    config.audio_capture_enabled = enabled;
+    crate::config::save_config(&config)?;
+    if enabled {
+        crate::audio_timeline::start_audio_timeline_capture(app);
+    }
+    Ok(())
+}
+
+/// Check whether a video call / meeting is currently active.
+#[tauri::command]
+pub fn timeline_detect_meeting() -> bool {
+    crate::audio_timeline::detect_meeting_in_progress()
+}
