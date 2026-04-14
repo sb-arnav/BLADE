@@ -914,12 +914,15 @@ export function Dashboard({ onBack, onNavigate }: Props) {
                 )}
               </div>
             ) : (
-              <div className="flex h-full flex-col items-center justify-center gap-3 py-6">
-                <div className="text-[11px] uppercase tracking-[0.22em]" style={{ color: p.dim }}>
+              <div className="flex h-full flex-col items-center justify-center gap-3 py-6 text-center">
+                <div
+                  className="text-[11px] uppercase tracking-[0.22em]"
+                  style={{ color: p.dim }}
+                >
                   God Mode offline
                 </div>
-                <div className="text-[10px]" style={{ color: p.muted }}>
-                  Enable God Mode to receive live intelligence briefs
+                <div className="text-[10px] max-w-[200px] leading-snug" style={{ color: p.muted }}>
+                  Enable God Mode in Settings to see live context — active app, system state, and AI-generated briefs.
                 </div>
                 <button
                   type="button"
@@ -929,7 +932,7 @@ export function Dashboard({ onBack, onNavigate }: Props) {
                   className="border px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] transition-all hover:brightness-125"
                   style={{ borderColor: `${p.amber}55`, color: p.amber, background: `${p.amber}0d` }}
                 >
-                  Activate God Mode
+                  Enable God Mode
                 </button>
               </div>
             )}

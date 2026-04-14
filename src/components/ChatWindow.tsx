@@ -84,14 +84,14 @@ function ContextRibbon({
     : null;
 
   return (
-    <div className="flex items-center justify-between px-3 py-1 border-b border-blade-border/30 bg-blade-bg/60 shrink-0 min-h-[1.75rem] gap-2">
+    <div className="flex items-center justify-between px-3 py-1 border-b border-blade-border/20 bg-blade-bg/30 shrink-0 min-h-[1.75rem] gap-2">
       {/* Left: model + provider */}
       <button
         onClick={onOpenSettings}
-        className="flex items-center gap-1.5 text-blade-muted/60 hover:text-blade-muted transition-colors min-w-0"
+        className="flex items-center gap-1.5 text-blade-muted/40 hover:text-blade-muted/80 transition-all duration-200 min-w-0 group"
         title="Open settings"
       >
-        <svg viewBox="0 0 24 24" className="w-2.5 h-2.5 shrink-0 opacity-60" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg viewBox="0 0 24 24" className="w-2.5 h-2.5 shrink-0 opacity-50 group-hover:opacity-80" fill="none" stroke="currentColor" strokeWidth="2">
           <circle cx="12" cy="12" r="3" />
           <path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" />
         </svg>
@@ -101,7 +101,7 @@ function ContextRibbon({
             : provider ?? modelShort ?? "no model"}
         </span>
         {lastResponseTime != null && (
-          <span className="text-blade-muted/30 text-[0.6rem] font-mono shrink-0">
+          <span className="text-blade-muted/25 text-[0.6rem] font-mono shrink-0">
             {lastResponseTime < 1000 ? `${lastResponseTime}ms` : `${(lastResponseTime / 1000).toFixed(1)}s`}
           </span>
         )}
@@ -109,19 +109,25 @@ function ContextRibbon({
 
       {/* Center: perception / god mode */}
       {godModeOn && perceptionState && (
-        <div className="flex items-center gap-1 text-emerald-400/50 text-[0.6rem] font-mono shrink-0">
-          <span className="w-1 h-1 rounded-full bg-emerald-400/50" />
-          <span className="truncate max-w-[120px]">Focused · {perceptionState}</span>
+        <div className="flex items-center gap-1.5 text-emerald-400/50 text-[0.6rem] font-mono shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/5 border border-emerald-500/10">
+          <span className="w-1 h-1 rounded-full bg-emerald-400/60 animate-pulse" />
+          <span className="truncate max-w-[120px]">{perceptionState}</span>
         </div>
       )}
 
       {/* Right: memory + tool count */}
-      <div className="flex items-center gap-2 text-blade-muted/40 text-[0.6rem] font-mono shrink-0">
+      <div className="flex items-center gap-2.5 text-blade-muted/30 text-[0.6rem] font-mono shrink-0">
         {memoryCount != null && (
-          <span title="Memories">{memoryCount} mem</span>
+          <span title="Memories" className="flex items-center gap-1">
+            <span className="text-blade-muted/20">◈</span>
+            {memoryCount}
+          </span>
         )}
         {toolCount != null && toolCount > 0 && (
-          <span title="Available tools">{toolCount} tools</span>
+          <span title="Available tools" className="flex items-center gap-1">
+            <span className="text-blade-muted/20">⬡</span>
+            {toolCount}
+          </span>
         )}
       </div>
     </div>
@@ -147,9 +153,9 @@ interface ErrorCardProps {
 function ErrorCard({ error, onRetry, onOpenSettings }: ErrorCardProps) {
   const kind = classifyError(error);
   return (
-    <div className="mx-4 mt-3 mb-1 rounded-xl border border-red-500/20 bg-red-500/5 animate-fade-in overflow-hidden">
+    <div className="mx-3 mt-2.5 mb-1 rounded-xl border border-red-500/15 bg-red-500/4 animate-fade-up overflow-hidden shadow-glow-error/30">
       <div className="flex items-start gap-2.5 px-3 py-2.5">
-        <div className="shrink-0 mt-0.5 w-4 h-4 rounded-full bg-red-500/15 flex items-center justify-center">
+        <div className="shrink-0 mt-0.5 w-4 h-4 rounded-full bg-red-500/12 flex items-center justify-center">
           <svg viewBox="0 0 24 24" className="w-2.5 h-2.5 text-red-400" fill="none" stroke="currentColor" strokeWidth="2.5">
             <path d="M12 9v4M12 17h.01" />
             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
@@ -206,6 +212,26 @@ function ErrorCard({ error, onRetry, onOpenSettings }: ErrorCardProps) {
     </div>
   );
 }
+
+// ─── Welcome Tour ─────────────────────────────────────────────────────────────
+
+const TOUR_STEPS = [
+  {
+    title: "Talk to BLADE like a person",
+    body: "This is your chat. Ask BLADE to write code, search the web, manage files, or just think through a problem with you. It knows your context.",
+    cta: "Got it",
+  },
+  {
+    title: "Ctrl+K opens everything",
+    body: "The command palette gives you instant access to every BLADE feature — panels, actions, settings, and more. Try it anytime.",
+    cta: "Nice",
+  },
+  {
+    title: "Enable God Mode for ambient intelligence",
+    body: "God Mode watches your screen in the background and quietly builds context. Open Settings to turn it on and unlock the Intelligence Brief.",
+    cta: "Let's go",
+  },
+] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -267,6 +293,30 @@ export function ChatWindow({
   const [search, setSearch] = useState("");
   const [composerDraft, setComposerDraft] = useState<string | null>(null);
   const [godModeStatus, setGodModeStatus] = useState<{ bytes: number; tier: string } | null>(null);
+
+  // Welcome tour — show once after onboarding
+  const [tourStep, setTourStep] = useState<number>(() => {
+    try {
+      return localStorage.getItem("blade_tour_complete") ? -1 : 0;
+    } catch {
+      return -1;
+    }
+  });
+
+  function advanceTour() {
+    const next = tourStep + 1;
+    if (next >= TOUR_STEPS.length) {
+      setTourStep(-1);
+      try { localStorage.setItem("blade_tour_complete", "1"); } catch {}
+    } else {
+      setTourStep(next);
+    }
+  }
+
+  function dismissTour() {
+    setTourStep(-1);
+    try { localStorage.setItem("blade_tour_complete", "1"); } catch {}
+  }
   const godModeFadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -444,10 +494,60 @@ export function ChatWindow({
 
   return (
     <div className="flex h-full bg-blade-bg text-blade-text">
+      {/* Welcome tour overlay */}
+      {tourStep >= 0 && tourStep < TOUR_STEPS.length && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center pb-24 pointer-events-none">
+          <div
+            className="pointer-events-auto mx-4 max-w-sm w-full rounded-2xl border border-blade-accent/30 bg-blade-surface shadow-xl shadow-black/40 animate-fade-in"
+            style={{ animation: "fadeInUp 0.25s ease" }}
+          >
+            <style>{`@keyframes fadeInUp { from { opacity:0; transform:translateY(12px) } to { opacity:1; transform:translateY(0) } }`}</style>
+            <div className="flex items-center justify-between px-4 pt-4 pb-1">
+              <div className="flex items-center gap-2">
+                <span className="text-blade-accent text-xs font-mono font-semibold">
+                  {tourStep + 1}/{TOUR_STEPS.length}
+                </span>
+                <span className="text-sm font-semibold text-blade-text">
+                  {TOUR_STEPS[tourStep].title}
+                </span>
+              </div>
+              <button
+                onClick={dismissTour}
+                className="text-blade-muted hover:text-blade-secondary transition-colors text-xs"
+                aria-label="Dismiss tour"
+              >
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </div>
+            <p className="px-4 pb-3 text-xs text-blade-secondary leading-relaxed">
+              {TOUR_STEPS[tourStep].body}
+            </p>
+            <div className="flex items-center justify-between px-4 pb-4">
+              <div className="flex gap-1">
+                {TOUR_STEPS.map((_, i) => (
+                  <span
+                    key={i}
+                    className={`w-1.5 h-1.5 rounded-full transition-colors ${i === tourStep ? "bg-blade-accent" : "bg-blade-border"}`}
+                  />
+                ))}
+              </div>
+              <button
+                onClick={advanceTour}
+                className="px-4 py-1.5 rounded-lg bg-blade-accent/15 border border-blade-accent/40 text-xs font-semibold text-blade-accent hover:bg-blade-accent/25 transition-colors"
+              >
+                {TOUR_STEPS[tourStep].cta}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar overlay */}
       {sidebarOpen && (
         <div
-          className="fixed left-0 right-0 bottom-0 z-30 bg-black/50 backdrop-blur-[2px] transition-opacity"
+          className="fixed left-0 right-0 bottom-0 z-30 bg-black/60 backdrop-blur-sm transition-opacity"
           style={{ top: "2.25rem" }}
           onClick={() => toggleSidebar(false)}
         />
@@ -455,18 +555,18 @@ export function ChatWindow({
 
       {/* Sidebar */}
       <div
-        className={`fixed left-0 bottom-0 z-40 w-60 bg-blade-surface border-r border-blade-border flex flex-col transition-transform duration-200 ease-out ${
+        className={`fixed left-0 bottom-0 z-40 w-56 bg-blade-surface/98 backdrop-blur-xl border-r border-blade-border/50 flex flex-col shadow-surface-xl transition-transform duration-200 ease-out ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
         style={{ top: "2.25rem" }}
       >
-        <div className="flex items-center justify-between px-3 py-2.5">
-          <span className="text-2xs font-medium tracking-widest uppercase text-blade-muted">History</span>
+        <div className="flex items-center justify-between px-3 py-2.5 border-b border-blade-border/40">
+          <span className="text-2xs font-semibold tracking-[0.2em] uppercase text-blade-muted/50">History</span>
           <div className="flex items-center gap-1">
             {messages.length > 0 && (
               <button
                 onClick={handleExportConversation}
-                className="w-6 h-6 rounded-md flex items-center justify-center text-blade-muted hover:text-blade-secondary hover:bg-blade-surface-hover transition-colors"
+                className="w-6 h-6 rounded-md flex items-center justify-center text-blade-muted/50 hover:text-blade-secondary hover:bg-blade-surface-hover transition-all duration-150"
                 title={exportCopied ? "Copied!" : "Copy conversation as markdown"}
               >
                 {exportCopied ? (
@@ -483,7 +583,7 @@ export function ChatWindow({
             )}
             <button
               onClick={() => { onNewConversation(); toggleSidebar(false); }}
-              className="w-6 h-6 rounded-md flex items-center justify-center text-blade-muted hover:text-blade-secondary hover:bg-blade-surface-hover transition-colors"
+              className="w-6 h-6 rounded-md flex items-center justify-center text-blade-muted/50 hover:text-blade-secondary hover:bg-blade-surface-hover transition-all duration-150"
               title="New conversation"
             >
               <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
@@ -508,10 +608,10 @@ export function ChatWindow({
                 return (
                   <div
                     key={conv.id}
-                    className={`group relative rounded-lg px-2.5 py-2 mb-0.5 cursor-pointer transition-colors ${
+                    className={`group relative rounded-lg px-2.5 py-2 mb-0.5 cursor-pointer transition-all duration-150 ${
                       isActive
-                        ? "bg-blade-accent-muted text-blade-text"
-                        : "text-blade-secondary hover:bg-blade-surface-hover hover:text-blade-text"
+                        ? "bg-blade-accent/8 border-l-2 border-blade-accent text-blade-text pl-2"
+                        : "border-l-2 border-transparent text-blade-secondary hover:bg-blade-surface-hover hover:text-blade-text"
                     }`}
                     onClick={() => { if (renamingId !== conv.id) { onSwitchConversation(conv.id); toggleSidebar(false); } }}
                   >
@@ -525,13 +625,13 @@ export function ChatWindow({
                           if (e.key === "Enter") commitRename(conv.id);
                           if (e.key === "Escape") setRenamingId(null);
                         }}
-                        className="w-full text-xs bg-blade-bg border border-blade-accent/40 rounded px-1.5 py-0.5 outline-none text-blade-text"
+                        className="w-full text-xs bg-blade-bg border border-blade-accent/40 rounded-md px-1.5 py-0.5 outline-none text-blade-text focus:border-blade-accent/60 focus:shadow-inner-focus transition-all"
                         onClick={(e) => e.stopPropagation()}
                         autoFocus
                       />
                     ) : (
                       <p
-                        className="text-xs truncate"
+                        className="text-xs truncate leading-tight"
                         onDoubleClick={(e) => startRename(conv, e)}
                         title="Double-click to rename"
                       >
@@ -539,16 +639,16 @@ export function ChatWindow({
                       </p>
                     )}
                     <div className="flex items-center justify-between mt-0.5">
-                      <span className="text-2xs text-blade-muted">
+                      <span className={`text-2xs ${isActive ? "text-blade-muted/60" : "text-blade-muted/40"}`}>
                         {formatTime(conv.updated_at)}
-                        {conv.message_count ? <span className="ml-1.5 text-blade-muted/40">{conv.message_count}m</span> : null}
+                        {conv.message_count ? <span className="ml-1.5 opacity-50">{conv.message_count}m</span> : null}
                       </span>
                       {conversations.length > 1 && renamingId !== conv.id && (
                         <span
                           onClick={(e) => { e.stopPropagation(); onDeleteConversation(conv.id); }}
-                          className="text-2xs text-blade-muted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                          className="text-2xs text-blade-muted/30 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
                         >
-                          del
+                          ×
                         </span>
                       )}
                     </div>

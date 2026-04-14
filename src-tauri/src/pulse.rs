@@ -823,3 +823,267 @@ pub async fn pulse_now(app: tauri::AppHandle) -> Result<String, String> {
     let _ = std::fs::write(&thought_path, &thought);
     Ok(thought)
 }
+
+// ── Daily Digest ──────────────────────────────────────────────────────────────
+
+/// Rich daily digest struct — the full morning briefing in structured form.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct DailyDigest {
+    /// AI-generated morning briefing prose
+    pub briefing: String,
+    /// Calendar events today
+    pub calendar: Vec<String>,
+    /// Unread emails that need responses (with auto-drafts if available)
+    pub email_drafts: Vec<DigestEmailDraft>,
+    /// Git activity summary
+    pub git_summary: String,
+    /// Coding stats from yesterday
+    pub coding_stats: DigestCodingStats,
+    /// Pending commitments from people graph / reminders
+    pub commitments: Vec<String>,
+    /// Key health/wellbeing signal
+    pub health_note: String,
+    /// Temporal pattern insight
+    pub pattern_insight: String,
+    /// Generated timestamp
+    pub generated_at: i64,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct DigestEmailDraft {
+    pub sender: String,
+    pub preview: String,
+    pub draft: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct DigestCodingStats {
+    pub total_hours: f64,
+    pub primary_file: String,
+    pub longest_focus_minutes: i64,
+    pub commits_yesterday: u32,
+}
+
+/// The full daily digest — pulls from calendar, email, git, health, people graph, reminders.
+pub async fn generate_daily_digest(app: &tauri::AppHandle) -> Result<DailyDigest, String> {
+    let config = crate::config::load_config();
+    if config.api_key.is_empty() && config.provider != "ollama" {
+        return Err("No API key configured".to_string());
+    }
+
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let yesterday_ts = chrono::Utc::now().timestamp() - 86400;
+
+    // ── Calendar ────────────────────────────────────────────────────────────
+    let integration_state = crate::integration_bridge::get_integration_state();
+    let calendar: Vec<String> = integration_state.upcoming_events.iter().map(|ev| {
+        let dt = chrono::DateTime::from_timestamp(ev.start_ts, 0)
+            .map(|d| d.with_timezone(&chrono::Local).format("%-H:%M").to_string())
+            .unwrap_or_else(|| "?".to_string());
+        format!("{} at {}", ev.title, dt)
+    }).collect();
+
+    // ── Git summary ─────────────────────────────────────────────────────────
+    let git_summary = gather_git_status_summary();
+
+    // ── Coding stats from activity timeline ─────────────────────────────────
+    let coding_stats = rusqlite::Connection::open(&db_path)
+        .ok()
+        .map(|conn| gather_coding_stats(&conn, yesterday_ts))
+        .unwrap_or_default();
+
+    // ── Pending commitments from reminders + people notes ──────────────────
+    let commitments = gather_commitments(&db_path);
+
+    // ── Health note from guardian ────────────────────────────────────────────
+    let health_note = {
+        let stats = crate::health_guardian::get_health_stats();
+        let mins = stats["daily_total_minutes"].as_i64().unwrap_or(0);
+        if mins > 480 {
+            format!("You were at the screen for {} hours yesterday. Watch the streak.", mins / 60)
+        } else if mins > 0 {
+            format!("{} hours of screen time recorded yesterday.", mins / 60)
+        } else {
+            String::new()
+        }
+    };
+
+    // ── Temporal pattern ─────────────────────────────────────────────────────
+    let pattern_insight = rusqlite::Connection::open(&db_path)
+        .ok()
+        .map(|conn| analyze_temporal_patterns(&conn))
+        .unwrap_or_default();
+
+    // ── Email drafts (top 3 unread) ──────────────────────────────────────────
+    let email_drafts = gather_email_drafts(&config, &integration_state).await;
+
+    // ── Morning briefing prose ───────────────────────────────────────────────
+    let briefing = generate_morning_briefing(&config, &today).await.unwrap_or_default();
+
+    let digest = DailyDigest {
+        briefing,
+        calendar,
+        email_drafts,
+        git_summary,
+        coding_stats,
+        commitments,
+        health_note,
+        pattern_insight,
+        generated_at: chrono::Utc::now().timestamp(),
+    };
+
+    // Emit so the Dashboard can show it
+    let _ = app.emit("blade_daily_digest", &digest);
+
+    Ok(digest)
+}
+
+fn gather_coding_stats(conn: &rusqlite::Connection, since: i64) -> DigestCodingStats {
+    // Pull coding-related activity_timeline entries from yesterday
+    let entries: Vec<(String, String, i64)> = conn.prepare(
+        "SELECT event_type, title, timestamp FROM activity_timeline
+         WHERE timestamp > ?1 AND (event_type LIKE '%code%' OR event_type LIKE '%git%' OR event_type = 'screen')
+         ORDER BY timestamp ASC LIMIT 200"
+    )
+    .ok()
+    .and_then(|mut stmt| {
+        stmt.query_map(rusqlite::params![since], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, i64>(2)?))
+        }).ok().map(|rows| rows.flatten().collect())
+    })
+    .unwrap_or_default();
+
+    let total_hours = (entries.len() as f64 * 5.0) / 60.0; // rough: each entry ~5min
+
+    // Find most mentioned file/project in titles
+    let mut title_counts: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+    for (_, title, _) in &entries {
+        let words: Vec<&str> = title.split_whitespace().collect();
+        for w in words.iter().take(3) {
+            if w.contains('.') || w.contains('/') {
+                *title_counts.entry(w.to_string()).or_insert(0) += 1;
+            }
+        }
+    }
+    let primary_file = title_counts.into_iter()
+        .max_by_key(|(_, c)| *c)
+        .map(|(f, _)| f)
+        .unwrap_or_default();
+
+    // Longest focus session: longest gap-free sequence of entries within 15 min of each other
+    let mut max_focus = 0i64;
+    let mut session_start: Option<i64> = None;
+    let mut last_ts: Option<i64> = None;
+    for (_, _, ts) in &entries {
+        match (session_start, last_ts) {
+            (None, _) => { session_start = Some(*ts); last_ts = Some(*ts); }
+            (Some(start), Some(prev)) => {
+                if ts - prev <= 900 {
+                    // Within 15 min — same session
+                    last_ts = Some(*ts);
+                    let duration_mins = (ts - start) / 60;
+                    if duration_mins > max_focus { max_focus = duration_mins; }
+                } else {
+                    // Gap > 15 min — new session
+                    session_start = Some(*ts);
+                    last_ts = Some(*ts);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Count git commits
+    let commits: u32 = conn.query_row(
+        "SELECT COUNT(*) FROM activity_timeline WHERE timestamp > ?1 AND event_type = 'git_commit'",
+        rusqlite::params![since],
+        |row| row.get(0),
+    ).unwrap_or(0);
+
+    DigestCodingStats {
+        total_hours: (total_hours * 10.0).round() / 10.0,
+        primary_file,
+        longest_focus_minutes: max_focus,
+        commits_yesterday: commits,
+    }
+}
+
+fn gather_commitments(db_path: &std::path::Path) -> Vec<String> {
+    let conn = match rusqlite::Connection::open(db_path) {
+        Ok(c) => c,
+        Err(_) => return Vec::new(),
+    };
+
+    // Pull from reminders table — any pending reminders
+    let reminder_items: Vec<String> = conn.prepare(
+        "SELECT title FROM reminders WHERE fired = 0 AND fire_at <= ?1 LIMIT 5"
+    )
+    .ok()
+    .and_then(|mut stmt| {
+        let cutoff = chrono::Utc::now().timestamp() + 86400; // next 24h
+        stmt.query_map(rusqlite::params![cutoff], |row| row.get::<_, String>(0))
+            .ok()
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+    })
+    .unwrap_or_default();
+
+    // Pull from people notes — look for things that sound like commitments
+    let people_commitments: Vec<String> = conn.prepare(
+        "SELECT name, notes FROM people WHERE notes LIKE '%by%' OR notes LIKE '%finish%' OR notes LIKE '%deadline%' OR notes LIKE '%promised%' LIMIT 5"
+    )
+    .ok()
+    .and_then(|mut stmt| {
+        stmt.query_map([], |row| {
+            Ok(format!("{}: {}", row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .ok()
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+    })
+    .unwrap_or_default();
+
+    let mut all = reminder_items;
+    all.extend(people_commitments);
+    all.truncate(8);
+    all
+}
+
+async fn gather_email_drafts(
+    config: &crate::config::BladeConfig,
+    state: &crate::integration_bridge::IntegrationState,
+) -> Vec<DigestEmailDraft> {
+    // Only generate drafts if we have unread emails and an API key
+    if state.unread_emails == 0 || (config.api_key.is_empty() && config.provider != "ollama") {
+        return Vec::new();
+    }
+
+    // We don't have the actual email content here (integration bridge gives counts)
+    // so we generate placeholder drafts with guidance instead
+    let count = state.unread_emails.min(3) as usize;
+    let mut drafts = Vec::new();
+
+    for i in 0..count {
+        drafts.push(DigestEmailDraft {
+            sender: format!("Unread email #{}", i + 1),
+            preview: "Open BLADE email integration to see content".to_string(),
+            draft: String::new(),
+        });
+    }
+
+    drafts
+}
+
+/// Tauri command: generate and return the daily digest
+#[tauri::command]
+pub async fn pulse_daily_digest(app: tauri::AppHandle) -> Result<DailyDigest, String> {
+    generate_daily_digest(&app).await
+}
+
+/// Tauri command: get the last cached daily digest
+#[tauri::command]
+pub fn pulse_get_daily_digest() -> Option<DailyDigest> {
+    let path = crate::config::blade_config_dir().join("last_daily_digest.json");
+    std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+}

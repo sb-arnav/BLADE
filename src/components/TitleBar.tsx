@@ -21,6 +21,16 @@ const ROLES: BladeRole[] = [
   { id: "security",   name: "Security",    icon: "◆", tagline: "Find it first" },
 ];
 
+// Role accent colors — subtle tint per domain
+const ROLE_COLOR: Record<string, string> = {
+  engineering: "text-indigo-400",
+  research:    "text-sky-400",
+  marketing:   "text-pink-400",
+  operations:  "text-amber-400",
+  trading:     "text-emerald-400",
+  security:    "text-red-400",
+};
+
 function RoleSwitcher() {
   const [activeRole, setActiveRole] = useState("engineering");
   const [open, setOpen] = useState(false);
@@ -30,6 +40,14 @@ function RoleSwitcher() {
     invoke<BladeRole>("roles_get_active").then((r) => setActiveRole(r.id)).catch(() => {});
   }, []);
 
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = () => setOpen(false);
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, [open]);
+
   const switchRole = async (id: string) => {
     setSwitching(true);
     try {
@@ -37,50 +55,113 @@ function RoleSwitcher() {
       setActiveRole(id);
       setOpen(false);
     } catch {
-      // revert optimistic state on failure — nothing to do since we didn't update yet
+      // keep previous state on failure
     } finally {
       setSwitching(false);
     }
   };
 
   const current = ROLES.find((r) => r.id === activeRole) ?? ROLES[0];
+  const roleColor = ROLE_COLOR[activeRole] ?? "text-blade-accent";
 
   return (
-    <div className="relative" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+    <div
+      className="relative"
+      style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+      onClick={(e) => e.stopPropagation()}
+    >
       <button
         onClick={() => !switching && setOpen((o) => !o)}
-        className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] text-blade-muted hover:text-blade-text hover:bg-blade-surface transition-colors"
-        title={switching ? "Switching role..." : current.tagline}
         disabled={switching}
+        title={switching ? "Switching…" : current.tagline}
+        className={`
+          flex items-center gap-1.5 h-6 px-2.5 rounded-md
+          text-2xs font-medium tracking-wide
+          border border-transparent
+          transition-all duration-200
+          ${open
+            ? "bg-blade-surface-active border-blade-border text-blade-text"
+            : "text-blade-muted hover:text-blade-secondary hover:bg-blade-surface hover:border-blade-border/50"
+          }
+        `}
       >
         {switching ? (
-          <span className="w-2 h-2 rounded-full bg-blade-accent/50 animate-pulse" />
+          <span className="w-1.5 h-1.5 rounded-full bg-blade-accent animate-pulse-subtle" />
         ) : (
-          <span className="font-mono text-blade-accent">{current.icon}</span>
+          <span className={`font-mono text-[11px] ${roleColor}`}>{current.icon}</span>
         )}
-        <span className={`tracking-wide ${switching ? "text-blade-muted/50" : ""}`}>{current.name.toUpperCase()}</span>
-        <span className="text-blade-muted/40 ml-0.5">▾</span>
+        <span className={`uppercase tracking-[0.12em] ${switching ? "opacity-50" : ""}`}>
+          {current.name}
+        </span>
+        <svg
+          viewBox="0 0 10 6"
+          className={`w-2 h-2 text-blade-muted/50 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+        >
+          <path d="M1 1l4 4 4-4" />
+        </svg>
       </button>
 
       {open && (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-50 bg-blade-surface border border-blade-border rounded-lg shadow-xl overflow-hidden min-w-[160px]">
-          {ROLES.map((role) => (
-            <button
-              key={role.id}
-              onClick={() => switchRole(role.id)}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[10px] transition-colors ${
-                role.id === activeRole
-                  ? "bg-blade-accent/10 text-blade-accent"
-                  : "text-blade-muted hover:text-blade-text hover:bg-blade-surface-hover"
-              }`}
-            >
-              <span className="font-mono w-3 text-center">{role.icon}</span>
-              <div>
-                <div className="font-medium">{role.name}</div>
-                <div className="text-[9px] text-blade-muted/60">{role.tagline}</div>
-              </div>
-            </button>
-          ))}
+        <div
+          className="
+            absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-50
+            min-w-[188px] overflow-hidden
+            bg-blade-surface/95 backdrop-blur-xl
+            border border-blade-border
+            rounded-xl shadow-surface-xl
+            animate-fade-up
+          "
+        >
+          {/* Header */}
+          <div className="px-3 py-2 border-b border-blade-border/60">
+            <p className="text-3xs font-semibold uppercase tracking-[0.2em] text-blade-muted/50">
+              Active Role
+            </p>
+          </div>
+
+          {ROLES.map((role) => {
+            const isActive = role.id === activeRole;
+            const color = ROLE_COLOR[role.id] ?? "text-blade-accent";
+            return (
+              <button
+                key={role.id}
+                onClick={() => switchRole(role.id)}
+                className={`
+                  w-full flex items-center gap-2.5 px-3 py-2.5 text-left
+                  transition-all duration-150
+                  ${isActive
+                    ? "bg-blade-accent/8 text-blade-text"
+                    : "text-blade-secondary hover:text-blade-text hover:bg-blade-surface-hover"
+                  }
+                `}
+              >
+                <span className={`font-mono text-[12px] w-4 text-center shrink-0 ${isActive ? color : "text-blade-muted/60"}`}>
+                  {role.icon}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xs font-medium">{role.name}</span>
+                    {isActive && (
+                      <span className={`text-3xs font-bold uppercase tracking-wider px-1 py-0.5 rounded ${color} bg-current/10`}
+                        style={{ background: "currentColor", opacity: 1 }}
+                      >
+                        <span className="opacity-0 absolute">.</span>
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-3xs text-blade-muted/50 mt-0.5">{role.tagline}</p>
+                </div>
+                {isActive && (
+                  <svg viewBox="0 0 12 12" className={`w-2.5 h-2.5 shrink-0 ${color}`} fill="currentColor">
+                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
@@ -99,80 +180,125 @@ function ModelBadge() {
 
   if (!routing) return null;
 
-  // Show a compact model name (strip long prefixes)
   const shortModel = routing.model
     .replace(/^claude-/, "")
     .replace(/^gpt-/, "")
     .replace(/^gemini-/, "")
-    .replace(/-\d{8}$/, "")       // strip date suffixes
-    .replace(/^accounts\/.*\/models\//, "");  // strip Fireworks prefixes
+    .replace(/-\d{8}$/, "")
+    .replace(/^accounts\/.*\/models\//, "");
 
   return (
     <span
-      className="text-[9px] font-mono text-blade-muted/50 tracking-wide px-1.5 py-0.5 rounded border border-blade-border/30"
       title={`${routing.provider} / ${routing.model}`}
+      className="
+        flex items-center gap-1
+        text-2xs font-mono text-blade-muted/40
+        px-2 py-0.5 rounded-md
+        border border-blade-border/30
+        bg-blade-surface/50
+        tracking-wide
+        hover:text-blade-muted/70 hover:border-blade-border/60
+        transition-all duration-200 cursor-default
+      "
     >
+      <span className="w-1 h-1 rounded-full bg-blade-accent/40" />
       {shortModel}
     </span>
   );
 }
 
 export function TitleBar() {
-  const minimize = async () => {
-    try { await appWindow.minimize(); } catch {}
-  };
-
-  const toggleMaximize = async () => {
-    try { await appWindow.toggleMaximize(); } catch {}
-  };
-
-  const closeWindow = async () => {
-    try { await appWindow.close(); } catch {}
-  };
+  const minimize = async () => { try { await appWindow.minimize(); } catch {} };
+  const toggleMaximize = async () => { try { await appWindow.toggleMaximize(); } catch {} };
+  const closeWindow = async () => { try { await appWindow.close(); } catch {} };
 
   return (
     <div
-      className="h-9 bg-blade-bg flex items-center gap-3 px-3 shrink-0 select-none border-b border-blade-border/40"
+      className="
+        h-9 shrink-0 select-none
+        flex items-center gap-3 px-3
+        bg-blade-bg/95 backdrop-blur-sm
+        border-b border-blade-border/40
+      "
       data-tauri-drag-region
+      style={{
+        background: "linear-gradient(180deg, rgba(17,17,21,0.95) 0%, rgba(8,8,10,0.95) 100%)",
+      }}
     >
-      <div className="flex items-center gap-1.5 shrink-0 pointer-events-none" data-tauri-drag-region>
-        <div className="w-2 h-2 rounded-full bg-blade-accent shadow-[0_0_10px_rgba(99,102,241,0.45)]" />
-        <span className="text-2xs font-semibold tracking-[0.3em] text-blade-muted">
+      {/* Left: BLADE logotype */}
+      <div
+        className="flex items-center gap-2 shrink-0 pointer-events-none"
+        data-tauri-drag-region
+      >
+        {/* Orb */}
+        <div
+          className="w-2 h-2 rounded-full bg-blade-accent"
+          style={{ boxShadow: "0 0 8px rgba(99,102,241,0.6), 0 0 16px rgba(99,102,241,0.2)" }}
+        />
+        <span
+          className="text-2xs font-bold tracking-[0.35em] text-blade-text/80"
+          style={{ fontFeatureSettings: '"cpsp" 1' }}
+        >
           BLADE
         </span>
       </div>
 
-      <div className="flex-1 h-full flex items-center justify-center gap-2" data-tauri-drag-region>
+      {/* Center: role + model */}
+      <div
+        className="flex-1 h-full flex items-center justify-center gap-2"
+        data-tauri-drag-region
+      >
         <RoleSwitcher />
         <ModelBadge />
       </div>
 
-      <div className="flex items-center gap-0.5 shrink-0" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+      {/* Right: window controls */}
+      <div
+        className="flex items-center gap-0.5 shrink-0"
+        style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+      >
         <button
           onClick={minimize}
-          className="w-8 h-8 rounded-md text-blade-muted/60 hover:text-blade-secondary hover:bg-blade-surface transition-colors flex items-center justify-center"
+          className="
+            w-7 h-7 rounded-md
+            flex items-center justify-center
+            text-blade-muted/40 hover:text-blade-secondary hover:bg-blade-surface
+            transition-all duration-150
+          "
           aria-label="Minimize"
         >
-          <svg viewBox="0 0 24 24" className="w-[10px] h-[10px]" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M5 12h14" />
+          <svg viewBox="0 0 20 20" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M4 10h12" />
           </svg>
         </button>
+
         <button
           onClick={toggleMaximize}
-          className="w-8 h-8 rounded-md text-blade-muted/60 hover:text-blade-secondary hover:bg-blade-surface transition-colors flex items-center justify-center"
+          className="
+            w-7 h-7 rounded-md
+            flex items-center justify-center
+            text-blade-muted/40 hover:text-blade-secondary hover:bg-blade-surface
+            transition-all duration-150
+          "
           aria-label="Maximize"
         >
-          <svg viewBox="0 0 24 24" className="w-[10px] h-[10px]" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <rect x="5" y="5" width="14" height="14" rx="1.5" />
+          <svg viewBox="0 0 20 20" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <rect x="4" y="4" width="12" height="12" rx="2" />
           </svg>
         </button>
+
         <button
           onClick={closeWindow}
-          className="w-8 h-8 rounded-md text-blade-muted/60 hover:text-red-400 hover:bg-red-400/10 transition-colors flex items-center justify-center"
+          className="
+            w-7 h-7 rounded-md
+            flex items-center justify-center
+            text-blade-muted/40 hover:text-red-400 hover:bg-red-500/10
+            transition-all duration-150
+          "
           aria-label="Close"
         >
-          <svg viewBox="0 0 24 24" className="w-[10px] h-[10px]" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M6 6l12 12M18 6L6 18" />
+          <svg viewBox="0 0 20 20" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M5 5l10 10M15 5L5 15" />
           </svg>
         </button>
       </div>

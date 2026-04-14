@@ -268,20 +268,60 @@ export function IntegrationStatus({ onBack }: IntegrationStatusProps) {
         )}
 
         {loading && (
-          <div className="flex items-center gap-2 text-2xs text-blade-muted py-4">
-            <div className="w-1.5 h-1.5 rounded-full bg-blade-accent animate-pulse" />
-            Loading integrations...
+          <div className="space-y-3 animate-pulse">
+            {[0,1,2,3].map(i => (
+              <div key={i} className="rounded-xl border border-blade-border/40 h-16 bg-blade-surface/40" />
+            ))}
           </div>
         )}
 
-        {error && (
-          <div className="p-3 rounded-xl bg-red-950/40 border border-red-800/40 text-xs text-red-400">
-            {error}
+        {!loading && error && (
+          <div className="flex flex-col items-center justify-center py-10 gap-4 text-center">
+            <div className="w-10 h-10 rounded-xl bg-red-900/20 border border-red-700/40 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 8v4M12 15v1" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-blade-secondary">Something went wrong</p>
+              <p className="text-xs text-blade-muted mt-1 max-w-xs">Integration bridge could not be reached.</p>
+            </div>
+            <button
+              onClick={fetchState}
+              className="px-4 py-1.5 rounded-lg bg-blade-surface border border-blade-border text-xs text-blade-secondary hover:text-blade-text hover:border-blade-accent/60 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* First-time empty state: state loaded but all zeros and last_updated is null */}
+        {!loading && !error && state && state.last_updated === null && (
+          <div className="rounded-xl border border-blade-accent/20 bg-blade-surface/40 p-5 mb-1">
+            <p className="text-sm font-semibold text-blade-text mb-1">Connect your first service</p>
+            <p className="text-xs text-blade-muted mb-4 leading-relaxed">
+              BLADE can pull in unread emails, calendar events, Slack mentions, and GitHub notifications — all in one place.
+            </p>
+            <div className="space-y-2 text-xs text-blade-secondary">
+              <div className="flex items-start gap-2.5">
+                <span className="text-blade-accent font-bold shrink-0 mt-0.5">1.</span>
+                <span>Toggle the service on below to enable it</span>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <span className="text-blade-accent font-bold shrink-0 mt-0.5">2.</span>
+                <span>Hit <span className="font-mono bg-blade-border/30 px-1 rounded">Poll</span> to fetch the latest data right now</span>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <span className="text-blade-accent font-bold shrink-0 mt-0.5">3.</span>
+                <span>BLADE will keep them up to date automatically in the background</span>
+              </div>
+            </div>
           </div>
         )}
 
         {/* Service cards */}
-        {!loading && (
+        {!loading && !error && (
           <div className="space-y-3">
             {SERVICES.map((service) => (
               <ServiceCard

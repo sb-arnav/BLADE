@@ -173,17 +173,60 @@ export function HealthPanel({ onBack }: { onBack: () => void }) {
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 max-w-2xl mx-auto w-full">
         {loading && (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-2 h-2 rounded-full bg-blade-accent animate-pulse" />
+          <div className="space-y-3 animate-pulse">
+            <div className="border border-blade-border rounded-xl bg-blade-surface/40 h-28" />
+            <div className="border border-blade-border rounded-lg bg-blade-surface/40 h-20" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="border border-blade-border rounded-lg bg-blade-surface/40 h-16" />
+              <div className="border border-blade-border rounded-lg bg-blade-surface/40 h-16" />
+            </div>
           </div>
         )}
-        {error && (
-          <div className="border border-red-700/40 rounded-lg bg-red-900/10 p-4 text-xs text-red-400">
-            Failed to load health stats: {error}
+        {!loading && error && (
+          <div className="flex flex-col items-center justify-center py-12 gap-4 text-center">
+            <div className="w-10 h-10 rounded-xl bg-red-900/20 border border-red-700/40 flex items-center justify-center">
+              <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-red-400">
+                <circle cx="8" cy="8" r="6" />
+                <path d="M8 5v3.5M8 10.5v.5" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-blade-secondary">Something went wrong</p>
+              <p className="text-xs text-blade-muted mt-1 max-w-xs">Could not load health data. The health guardian may still be starting up.</p>
+            </div>
+            <button
+              onClick={load}
+              className="px-4 py-1.5 text-xs font-medium rounded border border-blade-border text-blade-secondary hover:border-blade-accent/50 hover:text-blade-accent transition-all bg-blade-surface"
+            >
+              Retry
+            </button>
           </div>
         )}
 
-        {!loading && stats && (
+        {!loading && !error && stats && stats.daily_total_minutes === 0 && stats.current_streak_minutes === 0 && (
+          <div className="flex flex-col items-center justify-center py-16 gap-5 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-blade-surface border border-blade-border flex items-center justify-center">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className="text-blade-accent">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7v5l3 3" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-base font-semibold text-blade-text">BLADE is tracking your screen time</p>
+              <p className="text-xs text-blade-muted mt-1.5 max-w-xs leading-relaxed">
+                Check back in an hour for insights on your focus sessions, break habits, and daily usage patterns.
+              </p>
+            </div>
+            <div className="border border-blade-border/50 rounded-lg bg-blade-surface/40 p-3 text-xs text-blade-muted text-left max-w-xs w-full space-y-1">
+              <p className="font-medium text-blade-secondary">What BLADE tracks:</p>
+              <p>· Active screen time per session</p>
+              <p>· Break frequency and duration</p>
+              <p>· Daily totals vs. recommended 8h max</p>
+            </div>
+          </div>
+        )}
+
+        {!loading && !error && stats && !(stats.daily_total_minutes === 0 && stats.current_streak_minutes === 0) && (
           <>
             {/* Current streak — hero number */}
             <div className="border border-blade-border rounded-xl bg-blade-surface p-5 text-center space-y-1">
