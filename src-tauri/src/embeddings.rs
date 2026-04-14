@@ -324,6 +324,121 @@ pub fn recall_relevant(store: &SharedVectorStore, query: &str, top_k: usize) -> 
     formatted.join("\n\n")
 }
 
+/// Smart context recall — the "compounding" mechanism.
+/// Before each chat message, does a quick semantic search against:
+///   1. Past conversation summaries (memory_palace summaries)
+///   2. Knowledge graph facts (kg_nodes with high importance)
+///   3. Extracted preferences (brain_preferences)
+///
+/// Returns the top 3 most relevant hits formatted for system prompt injection.
+/// This is what makes BLADE get smarter with every conversation.
+pub fn smart_context_recall(query: &str) -> String {
+    if query.trim().is_empty() {
+        return String::new();
+    }
+
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    let conn = match rusqlite::Connection::open(&db_path) {
+        Ok(c) => c,
+        Err(_) => return String::new(),
+    };
+
+    // 1. Semantic search across vector entries — finds past summaries and exchanges
+    let query_embedding = match embed_texts(&[query.to_string()]) {
+        Ok(e) => e.into_iter().next().unwrap_or_default(),
+        Err(_) => return String::new(),
+    };
+
+    let mut hits: Vec<(f32, String, &'static str)> = Vec::new(); // (score, text, source_type)
+
+    // Load conversation summaries from vector_entries
+    let summaries: Vec<(String, Vec<u8>)> = conn.prepare(
+        "SELECT content, embedding FROM vector_entries WHERE source_type = 'conversation_summary' ORDER BY created_at DESC LIMIT 100"
+    ).and_then(|mut stmt| {
+        stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?))
+        }).map(|rows| rows.filter_map(|r| r.ok()).collect())
+    }).unwrap_or_default();
+
+    for (content, blob) in &summaries {
+        let vec: Vec<f32> = blob.chunks_exact(4)
+            .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+            .collect();
+        let score = {
+            if query_embedding.is_empty() || vec.is_empty() { 0.0 }
+            else {
+                let dot: f32 = query_embedding.iter().zip(vec.iter()).map(|(a, b)| a * b).sum();
+                let mag_a: f32 = query_embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
+                let mag_b: f32 = vec.iter().map(|x| x * x).sum::<f32>().sqrt();
+                if mag_a == 0.0 || mag_b == 0.0 { 0.0 } else { dot / (mag_a * mag_b) }
+            }
+        };
+        if score > 0.35 {
+            hits.push((score, content.clone(), "past_summary"));
+        }
+    }
+
+    // 2. KG facts — text match against high-importance nodes
+    let kg_nodes: Vec<(String, f32)> = conn.prepare(
+        "SELECT description, importance FROM kg_nodes WHERE importance >= 0.7 AND description != '' ORDER BY importance DESC LIMIT 30"
+    ).and_then(|mut stmt| {
+        stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, f32>(1)?))
+        }).map(|rows| rows.filter_map(|r| r.ok()).collect())
+    }).unwrap_or_default();
+
+    let query_lower = query.to_lowercase();
+    let query_terms: Vec<&str> = query_lower.split_whitespace()
+        .filter(|t| t.len() >= 3)
+        .collect();
+
+    for (desc, importance) in &kg_nodes {
+        if query_terms.is_empty() { break; }
+        let desc_lower = desc.to_lowercase();
+        let matches = query_terms.iter().filter(|t| desc_lower.contains(*t)).count();
+        if matches > 0 {
+            let score = (matches as f32 / query_terms.len() as f32) * importance;
+            if score > 0.2 {
+                hits.push((score, format!("[fact] {}", desc), "kg_fact"));
+            }
+        }
+    }
+
+    // 3. Preferences — always relevant, light weight
+    let prefs: Vec<(String, f64)> = conn.prepare(
+        "SELECT text, confidence FROM brain_preferences WHERE confidence >= 0.75 ORDER BY confidence DESC LIMIT 10"
+    ).and_then(|mut stmt| {
+        stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
+        }).map(|rows| rows.filter_map(|r| r.ok()).collect())
+    }).unwrap_or_default();
+
+    for (text, confidence) in &prefs {
+        hits.push(((*confidence as f32) * 0.5, format!("[preference] {}", text), "preference"));
+    }
+
+    if hits.is_empty() {
+        return String::new();
+    }
+
+    // Sort by score descending, take top 3
+    hits.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    let top: Vec<String> = hits
+        .into_iter()
+        .take(3)
+        .map(|(_, text, _)| text)
+        .collect();
+
+    if top.is_empty() {
+        return String::new();
+    }
+
+    format!(
+        "## Compounding Memory (relevant to this query)\n\n{}",
+        top.join("\n\n")
+    )
+}
+
 // --- Tauri Commands ---
 
 #[tauri::command]

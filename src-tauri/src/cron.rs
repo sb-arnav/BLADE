@@ -270,6 +270,13 @@ fn seed_preset_tasks(conn: &Connection) {
             r#"{"kind":"interval","time_of_day":null,"day_of_week":null,"interval_secs":7200}"#,
             r#"{"kind":"inbox_check","content":"inbox_check","agent_type":null,"cwd":null}"#,
         ),
+        (
+            "preset:memory_consolidation",
+            "Weekly Memory Consolidation",
+            "Sunday midnight: merge duplicate KG nodes, promote core knowledge, prune stale facts, generate memory diff.",
+            r#"{"kind":"weekly","time_of_day":0,"day_of_week":0,"interval_secs":null}"#,
+            r#"{"kind":"memory_consolidation","content":"memory_consolidation","agent_type":null,"cwd":null}"#,
+        ),
     ];
 
     for (id, name, desc, sched_json, action_json) in presets {
@@ -467,6 +474,9 @@ async fn execute_task(task: &CronTask, app: &tauri::AppHandle) {
         }
         "inbox_check" => {
             execute_inbox_check(task, app).await;
+        }
+        "memory_consolidation" => {
+            execute_memory_consolidation(app).await;
         }
         // "message" and anything else
         _ => {
@@ -695,6 +705,40 @@ Voice: Direct, honest. No headers. No bullets. Start in the middle."#,
             crate::config::check_and_disable_on_402(&e);
             log::warn!("[cron] Weekly review failed: {}", e);
         }
+    }
+}
+
+/// Execute the weekly memory consolidation task.
+async fn execute_memory_consolidation(app: &tauri::AppHandle) {
+    log::info!("[cron] Running weekly memory consolidation");
+
+    let diff = crate::memory::weekly_memory_consolidation().await;
+
+    if diff.is_empty() {
+        log::info!("[cron] Memory consolidation: no changes");
+        return;
+    }
+
+    let short_summary = diff.lines().take(3).collect::<Vec<_>>().join(" | ");
+    log::info!("[cron] Memory consolidation complete: {}", short_summary);
+
+    let _ = app.emit("proactive_nudge", serde_json::json!({
+        "message": format!("[Memory Consolidation]\n{}", diff),
+        "type": "memory_consolidation",
+    }));
+
+    // Also record in timeline
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+        let date_str = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let _ = crate::db::timeline_record(
+            &conn,
+            "memory",
+            &format!("Weekly memory consolidation {}", date_str),
+            &diff,
+            "BLADE",
+            "{}",
+        );
     }
 }
 

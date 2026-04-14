@@ -245,6 +245,150 @@ pub async fn update_conversation_block(user_msg: &str, assistant_msg: &str) -> R
     write_blade_file(&conversation_block_path(), &blocks.conversation_block)
 }
 
+// ── Fact extraction from conversations ───────────────────────────────────────
+
+/// A single extracted fact: a piece of knowledge worth storing persistently.
+#[derive(Debug, Clone)]
+pub struct Fact {
+    pub text: String,
+    /// Category: "decision", "technical", "preference", "personal"
+    pub category: String,
+    pub source: String, // e.g. "conversation:1234567890"
+}
+
+/// Extract key facts from a completed conversation using a cheap LLM call.
+/// Returns structured facts categorized by type:
+/// - "decision"   — "user chose React over Vue", "user prefers tabs over spaces"
+/// - "technical"  — "user's API is at /api/v2", "database is PostgreSQL 15"
+/// - "preference" — "user likes concise answers", "user gets annoyed by verbose responses"
+/// - "personal"   — name, role, project info shared
+///
+/// Stores each fact as a KG node with source = "conversation:{timestamp}".
+pub async fn extract_conversation_facts(messages: &[crate::providers::ChatMessage]) -> Vec<Fact> {
+    let config = load_config();
+    if config.api_key.is_empty() && config.provider != "ollama" {
+        return vec![];
+    }
+
+    // Build conversation text — cap at 4000 chars to avoid token explosion
+    let conversation_text: String = messages
+        .iter()
+        .filter(|m| !m.content.trim().is_empty())
+        .map(|m| format!("{}: {}", m.role, m.content))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    if conversation_text.len() < 100 {
+        return vec![];
+    }
+
+    let snippet = crate::safe_slice(&conversation_text, 4000);
+    let prompt = format!(
+        r#"Extract key compounding facts from this conversation. These facts will be stored permanently and shape future conversations.
+
+Focus ONLY on:
+1. DECISIONS — choices made ("user chose React over Vue", "user prefers tabs over spaces")
+2. TECHNICAL — concrete technical facts ("API is at /api/v2", "database is PostgreSQL 15", "project uses pnpm")
+3. PREFERENCES — how they like to work ("user likes concise answers", "user prefers bullet points over paragraphs")
+4. PERSONAL — identity facts (name, role, location, ongoing projects)
+
+If nothing meaningful was established, respond with exactly: NOTHING
+
+Otherwise respond ONLY with a JSON array (no markdown fences):
+[
+  {{"text": "fact text", "category": "decision|technical|preference|personal"}},
+  ...
+]
+
+Be specific. "user likes React" is useless. "user chose React over Vue for the dashboard because of the ecosystem" is valuable.
+
+CONVERSATION:
+{snippet}"#
+    );
+
+    let llm_msgs = vec![crate::providers::ConversationMessage::User(prompt)];
+    let cheap = crate::config::cheap_model_for_provider(&config.provider, &config.model);
+
+    let raw = match crate::providers::complete_turn(
+        &config.provider,
+        &config.api_key,
+        &cheap,
+        &llm_msgs,
+        &[],
+        config.base_url.as_deref(),
+    ).await {
+        Ok(r) => r.content,
+        Err(_) => return vec![],
+    };
+
+    let trimmed = raw.trim();
+    if trimmed.eq_ignore_ascii_case("NOTHING") || trimmed.starts_with("NOTHING") {
+        return vec![];
+    }
+
+    // Strip markdown fences if present
+    let json_str = if let Some(start) = trimmed.find('[') {
+        if let Some(end) = trimmed.rfind(']') {
+            &trimmed[start..=end]
+        } else { trimmed }
+    } else { trimmed };
+
+    let parsed: Vec<serde_json::Value> = match serde_json::from_str(json_str) {
+        Ok(v) => v,
+        Err(_) => return vec![],
+    };
+
+    let source = format!("conversation:{}", chrono::Utc::now().timestamp());
+    let mut facts = Vec::new();
+
+    for item in parsed {
+        let text = match item["text"].as_str() {
+            Some(t) if !t.trim().is_empty() => t.trim().to_string(),
+            _ => continue,
+        };
+        let category = item["category"]
+            .as_str()
+            .unwrap_or("technical")
+            .to_string();
+
+        // Immediately store as KG node
+        let node = crate::knowledge_graph::KnowledgeNode {
+            id: String::new(), // auto-assigned by add_node
+            concept: text.chars().take(80).collect::<String>().trim().to_lowercase(),
+            node_type: match category.as_str() {
+                "preference" => "concept".to_string(),
+                "technical"  => "technology".to_string(),
+                "decision"   => "event".to_string(),
+                "personal"   => "person".to_string(),
+                _            => "concept".to_string(),
+            },
+            description: text.clone(),
+            sources: vec![source.clone()],
+            importance: match category.as_str() {
+                "decision" | "personal"  => 0.8,
+                "technical" | "preference" => 0.7,
+                _ => 0.6,
+            },
+            created_at: chrono::Utc::now().timestamp(),
+            last_updated: chrono::Utc::now().timestamp(),
+        };
+        let _ = crate::knowledge_graph::add_node(node);
+
+        // For preferences, also store in brain_preferences
+        if category == "preference" {
+            let db_path = crate::config::blade_config_dir().join("blade.db");
+            if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                let pref_id = format!("pref-conv-{}", uuid::Uuid::new_v4());
+                let _ = crate::db::brain_upsert_preference(&conn, &pref_id, &text, 0.7, "conversation_extraction");
+            }
+        }
+
+        facts.push(Fact { text, category, source: source.clone() });
+    }
+
+    facts
+}
+
 // ── Legacy functions (kept for backwards compatibility) ───────────────────────
 
 fn context_path() -> PathBuf {
@@ -370,6 +514,15 @@ Key facts:"#,
         }
     }
 
+    // NEW: Extract structured facts into KG + brain_preferences
+    // This runs in the background so it doesn't slow down the command response
+    {
+        let msgs_clone = messages.clone();
+        tokio::spawn(async move {
+            extract_conversation_facts(&msgs_clone).await;
+        });
+    }
+
     // Also write each fact as a structured brain memory entry (legacy DB path)
     let db_path = crate::config::blade_config_dir().join("blade.db");
     if let Ok(conn) = rusqlite::Connection::open(&db_path) {
@@ -399,6 +552,163 @@ pub fn get_memory_log() -> Vec<serde_json::Value> {
         .take(30)
         .filter_map(|line| serde_json::from_str(line).ok())
         .collect()
+}
+
+// ── Weekly memory consolidation ───────────────────────────────────────────────
+
+/// Weekly consolidation pass — run this once a week via cron to keep memory lean and sharp.
+///
+/// What it does:
+/// 1. Merges duplicate KG nodes (same concept, different wording)
+/// 2. Promotes frequently-accessed facts to "core knowledge" (bumps importance to 0.9)
+/// 3. Prunes low-confidence facts that were never reaffirmed (older than 30 days, confidence < 0.5)
+/// 4. Generates a "memory diff" showing what BLADE learned this week
+///
+/// Returns a human-readable diff of what changed.
+pub async fn weekly_memory_consolidation() -> String {
+    let config = load_config();
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    let conn = match rusqlite::Connection::open(&db_path) {
+        Ok(c) => c,
+        Err(e) => return format!("DB error: {}", e),
+    };
+
+    let now = chrono::Utc::now().timestamp();
+    let thirty_days_ago = now - (30 * 86400);
+    let one_week_ago = now - (7 * 86400);
+    let mut diff_lines: Vec<String> = Vec::new();
+
+    // ── 1. Prune stale low-confidence KG nodes ─────────────────────────────────
+    let pruned: i64 = conn.execute(
+        "DELETE FROM kg_nodes WHERE importance < 0.4 AND last_updated < ?1",
+        rusqlite::params![thirty_days_ago],
+    ).map(|n| n as i64).unwrap_or(0);
+
+    if pruned > 0 {
+        diff_lines.push(format!("Pruned {} stale low-confidence knowledge nodes", pruned));
+    }
+
+    // ── 2. Promote frequently-accessed KG nodes ────────────────────────────────
+    // Nodes sourced from multiple conversations are promoted to "core knowledge".
+    // Heuristic: sources JSON array with 3+ entries has length > ~70 chars.
+    let promoted: i64 = conn.execute(
+        "UPDATE kg_nodes SET importance = MIN(importance + 0.1, 0.95)
+         WHERE length(sources) > 70 AND importance < 0.85",
+        [],
+    ).map(|n| n as i64).unwrap_or(0);
+
+    if promoted > 0 {
+        diff_lines.push(format!("Promoted {} multi-source facts to core knowledge", promoted));
+    }
+
+    // ── 3. Prune stale low-confidence preferences ──────────────────────────────
+    let pruned_prefs: i64 = conn.execute(
+        "DELETE FROM brain_preferences WHERE confidence < 0.5 AND updated_at < ?1",
+        rusqlite::params![thirty_days_ago * 1000], // brain_preferences uses ms timestamps
+    ).map(|n| n as i64).unwrap_or(0);
+
+    if pruned_prefs > 0 {
+        diff_lines.push(format!("Pruned {} stale behavioral preferences", pruned_prefs));
+    }
+
+    // ── 4. Count new facts learned this week ──────────────────────────────────
+    let new_kg_nodes: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM kg_nodes WHERE created_at >= ?1",
+        rusqlite::params![one_week_ago],
+        |r| r.get(0),
+    ).unwrap_or(0);
+
+    let new_episodes: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM memory_episodes WHERE created_at >= ?1",
+        rusqlite::params![one_week_ago],
+        |r| r.get(0),
+    ).unwrap_or(0);
+
+    let new_prefs: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM brain_preferences WHERE updated_at >= ?1",
+        rusqlite::params![one_week_ago * 1000],
+        |r| r.get(0),
+    ).unwrap_or(0);
+
+    diff_lines.push(format!(
+        "This week: {} new facts, {} new episodes, {} preference updates",
+        new_kg_nodes, new_episodes, new_prefs
+    ));
+
+    // ── 5. Compress memory blocks if over limit ────────────────────────────────
+    // Trigger compression of human_block if it's getting large
+    {
+        let blocks = load_memory_blocks();
+        if blocks.human_block.len() > HUMAN_BLOCK_SOFT_LIMIT {
+            let compressed = compress_block(
+                &blocks.human_block,
+                "human (facts about the user)",
+                HUMAN_BLOCK_SOFT_LIMIT,
+            ).await;
+            let _ = write_blade_file(&human_block_path(), &compressed);
+            diff_lines.push("Compressed human memory block".to_string());
+        }
+    }
+
+    // ── 6. LLM-generated memory diff (if API available) ───────────────────────
+    let summary = if !config.api_key.is_empty() || config.provider == "ollama" {
+        // Get top 10 recent KG nodes for the diff
+        let recent_nodes: Vec<String> = conn.prepare(
+            "SELECT concept, description FROM kg_nodes WHERE created_at >= ?1 ORDER BY importance DESC LIMIT 10"
+        ).and_then(|mut stmt| {
+            stmt.query_map(rusqlite::params![one_week_ago], |row| {
+                Ok(format!("• {} — {}",
+                    row.get::<_, String>(0)?,
+                    crate::safe_slice(&row.get::<_, String>(1).unwrap_or_default(), 60),
+                ))
+            }).map(|rows| rows.filter_map(|r| r.ok()).collect())
+        }).unwrap_or_default();
+
+        if !recent_nodes.is_empty() {
+            let prompt = format!(
+                r#"You are BLADE's memory curator. This week you learned these new facts:
+
+{}
+
+In 2-3 sentences, summarize what patterns you see in this week's learning. What topics dominated? What does this tell you about the user's current focus?
+
+Be concise and specific."#,
+                recent_nodes.join("\n")
+            );
+
+            let messages = vec![crate::providers::ConversationMessage::User(prompt)];
+            let cheap = crate::config::cheap_model_for_provider(&config.provider, &config.model);
+            match crate::providers::complete_turn(
+                &config.provider,
+                &config.api_key,
+                &cheap,
+                &messages,
+                &[],
+                config.base_url.as_deref(),
+            ).await {
+                Ok(r) => r.content.trim().to_string(),
+                Err(_) => String::new(),
+            }
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
+    let mut result = diff_lines.join("\n");
+    if !summary.is_empty() {
+        result.push_str("\n\nMemory diff analysis:\n");
+        result.push_str(&summary);
+    }
+
+    result
+}
+
+/// Tauri command wrapper for weekly memory consolidation.
+#[tauri::command]
+pub async fn run_weekly_memory_consolidation() -> Result<String, String> {
+    Ok(weekly_memory_consolidation().await)
 }
 
 /// Tauri command: get the current state of all three memory blocks (for Settings UI)

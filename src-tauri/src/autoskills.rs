@@ -31,6 +31,60 @@ pub enum AutoskillResult {
     SuggestionEmitted { name: String },
     /// No matching capability found in catalog
     NothingFound,
+    /// A native tool already covers this capability
+    NativeToolSufficient { native_name: String },
+}
+
+/// Native tool names and their capability keywords.
+/// Used to avoid installing MCP servers when a native tool already handles the request.
+fn native_tool_capabilities() -> &'static [(&'static str, &'static [&'static str])] {
+    &[
+        ("blade_read_file",    &["read_file", "read file", "fs.read", "filesystem.read", "file_read"]),
+        ("blade_write_file",   &["write_file", "write file", "fs.write", "filesystem.write", "file_write"]),
+        ("blade_edit_file",    &["edit_file", "edit file", "patch_file"]),
+        ("blade_list_dir",     &["list_dir", "list_directory", "listdir", "ls ", "fs.list", "filesystem.list"]),
+        ("blade_glob",         &["glob", "find_files", "search_files", "find files"]),
+        ("blade_search_files", &["search_files", "grep", "ripgrep", "search files"]),
+        ("blade_bash",         &["bash", "shell", "run_command", "execute"]),
+        ("blade_web_fetch",    &["web_fetch", "fetch_url", "http_get"]),
+    ]
+}
+
+/// Check if a native blade tool already covers the requested capability.
+/// Returns the native tool name if one matches.
+fn find_native_equivalent(capability: &str) -> Option<&'static str> {
+    let cap_lower = capability.to_lowercase();
+    for (tool_name, keywords) in native_tool_capabilities() {
+        for kw in *keywords {
+            if cap_lower.contains(kw) {
+                return Some(tool_name);
+            }
+        }
+    }
+    None
+}
+
+/// Fuzzy-match a tool name against catalog entries.
+/// Splits the tool name by '.' '_' and '-', then checks if any word matches catalog keywords.
+fn fuzzy_match_catalog(capability: &str, error: &str) -> Vec<&'static str> {
+    // First do the existing keyword matching
+    let mut exact = keywords_to_catalog_name(capability, error);
+
+    // Additionally, tokenise the capability name itself and check each token
+    let tokens: Vec<String> = capability
+        .split(|c: char| c == '.' || c == '_' || c == '-')
+        .map(|s| s.to_lowercase())
+        .collect();
+
+    let token_combined = tokens.join(" ");
+    let extra = keywords_to_catalog_name(&token_combined, "");
+    for e in extra {
+        if !exact.contains(&e) {
+            exact.push(e);
+        }
+    }
+
+    exact
 }
 
 /// Map common error patterns / keywords to catalog server names.
@@ -108,7 +162,8 @@ fn keywords_to_catalog_name(capability: &str, error: &str) -> Vec<&'static str> 
 }
 
 /// Try to acquire the missing capability.
-/// - If a matching auto-installable server exists: install it, return InstalledSilently
+/// - First checks if a native tool already handles this (avoids unnecessary installs)
+/// - If a matching auto-installable server exists: install it, emit tool_auto_installed, return InstalledSilently
 /// - If a matching server requires credentials: emit suggestion event, return SuggestionEmitted
 /// - Otherwise: return NothingFound
 pub async fn try_acquire(
@@ -116,16 +171,48 @@ pub async fn try_acquire(
     gap: GapContext<'_>,
     mcp_state: &crate::commands::SharedMcpManager,
 ) -> AutoskillResult {
-    let candidates = keywords_to_catalog_name(gap.missing_capability, gap.error);
+    // Step 1: Check if a native tool already covers this capability — don't over-install.
+    if let Some(native_name) = find_native_equivalent(gap.missing_capability) {
+        let _ = app.emit(
+            "autoskill_native_sufficient",
+            serde_json::json!({
+                "requested": gap.missing_capability,
+                "native_tool": native_name,
+                "message": format!(
+                    "Native tool '{}' already handles '{}' — no MCP server needed.",
+                    native_name, gap.missing_capability
+                ),
+            }),
+        );
+        return AutoskillResult::NativeToolSufficient {
+            native_name: native_name.to_string(),
+        };
+    }
+
+    // Step 2: Fuzzy-match against catalog (tolerates tool.name.style and token splits)
+    let candidates = fuzzy_match_catalog(gap.missing_capability, gap.error);
     if candidates.is_empty() {
         return AutoskillResult::NothingFound;
     }
+
+    // Step 3: Also check whether the server is already registered (avoid duplicate install)
+    let already_registered: Vec<String> = {
+        let manager = mcp_state.lock().await;
+        manager.server_status().into_iter().map(|(n, _)| n).collect()
+    };
 
     // Load evolution catalog entries to find matching ones
     let catalog = build_installable_catalog();
 
     for candidate_name in &candidates {
         if let Some(entry) = catalog.get(candidate_name) {
+            // Skip if already registered — maybe it just hasn't been discovered yet
+            if already_registered.iter().any(|r| r == candidate_name) {
+                // Re-discover tools from this server before giving up
+                let _ = mcp_state.lock().await.discover_all_tools().await;
+                continue;
+            }
+
             let _ = app.emit(
                 "autoskill_attempting",
                 serde_json::json!({
@@ -156,6 +243,7 @@ pub async fn try_acquire(
                     manager.register_server(candidate_name.to_string(), config);
                     if let Ok(tools) = manager.discover_all_tools().await {
                         let tool_count = tools.len();
+                        // Emit both the legacy event and the new UI-friendly event
                         let _ = app.emit(
                             "autoskill_installed",
                             serde_json::json!({
@@ -164,6 +252,19 @@ pub async fn try_acquire(
                                 "message": format!(
                                     "Automatically installed {} — {} tools now available. Retrying your request.",
                                     candidate_name, tool_count
+                                ),
+                            }),
+                        );
+                        // New event for the UI toast / notification
+                        let _ = app.emit(
+                            "tool_auto_installed",
+                            serde_json::json!({
+                                "server": candidate_name,
+                                "tool_count": tool_count,
+                                "triggered_by": gap.missing_capability,
+                                "message": format!(
+                                    "Installed {} to handle your request",
+                                    candidate_name
                                 ),
                             }),
                         );

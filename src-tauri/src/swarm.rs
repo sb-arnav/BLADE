@@ -10,6 +10,35 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // ---------------------------------------------------------------------------
+// Scratchpad entry — typed, traceable agent findings
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScratchpadEntry {
+    pub key: String,
+    pub value: String,
+    pub source_task: String,
+    pub timestamp: i64,
+}
+
+// ---------------------------------------------------------------------------
+// Swarm progress snapshot
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SwarmProgress {
+    pub swarm_id: String,
+    pub total: usize,
+    pub completed: usize,
+    pub running: usize,
+    pub failed: usize,
+    pub pending: usize,
+    pub percent: usize,
+    /// Rough estimate in seconds based on remaining tasks × average duration.
+    pub estimated_seconds_remaining: Option<u64>,
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -119,14 +148,29 @@ pub struct SwarmTask {
     pub started_at: Option<i64>,
     pub completed_at: Option<i64>,
     pub error: Option<String>,
+    /// Agent role assigned to this task (researcher, coder, analyst, writer, reviewer)
+    #[serde(default)]
+    pub role: String,
+    /// Tool names required by this task (from planner)
+    #[serde(default)]
+    pub required_tools: Vec<String>,
+    /// Estimated execution time tier: "fast", "medium", "slow"
+    #[serde(default = "default_medium")]
+    pub estimated_duration: String,
 }
+
+fn default_medium() -> String { "medium".to_string() }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Swarm {
     pub id: String,
     pub goal: String,
     pub status: SwarmStatus,
+    /// Legacy flat map — kept for backward compat and failure annotations.
     pub scratchpad: HashMap<String, String>,
+    /// Typed scratchpad entries with provenance — agents write here, synthesizer reads all.
+    #[serde(default)]
+    pub scratchpad_entries: Vec<ScratchpadEntry>,
     pub final_result: Option<String>,
     pub tasks: Vec<SwarmTask>,
     pub created_at: i64,
@@ -151,12 +195,13 @@ pub fn save_swarm(swarm: &Swarm) -> bool {
         None => return false,
     };
     let scratchpad = serde_json::to_string(&swarm.scratchpad).unwrap_or_default();
+    let entries_json = serde_json::to_string(&swarm.scratchpad_entries).unwrap_or_default();
     conn.execute(
-        "INSERT OR REPLACE INTO swarms (id, goal, status, scratchpad, final_result, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT OR REPLACE INTO swarms (id, goal, status, scratchpad, final_result, created_at, updated_at, scratchpad_entries)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         params![
             swarm.id, swarm.goal, swarm.status.as_str(), scratchpad,
-            swarm.final_result, swarm.created_at, swarm.updated_at
+            swarm.final_result, swarm.created_at, swarm.updated_at, entries_json
         ],
     ).is_ok()
 }
@@ -186,23 +231,66 @@ pub fn update_swarm_scratchpad(swarm_id: &str, scratchpad: &HashMap<String, Stri
     ).is_ok()
 }
 
+/// Write a typed ScratchpadEntry for a task completion.
+/// Also writes to the flat scratchpad for backward compat.
+pub fn write_scratchpad_entry(swarm_id: &str, entry: ScratchpadEntry) -> bool {
+    let conn = match open_db() {
+        Some(c) => c,
+        None => return false,
+    };
+    let now = chrono::Utc::now().timestamp();
+
+    // Load existing
+    let result: Option<(String, String)> = conn.query_row(
+        "SELECT scratchpad, scratchpad_entries FROM swarms WHERE id = ?1",
+        params![swarm_id],
+        |row| Ok((row.get(0)?, row.get::<_, String>(1).unwrap_or_default())),
+    ).ok();
+
+    let (mut flat, mut entries) = match result {
+        Some((f, e)) => {
+            let flat: HashMap<String, String> = serde_json::from_str(&f).unwrap_or_default();
+            let entries: Vec<ScratchpadEntry> = serde_json::from_str(&e).unwrap_or_default();
+            (flat, entries)
+        }
+        None => (HashMap::new(), Vec::new()),
+    };
+
+    // Update flat map
+    flat.insert(entry.key.clone(), entry.value.clone());
+    // Append typed entry (replace if same key+source exists)
+    entries.retain(|e| !(e.key == entry.key && e.source_task == entry.source_task));
+    entries.push(entry);
+
+    let flat_json = serde_json::to_string(&flat).unwrap_or_default();
+    let entries_json = serde_json::to_string(&entries).unwrap_or_default();
+
+    conn.execute(
+        "UPDATE swarms SET scratchpad = ?1, scratchpad_entries = ?2, updated_at = ?3 WHERE id = ?4",
+        params![flat_json, entries_json, now, swarm_id],
+    ).is_ok()
+}
+
 pub fn save_swarm_task(task: &SwarmTask) -> bool {
     let conn = match open_db() {
         Some(c) => c,
         None => return false,
     };
     let depends_on = serde_json::to_string(&task.depends_on).unwrap_or_default();
+    let required_tools = serde_json::to_string(&task.required_tools).unwrap_or_default();
     conn.execute(
         "INSERT OR REPLACE INTO swarm_tasks
          (id, swarm_id, title, goal, task_type, depends_on, agent_id, status, result,
-          scratchpad_key, created_at, started_at, completed_at, error)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+          scratchpad_key, created_at, started_at, completed_at, error,
+          role, required_tools, estimated_duration)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
         params![
             task.id, task.swarm_id, task.title, task.goal,
             task.task_type.to_string(), depends_on,
             task.agent_id, task.status.as_str(), task.result,
             task.scratchpad_key, task.created_at, task.started_at,
-            task.completed_at, task.error
+            task.completed_at, task.error,
+            task.role, required_tools, task.estimated_duration
         ],
     ).is_ok()
 }
@@ -241,14 +329,20 @@ pub fn update_task_status(
 
 pub fn load_swarm(swarm_id: &str) -> Option<Swarm> {
     let conn = open_db()?;
-    let (goal, status_str, scratchpad_str, final_result, created_at, updated_at): (String, String, String, Option<String>, i64, i64) =
+    // scratchpad_entries column may not exist in older DBs — use COALESCE fallback
+    let (goal, status_str, scratchpad_str, entries_str, final_result, created_at, updated_at):
+        (String, String, String, String, Option<String>, i64, i64) =
         conn.query_row(
-            "SELECT goal, status, scratchpad, final_result, created_at, updated_at FROM swarms WHERE id = ?1",
+            "SELECT goal, status, scratchpad,
+                    COALESCE(scratchpad_entries, '[]'),
+                    final_result, created_at, updated_at
+             FROM swarms WHERE id = ?1",
             params![swarm_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?)),
         ).ok()?;
 
     let scratchpad: HashMap<String, String> = serde_json::from_str(&scratchpad_str).unwrap_or_default();
+    let scratchpad_entries: Vec<ScratchpadEntry> = serde_json::from_str(&entries_str).unwrap_or_default();
     let tasks = load_swarm_tasks(swarm_id);
 
     Some(Swarm {
@@ -256,6 +350,7 @@ pub fn load_swarm(swarm_id: &str) -> Option<Swarm> {
         goal,
         status: SwarmStatus::from_str(&status_str),
         scratchpad,
+        scratchpad_entries,
         final_result,
         tasks,
         created_at,
@@ -270,7 +365,8 @@ pub fn load_swarm_tasks(swarm_id: &str) -> Vec<SwarmTask> {
     };
     let mut stmt = match conn.prepare(
         "SELECT id, title, goal, task_type, depends_on, agent_id, status, result,
-                scratchpad_key, created_at, started_at, completed_at, error
+                scratchpad_key, created_at, started_at, completed_at, error,
+                COALESCE(role, ''), COALESCE(required_tools, '[]'), COALESCE(estimated_duration, 'medium')
          FROM swarm_tasks WHERE swarm_id = ?1 ORDER BY created_at ASC",
     ) {
         Ok(s) => s,
@@ -282,6 +378,8 @@ pub fn load_swarm_tasks(swarm_id: &str) -> Vec<SwarmTask> {
         let depends_on: Vec<String> = serde_json::from_str(&depends_on_str).unwrap_or_default();
         let task_type_str: String = row.get(3)?;
         let status_str: String = row.get(6)?;
+        let required_tools_str: String = row.get(14)?;
+        let required_tools: Vec<String> = serde_json::from_str(&required_tools_str).unwrap_or_default();
         Ok(SwarmTask {
             id: row.get(0)?,
             swarm_id: swarm_id.to_string(),
@@ -297,6 +395,9 @@ pub fn load_swarm_tasks(swarm_id: &str) -> Vec<SwarmTask> {
             started_at: row.get(10)?,
             completed_at: row.get(11)?,
             error: row.get(12)?,
+            role: row.get(13)?,
+            required_tools,
+            estimated_duration: row.get(15)?,
         })
     })
     .ok()
@@ -359,13 +460,19 @@ pub fn resolve_ready_tasks(tasks: &[SwarmTask]) -> Vec<String> {
 }
 
 /// Build context for a task by gathering results from its dependencies + scratchpad.
+/// Downstream agents receive all upstream typed ScratchpadEntries as rich context.
 pub fn build_task_context(swarm: &Swarm, task: &SwarmTask) -> String {
     let mut parts: Vec<String> = vec![
         format!("# Swarm Goal\n{}", swarm.goal),
         format!("# This Task\n{}", task.goal),
     ];
 
-    // Dep results
+    // Include role/persona if set
+    if !task.role.is_empty() {
+        parts.push(format!("# Your Role\nYou are acting as a {} agent.", task.role));
+    }
+
+    // Dep results — direct output from predecessor tasks
     let dep_results: Vec<String> = task
         .depends_on
         .iter()
@@ -380,11 +487,23 @@ pub fn build_task_context(swarm: &Swarm, task: &SwarmTask) -> String {
         parts.push(format!("# Context from prerequisite tasks\n{}", dep_results.join("\n\n")));
     }
 
-    // Scratchpad — includes any results from other agents
-    if let Some(key) = &task.scratchpad_key {
-        if let Some(val) = swarm.scratchpad.get(key) {
-            parts.push(format!("# Shared scratchpad ({})\n{}", key, val));
-        }
+    // Typed scratchpad entries from ALL upstream tasks (not just direct deps)
+    // This gives downstream agents the full picture of what the swarm has discovered.
+    let upstream_ids: std::collections::HashSet<&str> = task
+        .depends_on
+        .iter()
+        .map(|d| d.as_str())
+        .collect();
+
+    let typed_entries: Vec<String> = swarm
+        .scratchpad_entries
+        .iter()
+        .filter(|e| upstream_ids.contains(e.source_task.as_str()))
+        .map(|e| format!("### [{}] from task '{}'\n{}", e.key, e.source_task, crate::safe_slice(&e.value, 600)))
+        .collect();
+
+    if !typed_entries.is_empty() {
+        parts.push(format!("# Shared findings from upstream agents\n{}", typed_entries.join("\n\n")));
     }
 
     // Failure annotations (evo-hq pattern) — warn about what other agents tried and failed,
@@ -402,6 +521,58 @@ pub fn build_task_context(swarm: &Swarm, task: &SwarmTask) -> String {
     }
 
     parts.join("\n\n")
+}
+
+/// Compute a real-time progress snapshot for a swarm.
+pub fn get_swarm_progress(swarm_id: &str) -> Option<SwarmProgress> {
+    let swarm = load_swarm(swarm_id)?;
+    let tasks = &swarm.tasks;
+    let total = tasks.len();
+    let completed = tasks.iter().filter(|t| t.status == SwarmTaskStatus::Completed).count();
+    let running = tasks.iter().filter(|t| t.status == SwarmTaskStatus::Running).count();
+    let failed = tasks.iter().filter(|t| t.status == SwarmTaskStatus::Failed).count();
+    let pending = tasks.iter().filter(|t| matches!(t.status, SwarmTaskStatus::Pending | SwarmTaskStatus::Ready | SwarmTaskStatus::Blocked)).count();
+    let percent = if total == 0 { 0 } else { (completed * 100) / total };
+
+    // Estimate remaining time: average seconds per completed task * remaining tasks
+    let estimated_seconds_remaining = if completed > 0 {
+        let total_elapsed: i64 = tasks
+            .iter()
+            .filter(|t| t.status == SwarmTaskStatus::Completed)
+            .filter_map(|t| t.started_at.zip(t.completed_at).map(|(s, c)| c - s))
+            .sum();
+        let avg_secs = total_elapsed / completed as i64;
+        let remaining_tasks = (pending + running) as i64;
+        // Account for parallelism (assume up to 5 concurrent)
+        let effective_remaining = (remaining_tasks + 4) / 5;
+        Some((avg_secs * effective_remaining).max(0) as u64)
+    } else if pending + running > 0 {
+        // No completed tasks yet — rough estimate based on duration tier
+        let est: u64 = tasks
+            .iter()
+            .filter(|t| matches!(t.status, SwarmTaskStatus::Pending | SwarmTaskStatus::Ready | SwarmTaskStatus::Running))
+            .map(|t| match t.estimated_duration.as_str() {
+                "fast" => 15u64,
+                "slow" => 120u64,
+                _ => 45u64,
+            })
+            .sum();
+        // Divide by concurrency factor
+        Some(est / 5 + 10)
+    } else {
+        None
+    };
+
+    Some(SwarmProgress {
+        swarm_id: swarm_id.to_string(),
+        total,
+        completed,
+        running,
+        failed,
+        pending,
+        percent,
+        estimated_seconds_remaining,
+    })
 }
 
 /// Validate that the task graph is a DAG (no cycles) via topological sort.
