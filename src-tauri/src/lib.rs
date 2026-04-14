@@ -947,6 +947,9 @@ pub fn run() {
             decision_gate::get_decision_log,
             decision_gate::decision_feedback,
             decision_gate::decision_evaluate,
+            // God Mode — proactive task queue exposed to frontend
+            godmode::get_proactive_tasks,
+            godmode::dismiss_proactive_task,
             // Deep Scan -- full machine identity discovery
             deep_scan::deep_scan_start,
             deep_scan::deep_scan_results,

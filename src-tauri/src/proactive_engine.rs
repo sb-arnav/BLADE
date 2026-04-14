@@ -249,7 +249,7 @@ async fn detect_stuck_pattern() -> Option<ProactiveAction> {
     Some(ProactiveAction {
         id: new_id(),
         action_type: "StuckDetection".to_string(),
-        trigger: format!("Error appeared {} times in 10 min: {}", count, &error_text[..error_text.len().min(80)]),
+        trigger: format!("Error appeared {} times in 10 min: {}", count, crate::safe_slice(&error_text, 80)),
         content,
         confidence: 0.85,
         accepted: -1,
@@ -296,7 +296,7 @@ async fn detect_workflow_repetition() -> Option<ProactiveAction> {
     Some(ProactiveAction {
         id: new_id(),
         action_type: "WorkflowSuggestion".to_string(),
-        trigger: format!("Workflow repeated {} times: {}", freq, &sequence[..sequence.len().min(80)]),
+        trigger: format!("Workflow repeated {} times: {}", freq, crate::safe_slice(&sequence, 80)),
         content,
         confidence: 0.75,
         accepted: -1,
@@ -429,8 +429,8 @@ async fn detect_context_switch(prev_window: &str, curr_window: &str) -> Option<P
     let content = format!(
         "You're switching from {prev_cat} ({prev}) to {curr_cat} ({curr}). \
          Want me to bookmark where you are so you can jump back instantly?",
-        prev = &prev_window[..prev_window.len().min(40)],
-        curr = &curr_window[..curr_window.len().min(40)],
+        prev = crate::safe_slice(prev_window, 40),
+        curr = crate::safe_slice(curr_window, 40),
         prev_cat = prev_cat,
         curr_cat = curr_cat,
     );
@@ -563,17 +563,45 @@ async fn proactive_loop(app: tauri::AppHandle) {
 
         let mut fired = 0usize;
 
-        // Helper closure: run one detector if its rule is enabled and cooled down
+        // Get the latest perception state for decision gate context
+        let perception = crate::perception_fusion::get_latest()
+            .unwrap_or_default();
+
+        // Helper: run one detector through the decision gate before emitting
         macro_rules! run_detector {
             ($rule_type:expr, $detector_expr:expr) => {{
                 if let Some(rule) = get_rule(&conn, $rule_type) {
                     if rule.enabled && cooldown_elapsed(&rule) {
                         if let Some(action) = $detector_expr.await {
                             if action.confidence >= rule.threshold {
-                                if save_action(&conn, &action).is_ok() {
-                                    let _ = app.emit("proactive_action", &action);
-                                    mark_rule_fired(&conn, $rule_type);
-                                    fired += 1;
+                                // Route through decision gate
+                                let signal = crate::decision_gate::Signal {
+                                    source: format!("proactive_{}", $rule_type),
+                                    description: action.content.clone(),
+                                    confidence: action.confidence,
+                                    reversible: true,
+                                    time_sensitive: action.action_type == "StuckDetection"
+                                        || action.action_type == "DeadlineWarning",
+                                };
+                                let (_, outcome) = crate::decision_gate::evaluate_and_record(
+                                    signal,
+                                    &perception,
+                                )
+                                .await;
+
+                                // Only surface if decision gate approves
+                                let should_emit = matches!(
+                                    &outcome,
+                                    crate::decision_gate::DecisionOutcome::ActAutonomously { .. }
+                                    | crate::decision_gate::DecisionOutcome::AskUser { .. }
+                                );
+
+                                if should_emit {
+                                    if save_action(&conn, &action).is_ok() {
+                                        let _ = app.emit("proactive_action", &action);
+                                        mark_rule_fired(&conn, $rule_type);
+                                        fired += 1;
+                                    }
                                 }
                             }
                         }
@@ -595,10 +623,29 @@ async fn proactive_loop(app: tauri::AppHandle) {
                         detect_context_switch(&last_window, &curr_window).await
                     {
                         if action.confidence >= rule.threshold {
-                            if save_action(&conn, &action).is_ok() {
-                                let _ = app.emit("proactive_action", &action);
-                                mark_rule_fired(&conn, "context_switch");
-                                fired += 1;
+                            let signal = crate::decision_gate::Signal {
+                                source: "proactive_context_switch".to_string(),
+                                description: action.content.clone(),
+                                confidence: action.confidence,
+                                reversible: true,
+                                time_sensitive: false,
+                            };
+                            let (_, outcome) = crate::decision_gate::evaluate_and_record(
+                                signal,
+                                &perception,
+                            )
+                            .await;
+                            let should_emit = matches!(
+                                &outcome,
+                                crate::decision_gate::DecisionOutcome::ActAutonomously { .. }
+                                | crate::decision_gate::DecisionOutcome::AskUser { .. }
+                            );
+                            if should_emit {
+                                if save_action(&conn, &action).is_ok() {
+                                    let _ = app.emit("proactive_action", &action);
+                                    mark_rule_fired(&conn, "context_switch");
+                                    fired += 1;
+                                }
                             }
                         }
                     }
@@ -814,6 +861,8 @@ pub async fn proactive_trigger_check(app: tauri::AppHandle) -> Result<usize, Str
         check_energy_level().await,
     ];
 
+    let perception = crate::perception_fusion::get_latest().unwrap_or_default();
+
     for (rule_type, maybe_action) in rule_types.iter().zip(results.into_iter()) {
         let action = match maybe_action {
             Some(a) => a,
@@ -830,7 +879,27 @@ pub async fn proactive_trigger_check(app: tauri::AppHandle) -> Result<usize, Str
             continue;
         }
 
-        if save_action(&conn, &action).is_ok() {
+        // Route through decision gate
+        let signal = crate::decision_gate::Signal {
+            source: format!("proactive_{}", rule_type),
+            description: action.content.clone(),
+            confidence: action.confidence,
+            reversible: true,
+            time_sensitive: action.action_type == "StuckDetection"
+                || action.action_type == "DeadlineWarning",
+        };
+        let (_, outcome) = crate::decision_gate::evaluate_and_record(
+            signal,
+            &perception,
+        )
+        .await;
+        let should_emit = matches!(
+            &outcome,
+            crate::decision_gate::DecisionOutcome::ActAutonomously { .. }
+            | crate::decision_gate::DecisionOutcome::AskUser { .. }
+        );
+
+        if should_emit && save_action(&conn, &action).is_ok() {
             let _ = app.emit("proactive_action", &action);
             mark_rule_fired(&conn, rule_type);
             fired += 1;

@@ -126,7 +126,7 @@ pub fn update_perception() -> PerceptionState {
 
 /// Return the last computed `PerceptionState`, if any.
 pub fn get_latest() -> Option<PerceptionState> {
-    perception_store().lock().ok()?.clone()
+    perception_store().lock().ok().and_then(|g| g.clone())
 }
 
 /// Produce a human-readable summary of what changed between two snapshots.
@@ -268,7 +268,9 @@ pub fn extract_context_tags(app: &str, title: &str, ocr: &str) -> Vec<String> {
     if title_l.contains(".rs") || ocr_l.contains("fn ") || ocr_l.contains("pub struct") {
         tags.push("rust".to_string());
     }
-    if title_l.contains(".ts") || title_l.contains(".tsx") || ocr_l.contains("const ") {
+    if title_l.contains(".ts") || title_l.contains(".tsx")
+        || (ocr_l.contains("const ") && (ocr_l.contains(": string") || ocr_l.contains(": number") || ocr_l.contains("interface ") || ocr_l.contains("type ") || title_l.contains(".ts")))
+    {
         tags.push("typescript".to_string());
     }
     if title_l.contains(".py") || ocr_l.contains("def ") || ocr_l.contains("import ") {

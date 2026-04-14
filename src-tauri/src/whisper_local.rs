@@ -125,6 +125,10 @@ fn parse_wav_to_f32(wav_bytes: &[u8]) -> Result<(Vec<f32>, u32), String> {
                 .collect::<Result<Vec<_>, _>>()?
         }
         (hound::SampleFormat::Int, 8) => {
+            // hound's Sample impl for i8 already converts unsigned WAV 8-bit
+            // (0-255) to signed i8 (-128..127) via signed_from_u8 (subtracts 128).
+            // So v=0 → -128 (min), v_raw=128 → 0 (silence), v_raw=255 → 127 (max).
+            // Dividing by 128.0 gives the correct [-1.0, ~1.0) float range.
             reader
                 .samples::<i8>()
                 .map(|s| s.map(|v| v as f32 / 128.0).map_err(|e| e.to_string()))

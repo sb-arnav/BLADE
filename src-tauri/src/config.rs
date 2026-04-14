@@ -120,6 +120,9 @@ struct DiskConfig {
     use_local_whisper: bool,
     #[serde(default = "default_whisper_model")]
     whisper_model: String,
+    /// Unix timestamp (seconds) of the last completed deep scan. 0 = never.
+    #[serde(default = "default_last_deep_scan")]
+    last_deep_scan: i64,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -127,6 +130,7 @@ struct DiskConfig {
 
 fn default_background_ai_enabled() -> bool { true }
 fn default_whisper_model() -> String { "tiny.en".to_string() }
+fn default_last_deep_scan() -> i64 { 0 }
 fn default_god_mode_tier() -> String { "normal".to_string() }
 fn default_voice_mode() -> String { "off".to_string() }
 fn default_tts_voice() -> String { "system".to_string() }
@@ -176,6 +180,7 @@ impl Default for DiskConfig {
             fallback_providers: Vec::new(),
             use_local_whisper: false,
             whisper_model: "tiny.en".to_string(),
+            last_deep_scan: 0,
             api_key: None,
         }
     }
@@ -254,6 +259,9 @@ pub struct BladeConfig {
     /// Which whisper model to use locally: "tiny.en", "base.en", "small.en"
     #[serde(default = "default_whisper_model")]
     pub whisper_model: String,
+    /// Unix timestamp (seconds) of the last completed deep scan. 0 = never run.
+    #[serde(default = "default_last_deep_scan")]
+    pub last_deep_scan: i64,
 }
 
 impl BladeConfig {
@@ -300,6 +308,7 @@ impl Default for BladeConfig {
             fallback_providers: Vec::new(),
             use_local_whisper: false,
             whisper_model: "tiny.en".to_string(),
+            last_deep_scan: 0,
         }
     }
 }
@@ -410,6 +419,7 @@ pub fn load_config() -> BladeConfig {
         fallback_providers: disk.fallback_providers,
         use_local_whisper: disk.use_local_whisper,
         whisper_model: disk.whisper_model,
+        last_deep_scan: disk.last_deep_scan,
     }
 }
 
@@ -452,6 +462,7 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         fallback_providers: config.fallback_providers.clone(),
         use_local_whisper: config.use_local_whisper,
         whisper_model: config.whisper_model.clone(),
+        last_deep_scan: config.last_deep_scan,
         api_key: None,
     };
 
