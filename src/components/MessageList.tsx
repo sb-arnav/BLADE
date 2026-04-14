@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useRef, useState, Component } from "react";
+import React, { memo, useCallback, useEffect, useRef, useState, Component, useMemo } from "react";
 import { Message, ToolExecution } from "../types";
 import { invoke } from "@tauri-apps/api/core";
 import { ActiveWindowInfo, ContextSuggestion } from "../hooks/useContextAwareness";
@@ -210,6 +210,109 @@ function CodeBlock({ className, children }: { className?: string; children: Reac
 
 const MemoCodeBlock = memo(CodeBlock);
 
+/** Typewriter effect — reveals text char by char at ~40ms/char */
+function TypewriterText({ text, className }: { text: string; className?: string }) {
+  const [revealed, setRevealed] = useState(0);
+  const intervalRef = useRef<number>(0);
+
+  useEffect(() => {
+    setRevealed(0);
+    let i = 0;
+    // Adaptive speed: faster for longer texts
+    const speed = Math.max(8, Math.min(25, 2000 / text.length));
+    intervalRef.current = window.setInterval(() => {
+      i++;
+      setRevealed(i);
+      if (i >= text.length) clearInterval(intervalRef.current);
+    }, speed);
+    return () => clearInterval(intervalRef.current);
+  }, [text]);
+
+  return (
+    <span className={className}>
+      {text.slice(0, revealed)}
+      {revealed < text.length && (
+        <span className="typing-cursor inline-block w-0.5 h-4 bg-indigo-400/70 ml-0.5 align-middle" />
+      )}
+    </span>
+  );
+}
+
+/** Confetti particle for thumbs-up reaction */
+function ConfettiParticle({ x, y, color, angle, speed }: {
+  x: number; y: number; color: string; angle: number; speed: number;
+}) {
+  const style: React.CSSProperties = {
+    position: "fixed",
+    left: x,
+    top: y,
+    width: 6,
+    height: 6,
+    borderRadius: "1px",
+    backgroundColor: color,
+    pointerEvents: "none",
+    animation: `confetti-particle 0.8s ease-out forwards`,
+    "--dx": `${Math.cos(angle) * speed}px`,
+    "--dy": `${Math.sin(angle) * speed}px`,
+  } as React.CSSProperties;
+  return <div style={style} />;
+}
+
+/** Tool execution mini-timeline */
+function ToolTimeline({ tools }: { tools: ToolExecution[] }) {
+  if (tools.length === 0) return null;
+
+  const steps = [
+    { label: "Thinking", done: true },
+    ...tools.map((t) => ({
+      label: t.tool_name.replace(/^blade_/, "").replace(/_/g, " "),
+      done: t.status === "completed",
+      error: t.is_error,
+    })),
+    { label: "Responding", done: tools.every((t) => t.status === "completed") },
+  ];
+
+  return (
+    <div className="flex items-center gap-1 mt-2 flex-wrap">
+      {steps.map((step, i) => (
+        <React.Fragment key={i}>
+          <div className="flex items-center gap-1">
+            <div
+              className="w-1.5 h-1.5 rounded-full shrink-0"
+              style={{
+                backgroundColor: step.done
+                  ? (step as { error?: boolean }).error ? "#f87171" : "#6366f1"
+                  : "rgba(99,102,241,0.2)",
+                boxShadow: step.done ? "0 0 4px rgba(99,102,241,0.5)" : "none",
+                transition: "all 0.3s ease",
+              }}
+            />
+            <span
+              className="text-[9px] font-mono uppercase tracking-wide"
+              style={{
+                color: step.done ? "rgba(165,180,252,0.8)" : "rgba(99,102,241,0.3)",
+                transition: "color 0.3s ease",
+              }}
+            >
+              {step.label}
+            </span>
+          </div>
+          {i < steps.length - 1 && (
+            <div
+              className="h-px flex-shrink-0"
+              style={{
+                width: 12,
+                backgroundColor: step.done ? "rgba(99,102,241,0.4)" : "rgba(99,102,241,0.1)",
+                transition: "background-color 0.5s ease",
+              }}
+            />
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
 function DateSeparator({ timestamp }: { timestamp: number }) {
   const date = new Date(timestamp);
   const today = new Date();
@@ -379,17 +482,34 @@ function MessageMeta({ msg, tools }: MessageMetaProps) {
 const MessageBubble = memo(function MessageBubble({
   msg,
   isLast,
+  isFirstMessage,
   onRetry,
   relatedTools,
 }: {
   msg: Message;
   isLast?: boolean;
+  isFirstMessage?: boolean;
   onRetry?: () => void;
   relatedTools: ToolExecution[];
 }) {
   const [hovered, setHovered] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [confetti, setConfetti] = useState<Array<{ id: number; x: number; y: number; color: string; angle: number; speed: number }>>([]);
   const isUser = msg.role === "user";
+
+  const fireConfetti = useCallback((e: React.MouseEvent) => {
+    const colors = ["#6366f1", "#8b5cf6", "#a78bfa", "#c4b5fd", "#818cf8", "#fbbf24"];
+    const particles = Array.from({ length: 12 }, (_, i) => ({
+      id: Date.now() + i,
+      x: e.clientX,
+      y: e.clientY,
+      color: colors[i % colors.length],
+      angle: (i / 12) * Math.PI * 2,
+      speed: 40 + Math.random() * 40,
+    }));
+    setConfetti(particles);
+    setTimeout(() => setConfetti([]), 900);
+  }, []);
 
   const handleDoubleClick = useCallback(() => {
     if (!msg.content) return;
@@ -399,6 +519,11 @@ const MessageBubble = memo(function MessageBubble({
   }, [msg.content]);
 
   return (
+    <>
+      {/* Confetti particles — rendered at fixed position */}
+      {confetti.map((p) => (
+        <ConfettiParticle key={p.id} x={p.x} y={p.y} color={p.color} angle={p.angle} speed={p.speed} />
+      ))}
     <div
       className={`flex ${isUser ? "justify-end" : "justify-start"}`}
       onMouseEnter={() => setHovered(true)}
@@ -412,8 +537,14 @@ const MessageBubble = memo(function MessageBubble({
           </div>
         )}
         {isUser ? (
-          /* User: compact pill, subtle accent */
-          <div className="rounded-2xl rounded-br-md bg-blade-accent/90 px-4 py-2 text-[0.8125rem] leading-relaxed text-white/95">
+          /* User: gradient pill — dark indigo to accent */
+          <div
+            className="rounded-2xl rounded-br-md px-4 py-2 text-[0.8125rem] leading-relaxed text-white/95"
+            style={{
+              background: "linear-gradient(135deg, rgba(55,48,107,0.95) 0%, rgba(79,70,229,0.92) 60%, rgba(99,102,241,0.88) 100%)",
+              boxShadow: "0 2px 16px rgba(99,102,241,0.18), inset 0 1px 0 rgba(255,255,255,0.08)",
+            }}
+          >
             {msg.image_base64 && (
               <img
                 src={
@@ -430,8 +561,13 @@ const MessageBubble = memo(function MessageBubble({
             </div>
           </div>
         ) : (
-          /* Assistant: no bubble, just text with left accent line */
-          <div className={`pl-3 border-l-2 ${msg.isAck ? "border-blade-accent/30" : "border-blade-border"}`}>
+          /* Assistant: left accent line — indigo 2px */
+          <div
+            className={`pl-3 border-l-2 ${msg.isAck ? "border-blade-accent/30" : "border-indigo-500/60"}`}
+            style={!msg.isAck ? {
+              borderImage: "linear-gradient(180deg, rgba(99,102,241,0.8) 0%, rgba(139,92,246,0.4) 100%) 1",
+            } : undefined}
+          >
             {msg.image_base64 && (
               <img
                 src={
@@ -443,25 +579,34 @@ const MessageBubble = memo(function MessageBubble({
                 className="rounded-lg max-w-full max-h-48 mb-3 border border-blade-border"
               />
             )}
-            <div className={`message-markdown text-[0.8125rem] ${msg.isAck ? "text-blade-text/40 italic" : "text-blade-text/90"}`}>
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  code({ className, children, ...rest }) {
-                    const isInline = !className && typeof children === "string" && !children.includes("\n");
-                    if (isInline) {
-                      return <code className={className} {...rest}>{children}</code>;
-                    }
-                    return <MemoCodeBlock className={className}>{children}</MemoCodeBlock>;
-                  },
-                  pre({ children }) {
-                    return <>{children}</>;
-                  },
-                }}
-              >
-                {msg.content}
-              </ReactMarkdown>
-            </div>
+            {isFirstMessage && !msg.isAck && msg.content && msg.content.length < 400 ? (
+              /* Typewriter reveal for first assistant message in new conversations */
+              <div className={`message-markdown text-[0.8125rem] text-blade-text/90`}>
+                <TypewriterText text={msg.content} />
+              </div>
+            ) : (
+              <div className={`message-markdown text-[0.8125rem] ${msg.isAck ? "text-blade-text/40 italic" : "text-blade-text/90"}`}>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    code({ className, children, ...rest }) {
+                      const isInline = !className && typeof children === "string" && !children.includes("\n");
+                      if (isInline) {
+                        return <code className={className} {...rest}>{children}</code>;
+                      }
+                      return <MemoCodeBlock className={className}>{children}</MemoCodeBlock>;
+                    },
+                    pre({ children }) {
+                      return <>{children}</>;
+                    },
+                  }}
+                >
+                  {msg.content}
+                </ReactMarkdown>
+              </div>
+            )}
+            {/* Tool mini-timeline */}
+            {relatedTools.length > 0 && <ToolTimeline tools={relatedTools} />}
             {msg.refined && (
               <span style={{ fontSize: '10px', opacity: 0.5, marginLeft: '8px', letterSpacing: '0.05em' }}>
                 ✦ refined
@@ -497,11 +642,12 @@ const MessageBubble = memo(function MessageBubble({
                 ↻
               </button>
             )}
-            {<MessageReactions messageId={msg.id} messageContent={msg.content} visible={hovered} />}
+            {<MessageReactions messageId={msg.id} messageContent={msg.content} visible={hovered} onThumbsUp={fireConfetti} />}
           </div>
         )}
       </div>
     </div>
+    </>
   );
 });
 
@@ -619,6 +765,14 @@ export function MessageList({
   );
   const focusLabel = activeWindow?.title?.trim() || activeWindow?.process_name?.trim() || null;
 
+  // Track the index of the first assistant message (for typewriter effect)
+  const firstAssistantIdx = useMemo(
+    () => messages.findIndex((m) => m.role === "assistant"),
+    // Only recalculate when conversation resets (messages go from 0 to >0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [messages.length === 0 ? 0 : messages[0]?.id]
+  );
+
   // Group completed tool executions by rough "response window" — all tools from
   // the last assistant turn (since the last user message timestamp)
   const lastUserTimestamp = [...messages].reverse().find((m) => m.role === "user")?.timestamp ?? 0;
@@ -734,6 +888,7 @@ export function MessageList({
                 <MessageBubble
                   msg={msg}
                   isLast={isLastAssistant}
+                  isFirstMessage={idx === firstAssistantIdx && messages.length <= 2}
                   onRetry={isLastAssistant ? onRetry : undefined}
                   relatedTools={related}
                 />

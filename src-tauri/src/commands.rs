@@ -270,6 +270,216 @@ fn safe_fallback_model(provider: &str) -> &'static str {
 }
 const MAX_TOOL_RESULT_CHARS: usize = 12_000;
 
+/// Try to complete a turn using a free/fallback model when the primary is rate-limited.
+/// Attempts OpenRouter free tier first, then Groq, then Ollama.
+/// Returns Some(turn) on success, None if no free model is available.
+async fn try_free_model_fallback(
+    config: &crate::config::BladeConfig,
+    conversation: &[crate::providers::ConversationMessage],
+    tools: &[crate::providers::ToolDefinition],
+    app: &tauri::AppHandle,
+) -> Option<crate::providers::AssistantTurn> {
+    // Candidates in order of preference (provider, model, needs_key)
+    let candidates: &[(&str, &str)] = &[
+        ("openrouter", "meta-llama/llama-3.3-70b-instruct:free"),
+        ("groq", "llama-3.3-70b-versatile"),
+        ("ollama", "llama3"),
+    ];
+
+    for (provider, model) in candidates {
+        // Skip if same as current (we already know it's rate-limited)
+        if *provider == config.provider.as_str() { continue; }
+
+        let key = if *provider == "ollama" {
+            String::new()
+        } else {
+            crate::config::get_provider_key(provider)
+        };
+
+        if key.is_empty() && *provider != "ollama" { continue; }
+
+        let _ = app.emit("blade_notification", serde_json::json!({
+            "type": "info",
+            "message": format!("Rate limited on {} — switching to {} ({}) for this request.",
+                config.provider, provider, model)
+        }));
+        let _ = app.emit("blade_status", "processing");
+
+        match providers::complete_turn(provider, &key, model, conversation, tools, None).await {
+            Ok(t) => {
+                let _ = app.emit("blade_routing_switched", serde_json::json!({
+                    "from_provider": &config.provider,
+                    "from_model": &config.model,
+                    "to_provider": provider,
+                    "to_model": model,
+                    "reason": "rate_limit",
+                }));
+                return Some(t);
+            }
+            Err(_) => continue,
+        }
+    }
+    None
+}
+
+/// Count implied task steps in a user query.
+/// Used to detect multi-step requests that need upfront planning.
+/// Returns an estimate of how many distinct actions are implied.
+fn count_task_steps(query: &str) -> usize {
+    let q = query.to_lowercase();
+
+    // Step boundary connectors
+    let step_connectors = [
+        " and then ", " then ", " after that ", " afterwards ",
+        " next ", " also ", " as well", " plus ", " followed by ",
+        " once ", " before ", " finally ", " lastly ",
+    ];
+
+    // Count explicit connectors
+    let connector_count = step_connectors.iter()
+        .filter(|&&c| q.contains(c))
+        .count();
+
+    // Count "and" between action verbs (rough heuristic)
+    let action_verbs = [
+        "compare", "fetch", "get", "read", "check", "show", "display",
+        "calculate", "find", "search", "run", "open", "send", "create",
+        "write", "analyze", "summarize", "visualize", "graph", "chart",
+        "list", "download", "upload", "format", "convert", "export",
+    ];
+    let verb_count = action_verbs.iter()
+        .filter(|&&v| q.contains(v))
+        .count();
+
+    // Compound queries with "vs", "versus", "compared to" imply at least 2 data fetches
+    let has_comparison = q.contains(" vs ") || q.contains(" versus ")
+        || q.contains("compared to") || q.contains("compare")
+        || q.contains("this month") && q.contains("last month")
+        || q.contains("this week") && q.contains("last week");
+
+    let mut score = connector_count;
+    if verb_count >= 2 { score += verb_count.saturating_sub(1); }
+    if has_comparison { score += 1; }
+
+    score
+}
+
+/// Build a human-readable explanation for a tool failure, including suggestions
+/// for alternative approaches and similar files/tools.
+async fn explain_tool_failure(
+    tool_name: &str,
+    args: &serde_json::Value,
+    error: &str,
+    app: Option<&tauri::AppHandle>,
+) -> String {
+    let lower_err = error.to_lowercase();
+
+    // File not found — search for similar files
+    if tool_name == "blade_read_file" || tool_name == "blade_write_file" || tool_name == "blade_edit_file" {
+        if let Some(path) = args["path"].as_str() {
+            if lower_err.contains("not found") || lower_err.contains("no such file") || lower_err.contains("os error 2") {
+                // Try to find similar files
+                let filename = std::path::Path::new(path)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or(path);
+                let parent = std::path::Path::new(path)
+                    .parent()
+                    .and_then(|p| p.to_str())
+                    .unwrap_or(".");
+
+                // Quick glob for similar files
+                let similar = find_similar_files(filename, parent);
+                let suggestion = if similar.is_empty() {
+                    format!(
+                        "`{}` failed: path `{}` does not exist. \
+                         Verify the path with `blade_list_dir` or `blade_glob` first.",
+                        tool_name, path
+                    )
+                } else {
+                    format!(
+                        "`{}` failed: `{}` not found. Similar files nearby:\n{}",
+                        tool_name, path,
+                        similar.iter().map(|f| format!("  - {}", f)).collect::<Vec<_>>().join("\n")
+                    )
+                };
+                return suggestion;
+            }
+
+            // Permission denied
+            if lower_err.contains("permission") || lower_err.contains("access denied") {
+                return format!(
+                    "`{}` failed on `{}`: permission denied. \
+                     Try running with elevated privileges via `blade_bash: sudo` (Linux/macOS) \
+                     or check file ownership.",
+                    tool_name, path
+                );
+            }
+        }
+    }
+
+    // Bash failure — extract exit code and give actionable advice
+    if tool_name == "blade_bash" {
+        if let Some(cmd) = args["command"].as_str() {
+            if lower_err.contains("command not found") || lower_err.contains("not recognized") {
+                let prog = cmd.split_whitespace().next().unwrap_or(cmd);
+                return format!(
+                    "`blade_bash` failed: `{}` is not installed. \
+                     Use `blade_self_upgrade` to install it, or check the correct command name.",
+                    prog
+                );
+            }
+            if lower_err.contains("timeout") {
+                return format!(
+                    "`blade_bash` timed out running: `{}`. \
+                     Increase `timeout_ms` or break the task into smaller steps.",
+                    crate::safe_slice(cmd, 80)
+                );
+            }
+        }
+    }
+
+    // Generic fallback with the raw error, just formatted more helpfully
+    format!(
+        "`{}` returned an error: {}\n\nConsider: try a different approach, check the arguments, or use a fallback tool.",
+        tool_name,
+        crate::safe_slice(error, 300)
+    )
+}
+
+/// Find files with similar names to `filename` inside `search_dir`.
+/// Returns up to 5 matches. Runs a quick directory scan — no subprocess.
+fn find_similar_files(filename: &str, search_dir: &str) -> Vec<String> {
+    let dir = std::path::Path::new(search_dir);
+    if !dir.is_dir() {
+        // Try parent
+        let parent = std::path::Path::new(filename).parent().unwrap_or(std::path::Path::new("."));
+        if !parent.is_dir() { return vec![]; }
+    }
+
+    let stem = std::path::Path::new(filename)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or(filename)
+        .to_lowercase();
+
+    let mut matches = Vec::new();
+    let search_path = if dir.is_dir() { dir } else { std::path::Path::new(".") };
+
+    if let Ok(entries) = std::fs::read_dir(search_path) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy().to_lowercase();
+            // Simple fuzzy: shares a common prefix of 4+ chars, or name contains the stem
+            if stem.len() >= 3 && (name_str.contains(&stem) || stem.contains(name_str.trim_end_matches(|c: char| c == '.' || c.is_alphanumeric() && false))) {
+                matches.push(entry.path().to_string_lossy().to_string());
+                if matches.len() >= 5 { break; }
+            }
+        }
+    }
+    matches
+}
+
 #[tauri::command]
 pub async fn send_message_stream(
     app: tauri::AppHandle,
@@ -407,11 +617,63 @@ pub async fn send_message_stream(
         }
     }
 
+    // ── Multi-step planning detection ─────────────────────────────────────────
+    // Detect complex multi-step requests (3+ implied actions) and inject a
+    // planning instruction so BLADE reasons through the plan before executing.
+    // This prevents the naive "react one tool at a time" anti-pattern.
+    //
+    // Heuristic: count distinct step-boundary words. If ≥3 detected → complex.
+    {
+        let plan_score = count_task_steps(&last_user_text);
+        if plan_score >= 3 {
+            // Emit plan-mode notification so UI can show "Planning..." status
+            let _ = app.emit("blade_planning", serde_json::json!({
+                "query": crate::safe_slice(&last_user_text, 120),
+                "step_count": plan_score,
+            }));
+            system_prompt.push_str(
+                "\n\n---\n\n## PLANNING MODE\n\n\
+                 The user's request requires multiple steps. Before calling any tools:\n\
+                 1. **State your plan** in 1-3 sentences: \"I'll [step 1], then [step 2], then [step 3].\"\n\
+                 2. **Execute step-by-step**, calling tools in the planned order.\n\
+                 3. **Check results** between steps — adapt the plan if a step fails.\n\
+                 4. **Summarize** what you accomplished when done.\n\n\
+                 Do NOT skip the plan — say it out loud as your first words."
+            );
+        }
+    }
+    // ── End multi-step planning ────────────────────────────────────────────────
+
     // MCP tools + native built-in tools (bash, file ops, web fetch)
     // Prune to ≤60 tools total — beyond that, accuracy degrades as the model
     // gets confused by irrelevant tool noise. Score MCP tools by relevance to
-    // the current task; native tools are always included (they're always needed).
-    let native_tools = crate::native_tools::tool_definitions();
+    // the current task; native tools are smartly filtered to top suggestions.
+    let all_native_tools = crate::native_tools::tool_definitions();
+
+    // Smart native tool selection: if we have a non-empty query, use suggest_tools_for_query
+    // to keep only the most relevant native tools. Fall back to all tools if no suggestions.
+    let native_tools: Vec<ToolDefinition> = if !last_user_text.is_empty() {
+        let suggested = crate::native_tools::suggest_tools_for_query(&last_user_text);
+        if suggested.is_empty() {
+            // No strong signal → include everything (safe fallback)
+            all_native_tools
+        } else {
+            // Always include the suggested tools, plus a small core set that's
+            // useful for nearly any task (time, clipboard, notify).
+            let always_include = &[
+                "blade_time_now", "blade_get_clipboard", "blade_set_clipboard",
+                "blade_notify", "blade_update_thread", "blade_read_thread",
+            ];
+            all_native_tools
+                .into_iter()
+                .filter(|t| suggested.contains(&t.name)
+                    || always_include.contains(&t.name.as_str()))
+                .collect()
+        }
+    } else {
+        all_native_tools
+    };
+
     let max_mcp_tools = 60usize.saturating_sub(native_tools.len());
 
     let mcp_tools: Vec<ToolDefinition> = if tool_snapshot.len() > max_mcp_tools {
@@ -708,22 +970,37 @@ pub async fn send_message_stream(
                             let _ = app.emit("blade_status", "error");
                             return Err("Rate limit circuit breaker tripped — too many rate limit errors in 5 minutes. Check your API quota or switch providers.".to_string());
                         }
-                        let wait = backoff_secs(secs, "rate_limit");
-                        let _ = app.emit("blade_notification", serde_json::json!({
-                            "type": "info",
-                            "message": format!("Rate limited — retrying in {}s", wait)
-                        }));
-                        tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
-                        let _ = app.emit("blade_status", "processing");
-                        let retry = providers::complete_turn(
-                            &config.provider, &config.api_key, &config.model,
-                            &conversation, &tools, config.base_url.as_deref(),
+
+                        // Strategy: instead of just waiting, try switching to a free/fallback
+                        // model first. This keeps the conversation flowing without delay.
+                        // Priority: OpenRouter free tier → Groq (generous free tier) → wait + retry.
+                        let free_model_result = try_free_model_fallback(
+                            &config,
+                            &conversation,
+                            &tools,
+                            &app,
                         ).await;
-                        match retry {
-                            Ok(t) => t,
-                            Err(e2) => {
-                                let _ = app.emit("blade_status", "error");
-                                return Err(format!("Still rate limited after {}s wait: {}", wait, e2));
+                        if let Some(t) = free_model_result {
+                            t
+                        } else {
+                            // No free model available — fall back to waiting
+                            let wait = backoff_secs(secs, "rate_limit");
+                            let _ = app.emit("blade_notification", serde_json::json!({
+                                "type": "info",
+                                "message": format!("Rate limited on {}. Retrying in {}s.", config.provider, wait)
+                            }));
+                            tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
+                            let _ = app.emit("blade_status", "processing");
+                            let retry = providers::complete_turn(
+                                &config.provider, &config.api_key, &config.model,
+                                &conversation, &tools, config.base_url.as_deref(),
+                            ).await;
+                            match retry {
+                                Ok(t) => t,
+                                Err(e2) => {
+                                    let _ = app.emit("blade_status", "error");
+                                    return Err(format!("Still rate limited after {}s wait: {}", wait, e2));
+                                }
                             }
                         }
                     }
@@ -1184,7 +1461,7 @@ pub async fn send_message_stream(
             );
 
             // Execute: native tools handled inline, MCP tools via manager
-            let (content, is_error) = if is_native {
+            let (mut content, is_error) = if is_native {
                 crate::native_tools::execute(&tool_call.name, &tool_call.arguments, Some(&app)).await
             } else {
                 let result = {
@@ -1211,14 +1488,45 @@ pub async fn send_message_stream(
                                 };
                                 match retry {
                                     Ok(r) => (format_tool_result(&r), r.is_error),
-                                    Err(e2) => (format!("Tool failed even after installing {}: {}", name, e2), true),
+                                    Err(e2) => {
+                                        let msg = explain_tool_failure(
+                                            &tool_call.name,
+                                            &tool_call.arguments,
+                                            &format!("Tool failed even after installing {}: {}", name, e2),
+                                            Some(&app),
+                                        ).await;
+                                        (msg, true)
+                                    }
                                 }
                             }
-                            _ => (format!("Tool error: {}", e), true),
+                            _ => {
+                                let msg = explain_tool_failure(
+                                    &tool_call.name,
+                                    &tool_call.arguments,
+                                    &e,
+                                    Some(&app),
+                                ).await;
+                                (msg, true)
+                            }
                         }
                     }
                 }
             };
+
+            // For native tool errors, enrich the failure explanation too.
+            if is_error && crate::native_tools::is_native(&tool_call.name) {
+                let raw_error = content.clone();
+                let enriched = explain_tool_failure(
+                    &tool_call.name,
+                    &tool_call.arguments,
+                    &raw_error,
+                    Some(&app),
+                ).await;
+                // Only replace if the enriched version adds new information
+                if enriched.len() > raw_error.len() || enriched.contains("Similar files") || enriched.contains("not installed") {
+                    content = enriched;
+                }
+            }
 
             // Emit a short preview of the result (first 300 chars) so the UI can show it
             let result_preview: String = content.chars().take(300).collect();

@@ -12,6 +12,7 @@
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
+use tauri::Emitter;
 
 // ---------------------------------------------------------------------------
 // AtomicBool guard — prevents duplicate loops
@@ -659,6 +660,9 @@ pub fn start_audio_timeline_capture(app: tauri::AppHandle) {
         return;
     }
 
+    // Notify HUD that audio capture is now active
+    let _ = app.emit("audio_capture_state", serde_json::json!({ "active": true }));
+
     tauri::async_runtime::spawn(async move {
         log::info!("[audio_timeline] capture loop started");
         let mut meeting_id = String::new();
@@ -668,6 +672,7 @@ pub fn start_audio_timeline_capture(app: tauri::AppHandle) {
             if !config.audio_capture_enabled {
                 AUDIO_CAPTURE_ACTIVE.store(false, Ordering::SeqCst);
                 log::info!("[audio_timeline] disabled in config — stopping");
+                let _ = app.emit("audio_capture_state", serde_json::json!({ "active": false }));
                 break;
             }
 
@@ -676,6 +681,7 @@ pub fn start_audio_timeline_capture(app: tauri::AppHandle) {
             // Respect audio_capture_enabled between chunks too
             if !crate::config::load_config().audio_capture_enabled {
                 AUDIO_CAPTURE_ACTIVE.store(false, Ordering::SeqCst);
+                let _ = app.emit("audio_capture_state", serde_json::json!({ "active": false }));
                 break;
             }
 

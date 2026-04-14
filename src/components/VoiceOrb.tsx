@@ -100,6 +100,60 @@ function Waveform({ active, color }: { active: boolean; color: string }) {
   );
 }
 
+/** Orbiting particles around the voice orb when active */
+function OrbParticles({ count = 8, radius = 32, color }: { count?: number; radius?: number; color: string }) {
+  return (
+    <>
+      {Array.from({ length: count }, (_, i) => {
+        const delay = (i / count) * -6; // stagger around the orbit
+        const size = i % 3 === 0 ? 3 : 2;
+        const orbitRadius = radius + (i % 3) * 6;
+        return (
+          <div
+            key={i}
+            className="absolute rounded-full pointer-events-none"
+            style={{
+              width: size,
+              height: size,
+              backgroundColor: color,
+              top: "50%",
+              left: "50%",
+              marginTop: -size / 2,
+              marginLeft: -size / 2,
+              opacity: 0.6 + (i % 3) * 0.15,
+              boxShadow: `0 0 ${size + 2}px ${color}`,
+              animation: `orb-particle-orbit ${2 + (i % 3) * 0.7}s linear infinite`,
+              animationDelay: `${delay}s`,
+              "--orbit-radius": `${orbitRadius}px`,
+            } as React.CSSProperties}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+/** Sound wave ripples that radiate outward when speaking */
+function SoundWaveRipples({ color }: { color: string }) {
+  return (
+    <>
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          className="absolute rounded-full pointer-events-none"
+          style={{
+            inset: 0,
+            border: `1.5px solid ${color}`,
+            opacity: 0,
+            animation: `orb-ripple-out 2s ease-out infinite`,
+            animationDelay: `${i * 0.65}s`,
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
 export function VoiceOrb({
   status,
   mode,
@@ -237,14 +291,15 @@ export function VoiceOrb({
   const isActive = orbState !== "idle" && orbState !== "error";
 
   // Colors and animations per state
+  // gradient: CSS gradient string for the orb core background
   const stateConfig = {
-    idle:       { ring: "border-blade-border/30",        glow: "",                          dot: "bg-blade-muted/40",         waveColor: "bg-blade-muted/40",    label: "Click to talk" },
-    listening:  { ring: "border-emerald-500/60",         glow: "shadow-emerald-500/20",     dot: "bg-emerald-400",            waveColor: "bg-emerald-400",       label: "Listening..." },
-    thinking:   { ring: "border-amber-500/60",           glow: "shadow-amber-500/20",       dot: "bg-amber-400",              waveColor: "bg-amber-400",         label: "Thinking..." },
-    speaking:   { ring: "border-blade-accent/70",        glow: "shadow-blade-accent/25",    dot: "bg-blade-accent",           waveColor: "bg-blade-accent",      label: "Speaking" },
-    recording:  { ring: "border-red-500/70",             glow: "shadow-red-500/20",         dot: "bg-red-500",                waveColor: "bg-red-400",           label: "Recording" },
-    processing: { ring: "border-amber-400/60",           glow: "shadow-amber-400/20",       dot: "bg-amber-400",              waveColor: "bg-amber-400",         label: "Processing..." },
-    error:      { ring: "border-red-500/50",             glow: "",                          dot: "bg-red-500/70",             waveColor: "bg-red-400",           label: "Mic error — click to dismiss" },
+    idle:       { ring: "border-blade-border/30",    glow: "",                          dot: "bg-blade-muted/40",   waveColor: "bg-blade-muted/40",  label: "Click to talk",              gradient: "radial-gradient(circle, #1e1e2e 0%, #0f0f17 100%)",                                       particleColor: "#6366f1" },
+    listening:  { ring: "border-emerald-500/60",     glow: "shadow-emerald-500/20",     dot: "bg-emerald-400",      waveColor: "bg-emerald-400",     label: "Listening...",               gradient: "radial-gradient(circle, #052e16 0%, #064e3b 60%, #0f0f17 100%)",                           particleColor: "#34d399" },
+    thinking:   { ring: "border-amber-500/60",       glow: "shadow-amber-500/20",       dot: "bg-amber-400",        waveColor: "bg-amber-400",       label: "Thinking...",                gradient: "radial-gradient(circle, #2d1a00 0%, #451a03 60%, #0f0f17 100%)",                           particleColor: "#fbbf24" },
+    speaking:   { ring: "border-indigo-500/70",      glow: "shadow-indigo-500/25",      dot: "bg-indigo-400",       waveColor: "bg-indigo-400",      label: "Speaking",                   gradient: "radial-gradient(circle, #1e1b4b 0%, #312e81 55%, #0f0f17 100%)",                           particleColor: "#818cf8" },
+    recording:  { ring: "border-red-500/70",         glow: "shadow-red-500/20",         dot: "bg-red-500",          waveColor: "bg-red-400",         label: "Recording",                  gradient: "radial-gradient(circle, #2d0010 0%, #450a0a 60%, #0f0f17 100%)",                           particleColor: "#f87171" },
+    processing: { ring: "border-amber-400/60",       glow: "shadow-amber-400/20",       dot: "bg-amber-400",        waveColor: "bg-amber-400",       label: "Processing...",              gradient: "radial-gradient(circle, #2d1a00 0%, #451a03 60%, #0f0f17 100%)",                           particleColor: "#fbbf24" },
+    error:      { ring: "border-red-500/50",         glow: "",                          dot: "bg-red-500/70",       waveColor: "bg-red-400",         label: "Mic error — click to dismiss", gradient: "radial-gradient(circle, #1c0a0a 0%, #0f0f17 100%)",                                       particleColor: "#ef4444" },
   }[orbState];
 
   // Pulse animation class per state
@@ -265,7 +320,7 @@ export function VoiceOrb({
 
   return (
     <>
-      {/* Waveform keyframes */}
+      {/* Orb keyframes */}
       <style>{`
         @keyframes blade-waveform {
           from { transform: scaleY(0.4); }
@@ -277,6 +332,18 @@ export function VoiceOrb({
         }
         .animate-pulse-slow {
           animation: pulse-slow 3s ease-in-out infinite;
+        }
+        @keyframes orb-breathe {
+          0%, 100% { transform: scale(1); }
+          50%       { transform: scale(1.02); }
+        }
+        @keyframes orb-particle-orbit {
+          0%   { transform: rotate(0deg) translateX(var(--orbit-radius, 32px)) rotate(0deg); }
+          100% { transform: rotate(360deg) translateX(var(--orbit-radius, 32px)) rotate(-360deg); }
+        }
+        @keyframes orb-ripple-out {
+          0%   { transform: scale(1);   opacity: 0.6; }
+          100% { transform: scale(2.8); opacity: 0; }
         }
       `}</style>
 
@@ -316,6 +383,16 @@ export function VoiceOrb({
 
         {/* Main orb */}
         <div className="relative flex items-center justify-center">
+          {/* Orbiting particles when active */}
+          {isActive && (
+            <OrbParticles count={orbState === "speaking" ? 10 : 7} radius={28} color={stateConfig.particleColor} />
+          )}
+
+          {/* Sound wave ripples when speaking */}
+          {orbState === "speaking" && (
+            <SoundWaveRipples color={stateConfig.particleColor} />
+          )}
+
           {/* Outer glow ring — pings when active */}
           {isActive && pulseClass && (
             <div
@@ -332,9 +409,13 @@ export function VoiceOrb({
             />
           )}
 
-          {/* Core circle */}
+          {/* Core circle — gradient shifts per state */}
           <div
-            className={`w-10 h-10 rounded-full border-2 ${stateConfig.ring} bg-blade-surface/90 backdrop-blur-sm shadow-surface-xl flex items-center justify-center transition-all duration-300 ${isActive ? stateConfig.glow + " shadow-lg" : ""}`}
+            className={`w-10 h-10 rounded-full border-2 ${stateConfig.ring} backdrop-blur-sm shadow-surface-xl flex items-center justify-center transition-all duration-500 ${isActive ? stateConfig.glow + " shadow-lg" : ""}`}
+            style={{
+              background: stateConfig.gradient,
+              animation: orbState === "idle" ? "orb-breathe 3.5s ease-in-out infinite" : undefined,
+            }}
           >
             {/* Center indicator */}
             {orbState === "speaking" ? (
@@ -377,9 +458,12 @@ export function VoiceOrb({
             )}
           </div>
 
-          {/* Idle slow pulse */}
+          {/* Idle breathing glow ring */}
           {orbState === "idle" && (
-            <div className={`absolute w-10 h-10 rounded-full bg-blade-muted/5 ${pulseClass}`} />
+            <div
+              className={`absolute w-10 h-10 rounded-full ${pulseClass}`}
+              style={{ background: "radial-gradient(circle, rgba(99,102,241,0.06) 0%, transparent 70%)" }}
+            />
           )}
         </div>
 

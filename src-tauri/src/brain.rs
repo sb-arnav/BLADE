@@ -3,6 +3,8 @@ use rusqlite;
 use crate::mcp::McpTool;
 use std::fs;
 use std::path::PathBuf;
+use chrono::Timelike;
+use chrono::Datelike;
 
 // ── Model capability tiers ────────────────────────────────────────────────────
 // Different models need different prompting strategies.
@@ -193,6 +195,245 @@ fn enforce_budget(parts: &mut Vec<String>, keep: usize) {
     }
 }
 
+// ── Smart context relevance scoring ──────────────────────────────────────────
+//
+// Returns a 0.0–1.0 score for how relevant a context block type is to the
+// current user query. Only blocks scoring above 0.3 get injected, keeping the
+// prompt lean and the model focused.
+//
+// Context type strings (matches the labels used below in build_system_prompt_inner):
+//   "code"        — codebase index, git, project instructions, recent file context
+//   "schedule"    — calendar, integration state, upcoming events
+//   "financial"   — spending data, subscriptions, financial brain
+//   "health"      — health/screen-time stats, break nudges
+//   "security"    — security alerts, pentest mode
+//   "smart_home"  — IoT, Home Assistant, Spotify
+//   "memory"      — typed memory, knowledge graph, episodic memory
+//   "people"      — people graph, social graph, contacts
+//   "system"      — world model, active processes, system info
+//   "research"    — ambient research, document library
+pub fn score_context_relevance(query: &str, context_type: &str) -> f32 {
+    let q = query.to_lowercase();
+
+    // Keyword sets per context type
+    let (high, medium, low): (&[&str], &[&str], &[&str]) = match context_type {
+        "code" => (
+            &["code", "bug", "error", "function", "rust", "typescript", "ts", "js",
+              "python", "git", "commit", "branch", "file", "module", "crate", "cargo",
+              "npm", "import", "class", "refactor", "test", "build", "compile",
+              "fix", "implement", "write", "edit", "diff", "pr", "pull request",
+              "debug", "lint", "api", "endpoint", "deploy", "ci", "type", "trait",
+              "struct", "enum", "fn ", "pub ", "async"],
+            &["project", "repo", "directory", "path", "read", "write", "run", "script"],
+            &[],
+        ),
+        "schedule" => (
+            &["calendar", "meeting", "schedule", "appointment", "event", "call",
+              "standup", "interview", "reminder", "deadline", "today", "tomorrow",
+              "this week", "next week", "monday", "tuesday", "wednesday", "thursday",
+              "friday", "saturday", "sunday", "am ", "pm ", "o'clock"],
+            &["plan", "time", "when", "busy", "free", "availability", "slot"],
+            &[],
+        ),
+        "financial" => (
+            &["spend", "spending", "money", "cost", "budget", "expense", "subscription",
+              "invoice", "payment", "price", "charge", "finance", "financial",
+              "transaction", "bank", "income", "salary", "revenue", "profit"],
+            &["much", "how much", "afford", "pay", "paid", "bill", "monthly"],
+            &[],
+        ),
+        "health" => (
+            &["health", "break", "eye strain", "posture", "screen time", "tired",
+              "headache", "rest", "stretch", "sleep", "wellness", "water"],
+            &["long", "sitting", "working"],
+            &[],
+        ),
+        "security" => (
+            &["security", "hack", "pentest", "vulnerability", "malware", "phishing",
+              "breach", "scan", "nmap", "exploit", "cve", "password", "leak",
+              "suspicious", "firewall", "ssl", "tls", "certificate"],
+            &["safe", "secure", "protect", "risk", "threat", "attack"],
+            &[],
+        ),
+        "smart_home" => (
+            &["home", "light", "lights", "spotify", "music", "play", "smart home",
+              "thermostat", "temperature", "hue", "assistant", "device", "iot",
+              "alexa", "google home", "homeassistant"],
+            &["turn on", "turn off", "volume", "pause", "resume", "skip"],
+            &[],
+        ),
+        "memory" => (
+            &["remember", "recall", "last time", "before", "previously", "past",
+              "history", "told", "said", "mentioned", "preference", "always", "never",
+              "you know", "you knew", "what did", "we talked"],
+            &["context", "fact", "know", "aware", "remind"],
+            &[],
+        ),
+        "people" => (
+            &["email", "message", "slack", "person", "contact", "colleague",
+              "friend", "team", "boss", "client", "meeting with", "talk to",
+              "send to", "reply to", "follow up"],
+            &["who", "their", "them", "he ", "she ", "they "],
+            &[],
+        ),
+        "system" => (
+            &["process", "cpu", "ram", "memory", "disk", "running", "pid", "kill",
+              "system", "performance", "slow", "crash", "port", "network"],
+            &["computer", "machine", "app", "application", "program"],
+            &[],
+        ),
+        "research" => (
+            &["search", "find", "look up", "research", "read", "article", "paper",
+              "document", "information", "learn", "explain", "what is", "how does",
+              "why", "compare", "difference"],
+            &["source", "link", "url", "web", "online"],
+            &[],
+        ),
+        _ => (&[], &[], &[]),
+    };
+
+    let mut score: f32 = 0.0;
+
+    // High-signal keyword hit = 0.6 base + 0.1 per additional hit (capped at 1.0)
+    let high_hits = high.iter().filter(|&&kw| q.contains(kw)).count();
+    if high_hits > 0 {
+        score = 0.6 + (high_hits.saturating_sub(1) as f32 * 0.1).min(0.4);
+    }
+
+    // Medium keyword hit — only lifts if not already scoring high
+    let med_hits = medium.iter().filter(|&&kw| q.contains(kw)).count();
+    if med_hits > 0 && score < 0.6 {
+        score = 0.35 + (med_hits.saturating_sub(1) as f32 * 0.05).min(0.2);
+    }
+
+    // Low keyword — minimal signal
+    let low_hits = low.iter().filter(|&&kw| q.contains(kw)).count();
+    if low_hits > 0 && score < 0.35 {
+        score = 0.2;
+    }
+
+    score.min(1.0)
+}
+
+// ── Situational humor injection ───────────────────────────────────────────────
+//
+// Returns an optional one-liner to append to the personality section.
+// Never fires when the user sounds frustrated or during serious debugging.
+// Humor is situational — tied to real state (streak, branches, time, day).
+pub fn maybe_add_humor(
+    perception: Option<&crate::perception_fusion::PerceptionState>,
+    user_mood: &str,
+) -> Option<String> {
+    // Never humor when user is frustrated, anxious, or mid-crisis
+    let blocked_moods = ["frustrated", "angry", "anxious", "stressed", "urgent", "panic"];
+    if blocked_moods.iter().any(|m| user_mood.contains(m)) {
+        return None;
+    }
+
+    // Never humor during serious debugging (visible errors on screen)
+    if let Some(p) = perception {
+        if !p.visible_errors.is_empty() {
+            return None;
+        }
+        // Don't humor during active error states in clipboard
+        if p.clipboard_type == "error" {
+            return None;
+        }
+    }
+
+    let now = chrono::Local::now();
+    let hour = now.hour();
+    let weekday = now.weekday();
+
+    // Gather state signals
+    let streak_mins = crate::health_guardian::get_health_stats()["current_streak_minutes"]
+        .as_i64()
+        .unwrap_or(0);
+
+    // Git branch count — check quickly
+    let branch_count: usize = {
+        let win = crate::context::get_active_window().ok();
+        win.and_then(|w| brain_git_branch_count(&w.window_title)).unwrap_or(0)
+    };
+
+    // Active app
+    let active_app = perception
+        .map(|p| p.active_app.as_str())
+        .unwrap_or("");
+
+    // Pick a situational one-liner — return first that matches
+    // Friday evening deploy
+    if weekday == chrono::Weekday::Fri && hour >= 17 {
+        if active_app.to_lowercase().contains("terminal") || active_app.to_lowercase().contains("vscode") {
+            return Some("Deploying on a Friday? I respect the chaos.".to_string());
+        }
+    }
+
+    // Long coding streak
+    if streak_mins >= 240 {
+        let hours = streak_mins / 60;
+        return Some(format!(
+            "{}h straight. Your code is probably fine. Your posture definitely isn't.",
+            hours
+        ));
+    }
+    if streak_mins >= 120 {
+        return Some("You've been at this for 2 hours. At least your coffee can take a break.".to_string());
+    }
+
+    // Too many git branches (light roast)
+    if branch_count >= 14 {
+        return Some(format!(
+            "Noticed you have {} unfinished git branches. No pressure.",
+            branch_count
+        ));
+    } else if branch_count >= 8 {
+        return Some(format!(
+            "{} branches open. Collecting them like Pokémon.",
+            branch_count
+        ));
+    }
+
+    // Late night coding
+    if hour >= 1 && hour <= 4 {
+        return Some("It's past 1am. The bugs will still be there after sleep. They always are.".to_string());
+    }
+    if hour >= 23 {
+        return Some("Late night session. The best ideas happen now — and also the worst ones. Hard to tell in the moment.".to_string());
+    }
+
+    // Monday morning
+    if weekday == chrono::Weekday::Mon && hour < 10 {
+        return Some("Monday. The git log awaits. Let's see what weekend-you left for today-you.".to_string());
+    }
+
+    None
+}
+
+/// Helper: count git branches in the active project. Returns 0 on failure.
+fn brain_git_branch_count(window_title: &str) -> Option<usize> {
+    let dir = crate::brain_extract_dir_from_title(window_title)?;
+    let out = crate::cmd_util::silent_cmd("git")
+        .args(&["branch", "--list"])
+        .current_dir(&dir)
+        .output()
+        .ok()?;
+    if out.status.success() {
+        let count = String::from_utf8_lossy(&out.stdout)
+            .lines()
+            .filter(|l| !l.trim().is_empty())
+            .count();
+        Some(count)
+    } else {
+        None
+    }
+}
+
+/// Public re-export of the dir extractor so brain helpers can use it.
+fn brain_extract_dir_from_title(title: &str) -> Option<std::path::PathBuf> {
+    extract_dir_from_window_title(title)
+}
+
 fn build_system_prompt_inner(
     tools: &[McpTool],
     user_query: &str,
@@ -339,10 +580,11 @@ fn build_system_prompt_inner(
     }
 
     // CODEBASE INDEX — inject structural knowledge of known projects.
-    // BLADE knows the shape of every project it has touched. Claude Code doesn't.
+    // Only inject when query is code-related (score > 0.3) or when there's no query
+    // (e.g. session start). This keeps the prompt lean for schedule/finance queries.
     // Cap per-project summary to 4k chars and total section to 25k chars to avoid
     // blowing the token budget when large projects are indexed.
-    {
+    if user_query.is_empty() || score_context_relevance(user_query, "code") > 0.3 {
         const MAX_PROJECT_CHARS: usize = 4_000;
         const MAX_INDEX_TOTAL_CHARS: usize = 25_000;
         let known_projects = crate::indexer::list_indexed_projects();
@@ -372,7 +614,7 @@ fn build_system_prompt_inner(
                 ));
             }
         }
-    }
+    } // end codebase index gate
 
     // Character Bible — inject from SQLite (structured, compounding knowledge)
     let db_path = crate::config::blade_config_dir().join("blade.db");
@@ -486,16 +728,26 @@ fn build_system_prompt_inner(
         parts.push(accountability_ctx);
     }
 
-    // Financial Brain — inject spending summary when meaningful data exists
-    let fin = crate::financial_brain::get_financial_context();
-    if !fin.is_empty() {
-        parts.push(fin);
+    // Financial Brain — only inject when the query is actually about money/spending
+    // (score > 0.3). Avoids polluting code/scheduling queries with financial data.
+    if user_query.is_empty() || score_context_relevance(user_query, "financial") > 0.3 {
+        let fin = crate::financial_brain::get_financial_context();
+        if !fin.is_empty() {
+            parts.push(fin);
+        }
     }
 
-    // Health Tracker — inject today's wellbeing state so BLADE can adapt its tone
-    let health_ctx = crate::health_tracker::get_health_context();
-    if !health_ctx.is_empty() {
-        parts.push(health_ctx);
+    // Health Tracker — inject when health-relevant OR when the streak is high enough
+    // to be worth noting regardless of query topic.
+    let health_score = if user_query.is_empty() { 1.0 } else { score_context_relevance(user_query, "health") };
+    let health_streak = crate::health_guardian::get_health_stats()["current_streak_minutes"]
+        .as_i64()
+        .unwrap_or(0);
+    if health_score > 0.3 || health_streak >= 90 {
+        let health_ctx = crate::health_tracker::get_health_context();
+        if !health_ctx.is_empty() {
+            parts.push(health_ctx);
+        }
     }
 
     // SCREEN TIME NUDGE — soft reminder if user has been working 90+ min without a break.
@@ -677,31 +929,51 @@ fn build_system_prompt_inner(
         }
     }
 
-    // Live Integrations — Gmail / Calendar / Slack / GitHub ambient state
+    // Live Integrations — Gmail / Calendar / Slack / GitHub ambient state.
+    // Gate by relevance: only inject when query is about schedule, email, people, or
+    // when there's an imminent meeting (regardless of query topic).
     {
-        let integration_ctx = crate::integration_bridge::get_integration_context();
-        if !integration_ctx.trim().is_empty() {
-            parts.push(integration_ctx);
-        }
-    }
-
-    // TEMPORAL CONTEXT — Upcoming meeting within 30 min. ONE line only. Skip if nothing soon.
-    {
+        let integration_score = if user_query.is_empty() {
+            1.0f32
+        } else {
+            score_context_relevance(user_query, "schedule")
+                .max(score_context_relevance(user_query, "people"))
+        };
         let state = crate::integration_bridge::get_integration_state();
-        if let Some(soonest) = state.upcoming_events.first() {
-            if soonest.minutes_until >= 0 && soonest.minutes_until <= 30 {
-                parts.push(format!(
-                    "Upcoming: \"{}\" in {} min.",
-                    crate::safe_slice(&soonest.title, 50),
-                    soonest.minutes_until
-                ));
+        let has_imminent = state.upcoming_events.first()
+            .map(|e| e.minutes_until >= 0 && e.minutes_until <= 30)
+            .unwrap_or(false);
+        if integration_score > 0.3 || has_imminent {
+            let integration_ctx = crate::integration_bridge::get_integration_context();
+            if !integration_ctx.trim().is_empty() {
+                parts.push(integration_ctx);
+            }
+            // TEMPORAL CONTEXT — Upcoming meeting within 30 min. ONE line only.
+            if let Some(soonest) = state.upcoming_events.first() {
+                if soonest.minutes_until >= 0 && soonest.minutes_until <= 30 {
+                    parts.push(format!(
+                        "Upcoming: \"{}\" in {} min.",
+                        crate::safe_slice(&soonest.title, 50),
+                        soonest.minutes_until
+                    ));
+                }
             }
         }
     }
 
-    // SECURITY ALERT — Only inject if there are flagged connections. Never inject if clean.
+    // SECURITY ALERT — Always inject (already gated at the source — only fires
+    // when there are flagged connections). The security context score just adds
+    // a richer explanation block when the query is security-related.
     if let Some(alert) = crate::security_monitor::get_security_alert_for_prompt() {
         parts.push(alert);
+    }
+    // Extra security expertise when query is clearly security-focused (beyond
+    // the kali check done above, which is the first pass).
+    if !user_query.is_empty() && score_context_relevance(user_query, "security") > 0.5
+        && !crate::kali::is_security_context(user_query)
+    {
+        // Mild security awareness without the full Kali prompt
+        parts.push("## Security Context\n\nThe user is working on a security-related task. Be precise about risks, mitigations, and tool options.".to_string());
     }
 
     // Activity Monitor — real-time awareness of what Arnav is doing right now
@@ -812,6 +1084,31 @@ fn build_system_prompt_inner(
     // and concrete tool call examples, closing the gap to Frontier performance.
     if let Some(scaffold) = reasoning_scaffold(tier) {
         parts.push(scaffold);
+    }
+
+    // HUMOR INJECTION — situational one-liner appended to the character section.
+    // Skipped for Small models (no point wasting tokens) and for frustrated/error contexts.
+    if *tier != ModelTier::Small {
+        let latest_perception = crate::perception_fusion::get_latest();
+        let perception_ref = latest_perception.as_ref();
+
+        // Detect mood from user query: look for frustration signals
+        let user_mood = {
+            let q = user_query.to_lowercase();
+            if q.contains("wtf") || q.contains("why isn't") || q.contains("why doesn't")
+                || q.contains("broken") || q.contains("stupid") || q.contains("ugh")
+                || q.contains("doesn't work") || q.contains("won't work")
+                || q.contains("fuck") || q.contains("shit")
+            {
+                "frustrated"
+            } else {
+                "neutral"
+            }
+        };
+
+        if let Some(humor) = maybe_add_humor(perception_ref, user_mood) {
+            parts.push(format!("## A Note for This Session\n\n{}", humor));
+        }
     }
 
     // For Small models, trim aggressively to fit limited context windows (4–8k tokens).
