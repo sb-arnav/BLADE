@@ -631,6 +631,9 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
   const [showKey, setShowKey] = useState(false);
   const [testState, setTestState] = useState<"idle" | "testing" | "ok" | "error">("idle");
   const [testMessage, setTestMessage] = useState<string | null>(null);
+  const [rescanRunning, setRescanRunning] = useState(false);
+  const [rescanStatus, setRescanStatus] = useState<string | null>(null);
+  const [rescanError, setRescanError] = useState<string | null>(null);
 
   useEffect(() => {
     setProvider(config.provider);
@@ -1068,6 +1071,45 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${backgroundAiEnabled ? "bg-blade-accent" : "bg-blade-border"}`}
             >
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${backgroundAiEnabled ? "translate-x-6" : "translate-x-1"}`} />
+            </button>
+          </div>
+        </section>
+
+        {/* System Scan */}
+        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold">System Scan</p>
+              <p className="text-xs text-blade-muted mt-0.5">
+                Re-scan your machine so BLADE stays up-to-date with your apps, git repos, shell history, and environment.
+              </p>
+              {rescanStatus && (
+                <p className="text-xs text-emerald-400 mt-1">{rescanStatus}</p>
+              )}
+              {rescanError && (
+                <p className="text-xs text-red-400 mt-1">{rescanError}</p>
+              )}
+            </div>
+            <button
+              type="button"
+              disabled={rescanRunning}
+              onClick={async () => {
+                setRescanRunning(true);
+                setRescanStatus(null);
+                setRescanError(null);
+                try {
+                  await invoke("deep_scan_start");
+                  const summary = await invoke<string>("deep_scan_summary");
+                  setRescanStatus(summary ? "Scan complete." : "Done.");
+                } catch (e) {
+                  setRescanError(typeof e === "string" ? e : "Scan failed.");
+                } finally {
+                  setRescanRunning(false);
+                }
+              }}
+              className="shrink-0 px-3.5 py-1.5 text-xs font-medium border border-blade-border text-blade-secondary rounded-lg hover:border-blade-accent/40 hover:text-blade-accent transition-colors disabled:opacity-40"
+            >
+              {rescanRunning ? "Scanning…" : "Rescan"}
             </button>
           </div>
         </section>

@@ -298,8 +298,12 @@ pub async fn stream_text_with_thinking(
     if !response.status().is_success() {
         let status = response.status();
         let body_text = response.text().await.unwrap_or_default();
-        // If extended thinking isn't supported on this model, fall back to normal stream
-        if body_text.contains("thinking") || status.as_u16() == 400 {
+        // If extended thinking isn't supported on this model, fall back to normal stream.
+        // Only fallback on 400s that are specifically about the thinking/budget_tokens
+        // parameters — other 400s (bad key, invalid model, etc.) should surface as real errors.
+        if status.as_u16() == 400
+            && (body_text.contains("thinking") || body_text.contains("budget_tokens"))
+        {
             return stream_text(app, api_key, model, messages).await;
         }
         return Err(format!("Anthropic API error {}: {}", status, body_text));

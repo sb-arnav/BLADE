@@ -507,6 +507,10 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
     ]
+    // Append browser-agent tool definitions (navigate, read_page, click stub, etc.)
+    .into_iter()
+    .chain(crate::browser_agent::tool_definitions())
+    .collect()
 }
 
 /// Check if a tool name is a native Blade tool
@@ -1139,6 +1143,59 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
                 (format!("Scheduled tasks ({}):\n\n{}", tasks.len(), lines.join("\n")), false)
             }
         }
+        // ── Browser agent tools ───────────────────────────────────────────────
+        "blade_browser_navigate" => {
+            let url = match args["url"].as_str() {
+                Some(u) => u,
+                None => return ("Missing required argument: url".to_string(), true),
+            };
+            let action = crate::browser_agent::BrowserAction::Navigate { url: url.to_string() };
+            crate::browser_agent::execute_browser_action(&action).await
+        }
+        "blade_browser_read_page" => {
+            let url = match args["url"].as_str() {
+                Some(u) => u,
+                None => return ("Missing required argument: url".to_string(), true),
+            };
+            let action = crate::browser_agent::BrowserAction::ReadPage { url: url.to_string() };
+            crate::browser_agent::execute_browser_action(&action).await
+        }
+        "blade_browser_click_pw" => {
+            let selector = match args["selector"].as_str() {
+                Some(s) => s,
+                None => return ("Missing required argument: selector".to_string(), true),
+            };
+            let action = crate::browser_agent::BrowserAction::Click { selector: selector.to_string() };
+            crate::browser_agent::execute_browser_action(&action).await
+        }
+        "blade_browser_type_pw" => {
+            let selector = match args["selector"].as_str() {
+                Some(s) => s,
+                None => return ("Missing required argument: selector".to_string(), true),
+            };
+            let text = match args["text"].as_str() {
+                Some(t) => t,
+                None => return ("Missing required argument: text".to_string(), true),
+            };
+            let action = crate::browser_agent::BrowserAction::Type {
+                selector: selector.to_string(),
+                text: text.to_string(),
+            };
+            crate::browser_agent::execute_browser_action(&action).await
+        }
+        "blade_browser_screenshot_pw" => {
+            let action = crate::browser_agent::BrowserAction::Screenshot;
+            crate::browser_agent::execute_browser_action(&action).await
+        }
+        "blade_browser_wait_for" => {
+            let selector = match args["selector"].as_str() {
+                Some(s) => s,
+                None => return ("Missing required argument: selector".to_string(), true),
+            };
+            let action = crate::browser_agent::BrowserAction::WaitFor { selector: selector.to_string() };
+            crate::browser_agent::execute_browser_action(&action).await
+        }
+
         _ => (format!("Unknown native tool: {}", name), true),
     }
 }

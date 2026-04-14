@@ -88,6 +88,7 @@ mod voice;
 mod voice_global;
 mod voice_intelligence;
 mod voice_local;
+mod whisper_local;
 mod world_model;
 mod workflow_builder;
 mod context_engine;
@@ -103,6 +104,10 @@ mod emotional_intelligence;
 mod prediction_engine;
 mod activity_monitor;
 mod action_tags;
+mod browser_agent;
+mod perception_fusion;
+mod decision_gate;
+mod deep_scan;
 
 use chrono::Timelike;
 use std::sync::Arc;
@@ -582,6 +587,7 @@ pub fn run() {
             voice_local::whisper_model_available,
             voice_local::whisper_download_model,
             voice_local::whisper_model_info,
+            whisper_local::whisper_transcribe_local,
             embeddings::embed_and_store,
             embeddings::semantic_search,
             embeddings::vector_store_size,
@@ -932,6 +938,19 @@ pub fn run() {
             // Browser Native — embedded browser sessions
             browser_native::browser_session_status,
             config::toggle_background_ai,
+            // Browser Agent — HTTP-based browser automation (Navigate, ReadPage; Click/Type/Screenshot stub Playwright)
+            browser_agent::browser_action,
+            // Perception Fusion — fused sensory state for God Mode JARVIS layer
+            perception_fusion::perception_get_latest,
+            perception_fusion::perception_update,
+            // Decision Gate — autonomous signal classifier (act / ask / queue / ignore)
+            decision_gate::get_decision_log,
+            decision_gate::decision_feedback,
+            decision_gate::decision_evaluate,
+            // Deep Scan -- full machine identity discovery
+            deep_scan::deep_scan_start,
+            deep_scan::deep_scan_results,
+            deep_scan::deep_scan_summary,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state

@@ -33,7 +33,7 @@ pub fn toggle_voice_input(app: &tauri::AppHandle) {
 async fn transcribe_and_emit(app: tauri::AppHandle) {
     let _ = app.emit("voice_global_transcribing", ());
 
-    // Get the audio
+    // Get the audio (WAV bytes as base64)
     let audio_b64 = match crate::voice::voice_stop_recording() {
         Ok(a) => a,
         Err(e) => {
@@ -43,13 +43,44 @@ async fn transcribe_and_emit(app: tauri::AppHandle) {
         }
     };
 
-    // Transcribe via Groq Whisper
-    let text = match crate::voice::voice_transcribe(audio_b64).await {
-        Ok(t) => t,
-        Err(e) => {
-            log::warn!("[voice_global] transcription error: {}", e);
-            let _ = app.emit("voice_global_error", e);
+    let config = crate::config::load_config();
+
+    // Route to local whisper.cpp or Groq API based on config
+    let text = if config.use_local_whisper {
+        use base64::Engine;
+        let wav_bytes = match base64::engine::general_purpose::STANDARD.decode(&audio_b64) {
+            Ok(b) => b,
+            Err(e) => {
+                let msg = format!("Audio decode error: {}", e);
+                log::warn!("[voice_global] {}", msg);
+                let _ = app.emit("voice_global_error", msg);
+                return;
+            }
+        };
+        // VAD gate: skip silent audio
+        let samples = crate::voice::audio_bytes_to_f32_approx(&wav_bytes);
+        if !crate::whisper_local::is_speech(&samples, crate::whisper_local::DEFAULT_VAD_THRESHOLD) {
+            log::debug!("[voice_global] VAD: silence, skipping");
+            let _ = app.emit("voice_global_error", "No speech detected");
             return;
+        }
+        match crate::whisper_local::transcribe_audio(&wav_bytes).await {
+            Ok(t) => t,
+            Err(e) => {
+                log::warn!("[voice_global] local transcription error: {}", e);
+                let _ = app.emit("voice_global_error", e);
+                return;
+            }
+        }
+    } else {
+        // Transcribe via Groq Whisper API
+        match crate::voice::voice_transcribe(audio_b64).await {
+            Ok(t) => t,
+            Err(e) => {
+                log::warn!("[voice_global] transcription error: {}", e);
+                let _ = app.emit("voice_global_error", e);
+                return;
+            }
         }
     };
 

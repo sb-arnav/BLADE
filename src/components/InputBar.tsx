@@ -70,7 +70,7 @@ export function InputBar({ onSend, onSlashCommand, disabled, loading, draftValue
 
   const handleSend = () => {
     const trimmed = value.trim();
-    if (!trimmed || disabled) return;
+    if (!trimmed || busy) return;
 
     // Handle slash commands
     if (slashMatches.length > 0 && slashActive) {

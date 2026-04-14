@@ -854,8 +854,59 @@ pub async fn send_message_stream(
             last_tool_signature = sig;
         }
 
+        // Track whether a schema-validation error was injected this iteration.
+        // We allow at most 1 such retry per iteration to avoid infinite loops.
+        let mut schema_retry_done = false;
+
         for tool_call in turn.tool_calls {
             let is_native = crate::native_tools::is_native(&tool_call.name);
+
+            // ── Structured-output validation ────────────────────────────────────
+            // Validate the LLM's tool arguments against the tool's declared schema.
+            // If validation fails (and we haven't already retried this iteration),
+            // inject the error as a Tool result so the LLM can self-correct.
+            // This implements the guidance/outlines retry pattern:
+            // bad structured output → inject error → LLM sees it → fixes args → retry.
+            if !schema_retry_done {
+                // Look up the tool's input_schema
+                let maybe_schema: Option<serde_json::Value> = if is_native {
+                    // Find the schema from native tool definitions
+                    crate::native_tools::tool_definitions()
+                        .into_iter()
+                        .find(|t| t.name == tool_call.name)
+                        .map(|t| t.input_schema)
+                } else {
+                    // Look up MCP tool schema
+                    let manager = state.lock().await;
+                    manager
+                        .get_tools()
+                        .iter()
+                        .find(|t| t.qualified_name == tool_call.name)
+                        .map(|t| t.input_schema.clone())
+                };
+
+                if let Some(ref schema) = maybe_schema {
+                    // Serialize current arguments back to a string for the validator
+                    let args_str = serde_json::to_string(&tool_call.arguments).unwrap_or_default();
+                    if let Err(validation_err) =
+                        providers::validate_tool_response(&args_str, Some(schema))
+                    {
+                        // Inject the validation error as a Tool result so the LLM retries
+                        conversation.push(ConversationMessage::Tool {
+                            tool_call_id: tool_call.id.clone(),
+                            tool_name: tool_call.name.clone(),
+                            content: format!(
+                                "Schema validation failed for tool '{}'. {}\n\
+                                 Re-call the tool with corrected arguments.",
+                                tool_call.name, validation_err
+                            ),
+                            is_error: true,
+                        });
+                        schema_retry_done = true;
+                        continue;
+                    }
+                }
+            }
 
             // Determine risk level
             let risk = if is_native {
