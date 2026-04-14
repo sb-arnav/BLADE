@@ -3242,16 +3242,30 @@ async fn spawn_runtime_process(
 
     let shared_session_id = Arc::new(Mutex::new(session_id));
 
+    // Shared output buffer — captures up to 500 lines so the completion handler can
+    // extract a summary, store it in execution_memory, and emit agent_completed.
+    let output_buf: Arc<std::sync::Mutex<Vec<String>>> =
+        Arc::new(std::sync::Mutex::new(Vec::new()));
+
     let app_stdout = app.clone();
     let task_id_stdout = task_id.clone();
     let runtime_id_stdout = runtime_id.clone();
     let tasks_stdout = tasks.clone();
     let session_stdout = shared_session_id.clone();
+    let output_buf_stdout = output_buf.clone();
     tokio::spawn(async move {
         let mut lines = BufReader::new(stdout).lines();
         while let Ok(Some(line)) = lines.next_line().await {
             if line.trim().is_empty() {
                 continue;
+            }
+            // Capture into buffer (cap at 500 lines to bound memory)
+            {
+                let mut buf = output_buf_stdout.lock().unwrap();
+                buf.push(line.clone());
+                if buf.len() > 500 {
+                    buf.drain(0..100);
+                }
             }
             parse_runtime_stdout_line(
                 &app_stdout,
@@ -3270,11 +3284,19 @@ async fn spawn_runtime_process(
     let task_id_stderr = task_id.clone();
     let runtime_id_stderr = runtime_id.clone();
     let session_stderr = shared_session_id.clone();
+    let output_buf_stderr = output_buf.clone();
     tokio::spawn(async move {
         let mut lines = BufReader::new(stderr).lines();
         while let Ok(Some(line)) = lines.next_line().await {
             if line.trim().is_empty() {
                 continue;
+            }
+            {
+                let mut buf = output_buf_stderr.lock().unwrap();
+                buf.push(format!("[err] {}", line));
+                if buf.len() > 500 {
+                    buf.drain(0..100);
+                }
             }
             emit_runtime_message(
                 &app_stderr,
@@ -3301,6 +3323,47 @@ async fn spawn_runtime_process(
             guard.wait().await
         };
         registry_wait.lock().await.remove(&task_id_wait);
+
+        // Drain captured output and build a completion summary.
+        // This is stored in execution_memory so BLADE can recall what each runtime did.
+        let captured_output: Vec<String> = {
+            output_buf.lock().unwrap().clone()
+        };
+        let exit_code = match &status {
+            Ok(code) => code.code().unwrap_or(0),
+            Err(_) => -1,
+        };
+
+        // Derive a compact summary of files changed / commits / errors from the raw output.
+        let completion_summary = summarize_runtime_output(&captured_output, &runtime_id_wait, exit_code);
+
+        // Store in execution_memory so BLADE never forgets what this agent did.
+        {
+            let label = format!("[runtime:{}] {}", runtime_id_wait, task_id_wait);
+            let full_text = captured_output.join("\n");
+            crate::execution_memory::record(
+                &label,
+                "",
+                &crate::safe_slice(&full_text, 6000),
+                "",
+                exit_code,
+                0,
+            );
+        }
+
+        // Emit agent_completed with the rich summary so the frontend / chat pipeline
+        // can inject it into the current conversation thread.
+        let _ = app_wait.emit(
+            "agent_completed",
+            serde_json::json!({
+                "id": task_id_wait,
+                "runtime_id": runtime_id_wait,
+                "exit_code": exit_code,
+                "status": if exit_code == 0 { "completed" } else { "failed" },
+                "summary": completion_summary,
+            }),
+        );
+
         match status {
             Ok(code) if code.success() => {
                 if !matches!(parser_kind, RuntimeParserKind::ClaudeAgentSdk) {
@@ -3326,7 +3389,7 @@ async fn spawn_runtime_process(
                         &runtime_id_wait,
                         "completed",
                         session.as_deref(),
-                        None,
+                        Some(&completion_summary),
                         None,
                     );
                 }
@@ -3356,7 +3419,7 @@ async fn spawn_runtime_process(
                     &runtime_id_wait,
                     "error",
                     session.as_deref(),
-                    None,
+                    Some(&completion_summary),
                     Some(&message),
                 );
             }
@@ -3393,6 +3456,68 @@ async fn spawn_runtime_process(
     });
 
     Ok(())
+}
+
+/// Extract a human-readable completion summary from raw runtime output lines.
+/// Looks for git commits, file changes, and error patterns — same heuristics
+/// used by background_agent.rs::extract_completion_summary.
+fn summarize_runtime_output(lines: &[String], runtime_id: &str, exit_code: i32) -> String {
+    let mut found: Vec<String> = Vec::new();
+
+    // Git commit lines
+    for line in lines.iter() {
+        let l = line.trim();
+        if l.starts_with("commit ")
+            || l.contains("committed")
+            || l.contains("[main ")
+            || l.contains("[master ")
+        {
+            found.push(format!("git: {}", l));
+        }
+    }
+
+    // File-edit lines (aider / claude-code / openhands patterns)
+    let file_patterns = [
+        "Wrote ", "Updated ", "Created ", "Deleted ", "Modified ",
+        "wrote ", "updated ", "created ",
+    ];
+    let code_exts = [".rs", ".ts", ".py", ".js", ".go", ".toml", ".tsx", ".json", ".md"];
+    for line in lines.iter().rev().take(60).rev() {
+        let l = line.trim();
+        if file_patterns.iter().any(|p| l.starts_with(p))
+            && code_exts.iter().any(|e| l.contains(e))
+        {
+            found.push(format!("file: {}", crate::safe_slice(l, 120)));
+        }
+    }
+
+    if found.is_empty() {
+        // Fallback: last 5 non-empty output lines
+        found = lines
+            .iter()
+            .rev()
+            .filter(|l| !l.trim().is_empty())
+            .take(5)
+            .rev()
+            .cloned()
+            .collect();
+    }
+
+    if found.is_empty() {
+        format!(
+            "Runtime {} {} (no output captured).",
+            runtime_id,
+            if exit_code == 0 { "completed" } else { "failed" }
+        )
+    } else {
+        format!(
+            "Runtime {} {} (exit {}):\n{}",
+            runtime_id,
+            if exit_code == 0 { "completed" } else { "failed" },
+            exit_code,
+            found.iter().take(15).cloned().collect::<Vec<_>>().join("\n")
+        )
+    }
 }
 
 async fn ensure_opencode_server(servers: SharedRuntimeServerRegistry) -> Result<String, String> {

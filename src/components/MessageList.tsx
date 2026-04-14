@@ -86,10 +86,19 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
 function CodeBlock({ className, children }: { className?: string; children: React.ReactNode }) {
   const [runOutput, setRunOutput] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
+  const [copied, setCopied] = useState(false);
   const codeRef = useRef<HTMLElement>(null);
   const code = String(children).replace(/\n$/, "");
   const lang = className?.replace("language-", "") ?? "";
   const isRunnable = ["bash", "sh", "shell", "python", "py", "javascript", "js", "typescript", "ts", ""].includes(lang);
+  const lines = code.split("\n");
+  const showLineNumbers = lines.length > 5;
+
+  const handleCopy = useCallback(async () => {
+    await navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }, [code]);
 
   const handleRun = useCallback(async () => {
     setRunning(true);
@@ -126,33 +135,64 @@ function CodeBlock({ className, children }: { className?: string; children: Reac
   }, [code, lang]);
 
   return (
-    <div className="rounded-lg overflow-hidden border border-blade-border bg-[#0c0c0f]">
-      <div className="flex items-center justify-between px-3 py-1.5 bg-blade-surface/50">
-        <span className="text-2xs text-blade-muted font-mono">{lang || "code"}</span>
+    <div className="group/code rounded-lg overflow-hidden border border-blade-border bg-[#0c0c0f] relative">
+      {/* Header bar: language label left, actions right */}
+      <div className="flex items-center justify-between px-3 py-1.5 bg-blade-surface/50 border-b border-blade-border/50">
+        <span className="text-2xs text-blade-accent/60 font-mono font-semibold tracking-wide">{lang || "code"}</span>
         <div className="flex items-center gap-1.5">
           {isRunnable && (
             <button
               onClick={handleRun}
               disabled={running}
-              className="text-2xs text-blade-muted hover:text-blade-accent transition-colors disabled:opacity-50 flex items-center gap-1"
+              className="text-2xs text-blade-muted hover:text-blade-accent transition-colors disabled:opacity-50 flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-blade-surface-hover"
               title="Run this code"
             >
               {running ? (
-                <span className="w-2 h-2 rounded-full bg-blade-accent animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-blade-accent animate-pulse" />
               ) : (
-                <svg viewBox="0 0 16 16" className="w-3 h-3" fill="currentColor">
+                <svg viewBox="0 0 16 16" className="w-2.5 h-2.5" fill="currentColor">
                   <path d="M3 2.5l10 5.5-10 5.5V2.5z"/>
                 </svg>
               )}
               {running ? "running" : "run"}
             </button>
           )}
-          <CopyButton text={code} />
+          {/* Inline copy button — always visible in header */}
+          <button
+            onClick={handleCopy}
+            className="text-2xs text-blade-muted hover:text-blade-secondary transition-all duration-150 flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-blade-surface-hover"
+            title="Copy code"
+          >
+            {copied ? (
+              <svg viewBox="0 0 24 24" className="w-2.5 h-2.5 text-blade-accent" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            )}
+            {copied ? "copied" : "copy"}
+          </button>
         </div>
       </div>
-      <pre className="!m-0 !border-0 !rounded-none overflow-x-auto px-3 py-3">
-        <code ref={codeRef} className="text-[0.8rem] leading-relaxed" />
-      </pre>
+      {/* Code with optional line numbers */}
+      <div className="flex overflow-x-auto">
+        {showLineNumbers && (
+          <div
+            className="shrink-0 select-none py-3 pr-3 pl-3 text-right text-[0.72rem] leading-relaxed font-mono text-blade-muted/25 border-r border-blade-border/30"
+            aria-hidden="true"
+          >
+            {lines.map((_, i) => (
+              <div key={i}>{i + 1}</div>
+            ))}
+          </div>
+        )}
+        <pre className={`!m-0 !border-0 !rounded-none overflow-x-auto py-3 flex-1 ${showLineNumbers ? "pl-3" : "px-3"}`}>
+          <code ref={codeRef} className="text-[0.8rem] leading-relaxed" />
+        </pre>
+      </div>
       {runOutput !== null && (
         <div className="border-t border-blade-border bg-blade-bg/70 px-3 py-2">
           <div className="flex items-center justify-between mb-1">
@@ -360,7 +400,7 @@ const MessageBubble = memo(function MessageBubble({
 
   return (
     <div
-      className={`flex ${isUser ? "justify-end" : "justify-start"} animate-fade-in`}
+      className={`flex ${isUser ? "justify-end" : "justify-start"}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onDoubleClick={handleDoubleClick}
@@ -534,14 +574,22 @@ export function MessageList({
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [showNewPill, setShowNewPill] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const isNearBottomRef = useRef(true);
+  // Track the count of messages when user last scrolled away — any new msgs show pill
+  const lastSeenCountRef = useRef(messages.length);
 
-  // Only auto-scroll when user is already near the bottom (within 300px).
+  // Only auto-scroll when user is already near the bottom (within 80px).
   // This lets users scroll up to read history without being yanked back down.
   useEffect(() => {
     if (isNearBottomRef.current) {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      lastSeenCountRef.current = messages.length;
+      setShowNewPill(false);
+    } else if (messages.length > lastSeenCountRef.current) {
+      // User scrolled up and new messages arrived
+      setShowNewPill(true);
     }
   }, [messages, loading, toolExecutions]);
 
@@ -549,13 +597,21 @@ export function MessageList({
     const el = scrollRef.current;
     if (!el) return;
     const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const wasNear = isNearBottomRef.current;
     isNearBottomRef.current = distFromBottom < 80;
     setShowScrollBtn(distFromBottom > 200);
-  }, []);
+    if (isNearBottomRef.current && !wasNear) {
+      // User scrolled back to bottom — clear pill
+      setShowNewPill(false);
+      lastSeenCountRef.current = messages.length;
+    }
+  }, [messages.length]);
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, []);
+    setShowNewPill(false);
+    lastSeenCountRef.current = messages.length;
+  }, [messages.length]);
 
   const activeTools = toolExecutions.filter((t) => t.status === "executing");
   const recentCompleted = toolExecutions.filter(
@@ -572,7 +628,8 @@ export function MessageList({
 
   return (
     <div className="flex-1 overflow-y-auto relative" ref={scrollRef} onScroll={handleScroll}>
-      {showScrollBtn && (
+      {/* Scroll to bottom button */}
+      {showScrollBtn && !showNewPill && (
         <button
           onClick={scrollToBottom}
           className="fixed bottom-24 right-6 z-20 w-8 h-8 rounded-full bg-blade-surface border border-blade-border shadow-lg flex items-center justify-center text-blade-muted hover:text-blade-accent hover:border-blade-accent/30 transition-all animate-fade-in"
@@ -583,36 +640,66 @@ export function MessageList({
           </svg>
         </button>
       )}
+
+      {/* New messages pill — appears when user is scrolled up and new messages arrive */}
+      {showNewPill && (
+        <button
+          onClick={scrollToBottom}
+          className="new-messages-pill fixed bottom-24 left-1/2 z-20 -translate-x-1/2 px-3.5 py-1.5 rounded-full bg-blade-accent text-white text-2xs font-semibold shadow-glow-accent-sm flex items-center gap-1.5 animate-fade-in"
+        >
+          <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M12 5v14M5 12l7 7 7-7" />
+          </svg>
+          New messages
+        </button>
+      )}
+
       <div className="max-w-2xl mx-auto px-6 py-6 space-y-6">
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center min-h-[50vh] gap-5 select-none">
-            <div className="flex flex-col items-center gap-2">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-blade-accent shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
-                <span className="text-xs font-semibold tracking-[0.3em] text-blade-muted uppercase">BLADE</span>
+          <div className="flex flex-col items-center justify-center min-h-[60vh] gap-8 select-none">
+            {/* BLADE wordmark + logo */}
+            <div className="flex flex-col items-center gap-3 animate-fade-in">
+              <div className="relative w-12 h-12 rounded-2xl bg-blade-surface border border-blade-border/80 flex items-center justify-center shadow-surface-md">
+                <div className="w-3 h-3 rounded-full bg-blade-accent shadow-[0_0_12px_rgba(99,102,241,0.6)]" />
+                <div className="absolute inset-0 rounded-2xl bg-blade-accent/5" />
               </div>
-              <p className="text-blade-muted/50 text-[0.7rem] text-center max-w-[260px] leading-relaxed">
-                {focusLabel
-                  ? `Focused on ${focusLabel}`
-                  : "Screen · voice · tools · memory · always on"}
-              </p>
+              <div className="text-center">
+                <h2 className="text-xl font-semibold text-blade-text tracking-tight">
+                  What can I help with?
+                </h2>
+                <p className="text-blade-muted/50 text-[0.75rem] mt-1 text-center max-w-[240px] leading-relaxed">
+                  {focusLabel
+                    ? `Focused on ${focusLabel}`
+                    : "Your local AI — screen · voice · tools · memory"}
+                </p>
+              </div>
             </div>
+
+            {/* 4 primary suggestion cards */}
             {onQuickAction && (
-              <div className="grid grid-cols-3 gap-1.5 w-full max-w-[360px]">
-                {EXAMPLE_PROMPTS.map((ex) => (
+              <div className="grid grid-cols-2 gap-2.5 w-full max-w-[380px]">
+                {WELCOME_SUGGESTIONS.map((s, i) => (
                   <button
-                    key={ex.label}
-                    onClick={() => onQuickAction(ex.prompt)}
-                    className="text-left px-2.5 py-2 rounded-lg border border-blade-border bg-blade-surface/60 hover:bg-blade-surface hover:border-blade-accent/20 transition-colors group"
+                    key={s.label}
+                    onClick={() => onQuickAction(s.prompt)}
+                    className="interactive text-left p-3.5 rounded-xl border border-blade-border/60 bg-blade-surface/60 hover:bg-blade-surface hover:border-blade-accent/20 transition-all duration-200 group"
+                    style={{ animationDelay: `${i * 60}ms` }}
                   >
-                    <span className="text-[0.7rem] text-blade-muted/60 font-mono block mb-0.5">{ex.icon}</span>
-                    <span className="text-[0.7rem] font-medium text-blade-secondary group-hover:text-blade-text transition-colors block leading-tight">
-                      {ex.label}
-                    </span>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-blade-muted/50 group-hover:text-blade-accent/70 transition-colors">
+                        {s.icon}
+                      </span>
+                    </div>
+                    <p className="text-xs font-semibold text-blade-secondary group-hover:text-blade-text transition-colors leading-snug">
+                      {s.label}
+                    </p>
+                    <p className="text-2xs text-blade-muted/40 mt-0.5 leading-tight">{s.desc}</p>
                   </button>
                 ))}
               </div>
             )}
+
+            {/* Keyboard hints */}
             <div className="flex items-center gap-3 text-[0.65rem] text-blade-muted/30 font-mono tracking-wider">
               <span>/ commands</span>
               <span>·</span>
@@ -633,8 +720,13 @@ export function MessageList({
                 (t) => t.started_at >= (messages[idx - 1]?.timestamp ?? 0) && t.started_at < msgEnd
               )
             : [];
+          // Apply entrance animation only to recent messages (last 2 messages)
+          const isNew = idx >= messages.length - 2;
           return (
-            <div key={msg.id}>
+            <div
+              key={msg.id}
+              style={isNew ? { animation: "messageIn 0.3s ease-out" } : undefined}
+            >
               {shouldShowDateSeparator(messages, idx) && (
                 <DateSeparator timestamp={msg.timestamp} />
               )}

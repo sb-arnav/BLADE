@@ -370,6 +370,26 @@ fn uuid_like(name: &str) -> String {
     format!("{:x}", hasher.finish())
 }
 
+/// Public (non-command) list of people — for use by other modules (e.g. persona_engine).
+pub fn people_list_pub() -> Vec<Person> {
+    ensure_tables();
+    let conn = match open_db() {
+        Some(c) => c,
+        None => return Vec::new(),
+    };
+    let mut stmt = match conn.prepare(
+        "SELECT id,name,relationship,communication_style,platform,topics,last_interaction,interaction_count,notes
+         FROM people ORDER BY interaction_count DESC, last_interaction DESC LIMIT 100"
+    ) {
+        Ok(s) => s,
+        Err(_) => return Vec::new(),
+    };
+    stmt.query_map([], |row| parse_person_row(row))
+        .ok()
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default()
+}
+
 // ── Tauri Commands ────────────────────────────────────────────────────────────
 
 #[tauri::command]

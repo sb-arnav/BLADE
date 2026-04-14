@@ -14,6 +14,7 @@ use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::collections::HashMap;
+use chrono::{Datelike, Timelike};
 
 // ── Structs ──────────────────────────────────────────────────────────────────
 
@@ -1260,4 +1261,50 @@ pub async fn persona_analyze_now() -> Result<Vec<PersonaTrait>, String> {
 pub fn persona_record_outcome(was_helpful: bool, topic: String) {
     ensure_tables();
     record_interaction_outcome(was_helpful, &topic);
+}
+
+/// Get the unified UserModel — everything BLADE knows about the user in one struct.
+#[tauri::command]
+pub fn get_user_model() -> UserModel {
+    ensure_tables();
+    ensure_expertise_table();
+    build_user_model()
+}
+
+/// Predict what the user needs next given current context.
+/// Returns None if no confident prediction can be made.
+#[tauri::command]
+pub async fn predict_next_need_cmd() -> Option<String> {
+    let model = build_user_model();
+    let perception = crate::perception_fusion::get_latest()
+        .unwrap_or_default();
+    predict_next_need(&model, &perception).await
+}
+
+/// Get the expertise map: topic → confidence (0.0–1.0).
+#[tauri::command]
+pub fn get_expertise_map() -> Vec<(String, f32)> {
+    ensure_expertise_table();
+    let map = load_expertise_map();
+    let mut items: Vec<(String, f32)> = map.into_iter().collect();
+    items.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    items
+}
+
+/// Update expertise after a conversation.
+/// `topics`: list of topics discussed. `user_knew_it`: true if user was teaching BLADE.
+#[tauri::command]
+pub fn update_expertise(topics: Vec<String>, user_knew_it: bool, evidence: String) {
+    ensure_expertise_table();
+    update_expertise_from_conversation(&topics, user_knew_it, &evidence);
+}
+
+/// Estimate user mood from recent messages.
+#[tauri::command]
+pub fn persona_estimate_mood(
+    recent_messages: Vec<String>,
+    time_of_day: u8,
+    streak_minutes: u32,
+) -> String {
+    estimate_mood(&recent_messages, time_of_day, streak_minutes)
 }

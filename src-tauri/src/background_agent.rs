@@ -634,6 +634,7 @@ pub async fn spawn_codex_agent(
 
 // ── Build command — extended to support Codex ─────────────────────────────────
 
+#[allow(dead_code)]
 fn build_codex_command(task: &str) -> (String, Vec<String>) {
     // Codex CLI: `codex -q "task"` (quiet, non-interactive)
     (

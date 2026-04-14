@@ -130,6 +130,7 @@ fn ensure_default_rules(conn: &rusqlite::Connection) {
         ("deadline_warning", true, 0.9, 360),
         ("context_switch", false, 0.6, 5), // off by default — too noisy
         ("energy_check", true, 0.7, 90),
+        ("user_model_prediction", true, 0.7, 30), // UserModel-driven behavioral prediction
     ];
 
     for (rule_type, enabled, threshold, cooldown) in defaults {
@@ -610,10 +611,11 @@ async fn proactive_loop(app: tauri::AppHandle) {
             }};
         }
 
-        run_detector!("stuck_detection",     detect_stuck_pattern());
-        run_detector!("workflow_repetition", detect_workflow_repetition());
-        run_detector!("deadline_warning",    detect_approaching_deadline());
-        run_detector!("energy_check",        check_energy_level());
+        run_detector!("stuck_detection",      detect_stuck_pattern());
+        run_detector!("workflow_repetition",  detect_workflow_repetition());
+        run_detector!("deadline_warning",     detect_approaching_deadline());
+        run_detector!("energy_check",         check_energy_level());
+        run_detector!("user_model_prediction", detect_user_model_prediction());
 
         // Context-switch detector (separate: needs prev/curr window)
         if !curr_window.is_empty() && !last_window.is_empty() && curr_window != last_window {
@@ -659,6 +661,27 @@ async fn proactive_loop(app: tauri::AppHandle) {
 
         let _ = fired; // suppress unused warning
     }
+}
+
+// ── UserModel prediction detector ────────────────────────────────────────────
+
+/// Uses the UserModel + current perception to predict what the user needs next.
+/// Returns a ProactiveAction if a confident prediction can be made.
+async fn detect_user_model_prediction() -> Option<ProactiveAction> {
+    let model = crate::persona_engine::build_user_model();
+    let perception = crate::perception_fusion::get_latest().unwrap_or_default();
+
+    let prediction = crate::persona_engine::predict_next_need(&model, &perception).await?;
+
+    Some(ProactiveAction {
+        id: new_id(),
+        action_type: "UserModelPrediction".to_string(),
+        trigger: format!("UserModel: mood={}, streak context", model.mood_today),
+        content: prediction,
+        confidence: 0.75,
+        accepted: -1,
+        created_at: now_secs(),
+    })
 }
 
 // ── Public entry point ────────────────────────────────────────────────────────
@@ -852,13 +875,14 @@ pub async fn proactive_trigger_check(app: tauri::AppHandle) -> Result<usize, Str
     let mut fired = 0usize;
 
     // Run each detector ignoring cooldowns (manual trigger)
-    let rule_types = ["stuck_detection", "workflow_repetition", "deadline_warning", "energy_check"];
+    let rule_types = ["stuck_detection", "workflow_repetition", "deadline_warning", "energy_check", "user_model_prediction"];
 
     let results: Vec<Option<ProactiveAction>> = vec![
         detect_stuck_pattern().await,
         detect_workflow_repetition().await,
         detect_approaching_deadline().await,
         check_energy_level().await,
+        detect_user_model_prediction().await,
     ];
 
     let perception = crate::perception_fusion::get_latest().unwrap_or_default();
@@ -886,7 +910,8 @@ pub async fn proactive_trigger_check(app: tauri::AppHandle) -> Result<usize, Str
             confidence: action.confidence,
             reversible: true,
             time_sensitive: action.action_type == "StuckDetection"
-                || action.action_type == "DeadlineWarning",
+                || action.action_type == "DeadlineWarning"
+                || action.action_type == "UserModelPrediction",
         };
         let (_, outcome) = crate::decision_gate::evaluate_and_record(
             signal,

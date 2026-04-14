@@ -140,7 +140,34 @@ export function HudBar() {
     return () => { unlisten.then((fn) => fn()); };
   }, []);
 
-  // Ctrl+G to toggle ghost card
+  // Listen to ghost meeting state so HUD can enter meeting mode independent of hud_update
+  useEffect(() => {
+    const unlistenState = listen<{ platform: string; meeting_name: string; speaker_name: string | null; duration_secs: number; listening: boolean }>(
+      "ghost_meeting_state",
+      (ev) => {
+        setData((prev) => ({
+          ...prev,
+          meeting_active: true,
+          meeting_name: ev.payload.meeting_name,
+          speaker_name: ev.payload.speaker_name,
+        }));
+      }
+    );
+    const unlistenEnded = listen("ghost_meeting_ended", () => {
+      setData((prev) => ({
+        ...prev,
+        meeting_active: false,
+        meeting_name: null,
+        speaker_name: null,
+      }));
+    });
+    return () => {
+      unlistenState.then((fn) => fn());
+      unlistenEnded.then((fn) => fn());
+    };
+  }, []);
+
+  // Ctrl+G to toggle ghost card — both local keyboard and Tauri global shortcut event
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "g") {
@@ -150,6 +177,13 @@ export function HudBar() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  useEffect(() => {
+    const unlisten = listen("ghost_toggle_card", () => {
+      setGhostVisible((v) => !v);
+    });
+    return () => { unlisten.then((fn) => fn()); };
   }, []);
 
   // ── Toast listener ─────────────────────────────────────────────────────────
@@ -250,6 +284,21 @@ export function HudBar() {
   const displayCountdown = localSecs ?? data.next_meeting_secs;
 
   return (
+    // Root: covers full screen but transparent — pointer-events: none so clicks pass through
+    // to underlying apps. Only the bar itself and visible cards re-enable pointer events.
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100vw",
+        height: "100vh",
+        background: "transparent",
+        pointerEvents: "none",
+        zIndex: 9998,
+      }}
+    >
+    {/* HUD bar strip — pointer events enabled only here */}
     <div
       style={{
         position: "fixed",
@@ -278,6 +327,7 @@ export function HudBar() {
         color: "rgba(255,255,255,0.7)",
         zIndex: 9999,
         boxSizing: "border-box",
+        pointerEvents: "auto",
       }}
       onDoubleClick={openMain}
     >
@@ -417,8 +467,10 @@ export function HudBar() {
           </button>
         )}
       </div>
+      {/* End of HUD bar strip */}
+    </div>
 
-      {/* Ghost suggestion card — floats below the HUD bar */}
+    {/* Ghost suggestion card — floats below the HUD bar, outside the bar div */}
       {ghost && ghostVisible && (
         <div
           style={{
@@ -435,6 +487,7 @@ export function HudBar() {
             padding: "12px",
             fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
             zIndex: 10000,
+            pointerEvents: "auto",
           }}
         >
           {/* Header */}
@@ -602,6 +655,7 @@ export function HudBar() {
             flexDirection: "column",
             gap: "6px",
             zIndex: 10001,
+            pointerEvents: "auto",
           }}
         >
           {toasts.map((toast) => {

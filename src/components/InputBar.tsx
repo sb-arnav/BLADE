@@ -341,6 +341,8 @@ export function InputBar({
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
+      {/* Spotlight overlay — dims the rest of the UI when input is focused */}
+      <div className={`input-spotlight-overlay ${isFocused ? "active" : ""}`} />
       {/* Smart suggestion pills */}
       {showSuggestions && (
         <div className="flex items-center gap-1.5 mb-2 flex-wrap animate-fade-up">

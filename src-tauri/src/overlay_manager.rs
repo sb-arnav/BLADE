@@ -53,6 +53,8 @@ pub struct ToastPayload {
 // ── Window Creation ────────────────────────────────────────────────────────────
 
 /// Create the HUD window (slim 30px bar at top, full width).
+/// The window is full-screen height but transparent — only the top 30px bar
+/// has visible content; ghost cards and toasts float below via CSS position:fixed.
 /// Reuses the existing window if already built.
 pub fn create_hud_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow, String> {
     if let Some(w) = app.get_webview_window("blade_hud") {
@@ -61,7 +63,6 @@ pub fn create_hud_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow,
 
     // Get primary monitor dimensions
     let (screen_w, screen_h, scale) = get_primary_monitor_info(app);
-    let _ = screen_h; // used only for positioning
 
     let builder = tauri::WebviewWindowBuilder::new(
         app,
@@ -69,7 +70,9 @@ pub fn create_hud_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow,
         tauri::WebviewUrl::App("hud.html".into()),
     )
     .title("BLADE HUD")
-    .inner_size(screen_w / scale, 30.0)
+    // Full screen width, full screen height so floating cards can render below the bar.
+    // The window is transparent; only visually active areas are rendered.
+    .inner_size(screen_w / scale, screen_h / scale)
     .position(0.0, 0.0)
     .decorations(false)
     .always_on_top(true)
@@ -80,17 +83,17 @@ pub fn create_hud_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow,
 
     let window = builder.build().map_err(|e| e.to_string())?;
 
-    // Stretch to full monitor width in physical pixels
+    // Stretch to full monitor dimensions in physical pixels
     let _ = window.set_size(tauri::PhysicalSize::new(
         screen_w as u32,
-        30,
+        screen_h as u32,
     ));
     let _ = window.set_position(tauri::PhysicalPosition::new(0i32, 0i32));
 
     // Content protection — invisible to screen share
     apply_content_protection(&window);
 
-    log::info!("[overlay_manager] HUD window created ({}x30)", screen_w as u32);
+    log::info!("[overlay_manager] HUD window created ({}x{})", screen_w as u32, screen_h as u32);
     Ok(window)
 }
 
@@ -156,7 +159,7 @@ pub fn build_hud_data() -> HudData {
     let meeting_platform = crate::ghost_mode::detect_active_platform();
     let meeting_active = meeting_platform != "none";
     let meeting_name = if meeting_active {
-        Some(meeting_platform.clone())
+        Some(crate::ghost_mode::platform_display_name(&meeting_platform))
     } else {
         None
     };
