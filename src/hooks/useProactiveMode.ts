@@ -203,7 +203,7 @@ export function useProactiveMode(onSendMessage?: (prompt: string) => void) {
     if (!config.enabled || isQuietHours(config)) return;
     if (suggestionsThisHour >= config.maxSuggestionsPerHour) return;
     // Don't re-add a previously dismissed stable-id suggestion
-    if (dismissedIdsRef.current.has(suggestion.id ?? "")) return;
+    if (dismissedIdsRef.current.has((suggestion as any).id ?? "")) return;
 
     setSuggestionsThisHour((prev) => prev + 1);
     setSuggestions((prev) => [
