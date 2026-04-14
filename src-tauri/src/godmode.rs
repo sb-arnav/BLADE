@@ -184,6 +184,8 @@ pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
             // Extreme: screen vision + decision gate for proactive actions
             if tier == "extreme" {
                 if let Some(understanding) = screen_vision_snapshot() {
+                    // Notify HUD: screenshot was taken (camera blink + screen flash)
+                    let _ = app.emit("screenshot_taken", ());
                     // Append vision context to the brief file
                     let path = crate::config::blade_config_dir().join("godmode_context.md");
                     if let Ok(mut contents) = std::fs::read_to_string(&path) {

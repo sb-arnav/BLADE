@@ -124,6 +124,7 @@ mod overlay_manager;
 mod people_graph;
 mod auto_reply;
 mod streak_stats;
+mod hive;
 
 use chrono::Timelike;
 use std::sync::Arc;
@@ -1096,6 +1097,14 @@ pub fn run() {
             streak_stats::streak_get_stats,
             streak_stats::streak_record_activity,
             streak_stats::streak_get_display,
+            // HIVE — distributed agent mesh across every platform
+            hive::hive_start,
+            hive::hive_stop,
+            hive::hive_get_status,
+            hive::hive_spawn_tentacle,
+            hive::hive_get_reports,
+            hive::hive_approve_decision,
+            hive::hive_set_autonomy,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
@@ -1350,6 +1359,11 @@ pub fn run() {
 
             // Streak & Stats — gamification layer
             streak_stats::ensure_tables();
+
+            // HIVE — distributed agent mesh (opt-in; starts tick loop if enabled)
+            if startup_god_config.hive_enabled {
+                hive::start_hive(app.handle().clone(), startup_god_config.hive_autonomy);
+            }
 
             // Register shortcuts from config (or defaults)
             register_all_shortcuts(app.handle());

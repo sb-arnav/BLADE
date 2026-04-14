@@ -139,6 +139,12 @@ struct DiskConfig {
     ghost_mode_position: String,
     #[serde(default)]
     ghost_auto_reply: bool,
+    /// Enable HIVE distributed agent mesh (default false — opt-in)
+    #[serde(default)]
+    hive_enabled: bool,
+    /// HIVE global autonomy level: 0.0 = always ask, 1.0 = fully autonomous
+    #[serde(default = "default_hive_autonomy")]
+    hive_autonomy: f32,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -146,6 +152,7 @@ struct DiskConfig {
 
 fn default_tts_speed() -> f32 { 1.0 }
 fn default_ghost_mode_position() -> String { "bottom-right".to_string() }
+fn default_hive_autonomy() -> f32 { 0.3 }
 fn default_background_ai_enabled() -> bool { true }
 fn default_whisper_model() -> String { "tiny.en".to_string() }
 fn default_last_deep_scan() -> i64 { 0 }
@@ -206,6 +213,8 @@ impl Default for DiskConfig {
             ghost_mode_enabled: false,
             ghost_mode_position: "bottom-right".to_string(),
             ghost_auto_reply: false,
+            hive_enabled: false,
+            hive_autonomy: 0.3,
             api_key: None,
         }
     }
@@ -308,6 +317,12 @@ pub struct BladeConfig {
     /// Auto-type suggested reply into chat input (requires hotkey confirmation)
     #[serde(default)]
     pub ghost_auto_reply: bool,
+    /// Enable HIVE distributed agent mesh (default false — opt-in)
+    #[serde(default)]
+    pub hive_enabled: bool,
+    /// HIVE global autonomy level: 0.0 = always ask, 1.0 = fully autonomous
+    #[serde(default = "default_hive_autonomy")]
+    pub hive_autonomy: f32,
 }
 
 impl BladeConfig {
@@ -362,6 +377,8 @@ impl Default for BladeConfig {
             ghost_mode_enabled: false,
             ghost_mode_position: "bottom-right".to_string(),
             ghost_auto_reply: false,
+            hive_enabled: false,
+            hive_autonomy: 0.3,
         }
     }
 }
@@ -480,6 +497,8 @@ pub fn load_config() -> BladeConfig {
         ghost_mode_enabled: disk.ghost_mode_enabled,
         ghost_mode_position: disk.ghost_mode_position,
         ghost_auto_reply: disk.ghost_auto_reply,
+        hive_enabled: disk.hive_enabled,
+        hive_autonomy: disk.hive_autonomy,
     }
 }
 
@@ -530,6 +549,8 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         ghost_mode_enabled: config.ghost_mode_enabled,
         ghost_mode_position: config.ghost_mode_position.clone(),
         ghost_auto_reply: config.ghost_auto_reply,
+        hive_enabled: config.hive_enabled,
+        hive_autonomy: config.hive_autonomy,
         api_key: None,
     };
 

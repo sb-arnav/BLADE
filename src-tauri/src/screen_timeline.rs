@@ -272,6 +272,8 @@ pub async fn capture_timeline_tick(app: &tauri::AppHandle) {
             "app_name": &app_name,
         }),
     );
+    // Notify HUD: screenshot taken (camera blink + blue screen flash)
+    let _ = app.emit("screenshot_taken", ());
 
     // 7. Async: describe + embed (doesn't block the capture loop)
     let thumb_b64 = B64.encode(&thumb);

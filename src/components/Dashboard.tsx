@@ -218,6 +218,38 @@ function breatheStyle(delay = "0s", active = true): CSSProperties {
   };
 }
 
+/** Animated number that counts up/down to `target` with easing */
+function AnimatedNumber({ target, suffix = "", decimals = 0 }: { target: number; suffix?: string; decimals?: number }) {
+  const [display, setDisplay] = useState(target);
+  const prev = useRef(target);
+  const raf = useRef<number>(0);
+
+  useEffect(() => {
+    const from = prev.current;
+    const to = target;
+    if (from === to) return;
+    const duration = 600;
+    const start = performance.now();
+    const animate = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplay(from + (to - from) * eased);
+      if (t < 1) {
+        raf.current = requestAnimationFrame(animate);
+      } else {
+        prev.current = to;
+        setDisplay(to);
+      }
+    };
+    raf.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(raf.current);
+  }, [target]);
+
+  const formatted = decimals > 0 ? display.toFixed(decimals) : Math.round(display).toString();
+  return <>{formatted}{suffix}</>;
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 /** Single pill in the status strip */
@@ -235,11 +267,22 @@ function StatusPill({
   onClick?: () => void;
 }) {
   const Tag = onClick ? "button" : "div";
+  const [ripples, setRipples] = useState<{ id: number; x: number; y: number }[]>([]);
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (!onClick) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const id = Date.now();
+    setRipples((r) => [...r, { id, x: e.clientX - rect.left, y: e.clientY - rect.top }]);
+    setTimeout(() => setRipples((r) => r.filter((rp) => rp.id !== id)), 600);
+    onClick();
+  };
+
   return (
     <Tag
       type={onClick ? "button" : undefined}
-      onClick={onClick}
-      className="flex items-center gap-2 border px-3 py-2 text-[10px] uppercase tracking-[0.2em] transition-all"
+      onClick={handleClick as unknown as React.MouseEventHandler}
+      className="relative flex items-center gap-2 border px-3 py-2 text-[10px] uppercase tracking-[0.2em] transition-all overflow-hidden"
       style={{
         borderColor: active ? `${color}55` : p.lineDim,
         background: active ? `${color}0d` : "rgba(0,0,0,0.25)",
@@ -248,6 +291,20 @@ function StatusPill({
         boxShadow: active ? `0 0 14px ${color}18` : "none",
       }}
     >
+      {ripples.map((rp) => (
+        <span
+          key={rp.id}
+          className="pointer-events-none absolute rounded-full"
+          style={{
+            left: rp.x - 20,
+            top: rp.y - 20,
+            width: 40,
+            height: 40,
+            background: `${color}30`,
+            animation: "db-ripple 0.6s ease-out forwards",
+          }}
+        />
+      ))}
       <span
         className="block h-2 w-2 shrink-0 rounded-full"
         style={{
@@ -339,7 +396,7 @@ function DataRow({
   );
 }
 
-/** Compact action button */
+/** Compact action button with ripple */
 function ActionBtn({
   label,
   icon,
@@ -355,12 +412,22 @@ function ActionBtn({
   loading?: boolean;
   disabled?: boolean;
 }) {
+  const [ripples, setRipples] = useState<{ id: number; x: number; y: number }[]>([]);
+
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const id = Date.now();
+    setRipples((r) => [...r, { id, x: e.clientX - rect.left, y: e.clientY - rect.top }]);
+    setTimeout(() => setRipples((r) => r.filter((rp) => rp.id !== id)), 700);
+    onClick();
+  };
+
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={handleClick}
       disabled={disabled || loading}
-      className="flex flex-col items-center justify-center gap-1.5 border p-3 text-center transition-all hover:brightness-125 active:scale-95 disabled:opacity-40"
+      className="relative flex flex-col items-center justify-center gap-1.5 border p-3 text-center transition-all hover:brightness-125 active:scale-95 disabled:opacity-40 overflow-hidden"
       style={{
         borderColor: `${color}33`,
         background: `${color}08`,
@@ -368,13 +435,27 @@ function ActionBtn({
         minHeight: "70px",
       }}
     >
+      {ripples.map((rp) => (
+        <span
+          key={rp.id}
+          className="pointer-events-none absolute rounded-full"
+          style={{
+            left: rp.x - 30,
+            top: rp.y - 30,
+            width: 60,
+            height: 60,
+            background: `${color}25`,
+            animation: "db-ripple 0.7s ease-out forwards",
+          }}
+        />
+      ))}
       <span className="text-lg leading-none">{loading ? "…" : icon}</span>
       <span className="text-[9px] font-bold uppercase tracking-[0.18em] leading-tight">{label}</span>
     </button>
   );
 }
 
-/** Compact agent row for the agents table */
+/** Compact agent row with progress bar for running agents */
 function AgentRowCompact({ agent }: { agent: BackgroundAgent }) {
   const statusColor = {
     Running: p.green,
@@ -382,6 +463,14 @@ function AgentRowCompact({ agent }: { agent: BackgroundAgent }) {
     Failed: p.red,
     Cancelled: p.muted,
   }[agent.status];
+
+  // Estimated progress for running agents based on elapsed time (0-95% over 60s)
+  const elapsedSecs = agent.status === "Running"
+    ? Math.floor((Date.now() / 1000) - agent.started_at)
+    : null;
+  const estimatedPct = elapsedSecs !== null
+    ? Math.min(95, Math.round((1 - Math.exp(-elapsedSecs / 40)) * 100))
+    : null;
 
   return (
     <div
@@ -397,6 +486,19 @@ function AgentRowCompact({ agent }: { agent: BackgroundAgent }) {
       </div>
       <div className="min-w-0">
         <div className="truncate font-bold" style={{ color: "#d0f0f8" }}>{agent.task}</div>
+        {estimatedPct !== null && (
+          <div className="mt-1 h-1 w-full rounded-full overflow-hidden" style={{ background: `${p.green}18` }}>
+            <div
+              className="h-full rounded-full"
+              style={{
+                width: `${estimatedPct}%`,
+                background: `linear-gradient(90deg, ${p.green}88, ${p.cyan}aa)`,
+                boxShadow: `0 0 6px ${p.green}88`,
+                transition: "width 1s linear",
+              }}
+            />
+          </div>
+        )}
         <div className="truncate text-[9px]" style={{ color: p.dim }}>{agent.cwd.split(/[\\/]/).pop()}</div>
       </div>
       <div className="text-right">
@@ -513,12 +615,20 @@ export function Dashboard({ onBack, onNavigate }: Props) {
   // ── Quick action loading states ─────────────────────────────────────────────
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
 
-  // ── Ticker ─────────────────────────────────────────────────────────────────
+  // ── Ticker — updates every second for real-time clock ──────────────────────
   const [now, setNow] = useState(Date.now());
   const tickRef = useRef(0);
   useEffect(() => {
-    tickRef.current = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(tickRef.current);
+    // Sync to nearest second boundary for clean ticking
+    const msToNextSecond = 1000 - (Date.now() % 1000);
+    const syncTimeout = setTimeout(() => {
+      setNow(Date.now());
+      tickRef.current = window.setInterval(() => setNow(Date.now()), 1000);
+    }, msToNextSecond);
+    return () => {
+      clearTimeout(syncTimeout);
+      clearInterval(tickRef.current);
+    };
   }, []);
 
   // ── Load core data ──────────────────────────────────────────────────────────
@@ -672,7 +782,64 @@ export function Dashboard({ onBack, onNavigate }: Props) {
           0%,100% { opacity:1; transform:scale(1); filter:blur(0px); }
           50% { opacity:0.55; transform:scale(0.78); filter:blur(0.5px); }
         }
+        @keyframes db-ripple {
+          0% { transform: scale(0); opacity: 1; }
+          100% { transform: scale(3.5); opacity: 0; }
+        }
+        @keyframes db-aurora-1 {
+          0%,100% { transform: translateX(-10%) translateY(0%) scale(1.1); opacity: 0.35; }
+          33% { transform: translateX(5%) translateY(-8%) scale(1.3); opacity: 0.5; }
+          66% { transform: translateX(-5%) translateY(5%) scale(0.95); opacity: 0.3; }
+        }
+        @keyframes db-aurora-2 {
+          0%,100% { transform: translateX(10%) translateY(5%) scale(1); opacity: 0.25; }
+          40% { transform: translateX(-8%) translateY(-5%) scale(1.2); opacity: 0.4; }
+          70% { transform: translateX(3%) translateY(8%) scale(0.9); opacity: 0.2; }
+        }
+        @keyframes db-aurora-3 {
+          0%,100% { transform: translateX(0%) translateY(-5%) scale(1.05); opacity: 0.2; }
+          50% { transform: translateX(-6%) translateY(6%) scale(1.15); opacity: 0.35; }
+        }
+        @keyframes db-header-shift {
+          0%   { background-position: 0% 50%; }
+          50%  { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        @keyframes db-clock-tick {
+          0% { opacity: 1; }
+          49% { opacity: 1; }
+          50% { opacity: 0.4; }
+          100% { opacity: 0.4; }
+        }
       `}</style>
+
+      {/* ── Aurora ambient animation — BLADE is alive ── */}
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
+        <div
+          className="absolute -top-1/4 -left-1/4 w-3/4 h-3/4 rounded-full"
+          style={{
+            background: "radial-gradient(ellipse, rgba(99,102,241,0.12) 0%, transparent 70%)",
+            animation: "db-aurora-1 18s ease-in-out infinite",
+            filter: "blur(40px)",
+          }}
+        />
+        <div
+          className="absolute -bottom-1/4 -right-1/4 w-2/3 h-2/3 rounded-full"
+          style={{
+            background: "radial-gradient(ellipse, rgba(139,92,246,0.10) 0%, transparent 70%)",
+            animation: "db-aurora-2 24s ease-in-out infinite",
+            filter: "blur(50px)",
+          }}
+        />
+        <div
+          className="absolute top-1/3 right-1/4 w-1/2 h-1/2 rounded-full"
+          style={{
+            background: "radial-gradient(ellipse, rgba(0,229,255,0.06) 0%, transparent 70%)",
+            animation: "db-aurora-3 30s ease-in-out infinite",
+            filter: "blur(60px)",
+          }}
+        />
+      </div>
 
       {/* CRT scanline overlay */}
       <div
@@ -688,11 +855,23 @@ export function Dashboard({ onBack, onNavigate }: Props) {
         style={{ boxShadow: "inset 0 0 100px rgba(0,0,0,0.65)" }}
       />
 
-      {/* ── Header bar ── */}
+      {/* ── Header bar — animated gradient ── */}
       <header
-        className="relative z-10 flex shrink-0 items-center gap-3 border-b px-4 py-2.5"
-        style={{ borderColor: p.line, background: "rgba(7,9,10,0.96)" }}
+        className="relative z-10 flex shrink-0 items-center gap-3 border-b px-4 py-2.5 overflow-hidden"
+        style={{
+          borderColor: p.line,
+          background: "linear-gradient(135deg, rgba(20,10,40,0.97) 0%, rgba(10,15,35,0.97) 30%, rgba(5,20,40,0.97) 60%, rgba(15,8,30,0.97) 100%)",
+          backgroundSize: "400% 400%",
+          animation: "db-header-shift 12s ease infinite",
+        }}
       >
+        {/* Header inner glow */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: "linear-gradient(90deg, rgba(99,102,241,0.05) 0%, transparent 40%, rgba(139,92,246,0.05) 100%)",
+          }}
+        />
         <button
           onClick={onBack}
           className="border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] transition-colors hover:brightness-125"
@@ -722,8 +901,12 @@ export function Dashboard({ onBack, onNavigate }: Props) {
               </span>
             )}
           </div>
-          <div className="text-[9px] uppercase tracking-[0.22em] mt-0.5" style={{ color: p.dim }}>
-            {new Date(now).toLocaleTimeString()} · auto-refresh 5s
+          <div className="text-[9px] uppercase tracking-[0.22em] mt-0.5 flex items-center gap-1" style={{ color: p.dim }}>
+            <span className="tabular-nums font-bold" style={{ color: p.cyan, textShadow: `0 0 8px ${p.cyan}66` }}>
+              {new Date(now).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+            </span>
+            <span>·</span>
+            <span>auto-refresh 5s</span>
             {godModeUpdate && (
               <span style={{ color: p.muted }}> · last scan {godModeUpdate.bytes}b</span>
             )}
@@ -1034,7 +1217,7 @@ export function Dashboard({ onBack, onNavigate }: Props) {
               <div className="space-y-1.5">
                 <DataRow label="Streak" value={fmtMinutes(health.current_streak_minutes)} accent={health.current_streak_minutes > 90 ? p.red : p.green} />
                 <DataRow label="Daily Total" value={fmtMinutes(health.daily_total_minutes)} accent={p.cyan} />
-                <DataRow label="Breaks Taken" value={health.breaks_taken} accent={p.amber} />
+                <DataRow label="Breaks Taken" value={<AnimatedNumber target={health.breaks_taken} />} accent={p.amber} />
                 <DataRow label="Status" value={health.status} accent={p.green} mono={false} />
               </div>
             ) : (
@@ -1054,7 +1237,7 @@ export function Dashboard({ onBack, onNavigate }: Props) {
           <Panel title="Total Recall" accent={p.blue}>
             {cfg?.screen_timeline_enabled && timeline ? (
               <div className="space-y-1.5">
-                <DataRow label="Captures" value={timeline.total_entries.toLocaleString()} accent={p.blue} />
+                <DataRow label="Captures" value={<AnimatedNumber target={timeline.total_entries} />} accent={p.blue} />
                 <DataRow label="Disk Used" value={fmt(timeline.disk_bytes)} accent={p.cyan} />
                 <DataRow label="Last Cap" value={relTime(timeline.newest_timestamp)} accent={p.muted} mono={false} />
               </div>

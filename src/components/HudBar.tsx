@@ -1,10 +1,12 @@
-/// BLADE HUD Bar — always-on-top slim 30px bar at the top of the screen.
+/// BLADE HUD Bar — fighter-jet heads-up display. Always-on-top, 30px at top of screen.
 ///
-/// Displays: time, active app, God Mode status, unread count, next meeting countdown.
-/// In meeting mode: shows meeting name + speaking participant.
-/// Click anywhere to expand the main BLADE window.
-/// Ctrl+G toggles the Ghost response card (when ghost_mode is active).
-/// Auto-hides when a fullscreen app is detected.
+/// Displays: time (monospaced, glowing), active app (typing reveal animation),
+/// God Mode status, unread count, next meeting countdown (amber/<15min, red/<5min),
+/// tiny waveform when audio capture is active, camera blink when screenshot taken.
+///
+/// Alert pulses: red for errors/security, amber for warnings.
+/// Scan line effect: subtle 1px horizontal lines scrolling slowly.
+/// Double-click opens main BLADE window.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -81,6 +83,87 @@ function confidenceColor(c: number): string {
   return "#f87171";
 }
 
+// ── Waveform bars component ───────────────────────────────────────────────────
+
+function AudioWaveform() {
+  const BAR_COUNT = 5;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "1.5px", height: "12px" }}>
+      {Array.from({ length: BAR_COUNT }, (_, i) => (
+        <div
+          key={i}
+          style={{
+            width: "2px",
+            height: "3px",
+            borderRadius: "1px",
+            background: "#10b981",
+            animation: `waveBar ${0.6 + i * 0.1}s ease-in-out infinite alternate`,
+            animationDelay: `${i * 0.07}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ── Camera icon (blinks on screenshot) ───────────────────────────────────────
+
+function CameraIcon({ blinking }: { blinking: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 12 10"
+      width="12"
+      height="10"
+      fill="none"
+      style={{
+        opacity: blinking ? 1 : 0.25,
+        transition: "opacity 0.15s",
+        filter: blinking ? "drop-shadow(0 0 3px #3b82f6)" : "none",
+      }}
+    >
+      <path
+        d="M4.5 1h3l1 1.5H11a.5.5 0 01.5.5v5a.5.5 0 01-.5.5H1a.5.5 0 01-.5-.5V3a.5.5 0 01.5-.5h2.5L4.5 1z"
+        stroke={blinking ? "#3b82f6" : "rgba(255,255,255,0.35)"}
+        strokeWidth="1"
+      />
+      <circle cx="6" cy="5" r="1.5" stroke={blinking ? "#3b82f6" : "rgba(255,255,255,0.35)"} strokeWidth="1" />
+    </svg>
+  );
+}
+
+// ── Typing reveal for active app name ────────────────────────────────────────
+
+function useTypingReveal(text: string, delay = 18) {
+  const [displayed, setDisplayed] = useState(text);
+  const [revealing, setRevealing] = useState(false);
+  const prevTextRef = useRef(text);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (text === prevTextRef.current) return;
+    prevTextRef.current = text;
+
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setRevealing(true);
+    setDisplayed("");
+
+    let i = 0;
+    const reveal = () => {
+      i++;
+      setDisplayed(text.slice(0, i));
+      if (i < text.length) {
+        timerRef.current = setTimeout(reveal, delay);
+      } else {
+        setRevealing(false);
+      }
+    };
+    timerRef.current = setTimeout(reveal, delay);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [text, delay]);
+
+  return { displayed, revealing };
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export function HudBar() {
@@ -101,9 +184,28 @@ export function HudBar() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [isCopying, setIsCopying] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+
+  // HUD alert pulse state: null | "error" | "warning"
+  const [alertPulse, setAlertPulse] = useState<"error" | "warning" | null>(null);
+
+  // Audio capture active
+  const [audioActive, setAudioActive] = useState(false);
+
+  // Screenshot camera blink
+  const [cameraBlink, setCameraBlink] = useState(false);
+  const cameraBlinkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Screen flash (blue border)
+  const [screenFlash, setScreenFlash] = useState(false);
+  const screenFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const toastTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [localSecs, setLocalSecs] = useState<number | null>(null);
+  const alertTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Typing reveal for active app name
+  const { displayed: displayedApp, revealing: appRevealing } = useTypingReveal(data.active_app);
 
   // ── Data listener ──────────────────────────────────────────────────────────
 
@@ -129,6 +231,54 @@ export function HudBar() {
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
   }, [localSecs]);
+
+  // ── Alert pulse on errors/warnings ──────────────────────────────────────────
+
+  useEffect(() => {
+    const unlistenErr = listen("blade_alert_error", () => {
+      triggerAlert("error");
+    });
+    const unlistenWarn = listen("blade_alert_warning", () => {
+      triggerAlert("warning");
+    });
+    // Also fire on error/warning toasts
+    return () => {
+      unlistenErr.then((fn) => fn());
+      unlistenWarn.then((fn) => fn());
+    };
+  }, []);
+
+  function triggerAlert(level: "error" | "warning") {
+    setAlertPulse(level);
+    if (alertTimer.current) clearTimeout(alertTimer.current);
+    alertTimer.current = setTimeout(() => setAlertPulse(null), 1800);
+  }
+
+  // ── Audio active polling via hud_update ────────────────────────────────────
+
+  useEffect(() => {
+    const unlisten = listen<{ active: boolean }>("audio_capture_state", (ev) => {
+      setAudioActive(ev.payload.active);
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
+
+  // ── Screenshot camera blink + screen flash ────────────────────────────────
+
+  useEffect(() => {
+    const unlisten = listen("screenshot_taken", () => {
+      // Camera blink for 1.2s
+      setCameraBlink(true);
+      if (cameraBlinkTimerRef.current) clearTimeout(cameraBlinkTimerRef.current);
+      cameraBlinkTimerRef.current = setTimeout(() => setCameraBlink(false), 1200);
+
+      // Screen flash for 600ms
+      setScreenFlash(true);
+      if (screenFlashTimerRef.current) clearTimeout(screenFlashTimerRef.current);
+      screenFlashTimerRef.current = setTimeout(() => setScreenFlash(false), 600);
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
 
   // ── Ghost suggestion listener ───────────────────────────────────────────────
 
@@ -194,8 +344,11 @@ export function HudBar() {
       const toast: Toast = { ...ev.payload, id, exiting: false };
       setToasts((prev) => [...prev, toast]);
 
+      // Trigger HUD alert pulse for warnings/errors
+      if (ev.payload.level === "error") triggerAlert("error");
+      else if (ev.payload.level === "warning") triggerAlert("warning");
+
       const timer = setTimeout(() => {
-        // Mark as exiting first for animation
         setToasts((prev) =>
           prev.map((t) => (t.id === id ? { ...t, exiting: true } : t))
         );
@@ -283,9 +436,16 @@ export function HudBar() {
   const gmColor = godModeColor(data.god_mode_status);
   const displayCountdown = localSecs ?? data.next_meeting_secs;
 
+  // Countdown urgency
+  const countdownUrgent = displayCountdown !== null && displayCountdown < 300;    // < 5 min
+  const countdownAmber  = displayCountdown !== null && displayCountdown < 900;    // < 15 min
+  const countdownColor  = countdownUrgent ? "#f87171" : countdownAmber ? "#f59e0b" : "rgba(255,255,255,0.45)";
+
+  // Alert pulse bar color
+  const alertBarColor = alertPulse === "error" ? "rgba(248,113,113,0.22)" : alertPulse === "warning" ? "rgba(245,158,11,0.18)" : null;
+  const alertBorderColor = alertPulse === "error" ? "rgba(248,113,113,0.5)" : alertPulse === "warning" ? "rgba(245,158,11,0.4)" : null;
+
   return (
-    // Root: covers full screen but transparent — pointer-events: none so clicks pass through
-    // to underlying apps. Only the bar itself and visible cards re-enable pointer events.
     <div
       style={{
         position: "fixed",
@@ -298,179 +458,265 @@ export function HudBar() {
         zIndex: 9998,
       }}
     >
-    {/* HUD bar strip — pointer events enabled only here */}
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        width: "100vw",
-        height: "30px",
-        background: isMeeting
-          ? "rgba(99,102,241,0.18)"
-          : "rgba(9,9,11,0.82)",
-        backdropFilter: "blur(16px) saturate(180%)",
-        WebkitBackdropFilter: "blur(16px) saturate(180%)",
-        borderBottom: isMeeting
-          ? "1px solid rgba(99,102,241,0.35)"
-          : "1px solid rgba(255,255,255,0.06)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "0 12px",
-        userSelect: "none",
-        cursor: "default",
-        fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-        fontSize: "11px",
-        letterSpacing: "-0.01em",
-        color: "rgba(255,255,255,0.7)",
-        zIndex: 9999,
-        boxSizing: "border-box",
-        pointerEvents: "auto",
-      }}
-      onDoubleClick={openMain}
-    >
-      {/* LEFT: time + active app (or meeting info) */}
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, overflow: "hidden" }}>
-        {/* Time */}
-        <span style={{ fontVariantNumeric: "tabular-nums", color: "rgba(255,255,255,0.85)", fontWeight: 500, flexShrink: 0 }}>
-          {data.time}
-        </span>
+      {/* Screen edge flash on screenshot (blue border around screen edges) */}
+      {screenFlash && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            pointerEvents: "none",
+            zIndex: 10002,
+            boxShadow: "inset 0 0 0 3px rgba(59,130,246,0.7)",
+            borderRadius: "0",
+            animation: "screenFlashFade 0.6s ease-out forwards",
+          }}
+        />
+      )}
 
-        {isMeeting ? (
-          /* Meeting mode: show platform + speaker */
-          <>
-            <div style={{ width: "1px", height: "12px", background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
+      {/* HUD bar strip */}
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          width: "100vw",
+          height: "30px",
+          background: alertBarColor
+            ? alertBarColor
+            : isMeeting
+            ? "rgba(99,102,241,0.18)"
+            : "rgba(6,6,10,0.88)",
+          backdropFilter: "blur(20px) saturate(200%)",
+          WebkitBackdropFilter: "blur(20px) saturate(200%)",
+          borderBottom: alertBorderColor
+            ? `1px solid ${alertBorderColor}`
+            : isMeeting
+            ? "1px solid rgba(99,102,241,0.4)"
+            : "1px solid rgba(255,255,255,0.05)",
+          boxShadow: alertPulse === "error"
+            ? "0 0 18px rgba(248,113,113,0.25), inset 0 -1px 0 rgba(248,113,113,0.1)"
+            : alertPulse === "warning"
+            ? "0 0 18px rgba(245,158,11,0.2), inset 0 -1px 0 rgba(245,158,11,0.1)"
+            : "0 1px 0 rgba(0,0,0,0.4)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 12px",
+          userSelect: "none",
+          cursor: "default",
+          fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace",
+          fontSize: "11px",
+          letterSpacing: "0.02em",
+          color: "rgba(255,255,255,0.7)",
+          zIndex: 9999,
+          boxSizing: "border-box",
+          pointerEvents: "auto",
+          // Scan line effect via repeating gradient
+          backgroundImage: alertBarColor
+            ? `repeating-linear-gradient(
+                180deg,
+                transparent,
+                transparent 4px,
+                rgba(0,0,0,0.04) 4px,
+                rgba(0,0,0,0.04) 5px
+              ), linear-gradient(${alertBarColor}, ${alertBarColor})`
+            : `repeating-linear-gradient(
+                180deg,
+                transparent,
+                transparent 4px,
+                rgba(0,0,0,0.05) 4px,
+                rgba(0,0,0,0.05) 5px
+              ), linear-gradient(${isMeeting ? "rgba(99,102,241,0.18)" : "rgba(6,6,10,0.88)"}, ${isMeeting ? "rgba(99,102,241,0.18)" : "rgba(6,6,10,0.88)"})`,
+          transition: "background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease",
+        }}
+        onDoubleClick={openMain}
+      >
+        {/* LEFT: time + active app (or meeting info) */}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, overflow: "hidden" }}>
+          {/* Time — monospaced, subtle glow */}
+          <span
+            style={{
+              fontVariantNumeric: "tabular-nums",
+              color: "rgba(255,255,255,0.92)",
+              fontWeight: 600,
+              fontSize: "12px",
+              letterSpacing: "0.08em",
+              flexShrink: 0,
+              textShadow: "0 0 8px rgba(255,255,255,0.25), 0 0 16px rgba(99,102,241,0.15)",
+            }}
+          >
+            {data.time}
+          </span>
+
+          {/* Divider */}
+          <div style={{ width: "1px", height: "12px", background: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
+
+          {isMeeting ? (
+            <>
+              {/* Meeting badge */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  padding: "2px 7px",
+                  borderRadius: "3px",
+                  background: "rgba(99,102,241,0.2)",
+                  border: "1px solid rgba(99,102,241,0.4)",
+                  flexShrink: 0,
+                }}
+              >
+                <span
+                  style={{
+                    width: "5px",
+                    height: "5px",
+                    borderRadius: "50%",
+                    background: "#f87171",
+                    animation: "hudPulse 1.5s ease-in-out infinite",
+                    flexShrink: 0,
+                  }}
+                />
+                <span style={{ color: "rgba(255,255,255,0.92)", fontWeight: 600, letterSpacing: "0.04em" }}>
+                  {data.meeting_name ?? "MEETING"}
+                </span>
+              </div>
+              {data.speaker_name && (
+                <span style={{ color: "rgba(255,255,255,0.4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "10px" }}>
+                  {data.speaker_name} speaking
+                </span>
+              )}
+            </>
+          ) : (
+            /* Active app with typing reveal */
+            data.active_app && (
+              <span
+                style={{
+                  color: appRevealing ? "rgba(99,102,241,0.8)" : "rgba(255,255,255,0.4)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  maxWidth: "220px",
+                  fontSize: "10px",
+                  letterSpacing: "0.03em",
+                  transition: "color 0.4s ease",
+                }}
+              >
+                {displayedApp}
+                {appRevealing && (
+                  <span style={{ borderRight: "1px solid rgba(99,102,241,0.8)", marginLeft: "1px", animation: "cursorBlink 0.6s step-end infinite" }} />
+                )}
+              </span>
+            )
+          )}
+        </div>
+
+        {/* RIGHT: camera icon, audio waveform, god mode, unread, next meeting, ghost toggle */}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+          {/* Camera icon — blinks when screenshot is taken */}
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <CameraIcon blinking={cameraBlink} />
+          </div>
+
+          {/* Audio waveform — visible only when audio capture is active */}
+          {audioActive && (
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <AudioWaveform />
+            </div>
+          )}
+
+          {/* Vertical separator */}
+          <div style={{ width: "1px", height: "12px", background: "rgba(255,255,255,0.06)", flexShrink: 0 }} />
+
+          {/* Next meeting countdown */}
+          {!isMeeting && displayCountdown !== null && data.next_meeting_name && (
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "5px",
-                padding: "2px 7px",
-                borderRadius: "4px",
-                background: "rgba(99,102,241,0.2)",
-                border: "1px solid rgba(99,102,241,0.35)",
-                flexShrink: 0,
+                gap: "4px",
+                padding: "2px 6px",
+                borderRadius: "3px",
+                background: countdownUrgent
+                  ? "rgba(248,113,113,0.12)"
+                  : countdownAmber
+                  ? "rgba(245,158,11,0.10)"
+                  : "rgba(255,255,255,0.04)",
+                border: `1px solid ${countdownUrgent ? "rgba(248,113,113,0.3)" : countdownAmber ? "rgba(245,158,11,0.25)" : "rgba(255,255,255,0.07)"}`,
+                animation: countdownUrgent ? "hudPulse 2s ease-in-out infinite" : "none",
               }}
             >
-              {/* Recording dot */}
-              <span
-                style={{
-                  width: "5px",
-                  height: "5px",
-                  borderRadius: "50%",
-                  background: "#f87171",
-                  animation: "pulse 1.5s ease-in-out infinite",
-                  flexShrink: 0,
-                }}
-              />
-              <span style={{ color: "rgba(255,255,255,0.9)", fontWeight: 500 }}>
-                {data.meeting_name ?? "Meeting"}
+              <svg viewBox="0 0 12 12" width="9" height="9" fill="none" style={{ flexShrink: 0 }}>
+                <circle cx="6" cy="6" r="5" stroke={countdownColor} strokeWidth="1.2" />
+                <path d="M6 3.5V6l2 1.5" stroke={countdownColor} strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+              <span style={{ color: countdownColor, fontWeight: 600, fontSize: "10px" }}>
+                {formatCountdown(displayCountdown)}
               </span>
             </div>
-            {data.speaker_name && (
-              <span style={{ color: "rgba(255,255,255,0.45)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {data.speaker_name} speaking
-              </span>
-            )}
-          </>
-        ) : (
-          /* Normal mode: active app */
-          data.active_app && (
-            <>
-              <div style={{ width: "1px", height: "12px", background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
-              <span style={{ color: "rgba(255,255,255,0.45)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "200px" }}>
-                {data.active_app}
-              </span>
-            </>
-          )
-        )}
-      </div>
+          )}
 
-      {/* RIGHT: god mode, unread, next meeting, ghost toggle */}
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-        {/* Next meeting countdown */}
-        {!isMeeting && displayCountdown !== null && data.next_meeting_name && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-              padding: "2px 7px",
-              borderRadius: "4px",
-              background: displayCountdown < 300 ? "rgba(245,158,11,0.12)" : "rgba(255,255,255,0.05)",
-              border: `1px solid ${displayCountdown < 300 ? "rgba(245,158,11,0.3)" : "rgba(255,255,255,0.08)"}`,
-            }}
-          >
-            <svg viewBox="0 0 12 12" width="9" height="9" fill="none" style={{ flexShrink: 0 }}>
-              <circle cx="6" cy="6" r="5" stroke={displayCountdown < 300 ? "#f59e0b" : "rgba(255,255,255,0.3)"} strokeWidth="1.2" />
-              <path d="M6 3.5V6l2 1.5" stroke={displayCountdown < 300 ? "#f59e0b" : "rgba(255,255,255,0.3)"} strokeWidth="1.2" strokeLinecap="round" />
-            </svg>
-            <span style={{ color: displayCountdown < 300 ? "#f59e0b" : "rgba(255,255,255,0.45)" }}>
-              {formatCountdown(displayCountdown)}
-            </span>
-          </div>
-        )}
+          {/* Unread count */}
+          {data.unread_count > 0 && (
+            <div
+              style={{
+                padding: "1px 5px",
+                borderRadius: "3px",
+                background: "rgba(248,113,113,0.12)",
+                border: "1px solid rgba(248,113,113,0.22)",
+                color: "#f87171",
+                fontSize: "10px",
+                fontWeight: 700,
+                letterSpacing: "0.02em",
+              }}
+            >
+              {data.unread_count > 99 ? "99+" : data.unread_count}
+            </div>
+          )}
 
-        {/* Unread count */}
-        {data.unread_count > 0 && (
+          {/* God Mode badge */}
           <div
             style={{
               padding: "1px 5px",
-              borderRadius: "9px",
-              background: "rgba(248,113,113,0.15)",
-              border: "1px solid rgba(248,113,113,0.25)",
-              color: "#f87171",
-              fontSize: "10px",
-              fontWeight: 600,
+              borderRadius: "3px",
+              background: `${gmColor}12`,
+              border: `1px solid ${gmColor}30`,
+              color: gmColor,
+              fontSize: "9px",
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textShadow: data.god_mode_status !== "off" ? `0 0 6px ${gmColor}` : "none",
             }}
           >
-            {data.unread_count > 99 ? "99+" : data.unread_count}
+            {godModeLabel(data.god_mode_status)}
           </div>
-        )}
 
-        {/* God Mode badge */}
-        <div
-          style={{
-            padding: "1px 5px",
-            borderRadius: "3px",
-            background: `${gmColor}18`,
-            border: `1px solid ${gmColor}35`,
-            color: gmColor,
-            fontSize: "9px",
-            fontWeight: 700,
-            letterSpacing: "0.04em",
-          }}
-        >
-          {godModeLabel(data.god_mode_status)}
+          {/* Ghost card toggle (only visible during meeting) */}
+          {isMeeting && ghost && (
+            <button
+              onClick={() => setGhostVisible((v) => !v)}
+              title="Toggle response card (Ctrl+G)"
+              style={{
+                padding: "2px 7px",
+                borderRadius: "3px",
+                background: ghostVisible ? "rgba(99,102,241,0.3)" : "rgba(99,102,241,0.12)",
+                border: "1px solid rgba(99,102,241,0.4)",
+                color: "rgba(255,255,255,0.85)",
+                cursor: "pointer",
+                fontSize: "9px",
+                fontWeight: 700,
+                letterSpacing: "0.06em",
+                outline: "none",
+                textShadow: "0 0 6px rgba(99,102,241,0.6)",
+              }}
+            >
+              BLADE
+            </button>
+          )}
         </div>
-
-        {/* Ghost card toggle (only visible during meeting) */}
-        {isMeeting && ghost && (
-          <button
-            onClick={() => setGhostVisible((v) => !v)}
-            title="Toggle response card (Ctrl+G)"
-            style={{
-              padding: "2px 7px",
-              borderRadius: "4px",
-              background: ghostVisible ? "rgba(99,102,241,0.3)" : "rgba(99,102,241,0.1)",
-              border: "1px solid rgba(99,102,241,0.35)",
-              color: "rgba(255,255,255,0.8)",
-              cursor: "pointer",
-              fontSize: "10px",
-              fontWeight: 500,
-              outline: "none",
-            }}
-          >
-            BLADE
-          </button>
-        )}
       </div>
-      {/* End of HUD bar strip */}
-    </div>
 
-    {/* Ghost suggestion card — floats below the HUD bar, outside the bar div */}
+      {/* Ghost suggestion card */}
       {ghost && ghostVisible && (
         <div
           style={{
@@ -478,12 +724,12 @@ export function HudBar() {
             top: "38px",
             right: "12px",
             width: "340px",
-            background: "rgba(9,9,11,0.94)",
-            backdropFilter: "blur(20px) saturate(180%)",
-            WebkitBackdropFilter: "blur(20px) saturate(180%)",
+            background: "rgba(6,6,10,0.92)",
+            backdropFilter: "blur(24px) saturate(180%)",
+            WebkitBackdropFilter: "blur(24px) saturate(180%)",
             borderRadius: "10px",
-            border: "1px solid rgba(99,102,241,0.25)",
-            boxShadow: "0 16px 40px rgba(0,0,0,0.7), 0 0 0 0.5px rgba(255,255,255,0.04)",
+            border: "1px solid rgba(99,102,241,0.3)",
+            boxShadow: "0 16px 48px rgba(0,0,0,0.75), 0 0 0 0.5px rgba(255,255,255,0.04), 0 0 20px rgba(99,102,241,0.08)",
             padding: "12px",
             fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
             zIndex: 10000,
@@ -495,13 +741,9 @@ export function HudBar() {
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <div
                 style={{
-                  width: "16px",
-                  height: "16px",
-                  borderRadius: "4px",
-                  background: "rgba(99,102,241,0.2)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  width: "16px", height: "16px", borderRadius: "4px",
+                  background: "rgba(99,102,241,0.2)", display: "flex",
+                  alignItems: "center", justifyContent: "center",
                 }}
               >
                 <svg viewBox="0 0 16 16" width="10" height="10" fill="none">
@@ -513,48 +755,27 @@ export function HudBar() {
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              {/* Confidence dot */}
               <span
-                style={{
-                  width: "6px",
-                  height: "6px",
-                  borderRadius: "50%",
-                  background: confidenceColor(ghost.confidence),
-                  flexShrink: 0,
-                }}
+                style={{ width: "6px", height: "6px", borderRadius: "50%", background: confidenceColor(ghost.confidence), flexShrink: 0 }}
                 title={`Confidence: ${Math.round(ghost.confidence * 100)}%`}
               />
               <button
                 onClick={() => setGhostVisible(false)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "rgba(255,255,255,0.25)",
-                  cursor: "pointer",
-                  padding: "0",
-                  lineHeight: 1,
-                  fontSize: "14px",
-                }}
+                style={{ background: "none", border: "none", color: "rgba(255,255,255,0.25)", cursor: "pointer", padding: 0, lineHeight: 1, fontSize: "14px" }}
               >
                 ×
               </button>
             </div>
           </div>
 
-          {/* Trigger (what was asked) */}
+          {/* Trigger */}
           {ghost.trigger && (
             <div
               style={{
-                padding: "5px 8px",
-                borderRadius: "5px",
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.06)",
-                fontSize: "10px",
-                color: "rgba(255,255,255,0.35)",
-                marginBottom: "8px",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
+                padding: "5px 8px", borderRadius: "5px", background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.06)", fontSize: "10px",
+                color: "rgba(255,255,255,0.35)", marginBottom: "8px",
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               }}
             >
               "{ghost.trigger.length > 80 ? ghost.trigger.slice(0, 80) + "…" : ghost.trigger}"
@@ -564,12 +785,8 @@ export function HudBar() {
           {/* Response text */}
           <div
             style={{
-              fontSize: "12px",
-              lineHeight: "1.6",
-              color: "rgba(255,255,255,0.88)",
-              marginBottom: "10px",
-              wordBreak: "break-word",
-              whiteSpace: "pre-wrap",
+              fontSize: "12px", lineHeight: "1.6", color: "rgba(255,255,255,0.88)",
+              marginBottom: "10px", wordBreak: "break-word", whiteSpace: "pre-wrap",
             }}
           >
             {ghost.response}
@@ -580,10 +797,8 @@ export function HudBar() {
             <div style={{ height: "2px", borderRadius: "1px", background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
               <div
                 style={{
-                  height: "100%",
-                  width: `${Math.round(ghost.confidence * 100)}%`,
-                  background: confidenceColor(ghost.confidence),
-                  borderRadius: "1px",
+                  height: "100%", width: `${Math.round(ghost.confidence * 100)}%`,
+                  background: confidenceColor(ghost.confidence), borderRadius: "1px",
                   transition: "width 0.4s ease",
                 }}
               />
@@ -602,17 +817,11 @@ export function HudBar() {
               onClick={typeResponse}
               disabled={isTyping}
               style={{
-                flex: 1,
-                padding: "5px 10px",
-                borderRadius: "5px",
+                flex: 1, padding: "5px 10px", borderRadius: "5px",
                 background: isTyping ? "rgba(99,102,241,0.15)" : "rgba(99,102,241,0.25)",
-                border: "1px solid rgba(99,102,241,0.4)",
-                color: "rgba(255,255,255,0.85)",
-                cursor: isTyping ? "not-allowed" : "pointer",
-                fontSize: "11px",
-                fontWeight: 500,
-                outline: "none",
-                transition: "background 0.15s",
+                border: "1px solid rgba(99,102,241,0.4)", color: "rgba(255,255,255,0.85)",
+                cursor: isTyping ? "not-allowed" : "pointer", fontSize: "11px",
+                fontWeight: 500, outline: "none", transition: "background 0.15s",
               }}
             >
               {isTyping ? "Typing…" : "Type it"}
@@ -620,24 +829,18 @@ export function HudBar() {
             <button
               onClick={copyResponse}
               style={{
-                flex: 1,
-                padding: "5px 10px",
-                borderRadius: "5px",
+                flex: 1, padding: "5px 10px", borderRadius: "5px",
                 background: isCopying ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.06)",
                 border: `1px solid ${isCopying ? "rgba(16,185,129,0.35)" : "rgba(255,255,255,0.1)"}`,
                 color: isCopying ? "#10b981" : "rgba(255,255,255,0.6)",
-                cursor: "pointer",
-                fontSize: "11px",
-                fontWeight: 500,
-                outline: "none",
-                transition: "all 0.15s",
+                cursor: "pointer", fontSize: "11px", fontWeight: 500,
+                outline: "none", transition: "all 0.15s",
               }}
             >
               {isCopying ? "Copied!" : "Copy"}
             </button>
           </div>
 
-          {/* Keyboard hint */}
           <div style={{ marginTop: "8px", fontSize: "9px", color: "rgba(255,255,255,0.18)", textAlign: "center" }}>
             Ctrl+G to toggle
           </div>
@@ -648,14 +851,9 @@ export function HudBar() {
       {toasts.length > 0 && (
         <div
           style={{
-            position: "fixed",
-            top: "38px",
-            left: "12px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "6px",
-            zIndex: 10001,
-            pointerEvents: "auto",
+            position: "fixed", top: "38px", left: "12px",
+            display: "flex", flexDirection: "column", gap: "6px",
+            zIndex: 10001, pointerEvents: "auto",
           }}
         >
           {toasts.map((toast) => {
@@ -665,7 +863,7 @@ export function HudBar() {
                 key={toast.id}
                 style={{
                   width: "300px",
-                  background: "rgba(9,9,11,0.94)",
+                  background: "rgba(6,6,10,0.94)",
                   backdropFilter: "blur(20px)",
                   WebkitBackdropFilter: "blur(20px)",
                   borderRadius: "8px",
@@ -683,13 +881,9 @@ export function HudBar() {
                 <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
                   <div
                     style={{
-                      width: "3px",
-                      height: "100%",
-                      minHeight: "24px",
-                      borderRadius: "2px",
-                      background: accent,
-                      flexShrink: 0,
-                      marginTop: "2px",
+                      width: "3px", height: "100%", minHeight: "24px",
+                      borderRadius: "2px", background: accent,
+                      flexShrink: 0, marginTop: "2px",
                     }}
                   />
                   <div style={{ minWidth: 0 }}>
@@ -709,11 +903,24 @@ export function HudBar() {
         </div>
       )}
 
-      {/* Pulse animation for recording dot */}
+      {/* Global keyframe animations */}
       <style>{`
-        @keyframes pulse {
+        @keyframes hudPulse {
           0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.4; transform: scale(0.85); }
+          50% { opacity: 0.5; transform: scale(0.9); }
+        }
+        @keyframes cursorBlink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0; }
+        }
+        @keyframes screenFlashFade {
+          0% { opacity: 1; }
+          60% { opacity: 0.6; }
+          100% { opacity: 0; }
+        }
+        @keyframes waveBar {
+          from { height: 3px; }
+          to   { height: 11px; }
         }
       `}</style>
     </div>

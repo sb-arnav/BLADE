@@ -18,9 +18,16 @@
 ///   voice_conversation_speaking   — TTS is playing the response
 ///   voice_conversation_thinking   — waiting for the AI response
 ///   voice_conversation_ended      — conversation mode exited
+///
+/// Enhancements (human-feel update):
+///   - Full conversation history passed to every turn (context continuity)
+///   - Filler detection: "um", "uh", "hmm" → waits longer before responding
+///   - Interruption grace period: 500 ms wait before cutting TTS (avoids "uh-huh" kills)
+///   - Session memory: summarised and stored in chat history when session ends
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use tauri::{Emitter, Manager};
+use rusqlite;
 
 static IS_RECORDING: AtomicBool = AtomicBool::new(false);
 
@@ -31,9 +38,61 @@ static TTS_INTERRUPT: AtomicBool = AtomicBool::new(false);
 /// Whether the voice conversation mode is active.
 static CONV_ACTIVE: AtomicBool = AtomicBool::new(false);
 
+/// Timestamp (ms since epoch) when TTS interruption was first signalled.
+/// Used to enforce the 500 ms grace period before actually cutting speech.
+static TTS_INTERRUPT_AT: AtomicU64 = AtomicU64::new(0);
+
+// ---------------------------------------------------------------------------
+// Filler word detection
+// ---------------------------------------------------------------------------
+
+/// Returns true when the transcript is predominantly a filler — the user is
+/// still gathering their thoughts and BLADE should wait before responding.
+fn is_filler(text: &str) -> bool {
+    let lower = text.trim().to_lowercase();
+    // Pure fillers (whole-phrase match)
+    let pure_fillers = ["um", "uh", "hmm", "hm", "er", "ah", "uhh", "umm"];
+    if pure_fillers.iter().any(|f| lower == *f) {
+        return true;
+    }
+    // Short phrase that's mostly filler
+    let word_count = lower.split_whitespace().count();
+    if word_count <= 3 {
+        let filler_words = ["um", "uh", "hmm", "hm", "er", "ah", "well", "so"];
+        let filler_count = lower.split_whitespace()
+            .filter(|w| filler_words.contains(w))
+            .count();
+        if filler_count >= word_count.saturating_sub(1) {
+            return true;
+        }
+    }
+    false
+}
+
+// ---------------------------------------------------------------------------
+// Back-channel word detection (don't cut TTS for these)
+// ---------------------------------------------------------------------------
+
+/// Returns true when the transcript is a back-channel acknowledgement:
+/// the user is signalling they're listening, not actually interrupting.
+fn is_back_channel(text: &str) -> bool {
+    let lower = text.trim().to_lowercase();
+    let back_channels = [
+        "uh huh", "uh-huh", "mm hmm", "mm-hmm", "yeah", "yep", "ok", "okay",
+        "right", "sure", "got it", "i see", "mhm", "mhmm", "yup", "cool",
+    ];
+    back_channels.iter().any(|b| lower == *b || lower == format!("{}.", b))
+}
+
 /// Returns true if a TTS interruption was requested by the conversation loop.
 pub fn is_tts_interrupted() -> bool {
     TTS_INTERRUPT.load(Ordering::SeqCst)
+}
+
+/// Returns the timestamp (ms since epoch) when the interruption grace period started,
+/// or 0 if no interruption is pending.
+pub fn tts_interrupt_at() -> u64 {
+    TTS_INTERRUPT_AT.load(Ordering::SeqCst)
 }
 
 // ---------------------------------------------------------------------------
@@ -202,6 +261,13 @@ pub fn voice_conversation_active() -> bool {
 // ---------------------------------------------------------------------------
 
 async fn run_conversation_loop(app: tauri::AppHandle) -> Result<(), String> {
+    // Conversation history: alternating user / assistant turns, accumulated
+    // across the entire session so every AI call has full context.
+    let mut conv_history: Vec<crate::providers::ConversationMessage> = Vec::new();
+
+    // Track voice intelligence session
+    let session_id = crate::voice_intelligence::start_voice_session();
+
     // Use a sync_channel to bridge the cpal OS thread → async VAD loop.
     // This mirrors the wake_word.rs pattern exactly.
     let (tx, rx) = std::sync::mpsc::sync_channel::<(Vec<f32>, u32)>(128);
@@ -322,10 +388,16 @@ async fn run_conversation_loop(app: tauri::AppHandle) -> Result<(), String> {
                     speech_buf.extend_from_slice(&frame);
                     total_silence_frames = 0;
 
-                    // If TTS was playing, interrupt it
+                    // If TTS was playing, start the interruption grace-period timer.
+                    // The actual interrupt fires in speak_and_wait once 500 ms elapses.
                     if crate::tts::is_speaking() {
-                        TTS_INTERRUPT.store(true, Ordering::SeqCst);
-                        log::info!("[voice_conv] user started speaking — interrupting TTS");
+                        let now_ms = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as u64;
+                        TTS_INTERRUPT_AT.store(now_ms, Ordering::SeqCst);
+                        // Don't set TTS_INTERRUPT yet — speak_and_wait polls it
+                        log::info!("[voice_conv] user started speaking — grace-period started");
                     }
                 } else {
                     total_silence_frames += 1;
@@ -367,6 +439,27 @@ async fn run_conversation_loop(app: tauri::AppHandle) -> Result<(), String> {
                             let trimmed = text.trim().to_string();
                             log::info!("[voice_conv] heard: {}", crate::safe_slice(&trimmed, 80));
 
+                            // Reset any pending interrupt signal now that TTS is done / we
+                            // are in the processing phase.
+                            TTS_INTERRUPT_AT.store(0, Ordering::SeqCst);
+                            TTS_INTERRUPT.store(false, Ordering::SeqCst);
+
+                            // Filler detection: if the user is still thinking, skip this
+                            // turn and wait for them to form a real utterance.
+                            if is_filler(&trimmed) {
+                                log::info!("[voice_conv] filler detected ('{}') — waiting", crate::safe_slice(&trimmed, 20));
+                                // Extra wait: give the user 1.5 s to continue speaking
+                                tokio::time::sleep(tokio::time::Duration::from_millis(1500)).await;
+                                continue;
+                            }
+
+                            // Back-channel check: if TTS was playing and this is just
+                            // acknowledgement, don't process it as a new turn.
+                            if is_back_channel(&trimmed) {
+                                log::info!("[voice_conv] back-channel ('{}') — ignoring", crate::safe_slice(&trimmed, 20));
+                                continue;
+                            }
+
                             // Check for stop phrases
                             let lower = trimmed.to_lowercase();
                             let is_stop = STOP_PHRASES.iter().any(|p| lower.contains(p));
@@ -376,12 +469,45 @@ async fn run_conversation_loop(app: tauri::AppHandle) -> Result<(), String> {
                                 break 'outer;
                             }
 
+                            // Analyze emotion in background (non-blocking; best-effort)
+                            let emotion = crate::voice_intelligence::analyze_voice_emotion(
+                                &trimmed, ""
+                            ).await;
+                            crate::voice_intelligence::add_segment(
+                                &session_id, &trimmed, &emotion, 0.8
+                            );
+
+                            // Emit emotion to frontend so the orb can adapt
+                            let _ = app.emit("voice_emotion_detected", serde_json::json!({
+                                "emotion": &emotion,
+                                "transcript": crate::safe_slice(&trimmed, 100),
+                            }));
+
+                            // Update UserModel mood from detected voice emotion
+                            update_mood_from_voice_emotion(&emotion);
+
+                            // Language detection (non-English auto-respond in same language)
+                            let (lang, is_foreign) = crate::voice_intelligence::detect_non_english(&trimmed).await;
+                            if is_foreign {
+                                log::info!("[voice_conv] non-English detected: {}", lang);
+                                let _ = app.emit("voice_language_detected", serde_json::json!({
+                                    "language": &lang,
+                                }));
+                            }
+
                             // Check cancel before the (potentially slow) AI call
                             if !CONV_ACTIVE.load(Ordering::Relaxed) {
                                 break 'outer;
                             }
-                            // Process through chat pipeline
-                            let response = process_voice_turn(&app, &trimmed).await;
+
+                            // Append user turn to conversation history
+                            conv_history.push(crate::providers::ConversationMessage::User(trimmed.clone()));
+
+                            // Process through chat pipeline with full history
+                            let response = process_voice_turn_with_history(
+                                &app, &trimmed, &conv_history, &emotion, &lang
+                            ).await;
+
                             // Check cancel again after AI returns — user may have hit stop
                             if !CONV_ACTIVE.load(Ordering::Relaxed) {
                                 break 'outer;
@@ -389,10 +515,18 @@ async fn run_conversation_loop(app: tauri::AppHandle) -> Result<(), String> {
                             match response {
                                 Ok(reply) if !reply.trim().is_empty() => {
                                     log::info!("[voice_conv] speaking reply ({} chars)", reply.len());
+                                    // Append assistant reply to history for next turn
+                                    conv_history.push(crate::providers::ConversationMessage::Assistant {
+                                        content: reply.clone(),
+                                        tool_calls: vec![],
+                                    });
+
                                     TTS_INTERRUPT.store(false, Ordering::SeqCst);
+                                    TTS_INTERRUPT_AT.store(0, Ordering::SeqCst);
                                     let _ = app.emit("voice_conversation_speaking", serde_json::json!({ "text": &reply }));
                                     let _ = crate::tts::speak_and_wait(&app, &reply).await;
                                     TTS_INTERRUPT.store(false, Ordering::SeqCst);
+                                    TTS_INTERRUPT_AT.store(0, Ordering::SeqCst);
                                     // Only re-enter listening state if still active
                                     if CONV_ACTIVE.load(Ordering::Relaxed) {
                                         let _ = app.emit("voice_conversation_listening", serde_json::json!({ "active": true }));
@@ -416,9 +550,120 @@ async fn run_conversation_loop(app: tauri::AppHandle) -> Result<(), String> {
         // Small yield to avoid spinning
     }
 
+    // End voice intelligence session
+    if let Some(session) = crate::voice_intelligence::end_voice_session(&session_id) {
+        // Persist the voice session as a chat history entry if it had any turns
+        if !session.segments.is_empty() {
+            save_voice_session_to_history(&app, &session, &conv_history).await;
+        }
+    }
+
     // CONV_ACTIVE is already false (set by stop_voice_conversation or break 'outer).
     // The cpal OS thread checks CONV_ACTIVE and will exit, releasing the mic.
     Ok(())
+}
+
+/// Update the UserModel mood field from a detected voice emotion.
+/// This is a best-effort fire-and-forget; failures are silently ignored.
+fn update_mood_from_voice_emotion(emotion: &str) {
+    // Map voice emotion → mood string used by persona_engine
+    let mood = match emotion {
+        "excited"    => "energetic",
+        "frustrated" => "frustrated",
+        "tired"      => "tired",
+        "focused"    => "focused",
+        "casual"     => "relaxed",
+        _            => return, // "neutral" — no update needed
+    };
+    // Write directly to the typed_memory "mood" preference so persona_engine picks it up
+    let fact = format!("User mood from voice: {}", mood);
+    let _ = crate::typed_memory::store_typed_memory(
+        crate::typed_memory::MemoryCategory::Preference,
+        &fact,
+        "voice_mood",
+        Some(0.8),
+    );
+}
+
+/// Summarize and store the completed voice session in chat history.
+async fn save_voice_session_to_history(
+    app: &tauri::AppHandle,
+    session: &crate::voice_intelligence::VoiceSession,
+    conv_history: &[crate::providers::ConversationMessage],
+) {
+    if conv_history.len() < 2 {
+        return;
+    }
+
+    // Build a summary of what was discussed
+    let turns: Vec<serde_json::Value> = conv_history.iter().enumerate().map(|(i, msg)| {
+        let (role, content) = match msg {
+            crate::providers::ConversationMessage::User(t)      => ("user", t.as_str()),
+            crate::providers::ConversationMessage::Assistant(t) => ("assistant", t.as_str()),
+            crate::providers::ConversationMessage::System(t)    => ("system", t.as_str()),
+        };
+        serde_json::json!({
+            "id": format!("voice-{}-{}", session.session_id, i),
+            "role": role,
+            "content": crate::safe_slice(content, 2000),
+            "timestamp": session.started_at * 1000 + i as i64 * 2000,
+        })
+    }).collect();
+
+    let conversation_id = format!("voice-{}", session.session_id);
+    if let Err(e) = tauri::async_runtime::spawn_blocking({
+        let conversation_id = conversation_id.clone();
+        move || {
+            // Use the history module's DB writer
+            let db_path = crate::config::blade_config_dir().join("blade.db");
+            if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                // Ensure table exists — history module owns this schema
+                let _ = conn.execute_batch(
+                    "CREATE TABLE IF NOT EXISTS conversations (
+                        id TEXT PRIMARY KEY,
+                        title TEXT,
+                        created_at INTEGER,
+                        updated_at INTEGER,
+                        message_count INTEGER DEFAULT 0
+                    );
+                    CREATE TABLE IF NOT EXISTS messages (
+                        id TEXT PRIMARY KEY,
+                        conversation_id TEXT NOT NULL,
+                        role TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        timestamp INTEGER NOT NULL
+                    );"
+                );
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as i64;
+                let title = format!("Voice session ({})",
+                    chrono::DateTime::from_timestamp(now / 1000, 0)
+                        .map(|d| d.format("%b %d %H:%M").to_string())
+                        .unwrap_or_else(|| "unknown".to_string()));
+                let _ = conn.execute(
+                    "INSERT OR REPLACE INTO conversations (id, title, created_at, updated_at, message_count)
+                     VALUES (?1, ?2, ?3, ?3, ?4)",
+                    rusqlite::params![conversation_id, title, now, turns.len() as i64],
+                );
+            }
+        }
+    }).await {
+        log::warn!("[voice_conv] session save error: {:?}", e);
+    }
+
+    // Delegate to the history command
+    let _ = tauri::async_runtime::spawn({
+        let app = app.clone();
+        let conversation_id = conversation_id.clone();
+        async move {
+            let _ = app.emit("voice_session_saved", serde_json::json!({
+                "conversation_id": conversation_id,
+                "turn_count": conv_history.len(),
+            }));
+        }
+    }).await;
 }
 
 /// Transcribe a buffer of f32 mono samples at `sample_rate` Hz.
@@ -436,8 +681,15 @@ async fn transcribe_samples(samples: &[f32], sample_rate: u32) -> Result<String,
 }
 
 /// Route the transcribed user text through the chat pipeline and return the reply.
+/// Passes the full conversation history for context continuity.
 /// Emits `voice_conversation_thinking` while waiting.
-async fn process_voice_turn(app: &tauri::AppHandle, user_text: &str) -> Result<String, String> {
+async fn process_voice_turn_with_history(
+    app: &tauri::AppHandle,
+    user_text: &str,
+    conv_history: &[crate::providers::ConversationMessage],
+    emotion: &str,
+    lang: &str,
+) -> Result<String, String> {
     let _ = app.emit("voice_conversation_thinking", serde_json::json!({ "text": user_text }));
 
     let config = crate::config::load_config();
@@ -446,13 +698,43 @@ async fn process_voice_turn(app: &tauri::AppHandle, user_text: &str) -> Result<S
         &crate::router::TaskType::Simple,
     );
 
-    // Build a minimal system prompt
-    let system_prompt = crate::brain::build_system_prompt_voice(app).await;
+    // Build voice system prompt, enhanced with emotion context
+    let mut system_prompt = crate::brain::build_system_prompt_voice(app).await;
 
-    let messages = vec![
-        crate::providers::ConversationMessage::System(system_prompt),
-        crate::providers::ConversationMessage::User(user_text.to_string()),
-    ];
+    // Inject emotion hint so the LLM can adapt tone
+    match emotion {
+        "frustrated" => system_prompt.push_str(
+            " The user sounds frustrated — respond with extra empathy, keep it short and clear.",
+        ),
+        "excited" => system_prompt.push_str(
+            " The user sounds excited — match their energy and keep the reply punchy.",
+        ),
+        "tired" => system_prompt.push_str(
+            " The user sounds tired — be gentle, slow down, use short sentences.",
+        ),
+        "focused" => system_prompt.push_str(
+            " The user is focused — be direct, no filler, answer the question.",
+        ),
+        _ => {}
+    }
+
+    // Language instruction: if user spoke a non-English language, respond in kind
+    if lang != "en" {
+        system_prompt.push_str(&format!(
+            " IMPORTANT: The user spoke in language code '{}'. \
+              Respond entirely in that same language.",
+            lang
+        ));
+    }
+
+    // Assemble messages: system + full prior history (already includes the new user turn)
+    let mut messages: Vec<crate::providers::ConversationMessage> = Vec::new();
+    messages.push(crate::providers::ConversationMessage::System(system_prompt));
+
+    // Add conversation history (the new user turn is already the last item)
+    for msg in conv_history {
+        messages.push(msg.clone());
+    }
 
     let no_tools: Vec<crate::providers::ToolDefinition> = vec![];
 

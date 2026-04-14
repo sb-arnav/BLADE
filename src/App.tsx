@@ -55,7 +55,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, EBState> {
   }
 }
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar" | "workflow-builder" | "code-sandbox" | "persona" | "negotiation" | "financial" | "context-engine" | "reasoning" | "social-graph" | "health" | "documents" | "habits" | "knowledge-graph" | "meetings" | "predictions" | "emotional-intel" | "decision-log" | "security" | "health-panel" | "temporal" | "integrations" | "smart-home" | "finance";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar" | "workflow-builder" | "code-sandbox" | "persona" | "negotiation" | "financial" | "context-engine" | "reasoning" | "social-graph" | "health" | "documents" | "habits" | "knowledge-graph" | "meetings" | "predictions" | "emotional-intel" | "decision-log" | "security" | "health-panel" | "temporal" | "integrations" | "smart-home" | "finance" | "hive";
 
 const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
 const Canvas = lazy(() => import("./components/Canvas"));
@@ -119,6 +119,7 @@ const TemporalPanel = lazy(() => import("./components/TemporalPanel").then(m => 
 const IntegrationStatus = lazy(() => import("./components/IntegrationStatus").then(m => ({ default: m.IntegrationStatus })));
 const SmartHomePanel = lazy(() => import("./components/SmartHomePanel").then(m => ({ default: m.SmartHomePanel })));
 const FinanceView = lazy(() => import("./components/FinanceView").then(m => ({ default: m.FinanceView })));
+const HiveView = lazy(() => import("./components/HiveView").then(m => ({ default: m.HiveView })));
 
 function ShellFallback({ label = "Loading workspace..." }: { label?: string }) {
   return (
@@ -908,6 +909,7 @@ export default function App() {
     { id: "export", label: "Export conversation", description: "Copy the current conversation as Markdown", section: "Chat Core", action: () => copyConversation(chat.messages, chat.currentConversation?.title) },
     { id: "chat", label: "Open chat panel", description: "Open the chat panel (or press Enter / /)", section: "Chat Core", action: () => setChatPanelOpen(true) },
 
+    { id: "hive", label: "Open Hive Control Center", description: "Mission control for BLADE's distributed agent mesh — tentacle map, live feed, pending decisions", section: "Operators", action: () => openRoute("hive") },
     { id: "agents", label: "Open Operator Center", description: "Launch the multi-runtime control plane", section: "Operators", action: () => openRoute("agents") },
     { id: "managed-agents", label: "Open Claude operator view", description: "Jump into the Claude-focused operator workflow", section: "Operators", action: () => openRoute("managed-agents") },
     { id: "agent-teams", label: "Open agent teams", description: "Coordinate multi-role execution plans", section: "Operators", action: () => openRoute("agent-teams") },
@@ -1075,6 +1077,7 @@ export default function App() {
     "integrations": <IntegrationStatus onBack={() => openRoute("dashboard")} />,
     "smart-home": <SmartHomePanel onBack={() => openRoute("dashboard")} />,
     "finance": <FinanceView onBack={() => openRoute("dashboard")} />,
+    "hive": <HiveView onBack={() => openRoute("dashboard")} />,
   };
 
   // Resolve what to render in the main area

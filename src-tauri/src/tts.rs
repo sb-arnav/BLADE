@@ -21,6 +21,113 @@ use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 
+// ── Voice style ───────────────────────────────────────────────────────────────
+
+/// Describes how BLADE should deliver a spoken response.
+#[derive(Debug, Clone, PartialEq)]
+pub enum VoiceStyle {
+    /// Single-word / very short confirmations: "sure", "done", "on it"
+    Quick,
+    /// Normal conversational replies (default).
+    Normal,
+    /// Multi-sentence explanations or instructions.
+    Explanation,
+    /// Emotionally charged or important statement — slight weight added.
+    Emphasis,
+}
+
+/// Classify the speaking style for `text` based on length, keywords, and tone cues.
+///
+/// Rules applied in order:
+/// 1. Very short (≤ 5 words) → Quick
+/// 2. Contains "let me explain", "here's how", "there are", numbered lists → Explanation
+/// 3. Contains "important", "warning", "note", "but", "however", "actually" as leading words → Emphasis
+/// 4. Medium length with a punchline indicator ("…right?", "get it?") → Emphasis (for humor)
+/// 5. Everything else → Normal
+pub fn select_voice_style(text: &str) -> VoiceStyle {
+    let trimmed = text.trim();
+    let word_count = trimmed.split_whitespace().count();
+    let lower = trimmed.to_lowercase();
+
+    if word_count <= 5 {
+        return VoiceStyle::Quick;
+    }
+
+    // Explanation triggers
+    let explanation_triggers = [
+        "let me explain",
+        "here's how",
+        "here is how",
+        "there are",
+        "first,",
+        "first of all",
+        "step 1",
+        "step one",
+        "to summarize",
+        "in other words",
+        "what this means",
+    ];
+    if explanation_triggers.iter().any(|t| lower.contains(t)) {
+        return VoiceStyle::Explanation;
+    }
+    // Multi-sentence explanation heuristic: 3+ sentences
+    let sentence_count = trimmed.matches(['.', '!', '?']).count();
+    if sentence_count >= 3 && word_count > 30 {
+        return VoiceStyle::Explanation;
+    }
+
+    // Emphasis triggers
+    let emphasis_triggers = [
+        "important",
+        "warning",
+        "careful",
+        "note that",
+        "actually,",
+        "actually ",
+        "but wait",
+        "however,",
+        "however ",
+        "the thing is",
+        "here's the thing",
+    ];
+    if emphasis_triggers.iter().any(|t| lower.contains(t)) {
+        return VoiceStyle::Emphasis;
+    }
+    // Punchline humor: ends with "right?" / "get it?" / "heh" / "haha"
+    let humor_endings = ["right?", "get it?", "heh", "haha", "ha."];
+    if humor_endings.iter().any(|e| lower.ends_with(e)) {
+        return VoiceStyle::Emphasis;
+    }
+
+    VoiceStyle::Normal
+}
+
+/// Map a `VoiceStyle` to a speed multiplier relative to the user's base `tts_speed`.
+pub fn style_speed_multiplier(style: &VoiceStyle) -> f32 {
+    match style {
+        VoiceStyle::Quick       => 1.15,
+        VoiceStyle::Normal      => 1.0,
+        VoiceStyle::Explanation => 0.9,
+        VoiceStyle::Emphasis    => 0.92,
+    }
+}
+
+/// Insert brief natural pauses into text before "but" / "however" and between
+/// sentences.  The SSML-like pause markers are only meaningful for TTS engines
+/// that support them; for others the comma/period punctuation already helps.
+///
+/// We add a short pause (comma) before contrast words and a slightly longer
+/// pause (period + space) after each sentence-ending punctuation when the next
+/// word is the start of a new thought.
+pub fn insert_pauses(text: &str) -> String {
+    // Add a beat before "but" and "however" when they're clause-starters.
+    let text = text.replace(", but ", ",  but ")  // double space = small pause hint
+                   .replace(". But ", ".  But ")
+                   .replace(", however,", ",  however,")
+                   .replace(". However,", ".  However,");
+    text
+}
+
 // ── singleton process handle ──────────────────────────────────────────────────
 
 static SPEAKING: std::sync::LazyLock<Arc<Mutex<Option<Child>>>> =
@@ -61,12 +168,20 @@ fn speak_with_voice(text: &str, voice: &str) {
 
 /// Core speak with explicit speed control.
 fn speak_with_voice_speed(text: &str, voice: &str, speed: f32) {
-    let clean = strip_markdown(text);
+    // Determine speaking style and adjust speed accordingly
+    let style = select_voice_style(text);
+    let adjusted_speed = speed * style_speed_multiplier(&style);
+
+    // Insert natural pauses into the clean text
+    let clean_raw = strip_markdown(text);
+    let clean = insert_pauses(&clean_raw);
     if clean.trim().is_empty() {
         return;
     }
+
     stop();
     TTS_ACTIVE.store(true, Ordering::SeqCst);
+    let speed = adjusted_speed;
 
     if voice.starts_with("openai:") {
         let voice_name = voice.trim_start_matches("openai:").to_string();
@@ -124,14 +239,31 @@ pub async fn speak_and_wait(app: &tauri::AppHandle, text: &str) -> Result<(), St
     let speed = config.tts_speed;
     speak_with_voice_speed(text, &voice, speed);
 
-    // Poll until TTS finishes or is externally stopped
+    // Poll until TTS finishes or is externally stopped.
+    // Interruption grace period: the conversation loop sets TTS_INTERRUPT_AT when
+    // the user starts speaking. We only cut the speech after 500 ms have elapsed —
+    // this prevents back-channel words ("uh huh", "right") from killing the response.
     loop {
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
         if !TTS_ACTIVE.load(Ordering::SeqCst) {
             break;
         }
-        // Check for interruption — user started speaking while TTS is active
-        // This is signalled via the VOICE_CONV_INTERRUPT flag set by the conversation loop
+        // Check for interruption grace period
+        let interrupt_at = crate::voice_global::tts_interrupt_at();
+        if interrupt_at > 0 {
+            let now_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64;
+            if now_ms.saturating_sub(interrupt_at) >= 500 {
+                // Grace period elapsed — actually interrupt
+                stop();
+                TTS_ACTIVE.store(false, Ordering::SeqCst);
+                let _ = app.emit("tts_interrupted", ());
+                break;
+            }
+        }
+        // Legacy direct interrupt flag (kept for compatibility)
         if crate::voice_global::is_tts_interrupted() {
             stop();
             TTS_ACTIVE.store(false, Ordering::SeqCst);
@@ -502,6 +634,18 @@ fn strip_markdown(text: &str) -> String {
 #[tauri::command]
 pub fn tts_speak(text: String) {
     speak(&text);
+}
+
+/// Classify the voice style for `text` and return it as a string.
+/// Frontend can use this to show hints about how the response will be delivered.
+#[tauri::command]
+pub fn tts_classify_style(text: String) -> String {
+    match select_voice_style(&text) {
+        VoiceStyle::Quick       => "quick".to_string(),
+        VoiceStyle::Normal      => "normal".to_string(),
+        VoiceStyle::Explanation => "explanation".to_string(),
+        VoiceStyle::Emphasis    => "emphasis".to_string(),
+    }
 }
 
 /// Stop any in-progress speech.

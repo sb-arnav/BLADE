@@ -1,18 +1,18 @@
 /// BLADE QuickAsk — Alt+Space popup with contextual suggestions, command history,
 /// inline results, and slash command support.
 ///
+/// Sci-fi upgrades:
+///   - Blurred glass background with border glow
+///   - Input auto-focuses with cursor blink animation
+///   - Results stream in via typewriter effect (not instant)
+///   - "BLADE is thinking" animation (3 dots with wave)
+///   - Recent commands show keyboard shortcuts [1]–[5]
+///
 /// Slash commands:
 ///   /screenshot  — capture screen + analyze
 ///   /voice       — start voice input
 ///   /lock        — lock screen
 ///   /break       — take a break reminder
-///
-/// Contextual suggestions are derived from:
-///   - clipboard content
-///   - active app
-///   - time of day
-///
-/// Recent command history (last 5) shown below suggestions.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -43,6 +43,9 @@ const SLASH_COMMANDS = [
   { cmd: "/break",      desc: "Take a break reminder",     icon: "☕" },
 ];
 
+// Typewriter speed: ms per character added to display
+const TYPEWRITER_CHAR_MS = 8;
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function loadHistory(): string[] {
@@ -62,7 +65,7 @@ function saveHistory(items: string[]) {
 
 function addToHistory(cmd: string, history: string[]): string[] {
   const trimmed = cmd.trim();
-  if (!trimmed || trimmed.startsWith("/")) return history; // don't persist slash cmds
+  if (!trimmed || trimmed.startsWith("/")) return history;
   const deduped = history.filter((h) => h !== trimmed);
   return [trimmed, ...deduped].slice(0, HISTORY_MAX);
 }
@@ -84,7 +87,6 @@ function buildSuggestions(
 ): Suggestion[] {
   const suggestions: Suggestion[] = [];
 
-  // Clipboard-based
   if (clipboard.length > 10) {
     const lower = clipboard.toLowerCase();
     if (lower.includes("error") || lower.includes("exception") || lower.includes("traceback")) {
@@ -96,7 +98,6 @@ function buildSuggestions(
     }
   }
 
-  // Active app context
   const app = activeApp.toLowerCase();
   if (app.includes("code") || app.includes("vim") || app.includes("nvim") || app.includes("cursor")) {
     suggestions.push({ text: "Explain the code I'm looking at", label: "Explain current code", icon: "💻" });
@@ -110,7 +111,6 @@ function buildSuggestions(
     suggestions.push({ text: "What does this command do?", label: "Explain command", icon: "⚡" });
   }
 
-  // Time-based
   const hour = new Date().getHours();
   if (hour >= 8 && hour < 10) {
     suggestions.push({ text: "What should I focus on today?", label: "Morning focus", icon: "🌅" });
@@ -123,23 +123,87 @@ function buildSuggestions(
   return suggestions.slice(0, 3);
 }
 
+// ── Thinking dots component ───────────────────────────────────────────────────
+
+function ThinkingDots() {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "4px",
+        padding: "10px 0",
+      }}
+    >
+      <span style={{ fontSize: "10px", color: "rgba(99,102,241,0.6)", marginRight: "4px", letterSpacing: "0.04em" }}>
+        BLADE
+      </span>
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          style={{
+            display: "inline-block",
+            width: "5px",
+            height: "5px",
+            borderRadius: "50%",
+            background: "rgba(99,102,241,0.7)",
+            animation: `thinkWave 1s ease-in-out infinite`,
+            animationDelay: `${i * 0.16}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function QuickAsk() {
   const [query, setQuery] = useState("");
-  const [response, setResponse] = useState("");
+  // fullResponse: complete buffered response from streaming
+  const [fullResponse, setFullResponse] = useState("");
+  // displayedResponse: typewriter-revealed portion of fullResponse
+  const [displayedResponse, setDisplayedResponse] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [contextApp, setContextApp] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [history, setHistory] = useState<string[]>(loadHistory);
   const [showSuggestions, setShowSuggestions] = useState(true);
-  const [selectedIdx, setSelectedIdx] = useState(-1); // keyboard nav
+  const [selectedIdx, setSelectedIdx] = useState(-1);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const streamBuffer = useRef("");
   const messagesRef = useRef<Message[]>([]);
   const clipboardRef = useRef("");
+
+  // Typewriter state
+  const typewriterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typewriterPosRef = useRef(0);
+
+  // Drive typewriter: reveal fullResponse char-by-char
+  useEffect(() => {
+    if (typewriterTimerRef.current) clearTimeout(typewriterTimerRef.current);
+    if (!fullResponse) {
+      setDisplayedResponse("");
+      typewriterPosRef.current = 0;
+      return;
+    }
+
+    const revealNext = () => {
+      typewriterPosRef.current = Math.min(typewriterPosRef.current + 1, fullResponse.length);
+      setDisplayedResponse(fullResponse.slice(0, typewriterPosRef.current));
+      if (typewriterPosRef.current < fullResponse.length) {
+        typewriterTimerRef.current = setTimeout(revealNext, TYPEWRITER_CHAR_MS);
+      }
+    };
+
+    if (typewriterPosRef.current < fullResponse.length) {
+      typewriterTimerRef.current = setTimeout(revealNext, TYPEWRITER_CHAR_MS);
+    }
+
+    return () => { if (typewriterTimerRef.current) clearTimeout(typewriterTimerRef.current); };
+  }, [fullResponse]);
 
   // ── Context capture on focus ──────────────────────────────────────────────
 
@@ -152,16 +216,13 @@ export function QuickAsk() {
         setShowSuggestions(true);
         setSelectedIdx(-1);
 
-        // Active app
         invoke<ActiveWindow>("get_active_window").then((w) => {
           if (w.app_name && w.app_name.toLowerCase() !== "blade") {
             setContextApp(w.app_name);
-            // Rebuild suggestions with latest context
             buildContextSuggestions(w.app_name);
           }
         }).catch(() => {});
 
-        // Clipboard
         invoke<string>("get_clipboard").then((text) => {
           clipboardRef.current = text ?? "";
           buildContextSuggestions(contextApp ?? "");
@@ -170,7 +231,6 @@ export function QuickAsk() {
     });
 
     setTimeout(() => inputRef.current?.focus(), 50);
-    // Initial suggestion build
     buildContextSuggestions("");
 
     return () => { unlisten.then((fn: () => void) => fn()); };
@@ -203,7 +263,7 @@ export function QuickAsk() {
     const unlistenToken = listen<string>("chat_token", (event) => {
       if (!active) return;
       streamBuffer.current += event.payload;
-      setResponse(streamBuffer.current);
+      setFullResponse(streamBuffer.current);
     });
     const unlistenDone = listen("chat_done", () => {
       if (!active) return;
@@ -216,15 +276,40 @@ export function QuickAsk() {
     };
   }, []);
 
+  // ── Keyboard shortcuts 1–5 for history items ──────────────────────────────
+
+  useEffect(() => {
+    const handleGlobal = (e: KeyboardEvent) => {
+      if (!showSuggestions || loading || fullResponse) return;
+      const key = parseInt(e.key);
+      if (key >= 1 && key <= 5 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // Only fire if input is focused and empty
+        if (document.activeElement === inputRef.current && !query) {
+          const histItems = history.slice(0, 5);
+          const item = histItems[key - 1];
+          if (item) {
+            e.preventDefault();
+            sendMessage(item);
+          }
+        }
+      }
+    };
+    window.addEventListener("keydown", handleGlobal);
+    return () => window.removeEventListener("keydown", handleGlobal);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSuggestions, loading, fullResponse, history, query]);
+
   // ── Slash command handling ────────────────────────────────────────────────
 
   const handleSlashCommand = useCallback(async (cmd: string) => {
     switch (cmd) {
       case "/screenshot": {
         setLoading(true);
-        setResponse("");
+        setFullResponse("");
+        setDisplayedResponse("");
         setError(null);
         streamBuffer.current = "";
+        typewriterPosRef.current = 0;
         try {
           const base64 = await invoke<string>("capture_screen");
           await invoke("send_message_stream", {
@@ -243,7 +328,7 @@ export function QuickAsk() {
         try {
           await invoke("voice_start_recording");
           setQuery("");
-          setResponse("Listening… press Ctrl+Space again to stop.");
+          setFullResponse("Listening… press Ctrl+Space again to stop.");
         } catch (e) {
           setError(typeof e === "string" ? e : "Voice start failed");
         }
@@ -281,13 +366,15 @@ export function QuickAsk() {
 
   const resetState = useCallback(() => {
     setQuery("");
-    setResponse("");
+    setFullResponse("");
+    setDisplayedResponse("");
     setError(null);
     setLoading(false);
     setContextApp(null);
     setShowSuggestions(true);
     setSelectedIdx(-1);
     streamBuffer.current = "";
+    typewriterPosRef.current = 0;
     messagesRef.current = [];
   }, []);
 
@@ -302,7 +389,6 @@ export function QuickAsk() {
 
     setShowSuggestions(false);
 
-    // Slash command
     if (trimmed.startsWith("/")) {
       const cmd = trimmed.split(" ")[0].toLowerCase();
       setQuery("");
@@ -310,7 +396,6 @@ export function QuickAsk() {
       return;
     }
 
-    // Save to history
     const newHistory = addToHistory(trimmed, history);
     setHistory(newHistory);
     saveHistory(newHistory);
@@ -332,7 +417,9 @@ export function QuickAsk() {
     messagesRef.current = nextMessages;
 
     streamBuffer.current = "";
-    setResponse("");
+    typewriterPosRef.current = 0;
+    setFullResponse("");
+    setDisplayedResponse("");
     setError(null);
     setLoading(true);
     setQuery("");
@@ -365,24 +452,23 @@ export function QuickAsk() {
 
   // ── Keyboard nav ─────────────────────────────────────────────────────────
 
-  // All selectable items: slash commands (if /), suggestions, history
-  const allSuggestions: Array<{ text: string; label?: string; isHistory?: boolean; isSlash?: boolean; icon?: string }> =
+  const allSuggestions: Array<{ text: string; label?: string; isHistory?: boolean; isSlash?: boolean; icon?: string; shortcut?: string }> =
     query.startsWith("/")
       ? SLASH_COMMANDS
           .filter((s) => s.cmd.startsWith(query.toLowerCase()))
           .map((s) => ({ text: s.cmd, label: s.desc, isSlash: true, icon: s.icon }))
       : query.trim()
-      ? []  // don't show suggestions while typing a real query
+      ? []
       : [
           ...suggestions.map((s) => ({ text: s.text, label: s.label, icon: s.icon })),
-          ...history.map((h) => ({ text: h, isHistory: true, icon: "🕐" })),
+          ...history.map((h, i) => ({ text: h, isHistory: true, icon: "🕐", shortcut: String(i + 1) })),
         ];
 
   const handleKeyDown = useCallback(
     async (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        if (response || error) {
+        if (fullResponse || error) {
           resetState();
         } else {
           await hide();
@@ -421,7 +507,6 @@ export function QuickAsk() {
 
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        // If an item is selected in keyboard nav, use it
         if (selectedIdx >= 0 && allSuggestions[selectedIdx]) {
           await sendMessage(allSuggestions[selectedIdx].text);
           setSelectedIdx(-1);
@@ -431,243 +516,294 @@ export function QuickAsk() {
         return;
       }
     },
-    [hide, openMain, query, sendMessage, allSuggestions, selectedIdx, response, error, resetState]
+    [hide, openMain, query, sendMessage, allSuggestions, selectedIdx, fullResponse, error, resetState]
   );
 
   // ── Styles ────────────────────────────────────────────────────────────────
 
-  const hasResponse = response.length > 0;
+  const hasResponse = fullResponse.length > 0;
   const showSuggestionList = showSuggestions && !loading && !hasResponse && !error && allSuggestions.length > 0;
   const isSlashMode = query.startsWith("/");
+  const typewriterDone = displayedResponse.length >= fullResponse.length;
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div
-      className="flex flex-col w-full overflow-hidden"
-      style={{
-        background: "rgba(9,9,11,0.93)",
-        backdropFilter: "blur(20px) saturate(180%)",
-        WebkitBackdropFilter: "blur(20px) saturate(180%)",
-        borderRadius: "14px",
-        border: "1px solid rgba(255,255,255,0.08)",
-        boxShadow: "0 32px 64px rgba(0,0,0,0.6), 0 0 0 0.5px rgba(255,255,255,0.04)",
-        minHeight: "72px",
-        fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      }}
-    >
-      {/* Input row */}
-      <div className="flex items-center gap-3 px-4" style={{ height: "72px", flexShrink: 0 }}>
-        {/* BLADE logo */}
-        <div
-          className="flex-shrink-0 w-5 h-5 rounded-md flex items-center justify-center"
-          style={{ background: "rgba(99,102,241,0.2)" }}
-        >
-          <svg viewBox="0 0 16 16" className="w-3 h-3" fill="none">
-            <path d="M8 2L14 8L8 14L2 8L8 2Z" fill="#6366f1" fillOpacity="0.9" />
-          </svg>
-        </div>
+    <>
+      <style>{`
+        @keyframes thinkWave {
+          0%, 100% { transform: translateY(0); opacity: 0.4; }
+          50% { transform: translateY(-4px); opacity: 1; }
+        }
+        @keyframes inputGlow {
+          0%, 100% { box-shadow: 0 0 0 1px rgba(99,102,241,0.15), 0 32px 64px rgba(0,0,0,0.7); }
+          50% { box-shadow: 0 0 0 1px rgba(99,102,241,0.4), 0 32px 72px rgba(0,0,0,0.75), 0 0 20px rgba(99,102,241,0.08); }
+        }
+        @keyframes cursorPulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0; }
+        }
+        .quickask-input::placeholder { color: rgba(113,113,122,0.6); }
+        .quickask-input:focus { outline: none; }
+      `}</style>
 
-        <input
-          ref={inputRef}
-          type="text"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setShowSuggestions(true);
-            setSelectedIdx(-1);
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder={
-            isSlashMode
-              ? "Type a command…"
-              : "Ask Blade, or type / for commands…"
-          }
-          disabled={loading}
-          className="flex-1 bg-transparent outline-none text-blade-text placeholder:text-blade-muted"
-          style={{
-            fontSize: "0.9rem",
-            fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-            letterSpacing: "-0.01em",
-            color: isSlashMode ? "#a5b4fc" : undefined,
-          }}
-          autoComplete="off"
-          spellCheck={false}
-        />
-
-        {/* Loading dots */}
-        {loading && (
-          <div className="flex-shrink-0 flex items-center gap-1">
-            {[0, 150, 300].map((delay) => (
-              <span
-                key={delay}
-                className="inline-block w-1 h-1 rounded-full bg-blade-accent animate-pulse-slow"
-                style={{ animationDelay: `${delay}ms` }}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Enter hint */}
-        {!loading && query.trim() && (
-          <kbd className="flex-shrink-0 text-blade-muted/40" style={{ fontSize: "0.6rem", fontFamily: "monospace" }}>
-            ↵
-          </kbd>
-        )}
-
-        {/* Esc hint */}
-        {!loading && !query.trim() && (
-          <kbd className="flex-shrink-0 text-blade-muted/30" style={{ fontSize: "0.6rem", fontFamily: "monospace" }}>
-            Esc
-          </kbd>
-        )}
-
-        <button
-          onClick={hide}
-          className="flex-shrink-0 w-5 h-5 rounded flex items-center justify-center text-blade-muted/30 hover:text-blade-muted transition-colors"
-          title="Close (Esc)"
-        >
-          <svg viewBox="0 0 16 16" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M4 4l8 8M12 4l-8 8" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Context pill */}
-      {contextApp && !hasResponse && !loading && !showSuggestionList && (
-        <div style={{ padding: "0 16px 8px", display: "flex", alignItems: "center", gap: "6px" }}>
+      <div
+        className="flex flex-col w-full overflow-hidden"
+        style={{
+          background: "rgba(6,6,10,0.88)",
+          backdropFilter: "blur(28px) saturate(200%)",
+          WebkitBackdropFilter: "blur(28px) saturate(200%)",
+          borderRadius: "14px",
+          border: "1px solid rgba(99,102,241,0.2)",
+          boxShadow: "0 32px 64px rgba(0,0,0,0.7), 0 0 0 0.5px rgba(255,255,255,0.04), 0 0 24px rgba(99,102,241,0.06)",
+          minHeight: "72px",
+          fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          animation: "inputGlow 4s ease-in-out infinite",
+        }}
+      >
+        {/* Input row */}
+        <div className="flex items-center gap-3 px-4" style={{ height: "72px", flexShrink: 0 }}>
+          {/* BLADE logo */}
           <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "5px",
-              padding: "3px 8px",
-              borderRadius: "6px",
-              background: "rgba(99,102,241,0.08)",
-              border: "1px solid rgba(99,102,241,0.15)",
-            }}
+            className="flex-shrink-0 w-5 h-5 rounded-md flex items-center justify-center"
+            style={{ background: "rgba(99,102,241,0.2)", boxShadow: "0 0 8px rgba(99,102,241,0.2)" }}
           >
-            <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "rgba(99,102,241,0.7)", flexShrink: 0 }} />
-            <span style={{
-              fontSize: "0.6rem",
-              color: "rgba(99,102,241,0.8)",
-              fontFamily: "Inter, sans-serif",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              maxWidth: "280px",
-            }}>
-              {contextApp}
-            </span>
+            <svg viewBox="0 0 16 16" className="w-3 h-3" fill="none">
+              <path d="M8 2L14 8L8 14L2 8L8 2Z" fill="#6366f1" fillOpacity="0.9" />
+            </svg>
           </div>
-        </div>
-      )}
 
-      {/* Suggestions / history / slash commands panel */}
-      {showSuggestionList && (
-        <>
-          <div style={{ height: "1px", background: "rgba(255,255,255,0.05)", margin: "0 16px" }} />
-          <div style={{ padding: "6px 8px 6px" }}>
-            {/* Section label */}
-            <div style={{ padding: "2px 8px 4px", fontSize: "9px", fontWeight: 600, letterSpacing: "0.06em", color: "rgba(255,255,255,0.2)", textTransform: "uppercase" }}>
-              {isSlashMode ? "Commands" : "Suggestions"}
-            </div>
-
-            {allSuggestions.map((item, i) => (
-              <div
-                key={i}
-                onClick={() => sendMessage(item.text)}
-                onMouseEnter={() => setSelectedIdx(i)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "6px 8px",
-                  borderRadius: "6px",
-                  background: selectedIdx === i ? "rgba(99,102,241,0.12)" : "transparent",
-                  cursor: "pointer",
-                  transition: "background 0.1s",
-                }}
-              >
-                <span style={{ fontSize: "13px", flexShrink: 0 }}>{item.icon}</span>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{
-                    fontSize: "11px",
-                    color: item.isHistory ? "rgba(255,255,255,0.45)" : item.isSlash ? "#a5b4fc" : "rgba(255,255,255,0.75)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}>
-                    {item.isSlash ? (item as { text: string }).text : item.label ?? item.text}
-                  </div>
-                  {item.isSlash && item.label && (
-                    <div style={{ fontSize: "9px", color: "rgba(255,255,255,0.25)", marginTop: "1px" }}>
-                      {item.label}
-                    </div>
-                  )}
-                  {!item.isSlash && item.label && item.text !== item.label && (
-                    <div style={{
-                      fontSize: "9px",
-                      color: "rgba(255,255,255,0.22)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      marginTop: "1px",
-                    }}>
-                      {item.text.length > 55 ? item.text.slice(0, 55) + "…" : item.text}
-                    </div>
-                  )}
-                </div>
-                {selectedIdx === i && (
-                  <kbd style={{ marginLeft: "auto", fontSize: "9px", color: "rgba(255,255,255,0.2)", fontFamily: "monospace", flexShrink: 0 }}>↵</kbd>
-                )}
-              </div>
-            ))}
-
-            {/* Keyboard hint */}
-            <div style={{ padding: "4px 8px 2px", fontSize: "9px", color: "rgba(255,255,255,0.15)", display: "flex", gap: "8px" }}>
-              <span>↑↓ navigate</span>
-              <span>Tab complete</span>
-              <span>Enter select</span>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Response / error area */}
-      {(hasResponse || error) && (
-        <>
-          <div style={{ height: "1px", background: "rgba(255,255,255,0.05)", margin: "0 16px" }} />
-          <div
-            className="px-4 py-3 overflow-y-auto"
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setShowSuggestions(true);
+              setSelectedIdx(-1);
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder={
+              isSlashMode
+                ? "Type a command…"
+                : "Ask Blade, or type / for commands…"
+            }
+            disabled={loading}
+            className="quickask-input flex-1 bg-transparent text-blade-text"
             style={{
-              maxHeight: "320px",
-              fontSize: "0.8125rem",
-              lineHeight: "1.65",
-              color: error ? "#f87171" : "#ececef",
+              fontSize: "0.9rem",
               fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
               letterSpacing: "-0.01em",
-              wordBreak: "break-word",
-              whiteSpace: "pre-wrap",
+              color: isSlashMode ? "#a5b4fc" : "rgba(255,255,255,0.88)",
+              caretColor: "#6366f1",
+              border: "none",
             }}
-          >
-            {error ? error : response}
-            {loading && !error && (
-              <span className="inline-block w-[2px] h-[0.85em] bg-blade-accent ml-0.5 align-middle typing-cursor" />
-            )}
-          </div>
+            autoComplete="off"
+            spellCheck={false}
+            autoFocus
+          />
 
-          {hasResponse && !loading && (
-            <div className="px-4 pb-2 flex items-center gap-1.5" style={{ fontSize: "0.6rem", color: "rgba(82,82,91,0.6)" }}>
-              <kbd style={{ fontFamily: "monospace" }}>Shift+Enter</kbd>
-              <span>open in Blade</span>
-              <span className="mx-1 opacity-40">·</span>
-              <kbd style={{ fontFamily: "monospace" }}>Esc</kbd>
-              <span>new query</span>
-            </div>
+          {/* Thinking animation */}
+          {loading && <ThinkingDots />}
+
+          {/* Enter hint */}
+          {!loading && query.trim() && (
+            <kbd
+              className="flex-shrink-0"
+              style={{
+                fontSize: "0.6rem",
+                fontFamily: "monospace",
+                color: "rgba(99,102,241,0.5)",
+                padding: "1px 4px",
+                borderRadius: "3px",
+                border: "1px solid rgba(99,102,241,0.2)",
+                background: "rgba(99,102,241,0.05)",
+              }}
+            >
+              ↵
+            </kbd>
           )}
-        </>
-      )}
-    </div>
+
+          {/* Esc hint */}
+          {!loading && !query.trim() && (
+            <kbd
+              className="flex-shrink-0"
+              style={{
+                fontSize: "0.6rem",
+                fontFamily: "monospace",
+                color: "rgba(113,113,122,0.35)",
+                padding: "1px 4px",
+                borderRadius: "3px",
+                border: "1px solid rgba(255,255,255,0.05)",
+              }}
+            >
+              Esc
+            </kbd>
+          )}
+
+          <button
+            onClick={hide}
+            className="flex-shrink-0 w-5 h-5 rounded flex items-center justify-center"
+            style={{ color: "rgba(113,113,122,0.4)", background: "none", border: "none", cursor: "pointer" }}
+            title="Close (Esc)"
+          >
+            <svg viewBox="0 0 16 16" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M4 4l8 8M12 4l-8 8" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Context pill */}
+        {contextApp && !hasResponse && !loading && !showSuggestionList && (
+          <div style={{ padding: "0 16px 8px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <div
+              style={{
+                display: "flex", alignItems: "center", gap: "5px",
+                padding: "3px 8px", borderRadius: "6px",
+                background: "rgba(99,102,241,0.07)",
+                border: "1px solid rgba(99,102,241,0.12)",
+              }}
+            >
+              <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "rgba(99,102,241,0.65)", flexShrink: 0 }} />
+              <span style={{
+                fontSize: "0.6rem",
+                color: "rgba(99,102,241,0.75)",
+                fontFamily: "Inter, sans-serif",
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                maxWidth: "280px",
+              }}>
+                {contextApp}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Suggestions / history / slash commands panel */}
+        {showSuggestionList && (
+          <>
+            <div style={{ height: "1px", background: "rgba(255,255,255,0.05)", margin: "0 16px" }} />
+            <div style={{ padding: "6px 8px 6px" }}>
+              <div style={{
+                padding: "2px 8px 4px",
+                fontSize: "9px", fontWeight: 700, letterSpacing: "0.08em",
+                color: "rgba(255,255,255,0.18)", textTransform: "uppercase",
+              }}>
+                {isSlashMode ? "Commands" : "Suggestions"}
+              </div>
+
+              {allSuggestions.map((item, i) => (
+                <div
+                  key={i}
+                  onClick={() => sendMessage(item.text)}
+                  onMouseEnter={() => setSelectedIdx(i)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: "8px",
+                    padding: "6px 8px", borderRadius: "6px",
+                    background: selectedIdx === i ? "rgba(99,102,241,0.12)" : "transparent",
+                    cursor: "pointer", transition: "background 0.1s",
+                    border: selectedIdx === i ? "1px solid rgba(99,102,241,0.15)" : "1px solid transparent",
+                  }}
+                >
+                  <span style={{ fontSize: "13px", flexShrink: 0 }}>{item.icon}</span>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{
+                      fontSize: "11px",
+                      color: item.isHistory ? "rgba(255,255,255,0.42)" : item.isSlash ? "#a5b4fc" : "rgba(255,255,255,0.75)",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>
+                      {item.isSlash ? (item as { text: string }).text : item.label ?? item.text}
+                    </div>
+                    {item.isSlash && item.label && (
+                      <div style={{ fontSize: "9px", color: "rgba(255,255,255,0.22)", marginTop: "1px" }}>
+                        {item.label}
+                      </div>
+                    )}
+                    {!item.isSlash && item.label && item.text !== item.label && (
+                      <div style={{
+                        fontSize: "9px", color: "rgba(255,255,255,0.2)",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: "1px",
+                      }}>
+                        {item.text.length > 55 ? item.text.slice(0, 55) + "…" : item.text}
+                      </div>
+                    )}
+                  </div>
+                  {/* Keyboard shortcut for history items */}
+                  {item.isHistory && item.shortcut && (
+                    <kbd style={{
+                      marginLeft: "auto", fontSize: "9px", flexShrink: 0,
+                      padding: "1px 4px", borderRadius: "3px",
+                      background: selectedIdx === i ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.05)",
+                      border: `1px solid ${selectedIdx === i ? "rgba(99,102,241,0.3)" : "rgba(255,255,255,0.07)"}`,
+                      color: selectedIdx === i ? "rgba(99,102,241,0.9)" : "rgba(255,255,255,0.2)",
+                      fontFamily: "monospace",
+                    }}>
+                      {item.shortcut}
+                    </kbd>
+                  )}
+                  {selectedIdx === i && !item.isHistory && (
+                    <kbd style={{
+                      marginLeft: "auto", fontSize: "9px", flexShrink: 0,
+                      color: "rgba(255,255,255,0.2)", fontFamily: "monospace",
+                    }}>↵</kbd>
+                  )}
+                </div>
+              ))}
+
+              <div style={{ padding: "4px 8px 2px", fontSize: "9px", color: "rgba(255,255,255,0.12)", display: "flex", gap: "8px" }}>
+                <span>↑↓ navigate</span>
+                <span>Tab complete</span>
+                <span>1–5 history</span>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Response / error area */}
+        {(hasResponse || error) && (
+          <>
+            <div style={{ height: "1px", background: "rgba(255,255,255,0.05)", margin: "0 16px" }} />
+            <div
+              className="px-4 py-3 overflow-y-auto"
+              style={{
+                maxHeight: "320px",
+                fontSize: "0.8125rem",
+                lineHeight: "1.65",
+                color: error ? "#f87171" : "#ececef",
+                fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                letterSpacing: "-0.01em",
+                wordBreak: "break-word",
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              {error ? error : displayedResponse}
+              {/* Blinking cursor while typewriter is running or loading */}
+              {!error && (loading || !typewriterDone) && (
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: "2px",
+                    height: "0.9em",
+                    background: "#6366f1",
+                    marginLeft: "1px",
+                    verticalAlign: "middle",
+                    animation: "cursorPulse 0.7s step-end infinite",
+                  }}
+                />
+              )}
+            </div>
+
+            {hasResponse && !loading && typewriterDone && (
+              <div className="px-4 pb-2 flex items-center gap-1.5" style={{ fontSize: "0.6rem", color: "rgba(82,82,91,0.55)" }}>
+                <kbd style={{ fontFamily: "monospace" }}>Shift+Enter</kbd>
+                <span>open in Blade</span>
+                <span className="mx-1 opacity-40">·</span>
+                <kbd style={{ fontFamily: "monospace" }}>Esc</kbd>
+                <span>new query</span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </>
   );
 }

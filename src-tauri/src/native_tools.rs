@@ -620,6 +620,157 @@ pub fn risk(_name: &str) -> crate::permissions::ToolRisk {
     crate::permissions::ToolRisk::Auto
 }
 
+// ── Smart tool suggestion ─────────────────────────────────────────────────────
+//
+// Returns the top 5-10 most relevant native tool names for the given query.
+// Used to reduce the tool list the AI sees — fewer irrelevant tools means
+// less confusion and faster, more accurate tool selection.
+//
+// The caller is responsible for merging these with MCP tools and the existing
+// relevance scoring in commands.rs.
+pub fn suggest_tools_for_query(query: &str) -> Vec<String> {
+    let q = query.to_lowercase();
+
+    // Tool category affinity map: keyword → tools to boost, tools to suppress
+    struct Affinity {
+        keywords: &'static [&'static str],
+        boost: &'static [&'static str],
+        suppress: &'static [&'static str],
+    }
+
+    let affinities: &[Affinity] = &[
+        // Email / messaging / communication
+        Affinity {
+            keywords: &["email", "mail", "gmail", "slack", "message", "send", "reply",
+                        "inbox", "calendar", "meeting", "schedule", "invite", "contact"],
+            boost: &["blade_set_reminder", "blade_notify", "blade_time_now"],
+            suppress: &["blade_bash", "blade_index_project", "blade_find_symbol",
+                        "blade_recall_execution", "blade_search_files",
+                        "blade_screenshot", "blade_pentest_authorize"],
+        },
+        // Code / development / files
+        Affinity {
+            keywords: &["code", "file", "bug", "error", "function", "git", "commit",
+                        "branch", "build", "test", "run", "install", "npm", "cargo",
+                        "python", "rust", "typescript", "javascript", "script",
+                        "read", "write", "edit", "fix", "refactor", "compile",
+                        "import", "deploy", "debug", "lint", "diff"],
+            boost: &["blade_bash", "blade_read_file", "blade_write_file",
+                     "blade_edit_file", "blade_glob", "blade_search_files",
+                     "blade_index_project", "blade_find_symbol",
+                     "blade_recall_execution", "blade_list_dir"],
+            suppress: &["blade_set_reminder", "blade_list_reminders",
+                        "blade_watch_url", "blade_notify",
+                        "blade_pentest_authorize", "blade_iot_control"],
+        },
+        // Web / research / browsing
+        Affinity {
+            keywords: &["search", "find online", "google", "browse", "website",
+                        "url", "web", "article", "news", "youtube", "reddit",
+                        "twitter", "x.com", "post", "tweet", "look up", "open"],
+            boost: &["blade_search_web", "blade_web_fetch", "blade_open_url",
+                     "blade_browser_open", "blade_browser_read",
+                     "blade_browser_click", "blade_browser_type",
+                     "blade_browser_screenshot", "blade_browser_login"],
+            suppress: &["blade_bash", "blade_index_project", "blade_find_symbol",
+                        "blade_pentest_authorize", "blade_set_api_key"],
+        },
+        // System / processes / desktop
+        Affinity {
+            keywords: &["process", "running", "app", "application", "cpu", "ram",
+                        "memory", "disk", "kill", "open app", "screenshot",
+                        "screen", "click", "type", "window", "ui", "desktop",
+                        "volume", "brightness", "lock", "shutdown"],
+            boost: &["blade_get_processes", "blade_kill_process", "blade_system_info",
+                     "blade_screenshot", "blade_ui_read", "blade_ui_click",
+                     "blade_ui_type", "blade_ui_wait", "blade_mouse", "blade_keyboard"],
+            suppress: &["blade_index_project", "blade_find_symbol",
+                        "blade_recall_execution", "blade_pentest_authorize",
+                        "blade_set_api_key"],
+        },
+        // Security / pentest
+        Affinity {
+            keywords: &["security", "hack", "pentest", "scan", "vulnerability",
+                        "nmap", "exploit", "malware", "phishing", "breach",
+                        "password", "ssl", "tls", "port scan", "firewall"],
+            boost: &["blade_pentest_authorize", "blade_bash", "blade_search_web",
+                     "blade_web_fetch", "blade_read_file"],
+            suppress: &["blade_browser_open", "blade_browser_click",
+                        "blade_browser_type", "blade_iot_control",
+                        "blade_set_reminder"],
+        },
+        // Smart home / IoT / music
+        Affinity {
+            keywords: &["light", "lights", "music", "spotify", "play", "pause",
+                        "home assistant", "smart home", "thermostat", "hue",
+                        "temperature", "iot", "device", "scene", "brightness"],
+            boost: &["blade_iot_control"],
+            suppress: &["blade_bash", "blade_index_project", "blade_find_symbol",
+                        "blade_recall_execution", "blade_pentest_authorize",
+                        "blade_screenshot", "blade_search_files"],
+        },
+        // Reminders / scheduling / time
+        Affinity {
+            keywords: &["remind", "reminder", "schedule", "alarm", "timer",
+                        "in 30 minutes", "tomorrow", "later", "don't forget",
+                        "alert", "time", "when"],
+            boost: &["blade_set_reminder", "blade_list_reminders",
+                     "blade_time_now", "blade_notify"],
+            suppress: &["blade_bash", "blade_index_project", "blade_find_symbol",
+                        "blade_recall_execution", "blade_pentest_authorize",
+                        "blade_screenshot"],
+        },
+        // Clipboard
+        Affinity {
+            keywords: &["clipboard", "copied", "paste", "copy this", "what did i copy",
+                        "what's in my clipboard"],
+            boost: &["blade_get_clipboard", "blade_set_clipboard"],
+            suppress: &["blade_index_project", "blade_find_symbol",
+                        "blade_pentest_authorize", "blade_iot_control"],
+        },
+    ];
+
+    // Score each native tool: +2 per affinity boost match, -1 per suppress match
+    let all_tools: Vec<String> = tool_definitions()
+        .into_iter()
+        .map(|t| t.name)
+        .collect();
+
+    let mut scores: std::collections::HashMap<String, i32> = all_tools
+        .iter()
+        .map(|name| (name.clone(), 0i32))
+        .collect();
+
+    for affinity in affinities {
+        let matches = affinity.keywords.iter().any(|&kw| q.contains(kw));
+        if matches {
+            for tool in affinity.boost {
+                if let Some(s) = scores.get_mut(*tool) { *s += 2; }
+            }
+            for tool in affinity.suppress {
+                if let Some(s) = scores.get_mut(*tool) { *s -= 1; }
+            }
+        }
+    }
+
+    // Also give a small bonus to tools whose name overlaps query words
+    for name in &all_tools {
+        let tool_stem = name.trim_start_matches("blade_");
+        if q.split_whitespace().any(|w| w.len() > 3 && tool_stem.contains(w)) {
+            if let Some(s) = scores.get_mut(name) { *s += 1; }
+        }
+    }
+
+    // Sort by score descending, return top 10 positively-scored tools
+    let mut ranked: Vec<(i32, String)> = scores
+        .into_iter()
+        .filter(|(score, _)| *score > 0)
+        .map(|(name, score)| (score, name))
+        .collect();
+    ranked.sort_by(|a, b| b.0.cmp(&a.0));
+    ranked.into_iter().take(10).map(|(_, name)| name).collect()
+}
+
 /// Dispatch a native tool call. Returns (output, is_error).
 pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -> (String, bool) {
     match name {

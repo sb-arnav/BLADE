@@ -573,6 +573,66 @@ fn fallback_voice_response(base_response: &str, emotion: &str) -> VoiceResponse 
 }
 
 // ---------------------------------------------------------------------------
+// Language detection
+// ---------------------------------------------------------------------------
+
+/// Detect the language of `transcript` using a fast LLM call.
+///
+/// Returns an ISO 639-1 code ("en", "es", "fr", "de", "hi", etc.)
+/// or "en" on failure.
+pub async fn detect_language(transcript: &str) -> String {
+    let cfg = crate::config::load_config();
+    let provider = cfg.provider.clone();
+    let api_key = cfg.api_key.clone();
+    let base_url = cfg.base_url.clone();
+    let model = fast_model(&provider).to_string();
+
+    let system = "You are a language detection tool. Given a short voice transcript, \
+                  return ONLY the ISO 639-1 two-letter language code (e.g. 'en', 'es', 'fr', \
+                  'de', 'hi', 'zh', 'ja', 'ar'). No explanation, no punctuation.";
+
+    let user_msg = format!("Transcript: \"{}\"", crate::safe_slice(transcript, 300));
+
+    match llm_call(&provider, &api_key, &model, base_url.as_deref(), system, &user_msg).await {
+        Ok(raw) => {
+            let code = raw.trim().to_lowercase();
+            // Accept only 2-letter codes
+            if code.len() == 2 && code.chars().all(|c| c.is_ascii_alphabetic()) {
+                code
+            } else {
+                "en".to_string()
+            }
+        }
+        Err(e) => {
+            eprintln!("[voice_intelligence] language detection error: {e}");
+            "en".to_string()
+        }
+    }
+}
+
+/// Detect language and, if non-English, emit an event so the conversation loop
+/// can prepend a language instruction to the system prompt.
+///
+/// Returns ("en", false) if English or detection fails; ("xx", true) otherwise.
+pub async fn detect_non_english(transcript: &str) -> (String, bool) {
+    // Quick heuristic: if the transcript is all ASCII letters/punctuation, it's
+    // almost certainly English — skip the LLM call to save latency.
+    let all_ascii = transcript.chars().all(|c| c.is_ascii());
+    if all_ascii {
+        // Still call the LLM if the words look like non-English ASCII languages
+        // (Spanish accents stripped by Whisper, etc.) — but only for short clips
+        let word_count = transcript.split_whitespace().count();
+        if word_count < 3 {
+            return ("en".to_string(), false);
+        }
+    }
+
+    let lang = detect_language(transcript).await;
+    let is_non_english = lang != "en";
+    (lang, is_non_english)
+}
+
+// ---------------------------------------------------------------------------
 // Tauri commands
 // ---------------------------------------------------------------------------
 
@@ -612,4 +672,9 @@ pub fn voice_intel_get_context(session_id: String) -> String {
 #[tauri::command]
 pub fn voice_intel_get_session(session_id: String) -> Option<VoiceSession> {
     load_session(&session_id)
+}
+
+#[tauri::command]
+pub async fn voice_intel_detect_language(transcript: String) -> String {
+    detect_language(&transcript).await
 }

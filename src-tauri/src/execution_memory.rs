@@ -40,6 +40,11 @@ fn open_db() -> Result<Connection, String> {
     Ok(conn)
 }
 
+/// Public accessor for other modules (e.g. hive.rs) that need to log actions.
+pub fn open_db_pub() -> Result<Connection, String> {
+    open_db()
+}
+
 fn init_schema(conn: &Connection) -> Result<(), String> {
     conn.execute_batch(
         "

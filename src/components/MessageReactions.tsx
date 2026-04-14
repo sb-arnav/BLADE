@@ -1,4 +1,4 @@
-import { useState, useCallback, useSyncExternalStore } from "react";
+import React, { useState, useCallback, useSyncExternalStore } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { addReaction as brainAddReaction } from "../data/characterBible";
 
@@ -82,20 +82,25 @@ export default function MessageReactions({
   messageId,
   messageContent,
   visible,
+  onThumbsUp,
 }: {
   messageId: string;
   messageContent?: string;
   visible: boolean;
+  onThumbsUp?: (e: React.MouseEvent) => void;
 }) {
   const { getReactions, toggleReaction } = useReactions();
   const active = getReactions(messageId);
   const [hovered, setHovered] = useState(false);
+  const [justReacted, setJustReacted] = useState<string | null>(null);
 
   const show = visible || hovered;
 
   const handleReaction = useCallback(
-    (emoji: string) => {
+    (emoji: string, e: React.MouseEvent) => {
       toggleReaction(messageId, emoji);
+      setJustReacted(emoji);
+      setTimeout(() => setJustReacted(null), 500);
       // Feed 👍/👎 into Brain for pattern detection + preference extraction
       if ((emoji === "\u{1F44D}" || emoji === "\u{1F44E}") && messageContent) {
         const polarity = emoji === "\u{1F44D}" ? 1 : -1;
@@ -103,13 +108,17 @@ export default function MessageReactions({
           // Every 5 reactions, synthesize into behavioral preferences (limbic loop)
           void invoke("consolidate_reactions_to_preferences").catch(() => {});
         });
+        // 👍 → fire confetti
+        if (emoji === "\u{1F44D}" && onThumbsUp) {
+          onThumbsUp(e);
+        }
         // 👎 → immediately generate a specific behavioral rule (don't wait for batch)
         if (emoji === "\u{1F44E}") {
           void invoke<string>("reaction_instant_rule", { messageContent }).catch(() => {});
         }
       }
     },
-    [messageId, messageContent, toggleReaction],
+    [messageId, messageContent, toggleReaction, onThumbsUp],
   );
 
   return (
@@ -122,19 +131,26 @@ export default function MessageReactions({
         const isActive = active.includes(emoji);
         const isPin = emoji === "\u{1F4CC}";
         const isVisible = show || (isPin && isActive);
+        const isPopping = justReacted === emoji;
 
         return (
           <button
             key={emoji}
             aria-label={label}
             title={label}
-            onClick={() => handleReaction(emoji)}
+            onClick={(e) => handleReaction(emoji, e)}
             className={[
-              "w-6 h-6 rounded-md text-xs flex items-center justify-center transition",
+              "w-6 h-6 rounded-md text-xs flex items-center justify-center transition-all",
               "hover:bg-blade-surface-hover",
               isActive ? "bg-blade-accent-muted" : "",
               isVisible ? "opacity-100" : "opacity-0 pointer-events-none",
+              isPopping ? "scale-150" : "scale-100",
             ].join(" ")}
+            style={{
+              transition: isPopping
+                ? "transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1)"
+                : "transform 0.2s ease, opacity 0.15s ease",
+            }}
           >
             {emoji}
           </button>

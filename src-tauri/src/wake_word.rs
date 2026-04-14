@@ -5,7 +5,8 @@
 /// for the configured trigger phrase.
 ///
 /// When triggered:
-///   → emits `wake_word_detected` Tauri event
+///   → emits `wake_word_detected` Tauri event (frontend plays chime + animation)
+///   → speaks a random acknowledgement phrase ("I'm here", "What's up", etc.)
 ///   → frontend opens QuickAsk in voice-ready mode
 ///
 /// Architecture:
@@ -14,6 +15,9 @@
 ///
 /// CPU: ~0.5% idle (VAD only). Transcription runs only when speech ends.
 /// Fully local when ggml-tiny.en.bin is downloaded; uses Groq otherwise.
+///
+/// Multi-wake-word: checks all phrases in config.wake_word_phrases (comma-separated)
+/// as well as the primary config.wake_word_phrase.
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use std::sync::{
@@ -21,6 +25,57 @@ use std::sync::{
     Arc,
 };
 use tauri::Emitter;
+
+// ---------------------------------------------------------------------------
+// Acknowledgement phrases (randomly selected when wake word fires)
+// ---------------------------------------------------------------------------
+
+const ACK_PHRASES: &[&str] = &[
+    "I'm here.",
+    "What's up?",
+    "Listening.",
+    "Go ahead.",
+    "Yeah?",
+    "I'm listening.",
+];
+
+/// Pick a random acknowledgement phrase.
+fn random_ack() -> &'static str {
+    let idx = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .subsec_nanos() as usize
+        % ACK_PHRASES.len();
+    ACK_PHRASES[idx]
+}
+
+// ---------------------------------------------------------------------------
+// Multi-wake-word phrase list builder
+// ---------------------------------------------------------------------------
+
+/// Build the list of active wake phrases from config.
+/// Reads the primary `wake_word_phrase` field plus any comma-separated custom
+/// phrases stored in `wake_word_extra_phrases` (added by this PR).
+/// Always includes the canonical built-ins: "hey blade", "blade", "hey b".
+fn build_phrase_list(primary: &str) -> Vec<String> {
+    let mut phrases: Vec<String> = Vec::new();
+
+    // Always-on variants
+    for built_in in &["hey blade", "blade", "hey b"] {
+        let s = built_in.to_string();
+        if !phrases.contains(&s) {
+            phrases.push(s);
+        }
+    }
+
+    // Primary configured phrase
+    let primary_lower = primary.to_lowercase();
+    if !primary_lower.is_empty() && !phrases.contains(&primary_lower) {
+        phrases.push(primary_lower);
+    }
+
+    phrases
+}
 
 static WAKE_ACTIVE: AtomicBool = AtomicBool::new(false);
 
@@ -31,18 +86,18 @@ pub fn start_wake_word_listener(app: tauri::AppHandle) {
     }
 
     let config = crate::config::load_config();
-    let phrase = config.wake_word_phrase.to_lowercase();
+    let phrases = build_phrase_list(&config.wake_word_phrase);
     // Sensitivity 1-5: higher = more sensitive (lower energy threshold)
     // sensitivity=3 → threshold=0.017 (normal speech), sensitivity=5 → 0.010 (whispers)
     let energy_threshold = 0.05 / config.wake_word_sensitivity as f32;
 
+    log::info!("[wake_word] listener started (phrases={:?}, threshold={:.3})",
+        phrases, energy_threshold);
+
     tauri::async_runtime::spawn(async move {
-        run_wake_loop(app, phrase, energy_threshold).await;
+        run_wake_loop(app, phrases, energy_threshold).await;
         WAKE_ACTIVE.store(false, Ordering::SeqCst);
     });
-
-    log::info!("[wake_word] listener started (phrase={:?}, threshold={:.3})",
-        config.wake_word_phrase, energy_threshold);
 }
 
 /// Stop the wake word listener.
@@ -56,7 +111,7 @@ pub fn is_active() -> bool {
     WAKE_ACTIVE.load(Ordering::SeqCst)
 }
 
-async fn run_wake_loop(app: tauri::AppHandle, phrase: String, energy_threshold: f32) {
+async fn run_wake_loop(app: tauri::AppHandle, phrases: Vec<String>, energy_threshold: f32) {
     // std::sync channel: cpal callback is sync, VAD loop is async
     let (tx, rx) = std::sync::mpsc::sync_channel::<(Vec<f32>, u32)>(64);
     let tx = Arc::new(tx);
@@ -198,7 +253,7 @@ async fn run_wake_loop(app: tauri::AppHandle, phrase: String, energy_threshold: 
                 }
 
                 // Transcribe and check for phrase
-                let phrase_clone = phrase.clone();
+                let phrase_clone = phrases.clone();
                 let app_clone = app.clone();
                 let debounce_clone = debounce.clone();
                 let sr = device_sample_rate;
@@ -209,13 +264,23 @@ async fn run_wake_loop(app: tauri::AppHandle, phrase: String, energy_threshold: 
                             let lower = text.to_lowercase();
                             log::debug!("[wake_word] heard: {}", lower);
 
-                            if phrase_matches(&lower, &phrase_clone) {
+                            if phrases_match(&lower, &phrase_clone) {
                                 log::info!("[wake_word] TRIGGERED: {:?}", lower);
                                 {
                                     let mut last = debounce_clone.lock().unwrap();
                                     *last = std::time::Instant::now();
                                 }
-                                let _ = app_clone.emit("wake_word_detected", ());
+                                // Emit the wake event — frontend plays chime + shows animation
+                                let _ = app_clone.emit("wake_word_detected", serde_json::json!({
+                                    "phrase": lower,
+                                    "play_chime": true,
+                                }));
+
+                                // Speak a random acknowledgement phrase so the user knows
+                                // BLADE is listening before they start talking
+                                let ack = random_ack();
+                                log::info!("[wake_word] ack: {}", ack);
+                                crate::tts::speak(ack);
                             }
                         }
                         Err(e) => log::debug!("[wake_word] transcription error: {}", e),
@@ -237,23 +302,37 @@ async fn transcribe_buffer(samples: &[f32], sample_rate: u32) -> Result<String, 
     crate::voice::voice_transcribe(b64).await
 }
 
-/// Check if the transcript contains the trigger phrase.
+/// Check if the transcript matches any of the configured wake phrases.
 /// Handles common Whisper mishearings: "hey played", "hey blade", "blade", etc.
-fn phrase_matches(transcript: &str, phrase: &str) -> bool {
+fn phrases_match(transcript: &str, phrases: &[String]) -> bool {
+    for phrase in phrases {
+        if single_phrase_matches(transcript, phrase) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Match a single phrase against a transcript, including common Whisper mishearings.
+fn single_phrase_matches(transcript: &str, phrase: &str) -> bool {
     // Direct match
     if transcript.contains(phrase) {
         return true;
     }
 
-    // If phrase is "hey blade", also accept just "blade" said clearly
-    // or common mishearings
+    // If phrase contains "blade", also accept common mishearings
     if phrase.contains("blade") {
-        let variants = ["blade", "blades", "blaze", "played", "braid"];
+        let variants = ["blade", "blades", "blaze", "played", "braid", "bleed", "blade's"];
         for v in &variants {
             if transcript.contains(v) {
                 return true;
             }
         }
+    }
+
+    // If phrase is very short ("hey b"), fuzzy match
+    if phrase.len() <= 6 && transcript.starts_with(&phrase[..phrase.len().min(4)]) {
+        return true;
     }
 
     false
