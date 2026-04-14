@@ -504,7 +504,7 @@ export function ChatWindow({
         {/* Error */}
         {error && (
           <div className="mx-4 mt-3 px-3 py-2 rounded-lg bg-red-500/8 border border-red-500/15 text-red-400 text-xs animate-fade-in flex items-center justify-between gap-2">
-            <span className="truncate">{error}</span>
+            <span className="break-words whitespace-pre-wrap" title={error}>{error}</span>
             <button
               onClick={onRetry}
               className="shrink-0 px-2 py-0.5 rounded-md bg-red-500/10 hover:bg-red-500/20 text-red-400 text-2xs transition-colors"

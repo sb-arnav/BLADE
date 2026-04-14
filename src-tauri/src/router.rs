@@ -144,15 +144,10 @@ pub fn suggest_model(provider: &str, task: &TaskType) -> Option<String> {
             TaskType::Vision => Some("gemini-2.0-flash".to_string()),
             TaskType::Creative => Some("gemini-2.5-pro-preview-06-05".to_string()),
         },
-        // OpenRouter: route through the best models available on the platform.
-        // Uses OpenRouter's own model IDs (not Anthropic date-versioned IDs).
-        "openrouter" => match task {
-            TaskType::Simple => Some("anthropic/claude-haiku-4.5".to_string()),
-            TaskType::Code => Some("anthropic/claude-sonnet-4.5".to_string()),
-            TaskType::Complex => Some("anthropic/claude-opus-4.5".to_string()),
-            TaskType::Vision => Some("anthropic/claude-sonnet-4.5".to_string()),
-            TaskType::Creative => Some("anthropic/claude-sonnet-4.5".to_string()),
-        },
+        // OpenRouter: never override — the user picked their model deliberately
+        // (may be free-tier, may be a specific version). Return None so the caller
+        // falls back to config.model.
+        "openrouter" => None,
         // Ollama: prefer Hermes 3 for tool-heavy tasks (it has native function-calling training)
         // and a lighter model for simple queries. Falls back to whatever the user set if unknown.
         "ollama" => match task {

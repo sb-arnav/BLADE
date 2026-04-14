@@ -169,7 +169,8 @@ pub async fn complete(
         Err(ref e) if is_function_generation_error(e) && !tools.is_empty() => {
             // Groq/Llama failed to generate a valid tool call — retry without
             // tools so the user gets a text response instead of a hard error.
-            groq_request(&client, api_key, build_body(model, messages, &[])).await
+            let no_tools: Vec<super::ToolDefinition> = vec![];
+            groq_request(&client, api_key, build_body(model, messages, &no_tools)).await
         }
         Err(e) => Err(e),
     }
@@ -305,7 +306,7 @@ pub async fn stream_text(
 
                 if let Some(data) = line.strip_prefix("data: ") {
                     if data.trim() == "[DONE]" {
-                        break;
+                        return Ok(());
                     }
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
                         if let Some(err) = json.get("error") {

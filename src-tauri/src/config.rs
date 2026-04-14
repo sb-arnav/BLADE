@@ -562,10 +562,11 @@ pub fn resolve_provider_for_task(
         }
     }
 
-    // Default: use active provider with task-appropriate model
-    let model = crate::router::suggest_model(&config.provider, task_type)
-        .unwrap_or_else(|| config.model.clone());
-    (config.provider.clone(), config.api_key.clone(), model)
+    // Default: use the user's configured model. The router's suggest_model is only
+    // a hint for *explicit* task routing overrides — it should NEVER override the
+    // user's deliberate model choice on the active provider. This was causing 404s
+    // on OpenRouter because suggest_model returned model IDs the user never asked for.
+    (config.provider.clone(), config.api_key.clone(), config.model.clone())
 }
 
 /// Get the stored routing config.
