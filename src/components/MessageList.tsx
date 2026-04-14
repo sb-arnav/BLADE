@@ -700,15 +700,6 @@ const WELCOME_SUGGESTIONS = [
   },
 ] as const;
 
-const EXAMPLE_PROMPTS = [
-  { label: "Debug screen", prompt: "Take a screenshot and help me debug what you see", icon: "⊡" },
-  { label: "Last commit", prompt: "What changed in the last git commit?", icon: "⌥" },
-  { label: "Explain codebase", prompt: "Give me a quick overview of the current project structure", icon: "◈" },
-  { label: "Research", prompt: "/research ", icon: "◎" },
-  { label: "Swarm agents", prompt: "/swarm ", icon: "⊕" },
-  { label: "Screen timeline", prompt: "/timeline", icon: "◷" },
-] as const;
-
 export function MessageList({
   messages,
   loading,
