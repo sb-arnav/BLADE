@@ -977,7 +977,7 @@ pub fn run() {
             system_control::launch_app,
             system_control::kill_app,
             system_control::list_running_apps,
-            system_control::focus_window,
+            system_control::sc_focus_window,
             system_control::minimize_all,
             system_control::get_battery_status,
             system_control::get_network_status,
@@ -997,7 +997,7 @@ pub fn run() {
             financial_brain::finance_spending_summary,
             financial_brain::finance_detect_subscriptions,
             // Health Guardian — Phase 8B screen time monitoring
-            health_guardian::health_get_stats,
+            health_guardian::health_guardian_stats,
             health_guardian::health_take_break,
             // Temporal Intelligence — Phase 8C time-aware context
             temporal_intel::temporal_what_was_i_doing,

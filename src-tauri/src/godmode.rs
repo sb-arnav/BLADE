@@ -74,7 +74,7 @@ fn proactive_tasks() -> &'static Mutex<Vec<ProactiveTask>> {
 }
 
 #[derive(Clone, serde::Serialize)]
-struct ProactiveTask {
+pub struct ProactiveTask {
     id: String,
     suggestion: String,
     category: String, // "error", "optimization", "reminder", "insight"

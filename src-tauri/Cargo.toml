@@ -52,7 +52,11 @@ tokio-tungstenite = "0.24"
 urlencoding = "2.1"
 glob = "0.3"
 zip = "2"
-whisper-rs = "0.13"
+whisper-rs = { version = "0.13", optional = true }
+
+[features]
+default = []
+local-whisper = ["whisper-rs"]
 
 [target.'cfg(windows)'.dependencies]
 uiautomation = "0.24.4"
