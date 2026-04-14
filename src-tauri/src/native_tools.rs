@@ -1258,6 +1258,176 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
                 (format!("Scheduled tasks ({}):\n\n{}", tasks.len(), lines.join("\n")), false)
             }
         }
+
+        // ── Smart coding-agent tools (LLM-callable) ───────────────────────────
+
+        // blade_spawn_coding_agent: BLADE auto-selects the best coding agent for the task.
+        // Understands task keywords and falls back gracefully if an agent isn't installed.
+        "blade_spawn_coding_agent" => {
+            let task = match args["task"].as_str() {
+                Some(t) => t.to_string(),
+                None => return ("Missing required argument: task".to_string(), true),
+            };
+            let project_dir = args["project_dir"].as_str().unwrap_or("").to_string();
+            let agent_type_override = args["agent_type"].as_str().unwrap_or("auto");
+
+            if let Some(app) = app {
+                // If a specific agent type was requested (not "auto"), spawn it directly.
+                // Otherwise, let auto_spawn_agent pick the best one for the task.
+                let result = if agent_type_override == "auto" || agent_type_override.is_empty() {
+                    crate::background_agent::auto_spawn_agent(app, &task, &project_dir).await
+                } else {
+                    let cwd = if project_dir.is_empty() { None } else { Some(project_dir.clone()) };
+                    crate::background_agent::agent_spawn(
+                        app.clone(),
+                        agent_type_override.to_string(),
+                        task.clone(),
+                        cwd,
+                    ).await
+                };
+
+                match result {
+                    Ok(id) => {
+                        if id.starts_with("swarm:") {
+                            (format!(
+                                "This is a research task — routing to BLADE's swarm instead of a coding agent. \
+                                 Task: \"{}\"\n\
+                                 Use the swarm_create command to kick off a parallel research swarm.",
+                                crate::safe_slice(&task, 100)
+                            ), false)
+                        } else {
+                            (format!(
+                                "Coding agent spawned (id: {}).\nTask: \"{}\"\n\n\
+                                 The agent is running in the background. \
+                                 Use blade_check_agent_status with id \"{}\" to monitor progress, \
+                                 or blade_get_agent_output when it completes.",
+                                id,
+                                crate::safe_slice(&task, 100),
+                                id
+                            ), false)
+                        }
+                    }
+                    Err(e) => (format!("Failed to spawn coding agent: {}", e), true),
+                }
+            } else {
+                let available = crate::background_agent::detect_available_agents();
+                if available.is_empty() {
+                    ("No coding agents found on this system. Install Claude Code with: npm install -g @anthropic-ai/claude-code".to_string(), true)
+                } else {
+                    (format!(
+                        "Available agents: {}. Cannot spawn without app context.",
+                        available.join(", ")
+                    ), true)
+                }
+            }
+        }
+
+        // blade_check_agent_status: returns status + recent output for one or all agents.
+        "blade_check_agent_status" => {
+            let agent_id = args["agent_id"].as_str().map(|s| s.to_string());
+            match agent_id {
+                Some(id) => {
+                    match crate::background_agent::agent_get_background(id.clone()) {
+                        Some(agent) => {
+                            let status_str = match agent.status {
+                                crate::background_agent::AgentStatus::Running    => "RUNNING",
+                                crate::background_agent::AgentStatus::Completed  => "COMPLETED",
+                                crate::background_agent::AgentStatus::Failed     => "FAILED",
+                                crate::background_agent::AgentStatus::Cancelled  => "CANCELLED",
+                            };
+                            let elapsed = {
+                                let now = chrono::Utc::now().timestamp();
+                                let secs = agent.finished_at.unwrap_or(now) - agent.started_at;
+                                if secs < 60 { format!("{}s", secs) }
+                                else { format!("{}m{}s", secs / 60, secs % 60) }
+                            };
+                            let recent: Vec<&String> = agent.output.iter().rev().take(20).rev().collect();
+                            let preview = if recent.is_empty() {
+                                "(no output yet)".to_string()
+                            } else {
+                                recent.iter().map(|l| l.as_str()).collect::<Vec<_>>().join("\n")
+                            };
+                            let summary = if agent.status == crate::background_agent::AgentStatus::Completed
+                                || agent.status == crate::background_agent::AgentStatus::Failed
+                            {
+                                format!(
+                                    "\n\nCompletion summary:\n{}",
+                                    crate::background_agent::extract_completion_summary(&agent)
+                                )
+                            } else {
+                                String::new()
+                            };
+                            (format!(
+                                "Agent {} [{}] — type: {} | elapsed: {} | output: {} lines\nTask: {}\n\nRecent output:\n{}{}",
+                                crate::safe_slice(&id, 8),
+                                status_str,
+                                agent.agent_type,
+                                elapsed,
+                                agent.output.len(),
+                                crate::safe_slice(&agent.task, 120),
+                                preview,
+                                summary
+                            ), false)
+                        }
+                        None => (format!("No agent found with id: {}", id), true),
+                    }
+                }
+                None => {
+                    // List all recent/active agents
+                    let agents = crate::background_agent::get_active_agents();
+                    if agents.is_empty() {
+                        ("No background coding agents running or recently completed.".to_string(), false)
+                    } else {
+                        let lines: Vec<String> = agents.iter().take(10).map(|a| {
+                            let s = match a.status {
+                                crate::background_agent::AgentStatus::Running    => "RUNNING",
+                                crate::background_agent::AgentStatus::Completed  => "DONE",
+                                crate::background_agent::AgentStatus::Failed     => "FAILED",
+                                crate::background_agent::AgentStatus::Cancelled  => "CANCELLED",
+                            };
+                            format!(
+                                "[{}] {} | {} | task: {}",
+                                s, crate::safe_slice(&a.id, 8), a.agent_type,
+                                crate::safe_slice(&a.task, 70)
+                            )
+                        }).collect();
+                        (format!("Active/recent coding agents ({}):\n{}", agents.len(), lines.join("\n")), false)
+                    }
+                }
+            }
+        }
+
+        // blade_get_agent_output: returns the full output + completion summary of a finished agent.
+        "blade_get_agent_output" => {
+            let agent_id = match args["agent_id"].as_str() {
+                Some(id) => id.to_string(),
+                None => return ("Missing required argument: agent_id".to_string(), true),
+            };
+            match crate::background_agent::agent_get_background(agent_id.clone()) {
+                Some(agent) => {
+                    let full_output = agent.output.join("\n");
+                    let summary = crate::background_agent::extract_completion_summary(&agent);
+                    let status_str = match agent.status {
+                        crate::background_agent::AgentStatus::Running    => "STILL RUNNING",
+                        crate::background_agent::AgentStatus::Completed  => "COMPLETED",
+                        crate::background_agent::AgentStatus::Failed     => "FAILED",
+                        crate::background_agent::AgentStatus::Cancelled  => "CANCELLED",
+                    };
+                    (format!(
+                        "Agent {} [{}] — {}\nTask: {}\n\n--- Full Output ({} lines) ---\n{}\n\n--- Summary ---\n{}",
+                        crate::safe_slice(&agent_id, 8),
+                        agent.agent_type,
+                        status_str,
+                        crate::safe_slice(&agent.task, 200),
+                        agent.output.len(),
+                        crate::safe_slice(&full_output, 8000),
+                        summary
+                    ), false)
+                }
+                None => (format!("No agent found with id: {}", agent_id), true),
+            }
+        }
+
         // ── Browser agent tools ───────────────────────────────────────────────
         "blade_browser_navigate" => {
             let url = match args["url"].as_str() {
