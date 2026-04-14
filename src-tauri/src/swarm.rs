@@ -459,6 +459,24 @@ pub fn resolve_ready_tasks(tasks: &[SwarmTask]) -> Vec<String> {
         .collect()
 }
 
+/// Compute the transitive closure of a task's dependencies (all ancestors).
+/// Returns a set of task IDs whose outputs are "visible" to this task.
+fn collect_transitive_deps<'a>(swarm: &'a Swarm, task: &'a SwarmTask) -> std::collections::HashSet<&'a str> {
+    let mut visited: std::collections::HashSet<&str> = std::collections::HashSet::new();
+    let mut queue: std::collections::VecDeque<&str> = task.depends_on.iter().map(|d| d.as_str()).collect();
+    while let Some(dep_id) = queue.pop_front() {
+        if visited.insert(dep_id) {
+            // Also follow that task's own dependencies
+            if let Some(dep_task) = swarm.tasks.iter().find(|t| t.id.as_str() == dep_id) {
+                for transitive in &dep_task.depends_on {
+                    queue.push_back(transitive.as_str());
+                }
+            }
+        }
+    }
+    visited
+}
+
 /// Build context for a task by gathering results from its dependencies + scratchpad.
 /// Downstream agents receive all upstream typed ScratchpadEntries as rich context.
 pub fn build_task_context(swarm: &Swarm, task: &SwarmTask) -> String {
@@ -487,13 +505,10 @@ pub fn build_task_context(swarm: &Swarm, task: &SwarmTask) -> String {
         parts.push(format!("# Context from prerequisite tasks\n{}", dep_results.join("\n\n")));
     }
 
-    // Typed scratchpad entries from ALL upstream tasks (not just direct deps)
-    // This gives downstream agents the full picture of what the swarm has discovered.
-    let upstream_ids: std::collections::HashSet<&str> = task
-        .depends_on
-        .iter()
-        .map(|d| d.as_str())
-        .collect();
+    // Typed scratchpad entries from ALL upstream tasks (transitive closure of deps).
+    // This gives downstream agents the full picture of what the swarm has discovered,
+    // not just direct predecessor output.
+    let upstream_ids = collect_transitive_deps(swarm, task);
 
     let typed_entries: Vec<String> = swarm
         .scratchpad_entries

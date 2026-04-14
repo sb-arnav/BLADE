@@ -525,6 +525,27 @@ fn build_system_prompt_inner(
         parts.push(meeting_action_ctx);
     }
 
+    // People Graph — inject relationship context for mentioned contacts.
+    // Extracts capitalized name tokens from the query and looks them up.
+    if !user_query.is_empty() {
+        let mentioned_names: Vec<String> = user_query
+            .split_whitespace()
+            .filter(|w| {
+                w.len() >= 2
+                    && w.chars().next().map(|c| c.is_uppercase()).unwrap_or(false)
+                    && w.chars().all(|c| c.is_alphabetic() || c == '\'' || c == '-')
+            })
+            .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+            .filter(|w| !w.is_empty())
+            .collect();
+        if !mentioned_names.is_empty() {
+            let people_ctx = crate::people_graph::get_people_context_for_prompt(&mentioned_names);
+            if !people_ctx.is_empty() {
+                parts.push(people_ctx);
+            }
+        }
+    }
+
     // Social Graph — inject contact profile if the query mentions a known person,
     // plus a brief relationship-health summary
     if !user_query.is_empty() {
@@ -1420,6 +1441,29 @@ pub async fn brain_extract_from_exchange(
         let asst_clone = assistant_text.clone();
         tokio::spawn(async move {
             extract_user_facts_from_exchange(&user_clone, &asst_clone).await;
+        });
+    }
+
+    // Extract compounding facts into virtual context blocks + typed memory.
+    // Runs for the streaming path (frontend calls brain_extract_from_exchange once
+    // the full assistant text is assembled). Only worth doing with real content.
+    if !assistant_text.is_empty() && (user_text.len() > 50 || assistant_text.len() > 50) {
+        let user_clone = user_text.clone();
+        let asst_clone = assistant_text.clone();
+        tokio::spawn(async move {
+            let fact_msgs = vec![
+                crate::providers::ChatMessage {
+                    role: "user".to_string(),
+                    content: user_clone,
+                    image_base64: None,
+                },
+                crate::providers::ChatMessage {
+                    role: "assistant".to_string(),
+                    content: asst_clone,
+                    image_base64: None,
+                },
+            ];
+            crate::memory::extract_conversation_facts(&fact_msgs).await;
         });
     }
 

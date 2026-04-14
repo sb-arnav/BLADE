@@ -481,27 +481,44 @@ pub async fn send_message_stream(
     let is_conversational = {
         let txt = last_user_text.trim();
         let txt_lower = txt.to_lowercase();
-        txt.len() < 160
-            && !txt.contains("```")
-            && !txt_lower.contains("run ")
-            && !txt_lower.contains("execute ")
-            && !txt_lower.contains("install ")
-            && !txt_lower.contains("build ")
-            && !txt_lower.contains("open ")
-            && !txt_lower.contains("search ")
-            && !txt_lower.contains("find ")
-            && !txt_lower.contains("fetch ")
-            && !txt_lower.contains("read file")
-            && !txt_lower.contains("write ")
-            && !txt_lower.contains("delete ")
-            && !txt_lower.contains("create ")
-            && !txt_lower.contains("git ")
-            && !txt_lower.contains("npm ")
-            && !txt_lower.contains("cargo ")
-            && !txt_lower.contains("python ")
-            && !txt_lower.contains("bash ")
-            && !txt_lower.contains("terminal")
-            && !txt_lower.contains("command")
+        // Use word-boundary matching: "find motivation" is conversational,
+        // "find the file" is not. Check that action words appear as standalone
+        // imperative commands (start of sentence or after space, followed by
+        // a space or end-of-string), not embedded in normal prose.
+        let has_action_word = txt.contains("```")
+            || txt_lower.starts_with("run ")
+            || txt_lower.starts_with("execute ")
+            || txt_lower.starts_with("install ")
+            || txt_lower.starts_with("build ")
+            || txt_lower.starts_with("open ")
+            || txt_lower.starts_with("search ")
+            || txt_lower.starts_with("find ")
+            || txt_lower.starts_with("fetch ")
+            || txt_lower.starts_with("write ")
+            || txt_lower.starts_with("delete ")
+            || txt_lower.starts_with("create ")
+            || txt_lower.starts_with("read ")
+            || txt_lower.contains("read file")
+            || txt_lower.contains("git ")
+            || txt_lower.contains(" npm ")
+            || txt_lower.starts_with("npm ")
+            || txt_lower.contains(" cargo ")
+            || txt_lower.starts_with("cargo ")
+            || txt_lower.contains("python ")
+            || txt_lower.contains("bash ")
+            || txt_lower.contains("terminal")
+            || txt_lower.contains("can you open ")
+            || txt_lower.contains("can you run ")
+            || txt_lower.contains("can you find ")
+            || txt_lower.contains("can you search ")
+            || txt_lower.contains("can you create ")
+            || txt_lower.contains("can you write ")
+            || txt_lower.contains("please open ")
+            || txt_lower.contains("please run ")
+            || txt_lower.contains("please find ")
+            || txt_lower.contains("please search ")
+            || txt_lower.contains("please create ");
+        txt.len() < 200 && !has_action_word
     };
     // Short conversations (≤6 messages) are safe to fast-path; longer sessions
     // may have tool-call context the model needs to continue properly.
@@ -872,6 +889,23 @@ pub async fn send_message_stream(
                     let _ = app2.emit("response_improved", serde_json::json!({
                         "improved": improved,
                     }));
+                }
+                // Extract compounding facts from this exchange into KG + typed memory
+                // Only run when there's enough content worth learning from (>50 chars each side)
+                if user_text.len() > 50 || assistant_text.len() > 50 {
+                    let fact_msgs = vec![
+                        crate::providers::ChatMessage {
+                            role: "user".to_string(),
+                            content: user_text.clone(),
+                            image_base64: None,
+                        },
+                        crate::providers::ChatMessage {
+                            role: "assistant".to_string(),
+                            content: assistant_text.clone(),
+                            image_base64: None,
+                        },
+                    ];
+                    crate::memory::extract_conversation_facts(&fact_msgs).await;
                 }
                 // Record activity for dream mode
                 crate::dream_mode::record_user_activity();
@@ -1253,6 +1287,15 @@ pub async fn send_message_stream(
             }
         }
     }
+    // Check cancel flag before firing the final summary call —
+    // the user may have hit stop during the last tool iteration.
+    if CHAT_CANCEL.load(Ordering::SeqCst) {
+        let _ = app.emit("chat_cancelled", ());
+        let _ = app.emit("chat_done", ());
+        let _ = app.emit("blade_status", "idle");
+        return Ok(());
+    }
+
     conversation.push(ConversationMessage::User(
         "Summarise what you've done so far and whether the task is complete.".to_string(),
     ));

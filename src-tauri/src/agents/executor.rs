@@ -147,26 +147,40 @@ pub async fn execute_next_step(
             }
         })
         .collect();
-    let mut provider_idx: usize = 0; // 0 = primary, 1+ = fallback_providers
+    // provider_idx: 0 = primary, 1..=N = fallback_providers[0..N-1]
+    let mut provider_idx: usize = 0;
+    // Count only genuine retries (not tool/provider switches) to bound the loop.
+    let mut real_attempts: u32 = 0;
+    // Guard against degenerate infinite loops (e.g. provider chain longer than MAX_RETRIES).
+    let max_total_iterations = MAX_RETRIES + fallback_providers.len() as u32 + 2;
+    let mut total_iterations: u32 = 0;
 
-    for attempt in 0..MAX_RETRIES {
+    while real_attempts < MAX_RETRIES {
+        total_iterations += 1;
+        if total_iterations > max_total_iterations {
+            // Safety valve: should never be hit in normal operation
+            last_error = "Internal: executor loop exceeded maximum iteration guard.".to_string();
+            break;
+        }
+
         let (current_provider, current_api_key) = if provider_idx == 0 {
             (provider.to_string(), api_key.to_string())
         } else {
+            // provider_idx is 1-based into fallback_providers
             fallback_providers
                 .get(provider_idx - 1)
                 .map(|(p, k)| (p.clone(), k.clone()))
                 .unwrap_or_else(|| (provider.to_string(), api_key.to_string()))
         };
 
-        // Emit a retry event on subsequent attempts so the UI can show it.
-        if attempt > 0 {
+        // Emit a retry event on subsequent real attempts so the UI can show it.
+        if real_attempts > 0 {
             let _ = app.emit(
                 "agent_step_retrying",
                 serde_json::json!({
                     "agent_id": &agent_id,
                     "step_id": &step_id,
-                    "attempt": attempt,
+                    "attempt": real_attempts,
                     "reflection": reflections.last().cloned().unwrap_or_default(),
                     "fallback_tool": if tool_fallback_used { active_tool.as_deref() } else { None },
                     "fallback_provider": if provider_idx > 0 { Some(&current_provider) } else { None },
@@ -197,6 +211,7 @@ pub async fn execute_next_step(
             }
             Err(error) => {
                 last_error = error.clone();
+
                 let is_tool_error = error.starts_with("Tool error:")
                     || error.contains("not found")
                     || error.contains("failed to call tool")
@@ -208,7 +223,8 @@ pub async fn execute_next_step(
                     || error.contains("timeout")
                     || error.contains("API error");
 
-                // Tool error → try fallback tool first (before retrying same tool)
+                // Tool error → switch to a fallback tool first.
+                // This does NOT consume a real attempt — we want MAX_RETRIES genuine tries.
                 if is_tool_error && !tool_fallback_used {
                     if let Some(orig_tool) = &tool_name {
                         if let Some(fb_tool) = tool_fallback(orig_tool) {
@@ -221,7 +237,6 @@ pub async fn execute_next_step(
                             active_tool = Some(fb_tool.to_string());
                             active_args = Some(fb_args);
                             tool_fallback_used = true;
-                            // Switch tool and retry on next loop iteration
                             let _ = app.emit(
                                 "agent_step_tool_fallback",
                                 serde_json::json!({
@@ -231,19 +246,20 @@ pub async fn execute_next_step(
                                     "fallback_tool": fb_tool,
                                 }),
                             );
-                            continue;
+                            continue; // does not increment real_attempts
                         }
                     }
-                    // No tool fallback available — fall through to thinking step
+                    // No named fallback — degrade to a pure thinking step (no tool).
                     if active_tool.is_some() {
-                        active_tool = None;  // degrade to thinking step
+                        active_tool = None;
                         active_args = None;
                         tool_fallback_used = true;
-                        continue;
+                        continue; // does not increment real_attempts
                     }
                 }
 
-                // LLM error → try next provider in fallback chain
+                // LLM / rate-limit error → advance to next provider in chain.
+                // Also does NOT consume a real attempt.
                 if is_llm_error && provider_idx < fallback_providers.len() {
                     provider_idx += 1;
                     let _ = app.emit(
@@ -255,16 +271,19 @@ pub async fn execute_next_step(
                             "next_provider": fallback_providers.get(provider_idx - 1).map(|(p, _)| p),
                         }),
                     );
-                    continue;
+                    continue; // does not increment real_attempts
                 }
 
-                // Don't generate a reflection after the last attempt — it would
+                // Count this as a genuine failed attempt.
+                real_attempts += 1;
+
+                // Don't generate a reflection after the last real attempt — it would
                 // never be used and wastes tokens.
-                if attempt + 1 < MAX_RETRIES {
+                if real_attempts < MAX_RETRIES {
                     let reflection = generate_reflection(
                         &error,
                         &step_desc,
-                        attempt + 1,
+                        real_attempts,
                         &current_provider,
                         &current_api_key,
                         model,

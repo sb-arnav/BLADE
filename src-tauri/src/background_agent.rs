@@ -235,7 +235,11 @@ async fn run_agent(
     let id_for_stdout = id.clone();
     let app_for_stdout = app.clone();
 
-    // Stream stdout lines as events
+    // Stream stdout and stderr as events.
+    // We track whether each stream is still open; the loop exits when both close.
+    let mut stdout_open = true;
+    let mut stderr_open = true;
+
     loop {
         if cancel.load(std::sync::atomic::Ordering::Relaxed) {
             let _ = child.kill().await;
@@ -244,8 +248,13 @@ async fn run_agent(
             return;
         }
 
+        // Exit when both streams have closed.
+        if !stdout_open && !stderr_open {
+            break;
+        }
+
         tokio::select! {
-            line = stdout_lines.next_line() => {
+            line = stdout_lines.next_line(), if stdout_open => {
                 match line {
                     Ok(Some(l)) => {
                         append_agent_output(&id_for_stdout, &l);
@@ -254,17 +263,21 @@ async fn run_agent(
                             "line": &l,
                         }));
                     }
-                    Ok(None) => break,
-                    Err(_) => break,
+                    // stdout closed — mark it done but keep draining stderr
+                    Ok(None) | Err(_) => { stdout_open = false; }
                 }
             }
-            line = stderr_lines.next_line() => {
-                if let Ok(Some(l)) = line {
-                    append_agent_output(&id_for_stdout, &format!("[err] {}", l));
-                    let _ = app_for_stdout.emit("agent_stderr", serde_json::json!({
-                        "id": &id_for_stdout,
-                        "line": l,
-                    }));
+            line = stderr_lines.next_line(), if stderr_open => {
+                match line {
+                    Ok(Some(l)) => {
+                        append_agent_output(&id_for_stdout, &format!("[err] {}", l));
+                        let _ = app_for_stdout.emit("agent_stderr", serde_json::json!({
+                            "id": &id_for_stdout,
+                            "line": l,
+                        }));
+                    }
+                    // stderr closed
+                    Ok(None) | Err(_) => { stderr_open = false; }
                 }
             }
         }

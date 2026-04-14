@@ -2332,9 +2332,27 @@ async fn search_web(query: &str, max_results: usize) -> (String, bool) {
 }
 
 fn expand_home(path: &str) -> String {
-    if path.starts_with("~/") {
+    if path.starts_with("~/") || path.starts_with("~\\") {
         if let Some(home) = dirs::home_dir() {
-            return format!("{}/{}", home.to_string_lossy(), &path[2..]);
+            // Use PathBuf join to get the platform-correct separator
+            let rest = &path[2..];
+            let joined = home.join(rest);
+            return joined.to_string_lossy().to_string();
+        }
+    }
+    // On Windows, normalise any forward-slash paths that look like absolute paths
+    // (e.g. "/c/Users/foo") to Windows form ("C:\\Users\\foo") so file ops work.
+    #[cfg(target_os = "windows")]
+    {
+        // Replace forward slashes with backslashes only in absolute-looking paths
+        if !path.contains("http://") && !path.contains("https://") {
+            let normalised = path.replace('/', "\\");
+            // Strip leading \ that was a Unix-style root prefix
+            if normalised.starts_with('\\') && !normalised.starts_with("\\\\") {
+                // Might be /c/Users/... style — try to keep as-is (let Windows reject it)
+                return normalised.trim_start_matches('\\').to_string();
+            }
+            return normalised;
         }
     }
     path.to_string()

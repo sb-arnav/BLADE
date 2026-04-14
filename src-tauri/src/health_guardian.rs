@@ -19,6 +19,12 @@ static ACTIVE_SINCE: AtomicI64 = AtomicI64::new(0);
 /// Unix timestamp of the last recorded idle moment.
 static LAST_BREAK: AtomicI64 = AtomicI64::new(0);
 
+/// Unix timestamp of the last wind-down notification (to avoid spamming every tick).
+static LAST_WINDDOWN: AtomicI64 = AtomicI64::new(0);
+
+/// Unix timestamp of the last break reminder (90-min / 3-hour) — throttle to once per 30 min.
+static LAST_BREAK_REMINDER: AtomicI64 = AtomicI64::new(0);
+
 /// Whether the monitor loop is running.
 static MONITOR_RUNNING: AtomicBool = AtomicBool::new(false);
 
@@ -126,33 +132,44 @@ async fn health_tick(app: &tauri::AppHandle) {
         );
     }
 
-    // Fire events based on streak length
-    if streak_mins >= 180 {
-        // > 3 hours — urgent
-        let _ = app.emit("health_break_reminder", serde_json::json!({
-            "urgency": "critical",
-            "streak_minutes": streak_mins,
-            "message": format!(
-                "You have been working for {} hours without a break. Step away now — stretch, hydrate, rest your eyes.",
-                streak_mins / 60
-            )
-        }));
-    } else if streak_mins >= 90 {
-        // > 90 min — standard reminder
-        let _ = app.emit("health_break_reminder", serde_json::json!({
-            "urgency": "warning",
-            "streak_minutes": streak_mins,
-            "message": format!(
-                "You have been active for {} minutes. Time for a 5-minute break.",
-                streak_mins
-            )
-        }));
+    // Fire break reminder events based on streak length.
+    // Throttle to at most once every 30 minutes so we don't spam every 5-min tick.
+    let last_reminder = LAST_BREAK_REMINDER.load(Ordering::Relaxed);
+    let secs_since_reminder = if last_reminder > 0 { now - last_reminder } else { i64::MAX };
+    if streak_mins >= 90 && secs_since_reminder > 1800 {
+        LAST_BREAK_REMINDER.store(now, Ordering::Relaxed);
+        if streak_mins >= 180 {
+            // > 3 hours — urgent
+            let _ = app.emit("health_break_reminder", serde_json::json!({
+                "urgency": "critical",
+                "streak_minutes": streak_mins,
+                "message": format!(
+                    "You have been working for {} hours without a break. Step away now — stretch, hydrate, rest your eyes.",
+                    streak_mins / 60
+                )
+            }));
+        } else {
+            // 90–180 min — standard reminder
+            let _ = app.emit("health_break_reminder", serde_json::json!({
+                "urgency": "warning",
+                "streak_minutes": streak_mins,
+                "message": format!(
+                    "You have been active for {} minutes. Time for a 5-minute break.",
+                    streak_mins
+                )
+            }));
+        }
     }
 
-    // Wind-down after 22:00
+    // Wind-down after 22:00 — fire at most once per hour to avoid spamming every 5-min tick
     if local_hour >= 22 {
+        let last_winddown = LAST_WINDDOWN.load(Ordering::Relaxed);
+        let secs_since_winddown = if last_winddown > 0 { now - last_winddown } else { i64::MAX };
+        // Only fire if user has been active (no break) for >30 min since 10pm
+        // and we haven't sent a wind-down reminder in the last 60 minutes.
         let last_break_mins = if last_break > 0 { (now - last_break) / 60 } else { streak_mins };
-        if last_break_mins > 60 {
+        if last_break_mins > 30 && secs_since_winddown > 3600 {
+            LAST_WINDDOWN.store(now, Ordering::Relaxed);
             let _ = app.emit("health_break_reminder", serde_json::json!({
                 "urgency": "wind_down",
                 "streak_minutes": streak_mins,
@@ -198,8 +215,8 @@ pub fn start_health_monitor(app: tauri::AppHandle) {
 
     tauri::async_runtime::spawn(async move {
         loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
             health_tick(&app).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
         }
     });
 }
@@ -274,6 +291,8 @@ pub fn take_break() {
     let now = chrono::Utc::now().timestamp();
     LAST_BREAK.store(now, Ordering::Relaxed);
     ACTIVE_SINCE.store(0, Ordering::Relaxed);
+    // Reset reminder throttle so next streak will fire again when due
+    LAST_BREAK_REMINDER.store(0, Ordering::Relaxed);
 }
 
 // ── Tauri Commands ────────────────────────────────────────────────────────────

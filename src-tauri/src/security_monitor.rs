@@ -361,7 +361,14 @@ pub fn scan_sensitive_files() -> Vec<SensitiveFile> {
 
     for root in &scan_roots {
         if root.is_dir() {
-            scan_dir_for_sensitive(root, &mut results, 0, 4);
+            // Use depth 2 for the broad home-dir scan, 3 for targeted subdirs.
+            // The home root contains many dirs; going deeper than 2 from ~ is slow.
+            let max_depth = if *root == home { 2 } else { 3 };
+            scan_dir_for_sensitive(root, &mut results, 0, max_depth);
+            // Cap results to avoid runaway scans on extremely large home dirs
+            if results.len() >= 500 {
+                break;
+            }
         }
     }
 
@@ -375,6 +382,10 @@ fn scan_dir_for_sensitive(
     max_depth: usize,
 ) {
     if depth > max_depth {
+        return;
+    }
+    // Hard cap per-call to prevent runaway recursion on very large trees
+    if results.len() >= 500 {
         return;
     }
 
@@ -569,10 +580,54 @@ fn file_contains_any(path: &Path, needles: &[&str]) -> bool {
 
 /// Basic heuristic URL safety check.
 pub fn check_url_safety(url: &str) -> UrlSafetyResult {
+    let url = url.trim();
+
+    // Handle empty input immediately
+    if url.is_empty() {
+        return UrlSafetyResult {
+            url: String::new(),
+            safe: false,
+            risk_level: "suspicious".to_string(),
+            flags: vec!["EMPTY_URL: No URL was provided".to_string()],
+            recommendation: "No URL to check — provide a full URL including scheme.".to_string(),
+        };
+    }
+
     let mut flags: Vec<String> = Vec::new();
 
     // Normalise
     let url_lower = url.to_lowercase();
+
+    // 0. Non-web schemes — handle before HTTP-specific checks
+    let has_web_scheme = url_lower.starts_with("http://") || url_lower.starts_with("https://");
+    if !has_web_scheme {
+        // javascript: and data: are explicitly dangerous
+        if url_lower.starts_with("javascript:") || url_lower.starts_with("data:") {
+            // Will be caught by check #7 below — fall through
+        } else if url_lower.contains("://") {
+            // e.g. ftp://, file://, mailto: — not phishing vectors but not web URLs
+            let scheme = url_lower.split("://").next().unwrap_or("").to_string();
+            return UrlSafetyResult {
+                url: url.to_string(),
+                safe: true,
+                risk_level: "safe".to_string(),
+                flags: vec![],
+                recommendation: format!(
+                    "This is a '{}://' URL — not a web address. No phishing signals apply.",
+                    scheme
+                ),
+            };
+        } else if url_lower.starts_with("mailto:") {
+            return UrlSafetyResult {
+                url: url.to_string(),
+                safe: true,
+                risk_level: "safe".to_string(),
+                flags: vec![],
+                recommendation: "This is an email link, not a web URL.".to_string(),
+            };
+        }
+        // No scheme at all — treat as a bare domain, fall through to normal checks
+    }
 
     // 1. Homograph attack — Cyrillic chars that look like Latin
     if contains_homograph_chars(url) {

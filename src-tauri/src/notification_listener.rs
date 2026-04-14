@@ -14,6 +14,9 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Mutex, OnceLock};
 use tauri::Emitter;
 
+#[cfg(target_os = "windows")]
+use rusqlite;
+
 // ── Data model ─────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,14 +81,17 @@ pub async fn start_notification_listener(app: tauri::AppHandle) {
     loop {
         let fresh = poll_notifications(last_seen_ts).await;
         if !fresh.is_empty() {
+            let mut max_ts = last_seen_ts;
             for n in &fresh {
                 store_notification(n.clone());
                 // Emit to frontend so it can surface in NotificationCenter
                 let _ = app.emit("os_notification", n);
-                if n.timestamp > last_seen_ts {
-                    last_seen_ts = n.timestamp;
+                if n.timestamp > max_ts {
+                    max_ts = n.timestamp;
                 }
             }
+            // Advance the watermark to the newest notification we saw this batch
+            last_seen_ts = max_ts;
         }
         tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
     }
@@ -116,112 +122,87 @@ async fn read_wpn_database(since_ts: i64) -> Result<Vec<OsNotification>, String>
     // The WPN database path
     let appdata = std::env::var("LOCALAPPDATA")
         .map_err(|_| "LOCALAPPDATA not set".to_string())?;
-    let db_path = format!(
-        r"{}\Microsoft\Windows\Notifications\wpndatabase.db",
-        appdata
-    );
+    let db_path = std::path::Path::new(&appdata)
+        .join("Microsoft")
+        .join("Windows")
+        .join("Notifications")
+        .join("wpndatabase.db");
 
-    if !std::path::Path::new(&db_path).exists() {
+    if !db_path.exists() {
         return Err("wpndatabase.db not found".to_string());
     }
 
-    // We use PowerShell + SQLite via the built-in System.Data.SQLite or
-    // a simple dotnet query. Since we don't want a Rust SQLite dep just for
-    // this, we use PowerShell's ability to load the DB.
-    let script = format!(
-        r#"
-Add-Type -AssemblyName System.Data
-$conn = New-Object System.Data.SQLite.SQLiteConnection "Data Source={path};Version=3;Read Only=True;"
-try {{
-    $conn.Open()
-    $cmd = $conn.CreateCommand()
-    $cmd.CommandText = "SELECT Handler, Payload, ArrivalTime FROM Notification WHERE ArrivalTime > {ts} ORDER BY ArrivalTime DESC LIMIT 30"
-    $reader = $cmd.ExecuteReader()
-    $rows = @()
-    while ($reader.Read()) {{
-        $rows += [PSCustomObject]@{{
-            Handler = $reader['Handler']
-            Payload = $reader['Payload']
-            ArrivalTime = $reader['ArrivalTime']
-        }}
-    }}
-    $reader.Close()
-    $conn.Close()
-    $rows | ConvertTo-Json -Compress
-}} catch {{
-    $conn.Close()
-    Write-Error $_.Exception.Message
-}}
-"#,
-        path = db_path.replace('\\', "\\\\"),
-        ts = since_ts * 10_000_000 + 116_444_736_000_000_000i64 // Unix → FILETIME
-    );
+    // The WPN database is held open (and locked) by the OS notification service.
+    // We copy it to a temp file first so we can read it without hitting lock errors.
+    let temp_path = std::env::temp_dir().join("blade_wpn_snapshot.db");
+    std::fs::copy(&db_path, &temp_path)
+        .map_err(|e| format!("Cannot copy WPN database (may be locked): {}", e))?;
 
-    let out = crate::cmd_util::silent_tokio_cmd("powershell")
-        .args(["-NoProfile", "-NonInteractive", "-Command", &script])
-        .output()
-        .await
-        .map_err(|e| format!("PowerShell error: {}", e))?;
+    // Now query the temp copy using rusqlite (already a project dependency).
+    // The DB is locked on the original but the copy is ours.
+    let filetime_since = since_ts * 10_000_000 + 116_444_736_000_000_000i64; // Unix → FILETIME
 
-    if !out.status.success() {
-        let err = String::from_utf8_lossy(&out.stderr);
-        return Err(format!("PS script failed: {}", err.trim()));
-    }
+    let results = tokio::task::spawn_blocking(move || -> Result<Vec<OsNotification>, String> {
+        let conn = rusqlite::Connection::open_with_flags(
+            &temp_path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .map_err(|e| format!("Cannot open WPN DB copy: {}", e))?;
 
-    let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    if stdout.is_empty() || stdout == "null" {
-        return Ok(vec![]);
-    }
+        let mut stmt = conn
+            .prepare(
+                "SELECT Handler, Payload, ArrivalTime \
+                 FROM Notification \
+                 WHERE ArrivalTime > ?1 \
+                 ORDER BY ArrivalTime DESC \
+                 LIMIT 30",
+            )
+            .map_err(|e| format!("WPN DB prepare failed: {}", e))?;
 
-    parse_wpn_json(&stdout, since_ts)
-}
+        let rows = stmt
+            .query_map(rusqlite::params![filetime_since], |row| {
+                Ok((
+                    row.get::<_, String>(0).unwrap_or_default(),
+                    row.get::<_, String>(1).unwrap_or_default(),
+                    row.get::<_, i64>(2).unwrap_or(0),
+                ))
+            })
+            .map_err(|e| format!("WPN DB query failed: {}", e))?;
 
-#[cfg(target_os = "windows")]
-fn parse_wpn_json(json_str: &str, since_ts: i64) -> Result<Vec<OsNotification>, String> {
-    // The JSON may be an object (single row) or array
-    let value: serde_json::Value = serde_json::from_str(json_str)
-        .map_err(|e| format!("JSON parse error: {}", e))?;
-
-    let rows = if value.is_array() {
-        value.as_array().cloned().unwrap_or_default()
-    } else {
-        vec![value]
-    };
-
-    let mut results = Vec::new();
-    for row in rows {
-        let handler = row["Handler"].as_str().unwrap_or("").to_string();
-        let payload = row["Payload"].as_str().unwrap_or("").to_string();
-        let arrival = row["ArrivalTime"].as_i64().unwrap_or(0);
-
-        // Convert FILETIME → Unix timestamp
-        let unix_ts = (arrival - 116_444_736_000_000_000i64) / 10_000_000;
-        if unix_ts < since_ts {
-            continue;
+        let mut results = Vec::new();
+        for row in rows.flatten() {
+            let (handler, payload, arrival) = row;
+            // FILETIME → Unix timestamp
+            let unix_ts = (arrival - 116_444_736_000_000_000i64) / 10_000_000;
+            if unix_ts < since_ts {
+                continue;
+            }
+            let app_name = extract_app_name_from_handler(&handler);
+            let (title, body) = parse_toast_xml(&payload);
+            if title.is_empty() && body.is_empty() {
+                continue;
+            }
+            let category = classify_notification(&app_name, &title);
+            results.push(OsNotification {
+                app_name,
+                title,
+                body,
+                timestamp: unix_ts,
+                category,
+            });
         }
 
-        // Extract app name from handler (e.g. "Windows.System.Toast!app!...")
-        let app_name = extract_app_name_from_handler(&handler);
+        Ok(results)
+    })
+    .await
+    .map_err(|e| format!("WPN read task panicked: {}", e))??;
 
-        // Parse the XML payload for title/body
-        let (title, body) = parse_toast_xml(&payload);
-
-        if title.is_empty() && body.is_empty() {
-            continue;
-        }
-
-        let category = classify_notification(&app_name, &title);
-        results.push(OsNotification {
-            app_name,
-            title,
-            body,
-            timestamp: unix_ts,
-            category,
-        });
-    }
+    // Clean up temp file (best-effort)
+    let _ = std::fs::remove_file(&temp_path);
 
     Ok(results)
 }
+
 
 #[cfg(target_os = "windows")]
 fn extract_app_name_from_handler(handler: &str) -> String {
