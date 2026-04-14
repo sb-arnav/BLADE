@@ -268,7 +268,7 @@ pub async fn stream_text(
 
                 if let Some(data) = line.strip_prefix("data: ") {
                     if data.trim() == "[DONE]" {
-                        break;
+                        return Ok(());
                     }
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
                         // Check for error objects embedded in the stream

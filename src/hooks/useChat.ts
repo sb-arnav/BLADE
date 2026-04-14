@@ -369,6 +369,17 @@ export function useChat() {
       setLoading(true);
       setError(null);
 
+      // Safety timeout: if no chat_done arrives within 120s, unstick loading.
+      // This prevents the UI from being permanently locked if the backend dies mid-stream.
+      const safetyTimer = setTimeout(() => {
+        if (streamRequestId.current !== "") {
+          streamBuffer.current = "";
+          streamRequestId.current = "";
+          setLoading(false);
+          setError("Request timed out — no response received. Check your API key and model in Settings.");
+        }
+      }, 120_000);
+
       try {
         await invoke("send_message_stream", {
           messages: nextMessages
@@ -380,6 +391,7 @@ export function useChat() {
             })),
         });
       } catch (cause) {
+        clearTimeout(safetyTimer);
         streamBuffer.current = "";
         setError(typeof cause === "string" ? cause : String(cause));
         setLoading(false);

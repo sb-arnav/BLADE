@@ -174,8 +174,9 @@ async fn compress_conversation_smart(
     let cheap = crate::config::cheap_model_for_provider(provider, model);
 
     let summary_msgs = vec![ConversationMessage::User(summary_prompt)];
+    let no_tools: Vec<ToolDefinition> = vec![];
     let summary = match crate::providers::complete_turn(
-        provider, api_key, &cheap, &summary_msgs, &[], base_url
+        provider, api_key, &cheap, &summary_msgs, &no_tools, base_url
     ).await {
         Ok(t) => t.content,
         Err(_) => {
@@ -242,6 +243,11 @@ fn classify_api_error(err: &str) -> ErrorRecovery {
         );
     }
 
+    // 404 — model not found on this provider. Switch to a known-good model.
+    if lower.contains("404") || lower.contains("no endpoints found") {
+        return ErrorRecovery::SwitchModelAndRetry;
+    }
+
     // Model not found / invalid — switch to a safe model for this provider
     if lower.contains("model") && (lower.contains("not found") || lower.contains("invalid")
         || lower.contains("does not exist") || lower.contains("not supported")) {
@@ -300,6 +306,13 @@ pub async fn send_message_stream(
         config.model = model;
     }
 
+    // Re-check API key after routing — the router may have switched to a
+    // provider whose key isn't stored, leaving api_key empty.
+    if config.api_key.is_empty() && config.provider != "ollama" {
+        let _ = app.emit("blade_status", "error");
+        return Err(format!("No API key stored for provider '{}'. Go to Settings to add one.", config.provider));
+    }
+
     // Context-length aware routing: if conversation is already very long,
     // switch to a long-context model rather than hitting a context-overflow error later.
     // Gemini Flash (1M tokens) is the safest bet for huge contexts at low cost.
@@ -307,9 +320,10 @@ pub async fn send_message_stream(
         let rough_tokens = messages.iter().map(|m| {
             m.content.len() / 4 + m.image_base64.as_ref().map(|_| 2000).unwrap_or(0)
         }).sum::<usize>();
-        if rough_tokens > 80_000 && config.base_url.is_none() {
+        if rough_tokens > 80_000 && config.base_url.is_none() && config.provider != "openrouter" && config.provider != "ollama" {
             // Long conversation — route to long-context model if available.
-            // Skip when base_url is set: we don't know what models that endpoint supports.
+            // Skip when base_url is set or on OpenRouter/Ollama: we don't know what
+            // models that endpoint supports and the user chose their model deliberately.
             let gemini_key = crate::config::get_provider_key("gemini");
             if !gemini_key.is_empty() && config.provider != "gemini" {
                 config.provider = "gemini".to_string();
@@ -1100,7 +1114,13 @@ pub fn set_config(
 ) -> Result<(), String> {
     let mut config = load_config();
     config.provider = provider;
-    config.api_key = api_key;
+    // Guard against masked key values like "sk-an...1234" from the frontend —
+    // these would overwrite the real keyring key with garbage. Only update
+    // the key if it looks like a real, complete key (no "..." mask).
+    if !api_key.contains("...") && !api_key.is_empty() {
+        config.api_key = api_key;
+    }
+    // If apiKey was empty or masked, keep the existing key from keyring.
     config.model = model;
     config.onboarded = true;
     if let Some(v) = token_efficient { config.token_efficient = v; }
@@ -1374,12 +1394,13 @@ pub async fn auto_title_conversation(
     );
 
     let messages = vec![crate::providers::ConversationMessage::User(prompt)];
+    let no_tools: Vec<ToolDefinition> = vec![];
     let turn = crate::providers::complete_turn(
         &config.provider,
         &config.api_key,
         model,
         &messages,
-        &[] as &[crate::providers::ToolDefinition],
+        &no_tools,
         config.base_url.as_deref(),
     )
     .await
@@ -1512,7 +1533,7 @@ pub async fn complete_onboarding(answers: Vec<String>) -> Result<(), String> {
         // Tool nodes from answer[2] — split on common separators
         let stack_answer = answers[2].trim().to_string();
         if !stack_answer.is_empty() {
-            let separators: &[char] = &[',', '/', '|', '+', '\n', ';'];
+            let separators: Vec<char> = vec![',', '/', '|', '+', '\n', ';'];
             let tools: Vec<&str> = stack_answer
                 .split(|c| separators.contains(&c))
                 .map(|s| s.trim())

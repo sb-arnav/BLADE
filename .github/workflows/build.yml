@@ -47,7 +47,12 @@ jobs:
             librsvg2-dev \
             libssl-dev \
             libasound2-dev \
+            libdbus-1-dev \
+            libsecret-1-dev \
+            libglib2.0-dev \
+            libxdo-dev \
             libpipewire-0.3-dev \
+            libspa-0.2-dev \
             pkg-config
 
       - name: Rust check (catch compile errors early)
