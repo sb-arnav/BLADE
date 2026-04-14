@@ -53,7 +53,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, EBState> {
   }
 }
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar" | "workflow-builder" | "code-sandbox" | "persona" | "negotiation" | "financial" | "context-engine" | "reasoning" | "social-graph" | "health" | "documents" | "habits" | "knowledge-graph" | "meetings" | "predictions" | "emotional-intel";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar" | "workflow-builder" | "code-sandbox" | "persona" | "negotiation" | "financial" | "context-engine" | "reasoning" | "social-graph" | "health" | "documents" | "habits" | "knowledge-graph" | "meetings" | "predictions" | "emotional-intel" | "decision-log" | "security" | "health-panel" | "temporal" | "integrations";
 
 const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
 const Canvas = lazy(() => import("./components/Canvas"));
@@ -110,6 +110,11 @@ const KnowledgeGraphView = lazy(() => import("./components/KnowledgeGraphView").
 const MeetingView = lazy(() => import("./components/MeetingView").then(m => ({ default: m.MeetingView })));
 const PredictionView = lazy(() => import("./components/PredictionView").then(m => ({ default: m.PredictionView })));
 const EmotionalIntelligenceView = lazy(() => import("./components/EmotionalIntelligenceView").then(m => ({ default: m.EmotionalIntelligenceView })));
+const DecisionLog = lazy(() => import("./components/DecisionLog").then(m => ({ default: m.DecisionLog })));
+const SecurityDashboard = lazy(() => import("./components/SecurityDashboard").then(m => ({ default: m.SecurityDashboard })));
+const HealthPanel = lazy(() => import("./components/HealthPanel").then(m => ({ default: m.HealthPanel })));
+const TemporalPanel = lazy(() => import("./components/TemporalPanel").then(m => ({ default: m.TemporalPanel })));
+const IntegrationStatus = lazy(() => import("./components/IntegrationStatus").then(m => ({ default: m.IntegrationStatus })));
 
 function ShellFallback({ label = "Loading workspace..." }: { label?: string }) {
   return (
@@ -897,6 +902,11 @@ export default function App() {
     { id: "email", label: "Open email workspace", description: "Read and draft email with Blade assistance", section: "System", action: () => openRoute("email") },
     { id: "docs", label: "Open document workspace", description: "Generate longer-form structured drafts", section: "System", action: () => openRoute("docs") },
     { id: "init", label: "Re-run Blade setup", description: "Reset onboarding and configure Blade from scratch", section: "System", action: () => openRoute("init") },
+    { id: "decision-log", label: "Open decision log", description: "Browse decisions BLADE has logged across conversations", section: "Knowledge", action: () => openRoute("decision-log") },
+    { id: "security", label: "Open security dashboard", description: "Audit permissions, secrets, and active tool access", section: "System", action: () => openRoute("security") },
+    { id: "health-panel", label: "Open health panel", description: "System health, memory usage, and background process status", section: "System", action: () => openRoute("health-panel") },
+    { id: "temporal", label: "Open temporal intelligence", description: "Replay what you were doing, detect work patterns, generate standups", section: "Knowledge", action: () => openRoute("temporal") },
+    { id: "integrations", label: "Open integration bridge", description: "Manage Gmail, Calendar, Slack, and GitHub integration status", section: "System", action: () => openRoute("integrations") },
   ];
 
   if (focusMode && config?.onboarded) {
@@ -993,6 +1003,11 @@ export default function App() {
     "meetings": <MeetingView onBack={() => openRoute("chat")} />,
     "predictions": <PredictionView onBack={() => openRoute("chat")} />,
     "emotional-intel": <EmotionalIntelligenceView onBack={() => openRoute("chat")} />,
+    "decision-log": <DecisionLog onBack={() => openRoute("chat")} />,
+    "security": <SecurityDashboard onBack={() => openRoute("chat")} />,
+    "health-panel": <HealthPanel onBack={() => openRoute("chat")} />,
+    "temporal": <TemporalPanel onBack={() => openRoute("chat")} />,
+    "integrations": <IntegrationStatus onBack={() => openRoute("chat")} />,
   };
 
   if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {
