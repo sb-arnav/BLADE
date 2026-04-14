@@ -15,7 +15,9 @@
 // Text is passed safely (not via shell args directly on Linux/macOS for OS voices).
 // A static singleton ensures only one utterance plays at a time.
 
-use std::process::{Child, Command};
+use std::process::Child;
+#[cfg(not(target_os = "windows"))]
+use std::process::Command;
 use std::sync::{Arc, Mutex};
 
 // ── singleton process handle ──────────────────────────────────────────────────
