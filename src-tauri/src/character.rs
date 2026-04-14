@@ -451,3 +451,135 @@ Don't start with "I am BLADE" — that's obvious. Start with what you've noticed
 pub fn blade_get_soul() -> String {
     load_soul()
 }
+
+// ── Feedback-driven trait adjustment ──────────────────────────────────────────
+
+/// Apply a reaction (thumbs up/down) to learn behavioral traits.
+/// Called immediately after a reaction is recorded.
+///
+/// Thumbs up on a concise response → increase "conciseness" preference.
+/// Thumbs down on a verbose response → decrease "verbosity" preference.
+/// Tracks which tool usages get positive reactions → prefer those tools.
+/// Tracks which response styles get negative reactions → avoid them.
+#[tauri::command]
+pub async fn apply_reaction_to_traits(
+    message_content: String,
+    polarity: i32,           // +1 = thumbs up, -1 = thumbs down
+    tools_used: Vec<String>, // tool names used in generating this response
+) -> Result<String, String> {
+    let config = load_config();
+    if config.api_key.is_empty() && config.provider != "ollama" {
+        return Ok("No API key — skipping trait adjustment".to_string());
+    }
+
+    let db_path = blade_config_dir().join("blade.db");
+    let conn = rusqlite::Connection::open(&db_path)
+        .map_err(|e| format!("DB error: {}", e))?;
+
+    let sign = if polarity > 0 { "POSITIVE" } else { "NEGATIVE" };
+    let preview = crate::safe_slice(&message_content, 400);
+
+    // Infer what style trait this reaction targets
+    let prompt = format!(
+        r#"A user gave a {sign} reaction to this AI response.
+
+Response:
+---
+{preview}
+---
+
+What specific behavioral trait does this reaction signal? Think about:
+- Response length (too long / too short / just right)
+- Format (bullet points, prose, code blocks, headers)
+- Tone (formal, casual, direct, verbose)
+- Approach (step-by-step, summary-first, example-heavy)
+- Tool usage: {tools}
+
+Respond with ONLY a JSON object:
+{{"trait": "specific trait name", "direction": "increase|decrease", "rule": "one sentence behavioral rule"}}
+
+Example: {{"trait": "conciseness", "direction": "increase", "rule": "Keep responses under 3 sentences for simple questions"}}
+
+Be specific. Not "be better" but "avoid bullet lists for yes/no questions"."#,
+        sign = sign,
+        preview = preview,
+        tools = if tools_used.is_empty() { "none".to_string() } else { tools_used.join(", ") },
+    );
+
+    let messages = vec![ConversationMessage::User(prompt)];
+    let model = crate::config::cheap_model_for_provider(&config.provider, &config.model);
+
+    let turn = providers::complete_turn(
+        &config.provider,
+        &config.api_key,
+        &model,
+        &messages,
+        &[],
+        config.base_url.as_deref(),
+    ).await.map_err(|e| { crate::config::check_and_disable_on_402(&e); e })?;
+
+    let raw = turn.content.trim();
+    // Extract JSON
+    let json_str = if let Some(start) = raw.find('{') {
+        if let Some(end) = raw.rfind('}') {
+            &raw[start..=end]
+        } else { raw }
+    } else { raw };
+
+    let parsed: serde_json::Value = serde_json::from_str(json_str)
+        .map_err(|e| format!("Parse error: {}", e))?;
+
+    let rule = parsed["rule"].as_str().unwrap_or_default();
+    let trait_name = parsed["trait"].as_str().unwrap_or("response_style");
+    let direction = parsed["direction"].as_str().unwrap_or("adjust");
+
+    if rule.is_empty() {
+        return Ok("No rule inferred".to_string());
+    }
+
+    // Compute confidence: positive reactions on what to keep = 0.75, negative on what to avoid = 0.88
+    let confidence = if polarity < 0 { 0.88 } else { 0.75 };
+
+    let pref_id = format!("pref-trait-{}", uuid::Uuid::new_v4());
+    let source = format!("reaction_trait:{}", trait_name);
+    let _ = crate::db::brain_upsert_preference(&conn, &pref_id, rule, confidence, &source);
+
+    // Track positive tool preferences
+    if polarity > 0 && !tools_used.is_empty() {
+        for tool in &tools_used {
+            let tool_rule = format!("Tool '{}' is effective for this type of task — prefer it", tool);
+            let tool_id = format!("pref-tool-{}-{}", tool.replace('/', "-"), uuid::Uuid::new_v4());
+            let _ = crate::db::brain_upsert_preference(&conn, &tool_id, &tool_rule, 0.7, "tool_reaction");
+        }
+    }
+
+    // Track negative tool patterns
+    if polarity < 0 && !tools_used.is_empty() {
+        for tool in &tools_used {
+            let tool_rule = format!("Avoid using tool '{}' when it produces results the user dislikes", tool);
+            let tool_id = format!("pref-tool-avoid-{}-{}", tool.replace('/', "-"), uuid::Uuid::new_v4());
+            let _ = crate::db::brain_upsert_preference(&conn, &tool_id, &tool_rule, 0.65, "tool_reaction_negative");
+        }
+    }
+
+    Ok(format!("Trait '{}' {} → rule stored (confidence: {:.0}%)", trait_name, direction, confidence * 100.0))
+}
+
+/// Get the top N learned preferences formatted for system prompt injection.
+/// These are the most high-confidence behavioral rules BLADE has learned.
+pub fn get_top_learned_preferences(n: usize) -> Vec<String> {
+    let db_path = blade_config_dir().join("blade.db");
+    let conn = match rusqlite::Connection::open(&db_path) {
+        Ok(c) => c,
+        Err(_) => return vec![],
+    };
+    match crate::db::brain_get_preferences(&conn) {
+        Ok(prefs) => prefs
+            .into_iter()
+            .filter(|p| p.confidence >= 0.7)
+            .take(n)
+            .map(|p| p.text)
+            .collect(),
+        Err(_) => vec![],
+    }
+}

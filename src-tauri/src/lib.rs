@@ -61,6 +61,7 @@ mod history;
 mod managed_agents;
 mod mcp;
 mod mcp_memory_server;
+mod mcp_fs_server;
 mod memory;
 mod permissions;
 mod plugins;
@@ -415,6 +416,7 @@ pub fn run() {
             commands::mcp_get_servers,
             commands::mcp_remove_server,
             commands::mcp_server_status,
+            commands::mcp_server_health,
             commands::respond_tool_approval,
             commands::history_list_conversations,
             commands::history_load_conversation,
@@ -574,6 +576,8 @@ pub fn run() {
             memory::get_memory_log,
             memory::get_memory_blocks,
             memory::set_memory_block,
+            memory::run_weekly_memory_consolidation,
+            character::apply_reaction_to_traits,
             router::classify_message,
             tray::set_tray_status,
             pulse::pulse_get_last_thought,
@@ -737,7 +741,9 @@ pub fn run() {
             swarm_commands::swarm_resume,
             swarm_commands::swarm_cancel,
             swarm_commands::swarm_write_scratchpad,
+            swarm_commands::swarm_write_scratchpad_entry,
             swarm_commands::swarm_read_scratchpad,
+            swarm_commands::swarm_get_progress,
             goal_engine::goal_add,
             goal_engine::goal_list,
             goal_engine::goal_complete,
@@ -1062,6 +1068,41 @@ pub fn run() {
                 }
 
                 let _ = manager.discover_all_tools().await;
+            });
+
+            // MCP server health monitor — checks every RECONNECT_INTERVAL_SECS and
+            // auto-reconnects dead servers. Fresh lock per iteration keeps tool calls unblocked.
+            let health_manager = setup_manager.clone();
+            let health_app = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_secs(
+                        mcp::RECONNECT_INTERVAL_SECS,
+                    )).await;
+                    let health = {
+                        let manager = health_manager.lock().await;
+                        manager.get_server_health()
+                    };
+                    for server in &health {
+                        if !server.connected && server.reconnect_attempts < 3 {
+                            // Try to reconnect: acquire lock, attempt reconnect
+                            let mut manager = health_manager.lock().await;
+                            if let Err(e) = manager.try_reconnect(&server.name).await {
+                                log::warn!(
+                                    "MCP auto-reconnect for '{}' failed: {}",
+                                    server.name, e
+                                );
+                            } else {
+                                // Re-discover tools now that it's back
+                                let _ = manager.discover_all_tools().await;
+                                let _ = health_app.emit(
+                                    "mcp_server_reconnected",
+                                    serde_json::json!({ "server": &server.name }),
+                                );
+                            }
+                        }
+                    }
+                }
             });
 
             // Start clipboard watcher

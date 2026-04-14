@@ -505,6 +505,19 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
     )
     .map_err(|e| format!("DB error: {}", e))?;
 
+    // ── Incremental schema upgrades (ALTER TABLE ADD COLUMN is idempotent via ignore) ──
+    // These columns were added in v0.4.7+ — older DBs need them backfilled.
+    let swarm_upgrades = [
+        "ALTER TABLE swarms ADD COLUMN scratchpad_entries TEXT NOT NULL DEFAULT '[]'",
+        "ALTER TABLE swarm_tasks ADD COLUMN role TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE swarm_tasks ADD COLUMN required_tools TEXT NOT NULL DEFAULT '[]'",
+        "ALTER TABLE swarm_tasks ADD COLUMN estimated_duration TEXT NOT NULL DEFAULT 'medium'",
+    ];
+    for sql in &swarm_upgrades {
+        // Ignore error — column already exists is the expected case on fresh re-runs
+        let _ = conn.execute(sql, []);
+    }
+
     Ok(())
 }
 

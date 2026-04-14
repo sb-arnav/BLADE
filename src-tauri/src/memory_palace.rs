@@ -644,6 +644,125 @@ pub fn get_memory_context(query: &str) -> String {
     parts.join("\n\n")
 }
 
+// ─── Conversation summarization ──────────────────────────────────────────────
+
+/// After a conversation of 5+ turns, generate a 2-sentence summary episode.
+/// Stored in memory_palace with embeddings for semantic recall.
+/// This makes "what did we discuss about X last week?" actually work.
+///
+/// Returns the summary string if one was generated.
+pub async fn summarize_conversation(
+    messages: &[crate::providers::ChatMessage],
+    conversation_id: &str,
+) -> Option<String> {
+    // Only summarize if we have at least 5 turns (user+assistant pairs = 10 messages minimum,
+    // but also count any shorter multi-round conversations ≥5 messages)
+    if messages.len() < 5 {
+        return None;
+    }
+
+    // Build conversation text from all messages, capped to avoid token explosion
+    let full_text: String = messages
+        .iter()
+        .filter(|m| !m.content.trim().is_empty())
+        .map(|m| format!("{}: {}", m.role, crate::safe_slice(&m.content, 300)))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    if full_text.len() < 200 {
+        return None;
+    }
+
+    let prompt = format!(
+        r#"Summarize this conversation in exactly 2 sentences:
+Sentence 1: What was discussed (the topic, problem, or task).
+Sentence 2: What was the outcome, decision, or conclusion.
+
+Be specific. Use concrete details (file names, technologies, decisions made).
+Do NOT be vague. "We discussed code" is useless. "Fixed the PostgreSQL connection timeout by switching to pgbouncer" is valuable.
+
+CONVERSATION:
+{}
+
+2-sentence summary:"#,
+        crate::safe_slice(&full_text, 3000)
+    );
+
+    let summary = llm_complete(&prompt).await.ok()?;
+    let summary = summary.trim().to_string();
+    if summary.len() < 20 {
+        return None;
+    }
+
+    // Store as a memory episode
+    let now = chrono::Utc::now().timestamp();
+    let id = uuid::Uuid::new_v4().to_string();
+
+    let episode = MemoryEpisode {
+        id: id.clone(),
+        title: format!("Conversation summary ({})", chrono::DateTime::from_timestamp(now, 0)
+            .map(|d| d.format("%b %d").to_string())
+            .unwrap_or_else(|| "unknown".to_string())),
+        summary: summary.clone(),
+        full_context: full_text.clone(),
+        tags: vec!["auto-summary".to_string(), "conversation".to_string()],
+        episode_type: "conversation".to_string(),
+        importance: 6, // mid-priority — retrievable but not critical
+        emotional_valence: "neutral".to_string(),
+        people: vec![],
+        projects: vec![],
+        recall_count: 0,
+        created_at: now,
+        occurred_at: now,
+    };
+
+    if let Ok(conn) = open_conn() {
+        ensure_tables(&conn);
+        let _ = conn.execute(
+            "INSERT OR IGNORE INTO memory_episodes
+                (id, title, summary, full_context, tags, episode_type, importance,
+                 emotional_valence, people, projects, recall_count, created_at, occurred_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 0, ?11, ?12)",
+            rusqlite::params![
+                episode.id,
+                episode.title,
+                episode.summary,
+                episode.full_context,
+                vec_to_json(&episode.tags),
+                episode.episode_type,
+                episode.importance,
+                episode.emotional_valence,
+                vec_to_json(&episode.people),
+                vec_to_json(&episode.projects),
+                episode.created_at,
+                episode.occurred_at,
+            ],
+        );
+    }
+
+    // Also embed the summary for semantic search
+    // This is what makes "what did we discuss about X last week?" work:
+    // the summary is stored in the vector store so future queries can find it.
+    let embed_source = format!("conv_summary:{}", conversation_id);
+    let summary_for_embed = format!("Conversation summary: {}", summary);
+    if let Ok(embeddings) = crate::embeddings::embed_texts(&[summary_for_embed.clone()]) {
+        if let Some(embedding) = embeddings.into_iter().next() {
+            let db_path = crate::config::blade_config_dir().join("blade.db");
+            if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                let blob: Vec<u8> = embedding.iter().flat_map(|f| f.to_le_bytes()).collect();
+                let ts = now;
+                let _ = conn.execute(
+                    "INSERT INTO vector_entries (content, embedding, source_type, source_id, created_at)
+                     VALUES (?1, ?2, 'conversation_summary', ?3, ?4)",
+                    rusqlite::params![summary_for_embed, blob, embed_source, ts],
+                );
+            }
+        }
+    }
+
+    Some(summary)
+}
+
 // ─── Auto-consolidation (fire and forget) ────────────────────────────────────
 
 pub async fn auto_consolidate_from_conversation(user_text: &str, assistant_text: &str) {

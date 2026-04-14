@@ -10,6 +10,10 @@ static REQUEST_ID: AtomicU64 = AtomicU64::new(1);
 const MCP_INIT_TIMEOUT: Duration = Duration::from_secs(10);
 const MCP_DISCOVERY_TIMEOUT: Duration = Duration::from_secs(15);
 const MCP_TOOL_CALL_TIMEOUT: Duration = Duration::from_secs(30);
+const MAX_AUTO_RECONNECT_ATTEMPTS: u32 = 3;
+/// How often (seconds) the background health monitor checks for dead servers.
+/// Exported so lib.rs can use the same constant for the sleep interval.
+pub const RECONNECT_INTERVAL_SECS: u64 = 30;
 
 // --- JSON-RPC Types ---
 
@@ -40,6 +44,33 @@ struct JsonRpcError {
 }
 
 // --- MCP Types ---
+
+/// Health report for a single registered MCP server.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerHealth {
+    pub name: String,
+    pub connected: bool,
+    pub tool_count: usize,
+    /// Unix timestamp (seconds) of the last successful tool call, or None.
+    pub last_call_time: Option<u64>,
+    pub error_count: u32,
+    pub reconnect_attempts: u32,
+}
+
+/// Per-tool quality statistics for ranking.
+#[derive(Debug, Clone, Default)]
+pub struct ToolStats {
+    pub success_count: u32,
+    pub failure_count: u32,
+    pub consecutive_failures: u32,
+}
+
+impl ToolStats {
+    /// Returns true when a tool should be deprioritised (5+ consecutive failures).
+    pub fn is_degraded(&self) -> bool {
+        self.consecutive_failures >= 5
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct McpTool {
@@ -193,6 +224,13 @@ pub struct McpManager {
     servers: HashMap<String, McpServerConfig>,
     processes: HashMap<String, McpProcess>,
     tools: Vec<McpTool>,
+    /// Per-server error counts and reconnect state for health monitoring
+    server_error_counts: HashMap<String, u32>,
+    server_reconnect_attempts: HashMap<String, u32>,
+    /// Unix timestamps (seconds) of the last successful call per server
+    server_last_call: HashMap<String, u64>,
+    /// Per-tool quality stats for ranking
+    tool_stats: HashMap<String, ToolStats>,
 }
 
 impl Default for McpManager {
@@ -207,6 +245,10 @@ impl McpManager {
             servers: HashMap::new(),
             processes: HashMap::new(),
             tools: Vec::new(),
+            server_error_counts: HashMap::new(),
+            server_reconnect_attempts: HashMap::new(),
+            server_last_call: HashMap::new(),
+            tool_stats: HashMap::new(),
         }
     }
 
@@ -260,6 +302,83 @@ impl McpManager {
                 (name.clone(), running)
             })
             .collect()
+    }
+
+    /// Return a health snapshot for every registered server.
+    pub fn get_server_health(&self) -> Vec<ServerHealth> {
+        self.servers
+            .keys()
+            .map(|name| {
+                let connected = self.processes.contains_key(name);
+                let tool_count = self.tools.iter().filter(|t| &t.server_name == name).count();
+                ServerHealth {
+                    name: name.clone(),
+                    connected,
+                    tool_count,
+                    last_call_time: self.server_last_call.get(name).copied(),
+                    error_count: self.server_error_counts.get(name).copied().unwrap_or(0),
+                    reconnect_attempts: self.server_reconnect_attempts.get(name).copied().unwrap_or(0),
+                }
+            })
+            .collect()
+    }
+
+    /// Record a successful call for a server and tool (resets consecutive failure counter).
+    fn record_success(&mut self, server_name: &str, qualified_tool: &str) {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        self.server_last_call.insert(server_name.to_string(), now);
+        self.server_reconnect_attempts.insert(server_name.to_string(), 0);
+
+        let stats = self.tool_stats.entry(qualified_tool.to_string()).or_default();
+        stats.success_count += 1;
+        stats.consecutive_failures = 0;
+    }
+
+    /// Record a failed call for a server and tool.
+    fn record_failure(&mut self, server_name: &str, qualified_tool: &str) {
+        let counter = self.server_error_counts.entry(server_name.to_string()).or_insert(0);
+        *counter += 1;
+
+        let stats = self.tool_stats.entry(qualified_tool.to_string()).or_default();
+        stats.failure_count += 1;
+        stats.consecutive_failures += 1;
+    }
+
+    /// Attempt to reconnect a disconnected server (up to MAX_AUTO_RECONNECT_ATTEMPTS).
+    /// Returns Ok(()) if the server is now running, Err otherwise.
+    pub async fn try_reconnect(&mut self, server_name: &str) -> Result<(), String> {
+        let attempts = self.server_reconnect_attempts.get(server_name).copied().unwrap_or(0);
+        if attempts >= MAX_AUTO_RECONNECT_ATTEMPTS {
+            return Err(format!(
+                "Server '{}' reached max reconnect attempts ({})",
+                server_name, MAX_AUTO_RECONNECT_ATTEMPTS
+            ));
+        }
+        self.server_reconnect_attempts.insert(server_name.to_string(), attempts + 1);
+
+        // Small delay proportional to attempt count to avoid hammering a broken server
+        let delay_ms = 500u64 * (attempts + 1) as u64;
+        tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+
+        self.ensure_running(server_name).await
+    }
+
+    /// Return the tool list sorted by quality: degraded tools are pushed to the end.
+    /// This is the list the LLM sees — poor performers stay available but deprioritised.
+    pub fn get_tools_ranked(&self) -> Vec<&McpTool> {
+        let mut tools: Vec<&McpTool> = self.tools.iter().collect();
+        tools.sort_by_key(|t| {
+            let degraded = self
+                .tool_stats
+                .get(&t.qualified_name)
+                .map(|s| s.is_degraded())
+                .unwrap_or(false);
+            if degraded { 1u8 } else { 0u8 }
+        });
+        tools
     }
 
     async fn ensure_running(&mut self, server_name: &str) -> Result<(), String> {
@@ -370,11 +489,14 @@ impl McpManager {
             }
         }
 
-        // Preserve built-in in-process tools (those not backed by a child process)
+        // Preserve built-in in-process tools (memory + filesystem — not backed by child processes)
         let built_in: Vec<McpTool> = self
             .tools
             .iter()
-            .filter(|t| t.server_name == crate::mcp_memory_server::SERVER_NAME)
+            .filter(|t| {
+                t.server_name == crate::mcp_memory_server::SERVER_NAME
+                    || t.server_name == crate::mcp_fs_server::SERVER_NAME
+            })
             .cloned()
             .collect();
         all_tools.extend(built_in);
@@ -383,14 +505,18 @@ impl McpManager {
         Ok(all_tools)
     }
 
-    /// Register the built-in in-process servers (e.g. blade.memory).
+    /// Register the built-in in-process servers (memory + filesystem).
     /// Call once at startup after McpManager is created.
     pub fn register_built_in_servers(&mut self) {
         let memory_tools = crate::mcp_memory_server::register_built_in_tools();
         self.tools.extend(memory_tools);
+        let fs_tools = crate::mcp_fs_server::register_built_in_tools();
+        self.tools.extend(fs_tools);
     }
 
-    /// Call a tool by its qualified name
+    /// Call a tool by its qualified name.
+    /// Tracks per-tool success/failure for quality ranking.
+    /// Auto-reconnects on process death (up to MAX_AUTO_RECONNECT_ATTEMPTS).
     pub async fn call_tool(
         &mut self,
         qualified_name: &str,
@@ -406,12 +532,40 @@ impl McpManager {
 
         // Dispatch to built-in in-process servers
         if tool.server_name == crate::mcp_memory_server::SERVER_NAME {
-            return crate::mcp_memory_server::handle_tool_call(&tool.name, arguments).await;
+            let result = crate::mcp_memory_server::handle_tool_call(&tool.name, arguments).await;
+            match &result {
+                Ok(r) if !r.is_error => self.record_success(&tool.server_name, qualified_name),
+                _ => self.record_failure(&tool.server_name, qualified_name),
+            }
+            return result;
         }
 
-        self.ensure_running(&tool.server_name).await?;
+        // Dispatch to built-in filesystem server
+        if tool.server_name == crate::mcp_fs_server::SERVER_NAME {
+            let result = crate::mcp_fs_server::handle_tool_call(&tool.name, arguments).await;
+            match &result {
+                Ok(r) if !r.is_error => self.record_success(&tool.server_name, qualified_name),
+                _ => self.record_failure(&tool.server_name, qualified_name),
+            }
+            return result;
+        }
 
-        let process = self.processes.get_mut(&tool.server_name).unwrap();
+        // Ensure the external process is running; attempt reconnect if not.
+        if let Err(e) = self.ensure_running(&tool.server_name).await {
+            // Process is down — attempt auto-reconnect
+            if let Err(reconnect_err) = self.try_reconnect(&tool.server_name).await {
+                self.record_failure(&tool.server_name, qualified_name);
+                return Err(format!(
+                    "Server '{}' unavailable: {} (reconnect failed: {})",
+                    tool.server_name, e, reconnect_err
+                ));
+            }
+        }
+
+        let process = self
+            .processes
+            .get_mut(&tool.server_name)
+            .ok_or(format!("Process for '{}' not found", tool.server_name))?;
 
         let params = serde_json::json!({
             "name": tool.name,
@@ -423,24 +577,42 @@ impl McpManager {
             process.send_request("tools/call", Some(params)),
         )
         .await
-        .map_err(|_| format!("Timed out calling MCP tool: {}", qualified_name))??;
+        .map_err(|_| format!("Timed out calling MCP tool: {}", qualified_name));
 
-        let is_error = result["isError"].as_bool().unwrap_or(false);
-        let content = if let Some(arr) = result["content"].as_array() {
-            arr.iter()
-                .map(|c| McpContent {
-                    content_type: c["type"].as_str().unwrap_or("text").to_string(),
-                    text: c["text"].as_str().map(|s| s.to_string()),
-                })
-                .collect()
-        } else {
-            vec![McpContent {
-                content_type: "text".to_string(),
-                text: Some(result.to_string()),
-            }]
-        };
+        match result {
+            Err(e) => {
+                self.record_failure(&tool.server_name, qualified_name);
+                Err(e)
+            }
+            Ok(Err(e)) => {
+                self.record_failure(&tool.server_name, qualified_name);
+                Err(e)
+            }
+            Ok(Ok(result)) => {
+                let is_error = result["isError"].as_bool().unwrap_or(false);
+                let content = if let Some(arr) = result["content"].as_array() {
+                    arr.iter()
+                        .map(|c| McpContent {
+                            content_type: c["type"].as_str().unwrap_or("text").to_string(),
+                            text: c["text"].as_str().map(|s| s.to_string()),
+                        })
+                        .collect()
+                } else {
+                    vec![McpContent {
+                        content_type: "text".to_string(),
+                        text: Some(result.to_string()),
+                    }]
+                };
 
-        Ok(McpToolResult { content, is_error })
+                if is_error {
+                    self.record_failure(&tool.server_name, qualified_name);
+                } else {
+                    self.record_success(&tool.server_name, qualified_name);
+                }
+
+                Ok(McpToolResult { content, is_error })
+            }
+        }
     }
 
     /// Shutdown all servers

@@ -381,9 +381,11 @@ pub async fn send_message_stream(
     }
     // ── End fast acknowledgment ──────────────────────────────────────────────
 
-    let tool_snapshot = {
+    // Use quality-ranked tool list: tools with 5+ consecutive failures are pushed to the end.
+    // This ensures the LLM naturally gravitates to reliable tools first.
+    let tool_snapshot: Vec<crate::mcp::McpTool> = {
         let manager = state.lock().await;
-        manager.get_tools().to_vec()
+        manager.get_tools_ranked().into_iter().cloned().collect()
     };
 
     let mut system_prompt = brain::build_system_prompt_for_model(
@@ -555,6 +557,31 @@ pub async fn send_message_stream(
                 tokio::spawn(async move {
                     crate::emotional_intelligence::process_message_emotion(&emotion_msg, emotion_app).await;
                 });
+            }
+            // CONVERSATION SUMMARIZATION (streaming path) — 5+ turns only
+            if input_message_count >= 5 {
+                let conv_msgs: Vec<crate::providers::ChatMessage> = conversation
+                    .iter()
+                    .filter_map(|m| match m {
+                        crate::providers::ConversationMessage::User(s) => Some(crate::providers::ChatMessage {
+                            role: "user".to_string(),
+                            content: s.clone(),
+                            image_base64: None,
+                        }),
+                        crate::providers::ConversationMessage::Assistant { content, .. } => Some(crate::providers::ChatMessage {
+                            role: "assistant".to_string(),
+                            content: content.clone(),
+                            image_base64: None,
+                        }),
+                        _ => None,
+                    })
+                    .collect();
+                if !conv_msgs.is_empty() {
+                    let conv_id = format!("stream_{}", chrono::Utc::now().timestamp());
+                    tokio::spawn(async move {
+                        crate::memory_palace::summarize_conversation(&conv_msgs, &conv_id).await;
+                    });
+                }
             }
         } else {
             let _ = app.emit("blade_status", "error");
@@ -862,6 +889,33 @@ pub async fn send_message_stream(
                 let full_exchange = format!("User: {}\n\nAssistant: {}", user_text, assistant_text);
                 crate::knowledge_graph::grow_graph_from_conversation(&full_exchange).await;
             });
+            // CONVERSATION SUMMARIZATION — for 5+ turn conversations, generate a 2-sentence
+            // summary episode so "what did we discuss about X last week?" actually works.
+            // We build the full messages list from the conversation buffer for this.
+            if input_message_count >= 5 {
+                let conv_msgs: Vec<crate::providers::ChatMessage> = conversation
+                    .iter()
+                    .filter_map(|m| match m {
+                        crate::providers::ConversationMessage::User(s) => Some(crate::providers::ChatMessage {
+                            role: "user".to_string(),
+                            content: s.clone(),
+                            image_base64: None,
+                        }),
+                        crate::providers::ConversationMessage::Assistant { content, .. } => Some(crate::providers::ChatMessage {
+                            role: "assistant".to_string(),
+                            content: content.clone(),
+                            image_base64: None,
+                        }),
+                        _ => None,
+                    })
+                    .collect();
+                if !conv_msgs.is_empty() {
+                    let conv_id = format!("tool_loop_{}", chrono::Utc::now().timestamp());
+                    tokio::spawn(async move {
+                        crate::memory_palace::summarize_conversation(&conv_msgs, &conv_id).await;
+                    });
+                }
+            }
             // VIRTUAL CONTEXT BLOCKS: update rolling conversation summary (fire-and-forget)
             {
                 let vcb_user = user_text_thread.clone();
@@ -1410,6 +1464,14 @@ pub async fn mcp_server_status(
 ) -> Result<Vec<(String, bool)>, String> {
     let manager = state.lock().await;
     Ok(manager.server_status())
+}
+
+#[tauri::command]
+pub async fn mcp_server_health(
+    state: tauri::State<'_, SharedMcpManager>,
+) -> Result<Vec<crate::mcp::ServerHealth>, String> {
+    let manager = state.lock().await;
+    Ok(manager.get_server_health())
 }
 
 #[tauri::command]

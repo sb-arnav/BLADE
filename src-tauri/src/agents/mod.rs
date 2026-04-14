@@ -6,6 +6,105 @@ pub mod thought_tree;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+// ---------------------------------------------------------------------------
+// Agent Roles — specialization templates
+// ---------------------------------------------------------------------------
+
+/// Predefined agent roles that shape system prompt and tool preferences.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum AgentRole {
+    /// Web search, document reading, summarization
+    Researcher,
+    /// Code generation, debugging, file editing
+    Coder,
+    /// Data analysis, comparison, decision frameworks
+    Analyst,
+    /// Content creation, editing, formatting
+    Writer,
+    /// Code review, fact checking, quality assurance
+    Reviewer,
+}
+
+impl AgentRole {
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "researcher" => Some(Self::Researcher),
+            "coder" => Some(Self::Coder),
+            "analyst" => Some(Self::Analyst),
+            "writer" => Some(Self::Writer),
+            "reviewer" => Some(Self::Reviewer),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Researcher => "researcher",
+            Self::Coder => "coder",
+            Self::Analyst => "analyst",
+            Self::Writer => "writer",
+            Self::Reviewer => "reviewer",
+        }
+    }
+
+    /// System prompt snippet to inject for this role.
+    pub fn system_prompt_snippet(&self) -> &'static str {
+        match self {
+            Self::Researcher => {
+                "You are a Researcher agent. Your specialty is gathering information: \
+                 web searches, reading documents, and synthesizing findings into clear summaries. \
+                 Prefer breadth first — collect multiple sources before synthesizing. \
+                 Always cite where you found information."
+            }
+            Self::Coder => {
+                "You are a Coder agent. Your specialty is writing, debugging, and refactoring code. \
+                 Produce clean, well-commented, production-ready code. \
+                 Prefer precision over brevity — explain your reasoning when making architectural choices. \
+                 Always consider edge cases and error handling."
+            }
+            Self::Analyst => {
+                "You are an Analyst agent. Your specialty is structured reasoning: \
+                 comparing options, applying decision frameworks, and drawing evidence-based conclusions. \
+                 Present findings as structured lists or tables where appropriate. \
+                 Be explicit about trade-offs and assumptions."
+            }
+            Self::Writer => {
+                "You are a Writer agent. Your specialty is creating clear, engaging content: \
+                 documentation, reports, emails, and structured prose. \
+                 Match tone to context — technical for technical audiences, plain language for general ones. \
+                 Always prioritize clarity and concision."
+            }
+            Self::Reviewer => {
+                "You are a Reviewer agent. Your specialty is quality assurance: \
+                 identifying bugs, logical errors, factual mistakes, and improvement opportunities. \
+                 Be thorough but constructive. Prioritize issues by severity. \
+                 Always explain the why behind each finding."
+            }
+        }
+    }
+
+    /// Preferred tool name patterns for this role (matched by substring against tool names).
+    pub fn preferred_tool_patterns(&self) -> Vec<&'static str> {
+        match self {
+            Self::Researcher => vec!["search", "fetch", "browse", "read", "web"],
+            Self::Coder => vec!["bash", "write", "edit", "file", "code", "run"],
+            Self::Analyst => vec!["bash", "read", "search", "calc"],
+            Self::Writer => vec!["write", "edit", "read", "file"],
+            Self::Reviewer => vec!["read", "bash", "search", "file"],
+        }
+    }
+
+    /// Build a full system prompt for an agent with this role.
+    pub fn build_system_prompt(&self, base_prompt: &str) -> String {
+        format!(
+            "{}\n\n---\n**Role specialization:** {}",
+            base_prompt,
+            self.system_prompt_snippet()
+        )
+    }
+}
+
 /// An agent is a long-running task with a goal, plan, and tool access
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Agent {

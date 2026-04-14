@@ -565,6 +565,28 @@ fn build_system_prompt_inner(
         }
     }
 
+    // COMPOUNDING MEMORY — smart context recall from past summaries, KG facts, and preferences.
+    // This is what makes BLADE get smarter over time: every conversation compounds into
+    // recalled context for future ones. Injected close to the query for maximum relevance.
+    if !user_query.is_empty() {
+        let compounding = crate::embeddings::smart_context_recall(user_query);
+        if !compounding.is_empty() {
+            parts.push(compounding);
+        }
+    }
+
+    // TOP LEARNED PREFERENCES — top 3 behavioral rules BLADE has learned from feedback.
+    // Surfaced here so they're always visible to the model when generating responses.
+    {
+        let learned = crate::character::get_top_learned_preferences(3);
+        if !learned.is_empty() {
+            parts.push(format!(
+                "## Behavioral Rules (Learned from Feedback)\n\nApply these rules to every response — they come from the user's direct feedback:\n\n{}",
+                learned.iter().map(|r| format!("- {}", r)).collect::<Vec<_>>().join("\n")
+            ));
+        }
+    }
+
     // Active window context
     if let Ok(activity) = crate::context::get_user_activity() {
         parts.push(format!("## Right Now\n\n{}", activity));
