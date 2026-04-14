@@ -1318,7 +1318,6 @@ pub fn load_scan_summary() -> Option<String> {
 /// Returns the results as JSON when complete.
 #[tauri::command]
 pub async fn deep_scan_start(app: tauri::AppHandle) -> Result<DeepScanResults, String> {
-    use tauri::Manager;
 
     let emit = |phase: &str, found: usize| {
         let _ = app.emit("deep_scan_progress", serde_json::json!({
