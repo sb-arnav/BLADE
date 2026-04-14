@@ -15,7 +15,7 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
     vec![
         ToolDefinition {
             name: "blade_bash".to_string(),
-            description: "Execute a shell command and return stdout + stderr. Use for: running code, tests, git, npm/cargo/pip, file listing, system info, anything needing a shell. Prefer this over asking the user to run commands. Custom tools forged by BLADE live in ~/.blade/tools/ and can be called directly via bash (e.g. `python3 ~/.blade/tools/my_tool.py [args]`).".to_string(),
+            description: "Execute a shell command and return stdout + stderr. On Windows runs via cmd.exe (/C), on macOS/Linux via sh (-c). Use for: running code, tests, git, npm/cargo/pip, file listing, anything needing a shell. Prefer this over asking the user to run commands. Large outputs (>8 KB) are spilled to a temp file — use blade_read_file to read the full output. Custom tools forged by BLADE live in ~/.blade/tools/ and can be called directly (e.g. `python3 ~/.blade/tools/my_tool.py [args]`).".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -28,7 +28,7 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: "blade_read_file".to_string(),
-            description: "Read a file and return its contents. Use for: reading source code, configs, logs, markdown, any text file. Supports offset/limit for large files.".to_string(),
+            description: "Read a text file and return its contents. Use for: reading source code, configs, logs, markdown, any UTF-8 text file. Supports offset/limit for large files (offset = line number to start from, limit = max lines). Binary files (images, executables) will return an error — use blade_bash with a hex tool instead. Returns '(empty file)' if the file exists but has no content.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -53,7 +53,7 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: "blade_edit_file".to_string(),
-            description: "Make a surgical edit — replace old_string with new_string in a file. old_string must appear exactly once. Always prefer this over rewriting the whole file for targeted changes. Read the file first if unsure of exact content.".to_string(),
+            description: "Make a surgical edit — replace old_string with new_string in a file. old_string must match exactly (including whitespace/indentation) and must appear exactly once. Returns an error if old_string is not found or appears multiple times — in both cases, use blade_read_file first to get the exact current content. Always prefer this over blade_write_file for targeted changes to existing files.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -174,8 +174,47 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "blade_get_clipboard".to_string(),
+            description: "Read the current contents of the user's clipboard. Use when the user says 'use what's in my clipboard', 'process the text I copied', or 'what's in my clipboard'. Returns the clipboard text or an error if the clipboard is empty or contains non-text data.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        ToolDefinition {
+            name: "blade_search_files".to_string(),
+            description: "Search for text/regex across files in a directory. Use for: finding where a function is defined, searching a codebase for a string, grepping logs. Faster and more convenient than blade_bash with grep. Returns matching lines with file path and line number.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string", "description": "Text or regex pattern to search for"},
+                    "path": {"type": "string", "description": "Directory or file to search in (absolute or ~/...). Defaults to home directory."},
+                    "file_glob": {"type": "string", "description": "Only search files matching this glob, e.g. '*.rs' or '*.{ts,tsx}' (optional)"},
+                    "case_sensitive": {"type": "boolean", "description": "Case-sensitive search (default false — case-insensitive)"},
+                    "max_results": {"type": "integer", "description": "Max matching lines to return (default 50)"}
+                },
+                "required": ["pattern"]
+            }),
+        },
+        ToolDefinition {
+            name: "blade_system_info".to_string(),
+            description: "Get system information: CPU usage, RAM usage, disk space, OS version, hostname, uptime. Use when the user asks about system resources, performance, or 'how much RAM/disk do I have'.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        ToolDefinition {
+            name: "blade_time_now".to_string(),
+            description: "Get the current date and time with timezone. Use whenever you need to know what time it is — for scheduling, reminders, timestamps, or any time-aware task. Returns local time, UTC time, Unix timestamp, and timezone name.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        ToolDefinition {
             name: "blade_open_url".to_string(),
-            description: "Open a URL in the user's default browser. Always use this instead of blade_bash for opening websites, YouTube videos, or any web links. The URL must be fully qualified (start with https://).".to_string(),
+            description: "Open a URL in the user's default browser (fire-and-forget). Use this when the user wants to visit a URL — YouTube videos, docs pages, any web link. The URL must start with http:// or https://. Use blade_browser_open instead if you need to READ or INTERACT with the page afterward (blade_browser_open uses BLADE's managed Chromium session).".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -234,7 +273,7 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: "blade_screenshot".to_string(),
-            description: "LAST RESORT: take a screenshot. Prefer blade_ui_read for native apps. Only use this for games, canvas apps, or when ui_read returns nothing useful. When omitted, automatically captures the user's monitor (not BLADE's dedicated monitor if one is set).".to_string(),
+            description: "LAST RESORT: take a screenshot of the screen and return a base64-encoded PNG. Prefer blade_ui_read for native apps — it's free and instant. Only use this for games, canvas apps, PDFs, or when blade_ui_read returns nothing useful. If BLADE has a dedicated monitor configured, omitting 'monitor' automatically picks the user's screen (not BLADE's). Returns a data:image/png;base64,... string suitable for vision models.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -307,7 +346,7 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
                 "properties": {
                     "provider": {
                         "type": "string",
-                        "description": "Provider name: 'anthropic', 'openai', 'gemini', 'groq', 'ollama', or 'openai' for any OpenAI-compat provider (use with base_url)",
+                        "description": "Provider name: 'anthropic' (Claude), 'openai' (GPT / any OpenAI-compatible API — pair with base_url for DeepSeek, Copilot, etc.), 'gemini', 'groq', 'ollama'",
                         "enum": ["anthropic", "openai", "gemini", "groq", "ollama"]
                     },
                     "api_key": {"type": "string", "description": "The API key to store securely in the system keychain"},
@@ -357,7 +396,7 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
             input_schema: json!({
                 "type": "object",
                 "properties": {
-                    "url": {"type": "string", "description": "The URL to watch (must start with https://)"},
+                    "url": {"type": "string", "description": "The URL to watch (must start with http:// or https://)"},
                     "label": {"type": "string", "description": "Human-readable label for this watcher (e.g. 'Competitor pricing page')"},
                     "interval_mins": {"type": "integer", "description": "How often to check in minutes (default 30, min 5, max 1440)"}
                 },
@@ -699,6 +738,26 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
                 None => return ("Missing required argument: text".to_string(), true),
             };
             set_clipboard(text)
+        }
+        "blade_get_clipboard" => {
+            get_clipboard()
+        }
+        "blade_search_files" => {
+            let pattern = match args["pattern"].as_str() {
+                Some(p) => p,
+                None => return ("Missing required argument: pattern".to_string(), true),
+            };
+            let path = args["path"].as_str();
+            let file_glob = args["file_glob"].as_str();
+            let case_sensitive = args["case_sensitive"].as_bool().unwrap_or(false);
+            let max_results = args["max_results"].as_u64().unwrap_or(50) as usize;
+            search_files(pattern, path, file_glob, case_sensitive, max_results)
+        }
+        "blade_system_info" => {
+            system_info().await
+        }
+        "blade_time_now" => {
+            time_now()
         }
         "blade_open_url" => {
             let url = match args["url"].as_str() {
@@ -1476,8 +1535,22 @@ fn read_file(path: &str, offset: usize, limit: Option<usize>) -> (String, bool) 
     // If BLADE reads a file in a new project directory, quietly index the whole thing.
     maybe_trigger_auto_index(&expanded);
 
-    match std::fs::read_to_string(&expanded) {
-        Ok(content) => {
+    match std::fs::read(&expanded) {
+        Ok(bytes) => {
+            // Detect binary: check for null bytes in first 8KB
+            let is_binary = bytes.iter().take(8192).any(|&b| b == 0);
+            if is_binary {
+                let size = bytes.len();
+                return (
+                    format!(
+                        "Cannot read '{}' as text: binary file ({} bytes). \
+                         Use blade_bash with xxd/hexdump for binary inspection.",
+                        path, size
+                    ),
+                    true,
+                );
+            }
+            let content = String::from_utf8_lossy(&bytes).into_owned();
             let lines: Vec<&str> = content.lines().collect();
             let start = offset.min(lines.len());
             let end = limit.map(|l| (start + l).min(lines.len())).unwrap_or(lines.len());
@@ -1485,7 +1558,15 @@ fn read_file(path: &str, offset: usize, limit: Option<usize>) -> (String, bool) 
             let result = truncate(slice, MAX_OUTPUT);
             (if result.is_empty() { "(empty file)".to_string() } else { result }, false)
         }
-        Err(e) => (format!("Cannot read '{}': {}", path, e), true),
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                (format!("File not found: '{}'. Check the path and try blade_glob to find the file.", path), true)
+            } else if e.kind() == std::io::ErrorKind::PermissionDenied {
+                (format!("Permission denied reading '{}'. Try blade_bash with sudo if needed.", path), true)
+            } else {
+                (format!("Cannot read '{}': {}", path, e), true)
+            }
+        }
     }
 }
 
@@ -1670,12 +1751,257 @@ fn set_clipboard(text: &str) -> (String, bool) {
     }
 }
 
+fn get_clipboard() -> (String, bool) {
+    match arboard::Clipboard::new().and_then(|mut c| c.get_text()) {
+        Ok(text) => {
+            if text.is_empty() {
+                ("Clipboard is empty.".to_string(), false)
+            } else {
+                (truncate(text, MAX_OUTPUT), false)
+            }
+        }
+        Err(e) => (format!("Clipboard error (may be empty or contain non-text data): {}", e), true),
+    }
+}
+
+fn search_files(
+    pattern: &str,
+    path: Option<&str>,
+    file_glob: Option<&str>,
+    case_sensitive: bool,
+    max_results: usize,
+) -> (String, bool) {
+    use std::io::{BufRead, BufReader};
+
+    let home = dirs::home_dir().unwrap_or_default();
+    let base = path
+        .map(|p| expand_home(p))
+        .map(std::path::PathBuf::from)
+        .unwrap_or(home);
+
+    if !base.exists() {
+        return (format!("Path does not exist: {}", base.display()), true);
+    }
+
+    // Build the glob pattern for file matching
+    let file_pattern = file_glob.unwrap_or("*");
+    let walk_pattern = if base.is_file() {
+        base.to_string_lossy().to_string()
+    } else {
+        format!("{}/**/{}", base.to_string_lossy(), file_pattern)
+    };
+
+    let files: Vec<std::path::PathBuf> = match glob::glob(&walk_pattern) {
+        Ok(paths) => paths.filter_map(|p| p.ok()).filter(|p| p.is_file()).collect(),
+        Err(e) => return (format!("Invalid glob '{}': {}", walk_pattern, e), true),
+    };
+
+    if files.is_empty() {
+        return (format!("No files matching '{}' found in {}", file_pattern, base.display()), false);
+    }
+
+    // Compile regex
+    let regex = if case_sensitive {
+        regex::Regex::new(pattern)
+    } else {
+        regex::Regex::new(&format!("(?i){}", pattern))
+    };
+    let re = match regex {
+        Ok(r) => r,
+        Err(e) => return (format!("Invalid regex pattern '{}': {}", pattern, e), true),
+    };
+
+    let mut matches: Vec<String> = Vec::new();
+    let mut files_searched = 0usize;
+
+    'outer: for file_path in &files {
+        let file = match std::fs::File::open(file_path) {
+            Ok(f) => f,
+            Err(_) => continue,
+        };
+        let reader = BufReader::new(file);
+        files_searched += 1;
+
+        for (line_num, line_result) in reader.lines().enumerate() {
+            if matches.len() >= max_results {
+                break 'outer;
+            }
+            let line = match line_result {
+                Ok(l) => l,
+                Err(_) => break, // binary file or read error — skip
+            };
+            if re.is_match(&line) {
+                matches.push(format!(
+                    "{}:{}: {}",
+                    file_path.to_string_lossy(),
+                    line_num + 1,
+                    line.trim()
+                ));
+            }
+        }
+    }
+
+    if matches.is_empty() {
+        return (
+            format!(
+                "No matches for '{}' in {} file(s) under {}",
+                pattern, files_searched, base.display()
+            ),
+            false,
+        );
+    }
+
+    let truncated = matches.len() >= max_results;
+    let mut result = format!(
+        "{} match(es) for '{}' across {} file(s):\n\n{}",
+        matches.len(),
+        pattern,
+        files_searched,
+        matches.join("\n")
+    );
+    if truncated {
+        result.push_str(&format!("\n\n[Showing first {} results — use max_results to get more]", max_results));
+    }
+    (result, false)
+}
+
+async fn system_info() -> (String, bool) {
+    // Build system info cross-platform via shell commands for reliability.
+    let mut lines: Vec<String> = Vec::new();
+
+    // OS + hostname
+    #[cfg(target_os = "windows")]
+    {
+        let (out, _) = bash("ver", None, 5_000).await;
+        lines.push(format!("OS: {}", out.trim()));
+        let (host, _) = bash("hostname", None, 5_000).await;
+        lines.push(format!("Hostname: {}", host.trim()));
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let (out, _) = bash("uname -srm", None, 5_000).await;
+        lines.push(format!("OS: {}", out.trim()));
+        let (host, _) = bash("hostname", None, 5_000).await;
+        lines.push(format!("Hostname: {}", host.trim()));
+    }
+
+    // RAM
+    #[cfg(target_os = "windows")]
+    {
+        let (ram, _) = bash(
+            "powershell -NoProfile -Command \"$os=Get-CimInstance Win32_OperatingSystem; $total=[math]::Round($os.TotalVisibleMemorySize/1MB,1); $free=[math]::Round($os.FreePhysicalMemory/1MB,1); 'RAM: ' + ($total-$free) + ' GB used / ' + $total + ' GB total'\"",
+            None,
+            10_000,
+        ).await;
+        let ram_clean = ram.trim().to_string();
+        if !ram_clean.is_empty() && !ram_clean.starts_with('[') {
+            lines.push(ram_clean);
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let (ram, _) = bash("vm_stat | awk '/Pages free|Pages active|Pages inactive|Pages wired/' | awk '{sum+=$NF} END {print sum*4096/1073741824 \" GB used (approx)\"}'", None, 5_000).await;
+        lines.push(format!("RAM: {}", ram.trim()));
+    }
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    {
+        let (ram, _) = bash("free -h | awk 'NR==2{print \"RAM: \" $3 \" used / \" $2 \" total\"}'", None, 5_000).await;
+        lines.push(ram.trim().to_string());
+    }
+
+    // Disk
+    #[cfg(target_os = "windows")]
+    {
+        let (disk, _) = bash(
+            "powershell -NoProfile -Command \"$d=Get-PSDrive C; $free=[math]::Round($d.Free/1GB,1); $used=[math]::Round($d.Used/1GB,1); 'Disk C: ' + $free + ' GB free, ' + $used + ' GB used'\"",
+            None,
+            10_000,
+        ).await;
+        let disk_clean = disk.trim().to_string();
+        if !disk_clean.is_empty() && !disk_clean.starts_with('[') {
+            lines.push(disk_clean);
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let (disk, _) = bash("df -h / | awk 'NR==2{print \"Disk /: \" $4 \" free / \" $2 \" total (\" $5 \" used)\"}'", None, 5_000).await;
+        lines.push(disk.trim().to_string());
+    }
+
+    // CPU
+    #[cfg(target_os = "windows")]
+    {
+        let (cpu, _) = bash(
+            "powershell -NoProfile -Command \"$p=Get-CimInstance Win32_Processor; 'CPU: ' + $p.Name + ' - ' + $p.LoadPercentage + '% load'\"",
+            None,
+            10_000,
+        ).await;
+        let cpu_clean = cpu.trim().to_string();
+        if !cpu_clean.is_empty() && !cpu_clean.starts_with('[') {
+            lines.push(cpu_clean);
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let (cpu, _) = bash("sysctl -n machdep.cpu.brand_string", None, 5_000).await;
+        lines.push(format!("CPU: {}", cpu.trim()));
+    }
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    {
+        let (cpu, _) = bash("grep 'model name' /proc/cpuinfo | head -1 | cut -d: -f2", None, 5_000).await;
+        lines.push(format!("CPU: {}", cpu.trim()));
+    }
+
+    // Uptime
+    #[cfg(target_os = "windows")]
+    {
+        let (up, _) = bash(
+            "powershell -NoProfile -Command \"$boot=(Get-CimInstance Win32_OperatingSystem).LastBootUpTime; $span=(Get-Date)-$boot; 'Uptime: ' + [int]$span.TotalDays + 'd ' + $span.Hours + 'h ' + $span.Minutes + 'm'\"",
+            None,
+            10_000,
+        ).await;
+        let up_clean = up.trim().to_string();
+        if !up_clean.is_empty() && !up_clean.starts_with('[') {
+            lines.push(up_clean);
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let (up, _) = bash("uptime -p 2>/dev/null || uptime", None, 5_000).await;
+        lines.push(format!("Uptime: {}", up.trim()));
+    }
+
+    let info = lines.into_iter().filter(|l| !l.is_empty()).collect::<Vec<_>>().join("\n");
+    if info.is_empty() {
+        ("Could not retrieve system information.".to_string(), true)
+    } else {
+        (info, false)
+    }
+}
+
+fn time_now() -> (String, bool) {
+    let now = chrono::Local::now();
+    let utc_now = chrono::Utc::now();
+    let unix = utc_now.timestamp();
+    let tz_name = now.format("%Z").to_string();
+    let local_str = now.format("%Y-%m-%d %H:%M:%S").to_string();
+    let utc_str = utc_now.format("%Y-%m-%d %H:%M:%S UTC").to_string();
+    let day_of_week = now.format("%A").to_string();
+    (
+        format!(
+            "Local: {} {} ({})\nUTC:   {}\nUnix:  {}",
+            day_of_week, local_str, tz_name, utc_str, unix
+        ),
+        false,
+    )
+}
+
 /// Run a code block from the chat UI and return output as a string.
 /// Used by the "Run" button on code blocks.
 #[tauri::command]
 pub async fn run_code_block(command: String) -> Result<String, String> {
     let (output, is_error) = bash(&command, None, 30_000).await;
-    if is_error && output.contains("not found") || output.contains("command not found") {
+    if is_error && (output.contains("not found") || output.contains("command not found")) {
         return Ok(format!("[Error] {}", output));
     }
     Ok(output)
