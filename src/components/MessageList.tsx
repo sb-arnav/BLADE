@@ -53,6 +53,8 @@ interface Props {
   onRetry?: () => void;
   activeWindow?: ActiveWindowInfo | null;
   contextSuggestions?: ContextSuggestion[];
+  /** Name of the actively-executing tool, for TypingIndicator */
+  activeToolName?: string | null;
 }
 
 function sanitizeHighlightHtml(html: string): string {
@@ -210,7 +212,136 @@ class MessageBoundary extends Component<{ children: React.ReactNode }, { error: 
   }
 }
 
-const MessageBubble = memo(function MessageBubble({ msg, isLast, onRetry }: { msg: Message; isLast?: boolean; onRetry?: () => void }) {
+/** Inline tool execution card — collapsed by default, expandable */
+function ToolCard({ tool }: { tool: ToolExecution }) {
+  const [expanded, setExpanded] = useState(false);
+  const isExecuting = tool.status === "executing";
+
+  let argPreview: string | null = null;
+  let argFull: string | null = null;
+  if (tool.arguments) {
+    try {
+      const parsed = JSON.parse(tool.arguments);
+      const vals = Object.values(parsed);
+      if (vals.length > 0) {
+        argFull = JSON.stringify(parsed, null, 2);
+        const v = String(vals[0]);
+        argPreview = v.length > 50 ? v.slice(0, 48) + "…" : v;
+      }
+    } catch {
+      argPreview = tool.arguments.slice(0, 50);
+      argFull = tool.arguments;
+    }
+  }
+
+  const displayName = tool.tool_name.replace(/^blade_/, "").replace(/_/g, " ");
+  const riskColor =
+    tool.risk === "Blocked" ? "text-red-400/70 bg-red-400/5 border-red-400/15" :
+    tool.risk === "Ask"     ? "text-amber-400/70 bg-amber-400/5 border-amber-400/15" :
+                              "text-blade-muted/60 bg-blade-surface border-blade-border/60";
+
+  const statusIcon = isExecuting ? (
+    <span className={`w-1.5 h-1.5 rounded-full shrink-0 animate-pulse-slow ${
+      tool.risk === "Blocked" ? "bg-red-400" : tool.risk === "Ask" ? "bg-amber-400" : "bg-blade-accent"
+    }`} />
+  ) : tool.is_error ? (
+    <span className="text-red-400/70 text-2xs shrink-0">✗</span>
+  ) : (
+    <span className="text-emerald-400/70 text-2xs shrink-0">✓</span>
+  );
+
+  return (
+    <div className={`rounded-lg border text-2xs font-mono overflow-hidden transition-all ${riskColor}`}>
+      {/* Header row — always visible */}
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-white/[0.02] transition-colors"
+      >
+        {statusIcon}
+        <span className="shrink-0">&#128295;</span>
+        <span className="font-semibold">{displayName}</span>
+        {argPreview && !expanded && (
+          <span className="text-blade-muted/40 truncate flex-1">{argPreview}</span>
+        )}
+        {tool.completed_at && (
+          <span className="text-blade-muted/30 ml-auto shrink-0">
+            {((tool.completed_at - tool.started_at) / 1000).toFixed(1)}s
+          </span>
+        )}
+        <svg
+          viewBox="0 0 24 24"
+          className={`w-3 h-3 shrink-0 ml-1 text-blade-muted/40 transition-transform ${expanded ? "rotate-180" : ""}`}
+          fill="none" stroke="currentColor" strokeWidth="2"
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+
+      {/* Expanded detail */}
+      {expanded && (
+        <div className="border-t border-blade-border/40 bg-blade-bg/30 px-2.5 py-2 space-y-2">
+          {argFull && (
+            <div>
+              <div className="text-blade-muted/40 uppercase tracking-wide text-[9px] mb-1">Input</div>
+              <pre className="text-blade-muted/70 whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto text-[0.7rem]">
+                {argFull}
+              </pre>
+            </div>
+          )}
+          {tool.result && (
+            <div>
+              <div className={`text-[9px] uppercase tracking-wide mb-1 ${tool.is_error ? "text-red-400/50" : "text-emerald-400/50"}`}>
+                {tool.is_error ? "Error" : "Result"}
+              </div>
+              <pre className={`whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto text-[0.7rem] ${
+                tool.is_error ? "text-red-400/60" : "text-blade-muted/60"
+              }`}>
+                {tool.result}
+              </pre>
+            </div>
+          )}
+          {isExecuting && (
+            <div className="text-blade-muted/40 italic">Running...</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface MessageMetaProps {
+  msg: Message;
+  tools: ToolExecution[];
+}
+
+/** Hover metadata row shown below assistant messages */
+function MessageMeta({ msg, tools }: MessageMetaProps) {
+  const words = msg.content?.split(/\s+/).filter(Boolean).length ?? 0;
+  const time = new Date(msg.timestamp).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return (
+    <div className="flex items-center gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <span className="text-2xs text-blade-muted/50">{time}</span>
+      {words > 0 && <span className="text-2xs text-blade-muted/30">{words}w</span>}
+      {tools.length > 0 && (
+        <span className="text-2xs text-blade-muted/30 font-mono">
+          {tools.length} tool{tools.length !== 1 ? "s" : ""}
+        </span>
+      )}
+    </div>
+  );
+}
+
+const MessageBubble = memo(function MessageBubble({
+  msg,
+  isLast,
+  onRetry,
+  relatedTools,
+}: {
+  msg: Message;
+  isLast?: boolean;
+  onRetry?: () => void;
+  relatedTools: ToolExecution[];
+}) {
   const [hovered, setHovered] = useState(false);
   const [copied, setCopied] = useState(false);
   const isUser = msg.role === "user";
@@ -229,7 +360,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isLast, onRetry }: { ms
       onMouseLeave={() => setHovered(false)}
       onDoubleClick={handleDoubleClick}
     >
-      <div className={`relative ${isUser ? "max-w-[75%]" : "max-w-[85%]"}`}>
+      <div className={`relative group ${isUser ? "max-w-[75%]" : "max-w-[85%]"}`}>
         {copied && (
           <div className={`absolute -top-6 ${isUser ? "right-0" : "left-3"} text-2xs text-blade-accent animate-fade-in`}>
             copied
@@ -283,9 +414,12 @@ const MessageBubble = memo(function MessageBubble({ msg, isLast, onRetry }: { ms
                 ✦ refined
               </span>
             )}
+            {/* Message metadata — visible on hover */}
+            <MessageMeta msg={msg} tools={relatedTools} />
           </div>
         )}
-        {hovered && (
+        {/* Action tray — hover only (user messages) */}
+        {isUser && hovered && (
           <div className={`absolute -bottom-5 ${isUser ? "right-0" : "left-3"} flex items-center gap-2`}>
             <span className="text-2xs text-blade-muted/50">
               {new Date(msg.timestamp).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
@@ -295,8 +429,13 @@ const MessageBubble = memo(function MessageBubble({ msg, isLast, onRetry }: { ms
                 {msg.content.split(/\s+/).filter(Boolean).length}w
               </span>
             )}
-            {!isUser && msg.content && <CopyButton text={msg.content} label="copy" />}
-            {!isUser && isLast && onRetry && (
+          </div>
+        )}
+        {/* Assistant action tray */}
+        {!isUser && hovered && (
+          <div className="flex items-center gap-2 mt-1">
+            {msg.content && <CopyButton text={msg.content} label="copy" />}
+            {isLast && onRetry && (
               <button
                 onClick={onRetry}
                 className="text-2xs text-blade-muted hover:text-blade-accent transition-colors font-mono"
@@ -305,7 +444,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isLast, onRetry }: { ms
                 ↻
               </button>
             )}
-            {!isUser && <MessageReactions messageId={msg.id} messageContent={msg.content} visible={hovered} />}
+            {<MessageReactions messageId={msg.id} messageContent={msg.content} visible={hovered} />}
           </div>
         )}
       </div>
@@ -330,6 +469,7 @@ export function MessageList({
   onQuickAction,
   onRetry,
   activeWindow,
+  activeToolName,
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -358,9 +498,16 @@ export function MessageList({
 
   const activeTools = toolExecutions.filter((t) => t.status === "executing");
   const recentCompleted = toolExecutions.filter(
-    (t) => t.status === "completed" && t.completed_at && Date.now() - t.completed_at < 3000
+    (t) => t.status === "completed" && t.completed_at && Date.now() - t.completed_at < 4000
   );
   const focusLabel = activeWindow?.title?.trim() || activeWindow?.process_name?.trim() || null;
+
+  // Group completed tool executions by rough "response window" — all tools from
+  // the last assistant turn (since the last user message timestamp)
+  const lastUserTimestamp = [...messages].reverse().find((m) => m.role === "user")?.timestamp ?? 0;
+  const toolsForLastTurn = toolExecutions.filter(
+    (t) => t.status === "completed" && t.started_at >= lastUserTimestamp
+  );
 
   return (
     <div className="flex-1 overflow-y-auto relative" ref={scrollRef} onScroll={handleScroll}>
@@ -417,64 +564,40 @@ export function MessageList({
 
         {messages.map((msg, idx) => {
           const isLastAssistant = msg.role === "assistant" && idx === messages.length - 1;
+          // Attribute completed tools to assistant messages that came after them
+          const nextMsg = messages[idx + 1];
+          const msgEnd = nextMsg?.timestamp ?? Date.now();
+          const related = msg.role === "assistant"
+            ? toolsForLastTurn.filter(
+                (t) => t.started_at >= (messages[idx - 1]?.timestamp ?? 0) && t.started_at < msgEnd
+              )
+            : [];
           return (
             <div key={msg.id}>
               {shouldShowDateSeparator(messages, idx) && (
                 <DateSeparator timestamp={msg.timestamp} />
               )}
               <MessageBoundary>
-                <MessageBubble msg={msg} isLast={isLastAssistant} onRetry={isLastAssistant ? onRetry : undefined} />
+                <MessageBubble
+                  msg={msg}
+                  isLast={isLastAssistant}
+                  onRetry={isLastAssistant ? onRetry : undefined}
+                  relatedTools={related}
+                />
               </MessageBoundary>
             </div>
           );
         })}
 
+        {/* Inline tool execution cards for active / recently completed tools */}
         {(activeTools.length > 0 || recentCompleted.length > 0) && (
           <div className="flex justify-start animate-fade-in">
-            <div className="pl-3 border-l-2 border-blade-border space-y-1">
-              {activeTools.map((tool) => {
-                // Parse argument preview: extract the first key's value from JSON
-                let argPreview: string | null = null;
-                if (tool.arguments) {
-                  try {
-                    const parsed = JSON.parse(tool.arguments);
-                    const vals = Object.values(parsed);
-                    if (vals.length > 0) {
-                      const v = String(vals[0]);
-                      argPreview = v.length > 40 ? v.slice(0, 38) + "…" : v;
-                    }
-                  } catch {
-                    argPreview = tool.arguments.slice(0, 40);
-                  }
-                }
-                return (
-                  <div key={tool.id} className="flex items-center gap-2 py-0.5 text-xs text-blade-muted">
-                    <div className={`w-1 h-1 rounded-full animate-pulse-slow shrink-0 ${
-                      tool.risk === "Blocked" ? "bg-red-400" : tool.risk === "Ask" ? "bg-amber-400" : "bg-blade-accent"
-                    }`} />
-                    <span className="font-mono text-2xs shrink-0">{tool.tool_name}</span>
-                    {argPreview && (
-                      <span className="text-2xs text-blade-muted/40 font-mono truncate max-w-[200px]">{argPreview}</span>
-                    )}
-                  </div>
-                );
-              })}
+            <div className="pl-3 border-l-2 border-blade-border space-y-1.5 w-full max-w-lg">
+              {activeTools.map((tool) => (
+                <ToolCard key={tool.id} tool={tool} />
+              ))}
               {recentCompleted.map((tool) => (
-                <div key={tool.id} className="py-0.5">
-                  <div className="flex items-center gap-2 text-xs text-blade-muted/50">
-                    <span className={`text-2xs shrink-0 ${tool.is_error ? "text-red-400/60" : "text-emerald-400/60"}`}>
-                      {tool.is_error ? "\u2717" : "\u2713"}
-                    </span>
-                    <span className="font-mono text-2xs">{tool.tool_name}</span>
-                  </div>
-                  {tool.result && (
-                    <div className={`mt-0.5 ml-4 text-2xs font-mono leading-relaxed whitespace-pre-wrap break-all max-h-16 overflow-hidden ${
-                      tool.is_error ? "text-red-400/50" : "text-blade-muted/40"
-                    }`}>
-                      {tool.result}
-                    </div>
-                  )}
-                </div>
+                <ToolCard key={tool.id} tool={tool} />
               ))}
             </div>
           </div>
@@ -482,7 +605,7 @@ export function MessageList({
 
         {loading && activeTools.length === 0 && recentCompleted.length === 0 && (
           <div className="flex justify-start">
-            <TypingIndicator visible />
+            <TypingIndicator visible activeToolName={activeToolName} />
           </div>
         )}
         <div ref={bottomRef} />

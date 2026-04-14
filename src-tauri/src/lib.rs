@@ -70,6 +70,7 @@ mod rag;
 mod reports;
 mod router;
 mod runtimes;
+mod audio_timeline;
 mod screen;
 mod screen_timeline;
 mod screen_timeline_commands;
@@ -116,6 +117,8 @@ mod security_monitor;
 mod health_guardian;
 mod temporal_intel;
 mod iot_bridge;
+mod typed_memory;
+mod personality_mirror;
 
 use chrono::Timelike;
 use std::sync::Arc;
@@ -734,6 +737,12 @@ pub fn run() {
             screen_timeline_commands::timeline_set_config,
             screen_timeline_commands::timeline_get_stats_cmd,
             screen_timeline_commands::timeline_cleanup,
+            screen_timeline_commands::timeline_search_everything,
+            screen_timeline_commands::timeline_get_audio,
+            screen_timeline_commands::timeline_meeting_summary,
+            screen_timeline_commands::timeline_get_action_items,
+            screen_timeline_commands::timeline_set_audio_capture,
+            screen_timeline_commands::timeline_detect_meeting,
             swarm_commands::swarm_create,
             swarm_commands::swarm_list,
             swarm_commands::swarm_get,
@@ -785,6 +794,12 @@ pub fn run() {
             memory_palace::memory_add_manual,
             memory_palace::memory_delete,
             memory_palace::memory_consolidate_now,
+            // Typed Memory — Omi-inspired structured memory categories
+            typed_memory::memory_store_typed,
+            typed_memory::memory_recall_category,
+            typed_memory::memory_get_all_typed,
+            typed_memory::memory_delete_typed,
+            typed_memory::memory_generate_user_summary,
             // Tool Forge — self-expanding capability engine
             tool_forge::forge_new_tool,
             tool_forge::forge_list_tools,
@@ -1000,6 +1015,10 @@ pub fn run() {
             security_monitor::security_scan_sensitive_files,
             security_monitor::security_check_url,
             security_monitor::security_overview,
+            // Security Monitor — Phase 10 Decepticon-inspired chained pipeline
+            security_monitor::security_run_audit,
+            security_monitor::security_audit_deps,
+            security_monitor::security_scan_code,
             // Financial Brain — Phase 8A CSV import + analytics
             financial_brain::finance_import_csv,
             financial_brain::finance_auto_categorize,
@@ -1020,6 +1039,10 @@ pub fn run() {
             iot_bridge::spotify_now_playing_cmd,
             iot_bridge::spotify_play_pause_cmd,
             iot_bridge::spotify_next_cmd,
+            // Personality Mirror -- chat-style extraction + injection
+            personality_mirror::personality_analyze,
+            personality_mirror::personality_import_chats,
+            personality_mirror::personality_get_profile,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
@@ -1167,6 +1190,11 @@ pub fn run() {
             } else if startup_god_config.screen_timeline_enabled {
                 // Timeline can run independently of god mode
                 screen_timeline::start_timeline_capture_loop(app.handle().clone());
+            }
+
+            // Start always-on audio capture if enabled
+            if startup_god_config.audio_capture_enabled {
+                audio_timeline::start_audio_timeline_capture(app.handle().clone());
             }
 
             // Start wake word listener if enabled

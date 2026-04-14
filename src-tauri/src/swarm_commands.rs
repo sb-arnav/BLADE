@@ -148,6 +148,10 @@ fn select_provider_for_task(
         "coder" => routing.code.as_deref(),
         "researcher" | "analyst" => routing.fast.as_deref(),
         "writer" | "reviewer" => routing.creative.as_deref().or(routing.code.as_deref()),
+        // Security roles: use the configured code/fast provider (prefer depth over speed)
+        "securityrecon" | "security_recon" | "recon" => routing.fast.as_deref(),
+        "securityanalyst" | "security_analyst" => routing.code.as_deref().or(routing.fast.as_deref()),
+        "securityauditor" | "security_auditor" | "auditor" => routing.code.as_deref(),
         _ => None,
     };
 

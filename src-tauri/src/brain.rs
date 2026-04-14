@@ -236,6 +236,11 @@ fn build_system_prompt_inner(
         parts.push(format!("## Identity\n\n{}", identity_block));
     }
 
+    // Personality mirror — match the user's communication style
+    if let Some(personality_injection) = crate::personality_mirror::get_personality_injection() {
+        parts.push(personality_injection);
+    }
+
     // Core identity reference — tools, workflows, OS-specific notes, personalisation.
     // Rules live in BLADE.md above; this section is the "body" (how to use tools, etc.)
     parts.push(build_identity(&config, provider, model));
@@ -433,6 +438,25 @@ fn build_system_prompt_inner(
     let memory_ctx = crate::memory_palace::get_memory_context(user_query);
     if !memory_ctx.is_empty() {
         parts.push(memory_ctx);
+    }
+
+    // Typed Memory — Omi-inspired structured facts/preferences/goals proactively surfaced
+    // from the current conversation context tags. Top 3 most relevant are injected here.
+    if !user_query.is_empty() {
+        // Derive context tags from the user query: split into significant words (4+ chars)
+        let context_tags: Vec<String> = user_query
+            .split_whitespace()
+            .filter(|w| w.len() >= 4)
+            .map(|w| w.to_lowercase().trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+            .filter(|w| !w.is_empty())
+            .collect();
+
+        if !context_tags.is_empty() {
+            let typed_ctx = crate::typed_memory::get_typed_memory_context(&context_tags);
+            if !typed_ctx.is_empty() {
+                parts.push(typed_ctx);
+            }
+        }
     }
 
     // Knowledge graph — semantic concept network (related concepts and their connections)

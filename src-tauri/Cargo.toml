@@ -38,6 +38,7 @@ arboard = "3"
 chrono = "0.4"
 keyring = { version = "3", features = ["windows-native", "apple-native", "sync-secret-service"] }
 rusqlite = { version = "0.39", features = ["bundled"] }
+csv = "1"
 cpal = "0.15"
 hound = "3.5"
 xcap = "0.9.4"

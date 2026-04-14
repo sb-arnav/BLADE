@@ -24,6 +24,12 @@ pub enum AgentRole {
     Writer,
     /// Code review, fact checking, quality assurance
     Reviewer,
+    /// Network scanning, port discovery, service enumeration
+    SecurityRecon,
+    /// Vulnerability assessment, risk scoring, CVE correlation
+    SecurityAnalyst,
+    /// Code review for security issues, dependency audit
+    SecurityAuditor,
 }
 
 impl AgentRole {
@@ -34,6 +40,9 @@ impl AgentRole {
             "analyst" => Some(Self::Analyst),
             "writer" => Some(Self::Writer),
             "reviewer" => Some(Self::Reviewer),
+            "securityrecon" | "security_recon" | "recon" => Some(Self::SecurityRecon),
+            "securityanalyst" | "security_analyst" => Some(Self::SecurityAnalyst),
+            "securityauditor" | "security_auditor" | "auditor" => Some(Self::SecurityAuditor),
             _ => None,
         }
     }
@@ -45,6 +54,9 @@ impl AgentRole {
             Self::Analyst => "analyst",
             Self::Writer => "writer",
             Self::Reviewer => "reviewer",
+            Self::SecurityRecon => "securityrecon",
+            Self::SecurityAnalyst => "securityanalyst",
+            Self::SecurityAuditor => "securityauditor",
         }
     }
 
@@ -81,6 +93,34 @@ impl AgentRole {
                  Be thorough but constructive. Prioritize issues by severity. \
                  Always explain the why behind each finding."
             }
+            Self::SecurityRecon => {
+                "You are a SecurityRecon agent. Your specialty is passive and active reconnaissance: \
+                 network scanning, port discovery, service enumeration, banner grabbing, and \
+                 mapping the attack surface of a target scope. \
+                 Use tools like nmap, masscan, netstat, and service probes. \
+                 Always document every open port, running service, and detected version. \
+                 Produce structured findings: host → port → service → version → notes. \
+                 Work only on authorized targets (owned systems, CTF environments, pentest scopes)."
+            }
+            Self::SecurityAnalyst => {
+                "You are a SecurityAnalyst agent. Your specialty is vulnerability assessment: \
+                 correlating recon findings against known CVEs, scoring risk using CVSS, \
+                 identifying exploit chains, and prioritizing remediation. \
+                 You receive structured recon data and produce a prioritized risk register. \
+                 For each finding: assign severity (critical/high/medium/low), cite relevant CVEs, \
+                 describe the attack vector, and recommend a concrete fix. \
+                 Be precise about CVSS scores. Flag quick wins (easy to exploit, high impact) first."
+            }
+            Self::SecurityAuditor => {
+                "You are a SecurityAuditor agent. Your specialty is code and dependency security review: \
+                 finding SQL injection, XSS, command injection, hardcoded secrets, insecure cryptography, \
+                 path traversal, SSRF, and insecure deserialization in source code. \
+                 Also audit dependencies: flag packages with known CVEs, outdated versions, and \
+                 abandoned libraries. For each finding: provide the file path, line number, \
+                 a clear description of the vulnerability class, the risk level, and a concrete \
+                 code-level fix suggestion. Use semgrep patterns, gitleaks rules, and OWASP Top 10 \
+                 as your reference framework."
+            }
         }
     }
 
@@ -92,6 +132,9 @@ impl AgentRole {
             Self::Analyst => vec!["bash", "read", "search", "calc"],
             Self::Writer => vec!["write", "edit", "read", "file"],
             Self::Reviewer => vec!["read", "bash", "search", "file"],
+            Self::SecurityRecon => vec!["bash", "network", "scan", "port", "fetch"],
+            Self::SecurityAnalyst => vec!["bash", "search", "read", "fetch", "cve"],
+            Self::SecurityAuditor => vec!["read", "bash", "file", "search", "write"],
         }
     }
 

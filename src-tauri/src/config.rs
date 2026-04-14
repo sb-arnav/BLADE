@@ -131,6 +131,8 @@ struct DiskConfig {
     /// Home Assistant base URL, e.g. "http://homeassistant.local:8123" (empty = disabled)
     #[serde(default)]
     ha_base_url: String,
+    #[serde(default)]
+    audio_capture_enabled: bool,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -193,6 +195,7 @@ impl Default for DiskConfig {
             integration_polling_enabled: false,
             tts_speed: 1.0,
             ha_base_url: String::new(),
+            audio_capture_enabled: false,
             api_key: None,
         }
     }
@@ -283,6 +286,9 @@ pub struct BladeConfig {
     /// Home Assistant base URL, e.g. "http://homeassistant.local:8123" (empty = disabled)
     #[serde(default)]
     pub ha_base_url: String,
+    /// Always-on audio capture alongside screenshots (Omi-style)
+    #[serde(default)]
+    pub audio_capture_enabled: bool,
 }
 
 impl BladeConfig {
@@ -333,6 +339,7 @@ impl Default for BladeConfig {
             integration_polling_enabled: false,
             tts_speed: 1.0,
             ha_base_url: String::new(),
+            audio_capture_enabled: false,
         }
     }
 }
@@ -447,6 +454,7 @@ pub fn load_config() -> BladeConfig {
         integration_polling_enabled: disk.integration_polling_enabled,
         tts_speed: disk.tts_speed,
         ha_base_url: disk.ha_base_url,
+        audio_capture_enabled: disk.audio_capture_enabled,
     }
 }
 
@@ -493,6 +501,7 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         integration_polling_enabled: config.integration_polling_enabled,
         tts_speed: config.tts_speed,
         ha_base_url: config.ha_base_url.clone(),
+        audio_capture_enabled: config.audio_capture_enabled,
         api_key: None,
     };
 

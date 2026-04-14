@@ -23,6 +23,26 @@ interface ProviderEntry {
   keyPlaceholder?: string;
 }
 
+// ── Smart API key detection ────────────────────────────────────────────────
+
+function detectProvider(key: string): { provider: string; model: string } | null {
+  if (key.startsWith("sk-or-v1-")) return { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free" };
+  if (key.startsWith("sk-ant-")) return { provider: "anthropic", model: "claude-sonnet-4-20250514" };
+  if (key.startsWith("sk-")) return { provider: "openai", model: "gpt-4o-mini" };
+  if (key.startsWith("gsk_")) return { provider: "groq", model: "llama-3.3-70b-versatile" };
+  if (key.startsWith("AIza")) return { provider: "gemini", model: "gemini-2.0-flash" };
+  return null;
+}
+
+const PROVIDER_FREE_TIER: Record<string, string> = {
+  openrouter: "Free models available",
+  gemini: "Generous free tier",
+  groq: "Free tier available",
+  ollama: "Completely free (local)",
+  openai: "Paid only",
+  anthropic: "Paid only",
+};
+
 // Every provider that speaks OpenAI-compatible format routes through
 // providers/openai.rs automatically when base_url is set.
 const PROVIDER_MATRIX: ProviderEntry[] = [
@@ -634,6 +654,8 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
   const [rescanRunning, setRescanRunning] = useState(false);
   const [rescanStatus, setRescanStatus] = useState<string | null>(null);
   const [rescanError, setRescanError] = useState<string | null>(null);
+  const [openrouterRoute, setOpenrouterRoute] = useState("auto");
+  const [detectedToast, setDetectedToast] = useState<string | null>(null);
 
   useEffect(() => {
     setProvider(config.provider);
@@ -863,14 +885,14 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
               <p className="text-sm font-medium">God Mode</p>
               <p className="text-xs text-blade-muted mt-0.5">Blade scans your machine and injects live context — files, apps, clipboard — into every conversation. Short prompts work because Blade already knows what you're doing.</p>
             </div>
-            <div className="grid grid-cols-4 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
               {(["off", "normal", "intermediate", "extreme"] as const).map((tier) => {
                 const labels: Record<string, string> = { off: "Off", normal: "Normal", intermediate: "Focused", extreme: "GOD MODE" };
                 const descs: Record<string, string> = {
                   off: "Disabled",
-                  normal: "5 min scan",
-                  intermediate: "2 min + clipboard",
-                  extreme: "1 min · full autonomy",
+                  normal: "Scans files, apps, repos every 5 min",
+                  intermediate: "All above + clipboard, active window, error detection every 2 min",
+                  extreme: "All above + screen OCR, proactive actions, autonomous decisions every 1 min",
                 };
                 const active = godModeTier === tier;
                 return (
@@ -884,7 +906,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
                         await invoke("toggle_god_mode", { enabled, tier: enabled ? tier : null });
                       } catch { /* ignore */ }
                     }}
-                    className={`flex flex-col items-center gap-0.5 rounded-xl border px-2 py-2 text-center transition-colors ${
+                    className={`flex flex-col items-start gap-0.5 rounded-xl border px-3 py-2.5 text-left transition-colors ${
                       active
                         ? tier === "extreme"
                           ? "border-orange-500 bg-orange-500/10 text-orange-400"
@@ -893,7 +915,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
                     }`}
                   >
                     <span className="text-xs font-semibold">{labels[tier]}</span>
-                    <span className="text-[10px] leading-tight opacity-70">{descs[tier]}</span>
+                    <span className="text-[9px] leading-tight opacity-70">{descs[tier]}</span>
                   </button>
                 );
               })}
@@ -1136,6 +1158,11 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             <p className="text-sm font-semibold truncate">
               {selectedEntry?.name ?? provider} <span className="font-mono text-blade-muted font-normal text-xs">· {model || "no model"}</span>
             </p>
+            {provider && PROVIDER_FREE_TIER[provider] && (
+              <p className={`text-[9px] mt-0.5 ${!PROVIDER_FREE_TIER[provider].includes("Paid") ? "text-emerald-400/70" : "text-blade-muted/50"}`}>
+                {PROVIDER_FREE_TIER[provider]}
+              </p>
+            )}
           </div>
           {testState === "testing" && (
             <span className="text-[10px] px-2 py-1 rounded-full border border-blade-muted/30 text-blade-muted animate-pulse">testing…</span>
@@ -1144,10 +1171,10 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             <span className="text-[10px] px-2 py-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-400">● connected</span>
           )}
           {testState === "error" && (
-            <span className="text-[10px] px-2 py-1 rounded-full border border-red-500/40 bg-red-500/10 text-red-400">✕ error</span>
+            <span className="text-[10px] px-2 py-1 rounded-full border border-red-500/40 bg-red-500/10 text-red-400" title={testMessage ?? undefined}>✕ error</span>
           )}
           {testState === "idle" && (
-            <span className="text-[10px] px-2 py-1 rounded-full border border-blade-border text-blade-muted/50">not tested</span>
+            <span className="text-[10px] px-2 py-1 rounded-full border border-blade-border text-blade-muted/50">save to test</span>
           )}
         </div>
 
@@ -1160,14 +1187,19 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             <div className="grid grid-cols-2 gap-1.5">
               {PROVIDER_MATRIX.filter(e => !e.baseUrl && e.id !== "ollama").map((entry, i) => {
                 const isSelected = selectedEntry?.name === entry.name && selectedEntry?.baseUrl === entry.baseUrl;
+                const freeTier = PROVIDER_FREE_TIER[entry.id];
+                const isFree = freeTier && !freeTier.includes("Paid");
                 return (
                   <button key={i} type="button"
                     onClick={() => { setSelectedEntry(entry); setProvider(entry.id); if (entry.model) setModel(entry.model); setBaseUrl(entry.baseUrl ?? ""); setTestState("idle"); setTestMessage(null); }}
                     className={`flex items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors ${isSelected ? "border-blade-accent bg-blade-accent/10" : "border-blade-border hover:border-blade-accent/40"}`}
                   >
-                    <div>
+                    <div className="flex-1 min-w-0">
                       <p className={`text-xs font-semibold leading-tight ${isSelected ? "text-blade-accent" : "text-blade-text"}`}>{entry.name}</p>
                       <p className="text-[9px] text-blade-muted/60 font-mono mt-0.5 truncate max-w-[120px]">{entry.model}</p>
+                      {freeTier && (
+                        <p className={`text-[8px] mt-0.5 ${isFree ? "text-emerald-400/80" : "text-blade-muted/50"}`}>{freeTier}</p>
+                      )}
                     </div>
                     <div className="flex flex-col items-end gap-1 ml-1">
                       {entry.badges.slice(0, 2).map(b => (
@@ -1217,9 +1249,10 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
                     onClick={() => { setSelectedEntry(entry); setProvider(entry.id); if (entry.model) setModel(entry.model); setBaseUrl(""); setTestState("idle"); setTestMessage(null); }}
                     className={`flex items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors ${isSelected ? "border-blade-accent bg-blade-accent/10" : "border-blade-border hover:border-blade-accent/40"}`}
                   >
-                    <div>
+                    <div className="flex-1 min-w-0">
                       <p className={`text-xs font-semibold leading-tight ${isSelected ? "text-blade-accent" : "text-blade-text"}`}>{entry.name}</p>
                       <p className="text-[9px] text-blade-muted/60 font-mono mt-0.5">{entry.model}</p>
+                      <p className="text-[8px] text-emerald-400/80 mt-0.5">Completely free (local)</p>
                     </div>
                     <div className="flex flex-col items-end gap-1 ml-1">
                       {entry.badges.slice(0, 2).map(b => (
@@ -1251,7 +1284,27 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
                   <input
                     type={showKey ? "text" : "password"}
                     value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setApiKey(val);
+                      setTestState("idle");
+                      setTestMessage(null);
+                      const detected = detectProvider(val.trim());
+                      if (detected) {
+                        const entry = PROVIDER_MATRIX.find(p => p.id === detected.provider && !p.baseUrl);
+                        if (entry) { setSelectedEntry(entry); setProvider(detected.provider); setBaseUrl(""); }
+                        setModel(detected.model);
+                        const providerNames: Record<string, string> = {
+                          openrouter: "OpenRouter — set model to llama-3.3-70b (free)",
+                          anthropic: "Anthropic — set model to Claude Sonnet 4",
+                          openai: "OpenAI — set model to gpt-4o-mini",
+                          groq: "Groq — set model to llama-3.3-70b",
+                          gemini: "Gemini — set model to gemini-2.0-flash",
+                        };
+                        setDetectedToast(`Detected ${providerNames[detected.provider] ?? detected.provider}`);
+                        setTimeout(() => setDetectedToast(null), 4000);
+                      }
+                    }}
                     className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 pr-9 text-sm outline-none font-mono focus:border-blade-accent/50 transition-colors"
                     placeholder={selectedEntry?.keyPlaceholder ?? "your-api-key"}
                   />
@@ -1284,6 +1337,33 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
                 className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none font-mono focus:border-blade-accent/50 transition-colors"
                 placeholder="https://api.example.com/v1"
               />
+            </label>
+          )}
+
+          {/* Smart paste toast */}
+          {detectedToast && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blade-accent/10 border border-blade-accent/30 text-blade-accent text-xs">
+              <svg viewBox="0 0 16 16" className="w-3.5 h-3.5 shrink-0" fill="currentColor"><path d="M13.354 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+              {detectedToast}
+            </div>
+          )}
+
+          {/* OpenRouter route preference */}
+          {provider === "openrouter" && (
+            <label className="space-y-1.5 block">
+              <span className="text-[9px] uppercase tracking-widest text-blade-muted">Route through</span>
+              <select
+                value={openrouterRoute}
+                onChange={(e) => setOpenrouterRoute(e.target.value)}
+                className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none focus:border-blade-accent/50 transition-colors"
+              >
+                <option value="auto">Auto (OpenRouter picks best)</option>
+                <option value="azure">Azure</option>
+                <option value="aws-bedrock">AWS Bedrock</option>
+                <option value="google-cloud">Google Cloud</option>
+                <option value="direct">Direct (provider API)</option>
+              </select>
+              <p className="text-[9px] text-blade-muted/60">Sets <code className="font-mono">provider.order</code> in the OpenRouter request.</p>
             </label>
           )}
 
