@@ -870,7 +870,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
                   off: "Disabled",
                   normal: "5 min scan",
                   intermediate: "2 min + clipboard",
-                  extreme: "1 min · full JARVIS",
+                  extreme: "1 min · full autonomy",
                 };
                 const active = godModeTier === tier;
                 return (

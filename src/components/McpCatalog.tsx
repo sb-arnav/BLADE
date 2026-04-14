@@ -37,7 +37,7 @@ const CATALOG: CatalogEntry[] = [
       { key: "GOOGLE_CLIENT_SECRET", label: "Client Secret", placeholder: "GOCSPX-..." },
       { key: "GOOGLE_REFRESH_TOKEN", label: "Refresh Token", placeholder: "1//..." },
     ],
-    badge: "🔥 JARVIS",
+    badge: "🔥 BLADE",
   },
   {
     id: "gmail",
@@ -53,7 +53,7 @@ const CATALOG: CatalogEntry[] = [
       { key: "GOOGLE_CLIENT_SECRET", label: "Client Secret", placeholder: "GOCSPX-..." },
       { key: "GOOGLE_REFRESH_TOKEN", label: "Refresh Token", placeholder: "1//..." },
     ],
-    badge: "🔥 JARVIS",
+    badge: "🔥 BLADE",
   },
   {
     id: "slack",
@@ -68,7 +68,7 @@ const CATALOG: CatalogEntry[] = [
       { key: "SLACK_BOT_TOKEN", label: "Slack Bot Token", placeholder: "xoxb-...", url: "https://api.slack.com/apps" },
       { key: "SLACK_TEAM_ID", label: "Team ID (optional)", placeholder: "T01234..." },
     ],
-    badge: "🔥 JARVIS",
+    badge: "🔥 BLADE",
   },
   {
     id: "notion",
@@ -110,7 +110,7 @@ const CATALOG: CatalogEntry[] = [
     envVars: [
       { key: "GITHUB_PERSONAL_ACCESS_TOKEN", label: "GitHub PAT", placeholder: "ghp_...", url: "https://github.com/settings/tokens" },
     ],
-    badge: "🔥 JARVIS",
+    badge: "🔥 BLADE",
   },
   {
     id: "gitlab",

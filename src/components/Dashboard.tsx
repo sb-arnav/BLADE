@@ -625,7 +625,7 @@ export function Dashboard({ onBack, onNavigate }: Props) {
         style={{ color: p.cyan, backgroundColor: p.bg, textShadow: `0 0 10px ${p.cyan}88` }}
       >
         <span style={{ animation: "db-blink 0.9s steps(2,end) infinite" }}>
-          Initializing JARVIS HUD...
+          Initializing BLADE HUD...
         </span>
       </div>
     );

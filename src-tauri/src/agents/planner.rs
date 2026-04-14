@@ -69,7 +69,7 @@ pub async fn plan_full(
     };
 
     let prompt = format!(
-        r#"You are a JARVIS-style task planner. Break this goal into concrete, executable subtasks.
+        r#"You are BLADE's task planner. Break this goal into concrete, executable subtasks.
 
 Goal: {}
 

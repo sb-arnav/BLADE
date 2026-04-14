@@ -1,4 +1,4 @@
-/// God Mode v2 — JARVIS-level ambient intelligence.
+/// God Mode v2 — BLADE's ambient intelligence layer.
 ///
 /// Three tiers, each building on the previous:
 ///   Normal       — 5 min: intelligence brief (3 lines), system vitals, active context
@@ -453,7 +453,7 @@ fn build_intelligence_brief(
 
     // ── Extreme: proactive directives ──
     if tier == "extreme" {
-        lines.push("\n**Mode: JARVIS** — Proactive. Anticipate. Execute. Don't wait for instructions.".to_string());
+        lines.push("\n**Mode: BLADE Extreme** — Proactive. Anticipate. Execute. Don't wait for instructions.".to_string());
     }
 
     lines.join("\n")

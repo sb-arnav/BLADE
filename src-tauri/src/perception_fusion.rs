@@ -1,4 +1,4 @@
-/// Perception Fusion — JARVIS-level sensory integration layer.
+/// Perception Fusion — BLADE's sensory integration layer.
 ///
 /// Every God Mode tick calls `update_perception()` which fuses all available
 /// signals (active window, clipboard, screen OCR, system vitals, idle state)
