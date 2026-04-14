@@ -108,6 +108,9 @@ mod browser_agent;
 mod perception_fusion;
 mod decision_gate;
 mod deep_scan;
+mod integration_bridge;
+mod system_control;
+mod notification_listener;
 
 use chrono::Timelike;
 use std::sync::Arc;
@@ -937,9 +940,11 @@ pub fn run() {
             emotional_intelligence::emotion_get_context,
             // Browser Native — embedded browser sessions
             browser_native::browser_session_status,
+            browser_native::connect_to_user_browser,
             config::toggle_background_ai,
-            // Browser Agent — HTTP-based browser automation (Navigate, ReadPage; Click/Type/Screenshot stub Playwright)
+            // Browser Agent — CDP-backed browser automation + autonomous agent loop
             browser_agent::browser_action,
+            browser_agent::browser_agent_loop,
             // Perception Fusion — fused sensory state for God Mode JARVIS layer
             perception_fusion::perception_get_latest,
             perception_fusion::perception_update,
@@ -954,6 +959,25 @@ pub fn run() {
             deep_scan::deep_scan_start,
             deep_scan::deep_scan_results,
             deep_scan::deep_scan_summary,
+            // Integration Bridge — Phase 4 MCP real-world integrations
+            integration_bridge::integration_get_state,
+            integration_bridge::integration_toggle,
+            integration_bridge::integration_poll_now,
+            // System Control — Phase 7 autonomous desktop management
+            system_control::lock_screen,
+            system_control::sleep_computer,
+            system_control::set_brightness,
+            system_control::set_volume,
+            system_control::launch_app,
+            system_control::kill_app,
+            system_control::list_running_apps,
+            system_control::focus_window,
+            system_control::minimize_all,
+            system_control::get_battery_status,
+            system_control::get_network_status,
+            // Notification Listener — Phase 5 partial
+            notification_listener::notification_get_recent,
+            notification_listener::notification_listener_start,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
@@ -1133,6 +1157,17 @@ pub fn run() {
 
             // Workflow Builder scheduler — checks every 60s for due scheduled workflows
             workflow_builder::start_workflow_scheduler(app.handle().clone());
+
+            // Integration Bridge — Phase 4 MCP always-on service polling
+            if startup_god_config.integration_polling_enabled {
+                let integration_app = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    integration_bridge::start_integration_polling(integration_app).await;
+                });
+            }
+
+            // Notification Listener — Phase 5 partial: poll OS notifications every 30s
+            notification_listener::notification_listener_start(app.handle().clone());
 
             // Register shortcuts from config (or defaults)
             register_all_shortcuts(app.handle());

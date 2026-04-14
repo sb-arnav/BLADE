@@ -1,23 +1,16 @@
 // src-tauri/src/browser_agent.rs
 //
-// Browser automation foundation for BLADE.
+// Browser automation agent for BLADE — Phase 1 of the JARVIS plan.
 //
-// Inspired by browser-use (vendor/browser-use/browser_use/) which defines
-// a clean action enum — Navigate, Click, Type, Screenshot, ReadPage, WaitFor —
-// that an LLM-driven agent dispatches step by step.
+// All browser actions are now backed by the CDP layer in browser_native.rs.
+// The old HTTP-only stubs for Click/Type/Screenshot/WaitFor have been replaced
+// with real implementations.
 //
-// Current implementation:
-//   Navigate  — HTTP GET via reqwest, returns final URL + page title
-//   ReadPage  — HTTP GET, strips HTML tags, returns readable text content
-//
-// Stubs (require Playwright/CDP integration):
-//   Click, Type, Screenshot, WaitFor — return a clear "not implemented" message
-//   so the LLM can fall back gracefully.
-//
-// Tool definitions are provided for the LLM to call these as native tools.
+// The agent loop drives a vision LLM (screenshot + goal + history → next action)
+// and emits "browser_agent_step" events to the frontend after each step.
 
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use tauri::Emitter;
 
 // ── Action enum ───────────────────────────────────────────────────────────────
 
@@ -26,292 +19,87 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case")]
 pub enum BrowserAction {
-    /// Navigate to a URL (HTTP GET)
+    /// Navigate to a URL
     Navigate { url: String },
-    /// Click a CSS selector — requires Playwright
+    /// Click a CSS selector
     Click { selector: String },
-    /// Type text into a CSS selector — requires Playwright
+    /// Type text into a CSS selector
     Type { selector: String, text: String },
-    /// Take a screenshot — requires Playwright
+    /// Take a screenshot of the current page
     Screenshot,
-    /// Fetch and return readable page text (HTTP GET + HTML strip)
+    /// Navigate to URL and return readable page text
     ReadPage { url: String },
-    /// Wait for a CSS selector to appear — requires Playwright
+    /// Wait for a CSS selector to appear (polls every 500 ms, up to 10 s)
     WaitFor { selector: String },
+    /// Signal the agent loop that the goal has been achieved
+    Done { summary: String },
 }
 
-// ── HTTP helpers ──────────────────────────────────────────────────────────────
+// ── Session helpers ───────────────────────────────────────────────────────────
 
-fn make_client() -> Result<Client, String> {
-    reqwest::Client::builder()
-        .user_agent(
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) \
-             AppleWebKit/537.36 (KHTML, like Gecko) \
-             Chrome/124.0.0.0 Safari/537.36",
-        )
-        .timeout(std::time::Duration::from_secs(20))
-        .redirect(reqwest::redirect::Policy::limited(5))
-        .build()
-        .map_err(|e| format!("Failed to create HTTP client: {}", e))
-}
-
-/// Fetch a URL and return `(final_url, status_code, body_text)`.
-async fn http_get(url: &str) -> Result<(String, u16, String), String> {
-    let client = make_client()?;
-    let response = client
-        .get(url)
-        .send()
-        .await
-        .map_err(|e| format!("HTTP request failed for '{}': {}", url, e))?;
-
-    let final_url = response.url().to_string();
-    let status = response.status().as_u16();
-    let body = response
-        .text()
-        .await
-        .map_err(|e| format!("Failed to read response body: {}", e))?;
-
-    Ok((final_url, status, body))
-}
-
-// ── HTML stripping ────────────────────────────────────────────────────────────
-
-/// Strip HTML tags and collapse whitespace to get readable plain text.
-/// Also decodes common HTML entities.
-///
-/// Uses byte-index iteration (not char iteration) for performance but advances
-/// by `char.len_utf8()` for non-ASCII characters so Unicode text (CJK, emoji,
-/// etc.) is preserved correctly in the output.
-fn strip_html(html: &str) -> String {
-    let mut out = String::with_capacity(html.len() / 2);
-    let mut in_tag = false;
-    let mut in_script = false;
-    let mut in_style = false;
-    let mut i = 0usize; // byte index into html
-
-    while i < html.len() {
-        // Decode the current Unicode character and its byte length.
-        // All HTML-significant chars (<, >, &, ;) are single-byte ASCII so
-        // non-ASCII chars always fall through to the `out.push(ch)` path unchanged.
-        let ch = match html[i..].chars().next() {
-            Some(c) => c,
-            None => break,
-        };
-        let ch_len = ch.len_utf8();
-
-        // Inside a <script> or <style> block: skip everything until the matching
-        // closing tag. Bare '<' in JS expressions (e.g. `a < b`) must NOT set
-        // in_tag, otherwise a later '>' would prematurely close the tag state
-        // and leak script content as text.
-        if (in_script || in_style) && !in_tag {
-            if ch == '<' {
-                let rest = &html[i..];
-                let tag_lower: String = rest.chars().skip(1).take(9).collect::<String>().to_lowercase();
-                if in_script && tag_lower.starts_with("/script") {
-                    in_script = false;
-                    in_tag = true; // consume the </script> chars up to '>' via the in_tag path
-                } else if in_style && tag_lower.starts_with("/style") {
-                    in_style = false;
-                    in_tag = true;
-                }
-                // bare '<' inside script/style — skip, do not set in_tag
-            }
-            i += ch_len;
-            continue;
-        }
-
-        // Detect opening <script> and <style> tags — skip their contents entirely.
-        if !in_tag && ch == '<' {
-            let rest = &html[i..];
-            let tag_lower: String = rest.chars().skip(1).take(10).collect::<String>().to_lowercase();
-            if tag_lower.starts_with("script") {
-                in_script = true;
-            } else if tag_lower.starts_with("style") {
-                in_style = true;
-            }
-            in_tag = true;
-            i += ch_len;
-            continue;
-        }
-
-        if in_tag {
-            if ch == '>' {
-                in_tag = false;
-                out.push(' '); // replace tag with a space separator
-            }
-            i += ch_len;
-            continue;
-        }
-
-        // Decode common HTML entities.
-        // Only search for ';' within the next 10 characters to avoid accidentally
-        // consuming unrelated semicolons further in the document (e.g. in CSS or JS).
-        if ch == '&' {
-            let rest = &html[i..];
-            let mut byte_pos = 1usize; // byte offset of first char after '&'
-            let mut char_count = 0usize;
-            let mut semi_byte_pos: Option<usize> = None;
-            for c in rest.chars().skip(1) {
-                if char_count >= 10 { break; }
-                if c == ';' {
-                    semi_byte_pos = Some(byte_pos); // byte position of ';' within rest
-                    break;
-                }
-                byte_pos += c.len_utf8();
-                char_count += 1;
-            }
-            if let Some(end) = semi_byte_pos {
-                let entity = &rest[1..end]; // entity name between '&' and ';'
-                let decoded = match entity {
-                    "amp"    => "&",
-                    "lt"     => "<",
-                    "gt"     => ">",
-                    "quot"   => "\"",
-                    "apos"   => "'",
-                    "nbsp"   => " ",
-                    "mdash"  => "—",
-                    "ndash"  => "–",
-                    "hellip" => "...",
-                    _ => "",
-                };
-                if !decoded.is_empty() {
-                    out.push_str(decoded);
-                    i += end + 1; // advance past '&' + entity name + ';'
-                    continue;
-                }
-            }
-        }
-
-        out.push(ch); // emit the character as-is (handles non-ASCII correctly)
-        i += ch_len;
-    }
-
-    // Collapse runs of whitespace (tabs, spaces, newlines) to single spaces,
-    // but preserve paragraph breaks (double newlines → blank line).
-    let collapsed = out
-        .lines()
-        .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    // Collapse runs of 3+ blank lines down to 2
-    let mut prev_blank = 0u8;
-    let mut final_out = String::with_capacity(collapsed.len());
-    for line in collapsed.lines() {
-        if line.trim().is_empty() {
-            prev_blank += 1;
-            if prev_blank <= 2 {
-                final_out.push('\n');
-            }
-        } else {
-            prev_blank = 0;
-            final_out.push_str(line);
-            final_out.push('\n');
-        }
-    }
-
-    final_out.trim().to_string()
-}
-
-/// Try to extract the <title> from an HTML document.
-fn extract_title(html: &str) -> Option<String> {
-    let lower = html.to_lowercase();
-    let start = lower.find("<title>")? + "<title>".len();
-    let end = lower[start..].find("</title>").map(|i| start + i)?;
-    let raw = &html[start..end];
-    let title = strip_html(raw).trim().to_string();
-    if title.is_empty() { None } else { Some(title) }
-}
+const AGENT_SESSION: &str = "browser_agent_default";
 
 // ── Action executor ───────────────────────────────────────────────────────────
 
-/// Execute a `BrowserAction` and return `(result_string, is_error)`.
+/// Execute a `BrowserAction` via the CDP layer.
+/// Returns `(result_text, is_error)`.
 pub async fn execute_browser_action(action: &BrowserAction) -> (String, bool) {
     match action {
         BrowserAction::Navigate { url } => {
-            match http_get(url).await {
-                Ok((final_url, status, body)) => {
-                    let title = extract_title(&body).unwrap_or_else(|| "(no title)".to_string());
-                    (
-                        format!(
-                            "Navigated to: {}\nFinal URL: {}\nHTTP Status: {}\nPage title: {}",
-                            url, final_url, status, title
-                        ),
-                        !(200..300).contains(&status),
-                    )
-                }
+            match crate::browser_native::navigate_session(AGENT_SESSION, url).await {
+                Ok(msg) => (msg, false),
                 Err(e) => (e, true),
             }
         }
 
         BrowserAction::ReadPage { url } => {
-            match http_get(url).await {
-                Ok((final_url, status, body)) => {
-                    let title = extract_title(&body).unwrap_or_else(|| "(no title)".to_string());
-                    let text = strip_html(&body);
-                    // Cap output to avoid token explosion
-                    const MAX_CHARS: usize = 20_000;
-                    let truncated = if text.chars().count() > MAX_CHARS {
-                        format!(
-                            "{}…\n[Content truncated at {} chars]",
-                            &text.chars().take(MAX_CHARS).collect::<String>(),
-                            MAX_CHARS
-                        )
-                    } else {
-                        text
-                    };
-                    (
-                        format!(
-                            "URL: {}\nFinal URL: {}\nHTTP Status: {}\nTitle: {}\n\n---\n\n{}",
-                            url, final_url, status, title, truncated
-                        ),
-                        !(200..300).contains(&status),
-                    )
-                }
+            // Navigate first, then extract text
+            match crate::browser_native::navigate_session(AGENT_SESSION, url).await {
+                Err(e) => return (e, true),
+                Ok(_) => {}
+            }
+            match crate::browser_native::read_page_content(AGENT_SESSION).await {
+                Ok(text) => (format!("URL: {}\n\n{}", url, text), false),
                 Err(e) => (e, true),
             }
         }
 
-        BrowserAction::Click { selector } => (
-            format!(
-                "Not implemented yet — requires Playwright. \
-                 Selector requested: '{}'. \
-                 Use blade_browser_click for managed browser sessions instead.",
-                selector
-            ),
-            false,
-        ),
+        BrowserAction::Click { selector } => {
+            match crate::browser_native::click_selector(AGENT_SESSION, selector).await {
+                Ok(msg) => (msg, false),
+                Err(e) => (e, true),
+            }
+        }
 
-        BrowserAction::Type { selector, text } => (
-            format!(
-                "Not implemented yet — requires Playwright. \
-                 Selector: '{}', Text: '{}'. \
-                 Use blade_browser_type for managed browser sessions instead.",
-                selector, text
-            ),
-            false,
-        ),
+        BrowserAction::Type { selector, text } => {
+            match crate::browser_native::type_into_selector(AGENT_SESSION, selector, text).await {
+                Ok(msg) => (msg, false),
+                Err(e) => (e, true),
+            }
+        }
 
-        BrowserAction::Screenshot => (
-            "Not implemented yet — requires Playwright. \
-             Use blade_screenshot for a desktop screenshot, \
-             or blade_browser_screenshot for the managed browser."
-                .to_string(),
-            false,
-        ),
+        BrowserAction::Screenshot => {
+            match crate::browser_native::capture_screenshot_b64(AGENT_SESSION).await {
+                Ok(b64) => (
+                    format!("Screenshot captured ({} base64 chars)", b64.len()),
+                    false,
+                ),
+                Err(e) => (e, true),
+            }
+        }
 
-        BrowserAction::WaitFor { selector } => (
-            format!(
-                "Not implemented yet — requires Playwright. \
-                 Selector: '{}'. Use blade_browser_read to poll page state instead.",
-                selector
-            ),
-            false,
-        ),
+        BrowserAction::WaitFor { selector } => {
+            match crate::browser_native::wait_for_selector_agent(AGENT_SESSION, selector, 10_000).await {
+                Ok(msg) => (msg, false),
+                Err(e) => (e, true),
+            }
+        }
+
+        BrowserAction::Done { summary } => (format!("Goal achieved: {}", summary), false),
     }
 }
 
-// ── Tauri command ─────────────────────────────────────────────────────────────
+// ── Tauri command: execute a single browser action ────────────────────────────
 
 /// Tauri command: execute a browser action.
 ///
@@ -320,6 +108,7 @@ pub async fn execute_browser_action(action: &BrowserAction) -> (String, bool) {
 /// { "action": "navigate", "url": "https://example.com" }
 /// { "action": "read_page", "url": "https://docs.rs/serde" }
 /// { "action": "click", "selector": "#submit-button" }
+/// { "action": "type", "selector": "#search", "text": "hello" }
 /// ```
 #[tauri::command]
 pub async fn browser_action(action_json: serde_json::Value) -> Result<String, String> {
@@ -334,6 +123,330 @@ pub async fn browser_action(action_json: serde_json::Value) -> Result<String, St
     }
 }
 
+// ── Agent loop ────────────────────────────────────────────────────────────────
+
+/// A single step's record kept in the action history fed back to the LLM.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct AgentStep {
+    step: u32,
+    action: String,
+    result: String,
+}
+
+/// LLM response format for the agent loop.
+/// The LLM must reply with a JSON object matching one of the BrowserAction variants.
+///
+/// System prompt instructs the LLM to reply *only* with a JSON action object.
+/// Supported actions:
+///   { "action": "navigate",   "url": "..." }
+///   { "action": "click",      "selector": "..." }
+///   { "action": "type",       "selector": "...", "text": "..." }
+///   { "action": "screenshot" }
+///   { "action": "read_page",  "url": "..." }
+///   { "action": "wait_for",   "selector": "..." }
+///   { "action": "done",       "summary": "..." }
+const AGENT_SYSTEM_PROMPT: &str = r#"You are a browser automation agent. You control a real web browser via CDP.
+
+Given:
+  - A screenshot of the current browser page (base64 PNG, may be absent on step 1)
+  - A goal from the user
+  - The history of actions you have already taken
+
+Respond with ONLY a JSON object representing the NEXT single action to take.
+
+Available actions:
+  {"action":"navigate","url":"<full URL>"}
+  {"action":"click","selector":"<CSS selector>"}
+  {"action":"type","selector":"<CSS selector>","text":"<text to type>"}
+  {"action":"screenshot"}
+  {"action":"read_page","url":"<full URL>"}
+  {"action":"wait_for","selector":"<CSS selector>"}
+  {"action":"done","summary":"<what was achieved>"}
+
+Rules:
+- Reply with ONE action object and nothing else — no markdown, no explanation.
+- Use "done" when the goal is fully achieved.
+- Prefer CSS selectors that are stable (id, data-testid, aria-label).
+- If you need to see the page state, use "screenshot" first.
+"#;
+
+/// Drive a browser agent loop: take screenshot → ask LLM → execute action → repeat.
+///
+/// Emits `browser_agent_step` events to the frontend after each step with:
+///   `{ step, action_json, result, screenshot_b64 }`
+///
+/// Returns a final summary string or an error.
+#[tauri::command]
+pub async fn browser_agent_loop(
+    app: tauri::AppHandle,
+    goal: String,
+    max_steps: u32,
+) -> Result<String, String> {
+    use crate::providers::{complete_turn, ConversationMessage};
+
+    let config = crate::config::load_config();
+    if config.api_key.is_empty() {
+        return Err("No API key configured. Please add a provider key in BLADE settings.".to_string());
+    }
+
+    // Prefer a vision-capable model.  The user's configured model is used as-is;
+    // most modern models (GPT-4o, Claude 3.x, Gemini 1.5) support vision.
+    let model = &config.model;
+    let provider = &config.provider;
+    let api_key = &config.api_key;
+
+    let mut history: Vec<AgentStep> = Vec::new();
+    let mut final_result = String::new();
+
+    for step in 0..max_steps {
+        // 1. Take a screenshot of the current page
+        let screenshot_b64 = crate::browser_native::capture_screenshot_b64(AGENT_SESSION)
+            .await
+            .unwrap_or_default(); // graceful: blank if browser not open yet
+
+        // 2. Build the LLM conversation
+        //    System: agent instructions
+        //    User:   goal + history + screenshot
+        let history_text = if history.is_empty() {
+            "No actions taken yet.".to_string()
+        } else {
+            history
+                .iter()
+                .map(|s| format!("Step {}: {} → {}", s.step, s.action, s.result))
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+
+        let user_text = format!(
+            "Goal: {}\n\nAction history:\n{}\n\nDecide the next action.",
+            goal, history_text
+        );
+
+        let messages: Vec<ConversationMessage> = vec![
+            ConversationMessage::System(AGENT_SYSTEM_PROMPT.to_string()),
+            if screenshot_b64.is_empty() {
+                ConversationMessage::User(user_text)
+            } else {
+                ConversationMessage::UserWithImage {
+                    text: user_text,
+                    image_base64: screenshot_b64.clone(),
+                }
+            },
+        ];
+
+        // 3. Ask the LLM for the next action
+        let turn = complete_turn(provider, api_key, model, &messages, &[], None).await
+            .map_err(|e| format!("LLM error at step {}: {}", step + 1, e))?;
+
+        let raw = turn.content.trim().to_string();
+
+        // Strip markdown code fences if the model wrapped the JSON
+        let json_str = if raw.starts_with("```") {
+            raw.lines()
+                .filter(|l| !l.starts_with("```"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        } else {
+            raw.clone()
+        };
+
+        // 4. Parse the action
+        let action: BrowserAction = serde_json::from_str(&json_str).map_err(|e| {
+            format!(
+                "LLM returned invalid action JSON at step {}: {} — raw: {}",
+                step + 1,
+                e,
+                raw
+            )
+        })?;
+
+        let action_label = action_label(&action);
+
+        // 5. Check for done
+        if let BrowserAction::Done { ref summary } = action {
+            final_result = summary.clone();
+            let _ = app.emit(
+                "browser_agent_step",
+                serde_json::json!({
+                    "step": step + 1,
+                    "action": action_label,
+                    "result": final_result,
+                    "screenshot_b64": screenshot_b64,
+                    "done": true,
+                }),
+            );
+            return Ok(final_result);
+        }
+
+        // 6. Execute the action
+        let (result_text, is_error) = execute_browser_action(&action).await;
+
+        // 7. Emit progress event to frontend
+        let _ = app.emit(
+            "browser_agent_step",
+            serde_json::json!({
+                "step": step + 1,
+                "action": action_label,
+                "result": result_text,
+                "screenshot_b64": screenshot_b64,
+                "done": false,
+                "is_error": is_error,
+            }),
+        );
+
+        history.push(AgentStep {
+            step: step + 1,
+            action: action_label,
+            result: if is_error {
+                format!("ERROR: {}", result_text)
+            } else {
+                result_text
+            },
+        });
+
+        // Small pause between steps to avoid hammering the browser
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    }
+
+    // Reached max_steps without a Done action
+    let summary = format!(
+        "Reached max_steps ({}) without completing goal. Last {} actions:\n{}",
+        max_steps,
+        history.len().min(5),
+        history
+            .iter()
+            .rev()
+            .take(5)
+            .map(|s| format!("  Step {}: {} → {}", s.step, s.action, s.result))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+    Ok(summary)
+}
+
+fn action_label(action: &BrowserAction) -> String {
+    match action {
+        BrowserAction::Navigate { url } => format!("navigate({})", url),
+        BrowserAction::Click { selector } => format!("click({})", selector),
+        BrowserAction::Type { selector, text } => format!("type({}, {:?})", selector, text),
+        BrowserAction::Screenshot => "screenshot".to_string(),
+        BrowserAction::ReadPage { url } => format!("read_page({})", url),
+        BrowserAction::WaitFor { selector } => format!("wait_for({})", selector),
+        BrowserAction::Done { summary } => format!("done({})", summary),
+    }
+}
+
+// ── HTML helpers (kept for ReadPage fallback / tests) ─────────────────────────
+
+/// Strip HTML tags and collapse whitespace to get readable plain text.
+/// Also decodes common HTML entities.
+fn strip_html(html: &str) -> String {
+    let mut out = String::with_capacity(html.len() / 2);
+    let mut in_tag = false;
+    let mut in_script = false;
+    let mut in_style = false;
+    let mut i = 0usize;
+
+    while i < html.len() {
+        let ch = match html[i..].chars().next() {
+            Some(c) => c,
+            None => break,
+        };
+        let ch_len = ch.len_utf8();
+
+        if (in_script || in_style) && !in_tag {
+            if ch == '<' {
+                let rest = &html[i..];
+                let tag_lower: String = rest.chars().skip(1).take(9).collect::<String>().to_lowercase();
+                if in_script && tag_lower.starts_with("/script") {
+                    in_script = false;
+                    in_tag = true;
+                } else if in_style && tag_lower.starts_with("/style") {
+                    in_style = false;
+                    in_tag = true;
+                }
+            }
+            i += ch_len;
+            continue;
+        }
+
+        if !in_tag && ch == '<' {
+            let rest = &html[i..];
+            let tag_lower: String = rest.chars().skip(1).take(10).collect::<String>().to_lowercase();
+            if tag_lower.starts_with("script") { in_script = true; }
+            else if tag_lower.starts_with("style") { in_style = true; }
+            in_tag = true;
+            i += ch_len;
+            continue;
+        }
+
+        if in_tag {
+            if ch == '>' {
+                in_tag = false;
+                out.push(' ');
+            }
+            i += ch_len;
+            continue;
+        }
+
+        if ch == '&' {
+            let rest = &html[i..];
+            let mut byte_pos = 1usize;
+            let mut char_count = 0usize;
+            let mut semi_byte_pos: Option<usize> = None;
+            for c in rest.chars().skip(1) {
+                if char_count >= 10 { break; }
+                if c == ';' { semi_byte_pos = Some(byte_pos); break; }
+                byte_pos += c.len_utf8();
+                char_count += 1;
+            }
+            if let Some(end) = semi_byte_pos {
+                let entity = &rest[1..end];
+                let decoded = match entity {
+                    "amp"    => "&",
+                    "lt"     => "<",
+                    "gt"     => ">",
+                    "quot"   => "\"",
+                    "apos"   => "'",
+                    "nbsp"   => " ",
+                    "mdash"  => "—",
+                    "ndash"  => "–",
+                    "hellip" => "...",
+                    _ => "",
+                };
+                if !decoded.is_empty() {
+                    out.push_str(decoded);
+                    i += end + 1;
+                    continue;
+                }
+            }
+        }
+
+        out.push(ch);
+        i += ch_len;
+    }
+
+    let collapsed = out
+        .lines()
+        .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let mut prev_blank = 0u8;
+    let mut final_out = String::with_capacity(collapsed.len());
+    for line in collapsed.lines() {
+        if line.trim().is_empty() {
+            prev_blank += 1;
+            if prev_blank <= 2 { final_out.push('\n'); }
+        } else {
+            prev_blank = 0;
+            final_out.push_str(line);
+            final_out.push('\n');
+        }
+    }
+    final_out.trim().to_string()
+}
+
 // ── Tool definitions for the LLM ──────────────────────────────────────────────
 
 /// Return ToolDefinitions so the LLM can call browser actions as native tools.
@@ -342,16 +455,15 @@ pub fn tool_definitions() -> Vec<crate::providers::ToolDefinition> {
     vec![
         crate::providers::ToolDefinition {
             name: "blade_browser_navigate".to_string(),
-            description: "Navigate to a URL via HTTP GET and return the page title and status. \
-                          Use this to confirm a page loads successfully or to follow redirects. \
-                          Unlike blade_web_fetch, this does not return page content — \
-                          use blade_browser_read_page for content.".to_string(),
+            description: "Navigate the browser to a URL. \
+                          Requires an active browser session (use connect_to_user_browser first). \
+                          Returns confirmation once the page has loaded.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
                     "url": {
                         "type": "string",
-                        "description": "Fully qualified URL to navigate to (must start with https:// or http://)"
+                        "description": "Fully qualified URL (must start with https:// or http://)"
                     }
                 },
                 "required": ["url"]
@@ -359,27 +471,24 @@ pub fn tool_definitions() -> Vec<crate::providers::ToolDefinition> {
         },
         crate::providers::ToolDefinition {
             name: "blade_browser_read_page".to_string(),
-            description: "Fetch a URL and return its readable text content (HTML tags stripped). \
-                          Use for: reading documentation, extracting article text, scraping data \
-                          from public pages. Returns up to 20,000 characters. For interactive \
-                          pages (requiring login/JS), use blade_browser_open + blade_browser_read \
-                          instead.".to_string(),
+            description: "Navigate to a URL and return its readable text content (innerText). \
+                          Uses the live browser — handles JS-rendered pages and authenticated sessions. \
+                          Returns up to 20,000 characters.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
                     "url": {
                         "type": "string",
-                        "description": "URL to fetch and read"
+                        "description": "URL to navigate to and read"
                     }
                 },
                 "required": ["url"]
             }),
         },
         crate::providers::ToolDefinition {
-            name: "blade_browser_click_pw".to_string(),
-            description: "Click a CSS selector in a browser tab. \
-                          NOT YET IMPLEMENTED — requires Playwright integration. \
-                          Use blade_browser_click for managed browser sessions.".to_string(),
+            name: "blade_browser_click".to_string(),
+            description: "Click an element in the browser by CSS selector. \
+                          Use blade_browser_screenshot or blade_browser_read to find the right selector.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -392,10 +501,9 @@ pub fn tool_definitions() -> Vec<crate::providers::ToolDefinition> {
             }),
         },
         crate::providers::ToolDefinition {
-            name: "blade_browser_type_pw".to_string(),
-            description: "Type text into a CSS selector. \
-                          NOT YET IMPLEMENTED — requires Playwright integration. \
-                          Use blade_browser_type for managed browser sessions.".to_string(),
+            name: "blade_browser_type".to_string(),
+            description: "Type text into an input field by CSS selector. \
+                          Fires input and change events so React/Vue/Angular forms react correctly.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -412,10 +520,9 @@ pub fn tool_definitions() -> Vec<crate::providers::ToolDefinition> {
             }),
         },
         crate::providers::ToolDefinition {
-            name: "blade_browser_screenshot_pw".to_string(),
-            description: "Take a screenshot of the current browser tab. \
-                          NOT YET IMPLEMENTED — requires Playwright integration. \
-                          Use blade_browser_screenshot for the managed browser instead.".to_string(),
+            name: "blade_browser_screenshot".to_string(),
+            description: "Take a screenshot of the current browser page. \
+                          Returns a base64 PNG. Use to see the page state before deciding what to click.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {}
@@ -423,8 +530,8 @@ pub fn tool_definitions() -> Vec<crate::providers::ToolDefinition> {
         },
         crate::providers::ToolDefinition {
             name: "blade_browser_wait_for".to_string(),
-            description: "Wait for a CSS selector to appear on the page. \
-                          NOT YET IMPLEMENTED — requires Playwright integration.".to_string(),
+            description: "Wait up to 10 seconds for a CSS selector to appear on the page. \
+                          Use after navigation or clicking a button that loads new content.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -434,6 +541,27 @@ pub fn tool_definitions() -> Vec<crate::providers::ToolDefinition> {
                     }
                 },
                 "required": ["selector"]
+            }),
+        },
+        crate::providers::ToolDefinition {
+            name: "blade_browser_agent_loop".to_string(),
+            description: "Run an autonomous browser agent that will achieve a goal by navigating, \
+                          clicking, typing, and reading pages. Give it a plain-English goal. \
+                          The agent emits step-by-step progress events. Use for multi-step tasks \
+                          like 'search for X on Google', 'fill out this form', 'read this article'.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "goal": {
+                        "type": "string",
+                        "description": "Plain-English goal for the browser agent"
+                    },
+                    "max_steps": {
+                        "type": "integer",
+                        "description": "Maximum number of steps (default 15, max 50)"
+                    }
+                },
+                "required": ["goal"]
             }),
         },
     ]

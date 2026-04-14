@@ -574,6 +574,14 @@ fn build_system_prompt_inner(
         }
     }
 
+    // Live Integrations — Gmail / Calendar / Slack / GitHub ambient state
+    {
+        let integration_ctx = crate::integration_bridge::get_integration_context();
+        if !integration_ctx.trim().is_empty() {
+            parts.push(integration_ctx);
+        }
+    }
+
     // Activity Monitor — real-time awareness of what Arnav is doing right now
     {
         let activity_ctx = crate::activity_monitor::get_activity_context();

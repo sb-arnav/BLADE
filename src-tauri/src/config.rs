@@ -123,6 +123,9 @@ struct DiskConfig {
     /// Unix timestamp (seconds) of the last completed deep scan. 0 = never.
     #[serde(default = "default_last_deep_scan")]
     last_deep_scan: i64,
+    /// Enable background polling of real-world integrations (Gmail, Calendar, Slack, GitHub)
+    #[serde(default)]
+    integration_polling_enabled: bool,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -181,6 +184,7 @@ impl Default for DiskConfig {
             use_local_whisper: false,
             whisper_model: "tiny.en".to_string(),
             last_deep_scan: 0,
+            integration_polling_enabled: false,
             api_key: None,
         }
     }
@@ -262,6 +266,9 @@ pub struct BladeConfig {
     /// Unix timestamp (seconds) of the last completed deep scan. 0 = never run.
     #[serde(default = "default_last_deep_scan")]
     pub last_deep_scan: i64,
+    /// Enable background polling of real-world integrations (Gmail, Calendar, Slack, GitHub)
+    #[serde(default)]
+    pub integration_polling_enabled: bool,
 }
 
 impl BladeConfig {
@@ -309,6 +316,7 @@ impl Default for BladeConfig {
             use_local_whisper: false,
             whisper_model: "tiny.en".to_string(),
             last_deep_scan: 0,
+            integration_polling_enabled: false,
         }
     }
 }
@@ -420,6 +428,7 @@ pub fn load_config() -> BladeConfig {
         use_local_whisper: disk.use_local_whisper,
         whisper_model: disk.whisper_model,
         last_deep_scan: disk.last_deep_scan,
+        integration_polling_enabled: disk.integration_polling_enabled,
     }
 }
 
@@ -463,6 +472,7 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         use_local_whisper: config.use_local_whisper,
         whisper_model: config.whisper_model.clone(),
         last_deep_scan: config.last_deep_scan,
+        integration_polling_enabled: config.integration_polling_enabled,
         api_key: None,
     };
 

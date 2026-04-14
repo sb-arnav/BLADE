@@ -7,6 +7,355 @@ use std::sync::{Arc, OnceLock};
 
 const CDP_BASE_URL: &str = "http://127.0.0.1:9222";
 
+// ── Browser detection ─────────────────────────────────────────────────────────
+
+/// Detect the user's default browser by reading the OS registry / settings.
+/// Returns a lowercase browser name: "chrome", "edge", "brave", "firefox", or "unknown".
+pub fn detect_default_browser() -> String {
+    #[cfg(target_os = "windows")]
+    {
+        use winreg::enums::{HKEY_CURRENT_USER, KEY_READ};
+        use winreg::RegKey;
+
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        if let Ok(key) = hkcu.open_subkey_with_flags(
+            r"SOFTWARE\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice",
+            KEY_READ,
+        ) {
+            if let Ok(prog_id) = key.get_value::<String, _>("ProgId") {
+                return map_prog_id_to_browser(&prog_id);
+            }
+        }
+        return "unknown".to_string();
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // macOS: query Launch Services via defaults
+        if let Ok(out) = std::process::Command::new("defaults")
+            .args(["read", "com.apple.LaunchServices/com.apple.launchservices.secure"])
+            .output()
+        {
+            let text = String::from_utf8_lossy(&out.stdout);
+            if text.contains("com.google.chrome") { return "chrome".to_string(); }
+            if text.contains("com.brave.browser") { return "brave".to_string(); }
+            if text.contains("com.microsoft.edgemac") { return "edge".to_string(); }
+            if text.contains("org.mozilla.firefox") { return "firefox".to_string(); }
+        }
+        return "unknown".to_string();
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(out) = std::process::Command::new("xdg-settings")
+            .args(["get", "default-web-browser"])
+            .output()
+        {
+            let text = String::from_utf8_lossy(&out.stdout).to_ascii_lowercase();
+            if text.contains("chrome") { return "chrome".to_string(); }
+            if text.contains("brave") { return "brave".to_string(); }
+            if text.contains("edge") { return "edge".to_string(); }
+            if text.contains("firefox") { return "firefox".to_string(); }
+        }
+        return "unknown".to_string();
+    }
+
+    #[allow(unreachable_code)]
+    "unknown".to_string()
+}
+
+fn map_prog_id_to_browser(prog_id: &str) -> String {
+    // Edge installed via Microsoft Store uses a long AppX ID
+    if prog_id.contains("ChromeHTML") || prog_id.contains("Chrome") {
+        "chrome".to_string()
+    } else if prog_id.contains("FirefoxURL") || prog_id.contains("Firefox") {
+        "firefox".to_string()
+    } else if prog_id.contains("MSEdgeHTM") || prog_id.contains("Edge")
+        || prog_id.contains("AppXq0fevzme2pys62n3e0fbqa7peapykr8v")
+    {
+        "edge".to_string()
+    } else if prog_id.contains("BraveHTML") || prog_id.contains("Brave") {
+        "brave".to_string()
+    } else {
+        "unknown".to_string()
+    }
+}
+
+/// Return the default remote-debugging port for a browser.
+/// Chrome, Edge, and Brave all default to 9222.
+pub fn get_browser_debug_port(browser: &str) -> u16 {
+    match browser {
+        "chrome" | "edge" | "brave" => 9222,
+        _ => 9223,
+    }
+}
+
+// ── Connect to user's running browser ────────────────────────────────────────
+
+/// Try to connect to the user's default browser.
+///
+/// - For Chromium-based browsers: first checks if a debug port is already open;
+///   if not, launches the browser with `--remote-debugging-port`.
+/// - For Firefox: returns an explanatory error.
+/// - On success: returns a `session_id` string that callers can use with
+///   `web_action` / `browser_describe_page`.
+#[tauri::command]
+pub async fn connect_to_user_browser() -> Result<String, String> {
+    let browser = detect_default_browser();
+
+    if browser == "firefox" {
+        return Err(
+            "Firefox automation requires geckodriver — Chromium-based browsers (Chrome, Edge, Brave) are supported natively.".to_string()
+        );
+    }
+
+    let port = get_browser_debug_port(&browser);
+    let base = format!("http://127.0.0.1:{}", port);
+
+    // Check if already running with debug port
+    let already_running = reqwest::get(format!("{}/json/version", base))
+        .await
+        .map(|r| r.status().is_success())
+        .unwrap_or(false);
+
+    if !already_running {
+        // Launch the user's browser with remote debugging
+        launch_user_browser(&browser, port).await?;
+
+        // Wait up to 15 s for the debug port to open
+        let deadline = std::time::Instant::now();
+        let mut connected = false;
+        while deadline.elapsed() < std::time::Duration::from_secs(15) {
+            if reqwest::get(format!("{}/json/version", base))
+                .await
+                .map(|r| r.status().is_success())
+                .unwrap_or(false)
+            {
+                connected = true;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        }
+        if !connected {
+            return Err(format!(
+                "Could not open a remote-debugging connection to {}. \
+                 Try closing all {} windows and retrying.",
+                browser, browser
+            ));
+        }
+    }
+
+    // Create a new tab and return its session id
+    let session_id = format!("user_browser_{}", browser);
+    // Seed the session by opening a blank page so the store entry exists
+    let _ = get_or_create_session_on_port(&session_id, None, port).await?;
+    Ok(session_id)
+}
+
+async fn launch_user_browser(browser: &str, port: u16) -> Result<(), String> {
+    let port_arg = format!("--remote-debugging-port={}", port);
+    let flag_no_first = "--no-first-run";
+
+    #[cfg(target_os = "windows")]
+    {
+        let candidates: &[&str] = match browser {
+            "chrome" => &[
+                r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+            ],
+            "edge" => &[
+                r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+                r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+            ],
+            "brave" => &[
+                r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe",
+                r"C:\Program Files (x86)\BraveSoftware\Brave-Browser\Application\brave.exe",
+            ],
+            _ => &[],
+        };
+        for bin in candidates {
+            if std::path::Path::new(bin).exists() {
+                let _ = crate::cmd_util::silent_cmd(bin)
+                    .args([&port_arg, flag_no_first])
+                    .spawn();
+                return Ok(());
+            }
+        }
+        return Err(format!("Could not find {} executable on this system.", browser));
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let app: &str = match browser {
+            "chrome" => "Google Chrome",
+            "edge" => "Microsoft Edge",
+            "brave" => "Brave Browser",
+            _ => return Err(format!("No known macOS app for browser '{}'", browser)),
+        };
+        let _ = std::process::Command::new("open")
+            .args(["-a", app, "--args", &port_arg, flag_no_first])
+            .spawn();
+        return Ok(());
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let bins: &[&str] = match browser {
+            "chrome" => &["google-chrome", "google-chrome-stable"],
+            "edge" => &["microsoft-edge", "microsoft-edge-stable"],
+            "brave" => &["brave-browser", "brave"],
+            _ => &[],
+        };
+        for bin in bins {
+            let r = std::process::Command::new(bin)
+                .args([&port_arg, flag_no_first])
+                .spawn();
+            if r.is_ok() { return Ok(()); }
+        }
+        return Err(format!("Could not find {} binary on PATH.", browser));
+    }
+
+    #[allow(unreachable_code)]
+    Err("Unsupported platform for browser launch.".to_string())
+}
+
+/// Like `get_or_create_session` but targets an arbitrary CDP port.
+async fn get_or_create_session_on_port(
+    session_id: &str,
+    initial_url: Option<&str>,
+    port: u16,
+) -> Result<BrowserSession, String> {
+    if let Some(existing) = session_store().lock().await.get(session_id).cloned() {
+        return Ok(existing);
+    }
+
+    let base = format!("http://127.0.0.1:{}", port);
+    let url = initial_url.unwrap_or("about:blank");
+    let client = reqwest::Client::new();
+    let encoded = urlencoding::encode(url);
+    let endpoint = format!("{}/json/new?{}", base, encoded);
+
+    let response = match client.put(&endpoint).send().await {
+        Ok(r) => r,
+        Err(_) => client.get(&endpoint).send().await
+            .map_err(|e| format!("Failed to create browser target: {}", e))?,
+    };
+
+    let target: CdpTarget = response.json().await
+        .map_err(|e| format!("Failed to parse browser target: {}", e))?;
+
+    let session = BrowserSession {
+        target_id: target.id,
+        ws_url: target.web_socket_debugger_url
+            .ok_or("Browser target missing websocket URL".to_string())?,
+    };
+    store_session(session_id, session.clone()).await;
+    Ok(session)
+}
+
+/// Expose the current page screenshot as raw base64 PNG.
+/// Used by the agent loop — returns just the base64 data string.
+pub(crate) async fn capture_screenshot_b64(session_id: &str) -> Result<String, String> {
+    ensure_browser_debugger().await?;
+    let session = get_or_create_session(session_id, None).await?;
+    cdp_call(&session.ws_url, "Page.enable", json!({})).await?;
+    let response = cdp_call(
+        &session.ws_url,
+        "Page.captureScreenshot",
+        json!({ "format": "png" }),
+    )
+    .await?;
+    let b64 = response
+        .get("data")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    Ok(b64)
+}
+
+/// Navigate a CDP session to a URL (used by browser_agent).
+pub(crate) async fn navigate_session(session_id: &str, url: &str) -> Result<String, String> {
+    ensure_browser_debugger().await?;
+    let mut session = get_or_create_session(session_id, Some(url)).await?;
+    cdp_call(&session.ws_url, "Page.enable", json!({})).await?;
+    cdp_call(&session.ws_url, "Page.navigate", json!({ "url": url })).await?;
+    wait_for_page_ready(&session.ws_url).await?;
+    refresh_session(&mut session).await?;
+    store_session(session_id, session).await;
+    Ok(format!("Navigated to {}", url))
+}
+
+/// Read the text content of the current page.
+pub(crate) async fn read_page_content(session_id: &str) -> Result<String, String> {
+    ensure_browser_debugger().await?;
+    let session = get_or_create_session(session_id, None).await?;
+    wait_for_page_ready(&session.ws_url).await?;
+    let text = eval_js(&session.ws_url, "document.body ? document.body.innerText : ''").await?;
+    const MAX: usize = 20_000;
+    if text.chars().count() > MAX {
+        Ok(format!(
+            "{}…\n[Truncated at {} chars]",
+            text.chars().take(MAX).collect::<String>(),
+            MAX
+        ))
+    } else {
+        Ok(text)
+    }
+}
+
+/// Click a selector.
+pub(crate) async fn click_selector(session_id: &str, selector: &str) -> Result<String, String> {
+    ensure_browser_debugger().await?;
+    let session = get_or_create_session(session_id, None).await?;
+    let sel_json = serde_json::to_string(selector).unwrap_or_default();
+    let result = eval_js(
+        &session.ws_url,
+        &format!(
+            "(function() {{ var el = document.querySelector({s}); if (!el) return 'not_found'; el.scrollIntoView({{block:'center'}}); el.click(); return 'clicked'; }})();",
+            s = sel_json
+        ),
+    )
+    .await?;
+    if result == "not_found" {
+        Err(format!("No element matched selector `{}`", selector))
+    } else {
+        Ok(format!("Clicked `{}`", selector))
+    }
+}
+
+/// Type text into a selector.
+pub(crate) async fn type_into_selector(session_id: &str, selector: &str, text: &str) -> Result<String, String> {
+    ensure_browser_debugger().await?;
+    let session = get_or_create_session(session_id, None).await?;
+    let sel_json = serde_json::to_string(selector).unwrap_or_default();
+    let val_json = serde_json::to_string(text).unwrap_or_default();
+    let result = eval_js(
+        &session.ws_url,
+        &format!(
+            "(function() {{ var el = document.querySelector({s}); if (!el) return 'not_found'; el.focus(); el.value = {v}; el.dispatchEvent(new Event('input', {{bubbles:true}})); el.dispatchEvent(new Event('change', {{bubbles:true}})); return 'typed'; }})();",
+            s = sel_json, v = val_json
+        ),
+    )
+    .await?;
+    if result == "not_found" {
+        Err(format!("No element matched selector `{}`", selector))
+    } else {
+        Ok(format!("Typed into `{}`", selector))
+    }
+}
+
+/// Wait for a CSS selector (polls every 500 ms, up to `timeout_ms`).
+pub(crate) async fn wait_for_selector_agent(
+    session_id: &str,
+    selector: &str,
+    timeout_ms: u64,
+) -> Result<String, String> {
+    ensure_browser_debugger().await?;
+    let session = get_or_create_session(session_id, None).await?;
+    wait_for_selector(&session.ws_url, selector, timeout_ms.min(10_000)).await?;
+    Ok(format!("Selector `{}` appeared", selector))
+}
+
 fn managed_chromium_dir() -> PathBuf {
     crate::config::blade_config_dir().join("chromium")
 }
