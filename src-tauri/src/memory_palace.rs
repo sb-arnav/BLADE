@@ -484,6 +484,7 @@ pub fn get_recent_episodes(days: u32, limit: usize) -> Vec<MemoryEpisode> {
         .unwrap_or_default()
 }
 
+#[allow(dead_code)]
 pub fn get_episodes_by_type(episode_type: &str, limit: usize) -> Vec<MemoryEpisode> {
     let conn = match open_conn() {
         Ok(c) => c,
