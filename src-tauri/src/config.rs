@@ -112,12 +112,21 @@ struct DiskConfig {
     background_ai_enabled: bool,
     #[serde(default)]
     persona_onboarding_complete: bool,
+    /// Ordered list of provider names to try if the primary fails with 429/503/5xx.
+    /// Example: ["groq", "openrouter", "ollama"]
+    #[serde(default)]
+    fallback_providers: Vec<String>,
+    #[serde(default)]
+    use_local_whisper: bool,
+    #[serde(default = "default_whisper_model")]
+    whisper_model: String,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
 }
 
 fn default_background_ai_enabled() -> bool { true }
+fn default_whisper_model() -> String { "tiny.en".to_string() }
 fn default_god_mode_tier() -> String { "normal".to_string() }
 fn default_voice_mode() -> String { "off".to_string() }
 fn default_tts_voice() -> String { "system".to_string() }
@@ -164,6 +173,9 @@ impl Default for DiskConfig {
             task_routing: TaskRouting::default(),
             background_ai_enabled: true,
             persona_onboarding_complete: false,
+            fallback_providers: Vec::new(),
+            use_local_whisper: false,
+            whisper_model: "tiny.en".to_string(),
             api_key: None,
         }
     }
@@ -232,6 +244,16 @@ pub struct BladeConfig {
     pub background_ai_enabled: bool,
     #[serde(default)]
     pub persona_onboarding_complete: bool,
+    /// Ordered list of provider names to try if the primary fails with 429/503/5xx.
+    /// Example: ["groq", "openrouter", "ollama"]
+    #[serde(default)]
+    pub fallback_providers: Vec<String>,
+    /// Use local whisper.cpp for transcription instead of cloud API
+    #[serde(default)]
+    pub use_local_whisper: bool,
+    /// Which whisper model to use locally: "tiny.en", "base.en", "small.en"
+    #[serde(default = "default_whisper_model")]
+    pub whisper_model: String,
 }
 
 impl BladeConfig {
@@ -275,6 +297,9 @@ impl Default for BladeConfig {
             task_routing: TaskRouting::default(),
             background_ai_enabled: true,
             persona_onboarding_complete: false,
+            fallback_providers: Vec::new(),
+            use_local_whisper: false,
+            whisper_model: "tiny.en".to_string(),
         }
     }
 }
@@ -382,6 +407,9 @@ pub fn load_config() -> BladeConfig {
         task_routing: disk.task_routing,
         background_ai_enabled: disk.background_ai_enabled,
         persona_onboarding_complete: disk.persona_onboarding_complete,
+        fallback_providers: disk.fallback_providers,
+        use_local_whisper: disk.use_local_whisper,
+        whisper_model: disk.whisper_model,
     }
 }
 
@@ -421,6 +449,9 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         task_routing: config.task_routing.clone(),
         background_ai_enabled: config.background_ai_enabled,
         persona_onboarding_complete: config.persona_onboarding_complete,
+        fallback_providers: config.fallback_providers.clone(),
+        use_local_whisper: config.use_local_whisper,
+        whisper_model: config.whisper_model.clone(),
         api_key: None,
     };
 

@@ -97,9 +97,10 @@ pub async fn complete(
     tools: &[ToolDefinition],
 ) -> Result<AssistantTurn, String> {
     let client = Client::new();
+    let encoded_model = urlencoding::encode(model);
     let url = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
-        model, api_key
+        encoded_model, api_key
     );
     let body = build_body(messages, tools);
 
@@ -158,9 +159,10 @@ pub async fn stream_text(
     use tauri::Emitter;
 
     let client = Client::new();
+    let encoded_model = urlencoding::encode(model);
     let url = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/{}:streamGenerateContent?alt=sse&key={}",
-        model, api_key
+        encoded_model, api_key
     );
 
     // Simple body without tool declarations for streaming
@@ -236,9 +238,10 @@ pub async fn stream_text(
 
 pub async fn test(api_key: &str, model: &str) -> Result<String, String> {
     let client = Client::new();
+    let encoded_model = urlencoding::encode(model);
     let url = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
-        model, api_key
+        encoded_model, api_key
     );
 
     let body = serde_json::json!({

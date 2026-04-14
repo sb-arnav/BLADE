@@ -109,10 +109,23 @@ pub fn voice_stop_recording() -> Result<String, String> {
     Ok(base64::engine::general_purpose::STANDARD.encode(&wav_data))
 }
 
-/// Transcribe audio using Groq Whisper API
+/// Transcribe audio using Groq Whisper API or local whisper.cpp depending on config.
 #[tauri::command]
 pub async fn voice_transcribe(audio_base64: String) -> Result<String, String> {
     let config = crate::config::load_config();
+
+    // Route to local whisper.cpp if configured
+    if config.use_local_whisper {
+        let audio_bytes = base64::engine::general_purpose::STANDARD
+            .decode(&audio_base64)
+            .map_err(|e| format!("Invalid audio data: {}", e))?;
+        // Energy-based VAD: skip silent audio before loading the model
+        let samples = audio_bytes_to_f32_approx(&audio_bytes);
+        if !crate::whisper_local::is_speech(&samples, crate::whisper_local::DEFAULT_VAD_THRESHOLD) {
+            return Ok(String::new());
+        }
+        return crate::whisper_local::transcribe_audio(&audio_bytes).await;
+    }
 
     // Voice transcription uses Groq Whisper. Resolve the key in priority order:
     // 1. Active provider is Groq → use its key directly
@@ -184,6 +197,17 @@ pub async fn voice_transcribe(audio_base64: String) -> Result<String, String> {
 #[tauri::command]
 pub async fn voice_transcribe_blob(audio_base64: String, file_ext: String) -> Result<String, String> {
     let config = crate::config::load_config();
+
+    // Route to local whisper.cpp if configured.
+    // Note: local whisper needs WAV (PCM). MediaRecorder blobs (webm/mp4) can't be
+    // decoded in pure Rust without ffmpeg, so fall through to the API for blob formats.
+    // If the caller passes a WAV blob, local transcription works fine.
+    if config.use_local_whisper && (file_ext.trim_start_matches('.') == "wav") {
+        let audio_bytes = base64::engine::general_purpose::STANDARD
+            .decode(&audio_base64)
+            .map_err(|e| format!("Invalid audio: {}", e))?;
+        return crate::whisper_local::transcribe_audio(&audio_bytes).await;
+    }
 
     let api_key = if config.provider == "groq" {
         config.api_key.clone()
@@ -268,4 +292,34 @@ pub(crate) fn encode_wav(samples: &[f32], channels: u16, sample_rate: u32) -> Re
         .map_err(|e| format!("WAV finalize error: {}", e))?;
 
     Ok(cursor.into_inner())
+}
+
+/// Quick-and-dirty extraction of f32 samples from WAV bytes for VAD pre-check.
+/// Returns an empty vec if the data isn't valid WAV — the VAD will then pass through.
+pub(crate) fn audio_bytes_to_f32_approx(wav_bytes: &[u8]) -> Vec<f32> {
+    use std::io::Cursor;
+    let Ok(mut reader) = hound::WavReader::new(Cursor::new(wav_bytes)) else {
+        return Vec::new();
+    };
+    let spec = reader.spec();
+    let channels = spec.channels as usize;
+    let bits = spec.bits_per_sample;
+    let fmt = spec.sample_format;
+
+    let raw: Vec<f32> = match (fmt, bits) {
+        (hound::SampleFormat::Float, 32) => {
+            reader.samples::<f32>().filter_map(|s| s.ok()).collect()
+        }
+        (hound::SampleFormat::Int, 16) => {
+            reader.samples::<i16>().filter_map(|s| s.ok()).map(|v| v as f32 / 32768.0).collect()
+        }
+        _ => return Vec::new(),
+    };
+
+    // Mix to mono
+    if channels <= 1 {
+        raw
+    } else {
+        raw.chunks(channels).map(|ch| ch.iter().sum::<f32>() / channels as f32).collect()
+    }
 }

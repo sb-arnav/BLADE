@@ -1,21 +1,24 @@
-/// God Mode — 24/7 background machine intelligence.
-/// Three tiers:
-///   Normal      — 5 min scan: recent files, downloads, running apps, monitors
-///   Intermediate — 2 min scan: everything above + clipboard + active window
-///   Extreme     — 1 min scan: everything above + proactive action suggestions injected into every prompt
+/// God Mode v2 — JARVIS-level ambient intelligence.
 ///
-/// Writes a live context file injected into every Blade conversation.
+/// Three tiers, each building on the previous:
+///   Normal       — 5 min: intelligence brief (3 lines), system vitals, active context
+///   Intermediate — 2 min: + clipboard intelligence, cross-session memory recall, error detection
+///   Extreme      — 1 min: + screen vision (screenshot → understanding), proactive task queue
+///
+/// Key design principle: BRIEF, not dump. Every scan produces a concise intelligence
+/// brief, not a 2000-char markdown wall. The model should read it in <2 seconds.
 
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 use tauri::{Emitter, Manager};
 
-/// Tracks the last error signature seen by God Mode for smart interrupt detection.
+// ── Stuck Error Detection ───────────────────────────────────────────────────
+
 struct StuckErrorState {
-    fingerprint: String,     // hash/preview of the error
-    first_seen: i64,         // unix timestamp when first detected
-    scan_count: u32,         // how many consecutive scans with same error
-    interrupted: bool,       // already fired interrupt for this session
+    fingerprint: String,
+    first_seen: i64,
+    scan_count: u32,
+    interrupted: bool,
 }
 
 static STUCK_ERROR: OnceLock<Mutex<Option<StuckErrorState>>> = OnceLock::new();
@@ -24,12 +27,9 @@ fn stuck_error() -> &'static Mutex<Option<StuckErrorState>> {
     STUCK_ERROR.get_or_init(|| Mutex::new(None))
 }
 
-/// Check if the user appears stuck on the same error and emit smart_interrupt if so.
-/// Called after each god mode scan that found errors.
 fn check_smart_interrupt(app: &tauri::AppHandle, error_preview: &str) {
     let now = chrono::Utc::now().timestamp();
-    // Use first 120 chars as fingerprint
-    let fingerprint = crate::safe_slice(&error_preview, 120).to_string();
+    let fingerprint = crate::safe_slice(error_preview, 120).to_string();
 
     let mut guard = match stuck_error().lock() {
         Ok(g) => g,
@@ -40,10 +40,9 @@ fn check_smart_interrupt(app: &tauri::AppHandle, error_preview: &str) {
         Some(state) if state.fingerprint == fingerprint => {
             state.scan_count += 1;
             let elapsed = now - state.first_seen;
-            // Fire interrupt after 5+ minutes (300s) and at least 2 scans, once per error session
             if elapsed >= 300 && state.scan_count >= 2 && !state.interrupted {
                 state.interrupted = true;
-                let preview = crate::safe_slice(&error_preview, 200).to_string();
+                let preview = crate::safe_slice(error_preview, 200).to_string();
                 let elapsed_min = elapsed / 60;
                 let _ = app.emit("smart_interrupt", serde_json::json!({
                     "error_preview": preview,
@@ -56,7 +55,6 @@ fn check_smart_interrupt(app: &tauri::AppHandle, error_preview: &str) {
             }
         }
         _ => {
-            // New error or different error — reset state
             *guard = Some(StuckErrorState {
                 fingerprint,
                 first_seen: now,
@@ -67,8 +65,61 @@ fn check_smart_interrupt(app: &tauri::AppHandle, error_preview: &str) {
     }
 }
 
+// ── Proactive Task Queue ────────────────────────────────────────────────────
+
+static PROACTIVE_TASKS: OnceLock<Mutex<Vec<ProactiveTask>>> = OnceLock::new();
+
+fn proactive_tasks() -> &'static Mutex<Vec<ProactiveTask>> {
+    PROACTIVE_TASKS.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+#[derive(Clone, serde::Serialize)]
+struct ProactiveTask {
+    id: String,
+    suggestion: String,
+    category: String, // "error", "optimization", "reminder", "insight"
+    created_at: i64,
+}
+
+fn queue_proactive_task(app: &tauri::AppHandle, suggestion: &str, category: &str) {
+    let task = ProactiveTask {
+        id: format!("pt-{}", chrono::Utc::now().timestamp_millis()),
+        suggestion: suggestion.to_string(),
+        category: category.to_string(),
+        created_at: chrono::Utc::now().timestamp(),
+    };
+
+    if let Ok(mut tasks) = proactive_tasks().lock() {
+        // Don't duplicate similar suggestions
+        if tasks.iter().any(|t| t.suggestion == task.suggestion) {
+            return;
+        }
+        tasks.push(task.clone());
+        // Keep max 10 pending tasks
+        if tasks.len() > 10 {
+            tasks.remove(0);
+        }
+    }
+
+    let _ = app.emit("proactive_suggestion", &task);
+}
+
+#[tauri::command]
+pub fn get_proactive_tasks() -> Vec<ProactiveTask> {
+    proactive_tasks().lock().map(|t| t.clone()).unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn dismiss_proactive_task(task_id: String) {
+    if let Ok(mut tasks) = proactive_tasks().lock() {
+        tasks.retain(|t| t.id != task_id);
+    }
+}
+
+// ── God Mode Loop ───────────────────────────────────────────────────────────
+
 pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
-    // Start Total Recall screen timeline if enabled
+    // Start Total Recall if enabled
     {
         let config = crate::config::load_config();
         if config.screen_timeline_enabled {
@@ -79,102 +130,116 @@ pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
     let tier = tier.to_string();
     tauri::async_runtime::spawn(async move {
         let mut first_run = true;
+        let mut last_brief = String::new();
 
         loop {
             if !first_run {
                 let interval_secs = match tier.as_str() {
                     "extreme" => 60,
                     "intermediate" => 120,
-                    _ => 300, // normal
+                    _ => 300,
                 };
                 tokio::time::sleep(Duration::from_secs(interval_secs)).await;
             }
             first_run = false;
 
-            // Stop if god mode was disabled
             let config = crate::config::load_config();
             if !config.god_mode {
                 let _ = app.emit("godmode_stopped", ());
                 break;
             }
 
-            let ctx = build_machine_context(&config.god_mode_tier);
-            let path = crate::config::blade_config_dir().join("godmode_context.md");
-            let _ = std::fs::write(&path, &ctx);
+            // Build the intelligence brief (not a data dump)
+            let brief = build_intelligence_brief(&tier, &last_brief);
 
-            // SMART INTERRUPT: detect if user is stuck on the same error
-            if config.god_mode_tier == "intermediate" || config.god_mode_tier == "extreme" {
-                if let Some(error_section) = extract_error_from_context(&ctx) {
+            // Write context file for injection into chat
+            let path = crate::config::blade_config_dir().join("godmode_context.md");
+            let _ = std::fs::write(&path, &brief);
+
+            // Smart interrupt: detect stuck errors (intermediate+)
+            if tier == "intermediate" || tier == "extreme" {
+                if let Some(error_section) = extract_error_from_context(&brief) {
                     check_smart_interrupt(&app, &error_section);
                 } else {
-                    // No current error — clear stuck state
                     if let Ok(mut guard) = stuck_error().lock() {
                         *guard = None;
                     }
                 }
             }
 
+            // Extreme: screen vision — capture + understand what's on screen
+            if tier == "extreme" {
+                if let Some(understanding) = screen_vision_snapshot() {
+                    // Append vision context to the brief file
+                    let path = crate::config::blade_config_dir().join("godmode_context.md");
+                    if let Ok(mut contents) = std::fs::read_to_string(&path) {
+                        contents.push_str(&format!("\n\n{}", understanding));
+                        let _ = std::fs::write(&path, &contents);
+                    }
+                }
+            }
+
+            // Emit update event
             let _ = app.emit("godmode_update", serde_json::json!({
-                "bytes": ctx.len(),
-                "tier": &config.god_mode_tier,
+                "bytes": brief.len(),
+                "tier": &tier,
             }));
 
-            // SIGNAL BUS: embed interesting snapshots into vector store
-            // so Blade can semantically recall "what was happening when X"
-            if ctx.len() > 100 {
+            // Embed into vector store for cross-session recall
+            if brief.len() > 100 {
                 let store = app.state::<crate::embeddings::SharedVectorStore>();
                 let store_clone = store.inner().clone();
-                let ctx_clone = ctx.clone();
+                let brief_clone = brief.clone();
                 let ts = chrono::Utc::now().timestamp().to_string();
                 tokio::spawn(async move {
                     crate::embeddings::auto_embed_exchange(
                         &store_clone,
-                        crate::safe_slice(&ctx_clone, 800),
+                        crate::safe_slice(&brief_clone, 800),
                         "",
                         &format!("godmode-{}", ts),
                     );
                 });
             }
 
-            // ACTIVITY TIMELINE: persist this snapshot as a timeline event
+            // Persist to activity timeline
             {
                 let db_path = crate::config::blade_config_dir().join("blade.db");
                 if let Ok(conn) = rusqlite::Connection::open(&db_path) {
-                    let title = ctx.lines()
-                        .find(|l| l.starts_with("**Active:**") || l.contains("Active Window"))
-                        .map(|l| l.replace("**Active:**", "").trim().to_string())
-                        .unwrap_or_else(|| "Machine snapshot".to_string());
-                    let snippet = crate::safe_slice(&ctx, 1000);
+                    let title = brief.lines()
+                        .find(|l| l.starts_with("**Doing:**") || l.starts_with("**Focus:**"))
+                        .map(|l| l.trim().to_string())
+                        .unwrap_or_else(|| "God Mode scan".to_string());
+                    let snippet = crate::safe_slice(&brief, 1000);
                     let _ = crate::db::timeline_record(
                         &conn,
                         "god_mode",
                         &title,
                         snippet,
                         "",
-                        &format!("{{\"tier\":\"{}\"}}", config.god_mode_tier),
+                        &format!("{{\"tier\":\"{}\"}}", tier),
                     );
                 }
             }
 
-            // EVOLUTION: feed fresh god mode data into the evolution engine
-            // Run async — don't block the god mode loop
+            // Evolution engine feed (async, non-blocking)
             {
                 let ev_app = app.clone();
                 tokio::spawn(async move {
                     crate::evolution::run_evolution_cycle(&ev_app).await;
                 });
             }
+
+            last_brief = brief;
         }
     });
 }
 
-/// Extract the error preview from a godmode context string, if an error section exists.
 fn extract_error_from_context(ctx: &str) -> Option<String> {
-    if let Some(pos) = ctx.find("### Active Errors Detected") {
+    if let Some(pos) = ctx.find("ERROR DETECTED") {
         let section = &ctx[pos..];
-        let end = section.find("\n\n## ").unwrap_or(section.len());
+        let end = section.find("\n\n").unwrap_or(section.len());
         let content = section[..end].trim().to_string();
-        if content.len() > 30 {
+        if content.len() > 20 {
             return Some(content);
         }
     }
@@ -191,81 +256,142 @@ pub fn load_godmode_context() -> Option<String> {
     std::fs::read_to_string(path).ok()
 }
 
-fn build_machine_context(tier: &str) -> String {
+// ── Intelligence Brief Builder ──────────────────────────────────────────────
+
+fn build_intelligence_brief(tier: &str, last_brief: &str) -> String {
     let now = chrono::Local::now();
-    let interval_label = match tier {
-        "extreme" => "1 min",
-        "intermediate" => "2 min",
-        _ => "5 min",
-    };
-    let mut sections: Vec<String> = vec![
-        format!(
-            "## Live Machine Context\n_Tier: {} | Scan interval: {} | Last scan: {}_",
-            tier, interval_label, now.format("%H:%M %p")
-        )
-    ];
+    let mut lines: Vec<String> = Vec::new();
 
-    // User understanding is always first — it's the most important context
-    if let Some(s) = who_is_the_user_section() { sections.push(s); }
-    if let Some(s) = recent_files_section() { sections.push(s); }
-    if let Some(s) = downloads_section() { sections.push(s); }
-    if let Some(s) = running_apps_section() { sections.push(s); }
-    if let Some(s) = monitor_section() { sections.push(s); }
-    if let Some(s) = git_repos_section() { sections.push(s); }
+    // Header — one line, not a wall
+    lines.push(format!("## God Mode | {} | {}", tier, now.format("%H:%M")));
 
-    // Intermediate+ extras
+    // ── Line 1: What you're doing right now ──
+    let focus = get_current_focus();
+    lines.push(format!("**Focus:** {}", focus));
+
+    // ── Line 2: What changed since last scan ──
+    let delta = get_delta_since_last(last_brief);
+    if !delta.is_empty() {
+        lines.push(format!("**Changed:** {}", delta));
+    }
+
+    // ── Line 3: System vitals (one line) ──
+    let vitals = get_system_vitals();
+    lines.push(format!("**System:** {}", vitals));
+
+    // ── User identity (compact, always injected) ──
+    if let Some(user) = who_is_the_user_compact() {
+        lines.push(format!("\n{}", user));
+    }
+
+    // ── Intermediate+: clipboard intelligence ──
     if tier == "intermediate" || tier == "extreme" {
-        if let Some(s) = clipboard_section() { sections.push(s); }
-        if let Some(s) = active_window_section() { sections.push(s); }
-        if let Some(s) = active_errors_section() { sections.push(s); }
+        if let Some(clip) = clipboard_intelligence() {
+            lines.push(format!("\n**Clipboard:** {}", clip));
+        }
+
+        // Error detection
+        if let Some(err) = detect_active_errors() {
+            lines.push(format!("\n**ERROR DETECTED:** {}", err));
+        }
+
+        // Cross-session recall — what were you doing at this time yesterday?
+        if let Some(recall) = cross_session_recall() {
+            lines.push(format!("\n**Yesterday at this time:** {}", recall));
+        }
     }
 
-    // Extreme: inject behavioral directive
+    // ── Extreme: proactive directives ──
     if tier == "extreme" {
-        sections.push(
-            "### Extreme Mode Directive\n\
-             You are in JARVIS mode. You have full context of this machine. \
-             For every user message, proactively suggest the single most valuable action you could take \
-             right now based on what you can see — files, apps, clipboard, activity. \
-             Do not wait to be asked. If you see something that needs doing, say so and offer to do it. \
-             Execute tasks autonomously when the user approves. \
-             You are not an assistant waiting for instructions. You are an active co-pilot."
-                .to_string(),
-        );
+        lines.push("\n**Mode: JARVIS** — Proactive. Anticipate. Execute. Don't wait for instructions.".to_string());
     }
 
-    sections.join("\n\n")
+    lines.join("\n")
 }
 
-fn recent_files_section() -> Option<String> {
+// ── Focus: What the user is doing RIGHT NOW ─────────────────────────────────
+
+fn get_current_focus() -> String {
+    let mut parts: Vec<String> = Vec::new();
+
+    // Active window (most important signal)
+    if let Ok(win) = crate::context::get_active_window() {
+        if !win.app_name.is_empty() {
+            let title_preview = if win.window_title.len() > 60 {
+                format!("{}...", &win.window_title[..60])
+            } else {
+                win.window_title.clone()
+            };
+
+            if !title_preview.is_empty() {
+                parts.push(format!("{} — {}", win.app_name, title_preview));
+            } else {
+                parts.push(win.app_name.clone());
+            }
+        }
+    }
+
+    if parts.is_empty() {
+        return "Unknown (no active window detected)".to_string();
+    }
+
+    parts.join(" | ")
+}
+
+// ── Delta: What changed since last scan ─────────────────────────────────────
+
+fn get_delta_since_last(last_brief: &str) -> String {
+    let mut changes: Vec<String> = Vec::new();
+
+    // Check if active window changed
+    let current_focus = get_current_focus();
+    if !last_brief.is_empty() {
+        let last_focus = last_brief.lines()
+            .find(|l| l.starts_with("**Focus:**"))
+            .map(|l| l.trim_start_matches("**Focus:**").trim().to_string())
+            .unwrap_or_default();
+        if !last_focus.is_empty() && last_focus != current_focus {
+            changes.push(format!("Switched from {}", last_focus.split(" — ").next().unwrap_or(&last_focus)));
+        }
+    }
+
+    // Recent file modifications (last N minutes based on tier)
+    if let Some(recent) = get_recently_modified_files(5) {
+        changes.push(recent);
+    }
+
+    if changes.is_empty() {
+        "No significant changes".to_string()
+    } else {
+        changes.join("; ")
+    }
+}
+
+fn get_recently_modified_files(minutes: u64) -> Option<String> {
     let home = dirs::home_dir()?;
     let cutoff = std::time::SystemTime::now()
-        .checked_sub(Duration::from_secs(86400))
+        .checked_sub(Duration::from_secs(minutes * 60))
         .unwrap_or(std::time::UNIX_EPOCH);
 
     let search_dirs = vec![
         home.join("Desktop"),
         home.join("Documents"),
         home.join("Downloads"),
-        home.join("projects"),
-        home.join("dev"),
-        home.join("code"),
     ];
 
-    let mut files: Vec<(std::time::SystemTime, String)> = Vec::new();
+    let mut count = 0u32;
+    let mut latest_name = String::new();
 
     for dir in search_dirs {
         if let Ok(entries) = std::fs::read_dir(&dir) {
-            for entry in entries.flatten() {
+            for entry in entries.flatten().take(50) {
                 if let Ok(meta) = entry.metadata() {
                     if let Ok(modified) = meta.modified() {
                         if modified >= cutoff && !meta.is_dir() {
-                            let name = format!(
-                                "{}/{}",
-                                dir.file_name()?.to_string_lossy(),
-                                entry.file_name().to_string_lossy()
-                            );
-                            files.push((modified, name));
+                            count += 1;
+                            if latest_name.is_empty() {
+                                latest_name = entry.file_name().to_string_lossy().to_string();
+                            }
                         }
                     }
                 }
@@ -273,353 +399,258 @@ fn recent_files_section() -> Option<String> {
         }
     }
 
-    if files.is_empty() { return None; }
-
-    files.sort_by(|a, b| b.0.cmp(&a.0));
-    files.truncate(12);
-
-    let lines: Vec<String> = files.iter().map(|(t, name)| {
-        let dt: chrono::DateTime<chrono::Local> = (*t).into();
-        format!("- {} ({})", name, dt.format("%H:%M"))
-    }).collect();
-
-    Some(format!("### Modified in Last 24h\n{}", lines.join("\n")))
+    if count == 0 { return None; }
+    if count == 1 {
+        Some(format!("{} modified", latest_name))
+    } else {
+        Some(format!("{} files modified (latest: {})", count, latest_name))
+    }
 }
 
-fn downloads_section() -> Option<String> {
-    let dir = dirs::home_dir()?.join("Downloads");
-    let cutoff = std::time::SystemTime::now()
-        .checked_sub(Duration::from_secs(7 * 86400))
-        .unwrap_or(std::time::UNIX_EPOCH);
+// ── System Vitals ───────────────────────────────────────────────────────────
 
-    let mut files: Vec<(std::time::SystemTime, u64, String)> = std::fs::read_dir(&dir)
-        .ok()?
-        .flatten()
-        .filter_map(|e| {
-            let meta = e.metadata().ok()?;
-            let modified = meta.modified().ok()?;
-            if modified < cutoff || meta.is_dir() { return None; }
-            Some((modified, meta.len(), e.file_name().to_string_lossy().to_string()))
-        })
-        .collect();
+fn get_system_vitals() -> String {
+    let mut parts: Vec<String> = Vec::new();
 
-    if files.is_empty() { return None; }
-
-    files.sort_by(|a, b| b.0.cmp(&a.0));
-    files.truncate(8);
-
-    let lines: Vec<String> = files.iter().map(|(t, size, name)| {
-        let dt: chrono::DateTime<chrono::Local> = (*t).into();
-        let sz = if *size >= 1_000_000 { format!("{:.1}MB", *size as f64 / 1_000_000.0) }
-                 else if *size >= 1_000 { format!("{:.0}KB", *size as f64 / 1_000.0) }
-                 else { format!("{}B", size) };
-        format!("- {} — {} ({})", name, sz, dt.format("%b %d %H:%M"))
-    }).collect();
-
-    Some(format!("### Downloads (Last 7 Days)\n{}", lines.join("\n")))
-}
-
-fn running_apps_section() -> Option<String> {
+    // Disk space
     #[cfg(target_os = "windows")]
     {
-        let out = crate::cmd_util::silent_cmd("tasklist")
-            .args(["/FO", "CSV", "/NH"])
+        if let Ok(out) = crate::cmd_util::silent_cmd("powershell")
+            .args(["-Command", "(Get-PSDrive C).Free / 1GB"])
             .output()
-            .ok()?;
-
-        let text = String::from_utf8_lossy(&out.stdout);
-        let mut apps: std::collections::HashSet<String> = std::collections::HashSet::new();
-
-        for line in text.lines() {
-            let parts: Vec<&str> = line.splitn(2, "\",\"").collect();
-            if let Some(name) = parts.first() {
-                let clean = name.trim_matches('"');
-                let lower = clean.to_lowercase();
-                if lower.contains("system") || lower.contains("svchost") || lower.contains("runtime")
-                    || lower.contains("ntoskrnl") || lower.contains("wininit") || lower.contains("csrss") {
-                    continue;
-                }
-                let app = clean.trim_end_matches(".exe").to_string();
-                if app.len() > 2 && app.len() < 30 {
-                    apps.insert(app);
+        {
+            if out.status.success() {
+                let free_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if let Ok(free_gb) = free_str.parse::<f64>() {
+                    let warning = if free_gb < 5.0 { " (LOW!)" } else { "" };
+                    parts.push(format!("Disk: {:.1}GB free{}", free_gb, warning));
                 }
             }
         }
-
-        if apps.is_empty() { return None; }
-        let mut sorted: Vec<String> = apps.into_iter().collect();
-        sorted.sort();
-        sorted.truncate(20);
-        return Some(format!("### Running Apps\n{}", sorted.join(", ")));
     }
 
-    #[cfg(target_os = "macos")]
+    // Memory usage
+    #[cfg(target_os = "windows")]
     {
-        let out = crate::cmd_util::silent_cmd("osascript")
-            .args(["-e", "tell application \"System Events\" to get name of every process whose background only is false"])
+        if let Ok(out) = crate::cmd_util::silent_cmd("powershell")
+            .args(["-Command", "[math]::Round((Get-Process | Measure-Object WorkingSet64 -Sum).Sum / 1GB, 1)"])
             .output()
-            .ok()?;
-        let text = String::from_utf8_lossy(&out.stdout);
-        let apps: Vec<&str> = text.split(", ").map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
-        if apps.is_empty() { return None; }
-        return Some(format!("### Running Apps\n{}", apps.join(", ")));
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        let out = crate::cmd_util::silent_cmd("ps")
-            .args(["-eo", "comm="])
-            .output()
-            .ok()?;
-        let text = String::from_utf8_lossy(&out.stdout);
-        let mut apps: std::collections::HashSet<String> = text.lines()
-            .map(|l| l.trim().to_string())
-            .filter(|s| !s.is_empty() && s.len() < 30)
-            .collect();
-        let noise = ["sh", "bash", "zsh", "ps", "grep", "awk", "sed", "cat", "ls"];
-        for n in &noise { apps.remove(*n); }
-        if apps.is_empty() { return None; }
-        let mut sorted: Vec<String> = apps.into_iter().collect();
-        sorted.sort();
-        sorted.truncate(20);
-        return Some(format!("### Running Apps\n{}", sorted.join(", ")));
-    }
-
-    #[allow(unreachable_code)]
-    None
-}
-
-/// Synthesize everything BLADE knows about the user into a single context block.
-/// This runs on every god mode scan and is always injected — it's the foundation
-/// of user understanding. Sources: persona.md, persona_engine traits, memory episodes,
-/// knowledge graph nodes, and inferred patterns from recent files/apps.
-fn who_is_the_user_section() -> Option<String> {
-    let mut parts: Vec<String> = Vec::new();
-
-    // 1. Persona.md — manually curated user context (highest trust)
-    let persona_path = crate::config::blade_config_dir().join("persona.md");
-    if let Ok(persona) = std::fs::read_to_string(&persona_path) {
-        let trimmed = persona.trim().to_string();
-        if !trimmed.is_empty() {
-            parts.push(format!("**User-defined context:**\n{}", trimmed));
+        {
+            if out.status.success() {
+                let used_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if let Ok(used_gb) = used_str.parse::<f64>() {
+                    parts.push(format!("RAM: {:.1}GB used", used_gb));
+                }
+            }
         }
     }
 
-    // 2. Learned persona traits (high-confidence only)
-    let traits = crate::persona_engine::get_all_traits();
-    let confident_traits: Vec<String> = traits
-        .iter()
-        .filter(|t| t.confidence > 0.5 && t.score > 0.4)
-        .map(|t| {
-            let level = if t.score >= 0.75 { "strong" } else { "moderate" };
-            format!("- {} ({} signal, {:.0}% confident)", t.trait_name, level, t.confidence * 100.0)
-        })
-        .collect();
-    if !confident_traits.is_empty() {
-        parts.push(format!("**Learned traits:**\n{}", confident_traits.join("\n")));
+    // CPU — top process
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(out) = crate::cmd_util::silent_cmd("powershell")
+            .args(["-Command", "Get-Process | Sort-Object CPU -Descending | Select-Object -First 1 -ExpandProperty ProcessName"])
+            .output()
+        {
+            if out.status.success() {
+                let top = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if !top.is_empty() {
+                    parts.push(format!("Top CPU: {}", top));
+                }
+            }
+        }
     }
 
-    // 3. Relationship depth
-    let rel = crate::persona_engine::get_relationship_state();
-    if rel.intimacy_score > 0.0 || rel.trust_score > 0.0 {
-        parts.push(format!(
-            "**Relationship:** {:.0}/100 intimacy, {:.0}/100 trust",
-            rel.intimacy_score, rel.trust_score
-        ));
-    }
-
-    // 4. Recent memory episodes (top 2 most important)
-    let episodes = crate::memory_palace::search_episodes("", 2);
-    if !episodes.is_empty() {
-        let ep_lines: Vec<String> = episodes.iter().map(|ep| {
-            format!("- [{}] {}: {}", ep.episode_type, ep.title, ep.summary)
-        }).collect();
-        parts.push(format!("**Key memories:**\n{}", ep_lines.join("\n")));
-    }
-
-    // 5. Knowledge graph — user's known projects/technologies
-    let kg_context = crate::knowledge_graph::get_graph_context("user projects technologies");
-    if !kg_context.trim().is_empty() {
-        // Truncate to keep it compact
-        let capped = if kg_context.len() > 500 {
-            format!("{}...", &kg_context[..500])
-        } else {
-            kg_context
-        };
-        parts.push(format!("**Known projects/tech:**\n{}", capped));
+    // macOS / Linux fallbacks
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Ok(out) = crate::cmd_util::silent_cmd("df")
+            .args(["-h", "/"])
+            .output()
+        {
+            if out.status.success() {
+                let text = String::from_utf8_lossy(&out.stdout);
+                if let Some(line) = text.lines().nth(1) {
+                    let cols: Vec<&str> = line.split_whitespace().collect();
+                    if cols.len() >= 4 {
+                        parts.push(format!("Disk: {} free", cols[3]));
+                    }
+                }
+            }
+        }
     }
 
     if parts.is_empty() {
-        return None;
-    }
-
-    let body = parts.join("\n\n");
-    // Cap at 1500 chars — enough context, won't bloat the system prompt
-    let capped = if body.len() > 1500 {
-        format!("{}...", &body[..1500])
+        "Vitals unavailable".to_string()
     } else {
-        body
-    };
-    Some(format!("### Who is this user\n{}", capped))
+        parts.join(" | ")
+    }
 }
 
-fn monitor_section() -> Option<String> {
-    let monitors = xcap::Monitor::all().ok()?;
-    if monitors.is_empty() { return None; }
+// ── Clipboard Intelligence ──────────────────────────────────────────────────
 
-    let lines: Vec<String> = monitors.iter().enumerate().map(|(i, m)| {
-        format!("- Monitor {}: {}x{}", i, m.width().unwrap_or(0), m.height().unwrap_or(0))
-    }).collect();
-
-    Some(format!("### Displays\n{}", lines.join("\n")))
-}
-
-fn clipboard_section() -> Option<String> {
-    // Read clipboard via arboard (already a dep)
+fn clipboard_intelligence() -> Option<String> {
     let mut clipboard = arboard::Clipboard::new().ok()?;
     let text = clipboard.get_text().ok()?;
-    if text.trim().is_empty() { return None; }
-    // Truncate long content
-    let preview = if text.len() > 400 {
-        let end = text.char_indices().nth(400).map(|(i, _)| i).unwrap_or(text.len());
-        format!("{}...", &text[..end])
-    } else {
-        text.clone()
-    };
-    Some(format!("### Clipboard\n```\n{}\n```", preview))
+    let trimmed = text.trim();
+    if trimmed.is_empty() { return None; }
+
+    // Classify what's in the clipboard
+    let lower = trimmed.to_lowercase();
+
+    // URL → note it for context
+    if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+        let url_preview = if trimmed.len() > 80 {
+            format!("{}...", &trimmed[..80])
+        } else {
+            trimmed.to_string()
+        };
+        return Some(format!("URL copied: {}", url_preview));
+    }
+
+    // Error/traceback → flag it
+    if lower.contains("traceback") || lower.contains("error:") ||
+       lower.contains("exception") || lower.contains("panicked at") ||
+       lower.contains("typeerror") || lower.contains("syntaxerror") ||
+       lower.contains("fatal:") || lower.contains("undefined is not") {
+        let preview = crate::safe_slice(trimmed, 150);
+        return Some(format!("Error copied: `{}`", preview));
+    }
+
+    // Code → note language hint
+    if trimmed.contains("fn ") || trimmed.contains("pub ") || trimmed.contains("impl ") {
+        return Some(format!("Rust code copied ({} chars)", trimmed.len()));
+    }
+    if trimmed.contains("const ") || trimmed.contains("import ") || trimmed.contains("export ") {
+        return Some(format!("JS/TS code copied ({} chars)", trimmed.len()));
+    }
+    if trimmed.contains("def ") || trimmed.contains("class ") || trimmed.contains("import ") {
+        return Some(format!("Python code copied ({} chars)", trimmed.len()));
+    }
+
+    // Long text → just note size
+    if trimmed.len() > 200 {
+        return Some(format!("Text copied ({} chars)", trimmed.len()));
+    }
+
+    // Short text → show it
+    Some(format!("\"{}\"", crate::safe_slice(trimmed, 80)));
+
+    // Suppress very short or numeric clipboard (timestamps, IDs, etc.)
+    None
 }
 
-fn active_window_section() -> Option<String> {
-    let win = crate::context::get_active_window().ok()?;
-    let mut parts = Vec::new();
-    if !win.app_name.is_empty() { parts.push(format!("App: {}", win.app_name)); }
-    if !win.window_title.is_empty() { parts.push(format!("Window: {}", win.window_title)); }
-    if parts.is_empty() { return None; }
-    Some(format!("### Active Window\n{}", parts.join("\n")))
-}
+// ── Error Detection ─────────────────────────────────────────────────────────
 
-/// Detect error/exception patterns in clipboard and active window title.
-/// Surfaces active debugging context so BLADE can proactively help.
-fn active_errors_section() -> Option<String> {
-    let mut found: Vec<String> = Vec::new();
-
-    // Check clipboard for error/traceback patterns
+fn detect_active_errors() -> Option<String> {
+    // Check clipboard for errors
     if let Ok(mut clipboard) = arboard::Clipboard::new() {
         if let Ok(text) = clipboard.get_text() {
             let lower = text.to_lowercase();
             let is_error = lower.contains("traceback") || lower.contains("error:") ||
                 lower.contains("exception") || lower.contains("panicked at") ||
-                lower.contains("cannot read") || lower.contains("typeerror") ||
-                lower.contains("syntaxerror") || lower.contains("nameerror") ||
-                lower.contains("valueerror") || lower.contains("attributeerror") ||
-                lower.contains("nullpointerexception") || lower.contains("segfault") ||
                 lower.contains("fatal:") || lower.contains("undefined is not");
 
             if is_error {
-                let preview = crate::safe_slice(&text, 300);
-                found.push(format!("**Clipboard contains error/traceback:**\n```\n{}\n```", preview));
+                return Some(crate::safe_slice(&text, 200).to_string());
             }
         }
     }
 
-    // Check active window title for error signals
+    // Check window title
     if let Ok(win) = crate::context::get_active_window() {
         let title_lower = win.window_title.to_lowercase();
         if title_lower.contains("error") || title_lower.contains("failed") ||
-            title_lower.contains("exception") || title_lower.contains("crash") {
-            found.push(format!("**Active window suggests error:** {}", win.window_title));
+           title_lower.contains("crash") {
+            return Some(win.window_title);
         }
     }
 
-    if found.is_empty() { return None; }
-
-    Some(format!("### Active Errors Detected\n{}", found.join("\n\n")))
+    None
 }
 
-/// Scan common code directories for git repos and show their status.
-/// Gives BLADE awareness of branches, dirty working trees, and ahead/behind state.
-fn git_repos_section() -> Option<String> {
+// ── Cross-Session Memory Recall ─────────────────────────────────────────────
 
-    let home = dirs::home_dir()?;
-    // Common places devs keep repos
-    let search_roots = [
-        home.join("projects"),
-        home.join("dev"),
-        home.join("code"),
-        home.join("src"),
-        home.join("work"),
-        home.join("repos"),
-    ];
+fn cross_session_recall() -> Option<String> {
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    let conn = rusqlite::Connection::open(&db_path).ok()?;
 
-    let mut repo_lines: Vec<String> = Vec::new();
+    // What was happening ~24h ago?
+    let yesterday = chrono::Utc::now().timestamp() - 86400;
+    let window = 1800; // 30 min window
 
-    for root in &search_roots {
-        if !root.is_dir() { continue; }
-        let entries = match std::fs::read_dir(root) {
-            Ok(e) => e,
-            Err(_) => continue,
-        };
-        for entry in entries.flatten().take(8) {
-            let path = entry.path();
-            if !path.is_dir() { continue; }
-            let git_dir = path.join(".git");
-            if !git_dir.exists() { continue; }
+    let result: Option<String> = conn.query_row(
+        "SELECT snippet FROM timeline WHERE event_type = 'god_mode' AND created_at BETWEEN ?1 AND ?2 ORDER BY created_at DESC LIMIT 1",
+        rusqlite::params![yesterday - window, yesterday + window],
+        |row| row.get(0),
+    ).ok();
 
-            let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    if let Some(snippet) = result {
+        // Extract just the focus line from yesterday's brief
+        let focus = snippet.lines()
+            .find(|l| l.starts_with("**Focus:**"))
+            .map(|l| l.trim_start_matches("**Focus:**").trim().to_string());
 
-            // Get branch
-            let branch = crate::cmd_util::silent_cmd("git")
-                .args(["-C", &path.to_string_lossy(), "rev-parse", "--abbrev-ref", "HEAD"])
-                .output()
-                .ok()
-                .and_then(|o| if o.status.success() { Some(String::from_utf8_lossy(&o.stdout).trim().to_string()) } else { None })
-                .unwrap_or_else(|| "unknown".to_string());
-
-            // Dirty state: number of changed files
-            let dirty_count = crate::cmd_util::silent_cmd("git")
-                .args(["-C", &path.to_string_lossy(), "status", "--porcelain"])
-                .output()
-                .ok()
-                .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
-                .unwrap_or(0);
-
-            // Ahead/behind vs upstream
-            let ahead_behind = crate::cmd_util::silent_cmd("git")
-                .args(["-C", &path.to_string_lossy(), "rev-list", "--count", "--left-right", "@{upstream}...HEAD"])
-                .output()
-                .ok()
-                .and_then(|o| {
-                    if o.status.success() {
-                        let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
-                        let parts: Vec<&str> = s.split('\t').collect();
-                        if parts.len() == 2 {
-                            let behind: i32 = parts[0].parse().unwrap_or(0);
-                            let ahead: i32 = parts[1].parse().unwrap_or(0);
-                            Some((ahead, behind))
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                });
-
-            let mut status_parts = Vec::new();
-            if dirty_count > 0 { status_parts.push(format!("{} changed", dirty_count)); }
-            if let Some((ahead, behind)) = ahead_behind {
-                if ahead > 0 { status_parts.push(format!("↑{}", ahead)); }
-                if behind > 0 { status_parts.push(format!("↓{}", behind)); }
+        if let Some(f) = focus {
+            if !f.is_empty() && f != "Unknown (no active window detected)" {
+                return Some(f);
             }
-            let status_str = if status_parts.is_empty() { "clean".to_string() } else { status_parts.join(", ") };
-
-            repo_lines.push(format!("- **{}** `{}` — {}", name, branch, status_str));
-
-            if repo_lines.len() >= 6 { break; }
         }
-        if repo_lines.len() >= 6 { break; }
     }
 
-    if repo_lines.is_empty() { return None; }
+    None
+}
 
-    Some(format!("### Git Repos\n{}", repo_lines.join("\n")))
+// ── Screen Vision (Extreme only) ────────────────────────────────────────────
+
+fn screen_vision_snapshot() -> Option<String> {
+    // Capture a screenshot using xcap
+    let monitors = xcap::Monitor::all().ok()?;
+    let monitor = monitors.first()?;
+    let image = monitor.capture_image().ok()?;
+
+    // Save to temp for potential vision model analysis
+    let temp_path = crate::config::blade_config_dir().join("godmode_screen.png");
+    image.save(&temp_path).ok()?;
+
+    // For now, use basic image dimensions + file info as context
+    // TODO: when vision model is available, send screenshot for analysis
+    let (w, h) = (image.width(), image.height());
+    Some(format!("**Screen:** {}x{} captured for vision analysis", w, h))
+}
+
+// ── Compact User Identity ───────────────────────────────────────────────────
+
+fn who_is_the_user_compact() -> Option<String> {
+    let mut parts: Vec<String> = Vec::new();
+
+    // Persona.md
+    let persona_path = crate::config::blade_config_dir().join("persona.md");
+    if let Ok(persona) = std::fs::read_to_string(&persona_path) {
+        let trimmed = persona.trim();
+        if !trimmed.is_empty() {
+            // Just first 2 lines — enough to know who they are
+            let preview: String = trimmed.lines()
+                .take(2)
+                .collect::<Vec<&str>>()
+                .join(" | ");
+            parts.push(preview);
+        }
+    }
+
+    // Top traits (1-liner)
+    let traits = crate::persona_engine::get_all_traits();
+    let top_traits: Vec<String> = traits
+        .iter()
+        .filter(|t| t.confidence > 0.6 && t.score > 0.5)
+        .take(3)
+        .map(|t| t.trait_name.clone())
+        .collect();
+    if !top_traits.is_empty() {
+        parts.push(format!("Traits: {}", top_traits.join(", ")));
+    }
+
+    if parts.is_empty() { return None; }
+
+    Some(format!("**User:** {}", parts.join(" | ")))
 }
