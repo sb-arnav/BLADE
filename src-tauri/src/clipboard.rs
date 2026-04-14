@@ -223,6 +223,176 @@ pub fn prefetch_bash_failure(command: &str, stderr: &str, app: AppHandle) {
 }
 
 // ---------------------------------------------------------------------------
+// Clipboard auto-action — wires clipboard events through the decision gate
+// ---------------------------------------------------------------------------
+
+/// Detect a rough language label from a code snippet (best-effort).
+fn detect_lang(text: &str) -> &'static str {
+    let t = text;
+    if t.contains("fn ") && (t.contains("->") || t.contains("let ") || t.contains("pub ")) {
+        return "Rust";
+    }
+    if t.contains("def ") && t.contains(":") {
+        return "Python";
+    }
+    if t.contains("function ") || t.contains("const ") && t.contains("=>") || t.contains("async ") {
+        return "JavaScript/TS";
+    }
+    if t.contains("public class ") || t.contains("System.out.println") {
+        return "Java";
+    }
+    if t.contains("#include") || t.contains("std::") {
+        return "C/C++";
+    }
+    if t.contains("<?php") {
+        return "PHP";
+    }
+    if t.contains("<html") || t.contains("</div>") {
+        return "HTML";
+    }
+    "code"
+}
+
+/// Fetch the <title> of a URL with a 5-second timeout.
+/// Returns None on any error or timeout.
+async fn fetch_url_title(url: &str) -> Option<String> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .user_agent("BLADE/1.0 (clipboard enrichment)")
+        .build()
+        .ok()?;
+
+    let resp = client.get(url).send().await.ok()?;
+
+    // Only parse HTML content-types
+    let ct = resp
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_lowercase();
+
+    if !ct.contains("text/html") {
+        // Non-HTML resource — return domain as label
+        return url
+            .parse::<reqwest::Url>()
+            .ok()
+            .and_then(|u| u.host_str().map(|h| h.to_string()));
+    }
+
+    // Read up to 8 KB — enough to find <title>
+    let body = resp.bytes().await.ok()?;
+    let html = std::str::from_utf8(&body[..body.len().min(8192)]).ok()?;
+
+    // Simple regex-free title extraction
+    let lower = html.to_lowercase();
+    let start = lower.find("<title")?.checked_add(6)?;
+    let open_end = html[start..].find('>')?;
+    let content_start = start + open_end + 1;
+    let content_end = lower[content_start..].find("</title>").map(|e| content_start + e)?;
+    let raw = &html[content_start..content_end];
+    let title = raw.trim().to_string();
+    if title.is_empty() {
+        None
+    } else {
+        Some(title)
+    }
+}
+
+/// Build a `decision_gate::Signal` from clipboard content and route it through
+/// the decision gate. Fires Tauri events based on the outcome.
+pub async fn clipboard_auto_action(app: &tauri::AppHandle, content: &str, content_type: &str) {
+    use crate::decision_gate::{Signal, DecisionOutcome};
+
+    let preview = crate::safe_slice(content, 80);
+
+    let signal = match content_type {
+        "error" => Signal {
+            source: "clipboard".to_string(),
+            description: format!("Error detected in clipboard: {}", preview),
+            confidence: 0.85,
+            reversible: true,
+            time_sensitive: true,
+        },
+        "url" => Signal {
+            source: "clipboard".to_string(),
+            description: format!("URL copied: {}", crate::safe_slice(content, 200)),
+            confidence: 0.7,
+            reversible: true,
+            time_sensitive: false,
+        },
+        "code" => {
+            let lang = detect_lang(content);
+            let len = content.len();
+            Signal {
+                source: "clipboard".to_string(),
+                description: format!("Code snippet copied ({}, {} chars)", lang, len),
+                confidence: 0.6,
+                reversible: true,
+                time_sensitive: false,
+            }
+        }
+        "command" => Signal {
+            source: "clipboard".to_string(),
+            description: format!("Shell command copied: {}", preview),
+            confidence: 0.5,
+            reversible: false,
+            time_sensitive: false,
+        },
+        _ => return, // Other / noise — skip
+    };
+
+    let perception = crate::perception_fusion::get_latest().unwrap_or_default();
+    let (_id, outcome) = crate::decision_gate::evaluate_and_record(signal, &perception).await;
+
+    match outcome {
+        DecisionOutcome::ActAutonomously { .. } => {
+            match content_type {
+                "url" => {
+                    // Enrich URL: fetch page title in background
+                    let url = content.trim().to_string();
+                    let app_clone = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let title = fetch_url_title(&url).await
+                            .unwrap_or_else(|| "Unknown page".to_string());
+                        let summary = format!("Enriched URL — title: {}", title);
+                        let _ = app_clone.emit("clipboard_enriched", serde_json::json!({
+                            "url": url,
+                            "title": title,
+                            "summary": summary,
+                        }));
+                    });
+                }
+                "error" => {
+                    // Surface error with suggested fix prompt
+                    let _ = app.emit("clipboard_error_detected", serde_json::json!({
+                        "preview": preview,
+                        "suggested_prompt": format!(
+                            "I found this error in your clipboard. Diagnose it and suggest a fix:\n\n{}",
+                            crate::safe_slice(content, 600)
+                        ),
+                    }));
+                }
+                _ => {}
+            }
+        }
+        DecisionOutcome::AskUser { question, .. } => {
+            let _ = app.emit("proactive_suggestion", serde_json::json!({
+                "question": question,
+                "content_type": content_type,
+                "preview": preview,
+            }));
+        }
+        DecisionOutcome::QueueForLater { task, .. } => {
+            log::debug!("[clipboard_auto_action] Queued for later: {}", task);
+        }
+        DecisionOutcome::Ignore { .. } => {
+            // Intentionally do nothing
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tauri commands
 // ---------------------------------------------------------------------------
 

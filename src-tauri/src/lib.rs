@@ -114,6 +114,7 @@ mod notification_listener;
 mod security_monitor;
 mod health_guardian;
 mod temporal_intel;
+mod iot_bridge;
 
 use chrono::Timelike;
 use std::sync::Arc;
@@ -1004,6 +1005,13 @@ pub fn run() {
             temporal_intel::temporal_daily_standup,
             temporal_intel::temporal_detect_patterns,
             temporal_intel::temporal_meeting_prep,
+            // IoT Bridge — Home Assistant + Spotify
+            iot_bridge::iot_get_entities,
+            iot_bridge::iot_get_state,
+            iot_bridge::iot_call_service,
+            iot_bridge::spotify_now_playing_cmd,
+            iot_bridge::spotify_play_pause_cmd,
+            iot_bridge::spotify_next_cmd,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
@@ -1197,6 +1205,15 @@ pub fn run() {
 
             // Health Guardian — Phase 8B: screen time + wellbeing monitor (every 5 min)
             health_guardian::start_health_monitor(app.handle().clone());
+
+            // Security Cache — refresh network suspicious-connection count every 5 min.
+            // Runs netstat once in background so brain.rs can read it without blocking.
+            tauri::async_runtime::spawn(async {
+                loop {
+                    security_monitor::update_security_cache();
+                    tokio::time::sleep(std::time::Duration::from_secs(300)).await;
+                }
+            });
 
             // Temporal Intelligence — ensure tables ready on startup
             temporal_intel::ensure_tables();
