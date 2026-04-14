@@ -22,6 +22,7 @@ pub struct PersonaTrait {
     pub updated_at: i64,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommunicationPattern {
     pub pattern_type: String,  // "time_of_day_mood", "topic_enthusiasm", "frustration_trigger", "humor_style", "preferred_depth"
@@ -429,6 +430,7 @@ pub async fn analyze_conversation_for_traits(
 }
 
 /// Generate a tonal prefix/suffix to inject based on relationship and traits.
+#[allow(dead_code)]
 pub async fn generate_persona_adapted_prefix(base_message: &str) -> String {
     let rel = get_relationship_state();
     let traits = get_all_traits();
@@ -474,6 +476,7 @@ pub fn persona_get_context() -> String {
 }
 
 /// Detect frustration in a user message using LLM.
+#[allow(dead_code)]
 pub async fn detect_frustration(message: &str) -> bool {
     if message.len() < 5 {
         return false;
@@ -521,6 +524,7 @@ pub async fn detect_frustration(message: &str) -> bool {
 }
 
 /// Detect enthusiasm level: "high" | "medium" | "low"
+#[allow(dead_code)]
 pub async fn detect_enthusiasm(message: &str) -> String {
     if message.is_empty() {
         return "medium".to_string();

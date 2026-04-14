@@ -7,11 +7,15 @@ use rand::RngCore;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
+#[allow(dead_code)]
 const SERVICE: &str = "blade-ai";
+#[allow(dead_code)]
 const KEY_NAME: &str = "encryption-key";
+#[allow(dead_code)]
 const NONCE_LEN: usize = 12;
 
 /// Loads the encryption key from the OS keychain, or generates and stores a new one.
+#[allow(dead_code)]
 pub fn get_or_create_encryption_key() -> Result<Vec<u8>, String> {
     let entry =
         keyring::Entry::new(SERVICE, KEY_NAME).map_err(|e| format!("Keyring init error: {e}"))?;
@@ -45,6 +49,7 @@ pub fn get_or_create_encryption_key() -> Result<Vec<u8>, String> {
 
 /// Encrypts plaintext with AES-256-GCM.
 /// Returns base64(nonce || ciphertext_with_tag).
+#[allow(dead_code)]
 pub fn encrypt(plaintext: &str, key: &[u8]) -> Result<String, String> {
     if key.len() != 32 {
         return Err(format!("Invalid key length: {} (expected 32)", key.len()));
@@ -69,6 +74,7 @@ pub fn encrypt(plaintext: &str, key: &[u8]) -> Result<String, String> {
 }
 
 /// Decrypts a base64-encoded ciphertext produced by `encrypt`.
+#[allow(dead_code)]
 pub fn decrypt(ciphertext_b64: &str, key: &[u8]) -> Result<String, String> {
     if key.len() != 32 {
         return Err(format!("Invalid key length: {} (expected 32)", key.len()));
@@ -95,12 +101,14 @@ pub fn decrypt(ciphertext_b64: &str, key: &[u8]) -> Result<String, String> {
 }
 
 /// Convenience: encrypts using the keychain-managed key.
+#[allow(dead_code)]
 pub fn encrypt_value(plaintext: &str) -> Result<String, String> {
     let key = get_or_create_encryption_key()?;
     encrypt(plaintext, &key)
 }
 
 /// Convenience: decrypts using the keychain-managed key.
+#[allow(dead_code)]
 pub fn decrypt_value(ciphertext: &str) -> Result<String, String> {
     let key = get_or_create_encryption_key()?;
     decrypt(ciphertext, &key)
@@ -108,6 +116,7 @@ pub fn decrypt_value(ciphertext: &str) -> Result<String, String> {
 
 /// Heuristic check: returns true if text looks like base64-encoded ciphertext.
 /// Requires valid base64 that decodes to at least nonce (12) + tag (16) + 1 byte.
+#[allow(dead_code)]
 pub fn is_encrypted(text: &str) -> bool {
     if text.len() < 40 {
         return false;
@@ -120,6 +129,7 @@ pub fn is_encrypted(text: &str) -> bool {
 
 /// Deterministic hash of a string, returned as a hex string.
 /// Useful for generating stable IDs from content.
+#[allow(dead_code)]
 pub fn hash_id(input: &str) -> String {
     let mut hasher = DefaultHasher::new();
     input.hash(&mut hasher);

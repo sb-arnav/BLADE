@@ -135,6 +135,7 @@ fn trim_for_small_model(parts: &mut Vec<String>, budget: usize) {
 
 /// Build the system prompt that gives Blade its personality and context.
 /// Optionally accepts the current user message to inject semantically relevant memories.
+#[allow(dead_code)]
 pub fn build_system_prompt(tools: &[McpTool]) -> String {
     build_system_prompt_inner(tools, "", None, &ModelTier::Frontier, "", "", usize::MAX)
 }
@@ -151,6 +152,7 @@ pub fn build_system_prompt_for_model(
     build_system_prompt_inner(tools, user_query, vector_store, &tier, provider, model, message_count)
 }
 
+#[allow(dead_code)]
 pub fn build_system_prompt_with_recall(
     tools: &[McpTool],
     user_query: &str,

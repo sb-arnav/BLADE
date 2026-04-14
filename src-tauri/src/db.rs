@@ -1093,6 +1093,7 @@ pub fn get_events_since(conn: &Connection, since: i64) -> Result<Vec<AnalyticsEv
 }
 
 /// Deletes analytics events older than the given timestamp (epoch millis).
+#[allow(dead_code)]
 pub fn prune_old_events(conn: &Connection, older_than: i64) -> Result<(), String> {
     conn.execute(
         "DELETE FROM analytics_events WHERE timestamp < ?1",
@@ -1506,6 +1507,7 @@ pub fn brain_set_skill_active(conn: &Connection, id: &str, active: bool) -> Resu
     Ok(())
 }
 
+#[allow(dead_code)]
 pub fn brain_increment_skill_usage(conn: &Connection, id: &str) -> Result<(), String> {
     conn.execute("UPDATE brain_skills SET usage_count=usage_count+1 WHERE id=?1", params![id]).map_err(|e| format!("DB error: {}", e))?;
     Ok(())

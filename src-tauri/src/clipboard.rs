@@ -42,6 +42,7 @@ fn content_hash(text: &str) -> u64 {
 }
 
 /// Get the current prefetch result if it matches the given content.
+#[allow(dead_code)]
 pub fn get_prefetch_for(text: &str) -> Option<ClipboardPrefetch> {
     let hash = content_hash(text);
     prefetch_cache()

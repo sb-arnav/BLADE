@@ -513,6 +513,7 @@ pub fn get_episodes_by_type(episode_type: &str, limit: usize) -> Vec<MemoryEpiso
 
 // ─── Contradiction finder ─────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 pub async fn find_contradictions() -> Vec<(MemoryEpisode, MemoryEpisode, String)> {
     let conn = match open_conn() {
         Ok(c) => c,
