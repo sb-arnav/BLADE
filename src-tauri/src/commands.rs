@@ -294,14 +294,10 @@ pub async fn send_message_stream(
         if task == crate::router::TaskType::Complex && config.provider == "anthropic" {
             use_extended_thinking = true;
         }
-        // Skip model routing when user has a custom base_url — the router doesn't know
-        // what models that endpoint supports, so overriding the model causes 404s.
-        if config.base_url.is_none() {
-            let (provider, api_key, model) = crate::config::resolve_provider_for_task(&config, &task);
-            config.provider = provider;
-            config.api_key = api_key;
-            config.model = model;
-        }
+        let (provider, api_key, model) = crate::config::resolve_provider_for_task(&config, &task);
+        config.provider = provider;
+        config.api_key = api_key;
+        config.model = model;
     }
 
     // Context-length aware routing: if conversation is already very long,

@@ -537,6 +537,12 @@ pub fn resolve_provider_for_task(
 ) -> (String, String, String) {
     use crate::router::TaskType;
 
+    // Custom endpoint (base_url set) — the router has no knowledge of what models
+    // that endpoint supports, so never override the user's configured model.
+    if config.base_url.is_some() {
+        return (config.provider.clone(), config.api_key.clone(), config.model.clone());
+    }
+
     let preferred = match task_type {
         TaskType::Code => config.task_routing.code.as_deref(),
         TaskType::Vision => config.task_routing.vision.as_deref(),
