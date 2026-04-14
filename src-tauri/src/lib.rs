@@ -119,6 +119,10 @@ mod temporal_intel;
 mod iot_bridge;
 mod typed_memory;
 mod personality_mirror;
+mod ghost_mode;
+mod people_graph;
+mod auto_reply;
+mod streak_stats;
 
 use chrono::Timelike;
 use std::sync::Arc;
@@ -1043,6 +1047,30 @@ pub fn run() {
             personality_mirror::personality_analyze,
             personality_mirror::personality_import_chats,
             personality_mirror::personality_get_profile,
+            // Ghost Mode -- invisible AI overlay for meetings and chat
+            ghost_mode::ghost_start,
+            ghost_mode::ghost_stop,
+            ghost_mode::ghost_set_position,
+            ghost_mode::ghost_get_status,
+            // People Graph -- relationship memory and reply style intelligence
+            people_graph::people_list,
+            people_graph::people_get,
+            people_graph::people_upsert,
+            people_graph::people_delete,
+            people_graph::people_suggest_reply_style,
+            people_graph::people_learn_from_conversation,
+            people_graph::people_get_context_for_prompt,
+            // Auto Reply -- draft replies in your style
+            auto_reply::auto_reply_draft,
+            auto_reply::auto_reply_learn_from_edit,
+            auto_reply::auto_reply_draft_batch,
+            // Daily Digest -- rich morning briefing
+            pulse::pulse_daily_digest,
+            pulse::pulse_get_daily_digest,
+            // Streak & Stats -- gamification layer
+            streak_stats::streak_get_stats,
+            streak_stats::streak_record_activity,
+            streak_stats::streak_get_display,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
@@ -1288,6 +1316,12 @@ pub fn run() {
 
             // Temporal Intelligence — ensure tables ready on startup
             temporal_intel::ensure_tables();
+
+            // People Graph — relationship memory
+            people_graph::ensure_tables();
+
+            // Streak & Stats — gamification layer
+            streak_stats::ensure_tables();
 
             // Register shortcuts from config (or defaults)
             register_all_shortcuts(app.handle());

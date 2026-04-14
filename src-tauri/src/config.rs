@@ -133,12 +133,19 @@ struct DiskConfig {
     ha_base_url: String,
     #[serde(default)]
     audio_capture_enabled: bool,
+    #[serde(default)]
+    ghost_mode_enabled: bool,
+    #[serde(default = "default_ghost_mode_position")]
+    ghost_mode_position: String,
+    #[serde(default)]
+    ghost_auto_reply: bool,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
 }
 
 fn default_tts_speed() -> f32 { 1.0 }
+fn default_ghost_mode_position() -> String { "bottom-right".to_string() }
 fn default_background_ai_enabled() -> bool { true }
 fn default_whisper_model() -> String { "tiny.en".to_string() }
 fn default_last_deep_scan() -> i64 { 0 }
@@ -196,6 +203,9 @@ impl Default for DiskConfig {
             tts_speed: 1.0,
             ha_base_url: String::new(),
             audio_capture_enabled: false,
+            ghost_mode_enabled: false,
+            ghost_mode_position: "bottom-right".to_string(),
+            ghost_auto_reply: false,
             api_key: None,
         }
     }
@@ -289,6 +299,15 @@ pub struct BladeConfig {
     /// Always-on audio capture alongside screenshots (Omi-style)
     #[serde(default)]
     pub audio_capture_enabled: bool,
+    /// Enable Ghost Mode — invisible overlay during meetings
+    #[serde(default)]
+    pub ghost_mode_enabled: bool,
+    /// Position of ghost overlay: "bottom-right" | "bottom-left" | "top-right" | "top-left"
+    #[serde(default = "default_ghost_mode_position")]
+    pub ghost_mode_position: String,
+    /// Auto-type suggested reply into chat input (requires hotkey confirmation)
+    #[serde(default)]
+    pub ghost_auto_reply: bool,
 }
 
 impl BladeConfig {
@@ -340,6 +359,9 @@ impl Default for BladeConfig {
             tts_speed: 1.0,
             ha_base_url: String::new(),
             audio_capture_enabled: false,
+            ghost_mode_enabled: false,
+            ghost_mode_position: "bottom-right".to_string(),
+            ghost_auto_reply: false,
         }
     }
 }
@@ -455,6 +477,9 @@ pub fn load_config() -> BladeConfig {
         tts_speed: disk.tts_speed,
         ha_base_url: disk.ha_base_url,
         audio_capture_enabled: disk.audio_capture_enabled,
+        ghost_mode_enabled: disk.ghost_mode_enabled,
+        ghost_mode_position: disk.ghost_mode_position,
+        ghost_auto_reply: disk.ghost_auto_reply,
     }
 }
 
@@ -502,6 +527,9 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         tts_speed: config.tts_speed,
         ha_base_url: config.ha_base_url.clone(),
         audio_capture_enabled: config.audio_capture_enabled,
+        ghost_mode_enabled: config.ghost_mode_enabled,
+        ghost_mode_position: config.ghost_mode_position.clone(),
+        ghost_auto_reply: config.ghost_auto_reply,
         api_key: None,
     };
 

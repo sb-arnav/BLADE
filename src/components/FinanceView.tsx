@@ -347,26 +347,36 @@ export function FinanceView({ onBack }: { onBack: () => void }) {
         </div>
 
         {/* Empty state — no data at all */}
-        {!loadingSummary && !summary && subscriptions.length === 0 && (
-          <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-            <div className="w-10 h-10 rounded-xl bg-blade-surface border border-blade-border flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="w-5 h-5 text-blade-muted" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" strokeLinecap="round" strokeLinejoin="round" />
+        {!loadingSummary && !loadingSubs && !summary && subscriptions.length === 0 && (
+          <div className="flex flex-col items-center justify-center gap-5 py-8 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-blade-surface border border-blade-border flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="w-7 h-7 text-blade-accent" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="2" />
+                <path d="M2 10h20" />
               </svg>
             </div>
             <div>
-              <p className="text-sm text-blade-secondary">No financial data yet</p>
-              <p className="text-2xs text-blade-muted mt-1">
-                Import a CSV to get started.
+              <p className="text-base font-semibold text-blade-text">Import your first bank statement</p>
+              <p className="text-2xs text-blade-muted mt-1.5 max-w-xs leading-relaxed">
+                BLADE will analyse your spending, detect recurring subscriptions, and show category breakdowns — all locally, never uploaded.
               </p>
             </div>
             <button
               onClick={handleImport}
               disabled={importing}
-              className="px-4 py-1.5 rounded-lg bg-blade-accent/10 border border-blade-accent/30 text-xs text-blade-accent hover:bg-blade-accent/20 transition-colors disabled:opacity-40"
+              className="px-5 py-2 rounded-lg bg-blade-accent/10 border border-blade-accent/30 text-sm font-semibold text-blade-accent hover:bg-blade-accent/20 hover:border-blade-accent/50 transition-colors disabled:opacity-40"
             >
-              Import CSV
+              {importing ? "Importing..." : "Import CSV"}
             </button>
+            <div className="border border-blade-border/50 rounded-lg bg-blade-surface/40 p-3 text-xs text-blade-muted text-left max-w-xs w-full">
+              <p className="font-medium text-blade-secondary mb-2">Supported formats:</p>
+              <div className="space-y-1">
+                <p>· Standard CSV with Date, Description, Amount columns</p>
+                <p>· Most bank exports (Chase, Bank of America, Wells Fargo)</p>
+                <p>· Mint, YNAB, and Personal Capital exports</p>
+                <p>· Any CSV — BLADE will auto-detect the columns</p>
+              </div>
+            </div>
           </div>
         )}
       </div>

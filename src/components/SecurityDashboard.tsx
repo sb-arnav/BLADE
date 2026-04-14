@@ -162,6 +162,8 @@ export function SecurityDashboard({ onBack }: { onBack: () => void }) {
     (f) => !f.gitignored && !f.protected
   ).length ?? 0;
 
+  const isFirstLoad = !loading && !error && overview !== null && overview.network.total_connections === 0 && overview.sensitive_files.length === 0 && overview.last_scan === null;
+
   return (
     <div className="flex flex-col h-full bg-blade-bg text-blade-text">
       {/* Header */}
@@ -188,17 +190,61 @@ export function SecurityDashboard({ onBack }: { onBack: () => void }) {
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 max-w-3xl mx-auto w-full">
         {loading && (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-2 h-2 rounded-full bg-blade-accent animate-pulse" />
+          <div className="space-y-3 animate-pulse">
+            <div className="grid grid-cols-3 gap-3">
+              {[0,1,2].map(i => (
+                <div key={i} className="border border-blade-border rounded-lg p-3 h-16 bg-blade-surface/40" />
+              ))}
+            </div>
+            <div className="border border-blade-border rounded-lg h-32 bg-blade-surface/40" />
+            <div className="border border-blade-border rounded-lg h-24 bg-blade-surface/40" />
           </div>
         )}
-        {error && (
-          <div className="border border-red-700/40 rounded-lg bg-red-900/10 p-4 text-xs text-red-400">
-            Failed to load security overview: {error}
+        {!loading && error && (
+          <div className="flex flex-col items-center justify-center py-12 gap-4 text-center">
+            <div className="w-10 h-10 rounded-xl bg-red-900/20 border border-red-700/40 flex items-center justify-center">
+              <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-red-400">
+                <circle cx="8" cy="8" r="6" />
+                <path d="M8 5v3.5M8 10.5v.5" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-blade-secondary">Something went wrong</p>
+              <p className="text-xs text-blade-muted mt-1 max-w-xs">Could not load security overview. Check that BLADE's backend is running.</p>
+            </div>
+            <button
+              onClick={load}
+              className="px-4 py-1.5 text-xs font-medium rounded border border-blade-border text-blade-secondary hover:border-blade-accent/50 hover:text-blade-accent transition-all bg-blade-surface"
+            >
+              Retry
+            </button>
           </div>
         )}
 
-        {!loading && overview && (
+        {!loading && !error && isFirstLoad && (
+          <div className="flex flex-col items-center justify-center py-16 gap-5 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-blade-surface border border-blade-border flex items-center justify-center">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className="text-blade-accent">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-base font-semibold text-blade-text">Run your first security scan</p>
+              <p className="text-xs text-blade-muted mt-1.5 max-w-xs leading-relaxed">
+                BLADE will inspect your active network connections and flag sensitive files that may be exposed. Takes a few seconds.
+              </p>
+            </div>
+            <button
+              onClick={handleScanNow}
+              disabled={scanning}
+              className="px-5 py-2 text-sm font-semibold rounded-lg border border-blade-accent/40 bg-blade-accent/10 text-blade-accent hover:bg-blade-accent/20 hover:border-blade-accent/60 transition-all disabled:opacity-40"
+            >
+              {scanning ? "Scanning..." : "Scan Now"}
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && !isFirstLoad && overview && (
           <>
             {/* Status cards */}
             <div className="grid grid-cols-3 gap-3">

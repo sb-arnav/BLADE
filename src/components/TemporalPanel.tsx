@@ -185,8 +185,16 @@ export function TemporalPanel({ onBack }: TemporalPanelProps) {
           </div>
 
           {activityError && (
-            <div className="mt-3 p-3 rounded-lg bg-red-950/40 border border-red-800/40 text-xs text-red-400">
-              {activityError}
+            <div className="mt-3 flex flex-col gap-2">
+              <div className="p-3 rounded-lg bg-red-950/40 border border-red-800/40 text-xs text-red-400">
+                {activityError}
+              </div>
+              <button
+                onClick={fetchActivity}
+                className="self-start px-3 py-1.5 rounded-lg bg-blade-surface border border-blade-border text-xs text-blade-secondary hover:text-blade-text hover:border-blade-accent/60 transition-colors"
+              >
+                Retry
+              </button>
             </div>
           )}
 
@@ -197,9 +205,10 @@ export function TemporalPanel({ onBack }: TemporalPanelProps) {
           )}
 
           {activityLoading && (
-            <div className="mt-3 flex items-center gap-2 text-2xs text-blade-muted">
-              <div className="w-1.5 h-1.5 rounded-full bg-blade-accent animate-pulse" />
-              Scanning timeline...
+            <div className="mt-3 space-y-2 animate-pulse">
+              <div className="h-4 rounded bg-blade-bg border border-blade-border/40 w-3/4" />
+              <div className="h-4 rounded bg-blade-bg border border-blade-border/40 w-1/2" />
+              <div className="h-4 rounded bg-blade-bg border border-blade-border/40 w-2/3" />
             </div>
           )}
         </section>
@@ -220,8 +229,16 @@ export function TemporalPanel({ onBack }: TemporalPanelProps) {
           </div>
 
           {standupError && (
-            <div className="mt-3 p-3 rounded-lg bg-red-950/40 border border-red-800/40 text-xs text-red-400">
-              {standupError}
+            <div className="mt-3 flex flex-col gap-2">
+              <div className="p-3 rounded-lg bg-red-950/40 border border-red-800/40 text-xs text-red-400">
+                {standupError}
+              </div>
+              <button
+                onClick={fetchStandup}
+                className="self-start px-3 py-1.5 rounded-lg bg-blade-surface border border-blade-border text-xs text-blade-secondary hover:text-blade-text hover:border-blade-accent/60 transition-colors"
+              >
+                Retry
+              </button>
             </div>
           )}
 
@@ -232,9 +249,10 @@ export function TemporalPanel({ onBack }: TemporalPanelProps) {
           )}
 
           {standupLoading && (
-            <div className="mt-3 flex items-center gap-2 text-2xs text-blade-muted">
-              <div className="w-1.5 h-1.5 rounded-full bg-blade-accent animate-pulse" />
-              Building standup...
+            <div className="mt-3 space-y-2 animate-pulse">
+              <div className="h-4 rounded bg-blade-bg border border-blade-border/40 w-full" />
+              <div className="h-4 rounded bg-blade-bg border border-blade-border/40 w-4/5" />
+              <div className="h-4 rounded bg-blade-bg border border-blade-border/40 w-3/5" />
             </div>
           )}
         </section>
@@ -256,20 +274,40 @@ export function TemporalPanel({ onBack }: TemporalPanelProps) {
           </div>
 
           {patternsError && (
-            <div className="p-3 rounded-lg bg-red-950/40 border border-red-800/40 text-xs text-red-400">
-              {patternsError}
+            <div className="flex flex-col items-center gap-3 py-4 text-center">
+              <p className="text-xs text-red-400">{patternsError}</p>
+              <button
+                onClick={fetchPatterns}
+                className="px-3 py-1.5 rounded-lg bg-blade-surface border border-blade-border text-xs text-blade-secondary hover:text-blade-text hover:border-blade-accent/60 transition-colors"
+              >
+                Retry
+              </button>
             </div>
           )}
 
           {patternsLoading && (
-            <div className="flex items-center gap-2 text-2xs text-blade-muted py-4">
-              <div className="w-1.5 h-1.5 rounded-full bg-blade-accent animate-pulse" />
-              Analyzing your work patterns...
+            <div className="space-y-2 animate-pulse py-2">
+              {[0,1,2].map(i => (
+                <div key={i} className="h-12 rounded-lg bg-blade-bg border border-blade-border/40" />
+              ))}
             </div>
           )}
 
           {patterns && !patternsLoading && patterns.length === 0 && (
-            <p className="text-xs text-blade-muted py-4 text-center">No patterns detected yet. Use BLADE more to build temporal context.</p>
+            <div className="flex flex-col items-center gap-3 py-8 text-center">
+              <div className="w-10 h-10 rounded-xl bg-blade-surface border border-blade-border flex items-center justify-center">
+                <svg viewBox="0 0 24 24" className="w-5 h-5 text-blade-muted" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M12 2a10 10 0 100 20 10 10 0 000-20z" strokeLinecap="round" />
+                  <path d="M12 8v4l3 3" strokeLinecap="round" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-blade-secondary">Building your pattern profile</p>
+                <p className="text-xs text-blade-muted mt-1 max-w-xs leading-relaxed">
+                  BLADE needs a few days of activity to detect your work rhythms. Keep using it and check back soon.
+                </p>
+              </div>
+            </div>
           )}
 
           {patterns && !patternsLoading && patterns.length > 0 && (
@@ -287,7 +325,26 @@ export function TemporalPanel({ onBack }: TemporalPanelProps) {
           )}
 
           {!patterns && !patternsLoading && !patternsError && (
-            <p className="text-xs text-blade-muted py-4 text-center">Click Detect to analyse your work patterns.</p>
+            <div className="flex flex-col items-center gap-3 py-8 text-center">
+              <div className="w-10 h-10 rounded-xl bg-blade-surface border border-blade-border flex items-center justify-center">
+                <svg viewBox="0 0 24 24" className="w-5 h-5 text-blade-muted" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M12 2a10 10 0 100 20 10 10 0 000-20z" strokeLinecap="round" />
+                  <path d="M12 8v4l3 3" strokeLinecap="round" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-blade-secondary">BLADE needs a few days of activity</p>
+                <p className="text-xs text-blade-muted mt-1 max-w-xs leading-relaxed">
+                  Keep using BLADE normally and it will detect your focus patterns, peak hours, and work rhythms.
+                </p>
+              </div>
+              <button
+                onClick={fetchPatterns}
+                className="px-3 py-1.5 rounded-lg bg-blade-surface border border-blade-border text-xs text-blade-secondary hover:text-blade-text hover:border-blade-accent/60 transition-colors"
+              >
+                Check now anyway
+              </button>
+            </div>
           )}
         </section>
       </div>

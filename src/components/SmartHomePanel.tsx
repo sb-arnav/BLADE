@@ -407,16 +407,43 @@ export function SmartHomePanel({ onBack }: { onBack: () => void }) {
 
         {/* Loading / error */}
         {loading && (
-          <div className="flex items-center gap-2 text-blade-muted text-xs">
-            <div className="w-2 h-2 rounded-full bg-blade-accent animate-pulse" />
-            Loading devices...
+          <div className="space-y-3 animate-pulse">
+            <div className="h-4 w-24 rounded bg-blade-surface/60 mb-1" />
+            <div className="grid grid-cols-2 gap-2">
+              {[0,1,2,3].map(i => (
+                <div key={i} className="rounded-xl border border-blade-border/40 h-16 bg-blade-surface/40" />
+              ))}
+            </div>
           </div>
         )}
 
         {!loading && error && (
-          <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-xs text-red-400">
-            {error}
-            <p className="text-2xs text-blade-muted mt-1">Configure your Home Assistant URL and token above.</p>
+          <div className="flex flex-col gap-3 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-4">
+            <div className="flex items-start gap-2">
+              <svg viewBox="0 0 24 24" className="w-4 h-4 text-red-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 8v4M12 15v1" />
+              </svg>
+              <div>
+                <p className="text-xs font-medium text-red-400">Could not connect to Home Assistant</p>
+                <p className="text-2xs text-blade-muted mt-1">{error}</p>
+                <p className="text-2xs text-blade-muted mt-1">Check your URL and token in the Configure panel, then retry.</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setLoading(true); fetchEntities(); }}
+                className="px-3 py-1.5 rounded-lg bg-blade-surface border border-blade-border text-2xs text-blade-muted hover:text-blade-text transition-colors"
+              >
+                Retry
+              </button>
+              <button
+                onClick={() => setShowConfig(true)}
+                className="px-3 py-1.5 rounded-lg bg-blade-accent/10 border border-blade-accent/30 text-2xs text-blade-accent hover:bg-blade-accent/20 transition-colors"
+              >
+                Configure
+              </button>
+            </div>
           </div>
         )}
 
@@ -446,22 +473,52 @@ export function SmartHomePanel({ onBack }: { onBack: () => void }) {
         })}
 
         {!loading && !error && entities.length === 0 && !showConfig && (
-          <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-            <div className="w-10 h-10 rounded-xl bg-blade-surface border border-blade-border flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="w-5 h-5 text-blade-muted" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M9 22V12h6v10" strokeLinecap="round" strokeLinejoin="round" />
+          <div className="flex flex-col items-center justify-center gap-5 py-10 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-blade-surface border border-blade-border flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="w-7 h-7 text-blade-accent" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                <path d="M9 22V12h6v10" />
               </svg>
             </div>
             <div>
-              <p className="text-sm text-blade-secondary">No devices found</p>
-              <p className="text-2xs text-blade-muted mt-1">Connect your Home Assistant instance to get started.</p>
+              <p className="text-base font-semibold text-blade-text">Connect your smart home</p>
+              <p className="text-2xs text-blade-muted mt-1.5 max-w-xs leading-relaxed">
+                BLADE integrates with Home Assistant to let you control lights, switches, climate, and sensors right here.
+              </p>
             </div>
+
+            <div className="border border-blade-border/60 rounded-xl bg-blade-surface p-4 text-left max-w-xs w-full space-y-3">
+              <p className="text-xs font-semibold text-blade-secondary uppercase tracking-wider">Setup guide</p>
+              <div className="space-y-3 text-xs text-blade-secondary">
+                <div className="flex items-start gap-3">
+                  <span className="w-5 h-5 rounded-full bg-blade-accent/20 border border-blade-accent/40 text-blade-accent flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">1</span>
+                  <div>
+                    <p className="font-medium text-blade-text">Install Home Assistant</p>
+                    <p className="text-blade-muted mt-0.5">Download from homeassistant.io — runs on a Raspberry Pi, NAS, or VM on your network.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="w-5 h-5 rounded-full bg-blade-accent/20 border border-blade-accent/40 text-blade-accent flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">2</span>
+                  <div>
+                    <p className="font-medium text-blade-text">Get a long-lived access token</p>
+                    <p className="text-blade-muted mt-0.5">In HA: Profile → Long-Lived Access Tokens → Create Token. Copy it.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="w-5 h-5 rounded-full bg-blade-accent/20 border border-blade-accent/40 text-blade-accent flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">3</span>
+                  <div>
+                    <p className="font-medium text-blade-text">Paste your URL and token below</p>
+                    <p className="text-blade-muted mt-0.5">Typical URL: <span className="font-mono text-[10px]">http://homeassistant.local:8123</span></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <button
               onClick={() => setShowConfig(true)}
-              className="px-4 py-1.5 rounded-lg bg-blade-accent/10 border border-blade-accent/30 text-xs text-blade-accent hover:bg-blade-accent/20 transition-colors"
+              className="px-5 py-2 rounded-lg bg-blade-accent/10 border border-blade-accent/30 text-sm font-semibold text-blade-accent hover:bg-blade-accent/20 hover:border-blade-accent/50 transition-colors"
             >
-              Configure
+              Configure Home Assistant
             </button>
           </div>
         )}

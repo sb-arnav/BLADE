@@ -235,25 +235,53 @@ export function DecisionLog({ onBack }: { onBack: () => void }) {
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {loading && (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-2 h-2 rounded-full bg-blade-accent animate-pulse" />
+          <div className="space-y-3 animate-pulse">
+            {[0,1,2].map(i => (
+              <div key={i} className="border border-blade-border rounded-lg bg-blade-surface/40 h-20" />
+            ))}
           </div>
         )}
-        {error && (
-          <div className="border border-red-700/40 rounded-lg bg-red-900/10 p-4 text-xs text-red-400">
-            Failed to load decision log: {error}
+        {!loading && error && (
+          <div className="flex flex-col items-center justify-center py-12 gap-4 text-center">
+            <div className="w-10 h-10 rounded-xl bg-red-900/20 border border-red-700/40 flex items-center justify-center">
+              <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-red-400">
+                <circle cx="8" cy="8" r="6" />
+                <path d="M8 5v3.5M8 10.5v.5" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-blade-secondary">Something went wrong</p>
+              <p className="text-xs text-blade-muted mt-1 max-w-xs">Could not load decision log.</p>
+            </div>
+            <button
+              onClick={load}
+              className="px-4 py-1.5 text-xs font-medium rounded border border-blade-border text-blade-secondary hover:border-blade-accent/50 hover:text-blade-accent transition-all bg-blade-surface"
+            >
+              Retry
+            </button>
           </div>
         )}
         {!loading && !error && entries.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="w-8 h-8 rounded-full bg-blade-surface border border-blade-border flex items-center justify-center mb-3">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <circle cx="8" cy="8" r="6" />
-                <path d="M8 5v4M8 11v.5" />
+          <div className="flex flex-col items-center justify-center py-12 text-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-blade-surface border border-blade-border flex items-center justify-center">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className="text-blade-muted">
+                <path d="M9 11l3 3L22 4" />
+                <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
               </svg>
             </div>
-            <p className="text-sm text-blade-secondary">No decisions recorded yet</p>
-            <p className="text-xs text-blade-muted mt-1">The decision gate will log activity here as BLADE operates</p>
+            <div>
+              <p className="text-sm font-semibold text-blade-secondary">BLADE hasn't made any autonomous decisions yet</p>
+              <p className="text-xs text-blade-muted mt-1.5 max-w-xs leading-relaxed">
+                Enable God Mode Extreme in Settings to see BLADE think for itself — every decision it makes will be logged here with its reasoning.
+              </p>
+            </div>
+            <div className="border border-blade-border/50 rounded-lg bg-blade-surface/40 p-3 text-xs text-blade-muted text-left max-w-xs w-full space-y-1">
+              <p className="font-medium text-blade-secondary">Decision types logged:</p>
+              <p>· Act autonomously (low-risk, high-confidence)</p>
+              <p>· Ask user (ambiguous or reversible)</p>
+              <p>· Queue for later (time-insensitive)</p>
+              <p>· Ignore (noise or low priority)</p>
+            </div>
           </div>
         )}
         {!loading && entries.map((entry) => (
