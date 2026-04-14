@@ -307,8 +307,9 @@ pub async fn send_message_stream(
         let rough_tokens = messages.iter().map(|m| {
             m.content.len() / 4 + m.image_base64.as_ref().map(|_| 2000).unwrap_or(0)
         }).sum::<usize>();
-        if rough_tokens > 80_000 {
-            // Long conversation — route to long-context model if available
+        if rough_tokens > 80_000 && config.base_url.is_none() {
+            // Long conversation — route to long-context model if available.
+            // Skip when base_url is set: we don't know what models that endpoint supports.
             let gemini_key = crate::config::get_provider_key("gemini");
             if !gemini_key.is_empty() && config.provider != "gemini" {
                 config.provider = "gemini".to_string();
