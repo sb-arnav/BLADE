@@ -468,10 +468,24 @@ pub fn create_ghost_overlay(app: &tauri::AppHandle) -> Result<(), String> {
         }
     }
 
-    // Enable content protection (invisible to screen share) on Windows
+    // Enable content protection (invisible to screen share) on Windows.
+    // SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE = 0x11) makes the window
+    // invisible to screen capture / screen share tools.
     #[cfg(target_os = "windows")]
     {
-        let _ = window.set_content_protection(true);
+        if let Ok(hwnd) = window.hwnd() {
+            // Declare SetWindowDisplayAffinity via raw FFI.
+            // The Win32 HWND is a *mut c_void; we pass it as-is.
+            // WDA_EXCLUDEFROMCAPTURE = 0x00000011
+            extern "system" {
+                fn SetWindowDisplayAffinity(
+                    hwnd: *mut std::ffi::c_void,
+                    affinity: u32,
+                ) -> i32;
+            }
+            // windows::Win32::Foundation::HWND(pub *mut core::ffi::c_void)
+            unsafe { SetWindowDisplayAffinity(hwnd.0, 0x00000011); }
+        }
     }
 
     // Close on Escape via frontend JS injected at runtime

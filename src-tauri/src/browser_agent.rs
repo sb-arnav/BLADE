@@ -240,23 +240,21 @@ pub async fn browser_agent_loop(
 
         let raw = turn.content.trim().to_string();
 
-        // Strip markdown code fences if the model wrapped the JSON
-        let json_str = if raw.starts_with("```") {
-            raw.lines()
-                .filter(|l| !l.starts_with("```"))
-                .collect::<Vec<_>>()
-                .join("\n")
-        } else {
-            raw.clone()
-        };
+        // Use the structured-output repair helper: strips markdown fences,
+        // fixes trailing commas, extracts JSON from prose, etc.
+        let json_val = crate::providers::extract_and_repair_json(&raw)
+            .map_err(|e| format!(
+                "LLM returned unparseable action at step {}: {} — raw: {}",
+                step + 1, e, crate::safe_slice(&raw, 300)
+            ))?;
 
         // 4. Parse the action
-        let action: BrowserAction = serde_json::from_str(&json_str).map_err(|e| {
+        let action: BrowserAction = serde_json::from_value(json_val).map_err(|e| {
             format!(
                 "LLM returned invalid action JSON at step {}: {} — raw: {}",
                 step + 1,
                 e,
-                raw
+                crate::safe_slice(&raw, 300)
             )
         })?;
 

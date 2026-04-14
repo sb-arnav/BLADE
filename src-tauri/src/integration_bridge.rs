@@ -64,28 +64,31 @@ fn now_secs() -> i64 {
 }
 
 fn default_configs() -> Vec<IntegrationConfig> {
+    // Services default to enabled=true so simulated data populates immediately.
+    // When a real MCP server is configured, the same poll path uses live data.
+    // Users can disable individual services via integration_toggle().
     vec![
         IntegrationConfig {
             service: "gmail".to_string(),
-            enabled: false,
+            enabled: true,
             poll_interval_secs: 120,
             last_poll: 0,
         },
         IntegrationConfig {
             service: "calendar".to_string(),
-            enabled: false,
+            enabled: true,
             poll_interval_secs: 300,
             last_poll: 0,
         },
         IntegrationConfig {
             service: "slack".to_string(),
-            enabled: false,
+            enabled: true,
             poll_interval_secs: 60,
             last_poll: 0,
         },
         IntegrationConfig {
             service: "github".to_string(),
-            enabled: false,
+            enabled: true,
             poll_interval_secs: 300,
             last_poll: 0,
         },
@@ -315,34 +318,43 @@ fn stash_app_handle(app: AppHandle) {
 pub async fn start_integration_polling(app: AppHandle) {
     stash_app_handle(app);
 
+    // Run one initial poll immediately so simulated data is available on first
+    // call to get_integration_context(), even before the first 15-second tick.
+    run_due_polls().await;
+
     tauri::async_runtime::spawn(async move {
         loop {
-            let configs = get_configs();
-            let now = now_secs();
-
-            for cfg in &configs {
-                if !cfg.enabled {
-                    continue;
-                }
-                let elapsed = now - cfg.last_poll;
-                if elapsed < cfg.poll_interval_secs as i64 {
-                    continue;
-                }
-
-                poll_service(&cfg.service).await;
-
-                // Update last_poll timestamp
-                let mut all = get_configs();
-                if let Some(entry) = all.iter_mut().find(|c| c.service == cfg.service) {
-                    entry.last_poll = now_secs();
-                }
-                set_configs(all);
-            }
-
             // Tick every 15 seconds — fine-grained enough for short intervals
             tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
+            run_due_polls().await;
         }
     });
+}
+
+/// Poll every enabled service that is past its interval. Extracted so both the
+/// startup eager-poll and the loop body share the same logic.
+async fn run_due_polls() {
+    let configs = get_configs();
+    let now = now_secs();
+
+    for cfg in &configs {
+        if !cfg.enabled {
+            continue;
+        }
+        let elapsed = now - cfg.last_poll;
+        if elapsed < cfg.poll_interval_secs as i64 {
+            continue;
+        }
+
+        poll_service(&cfg.service).await;
+
+        // Update last_poll timestamp
+        let mut all = get_configs();
+        if let Some(entry) = all.iter_mut().find(|c| c.service == cfg.service) {
+            entry.last_poll = now_secs();
+        }
+        set_configs(all);
+    }
 }
 
 /// Poll a single service and store results. Used by both the loop and
@@ -389,8 +401,14 @@ pub fn get_integration_state() -> IntegrationState {
 pub fn get_integration_context() -> String {
     let state = get_integration_state();
 
-    // Nothing collected yet (all zeros and no events)
-    if state.last_updated == 0 {
+    // Nothing collected yet — poll hasn't run (all services may be disabled or
+    // polling hasn't fired). Return empty so we don't surface stale zeros.
+    if state.last_updated == 0
+        && state.unread_emails == 0
+        && state.upcoming_events.is_empty()
+        && state.slack_mentions == 0
+        && state.github_notifications == 0
+    {
         return String::new();
     }
 
@@ -450,8 +468,20 @@ pub fn integration_toggle(service: String, enabled: bool) -> Result<(), String> 
 }
 
 /// Force an immediate poll for a specific service.
+/// Works regardless of the service's enabled flag — allows the UI to trigger
+/// a one-off refresh without permanently enabling background polling.
 #[tauri::command]
 pub async fn integration_poll_now(service: String) -> Result<IntegrationState, String> {
+    let known = ["gmail", "calendar", "slack", "github"];
+    if !known.contains(&service.as_str()) {
+        return Err(format!("Unknown integration service: {}", service));
+    }
     poll_service(&service).await;
+    // Update last_poll timestamp so the background loop doesn't immediately re-poll
+    let mut all = get_configs();
+    if let Some(entry) = all.iter_mut().find(|c| c.service == service) {
+        entry.last_poll = now_secs();
+    }
+    set_configs(all);
     Ok(get_integration_state())
 }

@@ -166,10 +166,20 @@ pub async fn start_voice_conversation(app: tauri::AppHandle) -> Result<(), Strin
 
     let result = run_conversation_loop(app.clone()).await;
 
-    CONV_ACTIVE.store(false, Ordering::SeqCst);
+    // If CONV_ACTIVE was set to false by the mic-init thread (no device),
+    // map a successful-but-empty result into a meaningful error.
+    let result = if result.is_ok() && !CONV_ACTIVE.swap(false, Ordering::SeqCst) {
+        // CONV_ACTIVE was already false — mic thread killed it
+        Err("No microphone available. Connect a mic and try again.".to_string())
+    } else {
+        CONV_ACTIVE.store(false, Ordering::SeqCst);
+        result
+    };
+
     TTS_INTERRUPT.store(false, Ordering::SeqCst);
-    let _ = app.emit("voice_conversation_ended", serde_json::json!({ "reason": "stopped" }));
-    log::info!("[voice_conv] conversation ended");
+    let reason = if result.is_err() { "no_mic" } else { "stopped" };
+    let _ = app.emit("voice_conversation_ended", serde_json::json!({ "reason": reason }));
+    log::info!("[voice_conv] conversation ended: {}", reason);
     result
 }
 
@@ -204,11 +214,20 @@ async fn run_conversation_loop(app: tauri::AppHandle) -> Result<(), String> {
         let host = cpal::default_host();
         let device = match host.default_input_device() {
             Some(d) => d,
-            None => { log::warn!("[voice_conv] no input device"); return; }
+            None => {
+                log::warn!("[voice_conv] no input device — voice conversation unavailable");
+                // Signal the async loop to exit by setting CONV_ACTIVE = false
+                CONV_ACTIVE.store(false, Ordering::SeqCst);
+                return;
+            }
         };
         let cpal_config = match device.default_input_config() {
             Ok(c) => c,
-            Err(e) => { log::warn!("[voice_conv] mic config error: {}", e); return; }
+            Err(e) => {
+                log::warn!("[voice_conv] mic config error: {} — voice conversation unavailable", e);
+                CONV_ACTIVE.store(false, Ordering::SeqCst);
+                return;
+            }
         };
 
         let sample_rate = cpal_config.sample_rate().0;
@@ -357,8 +376,16 @@ async fn run_conversation_loop(app: tauri::AppHandle) -> Result<(), String> {
                                 break 'outer;
                             }
 
+                            // Check cancel before the (potentially slow) AI call
+                            if !CONV_ACTIVE.load(Ordering::Relaxed) {
+                                break 'outer;
+                            }
                             // Process through chat pipeline
                             let response = process_voice_turn(&app, &trimmed).await;
+                            // Check cancel again after AI returns — user may have hit stop
+                            if !CONV_ACTIVE.load(Ordering::Relaxed) {
+                                break 'outer;
+                            }
                             match response {
                                 Ok(reply) if !reply.trim().is_empty() => {
                                     log::info!("[voice_conv] speaking reply ({} chars)", reply.len());
@@ -366,7 +393,10 @@ async fn run_conversation_loop(app: tauri::AppHandle) -> Result<(), String> {
                                     let _ = app.emit("voice_conversation_speaking", serde_json::json!({ "text": &reply }));
                                     let _ = crate::tts::speak_and_wait(&app, &reply).await;
                                     TTS_INTERRUPT.store(false, Ordering::SeqCst);
-                                    let _ = app.emit("voice_conversation_listening", serde_json::json!({ "active": true }));
+                                    // Only re-enter listening state if still active
+                                    if CONV_ACTIVE.load(Ordering::Relaxed) {
+                                        let _ = app.emit("voice_conversation_listening", serde_json::json!({ "active": true }));
+                                    }
                                 }
                                 Ok(_) => {}
                                 Err(e) => {

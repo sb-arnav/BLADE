@@ -233,10 +233,14 @@ async fn coordinator_loop(
                     let q = queue.lock().await;
                     let status = q.get(agent_id).map(|a| a.status.clone());
                     let result = q.get(agent_id).and_then(|a| {
-                        a.steps.iter()
-                            .filter(|s| s.status == StepStatus::Completed)
-                            .last()
-                            .and_then(|s| s.result.clone())
+                        // Prefer the Stage-4 synthesized result stored in context;
+                        // fall back to the last completed step's raw output.
+                        a.context.get("synthesized_result").cloned().or_else(|| {
+                            a.steps.iter()
+                                .filter(|s| s.status == StepStatus::Completed)
+                                .last()
+                                .and_then(|s| s.result.clone())
+                        })
                     });
                     (status, result)
                 };
@@ -320,10 +324,54 @@ async fn coordinator_loop(
             None => break,
         };
 
+        // Cascade failures: if a task's dependency has failed, mark it Failed too
+        // so the swarm can terminate rather than waiting forever on blocked tasks.
+        {
+            let failed_ids: std::collections::HashSet<String> = swarm.tasks
+                .iter()
+                .filter(|t| t.status == SwarmTaskStatus::Failed)
+                .map(|t| t.id.clone())
+                .collect();
+
+            if !failed_ids.is_empty() {
+                let to_fail: Vec<String> = swarm.tasks
+                    .iter()
+                    .filter(|t| {
+                        matches!(t.status, SwarmTaskStatus::Pending | SwarmTaskStatus::Ready | SwarmTaskStatus::Blocked)
+                            && t.depends_on.iter().any(|dep| failed_ids.contains(dep))
+                    })
+                    .map(|t| t.id.clone())
+                    .collect();
+
+                for blocked_id in to_fail {
+                    swarm::update_task_status(
+                        &blocked_id,
+                        &SwarmTaskStatus::Failed,
+                        None,
+                        None,
+                        Some("Dependency failed"),
+                    );
+                    let _ = app.emit("swarm_task_failed", serde_json::json!({
+                        "swarm_id": swarm_id,
+                        "task_id": &blocked_id,
+                        "error": "Dependency failed",
+                    }));
+                }
+
+                // Reload after cascading
+                swarm = match swarm::load_swarm(swarm_id) {
+                    Some(s) => s,
+                    None => break,
+                };
+            }
+        }
+
         let tasks = &swarm.tasks;
 
-        // 2. Check if all tasks are done
-        let all_done = tasks.iter().all(|t| matches!(t.status, SwarmTaskStatus::Completed | SwarmTaskStatus::Failed));
+        // 2. Check if all tasks are done (either completed or failed — nothing still running/pending).
+        // Guard: treat an empty task list as "not done" to avoid premature synthesis.
+        let all_done = !tasks.is_empty()
+            && tasks.iter().all(|t| matches!(t.status, SwarmTaskStatus::Completed | SwarmTaskStatus::Failed));
         if all_done {
             // Pass all typed scratchpad entries to synthesis so the final result is richer
             let final_result = crate::swarm_planner::synthesize_final_result_with_scratchpad(
@@ -560,7 +608,9 @@ pub fn swarm_write_scratchpad_entry(
 
 #[tauri::command]
 pub fn swarm_read_scratchpad(swarm_id: String, key: String) -> Option<String> {
-    swarm::load_swarm(&swarm_id)?.scratchpad.remove(&key)
+    // Use get() not remove() — the in-memory map is not persisted back, so
+    // remove() was silently dropping the entry without actually deleting from DB.
+    swarm::load_swarm(&swarm_id)?.scratchpad.get(&key).cloned()
 }
 
 /// Get real-time progress snapshot for a swarm — rich data for the frontend.

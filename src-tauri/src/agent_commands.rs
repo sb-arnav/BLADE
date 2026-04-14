@@ -452,6 +452,14 @@ pub(crate) async fn run_agent_loop_internal(
         .await
         {
             Ok(result) => {
+                // Store the synthesized result on the agent so the swarm coordinator
+                // can read it instead of falling back to the last step's raw output.
+                {
+                    let mut q = queue.lock().await;
+                    if let Some(agent) = q.get_mut(agent_id) {
+                        agent.context.insert("synthesized_result".to_string(), result.clone());
+                    }
+                }
                 let _ = app.emit(
                     "agent_synthesized",
                     serde_json::json!({

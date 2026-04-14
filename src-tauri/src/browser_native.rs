@@ -145,10 +145,16 @@ pub async fn connect_to_user_browser() -> Result<String, String> {
         }
     }
 
-    // Create a new tab and return its session id
+    // Use a stable session_id for the user browser so re-calling this command
+    // doesn't create a new blank tab each time.
     let session_id = format!("user_browser_{}", browser);
-    // Seed the session by opening a blank page so the store entry exists
-    let _ = get_or_create_session_on_port(&session_id, None, port).await?;
+
+    // Only create a new session entry if we don't already have one.
+    let already_have_session = session_store().lock().await.contains_key(&session_id);
+    if !already_have_session {
+        let _ = get_or_create_session_on_port(&session_id, None, port).await?;
+    }
+
     Ok(session_id)
 }
 
@@ -942,6 +948,21 @@ async fn cdp_call(
     method: &str,
     params: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
+    // Wrap the whole call in a 15-second timeout so a hung browser doesn't
+    // block the agent loop indefinitely.
+    tokio::time::timeout(
+        std::time::Duration::from_secs(15),
+        cdp_call_inner(ws_url, method, params),
+    )
+    .await
+    .map_err(|_| format!("CDP command '{}' timed out after 15 seconds", method))?
+}
+
+async fn cdp_call_inner(
+    ws_url: &str,
+    method: &str,
+    params: serde_json::Value,
+) -> Result<serde_json::Value, String> {
     let (mut stream, _) = tokio_tungstenite::connect_async(ws_url)
         .await
         .map_err(|error| format!("Failed to connect to browser debugger: {}", error))?;
@@ -958,17 +979,20 @@ async fn cdp_call(
         .await
         .map_err(|error| format!("Failed to send browser debugger command: {}", error))?;
 
+    // Drain incoming frames, skipping events (no "id" field) until we get our response.
     while let Some(frame) = stream.next().await {
         let frame = frame.map_err(|error| format!("Browser debugger read failed: {}", error))?;
         if let tokio_tungstenite::tungstenite::Message::Text(text) = frame {
             let value: serde_json::Value = serde_json::from_str(&text)
                 .map_err(|error| format!("Invalid browser debugger response: {}", error))?;
+            // Skip CDP event frames (push notifications with no "id")
             if value.get("id").and_then(|id| id.as_i64()) == Some(1) {
                 if let Some(error) = value.get("error") {
                     return Err(format!("Browser debugger command failed: {}", error));
                 }
                 return Ok(value.get("result").cloned().unwrap_or_else(|| json!({})));
             }
+            // Ignore CDP events (method: "DOM.documentUpdated", etc.) and keep reading
         }
     }
 
@@ -987,12 +1011,26 @@ async fn eval_js(ws_url: &str, expression: &str) -> Result<String, String> {
     )
     .await?;
 
-    Ok(result
-        .get("result")
-        .and_then(|value| value.get("value"))
-        .and_then(|value| value.as_str())
-        .unwrap_or_default()
-        .to_string())
+    // Check for JS exceptions returned in the result
+    let result_obj = result.get("result");
+    if let Some(obj) = result_obj {
+        if obj.get("subtype").and_then(|v| v.as_str()) == Some("error") {
+            let desc = obj.get("description").and_then(|v| v.as_str()).unwrap_or("JS exception");
+            return Err(format!("JS error: {}", desc));
+        }
+    }
+
+    // Coerce any JSON value type to a string — as_str() only works on JSON strings,
+    // but JS may return numbers, booleans, or null which we want as text too.
+    let val = result_obj.and_then(|o| o.get("value"));
+    let text = match val {
+        Some(serde_json::Value::String(s)) => s.clone(),
+        Some(serde_json::Value::Number(n)) => n.to_string(),
+        Some(serde_json::Value::Bool(b)) => b.to_string(),
+        Some(serde_json::Value::Null) | None => String::new(),
+        Some(other) => other.to_string(),
+    };
+    Ok(text)
 }
 
 async fn wait_for_page_ready(ws_url: &str) -> Result<(), String> {

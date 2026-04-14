@@ -133,7 +133,7 @@ function RoleSwitcher() {
                   w-full flex items-center gap-2.5 px-3 py-2.5 text-left
                   transition-all duration-150
                   ${isActive
-                    ? "bg-blade-accent/8 text-blade-text"
+                    ? "bg-blade-accent/10 text-blade-text"
                     : "text-blade-secondary hover:text-blade-text hover:bg-blade-surface-hover"
                   }
                 `}
@@ -144,13 +144,6 @@ function RoleSwitcher() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-2xs font-medium">{role.name}</span>
-                    {isActive && (
-                      <span className={`text-3xs font-bold uppercase tracking-wider px-1 py-0.5 rounded ${color} bg-current/10`}
-                        style={{ background: "currentColor", opacity: 1 }}
-                      >
-                        <span className="opacity-0 absolute">.</span>
-                      </span>
-                    )}
                   </div>
                   <p className="text-3xs text-blade-muted/50 mt-0.5">{role.tagline}</p>
                 </div>

@@ -165,8 +165,20 @@ pub async fn computer_use_task(
                     }));
                     history.push(format!("  → ERROR: {}", e));
                 } else {
-                    // Small delay between actions to let the screen settle
-                    tokio::time::sleep(std::time::Duration::from_millis(800)).await;
+                    // Small delay between actions to let the screen settle.
+                    // Check stop signal every 100 ms during the settle delay.
+                    let settle_deadline = std::time::Instant::now()
+                        + std::time::Duration::from_millis(800);
+                    while std::time::Instant::now() < settle_deadline {
+                        if is_stopped(&goal) {
+                            return Ok(ComputerUseResult {
+                                success: false,
+                                steps_taken,
+                                result: "Task stopped by user.".to_string(),
+                            });
+                        }
+                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                    }
                 }
             }
         }
@@ -257,19 +269,12 @@ async fn call_vision_model(
     .await?;
 
     let raw = turn.content.trim();
-    // Strip markdown code fences if present
-    let json_str = if raw.starts_with("```") {
-        raw.lines()
-            .skip(1)
-            .take_while(|l| !l.starts_with("```"))
-            .collect::<Vec<_>>()
-            .join("\n")
-    } else {
-        raw.to_string()
-    };
+    // Use the structured-output repair helper to handle fences, trailing commas, etc.
+    let json_val = crate::providers::extract_and_repair_json(raw)
+        .map_err(|e| format!("Failed to parse action JSON: {} — raw: {}", e, crate::safe_slice(raw, 200)))?;
 
-    serde_json::from_str::<ComputerAction>(&json_str)
-        .map_err(|e| format!("Failed to parse action JSON: {} — raw: {}", e, crate::safe_slice(&json_str, 200)))
+    serde_json::from_value::<ComputerAction>(json_val)
+        .map_err(|e| format!("Failed to deserialize action: {} — raw: {}", e, crate::safe_slice(raw, 200)))
 }
 
 async fn execute_action(action: &ComputerAction) -> Result<(), String> {
@@ -308,7 +313,15 @@ async fn execute_action(action: &ComputerAction) -> Result<(), String> {
             Ok(())
         }
         ComputerAction::Wait { ms, .. } => {
-            tokio::time::sleep(std::time::Duration::from_millis(*ms)).await;
+            // Cap wait to 10 seconds; break early if the stop signal fires.
+            let capped_ms = (*ms).min(10_000);
+            let deadline = std::time::Instant::now() + std::time::Duration::from_millis(capped_ms);
+            while std::time::Instant::now() < deadline {
+                if STOP_SIGNAL.load(std::sync::atomic::Ordering::Relaxed) {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
             Ok(())
         }
         _ => Ok(()), // Done/Failed/NeedApproval handled in main loop

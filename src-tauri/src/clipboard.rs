@@ -195,11 +195,24 @@ pub fn start_clipboard_watcher(app: AppHandle) {
 
                     // Kick off background pre-analysis if content is actionable
                     let kind = classify_content(&trimmed);
+                    let kind_str = format!("{:?}", kind).to_lowercase();
+
                     if should_prefetch(&trimmed, &kind) {
                         let text_clone = trimmed.clone();
                         let app_clone = app.clone();
+                        let kind_clone = kind.clone();
                         tauri::async_runtime::spawn(async move {
-                            prefetch_analysis(text_clone, kind, app_clone).await;
+                            prefetch_analysis(text_clone, kind_clone, app_clone).await;
+                        });
+                    }
+
+                    // Route through decision gate for autonomous/suggested actions.
+                    // Only act on clearly structured content (not plain Other text).
+                    if !matches!(kind, ClipboardContentType::Other) {
+                        let text_clone = trimmed.clone();
+                        let app_clone = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            clipboard_auto_action(&app_clone, &text_clone, &kind_str).await;
                         });
                     }
                 }

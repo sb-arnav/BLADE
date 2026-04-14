@@ -122,7 +122,7 @@ fn gather_context_at(hours_ago: u32) -> String {
                 let entries: Vec<String> = rows
                     .flatten()
                     .map(|(role, content, _ts)| {
-                        let snippet = &content[..content.len().min(200)];
+                        let snippet = crate::safe_slice(&content, 200);
                         format!("[{}]: {}…", role, snippet)
                     })
                     .collect();
@@ -182,7 +182,8 @@ fn gather_yesterday_context() -> String {
 
     let mut parts: Vec<String> = Vec::new();
 
-    // Git commits made since yesterday
+    // Git commits made since yesterday — run from home dir; silently skip if not in a repo
+    let git_cwd = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
     if let Ok(output) = std::process::Command::new("git")
         .args([
             "log",
@@ -191,23 +192,29 @@ fn gather_yesterday_context() -> String {
             "--since=24 hours ago",
             "--format=%h %s (%ar)",
         ])
+        .current_dir(&git_cwd)
         .output()
     {
-        let commits = String::from_utf8_lossy(&output.stdout).to_string();
-        if !commits.trim().is_empty() {
-            parts.push(format!("Git commits (last 24h):\n{}", commits.trim()));
+        if output.status.success() {
+            let commits = String::from_utf8_lossy(&output.stdout).to_string();
+            if !commits.trim().is_empty() {
+                parts.push(format!("Git commits (last 24h):\n{}", commits.trim()));
+            }
         }
     }
 
     // Files changed in git since yesterday
     if let Ok(output) = std::process::Command::new("git")
         .args(["diff", "--name-only", "HEAD@{24 hours ago}", "HEAD"])
+        .current_dir(&git_cwd)
         .output()
     {
-        let files = String::from_utf8_lossy(&output.stdout).to_string();
-        if !files.trim().is_empty() {
-            let file_list: Vec<&str> = files.lines().take(20).collect();
-            parts.push(format!("Files changed:\n{}", file_list.join("\n")));
+        if output.status.success() {
+            let files = String::from_utf8_lossy(&output.stdout).to_string();
+            if !files.trim().is_empty() {
+                let file_list: Vec<&str> = files.lines().take(20).collect();
+                parts.push(format!("Files changed:\n{}", file_list.join("\n")));
+            }
         }
     }
 
@@ -262,7 +269,7 @@ fn gather_yesterday_context() -> String {
                 let entries: Vec<String> = rows
                     .flatten()
                     .map(|c| {
-                        let snippet = &c[..c.len().min(150)];
+                        let snippet = crate::safe_slice(&c, 150);
                         format!("  - {}", snippet)
                     })
                     .collect();
@@ -303,7 +310,8 @@ pub fn detect_patterns() -> Vec<TemporalPattern> {
         .map(|rows| rows.flatten().collect())
         .unwrap_or_default();
 
-    if timestamps.len() < 20 {
+    // Require at least a few data points — 3 screenshots is enough for basic patterns
+    if timestamps.len() < 3 {
         return vec![];
     }
 
@@ -332,14 +340,16 @@ pub fn detect_patterns() -> Vec<TemporalPattern> {
 
     let mut patterns: Vec<TemporalPattern> = Vec::new();
 
-    // --- Work start time ---
-    if day_first_hour.len() >= 5 {
+    // --- Work start time --- (require at least 3 days of data)
+    if day_first_hour.len() >= 3 {
         let first_hours: Vec<u32> = day_first_hour.values().copied().collect();
         let avg_start = first_hours.iter().sum::<u32>() as f64 / first_hours.len() as f64;
         let round_hour = avg_start.round() as u32;
+        // With fewer data points, lower the confidence threshold slightly
+        let min_confidence = if first_hours.len() < 5 { 0.5 } else { 0.4 };
         let confidence = calculate_hour_consistency(&first_hours, round_hour);
 
-        if confidence > 0.4 {
+        if confidence >= min_confidence {
             patterns.push(TemporalPattern {
                 pattern_type: "work_start".to_string(),
                 description: format!(
@@ -353,14 +363,15 @@ pub fn detect_patterns() -> Vec<TemporalPattern> {
         }
     }
 
-    // --- Wrap-up time ---
-    if day_last_hour.len() >= 5 {
+    // --- Wrap-up time --- (require at least 3 days of data)
+    if day_last_hour.len() >= 3 {
         let last_hours: Vec<u32> = day_last_hour.values().copied().collect();
         let avg_end = last_hours.iter().sum::<u32>() as f64 / last_hours.len() as f64;
         let round_hour = avg_end.round() as u32;
+        let min_confidence = if last_hours.len() < 5 { 0.5 } else { 0.4 };
         let confidence = calculate_hour_consistency(&last_hours, round_hour);
 
-        if confidence > 0.4 {
+        if confidence >= min_confidence {
             patterns.push(TemporalPattern {
                 pattern_type: "work_end".to_string(),
                 description: format!(
@@ -435,7 +446,8 @@ pub fn detect_patterns() -> Vec<TemporalPattern> {
         })
         .count();
     let total_count = timestamps.len();
-    if total_count > 50 {
+    // Need at least a few data points to draw weekday/weekend conclusions
+    if total_count >= 10 {
         let weekday_fraction = weekday_count as f64 / total_count as f64;
         if weekday_fraction > 0.8 {
             patterns.push(TemporalPattern {
@@ -553,7 +565,7 @@ pub async fn meeting_prep(topic: String) -> Result<String, String> {
                         let dt = chrono::DateTime::from_timestamp(ts / 1000, 0)
                             .map(|d| d.with_timezone(&chrono::Local).format("%b %d").to_string())
                             .unwrap_or_else(|| "unknown date".to_string());
-                        let snippet = &content[..content.len().min(300)];
+                        let snippet = crate::safe_slice(&content, 300);
                         format!("[{} - {}]: {}", role, dt, snippet)
                     })
                     .collect();
@@ -587,7 +599,7 @@ pub async fn meeting_prep(topic: String) -> Result<String, String> {
                 let entries: Vec<String> = rows
                     .flatten()
                     .map(|(title, content)| {
-                        let snippet = &content[..content.len().min(400)];
+                        let snippet = crate::safe_slice(&content, 400);
                         format!("**{}**: {}", title, snippet)
                     })
                     .collect();

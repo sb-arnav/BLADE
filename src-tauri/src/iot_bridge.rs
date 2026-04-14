@@ -216,6 +216,19 @@ pub async fn ha_call_service(
 
 const SPOTIFY_LOCAL_PORT: u16 = 4381;
 
+/// Quick TCP-connect check: is Spotify's local API port open?
+/// Returns false immediately if the port is not listening so we can skip the
+/// slower HTTPS call entirely.
+async fn spotify_is_running() -> bool {
+    use tokio::net::TcpStream;
+    use tokio::time::{timeout, Duration};
+    let addr = format!("127.0.0.1:{}", SPOTIFY_LOCAL_PORT);
+    timeout(Duration::from_millis(200), TcpStream::connect(&addr))
+        .await
+        .map(|r| r.is_ok())
+        .unwrap_or(false)
+}
+
 /// Build a reqwest client that skips TLS verification for the Spotify local API.
 /// The local server uses a self-signed cert so we must accept it.
 fn spotify_client() -> Result<reqwest::Client, String> {
@@ -275,6 +288,9 @@ async fn spotify_get_tokens() -> Result<(String, String), String> {
 /// Get the currently playing track from Spotify desktop.
 /// Returns None if Spotify is idle / nothing is playing.
 pub async fn spotify_now_playing() -> Result<Option<SpotifyTrack>, String> {
+    if !spotify_is_running().await {
+        return Err("Spotify does not appear to be running (port 4381 not open).".to_string());
+    }
     let client = spotify_client()?;
     let (csrf, oauth) = spotify_get_tokens().await?;
 
@@ -334,6 +350,9 @@ pub async fn spotify_now_playing() -> Result<Option<SpotifyTrack>, String> {
 
 /// Toggle play/pause in Spotify desktop.
 pub async fn spotify_play_pause() -> Result<(), String> {
+    if !spotify_is_running().await {
+        return Err("Spotify does not appear to be running (port 4381 not open).".to_string());
+    }
     let client = spotify_client()?;
     let (csrf, oauth) = spotify_get_tokens().await?;
 
@@ -375,6 +394,9 @@ pub async fn spotify_play_pause() -> Result<(), String> {
 
 /// Skip to the next track in Spotify desktop.
 pub async fn spotify_next_track() -> Result<(), String> {
+    if !spotify_is_running().await {
+        return Err("Spotify does not appear to be running (port 4381 not open).".to_string());
+    }
     let client = spotify_client()?;
     let (csrf, oauth) = spotify_get_tokens().await?;
 

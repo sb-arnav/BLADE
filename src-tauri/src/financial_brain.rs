@@ -880,11 +880,24 @@ fn parse_csv_row(
 
 /// Normalize date strings from various bank formats to YYYY-MM-DD.
 fn normalize_date(s: &str) -> Option<String> {
-    let s = s.trim().trim_matches('"');
-    // Try common formats
+    let s = s.trim().trim_matches('"').trim();
+    if s.is_empty() {
+        return None;
+    }
+    // Try common formats in order of likelihood
     let formats = [
-        "%m/%d/%Y", "%Y-%m-%d", "%d-%m-%Y", "%m-%d-%Y",
-        "%m/%d/%y", "%d/%m/%Y", "%Y/%m/%d",
+        "%m/%d/%Y",   // 01/31/2024   (US, most US banks)
+        "%Y-%m-%d",   // 2024-01-31   (ISO)
+        "%m/%d/%y",   // 01/31/24     (US 2-digit year)
+        "%d/%m/%Y",   // 31/01/2024   (European)
+        "%d-%m-%Y",   // 31-01-2024
+        "%m-%d-%Y",   // 01-31-2024
+        "%Y/%m/%d",   // 2024/01/31
+        "%b %d, %Y",  // Jan 31, 2024  (long-form, some PDFs)
+        "%B %d, %Y",  // January 31, 2024
+        "%d %b %Y",   // 31 Jan 2024
+        "%d %B %Y",   // 31 January 2024
+        "%b %d %Y",   // Jan 31 2024  (no comma)
     ];
     for fmt in &formats {
         if let Ok(d) = chrono::NaiveDate::parse_from_str(s, fmt) {
@@ -894,16 +907,45 @@ fn normalize_date(s: &str) -> Option<String> {
     None
 }
 
-/// Parse an amount string like "$1,234.56" or "-1234.56" into f64.
+/// Parse an amount string like "$1,234.56", "€1.234,56", "(123.45)", or "-1234.56" into f64.
 fn parse_amount(s: &str) -> Option<f64> {
+    let s = s.trim().trim_matches('"');
+
+    // Detect parenthesised negatives like (1,234.56) — common in bank exports
+    let (s, negate) = if s.starts_with('(') && s.ends_with(')') {
+        (&s[1..s.len() - 1], true)
+    } else {
+        (s, false)
+    };
+
+    // Strip currency symbols and whitespace
     let cleaned: String = s
-        .trim()
-        .trim_matches('"')
-        .replace(',', "")
-        .replace('$', "")
-        .replace(' ', "");
-    if cleaned.is_empty() { return None; }
-    cleaned.parse::<f64>().ok()
+        .chars()
+        .filter(|c| c.is_ascii_digit() || *c == '.' || *c == '-' || *c == ',')
+        .collect::<String>()
+        // Handle European formats where comma is the decimal separator:
+        // If the string has a comma after the last dot (or no dot), it may be European.
+        // Simple heuristic: if there's a comma but no dot, treat comma as decimal.
+        ;
+
+    // Detect decimal-comma format: "1.234,56" → remove dots, replace comma with dot
+    let normalized = if cleaned.contains(',') && cleaned.contains('.') {
+        // Likely "1,234.56" (thousands comma, decimal dot) — just remove commas
+        cleaned.replace(',', "")
+    } else if cleaned.contains(',') && !cleaned.contains('.') {
+        // Likely "1234,56" (European decimal comma) — replace comma with dot
+        cleaned.replace(',', ".")
+    } else {
+        // Plain "1234.56" or "-1234.56"
+        cleaned
+    };
+
+    if normalized.is_empty() || normalized == "-" {
+        return None;
+    }
+
+    let val: f64 = normalized.parse().ok()?;
+    if negate { Some(-val.abs()) } else { Some(val) }
 }
 
 /// Import transactions from a CSV file exported by a bank.
@@ -1187,7 +1229,7 @@ pub fn detect_subscriptions() -> Result<Vec<serde_json::Value>, String> {
         let consistent = amounts.iter().all(|a| (a - median).abs() / median.max(0.01) < 0.10);
         if !consistent { continue; }
 
-        // Check monthly pattern: gaps between consecutive charges ~25-35 days
+        // Check recurring pattern: weekly (~7 days), monthly (~30 days), or annual (~365 days)
         let dates: Vec<chrono::NaiveDate> = charges
             .iter()
             .filter_map(|(_, d)| chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
@@ -1195,18 +1237,38 @@ pub fn detect_subscriptions() -> Result<Vec<serde_json::Value>, String> {
         if dates.len() < 2 { continue; }
 
         let gaps: Vec<i64> = dates.windows(2).map(|w| (w[1] - w[0]).num_days()).collect();
-        let monthly_gaps = gaps.iter().filter(|&&g| g >= 20 && g <= 40).count();
-        let is_monthly = monthly_gaps >= (gaps.len() / 2).max(1);
-        if !is_monthly { continue; }
+
+        let weekly_gaps  = gaps.iter().filter(|&&g| g >= 5  && g <= 10).count();
+        let monthly_gaps = gaps.iter().filter(|&&g| g >= 20 && g <= 45).count();
+        let annual_gaps  = gaps.iter().filter(|&&g| g >= 340 && g <= 390).count();
+
+        // Majority of gaps must match a single frequency pattern
+        let threshold = (gaps.len() / 2).max(1);
+        let (is_recurring, frequency) = if monthly_gaps >= threshold {
+            (true, "monthly")
+        } else if weekly_gaps >= threshold {
+            (true, "weekly")
+        } else if annual_gaps >= threshold {
+            (true, "annual")
+        } else {
+            (false, "")
+        };
+        if !is_recurring { continue; }
+        let frequency = frequency.to_string();
 
         let last_date = dates.last().map(|d| d.to_string()).unwrap_or_default();
+        let annual_cost = match frequency.as_str() {
+            "weekly"  => (median * 52.0 * 100.0).round() / 100.0,
+            "annual"  => (median * 100.0).round() / 100.0,
+            _         => (median * 12.0 * 100.0).round() / 100.0, // monthly
+        };
         subscriptions.push(serde_json::json!({
             "merchant": merchant_key,
             "amount": (median * 100.0).round() / 100.0,
-            "frequency": "monthly",
+            "frequency": frequency,
             "occurrences": charges.len(),
             "last_charge": last_date,
-            "annual_cost": (median * 12.0 * 100.0).round() / 100.0
+            "annual_cost": annual_cost
         }));
     }
 
