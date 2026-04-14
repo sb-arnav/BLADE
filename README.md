@@ -57,7 +57,7 @@ Every AI tool on the market runs one agent at a time, forgets everything between
 ## Core Features
 
 ### BLADE Swarm — Parallel Multi-Agent Orchestration
-Give BLADE a complex goal. It decomposes it into a DAG of sub-tasks and runs up to 5 specialized agents simultaneously. Agents share a scratchpad — findings from one feed directly into the next. When all tasks complete, BLADE synthesizes a final result.
+Give BLADE a complex goal. It decomposes it into a dependency graph of subtasks and runs up to 5 specialized agents simultaneously — routing each step to the best model for the job (coding tasks to a code-capable model, fast lookups to a cheap one). Agents share a scratchpad — findings from one feed directly into the next. If a step fails, BLADE reflects on what went wrong and retries with that insight. When all tasks complete, a final synthesis pass combines the results into a single coherent answer.
 
 No other desktop AI runs more than one agent at a time. BLADE runs a fleet.
 
@@ -74,8 +74,8 @@ Runs in the background, capturing your active window title, clipboard contents, 
 ### Computer Use — Desktop Agent
 BLADE can see your screen and control it. Click buttons, fill forms, read UI elements with OCR, navigate apps, take screenshots and reason about them. 40+ desktop action types.
 
-### Persistent Memory — Compounds Over Time
-Every conversation, command, and tool result is embedded locally and indexed with hybrid BM25 + vector search (Reciprocal Rank Fusion). The second week is smarter than the first.
+### Memory That Compounds
+BLADE maintains three living memory blocks: what it knows about you (your role, habits, preferences), its own persona, and a rolling conversation summary. Each block auto-compresses via LLM when full — there's no context limit that wipes your history. Every conversation, command, and tool result is also embedded locally and indexed with hybrid BM25 + vector search. The second week is smarter than the first. The second month is a different class of tool entirely.
 
 ### Background Agents
 Spawn Claude Code, Aider, or Goose as background workers with one command. BLADE stays the orchestrator — one surface, multiple specialists.
@@ -120,8 +120,8 @@ Installed builds auto-update from GitHub Releases.
 
 1. Download and launch BLADE
 2. The setup wizard guides you through provider + API key
-3. **`Alt+Space`** — QuickAsk from anywhere on your desktop
-4. **`Ctrl+Shift+V`** — Global voice input
+3. **`Ctrl+Space`** — QuickAsk from anywhere on your desktop
+4. **`Ctrl+Shift+B`** — Global voice input
 5. Enable **God Mode** in settings for live screen context
 6. Enable **Total Recall** in settings to start building your screen timeline
 
@@ -147,46 +147,6 @@ sudo apt-get install -y \
   libayatana-appindicator3-dev librsvg2-dev \
   libssl-dev libasound2-dev libpipewire-0.3-dev pkg-config
 ```
-
----
-
-## What's New in v0.5.0
-
-### AGI Memory Architecture
-- **Letta-style virtual context blocks** — human, persona, and conversation blocks replace flat `context.md`. Blocks auto-compress via LLM when full, giving BLADE infinite memory without hitting context limits.
-- **Persona onboarding** — first-run 5-question flow seeds the human block immediately. BLADE knows who you are from conversation 1.
-- **Passive activity monitoring** — background window + file scanner feeds persona traits from real behavior. No questions needed.
-- **Post-exchange fact extraction** — every chat turn fires a lightweight LLM pass that extracts facts and updates traits.
-
-### JARVIS 4-Stage Agent Pipeline
-Agents now follow the Microsoft JARVIS pattern:
-1. **Task Planning** — LLM decomposes goal into steps with dependency graph + synthesis guidance
-2. **Model Selection** — routes code/research/default subtasks to appropriate models
-3. **Execution** — parallel where dependencies allow
-4. **Response Synthesis** — combines all step outputs into a final coherent answer
-
-### Reflexion Retry Loop
-Agent steps that fail now retry up to 3 times. Each failure triggers a reflection ("what went wrong, what to try differently"), which is injected into the next attempt. Agents learn within a run.
-
-### Tree-of-Thoughts Reasoning
-For complex tasks (debugging, design, architecture), BLADE generates 3 thought paths, scores each, and uses the winning approach as the planning basis. 20–70% reasoning improvement on hard problems.
-
-### Built-in MCP Memory Server
-Four new MCP tools available to all agents at startup — no configuration needed:
-- `blade.memory.search` — query the knowledge graph
-- `blade.memory.add` — store new entities
-- `blade.memory.get_all` — surface top entities by importance
-- `blade.memory.relate` — link entities together
-
-### Structured JSON Output
-All agent plan parsing now uses repair-aware JSON extraction — strips markdown fences, fixes trailing commas, extracts from prose. Eliminates silent parse failures.
-
-### Bug Fixes
-- Eliminated all Windows terminal flash on startup and periodic tasks
-- Fixed provider routing when switching between native and custom base_url providers
-- Fixed voice transcription key resolution (Groq fallback chain)
-- Fixed SoulView knowledge graph showing empty (wrong DB column names)
-- Fixed thinking buffer accumulating across conversations
 
 ---
 
