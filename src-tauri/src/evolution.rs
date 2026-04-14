@@ -495,8 +495,9 @@ fn save_suggestion(suggestion: &EvolutionSuggestion) -> Result<(), String> {
 }
 
 /// Auto-install an MCP server that requires no token (e.g., puppeteer).
-/// Returns Ok(tool_count) on success.
-async fn auto_install_mcp(entry: &CatalogEntry, app: &tauri::AppHandle) -> Result<usize, String> {
+/// Returns Ok(discovered tools) on success.
+/// Feeds discovered tool names into the knowledge graph.
+async fn auto_install_mcp(entry: &CatalogEntry, app: &tauri::AppHandle) -> Result<Vec<crate::mcp::McpTool>, String> {
     use tauri::Manager;
 
     // Check node/npx is available
@@ -517,7 +518,7 @@ async fn auto_install_mcp(entry: &CatalogEntry, app: &tauri::AppHandle) -> Resul
 
     let mut config = crate::config::load_config();
     if config.mcp_servers.iter().any(|s| s.name == entry.name) {
-        return Ok(0); // Already registered
+        return Ok(vec![]); // Already registered
     }
     config.mcp_servers.push(config_entry);
     crate::config::save_config(&config)?;
@@ -531,9 +532,25 @@ async fn auto_install_mcp(entry: &CatalogEntry, app: &tauri::AppHandle) -> Resul
     let state = app.state::<crate::commands::SharedMcpManager>();
     let mut manager = state.lock().await;
     manager.register_server(entry.name.to_string(), mcp_config);
-    let tool_count = manager.discover_all_tools().await.unwrap_or_default().len();
+    let tools = manager.discover_all_tools().await.unwrap_or_default();
 
-    Ok(tool_count)
+    // Feed the newly discovered tools into the knowledge graph
+    if !tools.is_empty() {
+        let tool_names: Vec<String> = tools.iter().map(|t| t.name.clone()).collect();
+        let kg_text = format!(
+            "MCP server '{}' provides {} tools: {}. {}",
+            entry.name,
+            tools.len(),
+            tool_names.join(", "),
+            entry.description,
+        );
+        let app_clone = app.clone();
+        tauri::async_runtime::spawn(async move {
+            crate::knowledge_graph::grow_graph_from_conversation(&kg_text).await;
+        });
+    }
+
+    Ok(tools)
 }
 
 static EVOLUTION_TICK: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -586,43 +603,95 @@ pub async fn run_evolution_cycle(app: &tauri::AppHandle) {
         if known.contains(&suggestion_id) { continue; }
 
         if entry.auto_install && entry.required_token_hint.is_none() {
-            // Auto-install silently
-            match auto_install_mcp(entry, app).await {
-                Ok(_) => {
-                    auto_installed.push(entry.name.to_string());
+            // Run through decision_gate before auto-installing — installing software is
+            // semi-reversible (can be removed from config) so we treat it as reversible,
+            // but we still want the gate to decide whether to act or ask the user.
+            let signal = crate::decision_gate::Signal {
+                source: "evolution".to_string(),
+                description: format!(
+                    "Auto-install MCP server '{}' (triggered by: {}): {}",
+                    entry.name, trigger_app, entry.description
+                ),
+                confidence: 0.85,  // High — app was detected in use
+                reversible: true,  // Can be removed from config
+                time_sensitive: false,
+            };
+            let perception = crate::perception_fusion::get_latest()
+                .unwrap_or_else(crate::perception_fusion::update_perception);
+            let gate_outcome = crate::decision_gate::evaluate(&signal, &perception).await;
+
+            match gate_outcome {
+                crate::decision_gate::DecisionOutcome::ActAutonomously { .. } => {
+                    // Gate approved: proceed with install
+                    match auto_install_mcp(entry, app).await {
+                        Ok(tools) => {
+                            let tool_count = tools.len();
+                            auto_installed.push(entry.name.to_string());
+                            let suggestion = EvolutionSuggestion {
+                                id: suggestion_id,
+                                name: entry.name.to_string(),
+                                package: entry.package.to_string(),
+                                description: entry.description.to_string(),
+                                trigger_app: trigger_app.clone(),
+                                required_token_hint: None,
+                                auto_install: true,
+                                status: "installed".to_string(),
+                                created_at: chrono::Utc::now().timestamp(),
+                            };
+                            let _ = save_suggestion(&suggestion);
+                            log::info!(
+                                "[evolution] Auto-installed '{}' — {} tools discovered",
+                                entry.name, tool_count
+                            );
+                        }
+                        Err(e) => {
+                            log::warn!("[evolution] Auto-install failed for {}: {}", entry.name, e);
+                            let suggestion = EvolutionSuggestion {
+                                id: suggestion_id,
+                                name: entry.name.to_string(),
+                                package: entry.package.to_string(),
+                                description: entry.description.to_string(),
+                                trigger_app: trigger_app.clone(),
+                                required_token_hint: Some(format!(
+                                    "Auto-install failed ({}). Install Node.js/npx or add manually.",
+                                    e
+                                )),
+                                auto_install: false,
+                                status: "pending".to_string(),
+                                created_at: chrono::Utc::now().timestamp(),
+                            };
+                            let _ = save_suggestion(&suggestion);
+                            new_suggestions.push(suggestion);
+                        }
+                    }
+                }
+                crate::decision_gate::DecisionOutcome::AskUser { question, suggested_action } => {
+                    // Gate wants user confirmation — surface as a suggestion (not auto-install)
+                    log::info!(
+                        "[evolution] Decision gate: ask user about '{}' — {}",
+                        entry.name, question
+                    );
                     let suggestion = EvolutionSuggestion {
                         id: suggestion_id,
                         name: entry.name.to_string(),
                         package: entry.package.to_string(),
-                        description: entry.description.to_string(),
+                        description: format!("{} ({})", entry.description, suggested_action),
                         trigger_app: trigger_app.clone(),
                         required_token_hint: None,
-                        auto_install: true,
-                        status: "installed".to_string(),
-                        created_at: chrono::Utc::now().timestamp(),
-                    };
-                    let _ = save_suggestion(&suggestion);
-                }
-                Err(e) => {
-                    // Auto-install failed (e.g. npx not found) — surface as a manual suggestion
-                    log::warn!("Evolution auto-install failed for {}: {}", entry.name, e);
-                    let suggestion = EvolutionSuggestion {
-                        id: suggestion_id,
-                        name: entry.name.to_string(),
-                        package: entry.package.to_string(),
-                        description: entry.description.to_string(),
-                        trigger_app: trigger_app.clone(),
-                        required_token_hint: Some(format!("Auto-install failed ({}). Install Node.js/npx to enable auto-install, or add manually.", e)),
-                        auto_install: false,
+                        auto_install: true,  // Still flagged as auto_install-capable
                         status: "pending".to_string(),
                         created_at: chrono::Utc::now().timestamp(),
                     };
                     let _ = save_suggestion(&suggestion);
                     new_suggestions.push(suggestion);
                 }
+                _ => {
+                    // Queued or ignored — skip for now, will retry next cycle
+                    log::debug!("[evolution] Decision gate queued/ignored '{}' for this cycle", entry.name);
+                }
             }
         } else {
-            // Surface as a suggestion
+            // Needs a token — surface as a suggestion with install hint
             let suggestion = EvolutionSuggestion {
                 id: suggestion_id,
                 name: entry.name.to_string(),
@@ -634,6 +703,18 @@ pub async fn run_evolution_cycle(app: &tauri::AppHandle) {
                 status: "pending".to_string(),
                 created_at: chrono::Utc::now().timestamp(),
             };
+            // Feed capability info into knowledge graph so BLADE knows what's available
+            let kg_text = format!(
+                "MCP server '{}' is available for: {}. Triggered by using: {}. Requires: {}",
+                entry.name,
+                entry.description,
+                trigger_app,
+                entry.required_token_hint.unwrap_or("no token"),
+            );
+            let kg_text_clone = kg_text.clone();
+            tauri::async_runtime::spawn(async move {
+                crate::knowledge_graph::grow_graph_from_conversation(&kg_text_clone).await;
+            });
             let _ = save_suggestion(&suggestion);
             new_suggestions.push(suggestion);
         }
@@ -930,6 +1011,21 @@ pub async fn evolution_install_suggestion(
     let mut manager = state.lock().await;
     manager.register_server(name.clone(), mcp_config);
     let tools = manager.discover_all_tools().await?;
+
+    // Feed discovered tools into the knowledge graph
+    if !tools.is_empty() {
+        let tool_names: Vec<String> = tools.iter().map(|t| t.name.clone()).collect();
+        let kg_text = format!(
+            "MCP server '{}' was installed with {} tools: {}. {}",
+            name,
+            tools.len(),
+            tool_names.join(", "),
+            entry.description,
+        );
+        tauri::async_runtime::spawn(async move {
+            crate::knowledge_graph::grow_graph_from_conversation(&kg_text).await;
+        });
+    }
 
     // Mark as installed
     conn.execute(

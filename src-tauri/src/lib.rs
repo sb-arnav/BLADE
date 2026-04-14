@@ -670,6 +670,7 @@ pub fn run() {
             cron::cron_list,
             cron::cron_delete,
             cron::cron_toggle,
+            cron::cron_run_now,
             session_handoff::session_handoff_clear,
             session_handoff::session_handoff_write,
             session_handoff::session_handoff_get,
@@ -962,6 +963,7 @@ pub fn run() {
             // God Mode — proactive task queue exposed to frontend
             godmode::get_proactive_tasks,
             godmode::dismiss_proactive_task,
+            godmode::get_god_mode_context,
             // Deep Scan -- full machine identity discovery
             deep_scan::deep_scan_start,
             deep_scan::deep_scan_results,

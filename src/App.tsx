@@ -53,7 +53,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, EBState> {
   }
 }
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar" | "workflow-builder" | "code-sandbox" | "persona" | "negotiation" | "financial" | "context-engine" | "reasoning" | "social-graph" | "health" | "documents" | "habits" | "knowledge-graph" | "meetings" | "predictions" | "emotional-intel" | "decision-log" | "security" | "health-panel" | "temporal" | "integrations";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar" | "workflow-builder" | "code-sandbox" | "persona" | "negotiation" | "financial" | "context-engine" | "reasoning" | "social-graph" | "health" | "documents" | "habits" | "knowledge-graph" | "meetings" | "predictions" | "emotional-intel" | "decision-log" | "security" | "health-panel" | "temporal" | "integrations" | "smart-home" | "finance";
 
 const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
 const Canvas = lazy(() => import("./components/Canvas"));
@@ -115,6 +115,8 @@ const SecurityDashboard = lazy(() => import("./components/SecurityDashboard").th
 const HealthPanel = lazy(() => import("./components/HealthPanel").then(m => ({ default: m.HealthPanel })));
 const TemporalPanel = lazy(() => import("./components/TemporalPanel").then(m => ({ default: m.TemporalPanel })));
 const IntegrationStatus = lazy(() => import("./components/IntegrationStatus").then(m => ({ default: m.IntegrationStatus })));
+const SmartHomePanel = lazy(() => import("./components/SmartHomePanel").then(m => ({ default: m.SmartHomePanel })));
+const FinanceView = lazy(() => import("./components/FinanceView").then(m => ({ default: m.FinanceView })));
 
 function ShellFallback({ label = "Loading workspace..." }: { label?: string }) {
   return (
@@ -907,6 +909,8 @@ export default function App() {
     { id: "health-panel", label: "Open health panel", description: "System health, memory usage, and background process status", section: "System", action: () => openRoute("health-panel") },
     { id: "temporal", label: "Open temporal intelligence", description: "Replay what you were doing, detect work patterns, generate standups", section: "Knowledge", action: () => openRoute("temporal") },
     { id: "integrations", label: "Open integration bridge", description: "Manage Gmail, Calendar, Slack, and GitHub integration status", section: "System", action: () => openRoute("integrations") },
+    { id: "smart-home", label: "Open Smart Home", description: "Control IoT devices and Spotify via Home Assistant", section: "System", action: () => openRoute("smart-home") },
+    { id: "finance", label: "Open Finance", description: "View spending summary, categories, and recurring charges", section: "Knowledge", action: () => openRoute("finance") },
   ];
 
   if (focusMode && config?.onboarded) {
@@ -1008,6 +1012,8 @@ export default function App() {
     "health-panel": <HealthPanel onBack={() => openRoute("chat")} />,
     "temporal": <TemporalPanel onBack={() => openRoute("chat")} />,
     "integrations": <IntegrationStatus onBack={() => openRoute("chat")} />,
+    "smart-home": <SmartHomePanel onBack={() => openRoute("chat")} />,
+    "finance": <FinanceView onBack={() => openRoute("chat")} />,
   };
 
   if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {
