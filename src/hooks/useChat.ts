@@ -18,12 +18,15 @@ export function useChat() {
   const [pendingApproval, setPendingApproval] = useState<ToolApprovalRequest | null>(null);
   const [lastResponseTime, setLastResponseTime] = useState<number | null>(null);
   const [thinkingText, setThinkingText] = useState<string | null>(null);
+  const [ackText, setAckText] = useState<string | null>(null);
   const streamBuffer = useRef("");
   const streamRequestId = useRef<string>("");
   const requestStartRef = useRef<number>(0);
   const messagesRef = useRef<Message[]>([]);
   const bootstrappedRef = useRef(false);
   const currentConversationIdRef = useRef<string | null>(null);
+  // True if we've shown a fast-ack but the real stream hasn't started yet.
+  const awaitingRealStream = useRef(false);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -101,11 +104,39 @@ export function useChat() {
   useEffect(() => {
     let active = true;
 
+    // Fast acknowledgment — emitted by the cheap/fast model before the real stream starts.
+    const unlistenAck = listen<string>("chat_ack", (event) => {
+      if (!active) return;
+      // Only show if the stream hasn't already produced real tokens.
+      if (streamBuffer.current.length > 0) return;
+      awaitingRealStream.current = true;
+      setAckText(event.payload);
+      // Render the ack in the assistant bubble (italicised via ackText state)
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.role === "assistant" && last.content === "") {
+          return [
+            ...prev.slice(0, -1),
+            { ...last, content: event.payload, isAck: true },
+          ];
+        }
+        return prev;
+      });
+    });
+
     const unlistenToken = listen<string>("chat_token", (event) => {
       if (!active) return;
       // Guard: if a new request started while tokens from the old one are still
       // arriving, discard them so the new buffer isn't corrupted.
       const myRequestId = streamRequestId.current;
+
+      // If this is the first real token after a fast-ack, clear the ack display.
+      if (awaitingRealStream.current) {
+        awaitingRealStream.current = false;
+        setAckText(null);
+        streamBuffer.current = ""; // ensure buffer starts clean
+      }
+
       streamBuffer.current += event.payload;
       if (streamRequestId.current !== myRequestId) return;
       const content = streamBuffer.current;
@@ -114,7 +145,7 @@ export function useChat() {
         if (last?.role === "assistant") {
           return [
             ...prev.slice(0, -1),
-            { ...last, content },
+            { ...last, content, isAck: false },
           ];
         }
         return prev;
@@ -126,6 +157,8 @@ export function useChat() {
       const assembledBuffer = streamBuffer.current;
       streamBuffer.current = "";
       streamRequestId.current = "";
+      awaitingRealStream.current = false;
+      setAckText(null);
       if (requestStartRef.current > 0) {
         setLastResponseTime(Date.now() - requestStartRef.current);
         requestStartRef.current = 0;
@@ -184,13 +217,24 @@ export function useChat() {
     });
 
     const unlistenToolCompleted = listen<{ name: string; is_error: boolean; result?: string }>("tool_completed", (event) => {
-      setToolExecutions((prev) =>
-        prev.map((ex) =>
-          ex.tool_name === event.payload.name && ex.status === "executing"
+      setToolExecutions((prev) => {
+        // Match the LAST (most recently started) executing tool with this name.
+        // This handles parallel tools with the same name correctly — each completion
+        // updates the tool that was started most recently.
+        let lastIdx = -1;
+        for (let i = prev.length - 1; i >= 0; i--) {
+          if (prev[i].tool_name === event.payload.name && prev[i].status === "executing") {
+            lastIdx = i;
+            break;
+          }
+        }
+        if (lastIdx === -1) return prev;
+        return prev.map((ex, i) =>
+          i === lastIdx
             ? { ...ex, status: "completed" as const, is_error: event.payload.is_error, result: event.payload.result, completed_at: Date.now() }
             : ex
-        )
-      );
+        );
+      });
     });
 
     const unlistenApproval = listen<Omit<ToolApprovalRequest, "arguments"> & { arguments: unknown }>("tool_approval_needed", (event) => {
@@ -205,14 +249,25 @@ export function useChat() {
 
     // Extended thinking events from Anthropic
     const thinkingBuffer = { current: "" };
+    let thinkingTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    const resetThinkingBuffer = () => {
+      thinkingBuffer.current = "";
+      setThinkingText(null);
+      if (thinkingTimeout) { clearTimeout(thinkingTimeout); thinkingTimeout = null; }
+    };
+
     const unlistenThinking = listen<string>("chat_thinking", (event) => {
       if (!active) return;
       thinkingBuffer.current += event.payload;
       setThinkingText(thinkingBuffer.current);
+      // Auto-reset after 60s of no new tokens (guards against lost chat_thinking_done)
+      if (thinkingTimeout) clearTimeout(thinkingTimeout);
+      thinkingTimeout = setTimeout(resetThinkingBuffer, 60_000);
     });
     const unlistenThinkingDone = listen("chat_thinking_done", () => {
       if (!active) return;
-      thinkingBuffer.current = "";
+      resetThinkingBuffer();
     });
 
     const unlistenClipboard = listen<string>("clipboard_changed", (event) => {
@@ -244,6 +299,7 @@ export function useChat() {
 
     return () => {
       active = false;
+      unlistenAck.then((fn) => fn());
       unlistenToken.then((fn) => fn());
       unlistenDone.then((fn) => fn());
       unlistenThinking.then((fn) => fn());
@@ -304,6 +360,9 @@ export function useChat() {
       streamBuffer.current = "";
       streamRequestId.current = crypto.randomUUID();
       requestStartRef.current = Date.now();
+      awaitingRealStream.current = false;
+      setAckText(null);
+      setThinkingText(null);
       setLastResponseTime(null);
       setMessages(nextMessages);
       setCurrentConversationId(conversationId);
@@ -422,6 +481,7 @@ export function useChat() {
     currentConversation,
     lastResponseTime,
     thinkingText,
+    ackText,
     sendMessage,
     retryLastMessage,
     clearMessages,

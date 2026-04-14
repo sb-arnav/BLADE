@@ -473,6 +473,7 @@ pub async fn analyze_ui_mockup(image_base64: &str) -> Result<String, String> {
 /// Both images are sent in a single message when the provider supports multiple images;
 /// for providers that only handle one image at a time, each is analysed separately and
 /// the descriptions are compared by a second LLM call.
+#[allow(dead_code)]
 pub async fn compare_images(
     img1_base64: &str,
     img2_base64: &str,

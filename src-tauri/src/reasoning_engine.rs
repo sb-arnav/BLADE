@@ -742,6 +742,7 @@ pub fn get_recent_traces(limit: usize) -> Vec<ReasoningTrace> {
     .unwrap_or_default()
 }
 
+#[allow(dead_code)]
 pub fn get_trace(id: &str) -> Option<ReasoningTrace> {
     let conn = rusqlite::Connection::open(db_path()).ok()?;
     let mut stmt = conn

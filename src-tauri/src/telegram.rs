@@ -27,6 +27,7 @@ struct TgUpdate {
     message: Option<TgMessage>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize, Clone)]
 struct TgMessage {
     message_id: i64,
@@ -67,6 +68,7 @@ pub struct TelegramStatus {
 // Per-user conversation history (last N turns)
 type UserHistory = Vec<ConversationMessage>;
 
+#[allow(dead_code)]
 struct BotState {
     token: String,
     offset: i64,

@@ -240,6 +240,7 @@ pub fn list_habits(active_only: bool) -> Vec<Habit> {
 }
 
 /// Partially update a habit with JSON field values.
+#[allow(dead_code)]
 pub fn update_habit(id: &str, updates: serde_json::Value) -> Result<(), String> {
     let conn = open_db()?;
     let obj = updates.as_object().ok_or("updates must be a JSON object")?;
@@ -278,6 +279,7 @@ pub fn update_habit(id: &str, updates: serde_json::Value) -> Result<(), String> 
 }
 
 /// Archive (soft-delete) a habit so it no longer appears in the active list.
+#[allow(dead_code)]
 pub fn archive_habit(id: &str) -> Result<(), String> {
     let conn = open_db()?;
     conn.execute("UPDATE habits SET active = 0 WHERE id = ?1", params![id])
@@ -463,6 +465,7 @@ pub fn get_today_status() -> Vec<(Habit, bool)> {
 // ── Analytics ─────────────────────────────────────────────────────────────────
 
 /// Count consecutive days a habit was completed, going backward from today.
+#[allow(dead_code)]
 pub fn calculate_streak(habit_id: &str) -> i32 {
     let conn = match open_db() {
         Ok(c) => c,

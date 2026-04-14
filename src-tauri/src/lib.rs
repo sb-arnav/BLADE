@@ -60,6 +60,7 @@ mod files;
 mod history;
 mod managed_agents;
 mod mcp;
+mod mcp_memory_server;
 mod memory;
 mod permissions;
 mod plugins;
@@ -100,10 +101,12 @@ mod habit_engine;
 mod knowledge_graph;
 mod emotional_intelligence;
 mod prediction_engine;
+mod activity_monitor;
+mod action_tags;
 
 use chrono::Timelike;
 use std::sync::Arc;
-use tauri::{Manager, WindowEvent};
+use tauri::{Emitter, Manager, WindowEvent};
 
 /// Safely truncate a string at a char boundary.
 /// Unlike `&s[..n]`, this never panics on non-ASCII (emoji, CJK, etc.).
@@ -201,21 +204,35 @@ fn parse_shortcut(s: &str) -> Option<Shortcut> {
 fn register_all_shortcuts(app: &tauri::AppHandle) {
     let config = crate::config::load_config();
 
-    // Quick Ask shortcut
+    // Quick Ask shortcut (default: Ctrl+Space — Alt+Space conflicts with Windows system menu)
     let qa_shortcut = parse_shortcut(&config.quick_ask_shortcut)
-        .unwrap_or_else(|| Shortcut::new(Some(Modifiers::ALT), Code::Space));
+        .unwrap_or_else(|| Shortcut::new(Some(Modifiers::CONTROL), Code::Space));
     let qa_handle = app.clone();
-    let _ = app.global_shortcut().on_shortcut(qa_shortcut, move |_app, _sc, _ev| {
+    if let Err(e) = app.global_shortcut().on_shortcut(qa_shortcut, move |_app, _sc, _ev| {
         toggle_quickask(&qa_handle);
-    });
+    }) {
+        log::error!("Failed to register Quick Ask shortcut '{}': {}", config.quick_ask_shortcut, e);
+        let _ = app.emit("shortcut_registration_failed", serde_json::json!({
+            "shortcut": &config.quick_ask_shortcut,
+            "name": "Quick Ask",
+            "error": e.to_string()
+        }));
+    }
 
-    // Voice input shortcut (Ctrl+Shift+V by default)
+    // Voice input shortcut (default: Ctrl+Shift+B — Ctrl+Shift+V conflicts with paste-without-formatting)
     let voice_sc = parse_shortcut(&config.voice_shortcut)
-        .unwrap_or_else(|| Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyV));
+        .unwrap_or_else(|| Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyB));
     let voice_handle = app.clone();
-    let _ = app.global_shortcut().on_shortcut(voice_sc, move |_app, _sc, _ev| {
+    if let Err(e) = app.global_shortcut().on_shortcut(voice_sc, move |_app, _sc, _ev| {
         voice_global::toggle_voice_input(&voice_handle);
-    });
+    }) {
+        log::error!("Failed to register Voice shortcut '{}': {}", config.voice_shortcut, e);
+        let _ = app.emit("shortcut_registration_failed", serde_json::json!({
+            "shortcut": &config.voice_shortcut,
+            "name": "Voice Input",
+            "error": e.to_string()
+        }));
+    }
 }
 
 /// Tauri command: update a specific shortcut and re-register all shortcuts.
@@ -373,6 +390,8 @@ pub fn run() {
             config::save_config_field,
             commands::debug_config,
             commands::reset_onboarding,
+            commands::get_onboarding_status,
+            commands::complete_onboarding,
             commands::set_config,
             commands::update_init_prefs,
             commands::test_provider,
@@ -541,6 +560,8 @@ pub fn run() {
             character::get_character_bible,
             character::update_character_section,
             memory::get_memory_log,
+            memory::get_memory_blocks,
+            memory::set_memory_block,
             router::classify_message,
             tray::set_tray_status,
             pulse::pulse_get_last_thought,
@@ -683,6 +704,7 @@ pub fn run() {
             soul_commands::soul_delete_preference,
             soul_commands::soul_update_bible_section,
             soul_commands::soul_refresh_bible,
+            soul_commands::get_user_profile,
             screen_timeline_commands::timeline_search_cmd,
             screen_timeline_commands::timeline_browse_cmd,
             screen_timeline_commands::timeline_get_screenshot,
@@ -944,6 +966,8 @@ pub fn run() {
             let manager = setup_manager.clone();
             tauri::async_runtime::spawn(async move {
                 let mut manager = manager.lock().await;
+                // Register built-in in-process servers first
+                manager.register_built_in_servers();
                 for server in startup_config.mcp_servers {
                     manager.register_server(
                         server.name,
@@ -1072,6 +1096,9 @@ pub fn run() {
 
             // Habit Engine — checks every 15 min for due habits and fires reminders
             habit_engine::start_habit_reminder_loop(app.handle().clone());
+
+            // Activity Monitor — passive window + file watcher, feeds persona engine
+            activity_monitor::start_activity_monitor();
 
             // Sidecar monitor — ping registered devices every 5 minutes
             sidecar::start_sidecar_monitor(app.handle().clone());

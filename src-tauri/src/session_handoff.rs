@@ -30,6 +30,7 @@ fn handoff_path() -> PathBuf {
 }
 
 // Cache the handoff for the current session (cleared on new conversation)
+#[allow(dead_code)]
 static HANDOFF_CACHE: OnceLock<String> = OnceLock::new();
 
 /// Load the last session handoff if it exists and is recent enough (< 7 days)

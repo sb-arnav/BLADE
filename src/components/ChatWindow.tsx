@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { ConversationSummary, Message, RuntimeDescriptor, ToolApprovalRequest, ToolExecution } from "../types";
 import { ActiveWindowInfo, ContextSuggestion } from "../hooks/useContextAwareness";
 import { detectClipboardType } from "../utils/clipboardDetect";
@@ -111,6 +112,8 @@ export function ChatWindow({
 }: Props) {
   const [search, setSearch] = useState("");
   const [composerDraft, setComposerDraft] = useState<string | null>(null);
+  const [godModeStatus, setGodModeStatus] = useState<{ bytes: number; tier: string } | null>(null);
+  const godModeFadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [thinkingExpanded, setThinkingExpanded] = useState(false);
@@ -193,6 +196,19 @@ export function ChatWindow({
     setSidebarOpen(open);
     try { localStorage.setItem("blade-sidebar", open ? "open" : "closed"); } catch {}
   };
+
+  // GOD MODE — listen for context update events and show a brief status badge
+  useEffect(() => {
+    const unlisten = listen<{ bytes: number; tier: string }>("godmode_update", (event) => {
+      setGodModeStatus(event.payload);
+      if (godModeFadeTimer.current) clearTimeout(godModeFadeTimer.current);
+      godModeFadeTimer.current = setTimeout(() => setGodModeStatus(null), 8000);
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+      if (godModeFadeTimer.current) clearTimeout(godModeFadeTimer.current);
+    };
+  }, []);
 
   const clipboardDetection = useMemo(
     () => clipboardText ? detectClipboardType(clipboardText) : null,
@@ -564,6 +580,18 @@ export function ChatWindow({
                 </p>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* God Mode indicator — appears briefly after each context refresh */}
+        {godModeStatus && (
+          <div className="flex items-center gap-1.5 px-3 py-1 mx-3 mb-1 rounded-md border border-emerald-500/20 bg-emerald-500/5 text-emerald-400/70 font-mono text-[9px] tracking-widest uppercase animate-fade-in">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60 animate-pulse" />
+            <span>GOD MODE</span>
+            <span className="text-emerald-400/40">•</span>
+            <span>{godModeStatus.tier}</span>
+            <span className="text-emerald-400/40">•</span>
+            <span>{(godModeStatus.bytes / 1024).toFixed(1)}KB context</span>
           </div>
         )}
 

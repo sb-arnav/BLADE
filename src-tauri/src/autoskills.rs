@@ -22,6 +22,7 @@ pub struct GapContext<'a> {
 }
 
 /// Result of an autoskill attempt.
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum AutoskillResult {
     /// Installed silently — caller should retry the original task

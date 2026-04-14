@@ -383,7 +383,6 @@ async fn run_cmd(command: &str, timeout_ms: u64) -> (String, bool) {
 
     #[cfg(target_os = "windows")]
     let spawn_result = {
-        use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
         tokio::process::Command::new("cmd")
             .args(["/C", command])

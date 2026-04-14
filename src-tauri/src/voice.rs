@@ -114,20 +114,30 @@ pub fn voice_stop_recording() -> Result<String, String> {
 pub async fn voice_transcribe(audio_base64: String) -> Result<String, String> {
     let config = crate::config::load_config();
 
-    // Use Groq for transcription (free tier supports whisper)
-    // If user is on Groq, use their key. Otherwise check for a separate Groq key.
+    // Voice transcription uses Groq Whisper. Resolve the key in priority order:
+    // 1. Active provider is Groq → use its key directly
+    // 2. Dedicated "groq-whisper" keyring entry (legacy)
+    // 3. Standard Groq provider key stored via Settings
+    // If none found, fail clearly rather than sending the wrong key to Groq.
     let api_key = if config.provider == "groq" {
         config.api_key.clone()
     } else {
-        // Try to get Groq key from keychain as fallback
         keyring::Entry::new("blade-ai", "groq-whisper")
             .and_then(|e| e.get_password())
-            .unwrap_or(config.api_key.clone())
+            .ok()
+            .filter(|k| !k.is_empty())
+            .or_else(|| {
+                keyring::Entry::new("blade-ai", "groq")
+                    .and_then(|e| e.get_password())
+                    .ok()
+                    .filter(|k| !k.is_empty())
+            })
+            .unwrap_or_default()
     };
 
     if api_key.is_empty() {
         return Err(
-            "No API key available for transcription. Use Groq provider or add a Groq key."
+            "Voice transcription requires a Groq API key. Switch to Groq in Settings → Provider, or add your Groq key there."
                 .to_string(),
         );
     }
@@ -180,11 +190,19 @@ pub async fn voice_transcribe_blob(audio_base64: String, file_ext: String) -> Re
     } else {
         keyring::Entry::new("blade-ai", "groq-whisper")
             .and_then(|e| e.get_password())
-            .unwrap_or(config.api_key.clone())
+            .ok()
+            .filter(|k| !k.is_empty())
+            .or_else(|| {
+                keyring::Entry::new("blade-ai", "groq")
+                    .and_then(|e| e.get_password())
+                    .ok()
+                    .filter(|k| !k.is_empty())
+            })
+            .unwrap_or_default()
     };
 
     if api_key.is_empty() {
-        return Err("No API key for transcription. Set Groq as provider or add a Groq key.".to_string());
+        return Err("Voice transcription requires a Groq API key. Switch to Groq in Settings → Provider, or add your Groq key there.".to_string());
     }
 
     let audio_bytes = base64::engine::general_purpose::STANDARD

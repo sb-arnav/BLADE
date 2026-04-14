@@ -15,7 +15,7 @@ use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 use tauri::Emitter;
 use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::{Child, Command};
+use tokio::process::Child;
 use tokio::sync::Mutex;
 
 #[derive(Clone)]
@@ -3404,7 +3404,7 @@ async fn ensure_opencode_server(servers: SharedRuntimeServerRegistry) -> Result<
         "Blade found OpenCode state, but could not resolve a runnable OpenCode binary.".to_string()
     })?;
 
-    let mut child = Command::new(binary)
+    let mut child = crate::cmd_util::silent_tokio_cmd(binary)
         .arg("serve")
         .arg("--hostname=127.0.0.1")
         .arg("--port=4096")
@@ -3553,7 +3553,7 @@ async fn start_claude_agent_sdk_runtime(
         "running",
     );
 
-    let child = Command::new("node")
+    let child = crate::cmd_util::silent_tokio_cmd("node")
         .arg(&script_path)
         .arg(payload_b64)
         .current_dir(working_dir)
@@ -3645,7 +3645,7 @@ async fn start_claude_code_runtime(
         "running",
     );
 
-    let mut command = Command::new("claude");
+    let mut command = crate::cmd_util::silent_tokio_cmd("claude");
     command
         .arg("--print")
         .arg("--output-format")
@@ -3761,7 +3761,7 @@ async fn resume_claude_code_runtime(
         "running",
     );
 
-    let mut command = Command::new("claude");
+    let mut command = crate::cmd_util::silent_tokio_cmd("claude");
     command
         .arg("--print")
         .arg("--output-format")
@@ -3869,7 +3869,7 @@ async fn start_codex_runtime(
     );
     let working_dir = cwd.clone().unwrap_or_else(|| ".".into());
     let effective_goal = apply_handoff_context(&goal, handoff_note.as_deref());
-    let mut command = Command::new("codex");
+    let mut command = crate::cmd_util::silent_tokio_cmd("codex");
     command.current_dir(&working_dir);
 
     if let Some(session_id) = session_id.as_ref() {
@@ -3982,7 +3982,7 @@ async fn start_google_gemma_local_runtime(
         "running",
     );
 
-    let child = Command::new("ollama")
+    let child = crate::cmd_util::silent_tokio_cmd("ollama")
         .arg("run")
         .arg(&model)
         .arg(&effective_goal)
@@ -4066,7 +4066,7 @@ async fn start_open_interpreter_runtime(
         "running",
     );
 
-    let child = Command::new("interpreter")
+    let child = crate::cmd_util::silent_tokio_cmd("interpreter")
         .arg("-y")
         .arg(&effective_goal)
         .current_dir(&working_dir)
@@ -4151,7 +4151,7 @@ async fn start_aider_runtime(
         "running",
     );
 
-    let mut command = Command::new("aider");
+    let mut command = crate::cmd_util::silent_tokio_cmd("aider");
     command
         .arg("--message")
         .arg(&effective_goal)
@@ -4236,7 +4236,7 @@ async fn start_browser_use_runtime(
         "running",
     );
 
-    let child = Command::new("browser-use")
+    let child = crate::cmd_util::silent_tokio_cmd("browser-use")
         .arg("run")
         .arg(&effective_goal)
         .current_dir(&working_dir)
@@ -4321,7 +4321,7 @@ async fn start_openhands_runtime(
     );
 
     let child = if command_in_path("openhands").is_some() {
-        let mut command = Command::new("openhands");
+        let mut command = crate::cmd_util::silent_tokio_cmd("openhands");
         command
             .arg(&effective_goal)
             .current_dir(&working_dir)
@@ -4331,7 +4331,7 @@ async fn start_openhands_runtime(
             .spawn()
             .map_err(|error| format!("Failed to launch OpenHands CLI runtime: {error}"))?
     } else {
-        let mut command = Command::new("uvx");
+        let mut command = crate::cmd_util::silent_tokio_cmd("uvx");
         command
             .arg("--python")
             .arg("3.12")
@@ -4440,7 +4440,7 @@ async fn start_opencode_runtime(
         "running",
     );
 
-    let mut command = Command::new(binary);
+    let mut command = crate::cmd_util::silent_tokio_cmd(binary);
     command
         .arg("run")
         .arg("--format")

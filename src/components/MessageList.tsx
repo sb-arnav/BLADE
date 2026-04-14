@@ -251,7 +251,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isLast, onRetry }: { ms
           </div>
         ) : (
           /* Assistant: no bubble, just text with left accent line */
-          <div className="pl-3 border-l-2 border-blade-border">
+          <div className={`pl-3 border-l-2 ${msg.isAck ? "border-blade-accent/30" : "border-blade-border"}`}>
             {msg.image_base64 && (
               <img
                 src={`data:image/png;base64,${msg.image_base64}`}
@@ -259,7 +259,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isLast, onRetry }: { ms
                 className="rounded-lg max-w-full max-h-48 mb-3 border border-blade-border"
               />
             )}
-            <div className="message-markdown text-[0.8125rem] text-blade-text/90">
+            <div className={`message-markdown text-[0.8125rem] ${msg.isAck ? "text-blade-text/40 italic" : "text-blade-text/90"}`}>
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{

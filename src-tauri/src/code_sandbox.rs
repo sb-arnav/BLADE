@@ -254,7 +254,7 @@ fn run_bash(code: &str, timeout_secs: u64) -> Result<SandboxResult, String> {
     std::fs::write(&tmp_path, code)
         .map_err(|e| format!("Failed to write temp shell script: {}", e))?;
 
-    let mut cmd = Command::new(shell);
+    let mut cmd = crate::cmd_util::silent_cmd(shell);
     if shell == "cmd" {
         cmd.arg("/C").arg(&tmp_path);
     } else {
@@ -460,7 +460,7 @@ pub fn detect_language(code: &str) -> String {
 fn which_exists(bin: &str) -> bool {
     #[cfg(target_os = "windows")]
     {
-        Command::new("where")
+        crate::cmd_util::silent_cmd("where")
             .arg(bin)
             .stdout(Stdio::null())
             .stderr(Stdio::null())
@@ -470,7 +470,7 @@ fn which_exists(bin: &str) -> bool {
     }
     #[cfg(not(target_os = "windows"))]
     {
-        Command::new("which")
+        crate::cmd_util::silent_cmd("which")
             .arg(bin)
             .stdout(Stdio::null())
             .stderr(Stdio::null())

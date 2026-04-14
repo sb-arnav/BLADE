@@ -15,7 +15,7 @@
 // Text is passed safely (not via shell args directly on Linux/macOS for OS voices).
 // A static singleton ensures only one utterance plays at a time.
 
-use std::process::{Child, Command};
+use std::process::Child;
 use std::sync::{Arc, Mutex};
 
 // ── singleton process handle ──────────────────────────────────────────────────
@@ -34,6 +34,7 @@ pub fn speak(text: &str) {
 }
 
 /// Speak unconditionally with the configured voice (for pulse/cron outputs).
+#[allow(dead_code)]
 pub fn speak_unconditional(text: &str) {
     let config = crate::config::load_config();
     let voice = config.tts_voice.clone();
@@ -166,7 +167,7 @@ fn play_audio_file(path: &std::path::Path) -> Option<()> {
             "(New-Object Media.SoundPlayer '{}').PlaySync()",
             path_str.replace('\'', "''")
         );
-        let child = Command::new("powershell")
+        let child = crate::cmd_util::silent_cmd("powershell")
             .args(["-NoProfile", "-NonInteractive", "-Command", &script])
             .spawn()
             .ok()?;
@@ -262,7 +263,7 @@ fn tts_windows(text: &str, voice: &str) -> Option<Child> {
          {} $s.Speak($env:TTS_TEXT)",
         voice_filter
     );
-    Command::new("powershell")
+    crate::cmd_util::silent_cmd("powershell")
         .args(["-NoProfile", "-NonInteractive", "-Command", &script])
         .env("TTS_TEXT", text)
         .spawn()

@@ -101,10 +101,10 @@ Security testing with mandatory ownership verification. Uses Groq or Ollama — 
 
 | Platform | Download |
 |----------|----------|
-| **macOS** (Apple Silicon) | [`.dmg` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.4.7_aarch64.dmg) |
-| **macOS** (Intel) | [`.dmg` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.4.7_x64.dmg) |
-| **Windows** | [`.exe` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.4.7_x64-setup.exe) |
-| **Linux** | [`.AppImage` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.4.7_amd64.AppImage) |
+| **macOS** (Apple Silicon) | [`.dmg` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.5.0_aarch64.dmg) |
+| **macOS** (Intel) | [`.dmg` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.5.0_x64.dmg) |
+| **Windows** | [`.exe` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.5.0_x64-setup.exe) |
+| **Linux** | [`.AppImage` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.5.0_amd64.AppImage) |
 
 > **macOS note:** If you see "Blade is damaged and can't be opened", run:
 > ```bash
@@ -147,6 +147,46 @@ sudo apt-get install -y \
   libayatana-appindicator3-dev librsvg2-dev \
   libssl-dev libasound2-dev libpipewire-0.3-dev pkg-config
 ```
+
+---
+
+## What's New in v0.5.0
+
+### AGI Memory Architecture
+- **Letta-style virtual context blocks** — human, persona, and conversation blocks replace flat `context.md`. Blocks auto-compress via LLM when full, giving BLADE infinite memory without hitting context limits.
+- **Persona onboarding** — first-run 5-question flow seeds the human block immediately. BLADE knows who you are from conversation 1.
+- **Passive activity monitoring** — background window + file scanner feeds persona traits from real behavior. No questions needed.
+- **Post-exchange fact extraction** — every chat turn fires a lightweight LLM pass that extracts facts and updates traits.
+
+### JARVIS 4-Stage Agent Pipeline
+Agents now follow the Microsoft JARVIS pattern:
+1. **Task Planning** — LLM decomposes goal into steps with dependency graph + synthesis guidance
+2. **Model Selection** — routes code/research/default subtasks to appropriate models
+3. **Execution** — parallel where dependencies allow
+4. **Response Synthesis** — combines all step outputs into a final coherent answer
+
+### Reflexion Retry Loop
+Agent steps that fail now retry up to 3 times. Each failure triggers a reflection ("what went wrong, what to try differently"), which is injected into the next attempt. Agents learn within a run.
+
+### Tree-of-Thoughts Reasoning
+For complex tasks (debugging, design, architecture), BLADE generates 3 thought paths, scores each, and uses the winning approach as the planning basis. 20–70% reasoning improvement on hard problems.
+
+### Built-in MCP Memory Server
+Four new MCP tools available to all agents at startup — no configuration needed:
+- `blade.memory.search` — query the knowledge graph
+- `blade.memory.add` — store new entities
+- `blade.memory.get_all` — surface top entities by importance
+- `blade.memory.relate` — link entities together
+
+### Structured JSON Output
+All agent plan parsing now uses repair-aware JSON extraction — strips markdown fences, fixes trailing commas, extracts from prose. Eliminates silent parse failures.
+
+### Bug Fixes
+- Eliminated all Windows terminal flash on startup and periodic tasks
+- Fixed provider routing when switching between native and custom base_url providers
+- Fixed voice transcription key resolution (Groq fallback chain)
+- Fixed SoulView knowledge graph showing empty (wrong DB column names)
+- Fixed thinking buffer accumulating across conversations
 
 ---
 

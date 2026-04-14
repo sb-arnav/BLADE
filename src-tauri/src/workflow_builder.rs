@@ -306,7 +306,7 @@ async fn execute_node(
                 .unwrap_or(".")
                 .to_string();
 
-            let output = tokio::process::Command::new(if cfg!(windows) { "cmd" } else { "sh" })
+            let output = crate::cmd_util::silent_tokio_cmd(if cfg!(windows) { "cmd" } else { "sh" })
                 .arg(if cfg!(windows) { "/C" } else { "-c" })
                 .arg(&cmd)
                 .current_dir(&cwd)
