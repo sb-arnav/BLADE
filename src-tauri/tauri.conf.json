@@ -65,7 +65,9 @@
   "plugins": {
     "updater": {
       "pubkey": "",
-      "endpoints": []
+      "endpoints": [
+        "https://github.com/sb-arnav/BLADE/releases/latest/download/latest.json"
+      ]
     }
   }
 }
