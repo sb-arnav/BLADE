@@ -279,7 +279,7 @@ pub fn take_break() {
 // ── Tauri Commands ────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub fn health_get_stats() -> serde_json::Value {
+pub fn health_guardian_stats() -> serde_json::Value {
     get_health_stats()
 }
 

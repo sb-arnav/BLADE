@@ -426,7 +426,7 @@ pub async fn list_running_apps() -> Result<Vec<String>, String> {
 // ── Window Management ──────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn focus_window(title_pattern: String) -> Result<(), String> {
+pub async fn sc_focus_window(title_pattern: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         let script = format!(
@@ -809,7 +809,7 @@ pub async fn execute_tool(name: &str, _args: &serde_json::Value) -> Option<(Stri
                 Some(p) => p.to_string(),
                 None => return Some(("Missing required argument: title_pattern".to_string(), true)),
             };
-            Some(match focus_window(pattern).await {
+            Some(match sc_focus_window(pattern).await {
                 Ok(()) => ("Window focused.".to_string(), false),
                 Err(e) => (e, true),
             })

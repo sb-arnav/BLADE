@@ -262,10 +262,11 @@ pub async fn transcribe_audio_with_model(wav_bytes: &[u8], model_name: &str) -> 
 }
 
 /// Blocking whisper.cpp inference. Runs on a thread pool worker.
+/// Requires the `local-whisper` feature (which pulls in whisper-rs + LLVM).
+#[cfg(feature = "local-whisper")]
 fn run_whisper_inference(model_path: &str, samples: &[f32]) -> Result<String, String> {
     use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
-    // Load model context
     let ctx = WhisperContext::new_with_params(model_path, WhisperContextParameters::default())
         .map_err(|e| format!("Failed to load Whisper model: {}", e))?;
 
@@ -273,7 +274,6 @@ fn run_whisper_inference(model_path: &str, samples: &[f32]) -> Result<String, St
         .create_state()
         .map_err(|e| format!("Failed to create Whisper state: {}", e))?;
 
-    // Configure inference params
     let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
     params.set_n_threads(num_threads());
     params.set_translate(false);
@@ -282,16 +282,13 @@ fn run_whisper_inference(model_path: &str, samples: &[f32]) -> Result<String, St
     params.set_print_progress(false);
     params.set_print_realtime(false);
     params.set_print_timestamps(false);
-    // Suppress blank tokens that Whisper sometimes emits on near-silence
     params.set_no_speech_thold(0.6);
     params.set_logprob_thold(-1.0);
 
-    // Run full inference
     state
         .full(params, samples)
         .map_err(|e| format!("Whisper inference error: {}", e))?;
 
-    // Collect segments
     let num_segments = state
         .full_n_segments()
         .map_err(|e| format!("Segment count error: {}", e))?;
@@ -305,6 +302,12 @@ fn run_whisper_inference(model_path: &str, samples: &[f32]) -> Result<String, St
     }
 
     Ok(text.trim().to_string())
+}
+
+/// Stub when local-whisper feature is disabled — tells user to enable it or use API.
+#[cfg(not(feature = "local-whisper"))]
+fn run_whisper_inference(_model_path: &str, _samples: &[f32]) -> Result<String, String> {
+    Err("Local Whisper is not enabled. Build with --features local-whisper (requires LLVM/libclang), or use cloud transcription in Settings.".to_string())
 }
 
 /// Determine a reasonable thread count for whisper.cpp inference.
@@ -329,7 +332,6 @@ pub struct WhisperModelInfo {
 }
 
 /// Check whether the currently configured local Whisper model is downloaded.
-#[tauri::command]
 pub fn whisper_model_available() -> bool {
     let config = crate::config::load_config();
     model_path_for(&config.whisper_model).exists()
@@ -337,7 +339,6 @@ pub fn whisper_model_available() -> bool {
 
 /// Download the configured (or specified) Whisper model.
 /// Emits `whisper_download_started` and `whisper_download_complete` events.
-#[tauri::command]
 pub async fn whisper_download_model(app: tauri::AppHandle, model_name: Option<String>) -> Result<String, String> {
     use tauri::Emitter;
 
@@ -367,7 +368,6 @@ pub async fn whisper_download_model(app: tauri::AppHandle, model_name: Option<St
 }
 
 /// Get info about the currently configured local Whisper model.
-#[tauri::command]
 pub fn whisper_model_info() -> WhisperModelInfo {
     let config = crate::config::load_config();
     let model_name = config.whisper_model;
