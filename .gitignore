@@ -26,3 +26,8 @@ dist-ssr
 # Blade specific
 backend/venv/
 target/
+.fastembed_cache/
+
+# Claude Code (dev tooling — not part of the project)
+.claude/settings.local.json
+vendor/
