@@ -236,6 +236,13 @@ fn build_system_prompt_inner(
         parts.push(format!("## Identity\n\n{}", identity_block));
     }
 
+    // USER MODEL — unified behavioural profile: role, expertise, mood, active projects, goals.
+    // Compact 3-4 line summary so BLADE can predict needs and calibrate depth/tone instantly.
+    // Example: "Arnav (full-stack, TS/Rust). 2hr streak, working on BLADE swarm. Mood: productive."
+    if let Some(user_model_summary) = crate::persona_engine::get_user_model_summary() {
+        parts.push(user_model_summary);
+    }
+
     // Personality mirror — match the user's communication style
     if let Some(personality_injection) = crate::personality_mirror::get_personality_injection() {
         parts.push(personality_injection);

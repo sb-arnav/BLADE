@@ -130,6 +130,11 @@ fn load_results() -> Option<DeepScanResults> {
     serde_json::from_str(&data).ok()
 }
 
+/// Public API for persona_engine.rs — returns the full scan results struct.
+pub fn load_results_pub() -> Option<DeepScanResults> {
+    load_results()
+}
+
 // ── 1. Installed Apps — Windows registry ─────────────────────────────────────
 
 #[cfg(target_os = "windows")]

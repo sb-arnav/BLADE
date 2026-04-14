@@ -73,6 +73,10 @@ struct GhostState {
     platform: String,
     /// Position of the overlay window ("bottom-right" | "bottom-left" | "top-right" | "top-left").
     position: String,
+    /// When the current meeting was first detected (Unix seconds).
+    meeting_start_secs: Option<u64>,
+    /// Name of the most recently identified speaker.
+    current_speaker: Option<String>,
 }
 
 impl Default for GhostState {
@@ -81,6 +85,8 @@ impl Default for GhostState {
             participants: Vec::new(),
             platform: "none".to_string(),
             position: "bottom-right".to_string(),
+            meeting_start_secs: None,
+            current_speaker: None,
         }
     }
 }
@@ -100,6 +106,21 @@ pub struct GhostSuggestion {
     pub platform: String,
     /// UTC timestamp (ms).
     pub timestamp_ms: u64,
+}
+
+/// Meeting state pushed to the HUD bar so it can render meeting mode.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GhostMeetingState {
+    /// Platform name ("zoom" | "teams" | "meet" | "discord" | "slack" | "whatsapp")
+    pub platform: String,
+    /// Display name of the meeting (same as platform for now; can be enriched later)
+    pub meeting_name: String,
+    /// Name of the participant currently (or most recently) speaking.
+    pub speaker_name: Option<String>,
+    /// Duration of the current meeting in seconds (approximate).
+    pub duration_secs: u64,
+    /// Whether ghost mode is active and listening.
+    pub listening: bool,
 }
 
 /// Status returned by ghost_get_status.
@@ -582,16 +603,52 @@ async fn run_ghost_loop(app: tauri::AppHandle, state: Arc<Mutex<GhostState>>) {
 
         // 1. Detect active meeting platform
         let platform = detect_meeting_platform();
-        {
-            if let Ok(mut s) = state.lock() {
-                s.platform = platform.clone();
-            }
-        }
+        // Note: s.platform is updated in the meeting-state block below (not here)
+        // so the is_new_meeting check can compare previous vs current platform.
 
         // Only process audio when a meeting/chat is active
         if platform == "none" {
+            // If we had a meeting before, clear the meeting state in the HUD
+            {
+                if let Ok(mut s) = state.lock() {
+                    if s.meeting_start_secs.is_some() {
+                        s.meeting_start_secs = None;
+                        s.current_speaker = None;
+                        // Notify HUD that meeting ended
+                        let _ = app.emit("ghost_meeting_ended", serde_json::json!({}));
+                    }
+                }
+            }
             tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
             continue;
+        }
+
+        // Track meeting start time and emit HUD meeting state
+        let now_secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        {
+            if let Ok(mut s) = state.lock() {
+                let is_new_meeting = s.platform != platform || s.meeting_start_secs.is_none();
+                if is_new_meeting {
+                    s.meeting_start_secs = Some(now_secs);
+                }
+                s.platform = platform.clone();
+
+                let duration_secs = s.meeting_start_secs
+                    .map(|start| now_secs.saturating_sub(start))
+                    .unwrap_or(0);
+                let speaker_name = s.current_speaker.clone();
+                let meeting_state = GhostMeetingState {
+                    platform: platform.clone(),
+                    meeting_name: platform_display_name(&platform),
+                    speaker_name,
+                    duration_secs,
+                    listening: true,
+                };
+                let _ = app.emit("ghost_meeting_state", &meeting_state);
+            }
         }
 
         // 2. Capture audio chunk
@@ -645,7 +702,7 @@ async fn run_ghost_loop(app: tauri::AppHandle, state: Arc<Mutex<GhostState>>) {
             }
         }
 
-        // Update participant speaking style if we've seen this speaker before
+        // Update participant speaking style and current speaker tracking
         {
             if let Ok(mut s) = state.lock() {
                 if speaker_idx < s.participants.len() {
@@ -653,13 +710,31 @@ async fn run_ghost_loop(app: tauri::AppHandle, state: Arc<Mutex<GhostState>>) {
                     if p.speaking_style.len() < 300 {
                         p.speaking_style.push_str(&format!(" | {}", crate::safe_slice(&text, 60)));
                     }
+                    // Update current speaker name in state
+                    let name = p.name.clone();
+                    s.current_speaker = name.clone().or_else(|| Some(format!("Speaker {}", speaker_idx)));
                 } else {
                     // New speaker discovered
                     while s.participants.len() <= speaker_idx {
                         s.participants.push(ConversationParticipant::default());
                     }
                     s.participants[speaker_idx].speaking_style = text.chars().take(60).collect();
+                    s.current_speaker = Some(format!("Speaker {}", speaker_idx));
                 }
+
+                // Push updated meeting state to HUD with speaker info
+                let duration_secs = s.meeting_start_secs
+                    .map(|start| now_secs.saturating_sub(start))
+                    .unwrap_or(0);
+                let speaker_name = s.current_speaker.clone();
+                let meeting_state = GhostMeetingState {
+                    platform: s.platform.clone(),
+                    meeting_name: platform_display_name(&s.platform),
+                    speaker_name,
+                    duration_secs,
+                    listening: true,
+                };
+                let _ = app.emit("ghost_meeting_state", &meeting_state);
             }
         }
 
@@ -723,10 +798,15 @@ async fn run_ghost_loop(app: tauri::AppHandle, state: Arc<Mutex<GhostState>>) {
                         timestamp_ms: now_ms,
                     };
 
-                    // Emit to main window and overlay
+                    // Emit to main window and all overlays
                     let _ = app_clone.emit("ghost_suggestion", &suggestion);
 
-                    // Show overlay if hidden
+                    // Push to HUD bar so it can show the response card
+                    if let Some(hud) = app_clone.get_webview_window("blade_hud") {
+                        let _ = hud.emit("ghost_suggestion", &suggestion);
+                    }
+
+                    // Show legacy ghost overlay if present
                     if let Some(overlay) = app_clone.get_webview_window("ghost_overlay") {
                         let _ = overlay.show();
                         let _ = overlay.set_focus();
@@ -751,6 +831,19 @@ async fn run_ghost_loop(app: tauri::AppHandle, state: Arc<Mutex<GhostState>>) {
 /// Returns "zoom" | "teams" | "meet" | "discord" | "slack" | "whatsapp" | "none".
 pub fn detect_active_platform() -> String {
     detect_meeting_platform()
+}
+
+/// Return a human-readable display name for a meeting platform identifier.
+pub fn platform_display_name(platform: &str) -> String {
+    match platform {
+        "zoom"      => "Zoom Meeting",
+        "teams"     => "Microsoft Teams",
+        "meet"      => "Google Meet",
+        "discord"   => "Discord",
+        "slack"     => "Slack Huddle",
+        "whatsapp"  => "WhatsApp",
+        other       => other,
+    }.to_string()
 }
 
 // ── Tauri Commands ─────────────────────────────────────────────────────────────

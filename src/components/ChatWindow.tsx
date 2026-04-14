@@ -605,6 +605,11 @@ export function ChatWindow({
               )}
               {group.items.map((conv) => {
                 const isActive = conv.id === currentConversationId;
+                const convTitle = conv.title || "New conversation";
+                const convPreviewLines = [
+                  conv.message_count ? `${conv.message_count} messages` : null,
+                  `Last active ${formatTime(conv.updated_at)}`,
+                ].filter(Boolean).join(" · ");
                 return (
                   <div
                     key={conv.id}
@@ -615,6 +620,17 @@ export function ChatWindow({
                     }`}
                     onClick={() => { if (renamingId !== conv.id) { onSwitchConversation(conv.id); toggleSidebar(false); } }}
                   >
+                    {/* Hover preview tooltip */}
+                    {renamingId !== conv.id && (
+                      <div className="pointer-events-none absolute left-full top-0 ml-2 z-50 w-48 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                        <div className="bg-blade-surface/98 backdrop-blur-xl border border-blade-border rounded-lg px-3 py-2.5 shadow-surface-lg">
+                          <p className="text-2xs font-semibold text-blade-text leading-tight line-clamp-2">{convTitle}</p>
+                          {convPreviewLines && (
+                            <p className="text-2xs text-blade-muted/50 mt-1 leading-relaxed">{convPreviewLines}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     {renamingId === conv.id ? (
                       <input
                         ref={renameInputRef}
@@ -635,7 +651,7 @@ export function ChatWindow({
                         onDoubleClick={(e) => startRename(conv, e)}
                         title="Double-click to rename"
                       >
-                        {conv.title || "New conversation"}
+                        {convTitle}
                       </p>
                     )}
                     <div className="flex items-center justify-between mt-0.5">

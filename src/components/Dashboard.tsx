@@ -210,6 +210,14 @@ function blinkStyle(delay = "0s", active = true): CSSProperties {
   };
 }
 
+function breatheStyle(delay = "0s", active = true): CSSProperties {
+  if (!active) return {};
+  return {
+    animation: `db-breathe 2.4s ease-in-out infinite`,
+    animationDelay: delay,
+  };
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 /** Single pill in the status strip */
@@ -244,8 +252,8 @@ function StatusPill({
         className="block h-2 w-2 shrink-0 rounded-full"
         style={{
           backgroundColor: active ? color : "rgba(120,130,140,0.4)",
-          boxShadow: active ? `0 0 6px ${color}99` : "none",
-          ...blinkStyle("0s", active),
+          boxShadow: active ? `0 0 8px ${color}cc, 0 0 3px ${color}` : "none",
+          ...breatheStyle("0s", active),
         }}
       />
       <span style={{ color: p.muted }} className="font-normal">{label}</span>
@@ -292,8 +300,8 @@ function Panel({
           style={{ borderColor: `${accent}20`, color: accent }}
         >
           <span
-            className="block h-1.5 w-1.5"
-            style={{ backgroundColor: accent, boxShadow: `0 0 6px ${accent}` }}
+            className="block h-1.5 w-1.5 rounded-full"
+            style={{ backgroundColor: accent, boxShadow: `0 0 6px ${accent}`, ...breatheStyle("0s", true) }}
           />
           {title}
         </div>
@@ -659,6 +667,10 @@ export function Dashboard({ onBack, onNavigate }: Props) {
         @keyframes db-scan {
           0%{background-position:0 0}
           100%{background-position:0 100%}
+        }
+        @keyframes db-breathe {
+          0%,100% { opacity:1; transform:scale(1); filter:blur(0px); }
+          50% { opacity:0.55; transform:scale(0.78); filter:blur(0.5px); }
         }
       `}</style>
 

@@ -254,6 +254,16 @@ fn register_all_shortcuts(app: &tauri::AppHandle) {
             "error": e.to_string()
         }));
     }
+
+    // Ghost response card toggle: Ctrl+G
+    // Emits ghost_toggle_card to the HUD and ghost overlay windows.
+    let ghost_handle = app.clone();
+    let ghost_sc = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyG);
+    if let Err(e) = app.global_shortcut().on_shortcut(ghost_sc, move |_app, _sc, _ev| {
+        let _ = ghost_handle.emit("ghost_toggle_card", serde_json::json!({}));
+    }) {
+        log::warn!("Failed to register Ctrl+G ghost shortcut: {}", e);
+    }
 }
 
 /// Tauri command: update a specific shortcut and re-register all shortcuts.
@@ -852,6 +862,12 @@ pub fn run() {
             persona_engine::persona_analyze_now,
             persona_engine::persona_record_outcome,
             persona_engine::persona_analyze_now_weekly,
+            // Persona Engine v2 — UserModel, behavioral prediction, expertise tracking
+            persona_engine::get_user_model,
+            persona_engine::predict_next_need_cmd,
+            persona_engine::get_expertise_map,
+            persona_engine::update_expertise,
+            persona_engine::persona_estimate_mood,
             // Code Sandbox — safe multi-language code execution
             code_sandbox::sandbox_run,
             code_sandbox::sandbox_run_explain,

@@ -123,9 +123,15 @@ const FinanceView = lazy(() => import("./components/FinanceView").then(m => ({ d
 function ShellFallback({ label = "Loading workspace..." }: { label?: string }) {
   return (
     <div className="flex items-center justify-center h-full bg-blade-bg">
-      <div className="text-center">
-        <div className="w-2 h-2 rounded-full bg-blade-accent animate-pulse mx-auto" />
-        <p className="text-2xs text-blade-muted mt-3">{label}</p>
+      <div className="flex flex-col items-center gap-4 w-48">
+        {/* Skeleton lines */}
+        <div className="w-full space-y-2">
+          <div className="skeleton h-2.5 w-3/4 rounded-full" />
+          <div className="skeleton h-2 w-full rounded-full" />
+          <div className="skeleton h-2 w-5/6 rounded-full" />
+          <div className="skeleton h-2 w-2/3 rounded-full" />
+        </div>
+        <p className="text-2xs text-blade-muted/40 font-mono">{label}</p>
       </div>
     </div>
   );
@@ -1002,110 +1008,120 @@ export default function App() {
     );
   }
 
-  // Full-page routes
+  // All workspaces — dashboard is the default home.
+  // onBack goes to "dashboard"; onSendToChat opens the chat slide-out panel.
   const fullPageRoutes: Record<string, React.ReactNode> = {
-    analytics: <Analytics onBack={() => openRoute("chat")} />,
-    knowledge: <KnowledgeBase onBack={() => openRoute("chat")} onInsertToChat={(content) => { sendWithStats(content); openRoute("chat"); }} />,
-    comparison: <ModelComparison onBack={() => openRoute("chat")} />,
-    diagnostics: <Diagnostics onBack={() => openRoute("chat")} />,
-    discovery: <Discovery onComplete={() => openRoute("chat")} onSkip={() => openRoute("chat")} />,
-    agents: <OperatorCenter onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} runtimeCenter={runtimeCenter} defaultTab="mission" />,
-    terminal: <Terminal onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} />,
-    files: <FileBrowser onBack={() => openRoute("chat")} onSendToChat={(content, name) => { sendWithStats(`Analyze ${name}:\n\n\`\`\`\n${content.slice(0, 3000)}\n\`\`\``); openRoute("chat"); }} />,
-    canvas: <Canvas onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} />,
-    workflows: <WorkflowBuilder onBack={() => openRoute("chat")} onRunOutput={(output) => { sendWithStats(output); openRoute("chat"); }} />,
-    activity: <ActivityFeed items={activity.items} onBack={() => openRoute("chat")} />,
-    sync: <SyncSettings onBack={() => openRoute("chat")} />,
-    "managed-agents": <OperatorCenter onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} runtimeCenter={runtimeCenter} defaultTab="managed" />,
-    "email": <EmailAssistant onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} />,
-    "docs": <DocumentGenerator onBack={() => openRoute("chat")} />,
-    "web-auto": <WebAutomation onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} />,
-    "agent-teams": <AgentTeamPanel onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} />,
-    "git": <GitPanel onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} />,
-    "character": <CharacterBible onBack={() => openRoute("chat")} />,
-    "reports": <CapabilityReports onBack={() => openRoute("chat")} />,
+    analytics: <Analytics onBack={() => openRoute("dashboard")} />,
+    knowledge: <KnowledgeBase onBack={() => openRoute("dashboard")} onInsertToChat={(content) => { sendToChatPanel(content); openRoute("dashboard"); }} />,
+    comparison: <ModelComparison onBack={() => openRoute("dashboard")} />,
+    diagnostics: <Diagnostics onBack={() => openRoute("dashboard")} />,
+    discovery: <Discovery onComplete={() => openRoute("dashboard")} onSkip={() => openRoute("dashboard")} />,
+    agents: <OperatorCenter onBack={() => openRoute("dashboard")} onSendToChat={(text) => { sendToChatPanel(text); openRoute("dashboard"); }} runtimeCenter={runtimeCenter} defaultTab="mission" />,
+    terminal: <Terminal onBack={() => openRoute("dashboard")} onSendToChat={(text) => { sendToChatPanel(text); openRoute("dashboard"); }} />,
+    files: <FileBrowser onBack={() => openRoute("dashboard")} onSendToChat={(content, name) => { sendToChatPanel(`Analyze ${name}:\n\n\`\`\`\n${content.slice(0, 3000)}\n\`\`\``); openRoute("dashboard"); }} />,
+    canvas: <Canvas onBack={() => openRoute("dashboard")} onSendToChat={(text) => { sendToChatPanel(text); openRoute("dashboard"); }} />,
+    workflows: <WorkflowBuilder onBack={() => openRoute("dashboard")} onRunOutput={(output) => { sendToChatPanel(output); openRoute("dashboard"); }} />,
+    activity: <ActivityFeed items={activity.items} onBack={() => openRoute("dashboard")} />,
+    sync: <SyncSettings onBack={() => openRoute("dashboard")} />,
+    "managed-agents": <OperatorCenter onBack={() => openRoute("dashboard")} onSendToChat={(text) => { sendToChatPanel(text); openRoute("dashboard"); }} runtimeCenter={runtimeCenter} defaultTab="managed" />,
+    "email": <EmailAssistant onBack={() => openRoute("dashboard")} onSendToChat={(text) => { sendToChatPanel(text); openRoute("dashboard"); }} />,
+    "docs": <DocumentGenerator onBack={() => openRoute("dashboard")} />,
+    "web-auto": <WebAutomation onBack={() => openRoute("dashboard")} onSendToChat={(text) => { sendToChatPanel(text); openRoute("dashboard"); }} />,
+    "agent-teams": <AgentTeamPanel onBack={() => openRoute("dashboard")} onSendToChat={(text) => { sendToChatPanel(text); openRoute("dashboard"); }} />,
+    "git": <GitPanel onBack={() => openRoute("dashboard")} onSendToChat={(text) => { sendToChatPanel(text); openRoute("dashboard"); }} />,
+    "character": <CharacterBible onBack={() => openRoute("dashboard")} />,
+    "reports": <CapabilityReports onBack={() => openRoute("dashboard")} />,
     "init": <InitWizard onComplete={async () => { await loadConfig(); openRoute("deeplearn"); }} isReinit />,
     "deeplearn": (
       <DeepLearn
         onComplete={(summary) => {
           void summary;
-          openRoute("chat");
+          openRoute("dashboard");
         }}
-        onSkip={() => openRoute("chat")}
+        onSkip={() => openRoute("dashboard")}
       />
     ),
-    "computer-use": <ComputerUsePanel onDismiss={() => openRoute("chat")} />,
-    "bg-agents": <BackgroundAgentsPanel onBack={() => openRoute("chat")} onSendToChat={(text) => { sendWithStats(text); openRoute("chat"); }} />,
-    "screen-timeline": <ScreenTimeline onBack={() => openRoute("chat")} />,
-    "swarm": <SwarmView onBack={() => openRoute("chat")} />,
-    "soul": <SoulView onBack={() => openRoute("chat")} />,
-    "dashboard": <DashboardView onBack={() => openRoute("chat")} onNavigate={(r) => openRoute(r as Route)} />,
-    "skill-packs": <SkillPackView onBack={() => openRoute("chat")} />,
-    "goals": <GoalView onBack={() => openRoute("chat")} />,
-    "kali": <KaliView onBack={() => openRoute("chat")} />,
-    "agents-authority": <AgentDashboard onBack={() => openRoute("chat")} />,
-    "accountability": <AccountabilityView onBack={() => openRoute("chat")} />,
-    "sidecar": <SidecarView onBack={() => openRoute("chat")} />,
-    "workflow-builder": <WorkflowBuilderView onBack={() => openRoute("chat")} />,
-    "code-sandbox": <CodeSandboxView onBack={() => openRoute("chat")} />,
-    "persona": <PersonaView onBack={() => openRoute("chat")} />,
-    "negotiation": <NegotiationView onBack={() => openRoute("chat")} />,
-    "financial": <FinancialView onBack={() => openRoute("chat")} />,
-    "context-engine": <ContextEngineView onBack={() => openRoute("chat")} />,
-    "reasoning": <ReasoningView onBack={() => openRoute("chat")} />,
-    "social-graph": <SocialGraphView onBack={() => openRoute("chat")} />,
-    "health": <HealthView onBack={() => openRoute("chat")} />,
-    "documents": <DocumentView onBack={() => openRoute("chat")} />,
-    "habits": <HabitView onBack={() => openRoute("chat")} />,
-    "knowledge-graph": <KnowledgeGraphView onBack={() => openRoute("chat")} />,
-    "meetings": <MeetingView onBack={() => openRoute("chat")} />,
-    "predictions": <PredictionView onBack={() => openRoute("chat")} />,
-    "emotional-intel": <EmotionalIntelligenceView onBack={() => openRoute("chat")} />,
-    "decision-log": <DecisionLog onBack={() => openRoute("chat")} />,
-    "security": <SecurityDashboard onBack={() => openRoute("chat")} />,
-    "health-panel": <HealthPanel onBack={() => openRoute("chat")} />,
-    "temporal": <TemporalPanel onBack={() => openRoute("chat")} />,
-    "integrations": <IntegrationStatus onBack={() => openRoute("chat")} />,
-    "smart-home": <SmartHomePanel onBack={() => openRoute("chat")} />,
-    "finance": <FinanceView onBack={() => openRoute("chat")} />,
+    "computer-use": <ComputerUsePanel onDismiss={() => openRoute("dashboard")} />,
+    "bg-agents": <BackgroundAgentsPanel onBack={() => openRoute("dashboard")} onSendToChat={(text) => { sendToChatPanel(text); openRoute("dashboard"); }} />,
+    "screen-timeline": <ScreenTimeline onBack={() => openRoute("dashboard")} />,
+    "swarm": <SwarmView onBack={() => openRoute("dashboard")} />,
+    "soul": <SoulView onBack={() => openRoute("dashboard")} />,
+    "dashboard": <DashboardView onBack={() => openRoute("dashboard")} onNavigate={(r) => openRoute(r as Route)} />,
+    "skill-packs": <SkillPackView onBack={() => openRoute("dashboard")} />,
+    "goals": <GoalView onBack={() => openRoute("dashboard")} />,
+    "kali": <KaliView onBack={() => openRoute("dashboard")} />,
+    "agents-authority": <AgentDashboard onBack={() => openRoute("dashboard")} />,
+    "accountability": <AccountabilityView onBack={() => openRoute("dashboard")} />,
+    "sidecar": <SidecarView onBack={() => openRoute("dashboard")} />,
+    "workflow-builder": <WorkflowBuilderView onBack={() => openRoute("dashboard")} />,
+    "code-sandbox": <CodeSandboxView onBack={() => openRoute("dashboard")} />,
+    "persona": <PersonaView onBack={() => openRoute("dashboard")} />,
+    "negotiation": <NegotiationView onBack={() => openRoute("dashboard")} />,
+    "financial": <FinancialView onBack={() => openRoute("dashboard")} />,
+    "context-engine": <ContextEngineView onBack={() => openRoute("dashboard")} />,
+    "reasoning": <ReasoningView onBack={() => openRoute("dashboard")} />,
+    "social-graph": <SocialGraphView onBack={() => openRoute("dashboard")} />,
+    "health": <HealthView onBack={() => openRoute("dashboard")} />,
+    "documents": <DocumentView onBack={() => openRoute("dashboard")} />,
+    "habits": <HabitView onBack={() => openRoute("dashboard")} />,
+    "knowledge-graph": <KnowledgeGraphView onBack={() => openRoute("dashboard")} />,
+    "meetings": <MeetingView onBack={() => openRoute("dashboard")} />,
+    "predictions": <PredictionView onBack={() => openRoute("dashboard")} />,
+    "emotional-intel": <EmotionalIntelligenceView onBack={() => openRoute("dashboard")} />,
+    "decision-log": <DecisionLog onBack={() => openRoute("dashboard")} />,
+    "security": <SecurityDashboard onBack={() => openRoute("dashboard")} />,
+    "health-panel": <HealthPanel onBack={() => openRoute("dashboard")} />,
+    "temporal": <TemporalPanel onBack={() => openRoute("dashboard")} />,
+    "integrations": <IntegrationStatus onBack={() => openRoute("dashboard")} />,
+    "smart-home": <SmartHomePanel onBack={() => openRoute("dashboard")} />,
+    "finance": <FinanceView onBack={() => openRoute("dashboard")} />,
   };
 
-  if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {
-    return (
-      <ToastProvider>
-        <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
-          <TitleBar />
-          {workspaceIntent && workspaceIntent.route === route ? (
-            <div className="px-4 py-2 border-b border-blade-border/40 bg-blade-bg/90">
-              <div className="max-w-5xl mx-auto flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-2xs uppercase tracking-[0.2em] text-blade-muted">Blade handoff</div>
-                  <div className="text-sm text-blade-secondary mt-1">{workspaceIntent.title}</div>
-                  <div className="text-2xs text-blade-muted mt-1">{workspaceIntent.note}</div>
-                </div>
-                <button
-                  onClick={() => setWorkspaceIntent(null)}
-                  className="text-2xs text-blade-muted hover:text-blade-secondary transition-colors"
-                >
-                  dismiss
-                </button>
-              </div>
+  // Resolve what to render in the main area
+  const mainContent = route === "settings" ? (
+    <Suspense fallback={<ShellFallback label="Loading settings..." />}>
+      <Settings
+        config={config}
+        onBack={() => openRoute("dashboard")}
+        onSaved={(nextConfig) => {
+          setConfig(nextConfig);
+          openRoute("dashboard");
+        }}
+        onConfigRefresh={loadConfig}
+      />
+    </Suspense>
+  ) : (
+    <>
+      {workspaceIntent && workspaceIntent.route === route && (
+        <div className="px-4 py-2 border-b border-blade-border/40 bg-blade-bg/90 shrink-0">
+          <div className="max-w-5xl mx-auto flex items-start justify-between gap-4">
+            <div>
+              <div className="text-2xs uppercase tracking-[0.2em] text-blade-muted">Blade handoff</div>
+              <div className="text-sm text-blade-secondary mt-1">{workspaceIntent.title}</div>
+              <div className="text-2xs text-blade-muted mt-1">{workspaceIntent.note}</div>
             </div>
-          ) : null}
-          <Suspense fallback={<ShellFallback />}>
-            <div key={route} className="route-enter flex-1 min-h-0 flex flex-col">
-              {fullPageRoutes[route]}
-            </div>
-          </Suspense>
+            <button
+              onClick={() => setWorkspaceIntent(null)}
+              className="text-2xs text-blade-muted hover:text-blade-secondary transition-colors"
+            >
+              dismiss
+            </button>
+          </div>
         </div>
-      </ToastProvider>
-    );
-  }
+      )}
+      <Suspense fallback={<ShellFallback />}>
+        <div key={route} className="route-enter flex-1 min-h-0 flex flex-col">
+          {fullPageRoutes[route] ?? fullPageRoutes["dashboard"]}
+        </div>
+      </Suspense>
+    </>
+  );
 
   return (
     <ToastProvider>
     <ErrorBoundary>
-    <div className="h-screen flex flex-col bg-blade-bg text-blade-text relative">
+    <div className="h-screen flex flex-col bg-blade-bg text-blade-text relative overflow-hidden">
+      {/* File drop overlay */}
       {isDragging && (
         <div className="absolute inset-0 z-50 bg-blade-bg/90 backdrop-blur-sm flex items-center justify-center border-2 border-dashed border-blade-accent/40 rounded-xl m-2 pointer-events-none animate-fade-in">
           <div className="text-center">
@@ -1119,6 +1135,7 @@ export default function App() {
           </div>
         </div>
       )}
+
       <TitleBar />
       <CommandPalette commands={commands} open={paletteOpen} onClose={closePalette} />
       <Suspense fallback={null}>
@@ -1133,7 +1150,6 @@ export default function App() {
             open={branchOpen}
             onClose={() => setBranchOpen(false)}
             onBranchSwitch={(_messages) => {
-              // Branch switching is handled by the BranchNavigator's internal hook state
               setBranchOpen(false);
             }}
           />
@@ -1149,20 +1165,39 @@ export default function App() {
         onClearAll={notifications.clearAll}
         onAction={(r) => { openRoute(r as Route); setNotificationsOpen(false); }}
       />
-      <div className="flex-1 min-h-0">
-        <Suspense fallback={<ShellFallback label={route === "settings" ? "Loading settings..." : "Loading Blade..."} />}>
-          <div key={route} className="route-enter h-full flex flex-col">
-          {route === "settings" ? (
-            <Settings
-              config={config}
-              onBack={() => openRoute("chat")}
-              onSaved={(nextConfig) => {
-                setConfig(nextConfig);
-                openRoute("chat");
-              }}
-              onConfigRefresh={loadConfig}
-            />
-          ) : (
+
+      {/* ── Main layout: workspace + slide-out chat panel ── */}
+      <div className="flex-1 min-h-0 flex flex-col relative">
+
+        {/* Main content shifts left when chat panel opens */}
+        <div className={`flex-1 min-h-0 flex flex-col transition-all duration-300 ${chatPanelOpen ? "mr-[40%]" : ""}`}>
+          {mainContent}
+        </div>
+
+        {/* ── Slide-out chat panel — right side, 40% width ── */}
+        <div
+          className={`absolute top-0 right-0 h-full w-[40%] min-w-[320px] max-w-[600px] flex flex-col bg-blade-bg border-l border-blade-border/50 shadow-surface-xl transition-transform duration-300 ease-out z-30 ${chatPanelOpen ? "translate-x-0" : "translate-x-full"}`}
+          style={{ willChange: "transform" }}
+        >
+          {/* Panel header */}
+          <div className="flex items-center justify-between px-3 py-2 border-b border-blade-border/30 shrink-0">
+            <span className="text-2xs uppercase tracking-[0.18em] text-blade-muted/60 font-semibold">Chat</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] text-blade-muted/30">Esc to close</span>
+              <button
+                onClick={() => setChatPanelOpen(false)}
+                className="w-5 h-5 rounded flex items-center justify-center text-blade-muted/40 hover:text-blade-secondary hover:bg-blade-surface transition-colors"
+                title="Close chat panel"
+              >
+                <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* ChatWindow fills the panel */}
+          <div className="flex-1 min-h-0">
             <ChatWindow
               messages={chat.messages}
               loading={chat.loading}
@@ -1206,11 +1241,52 @@ export default function App() {
               onOpenNotifications={() => setNotificationsOpen(true)}
               unreadNotificationCount={notifications.unreadCount}
             />
-          )}
           </div>
-        </Suspense>
+        </div>
+
+        {/* Transparent scrim behind the panel — click to close */}
+        {chatPanelOpen && (
+          <div
+            className="absolute inset-0 z-20"
+            onClick={() => setChatPanelOpen(false)}
+            style={{ right: "40%" }}
+          />
+        )}
       </div>
-      <VoiceOrb status={voiceMode.status} mode={voiceMode.mode} onDismissError={voiceMode.stopEverything} />
+
+      {/* ── Chat open button — bottom-right, just left of VoiceOrb ── */}
+      {!chatPanelOpen && (
+        <button
+          onClick={openChatPanel}
+          className="fixed bottom-6 right-20 z-40 w-9 h-9 rounded-full bg-blade-surface/90 border border-blade-border/50 shadow-surface-xl backdrop-blur-sm flex items-center justify-center text-blade-muted/60 hover:text-blade-secondary hover:border-blade-border transition-all duration-200"
+          title="Open chat (Enter or /)"
+        >
+          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          {notifications.unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-blade-accent text-[8px] font-bold text-blade-bg flex items-center justify-center">
+              {notifications.unreadCount > 9 ? "9+" : notifications.unreadCount}
+            </span>
+          )}
+        </button>
+      )}
+
+      {/* ── VoiceOrb: PRIMARY input — always visible, wired to voice conversation ── */}
+      <VoiceOrb
+        status={voiceMode.status}
+        mode={voiceMode.mode}
+        onDismissError={voiceMode.stopEverything}
+        conversationState={voiceConv.conversationState}
+        isConversationActive={voiceConv.isActive}
+        onStartConversation={voiceConv.startConversation}
+        onStopConversation={voiceConv.stopConversation}
+        onPttDown={voiceMode.onPttMouseDown}
+        onPttUp={voiceMode.onPttMouseUp}
+        onOpenChat={openChatPanel}
+        lastResponse={lastOrbResponse}
+      />
+
       {personaOnboardingOpen && (
         <OnboardingModal
           onComplete={() => setPersonaOnboardingOpen(false)}
