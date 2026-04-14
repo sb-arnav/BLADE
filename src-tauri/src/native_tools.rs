@@ -512,6 +512,8 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
     .chain(crate::browser_agent::tool_definitions())
     // Append system control tool definitions (lock, volume, brightness, app management, etc.)
     .chain(crate::system_control::tool_definitions())
+    // Append security monitor tool definitions (security scan, URL safety check)
+    .chain(crate::security_monitor::tool_definitions())
     .collect()
 }
 
@@ -1203,6 +1205,14 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
             match crate::system_control::execute_tool(name, args).await {
                 Some(result) => result,
                 None => (format!("Unknown system control tool: {}", name), true),
+            }
+        }
+
+        // ── Security Monitor tools ────────────────────────────────────────────
+        "blade_security_scan" | "blade_check_url_safety" => {
+            match crate::security_monitor::execute_tool(name, args).await {
+                Some(result) => result,
+                None => (format!("Security tool dispatch error for: {}", name), true),
             }
         }
 

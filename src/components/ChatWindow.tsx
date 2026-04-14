@@ -10,6 +10,7 @@ import { InputBar } from "./InputBar";
 import { SearchInput } from "./SearchInput";
 import { ToolApprovalDialog } from "./ToolApprovalDialog";
 import { InsightsBar } from "./InsightsBar";
+import { useVoiceConversation } from "../hooks/useVoiceConversation";
 
 interface Props {
   messages: Message[];
@@ -118,6 +119,15 @@ export function ChatWindow({
   const [renameValue, setRenameValue] = useState("");
   const [thinkingExpanded, setThinkingExpanded] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
+
+  // Phase 6 — conversational voice mode
+  const {
+    conversationState,
+    transcript: voiceTranscript,
+    isActive: voiceConvActive,
+    startConversation,
+    stopConversation,
+  } = useVoiceConversation();
 
   const startRename = useCallback((conv: ConversationSummary, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -461,6 +471,32 @@ export function ChatWindow({
                 )}
               </button>
             )}
+            {/* Voice conversation button */}
+            <button
+              onClick={voiceConvActive ? stopConversation : () => { startConversation(); }}
+              className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
+                voiceConvActive
+                  ? "text-emerald-400 bg-emerald-400/10 hover:bg-emerald-400/20"
+                  : "text-blade-muted hover:text-blade-secondary hover:bg-blade-surface"
+              }`}
+              title={voiceConvActive ? "Stop voice conversation" : "Start voice conversation"}
+            >
+              {conversationState === "speaking" ? (
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="23" />
+                  <line x1="8" y1="23" x2="16" y2="23" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" className={`w-3.5 h-3.5 ${conversationState === "listening" ? "animate-pulse" : ""}`} fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="23" />
+                  <line x1="8" y1="23" x2="16" y2="23" />
+                </svg>
+              )}
+            </button>
             <button
               onClick={ttsSpeaking ? onStopTTS : onToggleTTS}
               className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
@@ -620,6 +656,102 @@ export function ChatWindow({
 
       {pendingApproval && (
         <ToolApprovalDialog request={pendingApproval} onRespond={onRespondApproval} />
+      )}
+
+      {/* Voice Conversation Overlay — shown when conversational mode is active */}
+      {voiceConvActive && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-blade-bg/95 backdrop-blur-md"
+          style={{ top: "2.25rem" }}
+        >
+          {/* State label */}
+          <div className="mb-6 flex flex-col items-center gap-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-blade-muted/60">
+              Voice Conversation
+            </p>
+
+            {/* Waveform / pulse animation */}
+            <div className="flex items-end gap-1 h-10">
+              {Array.from({ length: 7 }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`w-1 rounded-full transition-all duration-150 ${
+                    conversationState === "listening"
+                      ? "bg-emerald-400/70"
+                      : conversationState === "thinking"
+                      ? "bg-amber-400/70"
+                      : conversationState === "speaking"
+                      ? "bg-blade-accent/80"
+                      : "bg-blade-muted/30"
+                  }`}
+                  style={{
+                    height: conversationState === "listening"
+                      ? `${12 + Math.sin(i * 1.4) * 8}px`
+                      : conversationState === "thinking"
+                      ? `${8 + ((i % 3) * 6)}px`
+                      : conversationState === "speaking"
+                      ? `${10 + Math.abs(Math.sin(i * 0.9)) * 20}px`
+                      : "8px",
+                    animation: conversationState !== "idle"
+                      ? `voice-bar-${(i % 3) + 1} 0.8s ease-in-out infinite alternate`
+                      : "none",
+                    animationDelay: `${i * 0.1}s`,
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* State text */}
+            <p className={`text-sm font-medium tracking-wide ${
+              conversationState === "listening" ? "text-emerald-400" :
+              conversationState === "thinking" ? "text-amber-400" :
+              conversationState === "speaking" ? "text-blade-accent" :
+              "text-blade-muted"
+            }`}>
+              {conversationState === "listening" && "Listening..."}
+              {conversationState === "thinking" && "Thinking..."}
+              {conversationState === "speaking" && "Speaking..."}
+            </p>
+          </div>
+
+          {/* Recent transcript — last 4 turns */}
+          {voiceTranscript.length > 0 && (
+            <div className="w-full max-w-sm px-4 mb-6 space-y-1.5 max-h-48 overflow-y-auto">
+              {voiceTranscript.slice(-4).map((turn, i) => (
+                <div
+                  key={i}
+                  className={`px-3 py-1.5 rounded-lg text-xs ${
+                    turn.role === "user"
+                      ? "bg-blade-surface text-blade-secondary ml-8"
+                      : "bg-blade-accent/10 text-blade-text mr-8"
+                  }`}
+                >
+                  <span className={`text-[9px] uppercase tracking-wider font-semibold mr-1.5 ${
+                    turn.role === "user" ? "text-blade-muted/50" : "text-blade-accent/60"
+                  }`}>
+                    {turn.role === "user" ? "You" : "BLADE"}
+                  </span>
+                  {turn.text}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Stop button */}
+          <button
+            onClick={stopConversation}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blade-surface border border-blade-border text-blade-secondary hover:text-blade-text hover:bg-blade-surface-hover hover:border-red-400/30 transition-all text-xs font-medium"
+          >
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="4" y="4" width="16" height="16" rx="2" fill="currentColor" />
+            </svg>
+            Stop conversation
+          </button>
+
+          <p className="mt-3 text-2xs text-blade-muted/40">
+            Say "stop", "bye", or "that's all" to end naturally
+          </p>
+        </div>
       )}
     </div>
   );

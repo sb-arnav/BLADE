@@ -161,6 +161,20 @@ pub fn build_system_prompt_with_recall(
     build_system_prompt_inner(tools, user_query, vector_store, &ModelTier::Frontier, "", "", usize::MAX)
 }
 
+/// Build a lean system prompt for the voice conversation loop.
+/// Skips tool/MCP context for speed — voice turns should be fast.
+pub async fn build_system_prompt_voice(_app: &tauri::AppHandle) -> String {
+    let config = crate::config::load_config();
+    let name = if config.user_name.is_empty() { "the user".to_string() } else { config.user_name.clone() };
+    format!(
+        "You are BLADE, a personal AI assistant having a spoken conversation with {}. \
+         Keep responses concise and natural — you are speaking aloud, not writing. \
+         Avoid markdown, bullet points, or code unless the user explicitly asks. \
+         Aim for 1-3 sentences per response unless more detail is specifically needed.",
+        name
+    )
+}
+
 /// Hard budget for the assembled system prompt.
 /// ~150k chars ≈ 37.5k tokens — leaves plenty of room for the conversation
 /// inside a 200k context window.

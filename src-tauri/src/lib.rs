@@ -111,6 +111,9 @@ mod deep_scan;
 mod integration_bridge;
 mod system_control;
 mod notification_listener;
+mod security_monitor;
+mod health_guardian;
+mod temporal_intel;
 
 use chrono::Timelike;
 use std::sync::Arc;
@@ -708,6 +711,9 @@ pub fn run() {
             wake_word::wake_word_start,
             wake_word::wake_word_stop,
             wake_word::wake_word_status,
+            voice_global::start_voice_conversation,
+            voice_global::stop_voice_conversation,
+            voice_global::voice_conversation_active,
             soul_commands::soul_get_state,
             soul_commands::soul_take_snapshot,
             soul_commands::soul_delete_preference,
@@ -978,6 +984,26 @@ pub fn run() {
             // Notification Listener — Phase 5 partial
             notification_listener::notification_get_recent,
             notification_listener::notification_listener_start,
+            // Security Monitor — Phase 9 security fortress
+            security_monitor::security_scan_network,
+            security_monitor::security_check_breach,
+            security_monitor::security_check_password_hash,
+            security_monitor::security_scan_sensitive_files,
+            security_monitor::security_check_url,
+            security_monitor::security_overview,
+            // Financial Brain — Phase 8A CSV import + analytics
+            financial_brain::finance_import_csv,
+            financial_brain::finance_auto_categorize,
+            financial_brain::finance_spending_summary,
+            financial_brain::finance_detect_subscriptions,
+            // Health Guardian — Phase 8B screen time monitoring
+            health_guardian::health_get_stats,
+            health_guardian::health_take_break,
+            // Temporal Intelligence — Phase 8C time-aware context
+            temporal_intel::temporal_what_was_i_doing,
+            temporal_intel::temporal_daily_standup,
+            temporal_intel::temporal_detect_patterns,
+            temporal_intel::temporal_meeting_prep,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
@@ -1168,6 +1194,12 @@ pub fn run() {
 
             // Notification Listener — Phase 5 partial: poll OS notifications every 30s
             notification_listener::notification_listener_start(app.handle().clone());
+
+            // Health Guardian — Phase 8B: screen time + wellbeing monitor (every 5 min)
+            health_guardian::start_health_monitor(app.handle().clone());
+
+            // Temporal Intelligence — ensure tables ready on startup
+            temporal_intel::ensure_tables();
 
             // Register shortcuts from config (or defaults)
             register_all_shortcuts(app.handle());
