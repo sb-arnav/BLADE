@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Priority {
     Immediate,
@@ -11,6 +12,7 @@ pub enum Priority {
     Low,
 }
 
+#[allow(dead_code)]
 pub struct AgentQueue {
     agents: HashMap<String, Agent>,
     running: Vec<String>,
@@ -28,6 +30,7 @@ impl Default for AgentQueue {
 }
 
 impl AgentQueue {
+    #[allow(dead_code)]
     pub fn set_max_concurrent(&mut self, n: usize) {
         self.max_concurrent = n.max(1);
     }
@@ -54,6 +57,7 @@ impl AgentQueue {
         agents
     }
 
+    #[allow(dead_code)]
     pub fn list_active(&self) -> Vec<&Agent> {
         self.agents
             .values()
@@ -66,10 +70,12 @@ impl AgentQueue {
             .collect()
     }
 
+    #[allow(dead_code)]
     pub fn can_run_more(&self) -> bool {
         self.running.len() < self.max_concurrent
     }
 
+    #[allow(dead_code)]
     pub fn mark_running(&mut self, id: &str) {
         if !self.running.contains(&id.to_string()) {
             self.running.push(id.to_string());
@@ -80,6 +86,7 @@ impl AgentQueue {
         self.running.retain(|r| r != id);
     }
 
+    #[allow(dead_code)]
     pub fn next_pending(&self) -> Option<String> {
         self.agents
             .values()
@@ -112,6 +119,7 @@ impl AgentQueue {
         }
     }
 
+    #[allow(dead_code)]
     pub fn remove(&mut self, id: &str) {
         self.agents.remove(id);
         self.mark_done(id);

@@ -70,6 +70,7 @@ async fn transcribe_and_emit(app: tauri::AppHandle) {
 }
 
 /// Returns whether global voice recording is active.
+#[allow(dead_code)]
 pub fn is_recording() -> bool {
     IS_RECORDING.load(Ordering::SeqCst)
 }

@@ -39,6 +39,7 @@ pub struct KnowledgeEdge {
     pub created_at: i64,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphQuery {
     pub concept: String,

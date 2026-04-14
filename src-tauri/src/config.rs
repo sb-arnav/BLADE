@@ -618,6 +618,7 @@ pub fn check_and_disable_on_402(err_msg: &str) -> bool {
     false
 }
 
+#[allow(dead_code)]
 pub fn update_window_state(window_state: WindowState) -> Result<(), String> {
     // Don't save minimized/off-screen sentinel positions (Windows uses -32000)
     if window_state.x < -10000 || window_state.y < -10000 {

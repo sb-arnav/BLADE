@@ -215,6 +215,7 @@ pub async fn rag_query(
 
 // --- Chunking ---
 
+#[allow(dead_code)]
 struct Chunk {
     text: String,
     index: usize,
