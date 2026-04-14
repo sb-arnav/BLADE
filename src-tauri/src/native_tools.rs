@@ -510,6 +510,8 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
     // Append browser-agent tool definitions (navigate, read_page, click stub, etc.)
     .into_iter()
     .chain(crate::browser_agent::tool_definitions())
+    // Append system control tool definitions (lock, volume, brightness, app management, etc.)
+    .chain(crate::system_control::tool_definitions())
     .collect()
 }
 
@@ -1194,6 +1196,14 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
             };
             let action = crate::browser_agent::BrowserAction::WaitFor { selector: selector.to_string() };
             crate::browser_agent::execute_browser_action(&action).await
+        }
+
+        // ── System Control tools ──────────────────────────────────────────────
+        name if crate::system_control::is_system_control_tool(name) => {
+            match crate::system_control::execute_tool(name, args).await {
+                Some(result) => result,
+                None => (format!("Unknown system control tool: {}", name), true),
+            }
         }
 
         _ => (format!("Unknown native tool: {}", name), true),
