@@ -104,7 +104,8 @@ pub async fn complete_turn(
         if !tools.is_empty() {
             if let Err(ref e) = result {
                 if e.contains("404") {
-                    return openai::complete(api_key, model, messages, &[], base_url).await;
+                    let no_tools: &[ToolDefinition] = Default::default();
+                    return openai::complete(api_key, model, messages, no_tools, base_url).await;
                 }
             }
         }
@@ -206,7 +207,7 @@ pub async fn stream_fast_acknowledgment(message: &str, config: &crate::config::B
         ConversationMessage::User(message.to_string()),
     ];
 
-    let no_tools: &[ToolDefinition] = &[];
+    let no_tools: &[ToolDefinition] = Default::default();
     let turn = match provider.as_str() {
         "anthropic"  => anthropic::complete(&api_key, &model, &messages, no_tools).await?,
         "gemini"     => gemini::complete(&api_key, &model, &messages, no_tools).await?,
