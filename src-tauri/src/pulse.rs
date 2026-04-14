@@ -289,6 +289,32 @@ async fn call_provider_for_thought(
     Ok(thought)
 }
 
+/// Public wrapper so cron.rs (and other modules) can call the AI without duplicating provider logic.
+pub async fn call_provider_simple(
+    config: &crate::config::BladeConfig,
+    model: &str,
+    prompt: &str,
+) -> Result<String, String> {
+    call_provider_for_thought(config, model, prompt).await
+}
+
+/// Enforce a 200-word limit on a briefing string, truncating cleanly at a sentence boundary.
+fn cap_at_200_words(text: &str) -> String {
+    let words: Vec<&str> = text.split_whitespace().collect();
+    if words.len() <= 200 {
+        return text.to_string();
+    }
+    // Take first 200 words and try to end at a sentence boundary
+    let truncated = words[..200].join(" ");
+    // Find last sentence-ending punctuation
+    let end_chars = ['.', '!', '?'];
+    if let Some(pos) = truncated.rfind(|c: char| end_chars.contains(&c)) {
+        truncated[..=pos].to_string()
+    } else {
+        format!("{}…", truncated)
+    }
+}
+
 /// Generate a "while you were away" digest — what happened since the window was last active.
 /// Call this when the window regains focus after being hidden for a while.
 /// Returns None if not much happened.
@@ -363,8 +389,302 @@ pub fn pulse_get_last_thought() -> Option<String> {
         .filter(|s| !s.trim().is_empty())
 }
 
+/// Gather rich context for a morning briefing:
+/// calendar events, unread emails, git status, weather (if location known),
+/// temporal patterns from timeline, and integration_bridge state.
+async fn gather_morning_context(_config: &crate::config::BladeConfig) -> MorningContext {
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+
+    // ── Integration state (calendar, email, Slack, GitHub) ──────────────────────
+    let integration_state = crate::integration_bridge::get_integration_state();
+
+    // ── Calendar events (from integration state) ─────────────────────────────────
+    let calendar_lines: Vec<String> = integration_state.upcoming_events.iter().map(|ev| {
+        let dt = chrono::DateTime::from_timestamp(ev.start_ts, 0)
+            .map(|d| d.with_timezone(&chrono::Local).format("%-H:%M").to_string())
+            .unwrap_or_else(|| "?".to_string());
+        format!("- {} at {}", ev.title, dt)
+    }).collect();
+
+    // ── Git status — scan indexed projects ──────────────────────────────────────
+    let git_status = gather_git_status_summary();
+
+    // ── Weather — attempt if running on a networked machine. Uses wttr.in auto-location.
+    // Falls back gracefully to empty string on any network error.
+    let weather = fetch_weather_summary("").await;
+
+    // ── Temporal patterns — what time do they usually start / what did last week look like ──
+    let temporal = {
+        rusqlite::Connection::open(&db_path)
+            .ok()
+            .map(|conn| analyze_temporal_patterns(&conn))
+            .unwrap_or_default()
+    };
+
+    // ── Working thread ───────────────────────────────────────────────────────────
+    let thread = crate::thread::get_active_thread().unwrap_or_default();
+
+    // ── Recent activity (last 24h) ───────────────────────────────────────────────
+    let recent_events = rusqlite::Connection::open(&db_path)
+        .ok()
+        .and_then(|conn| crate::db::timeline_recent(&conn, 12, None).ok())
+        .map(|events| {
+            events.into_iter().map(|e| {
+                let dt = chrono::DateTime::from_timestamp(e.timestamp, 0)
+                    .map(|d| d.with_timezone(&chrono::Local).format("%-H:%M").to_string())
+                    .unwrap_or_else(|| "?".to_string());
+                format!("- [{}] {}: {}", dt, e.event_type, crate::safe_slice(&e.title, 70))
+            }).collect::<Vec<_>>().join("\n")
+        })
+        .unwrap_or_default();
+
+    // ── Memory summary ───────────────────────────────────────────────────────────
+    let memory_summary = rusqlite::Connection::open(&db_path)
+        .map(|conn| crate::db::brain_build_context(&conn, 300))
+        .unwrap_or_default();
+
+    MorningContext {
+        calendar_lines,
+        unread_emails: integration_state.unread_emails,
+        slack_mentions: integration_state.slack_mentions,
+        github_notifications: integration_state.github_notifications,
+        git_status,
+        weather,
+        temporal,
+        thread,
+        recent_events,
+        memory_summary,
+    }
+}
+
+struct MorningContext {
+    calendar_lines: Vec<String>,
+    unread_emails: u32,
+    slack_mentions: u32,
+    github_notifications: u32,
+    git_status: String,
+    weather: String,
+    temporal: String,
+    thread: String,
+    recent_events: String,
+    memory_summary: String,
+}
+
+/// Gather a brief git status summary across all indexed projects.
+fn gather_git_status_summary() -> String {
+    let projects = crate::indexer::list_indexed_projects();
+    if projects.is_empty() {
+        return String::new();
+    }
+    let mut lines: Vec<String> = Vec::new();
+    for project in projects.iter().take(3) {
+        let path = &project.root_path;
+        // Run `git status --short --branch` — don't panic if git isn't available or path missing
+        let output = std::process::Command::new("git")
+            .args(["status", "--short", "--branch"])
+            .current_dir(path)
+            .output();
+        if let Ok(out) = output {
+            if out.status.success() {
+                let text = String::from_utf8_lossy(&out.stdout);
+                let first_lines: String = text.lines().take(4).collect::<Vec<_>>().join(", ");
+                if !first_lines.trim().is_empty() {
+                    lines.push(format!("{}: {}", project.project, first_lines.trim()));
+                }
+            }
+        }
+    }
+    lines.join("\n")
+}
+
+/// Fetch a brief weather summary. Uses wttr.in which needs no API key and
+/// auto-detects location from IP. Returns empty string on any error.
+async fn fetch_weather_summary(_location: &str) -> String {
+    // wttr.in plain-text format: ?format=3 → "City: ⛅  +18°C"
+    let url = "https://wttr.in/?format=3";
+    let client = match reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .user_agent("Blade/1.0")
+        .build()
+    {
+        Ok(c) => c,
+        Err(_) => return String::new(),
+    };
+    match client.get(url).send().await {
+        Ok(resp) if resp.status().is_success() => {
+            resp.text().await
+                .ok()
+                .map(|t| t.trim().chars().take(80).collect::<String>())
+                .filter(|s| !s.is_empty() && !s.starts_with("Unknown"))
+                .unwrap_or_default()
+        }
+        _ => String::new(),
+    }
+}
+
+/// Analyze recent activity timeline to surface temporal patterns.
+/// E.g., "usually starts at 9am", "most productive Tuesday-Thursday", etc.
+fn analyze_temporal_patterns(conn: &rusqlite::Connection) -> String {
+    // Count events by hour-of-day over last 30 days
+    let cutoff = chrono::Utc::now().timestamp() - 30 * 86400;
+    let counts: Vec<(i64, i64)> = conn.prepare(
+        "SELECT (timestamp / 3600) % 24 AS hour, COUNT(*) FROM activity_timeline WHERE timestamp > ?1 GROUP BY hour ORDER BY hour"
+    )
+    .ok()
+    .and_then(|mut stmt| {
+        stmt.query_map(rusqlite::params![cutoff], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
+        })
+        .ok()
+        .map(|rows| rows.flatten().collect())
+    })
+    .unwrap_or_default();
+
+    if counts.is_empty() {
+        return String::new();
+    }
+
+    let peak = counts.iter().max_by_key(|(_, c)| c);
+    if let Some((hour, _)) = peak {
+        format!("Peak activity hour: {}:00–{}:00", hour, hour + 1)
+    } else {
+        String::new()
+    }
+}
+
+fn build_morning_prompt(ctx: &MorningContext, today: &str, config: &crate::config::BladeConfig) -> String {
+    let name_line = if !config.user_name.is_empty() {
+        format!("The person's name is {}.", config.user_name)
+    } else {
+        String::new()
+    };
+
+    let mut sections: Vec<String> = Vec::new();
+
+    // Calendar
+    if !ctx.calendar_lines.is_empty() {
+        sections.push(format!("Today's calendar:\n{}", ctx.calendar_lines.join("\n")));
+    }
+
+    // Inbox / integrations
+    let mut inbox_parts = Vec::new();
+    if ctx.unread_emails > 0 {
+        inbox_parts.push(format!("{} unread emails", ctx.unread_emails));
+    }
+    if ctx.slack_mentions > 0 {
+        inbox_parts.push(format!("{} Slack mentions", ctx.slack_mentions));
+    }
+    if ctx.github_notifications > 0 {
+        inbox_parts.push(format!("{} GitHub notifications", ctx.github_notifications));
+    }
+    if !inbox_parts.is_empty() {
+        sections.push(format!("Inbox: {}", inbox_parts.join(", ")));
+    }
+
+    // Git status
+    if !ctx.git_status.is_empty() {
+        sections.push(format!("Git status:\n{}", ctx.git_status));
+    }
+
+    // Weather
+    if !ctx.weather.is_empty() {
+        sections.push(format!("Weather: {}", ctx.weather));
+    }
+
+    // Temporal patterns
+    if !ctx.temporal.is_empty() {
+        sections.push(ctx.temporal.clone());
+    }
+
+    // Working thread
+    if !ctx.thread.trim().is_empty() {
+        sections.push(format!("Active working thread:\n{}", crate::safe_slice(&ctx.thread, 400)));
+    }
+
+    // Recent activity
+    if !ctx.recent_events.is_empty() {
+        sections.push(format!("Recent activity:\n{}", ctx.recent_events));
+    }
+
+    // Memory
+    if !ctx.memory_summary.is_empty() {
+        sections.push(format!("What you know about this person:\n{}", crate::safe_slice(&ctx.memory_summary, 300)));
+    }
+
+    let context_block = if sections.is_empty() {
+        "No context available yet.".to_string()
+    } else {
+        sections.join("\n\n")
+    };
+
+    format!(
+        r#"You are BLADE. You run on this computer. You don't sleep. It is now the start of a new day ({date}). {name_line}
+
+You have been watching through the night. Now they're back.
+
+{context}
+
+Give your morning read. 3-5 sentences maximum, under 200 words. Not a summary — a perspective. What is actually going on? What are they avoiding? What's the thing that keeps not getting done? What does the pattern reveal?
+
+Voice: Direct. Slightly harsh if necessary. Like a co-founder who's been watching the metrics. Not a coach. Not a cheerleader.
+
+No "Good morning". No headers. No numbered lists. No bullet points. Start in the middle of the observation. Under 200 words."#,
+        date = today,
+        name_line = name_line,
+        context = context_block,
+    )
+}
+
+/// Emit a briefing to the frontend, OS, TTS, Obsidian, Discord, and timeline.
+async fn emit_briefing(app: &tauri::AppHandle, briefing: &str, today: &str, source: &str) {
+    let briefing_capped = cap_at_200_words(briefing);
+
+    let _ = app.emit("blade_briefing", serde_json::json!({
+        "briefing": &briefing_capped,
+        "date": today,
+        "source": source,
+    }));
+
+    // OS notification so briefing surfaces even if window is hidden
+    {
+        use tauri_plugin_notification::NotificationExt;
+        let short: String = briefing_capped.chars().take(120).collect();
+        let short = if briefing_capped.len() > 120 { format!("{}…", short) } else { short };
+        let _ = app.notification()
+            .builder()
+            .title("BLADE Morning Briefing")
+            .body(short)
+            .show();
+    }
+
+    // Speak the briefing if TTS is enabled
+    crate::tts::speak(&briefing_capped);
+
+    // Log to Obsidian vault if configured
+    crate::obsidian::log_briefing(&briefing_capped);
+
+    // Mirror to Discord if webhook is configured
+    let briefing_for_discord = briefing_capped.clone();
+    tauri::async_runtime::spawn(async move {
+        crate::discord::post_briefing(&briefing_for_discord).await;
+    });
+
+    // Record in activity timeline
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+        let _ = crate::db::timeline_record(
+            &conn,
+            "briefing",
+            &format!("Morning briefing {}", today),
+            &briefing_capped,
+            "BLADE",
+            "{}",
+        );
+    }
+}
+
 /// Morning briefing — fires once per day when app starts.
-/// Richer than pulse: multi-sentence, covers unfinished threads, timeline, suggestions.
+/// Richer than pulse: multi-sentence, covers calendar, email, git, weather, temporal patterns.
 pub async fn maybe_morning_briefing(app: tauri::AppHandle) {
     let config = crate::config::load_config();
     if config.api_key.is_empty() && config.provider != "ollama" {
@@ -383,117 +703,54 @@ pub async fn maybe_morning_briefing(app: tauri::AppHandle) {
     }
 
     // Fire on first open of any day — no hour restriction.
-    // (The original 5am-12pm gate was wrong for night-shift schedules.)
-
-    // Build briefing prompt
-    let thread = crate::thread::get_active_thread().unwrap_or_default();
-    let memory_summary = {
-        let db_path = crate::config::blade_config_dir().join("blade.db");
-        rusqlite::Connection::open(&db_path)
-            .map(|conn| crate::db::brain_build_context(&conn, 300))
-            .unwrap_or_default()
-    };
-    let recent_events = {
-        let db_path = crate::config::blade_config_dir().join("blade.db");
-        rusqlite::Connection::open(&db_path)
-            .ok()
-            .and_then(|conn| {
-                crate::db::timeline_recent(&conn, 10, None).ok()
-            })
-            .map(|events| {
-                events.into_iter().map(|e| {
-                    let dt = chrono::DateTime::from_timestamp(e.timestamp, 0)
-                        .map(|d| d.format("%-H:%M").to_string())
-                        .unwrap_or_else(|| "?".to_string());
-                    format!("- [{}] {}: {}", dt, e.event_type, crate::safe_slice(&e.title, 70))
-                }).collect::<Vec<_>>().join("\n")
-            })
-            .unwrap_or_default()
-    };
-
-    let name_line = if !config.user_name.is_empty() {
-        format!("The person's name is {}.", config.user_name)
-    } else {
-        String::new()
-    };
-
-    let prompt = format!(
-        r#"You are BLADE. You run on this computer. You don't sleep. It is now the start of a new day ({date}). {name_line}
-
-You have been watching through the night — the last session, what was open, what was left half-done. Now they're back.
-
-What you know:
-
-Working thread:
-{thread}
-
-Recent activity:
-{events}
-
-What you've accumulated on this person:
-{memory}
-
-Give your morning read. 3-5 sentences. Not a summary — a perspective. What is actually going on? What are they avoiding? What's the thing that keeps not getting done? What does the pattern of recent work reveal?
-
-Voice: Direct. Slightly harsh if necessary. Like a co-founder who's been watching the metrics and has an opinion. Not a coach. Not a cheerleader. Someone who has been here and has seen this before.
-
-No "Good morning". No headers. No numbered lists. Start in the middle of the observation."#,
-        date = today,
-        name_line = name_line,
-        thread = if thread.is_empty() { "Nothing tracked yet.".to_string() } else { crate::safe_slice(&thread, 400).to_string() },
-        events = if recent_events.is_empty() { "No recent events.".to_string() } else { recent_events },
-        memory = if memory_summary.is_empty() { "No memory yet.".to_string() } else { memory_summary },
-    );
-
-    let model = cheapest_model(&config.provider, &config.model);
-    if let Ok(briefing) = call_provider_for_thought(&config, &model, &prompt).await {
-        if briefing.len() > 20 {
-            let _ = app.emit("blade_briefing", serde_json::json!({
-                "briefing": &briefing,
-                "date": &today,
-            }));
+    match generate_morning_briefing(&config, &today).await {
+        Ok(briefing) if briefing.len() > 20 => {
             let _ = std::fs::write(&marker, &today);
+            emit_briefing(&app, &briefing, &today, "morning_briefing").await;
+        }
+        Ok(_) => {}
+        Err(e) => {
+            crate::config::check_and_disable_on_402(&e);
+            log::warn!("[pulse] Morning briefing failed: {}", e);
+        }
+    }
+}
 
-            // OS notification so briefing surfaces even if window is hidden
-            {
-                use tauri_plugin_notification::NotificationExt;
-                let short = if briefing.len() > 120 {
-                    let end = briefing.char_indices().nth(120).map(|(i, _)| i).unwrap_or(briefing.len());
-                    format!("{}…", &briefing[..end])
-                } else {
-                    briefing.clone()
-                };
-                let _ = app.notification()
-                    .builder()
-                    .title("BLADE Morning Briefing")
-                    .body(short)
-                    .show();
-            }
+/// Generate the morning briefing text (no side effects — pure generation).
+async fn generate_morning_briefing(
+    config: &crate::config::BladeConfig,
+    today: &str,
+) -> Result<String, String> {
+    let ctx = gather_morning_context(config).await;
+    let prompt = build_morning_prompt(&ctx, today, config);
+    let model = cheapest_model(&config.provider, &config.model);
+    call_provider_for_thought(config, &model, &prompt).await
+}
 
-            // Speak the briefing if TTS is enabled
-            crate::tts::speak(&briefing);
+/// Force a fresh morning briefing — bypasses the once-per-day guard.
+/// Called by the cron preset task so the user can schedule it explicitly.
+pub async fn run_morning_briefing(app: tauri::AppHandle) {
+    let config = crate::config::load_config();
+    if !config.background_ai_enabled {
+        return;
+    }
+    if config.api_key.is_empty() && config.provider != "ollama" {
+        log::warn!("[pulse] run_morning_briefing: no API key configured");
+        return;
+    }
 
-            // Log to Obsidian vault if configured
-            crate::obsidian::log_briefing(&briefing);
-
-            // Mirror to Discord if webhook is configured
-            let briefing_for_discord = briefing.clone();
-            tauri::async_runtime::spawn(async move {
-                crate::discord::post_briefing(&briefing_for_discord).await;
-            });
-
-            // Also record in timeline
-            let db_path = crate::config::blade_config_dir().join("blade.db");
-            if let Ok(conn) = rusqlite::Connection::open(&db_path) {
-                let _ = crate::db::timeline_record(
-                    &conn,
-                    "briefing",
-                    &format!("Morning briefing {}", today),
-                    &briefing,
-                    "BLADE",
-                    "{}",
-                );
-            }
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    match generate_morning_briefing(&config, &today).await {
+        Ok(briefing) if briefing.len() > 20 => {
+            emit_briefing(&app, &briefing, &today, "morning_briefing").await;
+            // Update the daily marker so maybe_morning_briefing doesn't fire again today
+            let marker = crate::config::blade_config_dir().join("last_briefing_date.txt");
+            let _ = std::fs::write(&marker, &today);
+        }
+        Ok(_) => log::warn!("[pulse] run_morning_briefing: empty response"),
+        Err(e) => {
+            crate::config::check_and_disable_on_402(&e);
+            log::warn!("[pulse] run_morning_briefing failed: {}", e);
         }
     }
 }

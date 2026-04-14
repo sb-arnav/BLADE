@@ -116,6 +116,13 @@ pub fn dismiss_proactive_task(task_id: String) {
     }
 }
 
+/// Return the latest God Mode intelligence brief (raw markdown from godmode_context.md).
+/// Returns empty string when God Mode is inactive or no scan has run yet.
+#[tauri::command]
+pub fn get_god_mode_context() -> String {
+    load_godmode_context().unwrap_or_default()
+}
+
 // ── God Mode Loop ───────────────────────────────────────────────────────────
 
 pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
