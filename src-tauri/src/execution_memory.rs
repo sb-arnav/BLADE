@@ -69,10 +69,19 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
             INSERT INTO executions_fts(rowid, command, stdout, stderr)
             VALUES (new.id, new.command, new.stdout, new.stderr);
         END;
+
+        CREATE TRIGGER IF NOT EXISTS executions_ad AFTER DELETE ON executions BEGIN
+            INSERT INTO executions_fts(executions_fts, rowid, command, stdout, stderr)
+            VALUES ('delete', old.id, old.command, old.stdout, old.stderr);
+        END;
         ",
     )
     .map_err(|e| format!("ExecMem schema error: {}", e))
 }
+
+/// Maximum number of execution records to keep. Older rows are pruned once
+/// this limit is exceeded. 10 000 rows at ~5 KB average ≈ 50 MB — manageable.
+const MAX_EXECUTIONS: i64 = 10_000;
 
 /// Record a completed execution. Called automatically from blade_bash.
 pub fn record(
@@ -93,6 +102,17 @@ pub fn record(
         "INSERT INTO executions (command, cwd, stdout, stderr, exit_code, duration_ms, timestamp)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params![command, cwd, stdout, stderr, exit_code, duration_ms, now],
+    );
+
+    // Prune oldest rows once the table exceeds MAX_EXECUTIONS.
+    // Uses a subquery so we don't need a second COUNT query.
+    let _ = conn.execute(
+        "DELETE FROM executions WHERE id IN (
+             SELECT id FROM executions
+             ORDER BY timestamp ASC
+             LIMIT MAX(0, (SELECT COUNT(*) FROM executions) - ?1)
+         )",
+        params![MAX_EXECUTIONS],
     );
 }
 

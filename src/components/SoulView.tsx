@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 interface CharacterBible {
@@ -167,23 +167,40 @@ interface UserProfile {
   knowledge_nodes: KnowledgeNode[];
 }
 
+interface StreakStats {
+  current_streak: number;
+  longest_streak: number;
+  total_active_days: number;
+  total_conversations: number;
+  total_messages: number;
+  tools_used_count: number;
+  facts_known: number;
+  people_known: number;
+  active_today: boolean;
+  streak_label: string;
+}
+
 export function SoulView({ onBack }: Props) {
   const [state, setState] = useState<SoulState | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [streak, setStreak] = useState<StreakStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [snapshotting, setSnapshotting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<"profile" | "you" | "blade" | "diff">("profile");
   const [snapshotResult, setSnapshotResult] = useState<string | null>(null);
+  const graphCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const load = useCallback(async () => {
     try {
-      const [s, p] = await Promise.all([
+      const [s, p, st] = await Promise.all([
         invoke<SoulState>("soul_get_state"),
         invoke<UserProfile>("get_user_profile").catch(() => null),
+        invoke<StreakStats>("streak_get_stats").catch(() => null),
       ]);
       setState(s);
       setProfile(p);
+      setStreak(st);
     } catch (e) {
       console.error("[soul] load:", e);
     } finally {
@@ -192,6 +209,65 @@ export function SoulView({ onBack }: Props) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Render the knowledge graph on canvas whenever profile nodes change
+  useEffect(() => {
+    const canvas = graphCanvasRef.current;
+    if (!canvas || !profile || profile.knowledge_nodes.length === 0) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const W = canvas.width;
+    const H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    const nodes = profile.knowledge_nodes.slice(0, 40); // cap for perf
+    const cx = W / 2;
+    const cy = H / 2;
+
+    // Simple radial layout
+    const positions: { x: number; y: number }[] = nodes.map((_, i) => {
+      if (i === 0) return { x: cx, y: cy };
+      const angle = (i / (nodes.length - 1)) * 2 * Math.PI;
+      const r = 70 + (i % 3) * 20;
+      return { x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r };
+    });
+
+    // Draw edges from center node to all others
+    ctx.strokeStyle = "rgba(99,102,241,0.15)";
+    ctx.lineWidth = 1;
+    for (let i = 1; i < positions.length; i++) {
+      ctx.beginPath();
+      ctx.moveTo(positions[0].x, positions[0].y);
+      ctx.lineTo(positions[i].x, positions[i].y);
+      ctx.stroke();
+    }
+
+    // Draw nodes
+    nodes.forEach((node, i) => {
+      const { x, y } = positions[i];
+      const color =
+        node.node_type === "project" ? "rgba(99,102,241,0.8)" :
+        node.node_type === "tool"    ? "rgba(52,211,153,0.8)" :
+        node.node_type === "person"  ? "rgba(251,191,36,0.8)" :
+                                       "rgba(148,163,184,0.6)";
+      const r = i === 0 ? 6 : 4;
+
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, 2 * Math.PI);
+      ctx.fillStyle = color;
+      ctx.fill();
+
+      // Label (only for nodes with enough space)
+      if (i < 20) {
+        ctx.fillStyle = "rgba(148,163,184,0.8)";
+        ctx.font = "8px monospace";
+        ctx.textAlign = x > cx ? "left" : "right";
+        ctx.fillText(node.label.slice(0, 16), x + (x > cx ? r + 2 : -(r + 2)), y + 3);
+      }
+    });
+  }, [profile, activeTab]);
 
   const takeSnapshot = async () => {
     setSnapshotting(true);
@@ -339,6 +415,54 @@ export function SoulView({ onBack }: Props) {
               )}
             </div>
 
+            {/* Streak & memory stats */}
+            {streak && (
+              <div className="bg-blade-surface border border-blade-border rounded-lg p-3">
+                <div className="text-[10px] uppercase tracking-widest text-blade-muted mb-2">BLADE stats</div>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    {
+                      label: "Streak",
+                      value: streak.current_streak > 0 ? streak.streak_label : "—",
+                      sub: streak.active_today ? "active today" : "not active today",
+                      accent: streak.current_streak > 0,
+                    },
+                    {
+                      label: "Conversations",
+                      value: streak.total_conversations.toLocaleString(),
+                      sub: `${streak.total_messages.toLocaleString()} messages`,
+                      accent: false,
+                    },
+                    {
+                      label: "Facts known",
+                      value: streak.facts_known.toLocaleString(),
+                      sub: `${streak.people_known} people`,
+                      accent: false,
+                    },
+                    {
+                      label: "Tools used",
+                      value: streak.tools_used_count.toLocaleString(),
+                      sub: `${streak.total_active_days} active days`,
+                      accent: false,
+                    },
+                  ].map(({ label, value, sub, accent }) => (
+                    <div key={label} className="text-center">
+                      <div className={`text-base font-bold ${accent ? "text-blade-accent" : "text-blade-text"}`}>
+                        {value}
+                      </div>
+                      <div className="text-[9px] text-blade-muted mt-0.5">{label}</div>
+                      <div className="text-[8px] text-blade-muted/50 mt-0.5">{sub}</div>
+                    </div>
+                  ))}
+                </div>
+                {streak.longest_streak > 0 && (
+                  <div className="mt-2 text-[9px] text-blade-muted/60 text-center">
+                    Longest streak: {streak.longest_streak} days
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Relationship depth */}
             {profile && (profile.relationship.intimacy_score > 0 || profile.relationship.trust_score > 0) && (
               <div className="bg-blade-surface border border-blade-border rounded-lg p-3 space-y-2">
@@ -397,14 +521,38 @@ export function SoulView({ onBack }: Props) {
               </div>
             )}
 
-            {/* Knowledge graph nodes */}
+            {/* Knowledge graph nodes — canvas visualization + tag cloud */}
             {profile && profile.knowledge_nodes.length > 0 && (
               <div className="bg-blade-surface border border-blade-border rounded-lg p-3 space-y-2">
                 <div className="text-[10px] uppercase tracking-widest text-blade-muted">
                   Known context ({profile.knowledge_nodes.length} nodes)
                 </div>
+                {/* Canvas graph — renders radial node layout */}
+                <canvas
+                  ref={graphCanvasRef}
+                  width={340}
+                  height={200}
+                  className="w-full rounded-md bg-blade-bg/50"
+                  style={{ maxHeight: 200 }}
+                />
+                {/* Legend */}
+                <div className="flex items-center gap-3 text-[9px] text-blade-muted">
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-blade-accent inline-block" /> project
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /> tool
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" /> person
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-blade-muted/60 inline-block" /> other
+                  </span>
+                </div>
+                {/* Tag cloud (collapsed to top 20) */}
                 <div className="flex flex-wrap gap-1.5">
-                  {profile.knowledge_nodes.map((node) => (
+                  {profile.knowledge_nodes.slice(0, 20).map((node) => (
                     <span
                       key={node.id}
                       title={node.description}
@@ -413,12 +561,19 @@ export function SoulView({ onBack }: Props) {
                           ? "border-blade-accent/40 text-blade-accent bg-blade-accent/5"
                           : node.node_type === "tool"
                           ? "border-green-500/30 text-green-400 bg-green-500/5"
+                          : node.node_type === "person"
+                          ? "border-yellow-500/30 text-yellow-400 bg-yellow-500/5"
                           : "border-blade-border text-blade-muted"
                       }`}
                     >
                       {node.label}
                     </span>
                   ))}
+                  {profile.knowledge_nodes.length > 20 && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full border border-blade-border text-blade-muted/50">
+                      +{profile.knowledge_nodes.length - 20} more
+                    </span>
+                  )}
                 </div>
               </div>
             )}

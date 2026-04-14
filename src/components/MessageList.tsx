@@ -277,34 +277,39 @@ function ToolCard({ tool }: { tool: ToolExecution }) {
         </svg>
       </button>
 
-      {/* Expanded detail */}
-      {expanded && (
-        <div className="border-t border-blade-border/40 bg-blade-bg/30 px-2.5 py-2 space-y-2">
-          {argFull && (
-            <div>
-              <div className="text-blade-muted/40 uppercase tracking-wide text-[9px] mb-1">Input</div>
-              <pre className="text-blade-muted/70 whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto text-[0.7rem]">
-                {argFull}
-              </pre>
-            </div>
-          )}
-          {tool.result && (
-            <div>
-              <div className={`text-[9px] uppercase tracking-wide mb-1 ${tool.is_error ? "text-red-400/50" : "text-emerald-400/50"}`}>
-                {tool.is_error ? "Error" : "Result"}
+      {/* Expanded detail — smooth height transition via grid-rows trick */}
+      <div
+        className="grid transition-[grid-template-rows] duration-200 ease-out"
+        style={{ gridTemplateRows: expanded ? "1fr" : "0fr" }}
+      >
+        <div className="overflow-hidden">
+          <div className="border-t border-blade-border/40 bg-blade-bg/30 px-2.5 py-2 space-y-2">
+            {argFull && (
+              <div>
+                <div className="text-blade-muted/40 uppercase tracking-wide text-[9px] mb-1">Input</div>
+                <pre className="text-blade-muted/70 whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto text-[0.7rem]">
+                  {argFull}
+                </pre>
               </div>
-              <pre className={`whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto text-[0.7rem] ${
-                tool.is_error ? "text-red-400/60" : "text-blade-muted/60"
-              }`}>
-                {tool.result}
-              </pre>
-            </div>
-          )}
-          {isExecuting && (
-            <div className="text-blade-muted/40 italic">Running...</div>
-          )}
+            )}
+            {tool.result && (
+              <div>
+                <div className={`text-[9px] uppercase tracking-wide mb-1 ${tool.is_error ? "text-red-400/50" : "text-emerald-400/50"}`}>
+                  {tool.is_error ? "Error" : "Result"}
+                </div>
+                <pre className={`whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto text-[0.7rem] ${
+                  tool.is_error ? "text-red-400/60" : "text-blade-muted/60"
+                }`}>
+                  {tool.result}
+                </pre>
+              </div>
+            )}
+            {isExecuting && (
+              <div className="text-blade-muted/40 italic">Running...</div>
+            )}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -371,8 +376,12 @@ const MessageBubble = memo(function MessageBubble({
           <div className="rounded-2xl rounded-br-md bg-blade-accent/90 px-4 py-2 text-[0.8125rem] leading-relaxed text-white/95">
             {msg.image_base64 && (
               <img
-                src={`data:image/png;base64,${msg.image_base64}`}
-                alt="Screenshot"
+                src={
+                  msg.image_base64.startsWith("data:")
+                    ? msg.image_base64
+                    : `data:image/png;base64,${msg.image_base64}`
+                }
+                alt="Attached image"
                 className="rounded-lg max-w-full max-h-40 mb-2 opacity-90"
               />
             )}
@@ -385,8 +394,12 @@ const MessageBubble = memo(function MessageBubble({
           <div className={`pl-3 border-l-2 ${msg.isAck ? "border-blade-accent/30" : "border-blade-border"}`}>
             {msg.image_base64 && (
               <img
-                src={`data:image/png;base64,${msg.image_base64}`}
-                alt="Screenshot"
+                src={
+                  msg.image_base64.startsWith("data:")
+                    ? msg.image_base64
+                    : `data:image/png;base64,${msg.image_base64}`
+                }
+                alt="Attached image"
                 className="rounded-lg max-w-full max-h-48 mb-3 border border-blade-border"
               />
             )}

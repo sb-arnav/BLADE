@@ -19,6 +19,7 @@ import { useProactiveMode } from "./hooks/useProactiveMode";
 import { useVoiceCommands } from "./hooks/useVoiceCommands";
 import { useVoiceMode } from "./hooks/useVoiceMode";
 import { VoiceOrb } from "./components/VoiceOrb";
+import { useVoiceConversation } from "./hooks/useVoiceConversation";
 import { useRuntimes } from "./hooks/useRuntimes";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
@@ -179,7 +180,8 @@ const ROUTE_INTENT_LABELS: Partial<Record<Route, { title: string; note: string }
 export default function App() {
   const [config, setConfig] = useState<BladeConfig | null>(null);
   const [loading, setLoading] = useState(true);
-  const [route, setRoute] = useState<Route>("chat");
+  const [route, setRoute] = useState<Route>("dashboard");
+  const [chatPanelOpen, setChatPanelOpen] = useState(false);
   const [personaOnboardingOpen, setPersonaOnboardingOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
@@ -211,6 +213,21 @@ export default function App() {
       else setVoiceDraft(text);
     },
   });
+
+  // Hoisted voice conversation — controls the VoiceOrb's primary interaction
+  const voiceConv = useVoiceConversation();
+
+  // Track last assistant response for the orb tooltip
+  const [lastOrbResponse, setLastOrbResponse] = useState<string | null>(null);
+  useEffect(() => {
+    if (!chat.loading && chat.messages.length > 0) {
+      const last = chat.messages[chat.messages.length - 1];
+      if (last.role === "assistant" && last.content) {
+        setLastOrbResponse(last.content.slice(0, 160));
+      }
+    }
+  }, [chat.loading, chat.messages]);
+
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const handleImageDrop = useCallback((dataUrl: string) => {
@@ -829,14 +846,38 @@ export default function App() {
     }
   };
 
+  // Chat panel keyboard shortcuts: Enter or / opens it, Escape closes it
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't hijack when typing in an input/textarea
+      const target = e.target as HTMLElement;
+      const inInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
+
+      if (e.key === "Escape" && chatPanelOpen) {
+        e.preventDefault();
+        setChatPanelOpen(false);
+        return;
+      }
+
+      if (!inInput && !paletteOpen && !chatPanelOpen) {
+        if (e.key === "Enter" || e.key === "/") {
+          e.preventDefault();
+          setChatPanelOpen(true);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [chatPanelOpen, paletteOpen]);
+
   // Keyboard shortcuts
   useKeyboard({
     onNewConversation: () => chat.newConversation(),
     onSettings: () => setRoute((r) => r === "settings" ? "chat" : "settings"),
     onToggleSidebar: () => setBranchOpen((p) => !p),
-    onFocusInput: () => inputRef.current?.focus(),
+    onFocusInput: () => { setChatPanelOpen(true); setTimeout(() => inputRef.current?.focus(), 50); },
     onPalette: () => setPaletteOpen((p) => !p),
-    onEscape: paletteOpen ? () => setPaletteOpen(false) : shortcutHelpOpen ? () => setShortcutHelpOpen(false) : notificationsOpen ? () => setNotificationsOpen(false) : undefined,
+    onEscape: paletteOpen ? () => setPaletteOpen(false) : chatPanelOpen ? () => setChatPanelOpen(false) : shortcutHelpOpen ? () => setShortcutHelpOpen(false) : notificationsOpen ? () => setNotificationsOpen(false) : undefined,
     onHideWindow: hideWindow,
     onShortcutHelp: () => setShortcutHelpOpen((p) => !p),
     onFocusMode: () => setFocusMode((p) => !p),
@@ -846,7 +887,7 @@ export default function App() {
     { id: "new", label: "New conversation", description: "Start a fresh thread in chat", section: "Chat Core", shortcut: "Ctrl+N", action: () => chat.newConversation() },
     { id: "clear", label: "Clear thread", description: "Remove messages from the current conversation", section: "Chat Core", action: () => chat.clearMessages() },
     { id: "export", label: "Export conversation", description: "Copy the current conversation as Markdown", section: "Chat Core", action: () => copyConversation(chat.messages, chat.currentConversation?.title) },
-    { id: "chat", label: "Return to chat", description: "Go back to the main conversation workspace", section: "Chat Core", action: () => openRoute("chat") },
+    { id: "chat", label: "Open chat panel", description: "Open the chat panel (or press Enter / /)", section: "Chat Core", action: () => setChatPanelOpen(true) },
 
     { id: "agents", label: "Open Operator Center", description: "Launch the multi-runtime control plane", section: "Operators", action: () => openRoute("agents") },
     { id: "managed-agents", label: "Open Claude operator view", description: "Jump into the Claude-focused operator workflow", section: "Operators", action: () => openRoute("managed-agents") },

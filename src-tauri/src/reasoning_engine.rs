@@ -709,18 +709,15 @@ pub fn get_recent_traces(limit: usize) -> Vec<ReasoningTrace> {
         Err(_) => return vec![],
     };
 
-    let sql = format!(
+    let mut stmt = match conn.prepare(
         "SELECT id, question, steps, final_answer, total_confidence, reasoning_quality, created_at \
-         FROM reasoning_traces ORDER BY created_at DESC LIMIT {}",
-        limit
-    );
-
-    let mut stmt = match conn.prepare(&sql) {
+         FROM reasoning_traces ORDER BY created_at DESC LIMIT ?1",
+    ) {
         Ok(s) => s,
         Err(_) => return vec![],
     };
 
-    stmt.query_map([], |row| {
+    stmt.query_map(params![limit as i64], |row| {
         Ok((
             row.get::<_, String>(0)?,
             row.get::<_, String>(1)?,

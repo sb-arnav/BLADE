@@ -6,6 +6,9 @@
 /// relationship state that shape every future response.
 ///
 /// The more you use BLADE, the more it sounds like it *knows* you — because it does.
+///
+/// v2: UserModel — unified aggregated model of the user. Behavioral prediction.
+/// Expertise tracking. Mood detection. All wired into brain.rs for context injection.
 
 use rusqlite::params;
 use serde::{Deserialize, Serialize};

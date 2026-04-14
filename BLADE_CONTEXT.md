@@ -10,12 +10,15 @@ Blade is a **personal AI desktop app** built with Tauri 2 (Rust backend + React/
 
 **Key differentiators from every other AI app:**
 1. **MCP protocol** — connects to 7,600+ MCP servers (Slack, GitHub, databases, etc.)
-2. **Compounding personalization** — SOUL.md, Knowledge Graph, auto-learn, feedback loop
-3. **Native desktop** — system tray, Alt+Space hotkey, screen capture, clipboard monitoring
+2. **Compounding personalization** — Typed Memory (7 categories), Personality Mirror, People Graph, SOUL.md
+3. **Native desktop** — system tray, Ctrl+Space hotkey, screen capture, clipboard monitoring
 4. **Multi-model smart routing** — auto-selects the right model per task
-5. **Voice in + voice out** — mic input via Whisper, TTS via Web Speech API
-6. **Screen awareness** — screenshot → vision model analysis
-7. **Claude Managed Agents** — first desktop client for Anthropic's Agent SDK
+5. **Voice in + voice out** — emotion-aware conversational voice (Whisper + voice intelligence)
+6. **Screen awareness** — screenshot → vision model + Total Recall timeline
+7. **Ghost Mode** — invisible meeting overlay with AI suggestions, hidden from screen share
+8. **Deep System Discovery** — 12 parallel scanners build a full identity profile on first run
+9. **Autonomous decision-making** — Decision Gate classifies every signal and acts or asks
+10. **Browser + system + smart home control** — CDP automation, desktop control, Home Assistant
 
 ---
 
@@ -23,14 +26,17 @@ Blade is a **personal AI desktop app** built with Tauri 2 (Rust backend + React/
 
 | Layer | Tech | Details |
 |-------|------|---------|
-| Frontend | React 19 + TypeScript | 75k+ lines, 83 components, 90 hooks |
-| Backend | Rust + Tauri 2 | 8k lines, 40 modules |
+| Frontend | React 19 + TypeScript | 83k+ lines, 132 components, 90 hooks |
+| Backend | Rust + Tauri 2 | 127 modules |
 | Styling | Tailwind CSS | Custom `blade-*` color tokens |
-| State | React hooks + localStorage | Migrating to SQLite (db.rs ready) |
+| State | React hooks + SQLite | localStorage + SQLite via db.rs |
 | AI Providers | 5 providers | Anthropic, OpenAI, Groq, Gemini, Ollama |
 | MCP | Custom client | mcp.rs with tool discovery, permission system |
-| Database | SQLite (rusqlite) | db.rs with FTS5 full-text search |
+| Database | SQLite (rusqlite) | db.rs with FTS5 + vector search |
 | Security | OS Keychain | API keys in Windows Credential Manager |
+| Audio | cpal | System + mic loopback for Ghost Mode and Audio Timeline |
+| Browser | Chrome DevTools Protocol | Real-browser automation via browser_native.rs |
+| Smart Home | Home Assistant REST + Spotify | IoT control via iot_bridge.rs |
 | Build | Vite + Cargo | Hot reload dev, NSIS installer for production |
 
 ---
@@ -44,7 +50,7 @@ blade/
 │   ├── main.tsx                  # Entry point with React.StrictMode
 │   ├── index.css                 # Global styles, markdown, code highlighting
 │   ├── types.ts                  # Core TypeScript interfaces
-│   ├── components/               # 83 React components
+│   ├── components/               # 132 React components
 │   │   ├── ChatWindow.tsx        # Main chat UI with sidebar, clipboard bar
 │   │   ├── MessageList.tsx       # Message rendering with React.memo
 │   │   ├── InputBar.tsx          # Input with voice, screenshot, slash commands, paste
@@ -180,6 +186,26 @@ blade/
 │       ├── rag.rs                # RAG pipeline (ingest + query)
 │       ├── trace.rs              # Provider call logging
 │       ├── tray.rs               # System tray management
+│       ├── ghost_mode.rs         # Invisible meeting overlay (cpal + Whisper + content protection)
+│       ├── deep_scan.rs          # 12-scanner system discovery (parallel, ~10s)
+│       ├── people_graph.rs       # Relationship graph (auto-learned from conversations)
+│       ├── auto_reply.rs         # Draft replies in user's style per person
+│       ├── typed_memory.rs       # 7-category semantic memory with proactive surfacing
+│       ├── decision_gate.rs      # Autonomous action classifier (act / ask / queue / ignore)
+│       ├── browser_agent.rs      # Vision-driven browser agent loop
+│       ├── browser_native.rs     # Chrome DevTools Protocol implementation
+│       ├── system_control.rs     # Lock, volume, brightness, apps, battery, network
+│       ├── iot_bridge.rs         # Home Assistant REST + Spotify control
+│       ├── financial_brain.rs    # Spending analysis, CSV import, subscription tracking
+│       ├── health_guardian.rs    # Screen time monitor + break reminders
+│       ├── temporal_intel.rs     # Activity recall, standup, pattern detection
+│       ├── security_monitor.rs   # Network, phishing, breach, sensitive files, code scan
+│       ├── audio_timeline.rs     # Always-on audio capture + Whisper + insight extraction
+│       ├── personality_mirror.rs # Communication style extraction (WhatsApp/Telegram/CSV import)
+│       ├── voice_intelligence.rs # Emotion-aware conversational voice with session continuity
+│       ├── knowledge_graph.rs    # Entity-relationship graph (seeded by deep_scan)
+│       ├── perception_fusion.rs  # Unified perception state for decision_gate
+│       ├── activity_monitor.rs   # App focus + idle detection
 │       └── plugins/              # Plugin system
 │           ├── mod.rs
 │           ├── loader.rs
@@ -295,45 +321,52 @@ cd src-tauri && cargo check
 
 ---
 
-## Current State (as of April 2026)
+## Current State (v0.6.0 — April 2026)
 
 - **83,800+ lines** across **243 files**
-- **83 components**, **90 hooks**, **15 lib files**, **6 data files**
-- **14 routes** in App.tsx, **32 command palette entries**
+- **132 components**, **90 hooks**, **15 lib files**, **6 data files**
+- **127 Rust modules** in src-tauri/src/
 - **5 AI providers** with streaming
 - **12 Tauri plugins** installed and wired
-- **SQLite database** ready (db.rs + db_commands.rs + data layer)
-- **Claude Managed Agents** integration (first desktop client)
+- **SQLite database** with FTS5 + vector search (db.rs + db_commands.rs + data layer)
 - TypeScript compiles clean, Rust compiles clean
 
 ### What Works End-to-End
-- Onboarding → chat → voice → screenshot flow
-- MCP tool calling with approval
-- Conversation history + persistence
-- Smart model routing
-- Clipboard monitoring + smart detection
-- Drag & drop files, Ctrl+V paste images
-- TTS voice output
-- Focus mode, keyboard shortcuts (12+), slash commands (7)
-
-### What Needs Wiring
-- Many components exist but aren't routed in App.tsx yet (need routes + palette entries)
-- `src/data/*.ts` layer exists but hooks still use localStorage directly
-- Some Rust commands registered but not called from frontend (~30 unused)
-- Streaming should migrate from events to Tauri Channels (more efficient)
+- Onboarding v2: paste key → auto-detect provider → 12-scanner system scan → 5 personality questions
+- Chat + streaming + stop button + smart compression
+- Ghost Mode: invisible meeting overlay, content protection, AI response suggestions
+- Total Recall: 30-second screenshot capture + semantic search
+- Audio Timeline: always-on audio capture, Whisper transcription, action item extraction, meeting detection
+- People Graph + Auto-Reply: relationship learning + style-matched draft messages
+- Decision Gate: autonomous action classification with per-source confidence thresholds
+- Browser Automation: CDP-backed agent loop (navigate, click, type, screenshot, read)
+- System Control: lock, volume, brightness, app launch/kill, battery, network
+- Smart Home: Home Assistant entity control + Spotify playback
+- Financial Brain: transaction logging, spending analysis, CSV import, subscription tracking
+- Health Guardian: screen time monitoring, break reminders, daily stats
+- Temporal Intelligence: activity recall, standup generation, pattern detection
+- Security Fortress: network monitoring, phishing detection, breach check, sensitive file scan, code scan
+- Personality Mirror: communication style extraction from chat history and imported logs
+- Conversational Voice: emotion-aware multi-turn voice with session continuity
+- Typed Memory: 7-category semantic memory with proactive context injection
+- MCP tool calling with approval flow
+- BLADE Swarm: parallel multi-agent DAG orchestration (5 agents)
+- Background agents: Claude Code, Aider, Goose
+- BLADE Cron: scheduled autonomous tasks
+- Evolution Engine: background self-improvement loop
 
 ### Known Issues
 - Some agent-delivered components have unused variable warnings (strict TS)
-- localStorage will hit 5-10MB limit eventually — SQLite migration needed
-- Window state can save off-screen positions on minimize (validation added but edge cases remain)
+- Streaming should migrate from events to Tauri Channels (more efficient)
+- Window state can save off-screen positions on minimize (edge cases remain)
 
 ---
 
 ## Vision & Roadmap
 
 **Phase 1 (DONE):** Core chat, voice, vision, MCP, polish
-**Phase 2 (IN PROGRESS):** Managed Agents, proactive mode, plugin system
-**Phase 3:** Character Bible, compounding personalization, monetization
-**Phase 4:** Full PC control, background agents, cross-device sync
+**Phase 2 (DONE):** Managed Agents, proactive mode, plugin system
+**Phase 3 (DONE):** Ghost Mode, system control, browser automation, smart home, financial/health intelligence, typed memory, people graph, audio timeline, security fortress, personality mirror, deep scan, temporal intelligence, decision gate
+**Phase 4 (NEXT):** Wake word always-on, SOUL.md diffs, OpenHands integration, MCP marketplace, offline TTS, mobile companion, cross-device encrypted sync
 
-**The moat:** OpenAI/Google build for 1 billion users. Blade is built for ONE person and gets more valuable every day it runs. The data stays local. The personalization compounds.
+**The moat:** OpenAI/Google build for 1 billion users. Blade is built for ONE person and gets more valuable every day it runs. The data stays local. The personalization compounds. 127 modules, every one of them learning something about you.

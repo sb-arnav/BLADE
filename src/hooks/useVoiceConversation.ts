@@ -42,10 +42,42 @@ export interface UseVoiceConversationResult {
   clearTranscript: () => void;
 }
 
+// If the backend enters "thinking" and never returns (crashed, hung, etc.) we
+// fall back to "listening" after 30 seconds so the user isn't left stranded.
+const THINKING_TIMEOUT_MS = 30_000;
+
 export function useVoiceConversation(): UseVoiceConversationResult {
   const [conversationState, setConversationState] = useState<ConversationState>("idle");
   const [transcript, setTranscript] = useState<ConversationTurn[]>([]);
   const startedRef = useRef(false);
+  // Handle for the thinking watchdog timer
+  const thinkingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearThinkingTimer = () => {
+    if (thinkingTimerRef.current) {
+      clearTimeout(thinkingTimerRef.current);
+      thinkingTimerRef.current = null;
+    }
+  };
+
+  // Persist the transcript as a voice conversation in chat history when the
+  // session ends. This ensures voice chats show up alongside text conversations.
+  const persistTranscriptRef = useRef<ConversationTurn[]>([]);
+  useEffect(() => {
+    persistTranscriptRef.current = transcript;
+  }, [transcript]);
+
+  const persistTranscript = useCallback((turns: ConversationTurn[]) => {
+    if (turns.length < 2) return; // don't save empty or single-turn sessions
+    const conversationId = crypto.randomUUID();
+    const messages = turns.map((t) => ({
+      id: crypto.randomUUID(),
+      role: t.role,
+      content: t.text,
+      timestamp: t.timestamp,
+    }));
+    invoke("history_save_conversation", { conversationId, messages }).catch(() => {});
+  }, []);
 
   // Listen to backend events and wake word
   useEffect(() => {
@@ -61,6 +93,8 @@ export function useVoiceConversation(): UseVoiceConversationResult {
     cleanups.push(() => window.removeEventListener("blade_wake_word_triggered", wakeWordHandler));
 
     listen<{ active: boolean }>("voice_conversation_listening", () => {
+      // Entering listening — cancel any thinking watchdog
+      clearThinkingTimer();
       setConversationState("listening");
     }).then((unlisten) => cleanups.push(unlisten));
 
@@ -71,9 +105,18 @@ export function useVoiceConversation(): UseVoiceConversationResult {
         ...prev,
         { role: "user", text: event.payload.text, timestamp: Date.now() },
       ]);
+      // Start the 30-second watchdog — if the backend never responds (hung or crashed)
+      // we nudge the state machine back to listening so the user isn't stuck.
+      clearThinkingTimer();
+      thinkingTimerRef.current = setTimeout(() => {
+        thinkingTimerRef.current = null;
+        setConversationState("listening");
+      }, THINKING_TIMEOUT_MS);
     }).then((unlisten) => cleanups.push(unlisten));
 
     listen<{ text: string }>("voice_conversation_speaking", (event) => {
+      // Response arrived — cancel the thinking watchdog
+      clearThinkingTimer();
       setConversationState("speaking");
       // Record the assistant's reply in the transcript
       setTranscript((prev) => [
@@ -83,14 +126,19 @@ export function useVoiceConversation(): UseVoiceConversationResult {
     }).then((unlisten) => cleanups.push(unlisten));
 
     listen<{ reason: string }>("voice_conversation_ended", () => {
+      clearThinkingTimer();
       setConversationState("idle");
       startedRef.current = false;
+      // Persist the completed session transcript to chat history
+      persistTranscript(persistTranscriptRef.current);
     }).then((unlisten) => cleanups.push(unlisten));
 
     return () => {
+      clearThinkingTimer();
       cleanups.forEach((fn) => fn());
     };
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persistTranscript]);
 
   const startConversation = useCallback(async () => {
     if (startedRef.current) return;
@@ -104,6 +152,7 @@ export function useVoiceConversation(): UseVoiceConversationResult {
     } catch (e) {
       console.error("[voice_conv] start failed:", e);
     } finally {
+      clearThinkingTimer();
       setConversationState("idle");
       startedRef.current = false;
     }
@@ -113,9 +162,12 @@ export function useVoiceConversation(): UseVoiceConversationResult {
     invoke("stop_voice_conversation").catch((e) => {
       console.error("[voice_conv] stop failed:", e);
     });
+    clearThinkingTimer();
+    // Persist whatever transcript has accumulated so far
+    persistTranscript(persistTranscriptRef.current);
     setConversationState("idle");
     startedRef.current = false;
-  }, []);
+  }, [persistTranscript]);
 
   const clearTranscript = useCallback(() => {
     setTranscript([]);

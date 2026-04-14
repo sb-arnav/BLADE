@@ -31,7 +31,29 @@ export interface AutoAction {
 }
 
 const STORAGE_KEY = "blade-auto-actions";
+const COOLDOWNS_KEY = "blade-auto-actions-cooldowns";
 const MAX_ACTIONS = 50;
+
+// Persist cooldowns to localStorage so they survive app restarts.
+// Format: { [actionId]: lastRunTimestamp }
+function loadCooldowns(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem(COOLDOWNS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveCooldown(id: string, ts: number) {
+  try {
+    const existing = loadCooldowns();
+    existing[id] = ts;
+    localStorage.setItem(COOLDOWNS_KEY, JSON.stringify(existing));
+  } catch {
+    // Non-fatal — worst case: cooldown not persisted across restart
+  }
+}
 
 const PRESET_ACTIONS: Omit<AutoAction, "id" | "runCount" | "lastRun" | "lastError" | "createdAt">[] = [
   {
@@ -111,7 +133,12 @@ function saveActions(actions: AutoAction[]) {
 
 export function useAutoActions() {
   const [actions, setActions] = useState<AutoAction[]>(loadActions);
-  const lastRunTimesRef = useRef<Record<string, number>>({});
+  // Initialise in-memory cooldown map from persisted storage so cooldowns
+  // survive app restarts. The ref is the fast path; localStorage is the durable store.
+  const lastRunTimesRef = useRef<Record<string, number>>(loadCooldowns());
+  // Track the last clipboard content that triggered an action to prevent double-fire
+  // (clipboard_changed can fire twice quickly for the same content on some platforms).
+  const lastClipboardTriggerRef = useRef<string>("");
 
   const addAction = useCallback((action: Omit<AutoAction, "id" | "runCount" | "lastRun" | "lastError" | "createdAt">) => {
     const newAction: AutoAction = {
@@ -167,13 +194,15 @@ export function useAutoActions() {
     return Date.now() - lastRun >= action.cooldownMs;
   }, []);
 
-  // Mark an action as run
+  // Mark an action as run — persist cooldown so it survives restarts
   const markRun = useCallback((id: string, error?: string) => {
-    lastRunTimesRef.current[id] = Date.now();
+    const now = Date.now();
+    lastRunTimesRef.current[id] = now;
+    saveCooldown(id, now);
     setActions((prev) => {
       const next = prev.map((a) =>
         a.id === id
-          ? { ...a, runCount: a.runCount + 1, lastRun: Date.now(), lastError: error || null }
+          ? { ...a, runCount: a.runCount + 1, lastRun: now, lastError: error || null }
           : a,
       );
       saveActions(next);
@@ -181,8 +210,12 @@ export function useAutoActions() {
     });
   }, []);
 
-  // Check clipboard trigger
+  // Check clipboard trigger — guards against double-fire by tracking the last
+  // content that matched. Same clipboard content won't trigger twice in a row,
+  // even if clipboard_changed fires multiple times for the same paste.
   const checkClipboardTrigger = useCallback((clipboardContent: string): AutoAction | null => {
+    if (!clipboardContent || clipboardContent === lastClipboardTriggerRef.current) return null;
+
     for (const action of actions) {
       if (action.trigger.type !== "clipboard" || !shouldRun(action)) continue;
 
@@ -194,11 +227,18 @@ export function useAutoActions() {
       if (pattern) {
         try {
           const regex = new RegExp(pattern, "i");
-          if (regex.test(clipboardContent)) return action;
+          if (regex.test(clipboardContent)) {
+            lastClipboardTriggerRef.current = clipboardContent;
+            return action;
+          }
         } catch {
-          if (clipboardContent.includes(pattern)) return action;
+          if (clipboardContent.includes(pattern)) {
+            lastClipboardTriggerRef.current = clipboardContent;
+            return action;
+          }
         }
       } else if (minLength > 0) {
+        lastClipboardTriggerRef.current = clipboardContent;
         return action;
       }
     }

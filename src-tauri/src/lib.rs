@@ -120,6 +120,7 @@ mod iot_bridge;
 mod typed_memory;
 mod personality_mirror;
 mod ghost_mode;
+mod overlay_manager;
 mod people_graph;
 mod auto_reply;
 mod streak_stats;
@@ -1052,6 +1053,11 @@ pub fn run() {
             ghost_mode::ghost_stop,
             ghost_mode::ghost_set_position,
             ghost_mode::ghost_get_status,
+            // Overlay Manager -- HUD bar + toast notifications
+            overlay_manager::overlay_show_hud,
+            overlay_manager::overlay_hide_hud,
+            overlay_manager::overlay_update_hud,
+            overlay_manager::overlay_show_notification,
             // People Graph -- relationship memory and reply style intelligence
             people_graph::people_list,
             people_graph::people_get,
@@ -1155,6 +1161,9 @@ pub fn run() {
                     }
                 }
             });
+
+            // Start HUD update loop (pushes data every 10s when HUD is visible)
+            overlay_manager::start_hud_update_loop(app.handle().clone());
 
             // Start clipboard watcher
             clipboard::start_clipboard_watcher(app.handle().clone());

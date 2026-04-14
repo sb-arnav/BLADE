@@ -545,6 +545,56 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
                 "properties": {}
             }),
         },
+        ToolDefinition {
+            name: "blade_spawn_coding_agent".to_string(),
+            description: "Spawn Claude Code, Aider, or Goose as a background coding agent that autonomously works on a task. BLADE decides which agent is best based on the task (refactor/implement/build/fix → Claude Code; git-patch/TDD → Aider). The agent runs in the background — use blade_check_agent_status to monitor it. Returns an agent ID. Use this for tasks that need multi-file edits, large refactors, test generation, or anything that would take many manual tool calls.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "task": {
+                        "type": "string",
+                        "description": "Detailed description of what the coding agent should do. Be specific about files, goals, and constraints."
+                    },
+                    "project_dir": {
+                        "type": "string",
+                        "description": "Absolute path to the project directory where the agent should work. Defaults to home directory if omitted."
+                    },
+                    "agent_type": {
+                        "type": "string",
+                        "description": "Force a specific agent: 'claude' (Claude Code CLI), 'aider', 'goose', 'codex'. Omit to let BLADE auto-select.",
+                        "enum": ["claude", "aider", "goose", "codex", "auto"]
+                    }
+                },
+                "required": ["task"]
+            }),
+        },
+        ToolDefinition {
+            name: "blade_check_agent_status".to_string(),
+            description: "Check the live status of a background coding agent spawned by blade_spawn_coding_agent. Returns status (running/completed/failed), a progress summary, and recent output lines. Call this periodically to see if the agent has finished.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "agent_id": {
+                        "type": "string",
+                        "description": "The agent ID returned by blade_spawn_coding_agent. Omit to see all recent agents."
+                    }
+                }
+            }),
+        },
+        ToolDefinition {
+            name: "blade_get_agent_output".to_string(),
+            description: "Get the full output of a completed background coding agent. Use after blade_check_agent_status shows the agent is done. Returns all captured stdout/stderr lines and a completion summary extracted from the output (files changed, git commits made, errors).".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "agent_id": {
+                        "type": "string",
+                        "description": "The agent ID returned by blade_spawn_coding_agent."
+                    }
+                },
+                "required": ["agent_id"]
+            }),
+        },
     ]
     // Append browser-agent tool definitions (navigate, read_page, click stub, etc.)
     .into_iter()

@@ -6,7 +6,7 @@
 
 **The AI that watches, learns, and works — while others just talk.**
 
-Not a chat window. An operating intelligence wired into your screen, files, apps, and memory. Runs 5 agents in parallel. Remembers everything you've looked at. Sees your screen. Controls your desktop. Fully local.
+Not a chat window. An operating intelligence wired into your screen, files, apps, memory, finances, health, and home. Runs 5 agents in parallel. Remembers everything. Sees your screen. Hears your meetings. Controls your desktop. Fully local.
 
 [![Release](https://img.shields.io/github/v/release/sb-arnav/BLADE?style=flat-square&label=latest&color=0f0f0f)](https://github.com/sb-arnav/BLADE/releases/latest)
 [![License](https://img.shields.io/github/license/sb-arnav/BLADE?style=flat-square&color=0f0f0f)](LICENSE)
@@ -26,6 +26,8 @@ Every AI tool on the market runs one agent at a time, forgets everything between
 
 - **Hermes Agent** — lives in your Telegram DMs. No screen awareness, no native desktop, no computer use.
 - **OpenClaw** — a WhatsApp chatbot with 355K stars and 9 CVEs. No screen control, flat Markdown memory.
+- **Omi** — a wearable that records conversations. No desktop control, no screen context, no agent swarms.
+- **Cluely** — meeting overlay for suggestions. One trick. No memory, no automation, no local data.
 - **Screenpipe** — great screen recorder, that's it. No agents, no chat, no tools.
 - **Jan / LM Studio** — polished model launchers. No agents, no memory, no automation.
 - **Open Interpreter** — runs code in a terminal. Blind to your screen, no parallelism.
@@ -36,30 +38,50 @@ Every AI tool on the market runs one agent at a time, forgets everything between
 
 ## What makes it different
 
-| Capability | BLADE | Hermes Agent | OpenClaw | Screenpipe | Jan | Open Interpreter | Claude Code |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| Native desktop app (not daemon/CLI) | ✓ | ✗ | ✗ | ✗ | ✓ | ✗ | CLI |
-| Parallel multi-agent swarms (5 agents at once) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Screen timeline / Total Recall | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ |
-| Computer use (click, type, OCR, UI control) | ✓ | ✗ | ✗ | ✗ | ✗ | partial | ✗ |
-| God Mode (live screen + clipboard context) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Persistent vector memory (BM25 + vector, RRF) | ✓ | partial | ✗ | FTS5 | ✗ | ✗ | ✗ |
-| Auto-evolving MCP tool catalog | ✓ | partial | ✗ | ✗ | ✗ | ✗ | ✓ |
-| Background agent spawning (Claude Code, Aider, Goose) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Global voice input | ✓ | partial | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Built with Tauri (not Electron) | ✓ | N/A | ✗ | ✓ | ✗ | N/A | N/A |
-| Any LLM provider + local (Ollama) | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ |
-| Zero telemetry, fully local | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ |
-| Free and open source | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
+| Capability | BLADE | Hermes Agent | OpenClaw | Omi | Cluely | Screenpipe | Jan | Open Interpreter | Claude Code |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Native desktop app (not daemon/CLI) | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | CLI |
+| Parallel multi-agent swarms (5 agents) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Screen timeline / Total Recall | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ |
+| Computer use (click, type, OCR, UI control) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | partial | ✗ |
+| Ghost Mode (invisible meeting overlay) | ✓ | ✗ | ✗ | ✗ | partial | ✗ | ✗ | ✗ | ✗ |
+| God Mode (live screen + clipboard context) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| People Graph + Auto-Reply | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Audio Timeline (always-on capture) | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Deep System Discovery (12 scanners) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Typed Memory (7 semantic categories) | ✓ | partial | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Decision Gate (autonomous actions) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Browser Automation (CDP, real browser) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | partial | ✗ |
+| System Control (lock, volume, brightness) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Smart Home (Home Assistant + Spotify) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Financial Brain (spending, subscriptions) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Health Guardian (screen time, breaks) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Temporal Intelligence (recall, patterns) | ✓ | ✗ | ✗ | partial | ✗ | partial | ✗ | ✗ | ✗ |
+| Security Fortress (network, phishing) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Personality Mirror (learns your style) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Persistent vector memory (BM25 + vector, RRF) | ✓ | partial | ✗ | ✗ | ✗ | FTS5 | ✗ | ✗ | ✗ |
+| Auto-evolving MCP tool catalog | ✓ | partial | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
+| Background agent spawning (Claude Code, Aider, Goose) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Conversational voice (emotion-aware) | ✓ | partial | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Built with Tauri (not Electron) | ✓ | N/A | ✗ | N/A | ✗ | ✓ | ✗ | N/A | N/A |
+| Any LLM provider + local (Ollama) | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ |
+| Zero telemetry, fully local | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ |
+| Free and open source | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ |
 
 ---
 
 ## Core Features
 
+### Ghost Mode — Invisible Meeting AI
+BLADE listens to your meetings (Zoom, Meet, Teams, Discord, Slack) and chat platforms via system audio. Every 5 seconds it transcribes the last chunk with Whisper, detects questions being directed at you, and fires AI-generated response suggestions into a transparent always-on-top overlay — invisible to screen share on Windows via content protection. Suggestions are written in your own voice using your Personality Mirror profile. You see the answer. Nobody else sees the overlay.
+
 ### BLADE Swarm — Parallel Multi-Agent Orchestration
 Give BLADE a complex goal. It decomposes it into a dependency graph of subtasks and runs up to 5 specialized agents simultaneously — routing each step to the best model for the job (coding tasks to a code-capable model, fast lookups to a cheap one). Agents share a scratchpad — findings from one feed directly into the next. If a step fails, BLADE reflects on what went wrong and retries with that insight. When all tasks complete, a final synthesis pass combines the results into a single coherent answer.
 
 No other desktop AI runs more than one agent at a time. BLADE runs a fleet.
+
+### Deep System Discovery — 12 Scanners
+On first launch, BLADE runs 12 parallel scanners across your machine: installed apps, default browser, IDEs and extensions, git repos and their primary languages, shell history and top commands, WSL distros and projects, package managers (npm/pip/cargo/brew), AI tools already installed, system info, SSH keys, Docker containers, and browser bookmarks. The results are stored locally and seed the knowledge graph so BLADE knows your full stack before you type a single message.
 
 ### Total Recall — Screen Timeline with Semantic Search
 BLADE captures a screenshot every 30 seconds, fingerprints it (identical frames are skipped), runs a vision model description on it, and embeds everything for semantic search.
@@ -68,23 +90,66 @@ BLADE captures a screenshot every 30 seconds, fingerprints it (identical frames 
 
 This is Rewind.ai, open-source, built into BLADE. Rewind charges $30/month. BLADE is free.
 
+### Audio Timeline — Always-On Conversation Memory
+BLADE captures audio continuously (mic and/or system audio), transcribes every 30-second chunk, and extracts action items, decisions, named mentions, and topics from each one. Every piece of audio is indexed so you can search across everything you've said or heard.
+
+*"What did we decide in that call an hour ago?"* → exact transcript plus summary.
+*"Find all tasks I said I'd do today"* → action items pulled from every conversation chunk.
+
+Meeting detection groups chunks into full meeting summaries automatically.
+
+### People Graph + Auto-Reply
+BLADE builds a relationship graph from every conversation — learning each person's name, role, communication style, platform, and what you talk about. When a message arrives, it looks up the sender, injects relationship context, and drafts a reply written in your style for your relationship with that specific person. You review and send. The more interactions you have, the more accurate the drafts become.
+
+### Conversational Voice — Emotion-Aware
+Beyond push-to-talk: BLADE tracks emotional state across voice turns, detects topic drift, and adapts its spoken response style in real time. A cheap model classifies emotion (angry, confused, excited, neutral) from your words. The quality model adapts its tone accordingly. Session continuity means BLADE remembers the arc of a multi-turn voice conversation, not just the last thing you said.
+
+`Ctrl+Shift+V` from anywhere — record, transcribe via Whisper, auto-fill. `Ctrl+Space` for QuickAsk. Wake word ("Hey BLADE") for always-on.
+
+### Decision Gate — Autonomous Actions
+Every time BLADE detects a signal — error on screen, clipboard content, proactive trigger, God Mode event — the Decision Gate classifies it in microseconds: act autonomously, ask the user, queue for later, or ignore. High-confidence reversible actions are taken without interrupting you. Low-confidence or irreversible actions surface a question. The thresholds are per-source and adapt based on your feedback — over time BLADE learns exactly how much autonomy you want to give it for each type of event.
+
+### Browser Automation — Your Actual Browser via CDP
+BLADE connects to your real running Chrome/Chromium instance via the Chrome DevTools Protocol. It can navigate, click, fill forms, wait for selectors, take screenshots of pages, and extract readable text — all in a vision-driven agent loop (screenshot → goal → next action). No puppeteer subprocess, no separate browser instance. It uses the browser you already have open, with all your logged-in sessions.
+
+### System Control — Lock, Volume, Brightness, Apps
+BLADE can lock your screen, set system volume, control display brightness, launch and kill applications, focus windows, and query battery and network status. All invocable by the AI directly as tools. Ask BLADE to turn off Spotify, lock your screen in 5 minutes, or drop volume to 20% before a call.
+
+### Smart Home — Home Assistant + Spotify
+Connect BLADE to your Home Assistant instance for full entity control: lights, switches, sensors, thermostats — anything in your home network. Spotify integration handles playback control. Ask BLADE to turn off the living room lights when you leave, or play focus music when you start a deep work session.
+
 ### God Mode — Live Screen Context
 Runs in the background, capturing your active window title, clipboard contents, and running apps every N minutes. Every AI call gets this context injected automatically. The model knows what you're working on without being told.
+
+### Typed Memory — 7 Semantic Categories
+Old-style memory treats "birthday is March 15" the same as "prefers dark mode." BLADE's Typed Memory stores every fact in one of seven categories: **Fact** (immutable biographical data), **Preference** (how you like things), **Decision** (choices made with rationale), **Relationship** (people and their context), **Skill** (what you know or are learning), **Goal** (near-term intentions), **Routine** (recurring behavior and schedule). When context tags arrive from perception — "rust", "debugging" — the most relevant memories from matching categories are injected into the system prompt automatically.
+
+### Financial Brain — Personal Finance Intelligence
+Log transactions manually. BLADE analyzes spending patterns, identifies your top categories, shows month-over-month changes, flags when you're over budget, tracks subscriptions, detects savings opportunities, and surfaces investment suggestions based on monthly surplus. Import transactions from CSV. Financial context is injected into the system prompt when meaningful data exists — BLADE knows you're over budget on food before you ask.
+
+### Health Guardian — Screen Time and Wellbeing
+BLADE runs a background health monitor every 5 minutes. It tracks your active streak, fires break reminders at 90 minutes and 3 hours of continuous screen time, suggests winding down after 10pm, and stores daily stats (screen time, breaks taken, longest streak) to the local database. It knows when you worked, for how long, and whether you took care of yourself.
+
+### Temporal Intelligence — Recall, Standup, Patterns
+*"What was I working on 3 hours ago?"* — BLADE queries the screen timeline, God Mode snapshots, and conversation history around that time window and summarizes what it finds. *"Give me yesterday's standup"* — generates a structured summary of what you worked on, what you completed, and what's next. Pattern detection runs across weeks of data to find recurring habits: when you start coding, when you deploy, when you context-switch.
+
+### Security Fortress — Network, Phishing, Passwords, Code Scan
+BLADE monitors active network connections and flags suspicious ones. It checks emails against breach databases. It scans your filesystem for sensitive files (credentials, private keys, `.env` files) and tells you which ones are missing from `.gitignore`. It analyzes URLs before you open them — detecting phishing indicators, suspicious redirects, and domain spoofing. Code scanning checks for hardcoded secrets and common vulnerability patterns.
+
+### Personality Mirror — Learns Your Communication Style
+BLADE analyzes your own writing across chat history and imported external logs (WhatsApp, Telegram, Discord, iMessage, CSV) to build a PersonalityProfile: average message length, emoji frequency, formality level, technical depth, humor style, signature phrases, greeting and sign-off patterns. That profile gets injected into every response — BLADE writes back to you the way you write.
 
 ### Computer Use — Desktop Agent
 BLADE can see your screen and control it. Click buttons, fill forms, read UI elements with OCR, navigate apps, take screenshots and reason about them. 40+ desktop action types.
 
 ### Memory That Compounds
-BLADE maintains three living memory blocks: what it knows about you (your role, habits, preferences), its own persona, and a rolling conversation summary. Each block auto-compresses via LLM when full — there's no context limit that wipes your history. Every conversation, command, and tool result is also embedded locally and indexed with hybrid BM25 + vector search. The second week is smarter than the first. The second month is a different class of tool entirely.
+BLADE maintains three living memory blocks: what it knows about you (role, habits, preferences), its own persona, and a rolling conversation summary. Each block auto-compresses via LLM when full — there's no context limit that wipes your history. Every conversation, command, and tool result is also embedded locally and indexed with hybrid BM25 + vector search with Reciprocal Rank Fusion. The second week is smarter than the first. The second month is a different class of tool entirely.
 
 ### Background Agents
 Spawn Claude Code, Aider, or Goose as background workers with one command. BLADE stays the orchestrator — one surface, multiple specialists.
 
 ### Auto-Evolving MCP Catalog
 BLADE ships with 20+ MCP servers pre-catalogued and auto-installs them as you use new apps — Git, Chrome, Linear, Figma, Slack, databases, terminals. The toolkit grows without you touching a config file.
-
-### Global Voice Input
-`Ctrl+Shift+V` from anywhere — record, transcribe via Whisper, auto-fill QuickAsk. No window switching.
 
 ### BLADE Cron
 Schedule recurring autonomous tasks: *"every Monday at 9am, summarize my GitHub notifications and brief me on what matters."* Runs while you sleep.
@@ -101,10 +166,10 @@ Security testing with mandatory ownership verification. Uses Groq or Ollama — 
 
 | Platform | Download |
 |----------|----------|
-| **macOS** (Apple Silicon) | [`.dmg` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.5.1_aarch64.dmg) |
-| **macOS** (Intel) | [`.dmg` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.5.1_x64.dmg) |
-| **Windows** | [`.exe` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.5.1_x64-setup.exe) |
-| **Linux** | [`.AppImage` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.5.1_amd64.AppImage) |
+| **macOS** (Apple Silicon) | [`.dmg` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.6.0_aarch64.dmg) |
+| **macOS** (Intel) | [`.dmg` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.6.0_x64.dmg) |
+| **Windows** | [`.exe` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.6.0_x64-setup.exe) |
+| **Linux** | [`.AppImage` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.6.0_amd64.AppImage) |
 
 > **macOS note:** If you see "Blade is damaged and can't be opened", run:
 > ```bash
@@ -118,12 +183,15 @@ Installed builds auto-update from GitHub Releases.
 
 ## Quick Start
 
-1. Download and launch BLADE
-2. The setup wizard guides you through provider + API key
-3. **`Ctrl+Space`** — QuickAsk from anywhere on your desktop
-4. **`Ctrl+Shift+B`** — Global voice input
-5. Enable **God Mode** in settings for live screen context
-6. Enable **Total Recall** in settings to start building your screen timeline
+1. **Download and launch BLADE**
+2. **Paste your API key** — pick a provider (Anthropic, OpenAI, Groq, Gemini, or Ollama for fully local). BLADE auto-detects the provider from your key format.
+3. **System scan** — BLADE runs 12 scanners across your machine (apps, git repos, tools, shell history). Takes ~10 seconds. Skip if you prefer.
+4. **Personality questions** — 5 quick questions: your name and role, what you're building, your stack, your biggest goal, and how you want BLADE to communicate. These seed the memory that BLADE refines from that point on.
+5. **`Ctrl+Space`** — QuickAsk from anywhere on your desktop
+6. **`Ctrl+Shift+V`** — Global voice input from any window
+7. Enable **Ghost Mode** in settings to get invisible meeting suggestions
+8. Enable **Total Recall** to start building your screen timeline
+9. Enable **Audio Timeline** to capture and search all conversations
 
 **Slash commands** — type `/` in chat: `/clear` `/new` `/screenshot` `/voice` `/focus` `/swarm` `/init` `/help`
 
@@ -154,43 +222,75 @@ sudo apt-get install -y \
 
 ```
 BLADE/
-├── src/                         # React + Vite frontend
-│   ├── components/
-│   │   ├── SwarmView.tsx        # DAG visualization for parallel agents
-│   │   ├── ScreenTimeline.tsx   # Total Recall thumbnail grid + search
-│   │   ├── GodMode.tsx          # Screen context UI
-│   │   └── ...                  # Chat, Settings, QuickAsk, Agents
+├── src/                              # React + Vite frontend (TypeScript)
+│   ├── components/                   # 132 UI components
+│   │   ├── ChatWindow.tsx            # Main chat + streaming UI
+│   │   ├── SwarmView.tsx             # DAG visualization for parallel agents
+│   │   ├── ScreenTimeline.tsx        # Total Recall thumbnail grid + search
+│   │   ├── GodMode.tsx               # Screen context UI
+│   │   ├── GhostOverlay.tsx          # Invisible meeting overlay
+│   │   ├── FinanceDashboard.tsx      # Financial Brain UI
+│   │   ├── MeetingAssistant.tsx      # Meeting notes + audio timeline
+│   │   ├── PeopleGraph.tsx           # Relationship graph visualization
+│   │   ├── SecurityDashboard.tsx     # Security Fortress overview
+│   │   ├── OnboardingModal.tsx       # New onboarding (scan + personality)
+│   │   └── ...                       # Settings, QuickAsk, Agents, 120+ more
 │   └── hooks/
-│       ├── useSwarm.ts          # Swarm state + real-time events
-│       ├── useScreenTimeline.ts # Timeline browse + semantic search
-│       └── ...
-└── src-tauri/src/               # Rust backend
-    ├── swarm.rs                 # SwarmTask DAG — parallel multi-agent orchestration
-    ├── swarm_commands.rs        # Coordinator loop — dependency resolution + agent spawning
-    ├── swarm_planner.rs         # LLM goal decomposition + DAG synthesis
-    ├── screen_timeline.rs       # Screenshot capture, fingerprint dedup, vision description
-    ├── screen_timeline_commands.rs  # Timeline search, browse, config
-    ├── godmode.rs               # Live screen + clipboard context injection
-    ├── brain.rs                 # System prompt builder + model-adaptive prompting
-    ├── commands.rs              # Message loop + tool execution
-    ├── db.rs                    # SQLite (memory, swarms, timeline, embeddings)
-    ├── embeddings.rs            # Local semantic search (fastembed AllMiniLML6V2, BM25+vector RRF)
-    ├── native_tools.rs          # 20+ built-in tools (bash, file, web, UI automation)
-    ├── mcp.rs                   # MCP client + auto-evolving tool catalog
-    ├── evolution.rs             # Background research loop + MCP catalog (20+ servers)
-    ├── computer_use.rs          # Vision loop — click, type, OCR, screenshot
-    ├── runtimes.rs              # Multi-runtime OperatorCenter (Claude, Goose, Aider)
-    ├── background_agent.rs      # Background agent spawning
-    ├── voice_global.rs          # Global push-to-talk + Whisper transcription
-    ├── tts.rs                   # TTS (system voices + OpenAI nova/alloy/shimmer)
-    ├── indexer.rs               # Codebase symbol indexing
-    ├── character.rs             # Preference learning from reactions
-    ├── cron.rs                  # Scheduled autonomous tasks
-    ├── pulse.rs                 # Morning briefing engine
-    └── providers/               # Anthropic, OpenAI, Gemini, Groq, Ollama
+│       ├── useSwarm.ts               # Swarm state + real-time events
+│       ├── useScreenTimeline.ts      # Timeline browse + semantic search
+│       ├── useVoiceMode.ts           # Conversational voice state
+│       └── ...                       # 90+ hooks
+└── src-tauri/src/                    # Rust backend (127 modules)
+    ├── swarm.rs                      # SwarmTask DAG — parallel orchestration
+    ├── swarm_commands.rs             # Coordinator loop + agent spawning
+    ├── swarm_planner.rs              # LLM goal decomposition + DAG synthesis
+    ├── ghost_mode.rs                 # Invisible meeting overlay (cpal + Whisper)
+    ├── deep_scan.rs                  # 12-scanner system discovery
+    ├── people_graph.rs               # Relationship graph (auto-learned)
+    ├── auto_reply.rs                 # Draft replies in your style
+    ├── typed_memory.rs               # 7-category semantic memory
+    ├── decision_gate.rs              # Autonomous action classifier
+    ├── browser_agent.rs              # Vision-driven browser agent loop
+    ├── browser_native.rs             # Chrome DevTools Protocol layer
+    ├── system_control.rs             # Lock, volume, brightness, apps
+    ├── iot_bridge.rs                 # Home Assistant + Spotify
+    ├── financial_brain.rs            # Spending analysis + insights
+    ├── health_guardian.rs            # Screen time + break reminders
+    ├── temporal_intel.rs             # Recall, standup, pattern detection
+    ├── security_monitor.rs           # Network, phishing, breach, code scan
+    ├── audio_timeline.rs             # Always-on audio capture + extraction
+    ├── personality_mirror.rs         # Communication style extraction
+    ├── voice_intelligence.rs         # Emotion-aware conversational voice
+    ├── screen_timeline.rs            # Screenshot capture + vision description
+    ├── screen_timeline_commands.rs   # Timeline search, browse, config
+    ├── godmode.rs                    # Live screen + clipboard context
+    ├── brain.rs                      # System prompt builder (all context sources)
+    ├── commands.rs                   # Message loop + tool execution
+    ├── db.rs                         # SQLite (memory, swarms, timeline, embeddings)
+    ├── embeddings.rs                 # Hybrid BM25 + vector search (RRF)
+    ├── native_tools.rs               # 20+ built-in tools (bash, file, web, UI)
+    ├── mcp.rs                        # MCP client + auto-evolving tool catalog
+    ├── evolution.rs                  # Background research loop
+    ├── computer_use.rs               # Click, type, OCR, screenshot
+    ├── runtimes.rs                   # OperatorCenter (Claude, Goose, Aider)
+    ├── background_agent.rs           # Background agent spawning
+    ├── wake_word.rs                  # "Hey BLADE" always-on detection
+    ├── voice_global.rs               # Global push-to-talk + Whisper
+    ├── voice_local.rs                # Local Whisper (whisper-rs)
+    ├── tts.rs                        # TTS (system voices + OpenAI)
+    ├── cron.rs                       # Scheduled autonomous tasks
+    ├── pulse.rs                      # Morning briefing engine
+    ├── soul_commands.rs              # SOUL: character bible + weekly snapshots
+    ├── knowledge_graph.rs            # Entity-relationship knowledge graph
+    ├── perception_fusion.rs          # Unified perception state
+    ├── activity_monitor.rs           # App focus + idle detection
+    ├── kali.rs                       # Pentest mode (Groq/Ollama only)
+    ├── character.rs                  # Preference learning from reactions
+    ├── indexer.rs                    # Codebase symbol indexing
+    └── providers/                    # Anthropic, OpenAI, Gemini, Groq, Ollama
 ```
 
-All data is local: `~/.blade/blade.db` (SQLite), `~/.blade/screenshots/` (Total Recall). No cloud sync, no telemetry. API calls go directly to your configured provider using your own key.
+All data is local: `~/.blade/blade.db` (SQLite), `~/.blade/screenshots/` (Total Recall), `~/.blade/identity/` (scan results + personality profile). No cloud sync, no telemetry. API calls go directly to your configured provider using your own key.
 
 ---
 
@@ -200,6 +300,9 @@ All data is local: `~/.blade/blade.db` (SQLite), `~/.blade/screenshots/` (Total 
 |------|--------------|
 | Conversations, memory, embeddings | Local only — `~/.blade/` |
 | Screenshots (Total Recall) | Local only — `~/.blade/screenshots/` |
+| Audio transcripts (Audio Timeline) | Local only — `~/.blade/blade.db` |
+| System scan results | Local only — `~/.blade/identity/` |
+| Personality profile | Local only — `~/.blade/identity/personality_profile.json` |
 | API keys | OS keychain or local config |
 | Your messages | Sent to **your configured provider** with **your API key** |
 | Analytics / telemetry | None — BLADE has no servers |
@@ -210,12 +313,35 @@ Create `~/.blade/BLADE.md` to give BLADE workspace-level instructions (restrict 
 
 ## Roadmap
 
-- [ ] "Hey BLADE" wake word (local Whisper + Vosk) — always-on voice
+### Done in v0.6.0
+- [x] Ghost Mode — invisible meeting overlay with content protection
+- [x] Deep System Discovery — 12 parallel scanners on first launch
+- [x] People Graph — auto-learned relationship database
+- [x] Auto-Reply — message drafting in your own style
+- [x] Typed Memory — 7 semantic categories with proactive surfacing
+- [x] Decision Gate — autonomous action classifier with per-source thresholds
+- [x] Browser Automation — CDP-backed vision agent in your real browser
+- [x] System Control — lock, volume, brightness, apps, network, battery
+- [x] Smart Home — Home Assistant entities + Spotify playback control
+- [x] Financial Brain — transaction tracking, spending analysis, CSV import
+- [x] Health Guardian — screen time monitoring + break reminders
+- [x] Audio Timeline — always-on capture, transcription, and action extraction
+- [x] Personality Mirror — communication style extraction from chat history
+- [x] Conversational Voice — emotion-aware multi-turn voice sessions
+- [x] Temporal Intelligence — recall, standup generation, pattern detection
+- [x] Security Fortress — network monitoring, phishing detection, breach check, code scan
+- [x] Onboarding v2 — paste key → auto-detect → system scan → personality questions
+
+### What's next
+- [ ] "Hey BLADE" wake word (local Whisper + Vosk) — always-on without hotkey
 - [ ] SOUL.md diff — weekly transparency report on what BLADE has learned about you
 - [ ] God Mode privacy controls — per-app allowlist, blur sensitive areas
 - [ ] OpenHands integration as 6th background agent target
 - [ ] MCP marketplace — community tool discovery without config files
 - [ ] Offline TTS — Piper / Coqui for 100% local voice
+- [ ] Ghost Mode for more platforms — Teams Web, LinkedIn messages, Gmail
+- [ ] Mobile companion app — push BLADE summaries and decisions to your phone
+- [ ] Cross-device sync — encrypted vault for memory portability
 
 ---
 

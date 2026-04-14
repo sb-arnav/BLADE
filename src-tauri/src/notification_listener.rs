@@ -57,6 +57,15 @@ fn store_notification(n: OsNotification) {
 
 // ── Tauri commands ─────────────────────────────────────────────────────────────
 
+/// Return the count of unread notifications seen in the current session.
+/// Used by the HUD bar to show an unread badge.
+pub fn get_unread_count() -> u32 {
+    let guard = recent_store().lock().unwrap();
+    // Count notifications from the last 30 minutes as "unread"
+    let cutoff = chrono::Utc::now().timestamp() - 1800;
+    guard.iter().filter(|n| n.timestamp >= cutoff).count() as u32
+}
+
 /// Return up to 20 most recent OS notifications.
 #[tauri::command]
 pub fn notification_get_recent() -> Vec<OsNotification> {

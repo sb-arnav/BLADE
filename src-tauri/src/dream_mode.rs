@@ -176,10 +176,8 @@ async fn task_code_health_scan() -> String {
                 issues.push(format!("{}: {} bare .unwrap() calls", file, count));
             }
         }
-        if let Some(_) = contents.find("TODO") {
-            if contents.contains("TODO") && !contents.contains("TODO(") {
-                issues.push(format!("{}: TODO without owner", file));
-            }
+        if contents.contains("TODO") && !contents.contains("TODO(") {
+            issues.push(format!("{}: TODO without owner", file));
         }
         // Detect hardcoded credential patterns
         let lower = contents.to_lowercase();
