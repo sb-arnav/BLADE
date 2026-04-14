@@ -126,11 +126,14 @@ struct DiskConfig {
     /// Enable background polling of real-world integrations (Gmail, Calendar, Slack, GitHub)
     #[serde(default)]
     integration_polling_enabled: bool,
+    #[serde(default = "default_tts_speed")]
+    tts_speed: f32,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
 }
 
+fn default_tts_speed() -> f32 { 1.0 }
 fn default_background_ai_enabled() -> bool { true }
 fn default_whisper_model() -> String { "tiny.en".to_string() }
 fn default_last_deep_scan() -> i64 { 0 }
@@ -185,6 +188,7 @@ impl Default for DiskConfig {
             whisper_model: "tiny.en".to_string(),
             last_deep_scan: 0,
             integration_polling_enabled: false,
+            tts_speed: 1.0,
             api_key: None,
         }
     }
@@ -269,6 +273,9 @@ pub struct BladeConfig {
     /// Enable background polling of real-world integrations (Gmail, Calendar, Slack, GitHub)
     #[serde(default)]
     pub integration_polling_enabled: bool,
+    /// TTS playback speed multiplier (0.5 = half speed, 2.0 = double speed, default 1.0)
+    #[serde(default = "default_tts_speed")]
+    pub tts_speed: f32,
 }
 
 impl BladeConfig {
@@ -317,6 +324,7 @@ impl Default for BladeConfig {
             whisper_model: "tiny.en".to_string(),
             last_deep_scan: 0,
             integration_polling_enabled: false,
+            tts_speed: 1.0,
         }
     }
 }
@@ -429,6 +437,7 @@ pub fn load_config() -> BladeConfig {
         whisper_model: disk.whisper_model,
         last_deep_scan: disk.last_deep_scan,
         integration_polling_enabled: disk.integration_polling_enabled,
+        tts_speed: disk.tts_speed,
     }
 }
 
@@ -473,6 +482,7 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         whisper_model: config.whisper_model.clone(),
         last_deep_scan: config.last_deep_scan,
         integration_polling_enabled: config.integration_polling_enabled,
+        tts_speed: config.tts_speed,
         api_key: None,
     };
 

@@ -19,11 +19,20 @@ use std::process::Child;
 #[cfg(not(target_os = "windows"))]
 use std::process::Command;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 // ── singleton process handle ──────────────────────────────────────────────────
 
 static SPEAKING: std::sync::LazyLock<Arc<Mutex<Option<Child>>>> =
     std::sync::LazyLock::new(|| Arc::new(Mutex::new(None)));
+
+/// Set to true when TTS is actively playing (used by speak_and_wait and interruption detection).
+static TTS_ACTIVE: AtomicBool = AtomicBool::new(false);
+
+/// Returns true if TTS is currently playing.
+pub fn is_speaking() -> bool {
+    TTS_ACTIVE.load(Ordering::SeqCst)
+}
 
 /// Speak `text` using the configured voice. Checks voice_mode in config.
 pub fn speak(text: &str) {
@@ -40,43 +49,97 @@ pub fn speak(text: &str) {
 pub fn speak_unconditional(text: &str) {
     let config = crate::config::load_config();
     let voice = config.tts_voice.clone();
-    speak_with_voice(text, &voice);
+    let speed = config.tts_speed;
+    speak_with_voice_speed(text, &voice, speed);
 }
 
 /// Core speak — strips markdown, kills current speech, launches TTS.
 fn speak_with_voice(text: &str, voice: &str) {
+    let config = crate::config::load_config();
+    speak_with_voice_speed(text, voice, config.tts_speed);
+}
+
+/// Core speak with explicit speed control.
+fn speak_with_voice_speed(text: &str, voice: &str, speed: f32) {
     let clean = strip_markdown(text);
     if clean.trim().is_empty() {
         return;
     }
     stop();
+    TTS_ACTIVE.store(true, Ordering::SeqCst);
 
     if voice.starts_with("openai:") {
         let voice_name = voice.trim_start_matches("openai:").to_string();
         let text_owned = clean.clone();
         // Spawn async via tokio — don't block the call site
         tauri::async_runtime::spawn(async move {
-            speak_openai(&text_owned, &voice_name).await;
+            speak_openai(&text_owned, &voice_name, speed).await;
+            TTS_ACTIVE.store(false, Ordering::SeqCst);
         });
         return;
     }
 
     // OS-native
-    let child = launch_tts_process(&clean, voice);
+    let child = launch_tts_process_speed(&clean, voice, speed);
     if let Some(proc) = child {
         if let Ok(mut handle) = SPEAKING.lock() {
             *handle = Some(proc);
         }
         let speaking = SPEAKING.clone();
         std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_secs(120));
-            if let Ok(mut h) = speaking.lock() {
-                if let Some(ref mut child) = *h {
-                    let _ = child.try_wait();
+            // Wait for the child process to finish
+            let finished = {
+                let mut waited = false;
+                for _ in 0..240 { // wait up to 120s (checked every 500ms)
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                    if let Ok(mut h) = speaking.lock() {
+                        if let Some(ref mut child) = *h {
+                            if let Ok(Some(_)) = child.try_wait() {
+                                waited = true;
+                                break;
+                            }
+                        } else {
+                            // handle was cleared by stop()
+                            break;
+                        }
+                    }
                 }
-            }
+                waited
+            };
+            let _ = finished;
+            TTS_ACTIVE.store(false, Ordering::SeqCst);
         });
+    } else {
+        TTS_ACTIVE.store(false, Ordering::SeqCst);
     }
+}
+
+/// Speak text and asynchronously wait until TTS finishes (or is interrupted).
+/// Used by the voice conversation loop — always speaks regardless of voice_mode setting
+/// (the conversation loop is explicitly opted-in by the user clicking the mic button).
+pub async fn speak_and_wait(app: &tauri::AppHandle, text: &str) -> Result<(), String> {
+    use tauri::Emitter;
+    let config = crate::config::load_config();
+    let voice = config.tts_voice.clone();
+    let speed = config.tts_speed;
+    speak_with_voice_speed(text, &voice, speed);
+
+    // Poll until TTS finishes or is externally stopped
+    loop {
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        if !TTS_ACTIVE.load(Ordering::SeqCst) {
+            break;
+        }
+        // Check for interruption — user started speaking while TTS is active
+        // This is signalled via the VOICE_CONV_INTERRUPT flag set by the conversation loop
+        if crate::voice_global::is_tts_interrupted() {
+            stop();
+            TTS_ACTIVE.store(false, Ordering::SeqCst);
+            let _ = app.emit("tts_interrupted", ());
+            break;
+        }
+    }
+    Ok(())
 }
 
 /// Interrupt any in-progress speech.
@@ -88,11 +151,12 @@ pub fn stop() {
         }
         *handle = None;
     }
+    TTS_ACTIVE.store(false, Ordering::SeqCst);
 }
 
 // ── OpenAI TTS ────────────────────────────────────────────────────────────────
 
-async fn speak_openai(text: &str, voice: &str) {
+async fn speak_openai(text: &str, voice: &str, speed: f32) {
     let config = crate::config::load_config();
     // Use OpenAI key if provider is openai, otherwise look in keyring
     let api_key = if config.provider == "openai" {
@@ -108,11 +172,14 @@ async fn speak_openai(text: &str, voice: &str) {
         return;
     }
 
+    // Clamp speed to OpenAI's supported range [0.25, 4.0]
+    let clamped_speed = speed.max(0.25_f32).min(4.0_f32);
     let body = serde_json::json!({
         "model": "tts-1",
         "input": text,
         "voice": voice,
         "response_format": "mp3",
+        "speed": clamped_speed,
     });
 
     let client = reqwest::Client::new();
@@ -212,27 +279,36 @@ fn play_audio_file(path: &std::path::Path) -> Option<()> {
 // ── OS-native TTS ─────────────────────────────────────────────────────────────
 
 fn launch_tts_process(text: &str, voice: &str) -> Option<Child> {
+    launch_tts_process_speed(text, voice, 1.0)
+}
+
+fn launch_tts_process_speed(text: &str, voice: &str, speed: f32) -> Option<Child> {
     #[cfg(target_os = "macos")]
     {
-        tts_macos(text, voice)
+        tts_macos_speed(text, voice, speed)
     }
     #[cfg(target_os = "windows")]
     {
-        tts_windows(text, voice)
+        tts_windows_speed(text, voice, speed)
     }
     #[cfg(target_os = "linux")]
     {
-        tts_linux(text, voice)
+        tts_linux_speed(text, voice, speed)
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     {
-        let _ = (text, voice);
+        let _ = (text, voice, speed);
         None
     }
 }
 
 #[cfg(target_os = "macos")]
 fn tts_macos(text: &str, voice: &str) -> Option<Child> {
+    tts_macos_speed(text, voice, 1.0)
+}
+
+#[cfg(target_os = "macos")]
+fn tts_macos_speed(text: &str, voice: &str, speed: f32) -> Option<Child> {
     // Extract voice name from "system:VoiceName" or use default
     let voice_name = if voice.starts_with("system:") {
         voice.trim_start_matches("system:").to_string()
@@ -241,9 +317,13 @@ fn tts_macos(text: &str, voice: &str) -> Option<Child> {
         "Samantha".to_string()
     };
 
+    // `say -r` takes words-per-minute; default ~180, scale by speed
+    let wpm = ((180.0 * speed) as u32).max(80).min(600);
     Command::new("say")
         .arg("-v")
         .arg(&voice_name)
+        .arg("-r")
+        .arg(wpm.to_string())
         .arg(text)
         .spawn()
         .ok()
@@ -251,6 +331,11 @@ fn tts_macos(text: &str, voice: &str) -> Option<Child> {
 
 #[cfg(target_os = "windows")]
 fn tts_windows(text: &str, voice: &str) -> Option<Child> {
+    tts_windows_speed(text, voice, 1.0)
+}
+
+#[cfg(target_os = "windows")]
+fn tts_windows_speed(text: &str, voice: &str, speed: f32) -> Option<Child> {
     let voice_filter = if voice.starts_with("system:") {
         let v = voice.trim_start_matches("system:");
         format!("$s.SelectVoice('{}');", v)
@@ -258,12 +343,17 @@ fn tts_windows(text: &str, voice: &str) -> Option<Child> {
         String::new()
     };
 
+    // SAPI rate: -10 (slowest) to 10 (fastest). Default 0 = 1.0x.
+    // Map: speed 0.5 → -5, 1.0 → 0, 2.0 → 5 (capped to ±10)
+    let rate = ((speed - 1.0) * 5.0).round() as i32;
+    let rate_clamped = rate.max(-10).min(10);
+
     let script = format!(
         "[System.Console]::OutputEncoding = [System.Text.Encoding]::UTF8; \
          Add-Type -AssemblyName System.Speech; \
          $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; \
-         {} $s.Speak($env:TTS_TEXT)",
-        voice_filter
+         {} $s.Rate = {}; $s.Speak($env:TTS_TEXT)",
+        voice_filter, rate_clamped
     );
     crate::cmd_util::silent_cmd("powershell")
         .args(["-NoProfile", "-NonInteractive", "-Command", &script])
@@ -274,6 +364,11 @@ fn tts_windows(text: &str, voice: &str) -> Option<Child> {
 
 #[cfg(target_os = "linux")]
 fn tts_linux(text: &str, voice: &str) -> Option<Child> {
+    tts_linux_speed(text, voice, 1.0)
+}
+
+#[cfg(target_os = "linux")]
+fn tts_linux_speed(text: &str, voice: &str, speed: f32) -> Option<Child> {
     // Extract voice variant if specified: "system:en+f3" → "-v en+f3"
     let voice_arg = if voice.starts_with("system:") {
         voice.trim_start_matches("system:").to_string()
@@ -282,15 +377,19 @@ fn tts_linux(text: &str, voice: &str) -> Option<Child> {
         "en+f3".to_string()
     };
 
+    // espeak uses words-per-minute (-s); default ~175 wpm, scale by speed
+    let wpm = ((175.0 * speed) as u32).max(80).min(600);
+    let wpm_str = wpm.to_string();
+
     // espeak-ng with a better voice
     if let Ok(child) = Command::new("espeak-ng")
-        .args(["-v", &voice_arg, "-s", "150", text])
+        .args(["-v", &voice_arg, "-s", &wpm_str, text])
         .spawn()
     {
         return Some(child);
     }
     if let Ok(child) = Command::new("espeak")
-        .args(["-v", &voice_arg, "-s", "150", text])
+        .args(["-v", &voice_arg, "-s", &wpm_str, text])
         .spawn()
     {
         return Some(child);

@@ -13,6 +13,7 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
+use std::io::BufRead;
 
 // ── DB helpers ────────────────────────────────────────────────────────────────
 
@@ -91,6 +92,17 @@ pub fn ensure_tables() {
                 deadline TEXT NOT NULL,
                 monthly_required REAL NOT NULL DEFAULT 0,
                 status TEXT NOT NULL DEFAULT 'on_track',
+                created_at INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS transactions (
+                id TEXT PRIMARY KEY,
+                amount REAL NOT NULL,
+                category TEXT NOT NULL DEFAULT 'uncategorized',
+                description TEXT NOT NULL DEFAULT '',
+                merchant TEXT NOT NULL DEFAULT '',
+                date TEXT NOT NULL,
+                source_bank TEXT NOT NULL DEFAULT 'generic',
+                raw_row TEXT NOT NULL DEFAULT '',
                 created_at INTEGER NOT NULL
             );",
         );
@@ -781,4 +793,461 @@ pub async fn finance_budget_recommendation() -> String {
 pub async fn finance_get_context() -> String {
     ensure_tables();
     get_financial_context()
+}
+
+// ── CSV Import ────────────────────────────────────────────────────────────────
+
+/// Detected bank format based on CSV column headers.
+#[derive(Debug, Clone, PartialEq)]
+enum BankFormat {
+    Chase,       // Date,Description,Amount,Type,Balance
+    BankOfAmerica, // Posted Date,Reference Number,Payee,Address,Amount
+    WellsFargo,  // "Date","Amount","*","*","Description"
+    Amex,        // Date,Description,Amount,Extended Details,Appears On Your Statement As,...
+    Generic,     // date,description,amount or similar fallback
+}
+
+fn detect_bank_format(headers: &[String]) -> BankFormat {
+    let lower: Vec<String> = headers.iter().map(|h| h.to_lowercase().trim().to_string()).collect();
+    let joined = lower.join(",");
+
+    if joined.contains("posted date") && joined.contains("payee") && joined.contains("address") {
+        return BankFormat::BankOfAmerica;
+    }
+    if joined.contains("extended details") || joined.contains("appears on your statement") {
+        return BankFormat::Amex;
+    }
+    // Wells Fargo exports have 5 columns with * as column 3 and 4
+    if lower.len() >= 5 && (lower[2] == "*" || lower[3] == "*") {
+        return BankFormat::WellsFargo;
+    }
+    if joined.contains("type") && joined.contains("balance") && joined.contains("description") {
+        return BankFormat::Chase;
+    }
+    BankFormat::Generic
+}
+
+/// Parse a CSV row into (date, description, amount) based on detected bank format.
+/// Returns None if the row should be skipped.
+fn parse_csv_row(
+    record: &[String],
+    format: &BankFormat,
+) -> Option<(String, String, f64)> {
+    match format {
+        BankFormat::Chase => {
+            // Date,Description,Amount,Type,Balance
+            if record.len() < 3 { return None; }
+            let date = normalize_date(&record[0])?;
+            let desc = record[1].trim().to_string();
+            let amount = parse_amount(&record[2])?;
+            Some((date, desc, amount))
+        }
+        BankFormat::BankOfAmerica => {
+            // Posted Date,Reference Number,Payee,Address,Amount
+            if record.len() < 5 { return None; }
+            let date = normalize_date(&record[0])?;
+            let desc = record[2].trim().to_string();
+            let amount = parse_amount(&record[4])?;
+            Some((date, desc, amount))
+        }
+        BankFormat::WellsFargo => {
+            // "Date","Amount","*","*","Description"
+            if record.len() < 5 { return None; }
+            let date = normalize_date(&record[0])?;
+            let desc = record[4].trim().to_string();
+            let amount = parse_amount(&record[1])?;
+            Some((date, desc, amount))
+        }
+        BankFormat::Amex => {
+            // Date,Description,Amount (negative = charge, positive = credit)
+            if record.len() < 3 { return None; }
+            let date = normalize_date(&record[0])?;
+            let desc = record[1].trim().to_string();
+            // Amex exports charges as positive; flip sign
+            let amount = parse_amount(&record[2]).map(|a| -a)?;
+            Some((date, desc, amount))
+        }
+        BankFormat::Generic => {
+            // Try date in col 0, description in col 1, amount in col 2
+            if record.len() < 3 { return None; }
+            let date = normalize_date(&record[0])?;
+            let desc = record[1].trim().to_string();
+            let amount = parse_amount(&record[2])?;
+            Some((date, desc, amount))
+        }
+    }
+}
+
+/// Normalize date strings from various bank formats to YYYY-MM-DD.
+fn normalize_date(s: &str) -> Option<String> {
+    let s = s.trim().trim_matches('"');
+    // Try common formats
+    let formats = [
+        "%m/%d/%Y", "%Y-%m-%d", "%d-%m-%Y", "%m-%d-%Y",
+        "%m/%d/%y", "%d/%m/%Y", "%Y/%m/%d",
+    ];
+    for fmt in &formats {
+        if let Ok(d) = chrono::NaiveDate::parse_from_str(s, fmt) {
+            return Some(d.format("%Y-%m-%d").to_string());
+        }
+    }
+    None
+}
+
+/// Parse an amount string like "$1,234.56" or "-1234.56" into f64.
+fn parse_amount(s: &str) -> Option<f64> {
+    let cleaned: String = s
+        .trim()
+        .trim_matches('"')
+        .replace(',', "")
+        .replace('$', "")
+        .replace(' ', "");
+    if cleaned.is_empty() { return None; }
+    cleaned.parse::<f64>().ok()
+}
+
+/// Import transactions from a CSV file exported by a bank.
+/// Detects format automatically (Chase, BoA, Wells Fargo, Amex, generic).
+/// Stores into the `transactions` table and auto-categorizes.
+/// Returns the number of transactions imported.
+pub async fn import_csv_transactions(path: String) -> Result<u32, String> {
+    ensure_tables();
+
+    let file = std::fs::File::open(&path)
+        .map_err(|e| format!("Cannot open file: {e}"))?;
+    let reader = std::io::BufReader::new(file);
+    let mut lines = reader.lines();
+
+    // Read header row
+    let header_line = lines
+        .next()
+        .ok_or("CSV file is empty")?
+        .map_err(|e| format!("Read error: {e}"))?;
+    let headers: Vec<String> = split_csv_row(&header_line);
+    let format = detect_bank_format(&headers);
+
+    let conn = open_db()?;
+    let now = chrono::Utc::now().timestamp();
+    let mut imported = 0u32;
+
+    for line_result in lines {
+        let line = match line_result {
+            Ok(l) => l,
+            Err(_) => continue,
+        };
+        let line = line.trim().to_string();
+        if line.is_empty() { continue; }
+
+        let record = split_csv_row(&line);
+        let (date, description, amount) = match parse_csv_row(&record, &format) {
+            Some(r) => r,
+            None => continue,
+        };
+
+        if description.is_empty() { continue; }
+
+        let merchant = extract_merchant(&description);
+        let category = categorize_transaction(&description);
+        let id = Uuid::new_v4().to_string();
+        let bank_name = format!("{:?}", format).to_lowercase();
+
+        let _ = conn.execute(
+            "INSERT OR IGNORE INTO transactions
+             (id, amount, category, description, merchant, date, source_bank, raw_row, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![id, amount, category, description, merchant, date, bank_name, line, now],
+        );
+        imported += 1;
+    }
+
+    Ok(imported)
+}
+
+/// Naive CSV row splitter that handles quoted fields.
+fn split_csv_row(line: &str) -> Vec<String> {
+    let mut fields = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+
+    for ch in line.chars() {
+        match ch {
+            '"' => in_quotes = !in_quotes,
+            ',' if !in_quotes => {
+                fields.push(current.trim().to_string());
+                current = String::new();
+            }
+            _ => current.push(ch),
+        }
+    }
+    fields.push(current.trim().to_string());
+    fields
+}
+
+/// Extract a clean merchant name from a bank description string.
+fn extract_merchant(description: &str) -> String {
+    // Strip common bank noise (reference numbers, locations, etc.)
+    let parts: Vec<&str> = description.split_whitespace().collect();
+    // Take up to first 4 meaningful words
+    parts.iter().take(4).cloned().collect::<Vec<_>>().join(" ")
+}
+
+// ── Auto-categorize via LLM ───────────────────────────────────────────────────
+
+/// Use a cheap LLM call to categorize a transaction description.
+/// Falls back to the heuristic categorizer if LLM fails.
+pub async fn auto_categorize_transaction(description: String) -> Result<String, String> {
+    // Fast path: heuristic first
+    let heuristic = categorize_transaction(&description);
+    if heuristic != "shopping" {
+        // Heuristic matched something specific — trust it
+        return Ok(heuristic);
+    }
+
+    let config = crate::config::load_config();
+    if config.api_key.is_empty() {
+        return Ok(heuristic);
+    }
+
+    let prompt = format!(
+        "Categorize this bank transaction description into exactly ONE of these categories: \
+         groceries, subscription, transport, dining, utilities, shopping, entertainment, \
+         health, income, investment, savings, rent, education, travel, other.\n\n\
+         Transaction: \"{}\"\n\n\
+         Reply with ONLY the category word, nothing else.",
+        description.trim()
+    );
+
+    let (provider, api_key, model) =
+        crate::config::resolve_provider_for_task(&config, &crate::router::TaskType::Simple);
+
+    let messages = vec![crate::providers::ConversationMessage::User(prompt)];
+    match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &[], None).await {
+        Ok(t) => {
+            let cat = t.content.trim().to_lowercase();
+            let valid = ["groceries","subscription","transport","dining","utilities",
+                         "shopping","entertainment","health","income","investment",
+                         "savings","rent","education","travel","other"];
+            if valid.contains(&cat.as_str()) {
+                Ok(cat)
+            } else {
+                Ok(heuristic)
+            }
+        }
+        Err(_) => Ok(heuristic),
+    }
+}
+
+// ── Spending Summary ──────────────────────────────────────────────────────────
+
+/// Return spending by category for the last N days, across both transaction tables.
+pub fn get_spending_summary(days: u32) -> Result<serde_json::Value, String> {
+    ensure_tables();
+    let conn = open_db()?;
+
+    let cutoff = chrono::Local::now() - chrono::Duration::days(days as i64);
+    let cutoff_str = cutoff.format("%Y-%m-%d").to_string();
+
+    // Aggregate from fin_transactions (expenses only — negative amounts)
+    let mut cat_map: HashMap<String, f64> = HashMap::new();
+    let mut total_expense = 0f64;
+    let mut total_income = 0f64;
+
+    {
+        let mut stmt = conn.prepare(
+            "SELECT category, amount FROM fin_transactions WHERE date >= ?1"
+        ).map_err(|e| e.to_string())?;
+        let rows = stmt.query_map(params![cutoff_str], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
+        }).map_err(|e| e.to_string())?;
+        for row in rows.flatten() {
+            let (cat, amt) = row;
+            if amt < 0.0 {
+                *cat_map.entry(cat).or_insert(0.0) += amt.abs();
+                total_expense += amt.abs();
+            } else {
+                total_income += amt;
+            }
+        }
+    }
+
+    // Also aggregate from imported CSV transactions table
+    {
+        let mut stmt = conn.prepare(
+            "SELECT category, amount FROM transactions WHERE date >= ?1"
+        ).map_err(|e| e.to_string())?;
+        let rows = stmt.query_map(params![cutoff_str], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
+        }).map_err(|e| e.to_string())?;
+        for row in rows.flatten() {
+            let (cat, amt) = row;
+            if amt < 0.0 {
+                *cat_map.entry(cat).or_insert(0.0) += amt.abs();
+                total_expense += amt.abs();
+            } else {
+                total_income += amt;
+            }
+        }
+    }
+
+    // Sort categories by spend descending
+    let mut by_category: Vec<serde_json::Value> = cat_map
+        .into_iter()
+        .map(|(cat, amt)| {
+            serde_json::json!({
+                "category": cat,
+                "amount": (amt * 100.0).round() / 100.0,
+                "percent": if total_expense > 0.0 {
+                    (amt / total_expense * 100.0 * 10.0).round() / 10.0
+                } else { 0.0 }
+            })
+        })
+        .collect();
+    by_category.sort_by(|a, b| {
+        b["amount"].as_f64().unwrap_or(0.0)
+            .partial_cmp(&a["amount"].as_f64().unwrap_or(0.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    Ok(serde_json::json!({
+        "period_days": days,
+        "from": cutoff_str,
+        "to": chrono::Local::now().format("%Y-%m-%d").to_string(),
+        "total_expense": (total_expense * 100.0).round() / 100.0,
+        "total_income": (total_income * 100.0).round() / 100.0,
+        "net": ((total_income - total_expense) * 100.0).round() / 100.0,
+        "by_category": by_category
+    }))
+}
+
+// ── Subscription Detection ────────────────────────────────────────────────────
+
+/// Detect recurring charges: same merchant, similar amount (~±5%), monthly pattern.
+pub fn detect_subscriptions() -> Result<Vec<serde_json::Value>, String> {
+    ensure_tables();
+    let conn = open_db()?;
+
+    // Pull all transactions from both tables, grouped by merchant
+    struct TxRow { merchant: String, amount: f64, date: String }
+
+    let mut all: Vec<TxRow> = Vec::new();
+
+    // From fin_transactions — use description as merchant proxy
+    {
+        let mut stmt = conn.prepare(
+            "SELECT description, amount, date FROM fin_transactions ORDER BY date ASC"
+        ).map_err(|e| e.to_string())?;
+        let rows = stmt.query_map([], |row| {
+            Ok(TxRow {
+                merchant: row.get::<_, String>(0)?,
+                amount: row.get::<_, f64>(1)?,
+                date: row.get::<_, String>(2)?,
+            })
+        }).map_err(|e| e.to_string())?;
+        for r in rows.flatten() { all.push(r); }
+    }
+    // From imported transactions table
+    {
+        let mut stmt = conn.prepare(
+            "SELECT merchant, amount, date FROM transactions ORDER BY date ASC"
+        ).map_err(|e| e.to_string())?;
+        let rows = stmt.query_map([], |row| {
+            Ok(TxRow {
+                merchant: row.get::<_, String>(0)?,
+                amount: row.get::<_, f64>(1)?,
+                date: row.get::<_, String>(2)?,
+            })
+        }).map_err(|e| e.to_string())?;
+        for r in rows.flatten() { all.push(r); }
+    }
+
+    // Group by normalized merchant name
+    let mut merchant_map: HashMap<String, Vec<(f64, String)>> = HashMap::new();
+    for row in &all {
+        if row.amount >= 0.0 { continue; } // skip income
+        let key = normalize_merchant_key(&row.merchant);
+        merchant_map
+            .entry(key)
+            .or_default()
+            .push((row.amount.abs(), row.date.clone()));
+    }
+
+    let mut subscriptions = Vec::new();
+
+    for (merchant_key, mut charges) in merchant_map {
+        if charges.len() < 2 { continue; }
+        charges.sort_by(|a, b| a.1.cmp(&b.1)); // sort by date
+
+        // Check amount consistency (within 10%)
+        let amounts: Vec<f64> = charges.iter().map(|(a, _)| *a).collect();
+        let median = {
+            let mut sorted = amounts.clone();
+            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            sorted[sorted.len() / 2]
+        };
+        let consistent = amounts.iter().all(|a| (a - median).abs() / median.max(0.01) < 0.10);
+        if !consistent { continue; }
+
+        // Check monthly pattern: gaps between consecutive charges ~25-35 days
+        let dates: Vec<chrono::NaiveDate> = charges
+            .iter()
+            .filter_map(|(_, d)| chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
+            .collect();
+        if dates.len() < 2 { continue; }
+
+        let gaps: Vec<i64> = dates.windows(2).map(|w| (w[1] - w[0]).num_days()).collect();
+        let monthly_gaps = gaps.iter().filter(|&&g| g >= 20 && g <= 40).count();
+        let is_monthly = monthly_gaps >= (gaps.len() / 2).max(1);
+        if !is_monthly { continue; }
+
+        let last_date = dates.last().map(|d| d.to_string()).unwrap_or_default();
+        subscriptions.push(serde_json::json!({
+            "merchant": merchant_key,
+            "amount": (median * 100.0).round() / 100.0,
+            "frequency": "monthly",
+            "occurrences": charges.len(),
+            "last_charge": last_date,
+            "annual_cost": (median * 12.0 * 100.0).round() / 100.0
+        }));
+    }
+
+    // Sort by annual cost descending
+    subscriptions.sort_by(|a, b| {
+        b["annual_cost"].as_f64().unwrap_or(0.0)
+            .partial_cmp(&a["annual_cost"].as_f64().unwrap_or(0.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    Ok(subscriptions)
+}
+
+fn normalize_merchant_key(s: &str) -> String {
+    // lowercase, strip punctuation, take first 3 words
+    let clean: String = s.chars().map(|c| if c.is_alphanumeric() || c == ' ' { c } else { ' ' }).collect();
+    clean.split_whitespace()
+        .take(3)
+        .map(|w| w.to_lowercase())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+// ── New Tauri commands ────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn finance_import_csv(path: String) -> Result<u32, String> {
+    import_csv_transactions(path).await
+}
+
+#[tauri::command]
+pub async fn finance_auto_categorize(description: String) -> Result<String, String> {
+    auto_categorize_transaction(description).await
+}
+
+#[tauri::command]
+pub fn finance_spending_summary(days: u32) -> Result<serde_json::Value, String> {
+    get_spending_summary(days)
+}
+
+#[tauri::command]
+pub fn finance_detect_subscriptions() -> Result<Vec<serde_json::Value>, String> {
+    detect_subscriptions()
 }
