@@ -5,40 +5,42 @@ export default {
     extend: {
       colors: {
         blade: {
-          // Core palette — true black foundation
-          bg:               "#08080a",
-          surface:          "#111115",
-          "surface-hover":  "#17171c",
-          "surface-active": "#1c1c24",
+          // Apple dark palette
+          bg:               "#000000",
+          surface:          "#1c1c1e",        // Apple's dark surface
+          "surface-2":      "#2c2c2e",        // elevated surface
+          "surface-hover":  "#2c2c2e",
+          "surface-active": "#3a3a3c",
 
-          // Borders — barely-there, not thick gray
-          border:           "#1e1e24",
-          "border-hover":   "#2a2a35",
-          "border-strong":  "#3a3a48",
+          // Separators — Apple's subtle dark borders
+          border:           "#38383a",        // Apple's dark separator
+          "border-hover":   "#48484a",
+          "border-strong":  "#545456",
 
-          // Accent — indigo with glow
-          accent:           "#6366f1",
-          "accent-hover":   "#7c7ffa",
-          "accent-muted":   "rgba(99, 102, 241, 0.10)",
-          "accent-glow":    "rgba(99, 102, 241, 0.25)",
+          // Accent — Apple purple + blue
+          accent:           "#5856D6",        // Apple purple
+          "accent-blue":    "#007AFF",        // Apple blue
+          "accent-hover":   "#6E6CE8",
+          "accent-muted":   "rgba(88, 86, 214, 0.12)",
+          "accent-glow":    "rgba(88, 86, 214, 0.20)",
 
-          // Text hierarchy
-          text:             "#e4e4e7",
-          secondary:        "#a1a1aa",
-          muted:            "#71717a",
-          "muted-dim":      "#52525b",
+          // Text hierarchy — Apple's text colors
+          text:             "#ffffff",
+          secondary:        "#ebebf5cc",      // Apple secondary label
+          muted:            "#8e8e93",        // Apple secondary text
+          "muted-dim":      "#636366",
 
           // Semantic colors
-          success:          "#22c55e",
-          error:            "#ef4444",
-          warning:          "#f59e0b",
-          info:             "#3b82f6",
+          success:          "#30d158",        // Apple green
+          error:            "#ff453a",        // Apple red
+          warning:          "#ffd60a",        // Apple yellow
+          info:             "#007AFF",        // Apple blue
         }
       },
 
       fontFamily: {
-        sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
-        mono: ["JetBrains Mono", "SF Mono", "Consolas", "monospace"],
+        sans: ["-apple-system", "BlinkMacSystemFont", "Inter", "Segoe UI", "sans-serif"],
+        mono: ["SF Mono", "JetBrains Mono", "Consolas", "monospace"],
       },
 
       fontSize: {
@@ -47,20 +49,24 @@ export default {
       },
 
       boxShadow: {
-        // Accent glow — used on primary buttons and focused elements
-        "glow-accent": "0 0 0 1px rgba(99,102,241,0.15), 0 0 20px rgba(99,102,241,0.2), 0 0 40px rgba(99,102,241,0.06)",
-        "glow-accent-sm": "0 0 12px rgba(99,102,241,0.25), 0 0 4px rgba(99,102,241,0.1)",
-        "glow-success": "0 0 12px rgba(34,197,94,0.25)",
-        "glow-error":   "0 0 12px rgba(239,68,68,0.25)",
+        // Apple-style layered shadows — no glow, real depth
+        "card":       "0 0 0 1px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08)",
+        "card-hover": "0 0 0 1px rgba(0,0,0,0.04), 0 2px 4px rgba(0,0,0,0.08), 0 8px 20px rgba(0,0,0,0.12)",
+        "modal":      "0 0 0 1px rgba(255,255,255,0.06), 0 8px 32px rgba(0,0,0,0.6), 0 32px 64px rgba(0,0,0,0.4)",
+        "popover":    "0 0 0 1px rgba(255,255,255,0.06), 0 4px 16px rgba(0,0,0,0.4), 0 16px 32px rgba(0,0,0,0.3)",
 
-        // Elevated surfaces
-        "surface-sm":  "0 1px 4px rgba(0,0,0,0.4), 0 0 0 1px rgba(30,30,36,0.6)",
-        "surface-md":  "0 4px 16px rgba(0,0,0,0.5), 0 0 0 1px rgba(30,30,36,0.5)",
-        "surface-lg":  "0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(30,30,36,0.4)",
-        "surface-xl":  "0 16px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(30,30,36,0.3)",
+        // Legacy names kept for compatibility
+        "glow-accent":    "0 0 0 1px rgba(88,86,214,0.15), 0 0 12px rgba(88,86,214,0.15)",
+        "glow-accent-sm": "0 0 8px rgba(88,86,214,0.2)",
+        "glow-success":   "0 0 8px rgba(48,209,88,0.2)",
+        "glow-error":     "0 0 8px rgba(255,69,58,0.2)",
 
-        // Inner glow for inputs
-        "inner-focus": "inset 0 0 0 1px rgba(99,102,241,0.3), 0 0 0 3px rgba(99,102,241,0.1)",
+        "surface-sm":  "0 1px 3px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.04)",
+        "surface-md":  "0 4px 16px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.04)",
+        "surface-lg":  "0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04)",
+        "surface-xl":  "0 16px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)",
+
+        "inner-focus": "inset 0 0 0 1px rgba(88,86,214,0.3), 0 0 0 3px rgba(88,86,214,0.1)",
       },
 
       backdropBlur: {
@@ -68,19 +74,15 @@ export default {
       },
 
       animation: {
-        // Existing
         "fade-in":     "fadeIn 0.18s ease-out",
         "slide-in":    "slideIn 0.2s ease-out",
-        "pulse-slow":  "pulse 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "pulse-slow":  "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
 
-        // New premium animations
-        "fade-up":        "fadeUp 0.22s ease-out",
-        "slide-in-right": "slideInRight 0.2s ease-out",
-        "pulse-subtle":   "pulseSubtle 2s ease-in-out infinite",
-        "send-pulse":     "sendPulse 2s ease-in-out infinite",
+        "fade-up":        "fadeUp 0.22s cubic-bezier(0.25, 0.1, 0.25, 1)",
+        "slide-in-right": "slideInRight 0.25s cubic-bezier(0.25, 0.1, 0.25, 1)",
+        "pulse-subtle":   "pulseSubtle 2.5s ease-in-out infinite",
 
-        // Status dots
-        "ping-slow":  "ping 2s cubic-bezier(0, 0, 0.2, 1) infinite",
+        "ping-slow":  "ping 3s cubic-bezier(0, 0, 0.2, 1) infinite",
       },
 
       keyframes: {
@@ -93,31 +95,29 @@ export default {
           "100%": { opacity: "1", transform: "translateX(0)" },
         },
         fadeUp: {
-          "0%":   { opacity: "0", transform: "translateY(8px)" },
+          "0%":   { opacity: "0", transform: "translateY(6px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
         slideInRight: {
-          "0%":   { opacity: "0", transform: "translateX(10px)" },
+          "0%":   { opacity: "0", transform: "translateX(8px)" },
           "100%": { opacity: "1", transform: "translateX(0)" },
         },
         pulseSubtle: {
           "0%, 100%": { opacity: "1",   transform: "scale(1)" },
-          "50%":       { opacity: "0.6", transform: "scale(0.92)" },
-        },
-        sendPulse: {
-          "0%, 100%": { boxShadow: "0 0 0 0 rgba(99, 102, 241, 0)" },
-          "50%":       { boxShadow: "0 0 0 4px rgba(99, 102, 241, 0.15)" },
+          "50%":       { opacity: "0.6", transform: "scale(0.94)" },
         },
       },
 
       transitionDuration: {
         150:  "150ms",
         200:  "200ms",
+        250:  "250ms",
         300:  "300ms",
       },
 
       transitionTimingFunction: {
-        smooth: "cubic-bezier(0.4, 0, 0.2, 1)",
+        // Apple's default easing
+        smooth: "cubic-bezier(0.25, 0.1, 0.25, 1)",
         spring: "cubic-bezier(0.34, 1.56, 0.64, 1)",
       },
 

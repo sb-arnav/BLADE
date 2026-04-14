@@ -651,6 +651,119 @@ pub async fn big_agent_think(reports: Vec<TentacleReport>) -> Vec<Decision> {
     decisions
 }
 
+// ── Auto-Fix integration ──────────────────────────────────────────────────────
+
+/// Inspect all reports from the current tick. If the CI tentacle has produced a
+/// Critical-priority report, the Dev Head attempts to auto-fix it by spawning the
+/// full pipeline as a background task. Emits `hive_auto_fix_started` so the
+/// Dashboard can render the `AutoFixCard`.
+async fn maybe_trigger_auto_fix(app: &AppHandle, reports: &[TentacleReport]) {
+    for report in reports {
+        if report.tentacle_id != "tentacle-ci" {
+            continue;
+        }
+        if report.priority != Priority::Critical {
+            continue;
+        }
+        if report.processed {
+            continue;
+        }
+
+        // Extract repo_path, run_id, and error log from the report details.
+        let repo_path = report
+            .details
+            .get("repo_path")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        let run_id = report
+            .details
+            .get("run_id")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+
+        let error_log = report
+            .details
+            .get("error_log")
+            .and_then(|v| v.as_str())
+            .unwrap_or(&report.summary)
+            .to_string();
+
+        let workflow_name = report
+            .details
+            .get("workflow_name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown")
+            .to_string();
+
+        let error_type_str = report
+            .details
+            .get("error_type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+
+        let error_type = match error_type_str {
+            "typescript" | "TypeScript" => crate::auto_fix::ErrorType::TypeScript,
+            "rust" | "RustCompile" => crate::auto_fix::ErrorType::RustCompile,
+            "lint" | "Lint" => crate::auto_fix::ErrorType::Lint,
+            "test" | "Test" => crate::auto_fix::ErrorType::Test,
+            "build" | "Build" => crate::auto_fix::ErrorType::Build,
+            _ => crate::auto_fix::ErrorType::Unknown,
+        };
+
+        if repo_path.is_empty() {
+            log::warn!("[Hive] CI critical report missing repo_path — cannot auto-fix");
+            continue;
+        }
+
+        let failure = crate::auto_fix::CIFailure {
+            repo_path: repo_path.clone(),
+            workflow_name: workflow_name.clone(),
+            run_id,
+            job_name: report
+                .details
+                .get("job_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string(),
+            step_name: report
+                .details
+                .get("step_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string(),
+            error_log,
+            error_type,
+        };
+
+        // Emit the started event so the Dashboard can open AutoFixCard.
+        let _ = app.emit(
+            "hive_auto_fix_started",
+            serde_json::json!({
+                "repo_path": repo_path,
+                "workflow_name": workflow_name,
+                "run_id": run_id,
+                "summary": report.summary
+            }),
+        );
+
+        log::info!(
+            "[Hive] Dev Head triggering auto-fix pipeline for {}",
+            repo_path
+        );
+
+        // Spawn in background — the pipeline emits its own progress events.
+        let app_clone = app.clone();
+        tauri::async_runtime::spawn(async move {
+            let _result = crate::auto_fix::full_auto_fix_pipeline(&app_clone, failure).await;
+        });
+
+        // Only trigger once per tick.
+        break;
+    }
+}
+
 // ── Hive tick ────────────────────────────────────────────────────────────────
 
 /// Main 30-second Hive tick:
@@ -721,6 +834,10 @@ pub async fn hive_tick(app: &AppHandle) {
     // Big Agent sees everything.
     let big_decisions = big_agent_think(all_reports.clone()).await;
     all_decisions.extend(big_decisions);
+
+    // Dev Head: check if the CI tentacle reported a Critical failure.
+    // If so, hand off to the auto-fix pipeline (runs in a background task).
+    maybe_trigger_auto_fix(app, &all_reports).await;
 
     // Separate auto-executable from pending.
     let autonomy_level = {
