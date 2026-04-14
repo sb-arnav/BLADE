@@ -78,81 +78,112 @@ async fn http_get(url: &str) -> Result<(String, u16, String), String> {
 
 /// Strip HTML tags and collapse whitespace to get readable plain text.
 /// Also decodes common HTML entities.
+///
+/// Uses byte-index iteration (not char iteration) for performance but advances
+/// by `char.len_utf8()` for non-ASCII characters so Unicode text (CJK, emoji,
+/// etc.) is preserved correctly in the output.
 fn strip_html(html: &str) -> String {
     let mut out = String::with_capacity(html.len() / 2);
     let mut in_tag = false;
     let mut in_script = false;
     let mut in_style = false;
-    let bytes = html.as_bytes();
-    let mut i = 0;
+    let mut i = 0usize; // byte index into html
 
-    while i < bytes.len() {
-        let ch = bytes[i] as char;
+    while i < html.len() {
+        // Decode the current Unicode character and its byte length.
+        // All HTML-significant chars (<, >, &, ;) are single-byte ASCII so
+        // non-ASCII chars always fall through to the `out.push(ch)` path unchanged.
+        let ch = match html[i..].chars().next() {
+            Some(c) => c,
+            None => break,
+        };
+        let ch_len = ch.len_utf8();
 
-        // Detect <script ... > and <style ... > blocks — drop entirely
+        // Inside a <script> or <style> block: skip everything until the matching
+        // closing tag. Bare '<' in JS expressions (e.g. `a < b`) must NOT set
+        // in_tag, otherwise a later '>' would prematurely close the tag state
+        // and leak script content as text.
+        if (in_script || in_style) && !in_tag {
+            if ch == '<' {
+                let rest = &html[i..];
+                let tag_lower: String = rest.chars().skip(1).take(9).collect::<String>().to_lowercase();
+                if in_script && tag_lower.starts_with("/script") {
+                    in_script = false;
+                    in_tag = true; // consume the </script> chars up to '>' via the in_tag path
+                } else if in_style && tag_lower.starts_with("/style") {
+                    in_style = false;
+                    in_tag = true;
+                }
+                // bare '<' inside script/style — skip, do not set in_tag
+            }
+            i += ch_len;
+            continue;
+        }
+
+        // Detect opening <script> and <style> tags — skip their contents entirely.
         if !in_tag && ch == '<' {
             let rest = &html[i..];
-            let tag_lower: String = rest
-                .chars()
-                .skip(1)
-                .take(10)
-                .collect::<String>()
-                .to_lowercase();
+            let tag_lower: String = rest.chars().skip(1).take(10).collect::<String>().to_lowercase();
             if tag_lower.starts_with("script") {
                 in_script = true;
             } else if tag_lower.starts_with("style") {
                 in_style = true;
-            } else if in_script && tag_lower.starts_with("/script") {
-                in_script = false;
-            } else if in_style && tag_lower.starts_with("/style") {
-                in_style = false;
             }
             in_tag = true;
-            i += 1;
+            i += ch_len;
             continue;
         }
 
         if in_tag {
             if ch == '>' {
                 in_tag = false;
-                out.push(' '); // replace tag with a space
+                out.push(' '); // replace tag with a space separator
             }
-            i += 1;
+            i += ch_len;
             continue;
         }
 
-        if in_script || in_style {
-            i += 1;
-            continue;
-        }
-
-        // Decode common entities
+        // Decode common HTML entities.
+        // Only search for ';' within the next 10 characters to avoid accidentally
+        // consuming unrelated semicolons further in the document (e.g. in CSS or JS).
         if ch == '&' {
             let rest = &html[i..];
-            if let Some(end) = rest.find(';') {
-                let entity = &rest[1..end];
+            let mut byte_pos = 1usize; // byte offset of first char after '&'
+            let mut char_count = 0usize;
+            let mut semi_byte_pos: Option<usize> = None;
+            for c in rest.chars().skip(1) {
+                if char_count >= 10 { break; }
+                if c == ';' {
+                    semi_byte_pos = Some(byte_pos); // byte position of ';' within rest
+                    break;
+                }
+                byte_pos += c.len_utf8();
+                char_count += 1;
+            }
+            if let Some(end) = semi_byte_pos {
+                let entity = &rest[1..end]; // entity name between '&' and ';'
                 let decoded = match entity {
-                    "amp"   => "&",
-                    "lt"    => "<",
-                    "gt"    => ">",
-                    "quot"  => "\"",
-                    "apos"  => "'",
-                    "nbsp"  => " ",
-                    "mdash" => "—",
-                    "ndash" => "–",
+                    "amp"    => "&",
+                    "lt"     => "<",
+                    "gt"     => ">",
+                    "quot"   => "\"",
+                    "apos"   => "'",
+                    "nbsp"   => " ",
+                    "mdash"  => "—",
+                    "ndash"  => "–",
                     "hellip" => "...",
                     _ => "",
                 };
                 if !decoded.is_empty() {
                     out.push_str(decoded);
-                    i += end + 1;
+                    i += end + 1; // advance past '&' + entity name + ';'
                     continue;
                 }
             }
         }
 
-        out.push(ch);
-        i += 1;
+        out.push(ch); // emit the character as-is (handles non-ASCII correctly)
+        i += ch_len;
     }
 
     // Collapse runs of whitespace (tabs, spaces, newlines) to single spaces,

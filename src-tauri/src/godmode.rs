@@ -149,8 +149,15 @@ pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
                 break;
             }
 
-            // Build the intelligence brief (not a data dump)
-            let brief = build_intelligence_brief(&tier, &last_brief);
+            // ── Run perception fusion first — all downstream uses share this snapshot ──
+            let perception = tokio::task::spawn_blocking(
+                crate::perception_fusion::update_perception
+            )
+            .await
+            .unwrap_or_default();
+
+            // Build the intelligence brief using the fresh perception state
+            let brief = build_intelligence_brief(&tier, &last_brief, &perception);
 
             // Write context file for injection into chat
             let path = crate::config::blade_config_dir().join("godmode_context.md");
@@ -167,7 +174,7 @@ pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
                 }
             }
 
-            // Extreme: screen vision — capture + understand what's on screen
+            // Extreme: screen vision + decision gate for proactive actions
             if tier == "extreme" {
                 if let Some(understanding) = screen_vision_snapshot() {
                     // Append vision context to the brief file
@@ -177,12 +184,22 @@ pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
                         let _ = std::fs::write(&path, &contents);
                     }
                 }
+
+                // Route proactive signals through decision gate before acting
+                let proactive_app = app.clone();
+                let perception_clone = perception.clone();
+                tokio::spawn(async move {
+                    evaluate_and_queue_proactive_actions(&proactive_app, &perception_clone).await;
+                });
             }
 
-            // Emit update event
+            // Emit update event — include perception delta for the UI
             let _ = app.emit("godmode_update", serde_json::json!({
                 "bytes": brief.len(),
                 "tier": &tier,
+                "delta": &perception.delta_summary,
+                "user_state": &perception.user_state,
+                "context_tags": &perception.context_tags,
             }));
 
             // Embed into vector store for cross-session recall
@@ -234,6 +251,77 @@ pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
     });
 }
 
+/// Evaluate outstanding proactive signals through the decision gate.
+/// Only signals cleared as ActAutonomously are queued for the frontend.
+async fn evaluate_and_queue_proactive_actions(
+    app: &tauri::AppHandle,
+    perception: &crate::perception_fusion::PerceptionState,
+) {
+    use crate::decision_gate::{DecisionOutcome, Signal, evaluate_and_record};
+
+    // Build signals from current perception state
+    let mut signals: Vec<Signal> = Vec::new();
+
+    // Error detected → high-confidence, reversible (just showing notification)
+    if !perception.visible_errors.is_empty() {
+        signals.push(Signal {
+            source: "god_mode_error".to_string(),
+            description: format!(
+                "Error detected: {}",
+                crate::safe_slice(&perception.visible_errors[0], 120)
+            ),
+            confidence: 0.88,
+            reversible: true,
+            time_sensitive: true,
+        });
+    }
+
+    // Disk low warning
+    if perception.disk_free_gb > 0.0 && perception.disk_free_gb < 5.0 {
+        signals.push(Signal {
+            source: "god_mode_vitals".to_string(),
+            description: format!(
+                "Disk space critically low: {:.1}GB free — consider cleanup",
+                perception.disk_free_gb
+            ),
+            confidence: 0.95,
+            reversible: true,
+            time_sensitive: false,
+        });
+    }
+
+    // Context shift worth noting
+    if !perception.delta_summary.is_empty()
+        && perception.delta_summary != "No significant changes"
+        && !perception.delta_summary.starts_with("Initial")
+    {
+        signals.push(Signal {
+            source: "god_mode_context".to_string(),
+            description: format!("Context shift: {}", perception.delta_summary),
+            confidence: 0.6,
+            reversible: true,
+            time_sensitive: false,
+        });
+    }
+
+    for signal in signals {
+        let (_, outcome) = evaluate_and_record(signal, perception).await;
+        match outcome {
+            DecisionOutcome::ActAutonomously { action, reasoning } => {
+                queue_proactive_task(app, &action, "insight");
+                log::debug!("[GodMode] Autonomous action queued: {} (reason: {})", action, reasoning);
+            }
+            DecisionOutcome::AskUser { question, .. } => {
+                queue_proactive_task(app, &question, "reminder");
+            }
+            DecisionOutcome::QueueForLater { task, .. } => {
+                queue_proactive_task(app, &task, "optimization");
+            }
+            DecisionOutcome::Ignore { .. } => {}
+        }
+    }
+}
+
 fn extract_error_from_context(ctx: &str) -> Option<String> {
     if let Some(pos) = ctx.find("ERROR DETECTED") {
         let section = &ctx[pos..];
@@ -258,40 +346,95 @@ pub fn load_godmode_context() -> Option<String> {
 
 // ── Intelligence Brief Builder ──────────────────────────────────────────────
 
-fn build_intelligence_brief(tier: &str, last_brief: &str) -> String {
+fn build_intelligence_brief(
+    tier: &str,
+    last_brief: &str,
+    perception: &crate::perception_fusion::PerceptionState,
+) -> String {
     let now = chrono::Local::now();
     let mut lines: Vec<String> = Vec::new();
 
     // Header — one line, not a wall
     lines.push(format!("## God Mode | {} | {}", tier, now.format("%H:%M")));
 
-    // ── Line 1: What you're doing right now ──
-    let focus = get_current_focus();
+    // ── Line 1: What you're doing right now (from fused perception) ──
+    let focus = if !perception.active_app.is_empty() {
+        if !perception.active_title.is_empty() {
+            format!(
+                "{} — {}",
+                perception.active_app,
+                crate::safe_slice(&perception.active_title, 60)
+            )
+        } else {
+            perception.active_app.clone()
+        }
+    } else {
+        get_current_focus()
+    };
     lines.push(format!("**Focus:** {}", focus));
 
-    // ── Line 2: What changed since last scan ──
-    let delta = get_delta_since_last(last_brief);
-    if !delta.is_empty() {
+    // ── Line 2: What changed since last scan (perception delta) ──
+    let delta = if !perception.delta_summary.is_empty()
+        && perception.delta_summary != "No significant changes"
+        && !perception.delta_summary.starts_with("Initial")
+    {
+        perception.delta_summary.clone()
+    } else {
+        get_delta_since_last(last_brief)
+    };
+    if !delta.is_empty() && delta != "No significant changes" {
         lines.push(format!("**Changed:** {}", delta));
     }
 
-    // ── Line 3: System vitals (one line) ──
-    let vitals = get_system_vitals();
+    // ── Line 3: System vitals from perception (falls back to live query) ──
+    let vitals = if perception.disk_free_gb > 0.0 || perception.ram_used_gb > 0.0 {
+        let mut parts: Vec<String> = Vec::new();
+        if perception.disk_free_gb > 0.0 {
+            let warn = if perception.disk_free_gb < 5.0 { " (LOW!)" } else { "" };
+            parts.push(format!("Disk: {:.1}GB free{}", perception.disk_free_gb, warn));
+        }
+        if perception.ram_used_gb > 0.0 {
+            parts.push(format!("RAM: {:.1}GB used", perception.ram_used_gb));
+        }
+        if !perception.top_cpu_process.is_empty() {
+            parts.push(format!("Top CPU: {}", &perception.top_cpu_process));
+        }
+        parts.join(" | ")
+    } else {
+        get_system_vitals()
+    };
     lines.push(format!("**System:** {}", vitals));
+
+    // ── User state from perception ──
+    lines.push(format!("**User:** {}", perception.user_state));
+
+    // ── Context tags ──
+    if !perception.context_tags.is_empty() {
+        lines.push(format!("**Context:** {}", perception.context_tags.join(", ")));
+    }
 
     // ── User identity (compact, always injected) ──
     if let Some(user) = who_is_the_user_compact() {
         lines.push(format!("\n{}", user));
     }
 
-    // ── Intermediate+: clipboard intelligence ──
+    // ── Intermediate+: clipboard intelligence + error detection + recall ──
     if tier == "intermediate" || tier == "extreme" {
-        if let Some(clip) = clipboard_intelligence() {
-            lines.push(format!("\n**Clipboard:** {}", clip));
+        // Clipboard from perception state (already classified)
+        if !perception.clipboard_preview.is_empty() {
+            lines.push(format!(
+                "\n**Clipboard ({}):** {}",
+                perception.clipboard_type,
+                crate::safe_slice(&perception.clipboard_preview, 120)
+            ));
         }
 
-        // Error detection
-        if let Some(err) = detect_active_errors() {
+        // Errors from perception (visible_errors already deduplicated)
+        if !perception.visible_errors.is_empty() {
+            let err_preview = crate::safe_slice(&perception.visible_errors[0], 200);
+            lines.push(format!("\n**ERROR DETECTED:** {}", err_preview));
+        } else if let Some(err) = detect_active_errors() {
+            // Fallback to live detection if perception missed it
             lines.push(format!("\n**ERROR DETECTED:** {}", err));
         }
 
@@ -312,30 +455,19 @@ fn build_intelligence_brief(tier: &str, last_brief: &str) -> String {
 // ── Focus: What the user is doing RIGHT NOW ─────────────────────────────────
 
 fn get_current_focus() -> String {
-    let mut parts: Vec<String> = Vec::new();
-
     // Active window (most important signal)
     if let Ok(win) = crate::context::get_active_window() {
         if !win.app_name.is_empty() {
-            let title_preview = if win.window_title.len() > 60 {
-                format!("{}...", &win.window_title[..60])
-            } else {
-                win.window_title.clone()
-            };
-
+            let title_preview = crate::safe_slice(&win.window_title, 60);
             if !title_preview.is_empty() {
-                parts.push(format!("{} — {}", win.app_name, title_preview));
+                return format!("{} — {}", win.app_name, title_preview);
             } else {
-                parts.push(win.app_name.clone());
+                return win.app_name.clone();
             }
         }
     }
 
-    if parts.is_empty() {
-        return "Unknown (no active window detected)".to_string();
-    }
-
-    parts.join(" | ")
+    "Unknown (no active window detected)".to_string()
 }
 
 // ── Delta: What changed since last scan ─────────────────────────────────────
@@ -489,23 +621,25 @@ fn get_system_vitals() -> String {
 
 // ── Clipboard Intelligence ──────────────────────────────────────────────────
 
+#[allow(dead_code)]
 fn clipboard_intelligence() -> Option<String> {
     let mut clipboard = arboard::Clipboard::new().ok()?;
     let text = clipboard.get_text().ok()?;
     let trimmed = text.trim();
     if trimmed.is_empty() { return None; }
 
-    // Classify what's in the clipboard
+    // Suppress very short (≤3 chars) or purely numeric content (timestamps, IDs, etc.)
+    if trimmed.len() <= 3 || trimmed.chars().all(|c| c.is_ascii_digit() || c == '-' || c == '_') {
+        return None;
+    }
+
     let lower = trimmed.to_lowercase();
 
     // URL → note it for context
     if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
-        let url_preview = if trimmed.len() > 80 {
-            format!("{}...", &trimmed[..80])
-        } else {
-            trimmed.to_string()
-        };
-        return Some(format!("URL copied: {}", url_preview));
+        let url_preview = crate::safe_slice(trimmed, 80);
+        let suffix = if trimmed.len() > 80 { "..." } else { "" };
+        return Some(format!("URL copied: {}{}", url_preview, suffix));
     }
 
     // Error/traceback → flag it
@@ -521,10 +655,10 @@ fn clipboard_intelligence() -> Option<String> {
     if trimmed.contains("fn ") || trimmed.contains("pub ") || trimmed.contains("impl ") {
         return Some(format!("Rust code copied ({} chars)", trimmed.len()));
     }
-    if trimmed.contains("const ") || trimmed.contains("import ") || trimmed.contains("export ") {
+    if trimmed.contains("export ") || (trimmed.contains("const ") && trimmed.contains(": ")) {
         return Some(format!("JS/TS code copied ({} chars)", trimmed.len()));
     }
-    if trimmed.contains("def ") || trimmed.contains("class ") || trimmed.contains("import ") {
+    if trimmed.contains("import ") && trimmed.contains("def ") {
         return Some(format!("Python code copied ({} chars)", trimmed.len()));
     }
 
@@ -534,10 +668,7 @@ fn clipboard_intelligence() -> Option<String> {
     }
 
     // Short text → show it
-    Some(format!("\"{}\"", crate::safe_slice(trimmed, 80)));
-
-    // Suppress very short or numeric clipboard (timestamps, IDs, etc.)
-    None
+    Some(format!("\"{}\"", crate::safe_slice(trimmed, 80)))
 }
 
 // ── Error Detection ─────────────────────────────────────────────────────────
@@ -604,19 +735,29 @@ fn cross_session_recall() -> Option<String> {
 // ── Screen Vision (Extreme only) ────────────────────────────────────────────
 
 fn screen_vision_snapshot() -> Option<String> {
-    // Capture a screenshot using xcap
-    let monitors = xcap::Monitor::all().ok()?;
-    let monitor = monitors.first()?;
-    let image = monitor.capture_image().ok()?;
+    // Guard: catch any panic from xcap (some GPU drivers can cause issues)
+    let result = std::panic::catch_unwind(|| {
+        let monitors = xcap::Monitor::all().ok()?;
+        let monitor = monitors.into_iter().next()?;
+        let image = monitor.capture_image().ok()?;
 
-    // Save to temp for potential vision model analysis
-    let temp_path = crate::config::blade_config_dir().join("godmode_screen.png");
-    image.save(&temp_path).ok()?;
+        // Save to temp for potential vision model analysis
+        let temp_path = crate::config::blade_config_dir().join("godmode_screen.png");
+        // save() can fail if path doesn't exist or disk is full — that's fine
+        let saved = image.save(&temp_path).is_ok();
 
-    // For now, use basic image dimensions + file info as context
-    // TODO: when vision model is available, send screenshot for analysis
-    let (w, h) = (image.width(), image.height());
-    Some(format!("**Screen:** {}x{} captured for vision analysis", w, h))
+        let (w, h) = (image.width(), image.height());
+        let save_note = if saved { "saved" } else { "capture failed to save" };
+        Some(format!("**Screen:** {}x{} captured ({})", w, h, save_note))
+    });
+
+    match result {
+        Ok(inner) => inner,
+        Err(_) => {
+            log::warn!("[GodMode] screen_vision_snapshot panicked (xcap failure) — skipping");
+            None
+        }
+    }
 }
 
 // ── Compact User Identity ───────────────────────────────────────────────────

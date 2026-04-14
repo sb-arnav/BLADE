@@ -235,9 +235,9 @@ fn scan_ides() -> Vec<IdeInfo> {
         #[cfg(target_os = "windows")]
         { dirs::data_dir().map(|d| d.join("Code").join("User").join("settings.json")) }
         #[cfg(target_os = "macos")]
-        { home.join("Library/Application Support/Code/User/settings.json").into() }
+        { Some(home.join("Library/Application Support/Code/User/settings.json")) }
         #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-        { home.join(".config/Code/User/settings.json").into() }
+        { Some(home.join(".config/Code/User/settings.json")) }
     };
 
     if let Some(ref p) = vscode_settings {
@@ -255,8 +255,10 @@ fn scan_ides() -> Vec<IdeInfo> {
     let cursor_settings = {
         #[cfg(target_os = "windows")]
         { dirs::data_dir().map(|d| d.join("Cursor").join("User").join("settings.json")) }
-        #[cfg(not(target_os = "windows"))]
-        { None::<PathBuf> }
+        #[cfg(target_os = "macos")]
+        { Some(home.join("Library/Application Support/Cursor/User/settings.json")) }
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        { Some(home.join(".config/Cursor/User/settings.json")) }
     };
 
     if let Some(ref p) = cursor_settings {
@@ -1211,6 +1213,100 @@ fn build_summary(results: &DeepScanResults) -> String {
     lines.join("\n")
 }
 
+// ── Public API for brain.rs ───────────────────────────────────────────────────
+
+/// Return a compact 3-5 line identity block for injection into the system prompt.
+/// Reads the last saved scan result from disk; returns None if no scan has been run.
+/// This is intentionally terse — it goes into EVERY prompt, so every byte counts.
+pub fn load_scan_summary() -> Option<String> {
+    let results = load_results()?;
+
+    let mut lines: Vec<String> = Vec::with_capacity(6);
+
+    // Line 1: OS + hardware
+    let hw = if results.system_info.total_ram_mb > 0 {
+        format!(
+            "{}{}{}",
+            results.system_info.os_version,
+            if !results.system_info.cpu.is_empty() {
+                format!(", {}", results.system_info.cpu)
+            } else {
+                String::new()
+            },
+            if results.system_info.total_ram_mb > 0 {
+                format!(", {} GB RAM", results.system_info.total_ram_mb / 1024)
+            } else {
+                String::new()
+            },
+        )
+    } else {
+        results.system_info.os_version.clone()
+    };
+    if !hw.is_empty() {
+        lines.push(format!("Machine: {}", hw));
+    }
+
+    // Line 2: Browser
+    if let Some(ref browser) = results.default_browser {
+        lines.push(format!("Default browser: {}", browser));
+    }
+
+    // Line 3: IDEs + top languages
+    if !results.ides.is_empty() {
+        let ide_names: Vec<&str> = results.ides.iter().map(|i| i.name.as_str()).collect();
+        lines.push(format!("IDEs: {}", ide_names.join(", ")));
+    }
+
+    // Line 4: Coding languages (from git repos)
+    {
+        let mut lang_totals: HashMap<String, usize> = HashMap::new();
+        for repo in &results.git_repos {
+            for (lang, count) in &repo.language_counts {
+                *lang_totals.entry(lang.clone()).or_insert(0) += count;
+            }
+        }
+        if !lang_totals.is_empty() {
+            let mut langs: Vec<(String, usize)> = lang_totals.into_iter().collect();
+            langs.sort_by(|a, b| b.1.cmp(&a.1));
+            let top: Vec<&str> = langs.iter().take(5).map(|(l, _)| l.as_str()).collect();
+            lines.push(format!("Primary languages: {}", top.join(", ")));
+        }
+    }
+
+    // Line 5: Git repos (just count + names, max 5)
+    if !results.git_repos.is_empty() {
+        let repo_names: Vec<String> = results.git_repos.iter().take(5).map(|r| {
+            std::path::Path::new(&r.path)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| r.path.clone())
+        }).collect();
+        let suffix = if results.git_repos.len() > 5 {
+            format!(" (+{} more)", results.git_repos.len() - 5)
+        } else {
+            String::new()
+        };
+        lines.push(format!("Git repos: {}{}", repo_names.join(", "), suffix));
+    }
+
+    // Line 6: Active AI tools
+    {
+        let active_ai: Vec<&str> = results.ai_tools.iter()
+            .filter(|t| t.detected)
+            .map(|t| t.name.as_str())
+            .collect();
+        if !active_ai.is_empty() {
+            lines.push(format!("AI tools: {}", active_ai.join(", ")));
+        }
+    }
+
+    if lines.is_empty() {
+        None
+    } else {
+        Some(lines.join("\n"))
+    }
+}
+
 // ── Tauri Commands ────────────────────────────────────────────────────────────
 
 /// Start a full deep system scan. Emits `deep_scan_progress` events.
@@ -1228,7 +1324,11 @@ pub async fn deep_scan_start(app: tauri::AppHandle) -> Result<DeepScanResults, S
 
     emit("starting", 0);
 
-    // Run all scanners in parallel
+    // Run all 12 scanners in parallel.
+    // spawn_blocking tasks return JoinResult<T> — unwrap_or_default() absorbs panics.
+    // Async tasks are wrapped in tokio::spawn so a panic in one doesn't abort the join.
+    // Each scanner is fully independent: failure returns an empty/default value, never
+    // crashes the whole scan.
     let (
         installed_apps,
         default_browser,
@@ -1248,15 +1348,16 @@ pub async fn deep_scan_start(app: tauri::AppHandle) -> Result<DeepScanResults, S
         tokio::task::spawn_blocking(scan_ides),
         tokio::task::spawn_blocking(scan_git_repos),
         tokio::task::spawn_blocking(scan_shell_history),
-        scan_wsl_distros(),
-        scan_package_managers(),
-        scan_ai_tools(),
-        scan_system_info(),
+        async { tokio::spawn(scan_wsl_distros()).await.unwrap_or_default() },
+        async { tokio::spawn(scan_package_managers()).await.unwrap_or_default() },
+        async { tokio::spawn(scan_ai_tools()).await.unwrap_or_default() },
+        async { tokio::spawn(scan_system_info()).await.unwrap_or_default() },
         tokio::task::spawn_blocking(scan_ssh_keys),
-        scan_docker(),
+        async { tokio::spawn(scan_docker()).await.unwrap_or_default() },
         tokio::task::spawn_blocking(scan_browser_bookmarks),
     );
 
+    // JoinHandle results from spawn_blocking: unwrap_or_default absorbs panics/cancellations.
     let installed_apps = installed_apps.unwrap_or_default();
     let default_browser = default_browser.unwrap_or_default();
     let ides = ides.unwrap_or_default();
@@ -1291,12 +1392,21 @@ pub async fn deep_scan_start(app: tauri::AppHandle) -> Result<DeepScanResults, S
         browser_bookmarks,
     };
 
-    // Persist to disk
+    // Persist results to disk
     if let Err(e) = save_results(&results) {
         log::warn!("deep_scan: failed to save results: {}", e);
     }
 
-    // Seed knowledge graph
+    // Record scan timestamp in config so the UI can show "last scanned X days ago"
+    {
+        let mut cfg = crate::config::load_config();
+        cfg.last_deep_scan = chrono::Utc::now().timestamp();
+        if let Err(e) = crate::config::save_config(&cfg) {
+            log::warn!("deep_scan: failed to update last_deep_scan in config: {}", e);
+        }
+    }
+
+    // Seed knowledge graph (non-blocking — runs after we return results)
     let results_clone = results.clone();
     tokio::task::spawn_blocking(move || seed_knowledge_graph(&results_clone));
 

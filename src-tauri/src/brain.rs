@@ -216,6 +216,19 @@ fn build_system_prompt_inner(
         parts.push(role_injection);
     }
 
+    // DEEP SCAN IDENTITY — compact snapshot of the user's machine identity.
+    // Injected into every prompt so the AI always knows what apps, languages, repos,
+    // and tools this specific user has — no guessing, no generic answers.
+    // Loaded from ~/.blade/identity/scan_results.json (written by deep_scan_start).
+    if let Some(identity_block) = crate::deep_scan::load_scan_summary() {
+        parts.push(format!(
+            "## User's Machine Identity\n\n{}\n\n\
+             _(From last deep scan — use this to personalise tool recommendations, \
+             code suggestions, and workflow advice.)_",
+            identity_block
+        ));
+    }
+
     // Core identity reference — tools, workflows, OS-specific notes, personalisation.
     // Rules live in BLADE.md above; this section is the "body" (how to use tools, etc.)
     parts.push(build_identity(&config, provider, model));

@@ -14,6 +14,7 @@
 /// confidence threshold so BLADE learns each user's tolerance for autonomy.
 
 use std::sync::{Mutex, OnceLock};
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use crate::perception_fusion::PerceptionState;
 
@@ -68,22 +69,22 @@ pub struct DecisionRecord {
     pub feedback: Option<bool>,
 }
 
-// ── Ring buffer (max 100) ─────────────────────────────────────────────────────
+// ── Ring buffer (max 100) — uses VecDeque for O(1) front removal ──────────────
 
 const RING_MAX: usize = 100;
 
-static DECISION_LOG: OnceLock<Mutex<Vec<DecisionRecord>>> = OnceLock::new();
+static DECISION_LOG: OnceLock<Mutex<std::collections::VecDeque<DecisionRecord>>> = OnceLock::new();
 
-fn decision_log() -> &'static Mutex<Vec<DecisionRecord>> {
-    DECISION_LOG.get_or_init(|| Mutex::new(Vec::new()))
+fn decision_log() -> &'static Mutex<std::collections::VecDeque<DecisionRecord>> {
+    DECISION_LOG.get_or_init(|| Mutex::new(std::collections::VecDeque::new()))
 }
 
 fn push_decision(record: DecisionRecord) {
     if let Ok(mut log) = decision_log().lock() {
-        log.push(record);
-        if log.len() > RING_MAX {
-            log.remove(0);
+        if log.len() >= RING_MAX {
+            log.pop_front();
         }
+        log.push_back(record);
     }
 }
 
@@ -93,17 +94,55 @@ fn push_decision(record: DecisionRecord) {
 // threshold for that source by THRESHOLD_STEP so BLADE requires stronger
 // evidence before acting autonomously in the future.
 // When `was_correct=true`, we slightly lower the threshold (reward correct calls).
+// Thresholds are persisted to blade.db (settings table) so they survive restarts.
 
 const THRESHOLD_STEP_PENALTY: f64 = 0.05;
 const THRESHOLD_STEP_REWARD: f64 = 0.02;
 const THRESHOLD_MIN: f64 = 0.5;
 const THRESHOLD_MAX: f64 = 0.98;
+const THRESHOLD_DB_KEY: &str = "decision_gate_thresholds";
 
-static SOURCE_THRESHOLDS: OnceLock<Mutex<std::collections::HashMap<String, f64>>> =
-    OnceLock::new();
+static SOURCE_THRESHOLDS: OnceLock<Mutex<HashMap<String, f64>>> = OnceLock::new();
 
-fn source_thresholds() -> &'static Mutex<std::collections::HashMap<String, f64>> {
-    SOURCE_THRESHOLDS.get_or_init(|| Mutex::new(std::collections::HashMap::new()))
+fn source_thresholds() -> &'static Mutex<HashMap<String, f64>> {
+    SOURCE_THRESHOLDS.get_or_init(|| {
+        // Try to load persisted thresholds from DB on first access
+        Mutex::new(load_thresholds_from_db().unwrap_or_default())
+    })
+}
+
+/// Load threshold map from the settings table in blade.db.
+fn load_thresholds_from_db() -> Option<HashMap<String, f64>> {
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    let conn = rusqlite::Connection::open(&db_path).ok()?;
+    let json: String = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = ?1",
+            rusqlite::params![THRESHOLD_DB_KEY],
+            |row| row.get(0),
+        )
+        .ok()?;
+    serde_json::from_str(&json).ok()
+}
+
+/// Persist the current threshold map to blade.db settings.
+fn persist_thresholds() {
+    let map = match source_thresholds().lock() {
+        Ok(m) => m.clone(),
+        Err(_) => return,
+    };
+    let json = match serde_json::to_string(&map) {
+        Ok(j) => j,
+        Err(_) => return,
+    };
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+        let _ = conn.execute(
+            "INSERT INTO settings (key, value) VALUES (?1, ?2)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            rusqlite::params![THRESHOLD_DB_KEY, json],
+        );
+    }
 }
 
 /// Get the effective "act autonomously" threshold for a given source.
@@ -136,8 +175,45 @@ pub async fn evaluate(signal: &Signal, perception: &PerceptionState) -> Decision
     let c = signal.confidence;
     let act_threshold = effective_threshold(&signal.source);
 
-    // ── Rule 1: Strong + reversible + user is idle → act ─────────────────────
-    if c >= act_threshold && signal.reversible && perception.user_state == "idle" {
+    // ── Rule 1: Very weak signal → ignore immediately ─────────────────────────
+    if c < 0.3 {
+        return DecisionOutcome::Ignore {
+            reason: format!(
+                "Signal confidence too low ({:.0}%) to act on.",
+                c * 100.0
+            ),
+        };
+    }
+
+    // ── Rule 2: Irreversible action → always ask the user ────────────────────
+    if !signal.reversible {
+        return DecisionOutcome::AskUser {
+            question: format!(
+                "This action cannot be undone: {}. Should I proceed?",
+                signal.description
+            ),
+            suggested_action: signal.description.clone(),
+        };
+    }
+
+    // From here: reversible action, confidence >= 0.3
+
+    // ── Rule 3: Low confidence (0.3–0.5) → ask ───────────────────────────────
+    if c < 0.5 {
+        return DecisionOutcome::AskUser {
+            question: format!(
+                "I'm not very confident about this ({:.0}%). Should I: {}?",
+                c * 100.0,
+                signal.description
+            ),
+            suggested_action: signal.description.clone(),
+        };
+    }
+
+    // From here: reversible, confidence >= 0.5
+
+    // ── Rule 4: High confidence + user is idle → act autonomously ────────────
+    if c >= act_threshold && perception.user_state == "idle" {
         return DecisionOutcome::ActAutonomously {
             action: signal.description.clone(),
             reasoning: format!(
@@ -147,31 +223,24 @@ pub async fn evaluate(signal: &Signal, perception: &PerceptionState) -> Decision
         };
     }
 
-    // ── Rule 2: Irreversible or very low confidence → ask ────────────────────
-    if !signal.reversible || c < 0.5 {
-        let question = if !signal.reversible {
-            format!(
-                "This action cannot be undone: {}. Should I proceed?",
-                signal.description
-            )
-        } else {
-            format!(
-                "I'm not very confident about this ({}%). Should I: {}?",
-                (c * 100.0) as u32,
-                signal.description
-            )
-        };
-        return DecisionOutcome::AskUser {
-            question,
-            suggested_action: signal.description.clone(),
+    // ── Rule 5: High confidence + user focused + time-sensitive → act ────────
+    if c >= act_threshold && signal.time_sensitive {
+        return DecisionOutcome::ActAutonomously {
+            action: signal.description.clone(),
+            reasoning: format!(
+                "High confidence ({:.0}%), reversible, time-sensitive — acting now.",
+                c * 100.0
+            ),
         };
     }
 
-    // ── Rule 3: Not urgent + medium confidence → queue ────────────────────────
-    if !signal.time_sensitive && c >= 0.5 {
-        let priority = if c >= 0.8 {
+    // ── Rule 6: Not urgent + medium confidence → queue ───────────────────────
+    if !signal.time_sensitive {
+        let priority = if c >= act_threshold {
             Priority::High
-        } else if c >= 0.65 {
+        } else if c >= 0.7 {
+            Priority::High
+        } else if c >= 0.55 {
             Priority::Medium
         } else {
             Priority::Low
@@ -182,19 +251,9 @@ pub async fn evaluate(signal: &Signal, perception: &PerceptionState) -> Decision
         };
     }
 
-    // ── Rule 4: Very weak signal → ignore ─────────────────────────────────────
-    if c < 0.3 {
-        return DecisionOutcome::Ignore {
-            reason: format!(
-                "Signal confidence too low ({:.0}%) to act on.",
-                c * 100.0
-            ),
-        };
-    }
-
-    // ── Rule 5: Ambiguous zone (0.5–threshold, reversible, time-sensitive) ────
+    // ── Rule 7: Ambiguous zone (0.5–threshold, reversible, time-sensitive) ────
     // Call cheap LLM to classify. On any error, fall back to AskUser.
-    if c >= 0.5 && c < act_threshold && signal.reversible && signal.time_sensitive {
+    if c < act_threshold && signal.time_sensitive {
         if let Some(outcome) = llm_classify(signal, perception).await {
             return outcome;
         }
@@ -220,29 +279,18 @@ async fn llm_classify(signal: &Signal, perception: &PerceptionState) -> Option<D
 
     let cheap_model = crate::config::cheap_model_for_provider(&config.provider, &config.model);
 
-    let prompt = format!(
-        r#"You are BLADE's autonomous decision classifier. Given a signal and the user's current context, classify the action as ONE of: ACT, ASK, QUEUE, or IGNORE.
+    let system_prompt =
+        "You are BLADE's autonomous decision classifier. \
+         Respond with exactly one word on line 1: ACT | ASK | QUEUE | IGNORE. \
+         Then on line 2, one sentence of reasoning. No other text.\n\
+         Rules:\n\
+         - ACT = safe, reversible, high-value, user won't be disrupted\n\
+         - ASK = needs user judgment, significant impact, or ambiguous intent\n\
+         - QUEUE = useful but not urgent; can wait\n\
+         - IGNORE = low value, noise, or already handled";
 
-Signal:
-  Source: {}
-  Description: {}
-  Confidence: {:.0}%
-  Reversible: {}
-  Time-sensitive: {}
-
-User context:
-  App: {} — {}
-  State: {}
-  Active tags: {}
-
-Rules:
-- ACT = safe, reversible, high-value, user won't be disrupted
-- ASK = needs user judgment, significant impact, or ambiguous intent
-- QUEUE = useful but not urgent; can wait
-- IGNORE = low value, noise, or already handled
-
-Respond with exactly one line: ACT | ASK | QUEUE | IGNORE
-Then a second line with a one-sentence reasoning."#,
+    let user_prompt = format!(
+        "Signal:\n  Source: {}\n  Description: {}\n  Confidence: {:.0}%\n  Reversible: {}\n  Time-sensitive: {}\n\nUser context:\n  App: {} — {}\n  State: {}\n  Active tags: {}",
         signal.source,
         signal.description,
         signal.confidence * 100.0,
@@ -254,7 +302,10 @@ Then a second line with a one-sentence reasoning."#,
         perception.context_tags.join(", "),
     );
 
-    let msgs = vec![crate::providers::ConversationMessage::User(prompt)];
+    let msgs = vec![
+        crate::providers::ConversationMessage::System(system_prompt.to_string()),
+        crate::providers::ConversationMessage::User(user_prompt),
+    ];
     let turn = crate::providers::complete_turn(
         &config.provider,
         &config.api_key,
@@ -328,32 +379,31 @@ pub fn get_decision_log() -> Vec<DecisionRecord> {
         .lock()
         .map(|log| {
             let start = log.len().saturating_sub(20);
-            log[start..].to_vec()
+            log.iter().skip(start).cloned().collect()
         })
         .unwrap_or_default()
 }
 
 /// Record user feedback for a decision. Adjusts future confidence thresholds
 /// for the signal source so BLADE learns the user's preferred autonomy level.
+/// Thresholds are persisted to DB so they survive restarts.
 #[tauri::command]
 pub fn decision_feedback(id: String, was_correct: bool) -> Result<(), String> {
+    // Single lock: read source and update feedback in one pass
     let source = {
-        let log = decision_log().lock().map_err(|e| e.to_string())?;
-        log.iter()
-            .find(|r| r.id == id)
-            .map(|r| r.signal.source.clone())
-    };
-
-    // Update feedback flag in the ring buffer
-    if let Ok(mut log) = decision_log().lock() {
+        let mut log = decision_log().lock().map_err(|e| e.to_string())?;
+        let mut found_source: Option<String> = None;
         if let Some(record) = log.iter_mut().find(|r| r.id == id) {
             record.feedback = Some(was_correct);
+            found_source = Some(record.signal.source.clone());
         }
-    }
+        found_source
+    };
 
-    // Adjust threshold for the source
+    // Adjust threshold for the source and persist
     if let Some(src) = source {
         adjust_threshold(&src, was_correct);
+        persist_thresholds();
     }
 
     Ok(())
