@@ -692,12 +692,13 @@ pub fn extract_completion_summary(agent: &BackgroundAgent) -> String {
 
     // Fallback: last 5 non-empty lines
     if lines.is_empty() {
-        lines = agent.output.iter().rev()
+        let mut tail: Vec<String> = agent.output.iter().rev()
             .filter(|l| !l.trim().is_empty())
             .take(5)
-            .rev()
             .cloned()
             .collect();
+        tail.reverse();
+        lines = tail;
     }
 
     if lines.is_empty() {

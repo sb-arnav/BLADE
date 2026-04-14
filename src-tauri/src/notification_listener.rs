@@ -151,9 +151,10 @@ async fn read_wpn_database(since_ts: i64) -> Result<Vec<OsNotification>, String>
     // The DB is locked on the original but the copy is ours.
     let filetime_since = since_ts * 10_000_000 + 116_444_736_000_000_000i64; // Unix → FILETIME
 
+    let temp_path_clone = temp_path.clone();
     let results = tokio::task::spawn_blocking(move || -> Result<Vec<OsNotification>, String> {
         let conn = rusqlite::Connection::open_with_flags(
-            &temp_path,
+            &temp_path_clone,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
         )
         .map_err(|e| format!("Cannot open WPN DB copy: {}", e))?;
