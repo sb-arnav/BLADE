@@ -23,6 +23,7 @@ import { useVoiceConversation } from "./hooks/useVoiceConversation";
 import { useRuntimes } from "./hooks/useRuntimes";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
+import { ToastProvider } from "./components/Toast";
 
 // ── Error boundary ────────────────────────────────────────────────────────────
 interface EBState { error: Error | null }
@@ -623,8 +624,8 @@ export default function App() {
           action: {
             label: "Debug it",
             callback: () => {
-              openRoute("chat");
               sendWithStats(suggested_prompt);
+              setChatPanelOpen(true);
             },
           },
         });
@@ -790,6 +791,12 @@ export default function App() {
     setWorkspaceIntent(intent ? { route: nextRoute, ...intent } : ROUTE_INTENT_LABELS[nextRoute] ? { route: nextRoute, ...ROUTE_INTENT_LABELS[nextRoute]! } : null);
   }, []);
 
+  // Open the chat slide-out panel and return to dashboard if on a transient "chat" pseudo-route
+  const openChatPanel = useCallback(() => {
+    setChatPanelOpen(true);
+    setRoute((r) => r === "chat" ? "dashboard" : r);
+  }, []);
+
   const handleSlashCommand = useCallback((action: string) => {
     switch (action) {
       case "clear": chat.clearMessages(); break;
@@ -836,6 +843,12 @@ export default function App() {
   // Keep voice send ref in sync so voice mode can call sendWithStats
   useEffect(() => { voiceSendRef.current = sendWithStats; }, [sendWithStats]);
 
+  // Send a message and open the chat panel to show the conversation
+  const sendToChatPanel = useCallback((text: string) => {
+    sendWithStats(text);
+    setChatPanelOpen(true);
+  }, [sendWithStats]);
+
   const handleScreenshot = async () => {
     try {
       const png = await invoke<string>("capture_screen");
@@ -873,7 +886,7 @@ export default function App() {
   // Keyboard shortcuts
   useKeyboard({
     onNewConversation: () => chat.newConversation(),
-    onSettings: () => setRoute((r) => r === "settings" ? "chat" : "settings"),
+    onSettings: () => setRoute((r) => r === "settings" ? "dashboard" : "settings"),
     onToggleSidebar: () => setBranchOpen((p) => !p),
     onFocusInput: () => { setChatPanelOpen(true); setTimeout(() => inputRef.current?.focus(), 50); },
     onPalette: () => setPaletteOpen((p) => !p),
@@ -1059,33 +1072,38 @@ export default function App() {
 
   if (route !== "chat" && route !== "settings" && fullPageRoutes[route]) {
     return (
+      <ToastProvider>
         <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
-        <TitleBar />
-        {workspaceIntent && workspaceIntent.route === route ? (
-          <div className="px-4 py-2 border-b border-blade-border/40 bg-blade-bg/90">
-            <div className="max-w-5xl mx-auto flex items-start justify-between gap-4">
-              <div>
-                <div className="text-2xs uppercase tracking-[0.2em] text-blade-muted">Blade handoff</div>
-                <div className="text-sm text-blade-secondary mt-1">{workspaceIntent.title}</div>
-                <div className="text-2xs text-blade-muted mt-1">{workspaceIntent.note}</div>
+          <TitleBar />
+          {workspaceIntent && workspaceIntent.route === route ? (
+            <div className="px-4 py-2 border-b border-blade-border/40 bg-blade-bg/90">
+              <div className="max-w-5xl mx-auto flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-2xs uppercase tracking-[0.2em] text-blade-muted">Blade handoff</div>
+                  <div className="text-sm text-blade-secondary mt-1">{workspaceIntent.title}</div>
+                  <div className="text-2xs text-blade-muted mt-1">{workspaceIntent.note}</div>
+                </div>
+                <button
+                  onClick={() => setWorkspaceIntent(null)}
+                  className="text-2xs text-blade-muted hover:text-blade-secondary transition-colors"
+                >
+                  dismiss
+                </button>
               </div>
-              <button
-                onClick={() => setWorkspaceIntent(null)}
-                className="text-2xs text-blade-muted hover:text-blade-secondary transition-colors"
-              >
-                dismiss
-              </button>
             </div>
-          </div>
-        ) : null}
-        <Suspense fallback={<ShellFallback />}>
-          {fullPageRoutes[route]}
-        </Suspense>
-      </div>
+          ) : null}
+          <Suspense fallback={<ShellFallback />}>
+            <div key={route} className="route-enter flex-1 min-h-0 flex flex-col">
+              {fullPageRoutes[route]}
+            </div>
+          </Suspense>
+        </div>
+      </ToastProvider>
     );
   }
 
   return (
+    <ToastProvider>
     <ErrorBoundary>
     <div className="h-screen flex flex-col bg-blade-bg text-blade-text relative">
       {isDragging && (
@@ -1133,6 +1151,7 @@ export default function App() {
       />
       <div className="flex-1 min-h-0">
         <Suspense fallback={<ShellFallback label={route === "settings" ? "Loading settings..." : "Loading Blade..."} />}>
+          <div key={route} className="route-enter h-full flex flex-col">
           {route === "settings" ? (
             <Settings
               config={config}
@@ -1188,6 +1207,7 @@ export default function App() {
               unreadNotificationCount={notifications.unreadCount}
             />
           )}
+          </div>
         </Suspense>
       </div>
       <VoiceOrb status={voiceMode.status} mode={voiceMode.mode} onDismissError={voiceMode.stopEverything} />
@@ -1198,5 +1218,6 @@ export default function App() {
       )}
     </div>
     </ErrorBoundary>
+    </ToastProvider>
   );
 }

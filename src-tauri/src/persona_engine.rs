@@ -13,6 +13,7 @@
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::collections::HashMap;
 
 // ── Structs ──────────────────────────────────────────────────────────────────
 
@@ -626,6 +627,582 @@ fn collect_recent_execution_snippets() -> String {
         .map(|r| r.command)
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+// ── UserModel — unified aggregated model of the user ─────────────────────────
+
+/// Everything BLADE knows about the user, compiled into one struct.
+/// Aggregated from persona_engine traits, deep_scan, typed_memory, people_graph,
+/// personality_mirror, character bible, and interaction history.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserModel {
+    pub name: String,
+    pub role: String,                         // "full-stack developer"
+    pub primary_languages: Vec<String>,       // ["TypeScript", "Rust"]
+    pub work_hours: (u8, u8),                 // (10, 18) — 10am to 6pm
+    pub energy_pattern: String,               // "most productive in morning"
+    pub communication_style: String,          // "casual, concise, technical"
+    pub pet_peeves: Vec<String>,              // ["verbose answers", "bullet points for simple questions"]
+    pub active_projects: Vec<String>,         // from deep_scan + git repos
+    pub goals: Vec<String>,                   // from typed_memory Goal category
+    pub relationships: Vec<(String, String)>, // (name, relationship) from people_graph
+    pub expertise: Vec<(String, f32)>,        // (topic, confidence) from interactions
+    pub mood_today: String,                   // inferred from typing patterns, time, interactions
+}
+
+impl Default for UserModel {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            role: String::new(),
+            primary_languages: Vec::new(),
+            work_hours: (9, 18),
+            energy_pattern: "unknown".to_string(),
+            communication_style: "neutral".to_string(),
+            pet_peeves: Vec::new(),
+            active_projects: Vec::new(),
+            goals: Vec::new(),
+            relationships: Vec::new(),
+            expertise: Vec::new(),
+            mood_today: "neutral".to_string(),
+        }
+    }
+}
+
+// ── Expertise DB ──────────────────────────────────────────────────────────────
+
+fn expertise_db_path() -> std::path::PathBuf {
+    crate::config::blade_config_dir().join("persona.db")
+}
+
+fn open_expertise_db() -> Option<rusqlite::Connection> {
+    rusqlite::Connection::open(expertise_db_path()).ok()
+}
+
+/// Ensure expertise table exists (called lazily).
+pub fn ensure_expertise_table() {
+    if let Some(conn) = open_expertise_db() {
+        let _ = conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS user_expertise (
+                topic       TEXT PRIMARY KEY,
+                confidence  REAL NOT NULL DEFAULT 0.1,
+                updated_at  INTEGER NOT NULL DEFAULT 0,
+                evidence    TEXT NOT NULL DEFAULT '[]'
+            );"
+        );
+    }
+}
+
+/// Load expertise map from DB.
+pub fn load_expertise_map() -> HashMap<String, f32> {
+    let conn = match open_expertise_db() {
+        Some(c) => c,
+        None => return HashMap::new(),
+    };
+    ensure_expertise_table();
+    let mut stmt = match conn.prepare(
+        "SELECT topic, confidence FROM user_expertise ORDER BY confidence DESC LIMIT 50"
+    ) {
+        Ok(s) => s,
+        Err(_) => return HashMap::new(),
+    };
+    stmt.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)? as f32))
+    })
+    .ok()
+    .map(|rows| rows.filter_map(|r| r.ok()).collect())
+    .unwrap_or_default()
+}
+
+/// Bump expertise for a topic by `delta`. Clamped to 0.0–1.0.
+pub fn bump_expertise(topic: &str, delta: f32, evidence: &str) {
+    let conn = match open_expertise_db() {
+        Some(c) => c,
+        None => return,
+    };
+    ensure_expertise_table();
+    let now = chrono::Utc::now().timestamp();
+
+    // Read current value
+    let current: f32 = conn.query_row(
+        "SELECT confidence FROM user_expertise WHERE topic = ?1",
+        params![topic],
+        |row| row.get::<_, f64>(0).map(|v| v as f32),
+    ).unwrap_or(0.0);
+
+    let new_val = (current + delta).clamp(0.0, 1.0);
+
+    // Read existing evidence, keep last 5
+    let existing_evidence: Vec<String> = conn.query_row(
+        "SELECT evidence FROM user_expertise WHERE topic = ?1",
+        params![topic],
+        |row| row.get::<_, String>(0),
+    ).ok()
+    .and_then(|s| serde_json::from_str(&s).ok())
+    .unwrap_or_default();
+
+    let mut ev_list: Vec<String> = vec![evidence.to_string()];
+    ev_list.extend(existing_evidence.into_iter().take(4));
+    let ev_json = serde_json::to_string(&ev_list).unwrap_or_else(|_| "[]".to_string());
+
+    let _ = conn.execute(
+        "INSERT INTO user_expertise (topic, confidence, updated_at, evidence)
+         VALUES (?1, ?2, ?3, ?4)
+         ON CONFLICT(topic) DO UPDATE SET
+             confidence = ?2,
+             updated_at = ?3,
+             evidence   = ?4",
+        params![topic, new_val as f64, now, ev_json],
+    );
+}
+
+// ── build_user_model ──────────────────────────────────────────────────────────
+
+/// Aggregates everything BLADE knows about the user into a single `UserModel`.
+/// Pulls from: config, deep_scan, typed_memory, people_graph, persona traits,
+/// personality_mirror profile, character bible, and expertise map.
+pub fn build_user_model() -> UserModel {
+    let config = crate::config::load_config();
+    let mut model = UserModel::default();
+
+    // ── Name & basics from config ─────────────────────────────────────────────
+    model.name = if config.user_name.is_empty() {
+        std::env::var("USERNAME")
+            .or_else(|_| std::env::var("USER"))
+            .unwrap_or_else(|_| "User".to_string())
+    } else {
+        config.user_name.clone()
+    };
+
+    // ── Role from deep_scan results ───────────────────────────────────────────
+    if let Some(scan) = crate::deep_scan::load_scan_summary() {
+        // Extract primary languages from scan summary text (simple heuristic)
+        let langs_candidates = ["TypeScript", "Rust", "Python", "JavaScript", "Go", "Java",
+                                 "C#", "C++", "Swift", "Kotlin", "Ruby", "PHP"];
+        let scan_lower = scan.to_lowercase();
+        for lang in &langs_candidates {
+            if scan_lower.contains(&lang.to_lowercase()) && !model.primary_languages.contains(&lang.to_string()) {
+                model.primary_languages.push(lang.to_string());
+            }
+        }
+    }
+
+    // ── Git repos as active projects ──────────────────────────────────────────
+    if let Some(scan_results) = crate::deep_scan::load_results_pub() {
+        for repo in &scan_results.git_repos {
+            let name = std::path::Path::new(&repo.path)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| repo.path.clone());
+            if !model.active_projects.contains(&name) {
+                model.active_projects.push(name);
+            }
+            // Collect languages from repos
+            for (lang, _) in &repo.language_counts {
+                if !model.primary_languages.contains(lang) {
+                    model.primary_languages.push(lang.clone());
+                }
+            }
+        }
+        model.active_projects.truncate(10);
+        model.primary_languages.truncate(8);
+    }
+
+    // ── Character bible for role/identity ─────────────────────────────────────
+    let bible = crate::character::load_bible();
+    if !bible.identity.is_empty() {
+        // Extract role hint from identity block
+        let role_words = ["developer", "designer", "engineer", "researcher", "founder",
+                           "manager", "analyst", "architect", "data scientist", "devops"];
+        let id_lower = bible.identity.to_lowercase();
+        for rw in &role_words {
+            if id_lower.contains(rw) {
+                model.role = rw.to_string();
+                break;
+            }
+        }
+    }
+    if model.role.is_empty() && !model.primary_languages.is_empty() {
+        model.role = "software developer".to_string();
+    }
+
+    // ── Typed memories: goals, routines, preferences ──────────────────────────
+    let goals = crate::typed_memory::recall_by_category(crate::typed_memory::MemoryCategory::Goal, 5);
+    model.goals = goals.iter().map(|g| g.content.clone()).collect();
+
+    let routines = crate::typed_memory::recall_by_category(crate::typed_memory::MemoryCategory::Routine, 3);
+    // Extract work hours from routines
+    for r in &routines {
+        let rl = r.content.to_lowercase();
+        // Simple heuristic: look for "10am", "10:00", "9am" etc.
+        if rl.contains("am") || rl.contains("pm") || rl.contains(':') {
+            model.energy_pattern = r.content.clone();
+            break;
+        }
+    }
+
+    let prefs = crate::typed_memory::recall_by_category(crate::typed_memory::MemoryCategory::Preference, 10);
+    model.pet_peeves = prefs.iter()
+        .filter(|p| {
+            let cl = p.content.to_lowercase();
+            cl.contains("hate") || cl.contains("dislike") || cl.contains("avoid") ||
+            cl.contains("never") || cl.contains("don't") || cl.contains("not")
+        })
+        .map(|p| p.content.clone())
+        .take(5)
+        .collect();
+
+    // ── Communication style from personality_mirror ────────────────────────────
+    if let Some(profile) = crate::personality_mirror::load_profile() {
+        let tone = if profile.formality_level < 0.3 { "casual" }
+                   else if profile.formality_level < 0.6 { "semi-formal" }
+                   else { "formal" };
+        let depth = if profile.technical_depth > 0.6 { "technical" }
+                    else if profile.technical_depth > 0.3 { "moderately technical" }
+                    else { "non-technical" };
+        let len = match profile.avg_message_length.as_str() {
+            "very_short" | "short" => "concise",
+            "long" => "verbose",
+            _ => "medium-length",
+        };
+        model.communication_style = format!("{}, {}, {}", tone, len, depth);
+    }
+
+    // ── Persona traits for energy pattern ─────────────────────────────────────
+    let traits = get_all_traits();
+    let energy_trait = traits.iter().find(|t| t.trait_name == "energy").map(|t| t.score).unwrap_or(0.5);
+    if energy_trait > 0.7 {
+        model.energy_pattern = "high energy, consistently engaged".to_string();
+    } else if energy_trait < 0.3 {
+        model.energy_pattern = "low-key, prefers calm focused work".to_string();
+    } else if model.energy_pattern.is_empty() || model.energy_pattern == "unknown" {
+        model.energy_pattern = "moderate, steady work pace".to_string();
+    }
+
+    // ── People graph for relationships ────────────────────────────────────────
+    crate::people_graph::ensure_tables();
+    let people = crate::people_graph::people_list_pub();
+    model.relationships = people.iter()
+        .take(10)
+        .map(|p| (p.name.clone(), p.relationship.clone()))
+        .collect();
+
+    // ── Expertise map ─────────────────────────────────────────────────────────
+    ensure_expertise_table();
+    let expertise_map = load_expertise_map();
+    let mut expertise_vec: Vec<(String, f32)> = expertise_map.into_iter().collect();
+    expertise_vec.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    model.expertise = expertise_vec.into_iter().take(15).collect();
+
+    // ── Mood from health/streak stats ─────────────────────────────────────────
+    let stats = crate::health_guardian::get_health_stats();
+    let streak_mins = stats["current_streak_minutes"].as_i64().unwrap_or(0);
+    let hour = chrono::Local::now().hour() as u8;
+
+    model.mood_today = estimate_mood_from_context(streak_mins as u32, hour, &traits);
+
+    model
+}
+
+// ── estimate_mood ─────────────────────────────────────────────────────────────
+
+/// Estimate the user's current mood from available signals.
+/// `recent_messages` is the last few user messages (newest first).
+/// `hour` is the current hour (0–23). `streak_minutes` is time since last break.
+pub fn estimate_mood(recent_messages: &[String], time_of_day: u8, streak_minutes: u32) -> String {
+    let traits = get_all_traits();
+    let base = estimate_mood_from_context(streak_minutes, time_of_day, &traits);
+
+    if recent_messages.is_empty() {
+        return base;
+    }
+
+    // Analyse the last few messages for signals
+    let combined = recent_messages.iter().take(5).cloned().collect::<Vec<_>>().join(" ");
+    let combined_lower = combined.to_lowercase();
+
+    // Frustration signals
+    let frustration_signals = [
+        "again", "still", "why won't", "doesn't work", "broken", "ugh", "wtf",
+        "ffs", "come on", "argh", "not working", "keeps failing", "useless",
+    ];
+    let frustration_count = frustration_signals.iter().filter(|&&s| combined_lower.contains(s)).count();
+
+    // Curiosity signals
+    let curiosity_signals = ["how does", "why is", "what if", "interesting", "?", "curious"];
+    let curiosity_count = curiosity_signals.iter().filter(|&&s| combined_lower.contains(s)).count();
+
+    // Busyness signals — short messages mean busy
+    let avg_len = recent_messages.iter().map(|m| m.len()).sum::<usize>()
+        / recent_messages.len().max(1);
+
+    let word_count = recent_messages.iter()
+        .flat_map(|m| m.split_whitespace())
+        .count()
+        / recent_messages.len().max(1);
+
+    if frustration_count >= 2 || (frustration_count >= 1 && streak_minutes > 60) {
+        return "frustrated — be extra concise and direct, offer to help immediately".to_string();
+    }
+
+    if avg_len < 20 && word_count <= 3 {
+        return "busy — keep responses brief, skip preambles".to_string();
+    }
+
+    if curiosity_count >= 2 && streak_minutes < 30 {
+        return "curious and exploring — go deeper, explain the why".to_string();
+    }
+
+    if streak_minutes > 120 {
+        return "deep focus — minimal interruptions, concise help".to_string();
+    }
+
+    base
+}
+
+fn estimate_mood_from_context(streak_minutes: u32, hour: u8, traits: &[PersonaTrait]) -> String {
+    let energy = traits.iter().find(|t| t.trait_name == "energy").map(|t| t.score).unwrap_or(0.5);
+    let frustration_tol = traits.iter().find(|t| t.trait_name == "frustration_tolerance").map(|t| t.score).unwrap_or(0.5);
+
+    // Time-based baseline
+    let time_mood = if hour >= 6 && hour <= 10 {
+        "morning — fresh start, good for complex tasks"
+    } else if hour >= 11 && hour <= 14 {
+        "midday — productive peak"
+    } else if hour >= 15 && hour <= 18 {
+        "afternoon — steady work"
+    } else if hour >= 19 && hour <= 22 {
+        "evening — winding down, prefer lighter tasks"
+    } else {
+        "late night — deep focus or exhausted, keep it brief"
+    };
+
+    // Streak modifiers
+    if streak_minutes > 120 && frustration_tol < 0.4 {
+        return "tired and potentially frustrated — keep it short and direct".to_string();
+    }
+    if streak_minutes > 90 {
+        return format!("long streak ({}min) — {}", streak_minutes, time_mood);
+    }
+    if energy > 0.7 {
+        return format!("energetic — {}", time_mood);
+    }
+
+    time_mood.to_string()
+}
+
+// ── predict_next_need ─────────────────────────────────────────────────────────
+
+/// Predict what the user will likely need next based on their current context.
+/// Uses rule-based prediction for clear cases; returns None if nothing confident.
+pub async fn predict_next_need(
+    model: &UserModel,
+    perception: &crate::perception_fusion::PerceptionState,
+) -> Option<String> {
+    let hour = chrono::Local::now().hour() as u8;
+    let day = chrono::Local::now().weekday();
+    let streak = crate::health_guardian::get_health_stats();
+    let streak_mins = streak["current_streak_minutes"].as_i64().unwrap_or(0) as u32;
+
+    // Rule 1: Monday morning + fresh start → morning briefing
+    if hour >= 7 && hour <= 10
+       && day == chrono::Weekday::Mon
+       && streak_mins < 5
+    {
+        return Some("morning briefing — it's Monday morning and they just opened BLADE".to_string());
+    }
+
+    // Rule 2: Fresh start any weekday morning
+    if hour >= 7 && hour <= 9 && streak_mins < 5 {
+        return Some("quick morning context — what's on the agenda today".to_string());
+    }
+
+    // Rule 3: Error on screen for a while → debugging help
+    if !perception.visible_errors.is_empty() && streak_mins > 8 {
+        let err_preview = crate::safe_slice(&perception.visible_errors[0], 80);
+        return Some(format!("debugging help — error on screen for {}min: {}", streak_mins, err_preview));
+    }
+
+    // Rule 4: On Slack/messaging app → draft reply help
+    let app_lower = perception.active_app.to_lowercase();
+    let title_lower = perception.active_title.to_lowercase();
+    if (app_lower.contains("slack") || app_lower.contains("teams") || app_lower.contains("discord"))
+       && (title_lower.contains("mention") || title_lower.contains("thread"))
+    {
+        return Some("draft reply — mentioned in a conversation".to_string());
+    }
+
+    // Rule 5: Git-related activity → PR / ticket update
+    if title_lower.contains("pull request") || title_lower.contains("merge request")
+       || app_lower.contains("github") || app_lower.contains("gitlab")
+    {
+        return Some("PR review or ticket update".to_string());
+    }
+
+    // Rule 6: Long streak → break suggestion
+    if streak_mins > 90 {
+        return Some(format!("break suggestion — {}min streak, encourage a short rest", streak_mins));
+    }
+
+    // Rule 7: Code editor + specific language context
+    if !perception.context_tags.is_empty() {
+        let tags = &perception.context_tags;
+        let in_rust = tags.iter().any(|t| t == "rust");
+        let in_ts = tags.iter().any(|t| t == "typescript" || t == "javascript");
+
+        // Check if user is weak in this area
+        let weakest_area = model.expertise.iter()
+            .filter(|(topic, _)| {
+                if in_rust { topic.to_lowercase().contains("rust") }
+                else if in_ts { topic.to_lowercase().contains("typescript") || topic.to_lowercase().contains("javascript") }
+                else { false }
+            })
+            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        if let Some((topic, confidence)) = weakest_area {
+            if *confidence < 0.4 {
+                return Some(format!("explanation help — working with {} but confidence is low ({})", topic, confidence));
+            }
+        }
+    }
+
+    // Ambiguous — use LLM for complex cases
+    if !perception.active_app.is_empty() {
+        let context_summary = format!(
+            "User: {} ({}). Current app: {}. Window: {}. Tags: {}. Streak: {}min. Mood: {}. Hour: {}.",
+            model.name,
+            model.role,
+            perception.active_app,
+            crate::safe_slice(&perception.active_title, 60),
+            perception.context_tags.join(", "),
+            streak_mins,
+            model.mood_today,
+            hour,
+        );
+
+        let (provider, api_key, llm_model) = get_llm_provider();
+        if !api_key.is_empty() || provider == "ollama" {
+            let prompt = format!(
+                "Based on this user context, what do they most likely need next from their AI assistant? Answer in ONE short sentence (10-20 words), or say 'nothing specific' if unclear.\n\nContext: {}",
+                context_summary
+            );
+            use crate::providers::{complete_turn, ConversationMessage};
+            let conv = vec![ConversationMessage::User(prompt)];
+            if let Ok(turn) = complete_turn(&provider, &api_key, &llm_model, &conv, &[], None).await {
+                let answer = turn.content.trim().to_lowercase();
+                if !answer.contains("nothing specific") && !answer.is_empty() {
+                    return Some(turn.content.trim().to_string());
+                }
+            }
+        }
+    }
+
+    None
+}
+
+// ── update_expertise_from_conversation ───────────────────────────────────────
+
+/// After a conversation, update the user's expertise map.
+/// `messages` is (role, content) pairs. `user_knew_it` means the user was
+/// teaching BLADE rather than asking for help (yields a larger bump).
+pub fn update_expertise_from_conversation(
+    topics: &[String],
+    user_knew_it: bool,
+    evidence: &str,
+) {
+    ensure_expertise_table();
+    let delta = if user_knew_it { 0.2_f32 } else { 0.05_f32 };
+    for topic in topics {
+        bump_expertise(topic, delta, evidence);
+    }
+}
+
+/// Build the expertise injection string for brain.rs.
+/// Returns a line like:
+/// "User is expert in React hooks (0.9), TypeScript (0.8) but new to Rust async (0.3)."
+pub fn get_expertise_injection() -> Option<String> {
+    ensure_expertise_table();
+    let map = load_expertise_map();
+    if map.is_empty() {
+        return None;
+    }
+
+    let mut items: Vec<(&String, &f32)> = map.iter().collect();
+    items.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    let experts: Vec<String> = items.iter()
+        .filter(|(_, &c)| c >= 0.7)
+        .take(4)
+        .map(|(t, c)| format!("{} ({:.1})", t, c))
+        .collect();
+
+    let newbies: Vec<String> = items.iter()
+        .filter(|(_, &c)| c < 0.35)
+        .take(3)
+        .map(|(t, c)| format!("{} ({:.1})", t, c))
+        .collect();
+
+    match (experts.is_empty(), newbies.is_empty()) {
+        (true, true) => None,
+        (false, true) => Some(format!("User is expert in: {}.", experts.join(", "))),
+        (true, false) => Some(format!("User is still learning: {}.", newbies.join(", "))),
+        (false, false) => Some(format!(
+            "User is expert in: {}. Still learning: {}.",
+            experts.join(", "),
+            newbies.join(", ")
+        )),
+    }
+}
+
+// ── Compact 3-line user model summary for brain.rs ───────────────────────────
+
+/// Build a compact 3-line summary of the user model for injection into the system prompt.
+/// Format: "Name (role, lang/lang expert). Currently X, Yhr streak, working on PROJECT. Mood: Z."
+pub fn get_user_model_summary() -> Option<String> {
+    let model = build_user_model();
+
+    if model.name.is_empty() && model.role.is_empty() {
+        return None;
+    }
+
+    let mut lines = Vec::new();
+
+    // Line 1: Identity
+    let langs = if model.primary_languages.is_empty() {
+        String::new()
+    } else {
+        format!(", {}", model.primary_languages[..model.primary_languages.len().min(3)].join("/"))
+    };
+    let role_str = if model.role.is_empty() { "developer".to_string() } else { model.role.clone() };
+    lines.push(format!("{} ({}{}).", model.name, role_str, langs));
+
+    // Line 2: Current focus + streak
+    let stats = crate::health_guardian::get_health_stats();
+    let streak_mins = stats["current_streak_minutes"].as_i64().unwrap_or(0);
+    let streak_str = if streak_mins >= 60 {
+        format!("{}h{}min streak", streak_mins / 60, streak_mins % 60)
+    } else if streak_mins > 0 {
+        format!("{}min streak", streak_mins)
+    } else {
+        "fresh session".to_string()
+    };
+
+    let project_str = if let Some(proj) = model.active_projects.first() {
+        format!(", working on {}", proj)
+    } else {
+        String::new()
+    };
+    lines.push(format!("Currently {}{}.", streak_str, project_str));
+
+    // Line 3: Mood + predicted need
+    lines.push(format!("Mood: {}.", model.mood_today));
+
+    // Line 4 (optional): expertise hint
+    if let Some(exp_hint) = get_expertise_injection() {
+        lines.push(exp_hint);
+    }
+
+    Some(format!("## User Model\n\n{}", lines.join("\n")))
 }
 
 // ── Tauri commands ────────────────────────────────────────────────────────────

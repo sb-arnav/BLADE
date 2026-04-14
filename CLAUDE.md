@@ -2,135 +2,177 @@
 
 ## What This Is
 
-BLADE is a local-first personal AI desktop agent built with Tauri 2 (Rust) + React (TypeScript) + SQLite. It runs entirely on your machine — zero telemetry, zero cloud dependency. Think: an operating intelligence wired into your files, terminal, screen, and apps.
+BLADE is a JARVIS-level desktop AI agent. Tauri 2 (Rust) + React (TypeScript) + SQLite. 127 Rust modules, 132 React components, 50+ routes. It sees your screen, hears your voice, remembers everything, controls your desktop, and acts autonomously. Local-first, zero telemetry.
 
 ## Build Commands
 
 ```bash
-# Frontend dev (hot reload)
-cd /home/arnav/blade && npm run dev
-
-# Full Tauri build (compiles Rust + bundles frontend)
-npm run tauri build
-
-# Rust check only (fast — use this before committing)
-cd src-tauri && cargo check
-
-# TypeScript check
-npx tsc --noEmit
+npm run tauri dev          # Dev mode with hot reload (kills port 1420 first if needed)
+npm run tauri build        # Production build
+cd src-tauri && cargo check  # Rust only (only run when batching complete, not after every edit)
+npx tsc --noEmit           # TypeScript only
 ```
 
-## Project Structure
+**Don't run cargo check after every small edit** — it takes 1-2 min. Batch edits, check once at the end.
 
-```
-blade/
-├── src/                          # React frontend (TypeScript)
-│   ├── App.tsx                   # Root: routing, global event listeners, command palette
-│   ├── components/               # UI components (one file per feature)
-│   │   ├── ChatWindow.tsx        # Main chat + streaming UI
-│   │   ├── InputBar.tsx          # Input with stop button, voice, screenshot
-│   │   ├── TitleBar.tsx          # Title bar + Role switcher
-│   │   ├── Dashboard.tsx         # Mission control (pixel art aesthetic)
-│   │   ├── SoulView.tsx          # BLADE's self-knowledge + user profile
-│   │   └── ...                   # 30+ other panels
-│   └── hooks/                    # useChat, useVoiceMode, etc.
-│
-└── src-tauri/src/                # Rust backend
-    ├── lib.rs                    # Module registry + Tauri setup + command registration
-    ├── commands.rs               # Main chat pipeline: send_message_stream, cancel_chat
-    ├── brain.rs                  # System prompt builder (multi-source context assembly)
-    ├── config.rs                 # BladeConfig: load/save, keyring for API keys
-    ├── roles.rs                  # BLADE Roles: Engineering/Research/Marketing/etc
-    ├── autoskills.rs             # Auto-install MCP servers when tool calls fail
-    ├── git_style.rs              # Mine git history to learn coding style
-    ├── evolution.rs              # Self-improvement loop + MCP catalog (20 entries)
-    ├── soul_commands.rs          # SOUL: character bible, weekly snapshots, diffs
-    ├── wake_word.rs              # "Hey BLADE" always-on detection (cpal + Whisper)
-    ├── screen_timeline.rs        # Total Recall: screenshot every 30s + semantic search
-    ├── swarm.rs / swarm_commands # Parallel multi-agent DAG orchestration
-    ├── background_agent.rs       # Claude Code / Aider / Goose as background workers
-    ├── providers/                # Anthropic, OpenAI, Gemini, Groq, Ollama
-    ├── embeddings.rs             # SQLite-vec hybrid BM25+vector search
-    ├── db.rs                     # All SQLite schema + migrations
-    ├── native_tools.rs           # Bash, file ops, web fetch — always available
-    └── ...                       # 40+ other modules
-```
+## Critical Architecture Rules
 
-## Key Architectural Rules
+### Rust (src-tauri/src/)
 
-### Rust Backend
-- **Every new Tauri command** must be registered in `lib.rs` → `invoke_handler` → `generate_handler![]`
-- **Every new module** must be declared in `lib.rs` as `mod module_name;`
-- **Config changes**: add to `DiskConfig` struct, `BladeConfig` struct, both `Default` impls, `load_config()`, `save_config()`. All four places or it silently drops.
-- **SQL in execute_batch!**: do NOT use double quotes inside SQL strings — they break the macro. Use single quotes or plain text in comments.
-- **Cross-module function reuse**: use `pub(crate)` visibility. Example: `pub(crate) fn encode_wav` in voice.rs used by wake_word.rs.
-- **Cancel pattern**: `static SOME_ACTIVE: AtomicBool` — see `wake_word.rs` and `commands.rs::CHAT_CANCEL` for the pattern.
-- **tauri::Manager**: always `use tauri::Manager;` when calling `app.state()` — without it you get a confusing "no method named 'state'" error.
+**Module registration (EVERY TIME):**
+1. New module → `mod module_name;` in `lib.rs`
+2. New command → add to `generate_handler![]` in `lib.rs`
+3. New config field → add to ALL 6 places: `DiskConfig` struct, `DiskConfig::default()`, `BladeConfig` struct, `BladeConfig::default()`, `load_config()`, `save_config()`
 
-### Frontend
-- **New routes**: add to the `Route` type union in `App.tsx`, add lazy import, add entry in `fullPageRoutes`.
-- **Lazy imports**: `const Foo = lazy(() => import("./components/Foo").then((m) => ({ default: m.Foo })));`
-- **Tauri events**: listen in `App.tsx` useEffect, add to cleanup return. Pattern: `listen("event_name", handler).then(fn => fn())` in cleanup.
-- **Notifications**: `notifications.add({ type, title, message })` — `useNotifications()` hook from `NotificationCenter.tsx`.
+**Common mistakes that waste hours:**
+- `use tauri::Manager;` — MUST import when using `app.state()` or you get cryptic "no method named state" error
+- SQL in `execute_batch!` — NO double quotes inside SQL strings (breaks the macro)
+- `&[]` for empty slices — use `let no_tools: Vec<ToolDefinition> = vec![];` then `&no_tools` (Rust can't coerce `&[T; 0]` to `&[T]` in all contexts)
+- Duplicate `#[tauri::command]` function names across modules — Tauri's macro namespace is FLAT. Rename one of them.
+- `whisper-rs` requires LLVM/libclang — it's behind `local-whisper` feature flag. Default build doesn't need it.
+- Non-ASCII string slicing — ALWAYS use `crate::safe_slice(text, max_chars)`, never `&text[..n]`
 
-## Active Features (don't break these)
-
-| Feature | Key Files | Status |
-|---------|-----------|--------|
-| Chat + streaming | commands.rs, ChatWindow.tsx | ✅ |
-| Stop button | commands.rs:CHAT_CANCEL, InputBar.tsx | ✅ |
-| Self-healing errors | commands.rs:classify_api_error | ✅ |
-| Smart context compression | commands.rs:compress_conversation_smart | ✅ |
-| BLADE Roles | roles.rs, TitleBar.tsx | ✅ |
-| Autoskills | autoskills.rs | ✅ |
-| God Mode | godmode.rs | ✅ |
-| Wake Word | wake_word.rs | ✅ |
-| SOUL | soul_commands.rs, SoulView.tsx | ✅ |
-| Total Recall | screen_timeline.rs, screen_timeline_commands.rs | ✅ |
-| BLADE Swarm | swarm.rs, swarm_commands.rs, SwarmView.tsx | ✅ |
-| Background agents | background_agent.rs | ✅ |
-| GitStyle | git_style.rs | ✅ |
-| Evolution engine | evolution.rs | ✅ |
-| Pulse / briefings | pulse.rs | ✅ |
-| Dashboard | Dashboard.tsx (pixel art aesthetic) | ✅ |
-
-## CI
-
-GitHub Actions runs on every push to master. Three platforms: macOS, Windows, Linux. Build must pass all three. Watch for:
-- SQL strings with double quotes (breaks execute_batch!)
-- Missing `use tauri::Manager;` on app.state() calls
-- Unregistered commands (Rust compiles but frontend invoke fails at runtime)
-
-## Patterns to Follow
-
+**Patterns:**
 ```rust
-// New command pattern
+// New command
 #[tauri::command]
 pub async fn my_command(app: tauri::AppHandle, param: String) -> Result<String, String> {
-    // ...
     Ok(result)
 }
-// Then register in lib.rs: my_module::my_command,
 
-// Config field pattern (add to DiskConfig, BladeConfig, both Defaults, load, save)
+// Config field (6-place rule)
 #[serde(default = "default_my_field")]
 pub my_field: String,
-fn default_my_field() -> String { "default_value".to_string() }
+fn default_my_field() -> String { "default".to_string() }
+
+// Background task
+static RUNNING: AtomicBool = AtomicBool::new(false);
+pub fn start_my_loop(app: AppHandle) {
+    if RUNNING.swap(true, Ordering::SeqCst) { return; }
+    tauri::async_runtime::spawn(async move { loop { /* work */ tokio::time::sleep(...).await; } });
+}
+
+// Cancel pattern
+static CANCEL: AtomicBool = AtomicBool::new(false);
+// Check between iterations: if CANCEL.load(Ordering::SeqCst) { break; }
 ```
 
+### Frontend (src/)
+
 ```typescript
-// New route pattern in App.tsx
-type Route = "existing" | "my_new_route"; // add here
+// New route — 3 places in App.tsx:
+type Route = "existing" | "my_new_route";
 const MyView = lazy(() => import("./components/MyView").then(m => ({ default: m.MyView })));
 // In fullPageRoutes:
 "my_new_route": <MyView onBack={() => openRoute("chat")} />,
+// In command palette entries:
+{ label: "My View", action: () => openRoute("my_new_route"), section: "Features" }
+
+// Tauri event listening (in useEffect with cleanup):
+const unlisten = listen("event_name", (e) => { /* handle */ });
+return () => { unlisten.then(fn => fn()); };
+
+// Invoke with error handling:
+try { const result = await invoke<ResultType>("command_name", { arg1, arg2 }); }
+catch (e) { setError(typeof e === "string" ? e : String(e)); }
 ```
+
+## Module Map (what lives where)
+
+### Core Pipeline
+| Module | Purpose |
+|--------|---------|
+| `commands.rs` | Main chat: `send_message_stream`, tool loop, fast-ack, compression |
+| `brain.rs` | System prompt builder — assembles identity, context, tools, personality, memory |
+| `providers/mod.rs` | Unified LLM gateway, `provider/model` parsing, fallback chains |
+| `config.rs` | BladeConfig, keyring, 6-place config pattern |
+| `native_tools.rs` | 37+ built-in tools (bash, files, search, clipboard, browser, system, security, IoT) |
+| `router.rs` | Task classification, model routing per provider |
+| `mcp.rs` | MCP client, health monitoring, auto-reconnect, tool quality ranking |
+
+### Perception
+| Module | Purpose |
+|--------|---------|
+| `godmode.rs` | 3-tier ambient intelligence (Normal/Intermediate/Extreme) |
+| `perception_fusion.rs` | Unified PerceptionState (OCR, context tags, user state, vitals) |
+| `screen_timeline.rs` | Total Recall — screenshot every 30s + semantic search |
+| `clipboard.rs` | Monitor + classify + auto-action (routes through decision_gate) |
+| `audio_timeline.rs` | Always-on audio capture + Whisper + meeting detection |
+| `notification_listener.rs` | OS notification monitoring |
+
+### Decision & Autonomy
+| Module | Purpose |
+|--------|---------|
+| `decision_gate.rs` | Act/ask/queue/ignore classifier with learning thresholds |
+| `proactive_engine.rs` | 5 signal detectors → routes through decision_gate |
+| `ghost_mode.rs` | Invisible meeting overlay with content protection |
+| `auto_reply.rs` | Draft replies per recipient in user's style |
+
+### Memory & Learning
+| Module | Purpose |
+|--------|---------|
+| `memory.rs` | Letta-style virtual context blocks + conversation fact extraction |
+| `typed_memory.rs` | 7 categories (Fact/Preference/Decision/Skill/Goal/Routine/Relationship) |
+| `knowledge_graph.rs` | Entity-relationship graph |
+| `embeddings.rs` | BM25 + vector hybrid search + smart_context_recall |
+| `persona_engine.rs` | Personality traits + UserModel |
+| `personality_mirror.rs` | Chat style extraction + external import |
+| `people_graph.rs` | Contact knowledge + reply style suggestions |
+| `character.rs` | Feedback learning (thumbs up/down → behavioral traits) |
+
+### Agents
+| Module | Purpose |
+|--------|---------|
+| `swarm.rs` + `swarm_commands.rs` + `swarm_planner.rs` | DAG-based parallel agent orchestration |
+| `agents/executor.rs` | Step execution with tool fallback + provider fallback |
+| `agents/mod.rs` | 8 agent roles (Researcher/Coder/Analyst/Writer/Reviewer + 3 Security) |
+| `background_agent.rs` | Spawn Claude Code / Aider / Goose as workers |
+
+### Desktop Control
+| Module | Purpose |
+|--------|---------|
+| `browser_native.rs` | CDP browser control (Chrome/Edge/Brave) |
+| `browser_agent.rs` | Vision-driven browser agent loop |
+| `computer_use.rs` | Keyboard/mouse automation |
+| `system_control.rs` | Lock, volume, brightness, apps, windows, battery, network |
+| `iot_bridge.rs` | Home Assistant + Spotify |
+| `overlay_manager.rs` | HUD bar + toast notifications |
+
+### Voice
+| Module | Purpose |
+|--------|---------|
+| `voice_global.rs` | Push-to-talk + conversational voice mode |
+| `wake_word.rs` | "Hey BLADE" always-on detection |
+| `whisper_local.rs` | Local whisper.cpp (behind `local-whisper` feature flag) |
+| `tts.rs` | Text-to-speech with speed control + interruption |
+
+### Background Systems
+| Module | Purpose |
+|--------|---------|
+| `deep_scan.rs` | 12 parallel system scanners (first-run identity) |
+| `cron.rs` | Task scheduler (morning briefing, weekly review, inbox check) |
+| `pulse.rs` | Morning briefings + daily digest |
+| `evolution.rs` | Self-improvement + MCP catalog discovery |
+| `health_guardian.rs` | Screen time + break reminders |
+| `temporal_intel.rs` | Activity recall, standup, pattern detection |
+| `security_monitor.rs` | Network, phishing, breach, sensitive files, code scan, dependency audit |
+| `financial_brain.rs` | Spending, CSV import, subscriptions |
+| `streak_stats.rs` | Daily streaks + gamification |
+| `integration_bridge.rs` | Persistent MCP polling (Gmail/Calendar/Slack/GitHub) |
 
 ## What NOT to Do
 
-- Don't add features Arnav didn't ask for (but DO build features that are clearly implied)
-- Don't remove existing features — reorganize hierarchy instead
+- Don't run `cargo check` after every small edit — batch first
+- Don't add Co-Authored-By lines to commits — Arnav is the author
+- Don't remove existing features — upgrade in place
+- Don't use `&text[..n]` on user content — use `safe_slice`
+- Don't add `#[tauri::command]` with a name that exists in another module
 - Don't use `grep`/`cat`/`find` in bash — use the Read/Grep/Glob tools
-- Don't commit unless explicitly asked
-- Don't push unless explicitly asked
-- Don't use `--no-verify` or skip hooks
+- Don't hardcode model names for OpenRouter — user picks their model
+
+## CI
+
+GitHub Actions: `.github/workflows/build.yml` (smoke) + `release.yml` (full). Three platforms. Watch for:
+- Missing Linux system deps (libsecret, libxdo, libspa — all in the apt block now)
+- `whisper-rs-sys` needs LLVM — gated behind feature flag, default build skips it
+- Version mismatch — `package.json`, `Cargo.toml`, `tauri.conf.json` must match

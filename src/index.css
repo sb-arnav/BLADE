@@ -510,6 +510,12 @@ body {
   50%       { box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15); }
 }
 
+/* ─── PREMIUM: Toast progress bar ───────────────────────────────────────────── */
+@keyframes toast-progress {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
 /* ─── Focus Visible ──────────────────────────────────────────────────────────── */
 
 :focus-visible {

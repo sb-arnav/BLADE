@@ -466,6 +466,54 @@ const MessageBubble = memo(function MessageBubble({
 });
 
 
+// Premium empty-state suggestion cards (4 primary + 2 secondary)
+const WELCOME_SUGGESTIONS = [
+  {
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+    ),
+    label: "What's on my screen?",
+    desc: "Capture + analyze",
+    prompt: "Take a screenshot and tell me what you see. Is there anything I should know about?",
+  },
+  {
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4" />
+        <circle cx="12" cy="12" r="4" />
+      </svg>
+    ),
+    label: "Morning briefing",
+    desc: "Priorities + context",
+    prompt: "Give me a morning briefing — what should I focus on today? Include anything relevant from my recent context.",
+  },
+  {
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <polyline points="16 18 22 12 16 6" />
+        <polyline points="8 6 2 12 8 18" />
+      </svg>
+    ),
+    label: "Review my code",
+    desc: "Quality + suggestions",
+    prompt: "Review the code I'm currently working on. Look for bugs, style issues, and improvements.",
+  },
+  {
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <circle cx="11" cy="11" r="8" />
+        <path d="M21 21l-4.35-4.35" />
+      </svg>
+    ),
+    label: "Search my files",
+    desc: "Local file search",
+    prompt: "Search my files and help me find what I need. What files are in my current directory?",
+  },
+] as const;
+
 const EXAMPLE_PROMPTS = [
   { label: "Debug screen", prompt: "Take a screenshot and help me debug what you see", icon: "⊡" },
   { label: "Last commit", prompt: "What changed in the last git commit?", icon: "⌥" },
