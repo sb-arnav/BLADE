@@ -745,6 +745,14 @@ async fn run_ghost_loop(app: tauri::AppHandle, state: Arc<Mutex<GhostState>>) {
     log::info!("[ghost_mode] loop exited");
 }
 
+// ── Public helpers ─────────────────────────────────────────────────────────────
+
+/// Public wrapper around detect_meeting_platform() used by overlay_manager.
+/// Returns "zoom" | "teams" | "meet" | "discord" | "slack" | "whatsapp" | "none".
+pub fn detect_active_platform() -> String {
+    detect_meeting_platform()
+}
+
 // ── Tauri Commands ─────────────────────────────────────────────────────────────
 
 /// Start Ghost Mode listening and overlay.

@@ -27,6 +27,8 @@ export function useChat() {
   const currentConversationIdRef = useRef<string | null>(null);
   // True if we've shown a fast-ack but the real stream hasn't started yet.
   const awaitingRealStream = useRef(false);
+  // Holds the handle for the 120-second safety timeout so chat_done can clear it.
+  const safetyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -126,19 +128,23 @@ export function useChat() {
 
     const unlistenToken = listen<string>("chat_token", (event) => {
       if (!active) return;
-      // Guard: if a new request started while tokens from the old one are still
-      // arriving, discard them so the new buffer isn't corrupted.
+      // Guard: snapshot the current request ID at the moment this token arrives.
+      // If it has changed (a new request started), discard the token entirely so
+      // the new request's buffer is never contaminated by stale stream data.
       const myRequestId = streamRequestId.current;
+      if (!myRequestId) return; // no active request — discard
 
       // If this is the first real token after a fast-ack, clear the ack display.
       if (awaitingRealStream.current) {
         awaitingRealStream.current = false;
         setAckText(null);
-        streamBuffer.current = ""; // ensure buffer starts clean
+        streamBuffer.current = ""; // ensure buffer starts clean for this request
       }
 
-      streamBuffer.current += event.payload;
+      // Append only if still the same request (double-check after potential state update above)
       if (streamRequestId.current !== myRequestId) return;
+
+      streamBuffer.current += event.payload;
       const content = streamBuffer.current;
       setMessages((prev) => {
         const last = prev[prev.length - 1];
@@ -154,8 +160,15 @@ export function useChat() {
 
     const unlistenDone = listen("chat_done", () => {
       if (!active) return;
+      // Clear the safety timer — chat completed normally
+      if (safetyTimerRef.current) {
+        clearTimeout(safetyTimerRef.current);
+        safetyTimerRef.current = null;
+      }
       const assembledBuffer = streamBuffer.current;
       streamBuffer.current = "";
+      // Retire this request's ID so late-arriving tokens from a stale response
+      // (race condition: token arrives after done fires) get dropped
       streamRequestId.current = "";
       awaitingRealStream.current = false;
       setAckText(null);
@@ -167,11 +180,23 @@ export function useChat() {
       setToolExecutions([]);
       setThinkingText(null);
 
+      // Persist the conversation immediately after every chat completes
+      const convId = currentConversationIdRef.current;
+      const msgs = messagesRef.current;
+      if (convId && msgs.length > 0) {
+        invoke("history_save_conversation", { conversationId: convId, messages: msgs }).catch(() => {});
+      }
+
+      // Record streak activity — every completed chat counts toward the streak
+      invoke("streak_record_activity").catch(() => {});
+
       // Fire-and-forget: let the backend learn from the completed conversation
-      invoke("learn_from_conversation", { messages: messagesRef.current }).catch(() => {});
+      invoke("learn_from_conversation", { messages: msgs }).catch(() => {});
+
+      // Let the people graph learn who was mentioned in this conversation
+      invoke("people_learn_from_conversation", { messages: msgs }).catch(() => {});
 
       // Background entity extraction + full exchange embedding — use assembled text
-      const msgs = messagesRef.current;
       const lastUser = [...msgs].reverse().find((m) => m.role === "user");
       const lastAssistant = assembledBuffer ||
         ([...msgs].reverse().find((m) => m.role === "assistant")?.content ?? "");
@@ -186,10 +211,10 @@ export function useChat() {
           assistantText: lastAssistant,
         }).catch(() => {});
         // Auto-title after the FIRST exchange (2 messages: user + assistant)
-        const convId = currentConversationIdRef.current;
-        if (msgs.length === 2 && convId) {
+        const convId2 = currentConversationIdRef.current;
+        if (msgs.length === 2 && convId2) {
           invoke("auto_title_conversation", {
-            conversationId: convId,
+            conversationId: convId2,
             userText: lastUser.content,
             assistantText: lastAssistant,
           }).catch(() => {});
@@ -357,8 +382,16 @@ export function useChat() {
 
       const nextMessages = [...messagesRef.current, userMsg, assistantMsg];
 
+      // Cancel any in-flight safety timer from a previous request before starting a new one
+      if (safetyTimerRef.current) {
+        clearTimeout(safetyTimerRef.current);
+        safetyTimerRef.current = null;
+      }
       streamBuffer.current = "";
-      streamRequestId.current = crypto.randomUUID();
+      // Assign a fresh request ID — the token handler captures this immediately so stale
+      // tokens arriving after a new request starts will be discarded (the guard below).
+      const thisRequestId = crypto.randomUUID();
+      streamRequestId.current = thisRequestId;
       requestStartRef.current = Date.now();
       awaitingRealStream.current = false;
       setAckText(null);
@@ -371,10 +404,12 @@ export function useChat() {
 
       // Safety timeout: if no chat_done arrives within 120s, unstick loading.
       // This prevents the UI from being permanently locked if the backend dies mid-stream.
-      const safetyTimer = setTimeout(() => {
-        if (streamRequestId.current !== "") {
+      safetyTimerRef.current = setTimeout(() => {
+        // Only fire if this same request is still active (not superseded by a newer one)
+        if (streamRequestId.current === thisRequestId) {
           streamBuffer.current = "";
           streamRequestId.current = "";
+          safetyTimerRef.current = null;
           setLoading(false);
           setError("Request timed out — no response received. Check your API key and model in Settings.");
         }
@@ -391,8 +426,12 @@ export function useChat() {
             })),
         });
       } catch (cause) {
-        clearTimeout(safetyTimer);
+        if (safetyTimerRef.current) {
+          clearTimeout(safetyTimerRef.current);
+          safetyTimerRef.current = null;
+        }
         streamBuffer.current = "";
+        streamRequestId.current = "";
         setError(typeof cause === "string" ? cause : String(cause));
         setLoading(false);
       }

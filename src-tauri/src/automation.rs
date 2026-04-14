@@ -47,24 +47,29 @@ pub fn auto_press_key(key: String) -> Result<AutomationResult, String> {
 pub fn auto_key_combo(modifiers: Vec<String>, key: String) -> Result<AutomationResult, String> {
     let mut enigo = get_enigo()?;
 
-    for m in &modifiers {
-        let k = parse_modifier(m)?;
+    // Pre-parse all keys before pressing anything so we don't get stuck half-way
+    let parsed_modifiers: Vec<Key> = modifiers
+        .iter()
+        .map(|m| parse_modifier(m))
+        .collect::<Result<Vec<_>, _>>()?;
+    let parsed_key = parse_key(&key)?;
+
+    for &k in &parsed_modifiers {
         enigo.key(k, Direction::Press).map_err(|e| e.to_string())?;
     }
 
-    let k = parse_key(&key)?;
-    enigo.key(k, Direction::Click).map_err(|e| e.to_string())?;
+    let click_result = enigo.key(parsed_key, Direction::Click).map_err(|e| e.to_string());
 
-    for m in modifiers.iter().rev() {
-        let k = parse_modifier(m)?;
-        enigo
-            .key(k, Direction::Release)
-            .map_err(|e| e.to_string())?;
+    // Always release modifiers even if the key click failed — avoids stuck modifier keys
+    for &k in parsed_modifiers.iter().rev() {
+        let _ = enigo.key(k, Direction::Release);
     }
+
+    click_result?;
 
     Ok(AutomationResult {
         success: true,
-        message: format!("Key combo executed"),
+        message: "Key combo executed".to_string(),
     })
 }
 

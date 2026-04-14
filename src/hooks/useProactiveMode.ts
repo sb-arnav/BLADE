@@ -40,6 +40,8 @@ const DEFAULT_CONFIG: ProactiveConfig = {
 };
 
 const STORAGE_KEY = "blade-proactive";
+// Dismissed suggestion IDs are persisted so they don't come back after a restart
+const DISMISSED_KEY = "blade-proactive-dismissed";
 const SUGGESTION_TTL = 5 * 60 * 1000; // suggestions expire after 5 minutes
 
 function loadConfig(): ProactiveConfig {
@@ -53,6 +55,29 @@ function loadConfig(): ProactiveConfig {
 
 function saveConfig(config: ProactiveConfig) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+}
+
+function loadDismissedIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DISMISSED_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveDismissedId(id: string) {
+  try {
+    const existing = loadDismissedIds();
+    existing.add(id);
+    // Cap at 500 entries — prune oldest (arbitrary string order is fine here,
+    // we just need the Set to not grow without bound)
+    const arr = Array.from(existing);
+    if (arr.length > 500) arr.splice(0, arr.length - 500);
+    localStorage.setItem(DISMISSED_KEY, JSON.stringify(arr));
+  } catch {
+    // localStorage quota — non-fatal
+  }
 }
 
 function isQuietHours(config: ProactiveConfig): boolean {
@@ -119,11 +144,13 @@ function getTimeSuggestions(): ProactiveSuggestion[] {
   return suggestions;
 }
 
-export function useProactiveMode() {
+export function useProactiveMode(onSendMessage?: (prompt: string) => void) {
   const [config, setConfig] = useState<ProactiveConfig>(loadConfig);
   const [suggestions, setSuggestions] = useState<ProactiveSuggestion[]>([]);
   const [suggestionsThisHour, setSuggestionsThisHour] = useState(0);
   const lastHourRef = useRef(new Date().getHours());
+  // Dismissed IDs loaded once on mount — used to filter out re-surfaced suggestions
+  const dismissedIdsRef = useRef<Set<string>>(loadDismissedIds());
 
   // Reset hourly counter
   useEffect(() => {
@@ -147,8 +174,14 @@ export function useProactiveMode() {
       if (timeSuggestions.length > 0 && suggestionsThisHour < config.maxSuggestionsPerHour) {
         setSuggestions((prev) => {
           const existingIds = new Set(prev.map((s) => s.id));
-          const newOnes = timeSuggestions.filter((s) => !existingIds.has(s.id));
-          return [...prev.filter((s) => !s.dismissed && s.expiresAt > Date.now()), ...newOnes];
+          // Skip suggestions that were already dismissed (persisted across restarts)
+          const newOnes = timeSuggestions.filter(
+            (s) => !existingIds.has(s.id) && !dismissedIdsRef.current.has(s.id)
+          );
+          return [
+            ...prev.filter((s) => !s.dismissed && s.expiresAt > Date.now()),
+            ...newOnes,
+          ];
         });
       }
     };
@@ -169,6 +202,8 @@ export function useProactiveMode() {
   const addSuggestion = useCallback((suggestion: Omit<ProactiveSuggestion, "id" | "timestamp" | "dismissed" | "expiresAt">) => {
     if (!config.enabled || isQuietHours(config)) return;
     if (suggestionsThisHour >= config.maxSuggestionsPerHour) return;
+    // Don't re-add a previously dismissed stable-id suggestion
+    if (dismissedIdsRef.current.has(suggestion.id ?? "")) return;
 
     setSuggestionsThisHour((prev) => prev + 1);
     setSuggestions((prev) => [
@@ -184,12 +219,33 @@ export function useProactiveMode() {
   }, [config, suggestionsThisHour]);
 
   const dismissSuggestion = useCallback((id: string) => {
+    // Persist the dismissal so this suggestion never re-appears after a restart
+    dismissedIdsRef.current.add(id);
+    saveDismissedId(id);
     setSuggestions((prev) => prev.map((s) => (s.id === id ? { ...s, dismissed: true } : s)));
   }, []);
 
   const dismissAll = useCallback(() => {
-    setSuggestions((prev) => prev.map((s) => ({ ...s, dismissed: true })));
+    setSuggestions((prev) => {
+      prev.forEach((s) => {
+        if (!s.dismissed) {
+          dismissedIdsRef.current.add(s.id);
+          saveDismissedId(s.id);
+        }
+      });
+      return prev.map((s) => ({ ...s, dismissed: true }));
+    });
   }, []);
+
+  // Send the suggestion's prompt as a chat message and dismiss it
+  const acceptSuggestion = useCallback((id: string) => {
+    const suggestion = suggestions.find((s) => s.id === id);
+    if (!suggestion) return;
+    dismissSuggestion(id);
+    if (onSendMessage && suggestion.prompt) {
+      onSendMessage(suggestion.prompt);
+    }
+  }, [suggestions, dismissSuggestion, onSendMessage]);
 
   const updateConfig = useCallback((updates: Partial<ProactiveConfig>) => {
     setConfig((prev) => {
@@ -208,6 +264,7 @@ export function useProactiveMode() {
     addSuggestion,
     dismissSuggestion,
     dismissAll,
+    acceptSuggestion,
     isQuietHours: isQuietHours(config),
   };
 }

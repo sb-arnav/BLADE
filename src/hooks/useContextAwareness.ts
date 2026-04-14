@@ -92,7 +92,7 @@ function getSuggestionsForContext(activeWindow: ActiveWindowInfo | null): Contex
   return [...(APP_SUGGESTIONS[category] || []), ...APP_SUGGESTIONS["default"]];
 }
 
-export function useContextAwareness(pollIntervalMs = 5000) {
+export function useContextAwareness(pollIntervalMs = 10_000) {
   const [context, setContext] = useState<UserContext>({
     activeWindow: null,
     timeOfDay: getTimeOfDay(),
@@ -103,13 +103,21 @@ export function useContextAwareness(pollIntervalMs = 5000) {
   });
 
   const recentAppsRef = useRef<string[]>([]);
+  // Debounce: track timestamp of the last completed poll so rapid callers
+  // (e.g. InputBar focus events) don't hammer the native IPC layer.
+  const lastPollTimeRef = useRef<number>(0);
+  const DEBOUNCE_MS = 2_000;
 
   const pollContext = useCallback(async () => {
+    const now = Date.now();
+    if (now - lastPollTimeRef.current < DEBOUNCE_MS) return;
+    lastPollTimeRef.current = now;
+
     try {
       const win = await invoke<ActiveWindowInfo>("get_active_window");
       const suggestions = getSuggestionsForContext(win);
 
-      // Track recent apps
+      // Track recent apps — only record a new entry when the focused app changes
       if (win?.process_name) {
         const apps = recentAppsRef.current;
         if (apps[apps.length - 1] !== win.process_name) {
@@ -128,7 +136,7 @@ export function useContextAwareness(pollIntervalMs = 5000) {
         suggestedActions: suggestions,
       });
     } catch {
-      // Context detection not available
+      // Context detection not available (permissions, unsupported platform, etc.)
       setContext((prev) => ({
         ...prev,
         timeOfDay: getTimeOfDay(),

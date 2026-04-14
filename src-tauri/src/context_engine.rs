@@ -370,7 +370,8 @@ async fn pull_conversation_chunks(query: &str, limit: usize) -> Vec<ContextChunk
 
 /// Pull file-index snippets relevant to `query` using the indexer's symbol search.
 async fn pull_file_chunks(query: &str, limit: usize) -> Vec<ContextChunk> {
-    let db_path = crate::config::blade_config_dir().join("blade.db");
+    // indexer.rs stores symbols in codeindex.db (separate DB from blade.db)
+    let db_path = crate::config::blade_config_dir().join("codeindex.db");
     let pattern = format!("%{}%", crate::safe_slice(query, 100));
     let now = chrono::Utc::now().timestamp();
 
@@ -378,10 +379,10 @@ async fn pull_file_chunks(query: &str, limit: usize) -> Vec<ContextChunk> {
         let Ok(conn) = rusqlite::Connection::open(&db_path) else {
             return vec![];
         };
-        // symbols table from indexer.rs
+        // code_symbols table from indexer.rs
         let mut stmt = match conn.prepare(
             "SELECT name, file_path
-             FROM symbols
+             FROM code_symbols
              WHERE name LIKE ?1 OR file_path LIKE ?1
              ORDER BY name
              LIMIT ?2",
@@ -465,13 +466,19 @@ pub async fn retrieve_relevant_chunks(
     }
 
     // --- Score each candidate's relevance to the query ---
-    // We fire all scoring calls concurrently for speed
-    let score_futures: Vec<_> = candidates
-        .iter()
-        .map(|chunk| score_relevance(query, &chunk.content))
-        .collect();
+    // Cap candidates before scoring to avoid firing too many concurrent LLM calls.
+    candidates.truncate(20);
 
-    let scores = futures::future::join_all(score_futures).await;
+    // Score in batches of 8 to avoid overwhelming the API with simultaneous requests.
+    let mut scores: Vec<f32> = Vec::with_capacity(candidates.len());
+    for batch in candidates.chunks(8) {
+        let batch_futures: Vec<_> = batch
+            .iter()
+            .map(|chunk| score_relevance(query, &chunk.content))
+            .collect();
+        let batch_scores = futures::future::join_all(batch_futures).await;
+        scores.extend(batch_scores);
+    }
 
     for (chunk, score) in candidates.iter_mut().zip(scores.iter()) {
         chunk.relevance_score = *score;
@@ -577,6 +584,7 @@ pub fn format_context_for_prompt(ctx: &AssembledContext) -> String {
 
 /// Assemble smart context for `query` within `max_tokens`.
 /// Returns a formatted string ready for injection into the system prompt.
+/// Hard timeout of 8 seconds so it never blocks the main chat pipeline.
 ///
 /// Used by brain.rs after the existing world/causal/memory injections:
 /// ```rust
@@ -588,7 +596,18 @@ pub async fn assemble_smart_context(query: &str, max_tokens: usize) -> String {
         return String::new();
     }
 
-    let ctx = retrieve_relevant_chunks(query, max_tokens, &[]).await;
+    let query_owned = query.to_string();
+    let result = tokio::time::timeout(
+        tokio::time::Duration::from_secs(8),
+        async move { retrieve_relevant_chunks(&query_owned, max_tokens, &[]).await },
+    )
+    .await;
+
+    let ctx = match result {
+        Ok(c) => c,
+        Err(_) => return String::new(), // timed out — return nothing rather than blocking
+    };
+
     if ctx.chunks.is_empty() {
         return String::new();
     }

@@ -316,6 +316,17 @@ fn index_file(conn: &Connection, path: &str, project: &str) -> Result<usize, Str
         return Ok(0); // unchanged — skip
     }
 
+    // Remove stale FTS entries for this file before deleting the base rows.
+    // FTS5 content tables do not auto-delete when the base table rows are removed,
+    // so we must manually delete from the FTS shadow table first.
+    conn.execute(
+        "INSERT INTO code_symbols_fts(code_symbols_fts, rowid, name, signature, docstring, file_path)
+         SELECT 'delete', s.rowid, s.name, s.signature, s.docstring, s.file_path
+         FROM code_symbols s WHERE s.file_path = ?1",
+        params![path],
+    )
+    .ok(); // Non-fatal — FTS delete failures just leave stale entries
+
     // Delete old symbols for this file
     conn.execute("DELETE FROM code_symbols WHERE file_path = ?1", params![path])
         .map_err(|e| format!("Delete error: {}", e))?;
@@ -429,43 +440,34 @@ pub fn search_symbols(query: &str, project_filter: Option<&str>, limit: usize) -
             .collect::<Vec<_>>()
             .join(" ");
 
-        let sql = if let Some(proj) = project_filter {
-            format!(
-                "SELECT s.id, s.project, s.file_path, s.symbol_type, s.name, s.signature, s.docstring, s.line_number, s.indexed_at
-                 FROM code_symbols s
-                 INNER JOIN code_symbols_fts f ON s.rowid = f.rowid
-                 WHERE f.code_symbols_fts MATCH ?1 AND s.project = '{}'
-                 ORDER BY rank LIMIT {}",
-                proj, limit
-            )
-        } else {
-            format!(
-                "SELECT s.id, s.project, s.file_path, s.symbol_type, s.name, s.signature, s.docstring, s.line_number, s.indexed_at
-                 FROM code_symbols s
-                 INNER JOIN code_symbols_fts f ON s.rowid = f.rowid
-                 WHERE f.code_symbols_fts MATCH ?1
-                 ORDER BY rank LIMIT {}",
-                limit
-            )
-        };
-
-        let mut stmt = match conn.prepare(&sql) {
+        // Use a single parameterised query; NULL project means "all projects".
+        let mut stmt = match conn.prepare(
+            "SELECT s.id, s.project, s.file_path, s.symbol_type, s.name, s.signature, s.docstring, s.line_number, s.indexed_at
+             FROM code_symbols s
+             INNER JOIN code_symbols_fts f ON s.rowid = f.rowid
+             WHERE f.code_symbols_fts MATCH ?1
+               AND (?2 IS NULL OR s.project = ?2)
+             ORDER BY rank LIMIT ?3",
+        ) {
             Ok(s) => s,
             Err(_) => return vec![],
         };
-        let rows = stmt.query_map(params![fts_query], |row| {
-            Ok(CodeSymbol {
-                id: row.get(0)?,
-                project: row.get(1)?,
-                file_path: row.get(2)?,
-                symbol_type: row.get(3)?,
-                name: row.get(4)?,
-                signature: row.get(5)?,
-                docstring: row.get(6)?,
-                line_number: row.get::<_, i64>(7)? as usize,
-                indexed_at: row.get(8)?,
-            })
-        });
+        let rows = stmt.query_map(
+            params![fts_query, project_filter, limit as i64],
+            |row| {
+                Ok(CodeSymbol {
+                    id: row.get(0)?,
+                    project: row.get(1)?,
+                    file_path: row.get(2)?,
+                    symbol_type: row.get(3)?,
+                    name: row.get(4)?,
+                    signature: row.get(5)?,
+                    docstring: row.get(6)?,
+                    line_number: row.get::<_, i64>(7)? as usize,
+                    indexed_at: row.get(8)?,
+                })
+            },
+        );
         match rows {
             Ok(r) => r.flatten().collect(),
             Err(_) => vec![],
@@ -476,19 +478,19 @@ pub fn search_symbols(query: &str, project_filter: Option<&str>, limit: usize) -
 
     if !results.is_empty() { return results; }
 
-    // Fallback: simple name LIKE search
+    // Fallback: simple name LIKE search — all values bound, no string injection
     let like_query = format!("%{}%", query);
-    let sql = if let Some(proj) = project_filter {
-        format!("SELECT id, project, file_path, symbol_type, name, signature, docstring, line_number, indexed_at FROM code_symbols WHERE name LIKE ?1 AND project = '{}' ORDER BY name LIMIT {}", proj, limit)
-    } else {
-        format!("SELECT id, project, file_path, symbol_type, name, signature, docstring, line_number, indexed_at FROM code_symbols WHERE name LIKE ?1 ORDER BY name LIMIT {}", limit)
-    };
-
-    let mut stmt = match conn.prepare(&sql) {
+    let mut stmt = match conn.prepare(
+        "SELECT id, project, file_path, symbol_type, name, signature, docstring, line_number, indexed_at
+         FROM code_symbols
+         WHERE name LIKE ?1
+           AND (?2 IS NULL OR project = ?2)
+         ORDER BY name LIMIT ?3",
+    ) {
         Ok(s) => s,
         Err(_) => return vec![],
     };
-    stmt.query_map(params![like_query], |row| {
+    stmt.query_map(params![like_query, project_filter, limit as i64], |row| {
         Ok(CodeSymbol {
             id: row.get(0)?,
             project: row.get(1)?,

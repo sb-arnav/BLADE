@@ -16,6 +16,7 @@ export default defineConfig(async () => ({
         main: resolve(__dirname, "index.html"),
         quickask: resolve(__dirname, "quickask.html"),
         overlay: resolve(__dirname, "overlay.html"),
+        hud: resolve(__dirname, "hud.html"),
       },
     },
   },

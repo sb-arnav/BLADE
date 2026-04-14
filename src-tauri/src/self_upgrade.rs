@@ -541,8 +541,14 @@ pub async fn self_upgrade_audit() -> Vec<(String, bool)> {
     let catalog = capability_catalog();
     let mut results = Vec::new();
 
+    // Windows uses `where`, POSIX uses `which`
+    #[cfg(target_os = "windows")]
+    let checker = "where";
+    #[cfg(not(target_os = "windows"))]
+    let checker = "which";
+
     for (tool, _gap) in &catalog {
-        let available = tokio::process::Command::new("which")
+        let available = tokio::process::Command::new(checker)
             .arg(tool)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())

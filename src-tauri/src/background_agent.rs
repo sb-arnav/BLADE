@@ -12,6 +12,14 @@
 ///
 /// Agents run in background threads. BLADE can run multiple simultaneously.
 /// Each agent has a unique ID for tracking and cancellation.
+///
+/// Smart spawning: auto_spawn_agent() inspects the task description and
+/// picks the right agent type automatically. The LLM never needs to know
+/// which binary to invoke — it just describes the goal.
+///
+/// Multi-agent coordination: get_active_agents() returns all running agents.
+/// When two agents share related tasks, context injection links them so each
+/// one knows what the other has already done.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -119,6 +127,13 @@ fn build_agent_command(agent_type: &str, task: &str, _cwd: &str) -> Option<(Stri
             Some((
                 "goose".to_string(),
                 vec!["run".to_string(), "--text".to_string(), task.to_string()],
+            ))
+        }
+        "codex" => {
+            // OpenAI Codex CLI: `codex -q "task"` (quiet / non-interactive)
+            Some((
+                "codex".to_string(),
+                vec!["-q".to_string(), task.to_string()],
             ))
         }
         "bash" => {
@@ -293,12 +308,51 @@ async fn run_agent(
     };
     update_agent_status(&id, status.clone(), Some(code), None);
 
+    // Build completion summary and store in execution_memory
+    let summary = {
+        let reg = registry().lock().unwrap();
+        reg.get(&id)
+            .map(|a| extract_completion_summary(a))
+            .unwrap_or_default()
+    };
+
+    // Store agent run in execution memory so BLADE can recall it later
+    {
+        let reg = registry().lock().unwrap();
+        if let Some(agent) = reg.get(&id) {
+            let full_output = agent.output.join("\n");
+            let started = agent.started_at;
+            let finished = agent.finished_at.unwrap_or_else(|| chrono::Utc::now().timestamp());
+            let duration_ms = (finished - started) * 1000;
+            let command_label = format!("[agent:{}] {}", agent.agent_type, crate::safe_slice(&agent.task, 200));
+            crate::execution_memory::record(
+                &command_label,
+                &agent.cwd,
+                &crate::safe_slice(&full_output, 6000),
+                "",
+                code,
+                duration_ms,
+            );
+        }
+    }
+
+    // Emit both the legacy event (for existing listeners) and a richer one
     let _ = app.emit(
         "agent_complete",
         serde_json::json!({
             "id": id,
             "exit_code": code,
             "status": if code == 0 { "completed" } else { "failed" },
+        }),
+    );
+
+    let _ = app.emit(
+        "agent_completed",
+        serde_json::json!({
+            "id": id,
+            "exit_code": code,
+            "status": if code == 0 { "completed" } else { "failed" },
+            "summary": summary,
         }),
     );
 }
@@ -365,4 +419,314 @@ pub fn agent_get_output(id: String) -> String {
         .get(&id)
         .map(|a| a.output.join("\n"))
         .unwrap_or_default()
+}
+
+// ── Smart auto-spawning ────────────────────────────────────────────────────────
+
+/// Classify a task description and return the best agent type + rationale.
+/// This is the decision logic that lets BLADE autonomously choose a coding agent.
+fn classify_task(task: &str) -> (&'static str, &'static str) {
+    let t = task.to_lowercase();
+
+    // Coding tasks → Claude Code (strongest editor) or Aider (git-native)
+    let is_code_task = ["refactor", "implement", "build", "fix", "rewrite",
+                        "add feature", "migrate", "upgrade", "debug", "test",
+                        "create", "generate code", "scaffold", "port"]
+        .iter().any(|kw| t.contains(kw));
+
+    let multi_file = ["multiple files", "across files", "whole codebase",
+                      "all files", "entire project", "every file"]
+        .iter().any(|kw| t.contains(kw));
+
+    let is_research = ["research", "find", "compare", "analyse", "analyze",
+                       "summarize", "what is", "explain", "look up", "search for"]
+        .iter().any(|kw| t.contains(kw));
+
+    let is_design = ["generate image", "create design", "make image",
+                     "design asset", "ui design", "logo", "mockup", "wireframe"]
+        .iter().any(|kw| t.contains(kw));
+
+    let prefers_aider = ["git commit", "apply patch", "write tests", "tdd",
+                         "test-driven", "apply diff"]
+        .iter().any(|kw| t.contains(kw));
+
+    if is_design {
+        return ("unsupported", "image-generation");
+    }
+    if is_research && !is_code_task {
+        return ("swarm", "research");
+    }
+    if prefers_aider && !multi_file {
+        return ("aider", "git-native edits");
+    }
+    if is_code_task || multi_file {
+        return ("claude", "complex coding task");
+    }
+    // Default: Claude Code handles most things
+    ("claude", "general coding")
+}
+
+/// Intelligently spawn the best coding agent for a task.
+/// Returns the agent ID immediately; the agent runs in the background.
+///
+/// Decision logic:
+/// - "refactor", "implement", "build", "fix across multiple files" → Claude Code
+/// - "research", "find", "compare"                                 → BLADE swarm
+/// - "generate image", "create design"                             → returns error (not supported)
+/// - git-commit / patch tasks                                      → Aider
+pub async fn auto_spawn_agent(
+    app: &tauri::AppHandle,
+    task: &str,
+    project_dir: &str,
+) -> Result<String, String> {
+    let (agent_type, rationale) = classify_task(task);
+
+    match agent_type {
+        "unsupported" => {
+            return Err(format!(
+                "Image generation and design tasks are not supported by background coding agents. \
+                 Use a dedicated image-generation service instead."
+            ));
+        }
+        "swarm" => {
+            // Research tasks delegate to BLADE's own swarm — just return a marker ID
+            // so the caller knows we chose the swarm path.
+            return Ok(format!("swarm:research:{}", Uuid::new_v4()));
+        }
+        _ => {}
+    }
+
+    // Confirm the chosen agent is actually installed; fall back gracefully.
+    let available = detect_available_agents();
+    let chosen = if available.contains(&agent_type.to_string()) {
+        agent_type.to_string()
+    } else if available.contains(&"claude".to_string()) {
+        "claude".to_string()
+    } else if available.contains(&"aider".to_string()) {
+        "aider".to_string()
+    } else {
+        return Err(format!(
+            "No coding agent found on this system. \
+             Install Claude Code with: npm install -g @anthropic-ai/claude-code\n\
+             Checked: claude, aider, goose"
+        ));
+    };
+
+    // Inject context from sibling agents that are already running on related tasks
+    let enriched_task = inject_sibling_context(task);
+
+    let cwd = if project_dir.is_empty() {
+        None
+    } else {
+        Some(project_dir.to_string())
+    };
+
+    let id = agent_spawn(app.clone(), chosen.clone(), enriched_task, cwd).await?;
+
+    // Emit an auto-spawn event so the UI can surface why this agent was chosen
+    let _ = app.emit(
+        "agent_auto_spawned",
+        serde_json::json!({
+            "id": id,
+            "agent_type": chosen,
+            "rationale": rationale,
+            "task_preview": crate::safe_slice(task, 120),
+        }),
+    );
+
+    Ok(id)
+}
+
+/// Build a task string enriched with output snippets from related running agents.
+/// Keeps the injection small — just the last 10 lines from each sibling.
+fn inject_sibling_context(task: &str) -> String {
+    let registry = registry().lock().unwrap();
+    let running: Vec<&BackgroundAgent> = registry
+        .values()
+        .filter(|a| a.status == AgentStatus::Running)
+        .collect();
+
+    if running.is_empty() {
+        return task.to_string();
+    }
+
+    let mut ctx_parts: Vec<String> = Vec::new();
+    for sibling in running.iter().take(3) {
+        // Only inject if task keywords overlap
+        if tasks_are_related(task, &sibling.task) {
+            let snippet: Vec<&String> = sibling.output.iter().rev().take(10).rev().collect();
+            if !snippet.is_empty() {
+                ctx_parts.push(format!(
+                    "  [Sibling agent {} is working on: \"{}\"]\n  Recent output:\n{}",
+                    &sibling.id[..8],
+                    crate::safe_slice(&sibling.task, 80),
+                    snippet.iter().map(|l| format!("    {}", l)).collect::<Vec<_>>().join("\n")
+                ));
+            }
+        }
+    }
+
+    if ctx_parts.is_empty() {
+        task.to_string()
+    } else {
+        format!(
+            "{}\n\n--- Context from other agents working in parallel ---\n{}",
+            task,
+            ctx_parts.join("\n\n")
+        )
+    }
+}
+
+/// Rough keyword-overlap check to detect related tasks.
+fn tasks_are_related(a: &str, b: &str) -> bool {
+    let a_words: std::collections::HashSet<&str> = a.split_whitespace()
+        .filter(|w| w.len() > 4)
+        .collect();
+    let b_words: std::collections::HashSet<&str> = b.split_whitespace()
+        .filter(|w| w.len() > 4)
+        .collect();
+    let overlap = a_words.intersection(&b_words).count();
+    overlap >= 2
+}
+
+// ── Codex / OpenAI Responses API ─────────────────────────────────────────────
+
+/// Spawn a Codex CLI agent for a task.
+/// Falls back to Claude Code if `codex` is not installed.
+pub async fn spawn_codex_agent(
+    app: &tauri::AppHandle,
+    task: &str,
+    project_dir: &str,
+) -> Result<String, String> {
+    let available = detect_available_agents();
+    let use_codex = available.contains(&"codex".to_string());
+
+    let (agent_type, final_task) = if use_codex {
+        // Codex CLI: `codex -q "task"` or `codex exec "task"`
+        ("codex", task.to_string())
+    } else {
+        // Fall back to Claude Code
+        ("claude", task.to_string())
+    };
+
+    let cwd = if project_dir.is_empty() {
+        None
+    } else {
+        Some(project_dir.to_string())
+    };
+
+    let id = agent_spawn(app.clone(), agent_type.to_string(), final_task, cwd).await?;
+
+    if !use_codex {
+        let _ = app.emit(
+            "agent_fallback",
+            serde_json::json!({
+                "id": id,
+                "requested": "codex",
+                "used": "claude",
+                "reason": "Codex CLI not installed — fell back to Claude Code",
+            }),
+        );
+    }
+
+    Ok(id)
+}
+
+// ── Build command — extended to support Codex ─────────────────────────────────
+
+fn build_codex_command(task: &str) -> (String, Vec<String>) {
+    // Codex CLI: `codex -q "task"` (quiet, non-interactive)
+    (
+        "codex".to_string(),
+        vec!["-q".to_string(), task.to_string()],
+    )
+}
+
+// ── Multi-agent coordination ──────────────────────────────────────────────────
+
+/// Return all running (or recently finished) agents with their full state.
+/// The Dashboard can display these to give the user situational awareness.
+#[tauri::command]
+pub fn get_active_agents() -> Vec<BackgroundAgent> {
+    let registry = registry().lock().unwrap();
+    let now = chrono::Utc::now().timestamp();
+    let mut agents: Vec<BackgroundAgent> = registry
+        .values()
+        .filter(|a| {
+            a.status == AgentStatus::Running
+                || a.finished_at.map(|t| now - t < 300).unwrap_or(false)
+        })
+        .cloned()
+        .collect();
+    agents.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+    agents
+}
+
+/// Extract a human-readable summary from a completed agent's output.
+/// Looks for git commit messages, file change lists, and error summaries.
+pub fn extract_completion_summary(agent: &BackgroundAgent) -> String {
+    let output = agent.output.join("\n");
+    let mut lines: Vec<String> = Vec::new();
+
+    // Find git commit lines
+    for line in agent.output.iter() {
+        let l = line.trim();
+        if l.starts_with("commit ") || l.contains("committed") || l.contains("[main ") || l.contains("[master ") {
+            lines.push(format!("git: {}", l));
+        }
+    }
+
+    // Find file edit lines (aider / claude-code patterns)
+    let file_patterns = ["Wrote ", "Updated ", "Created ", "Deleted ", "Modified ",
+                          "wrote ", "updated ", "created ", "- ", "+ "];
+    for line in agent.output.iter().rev().take(50).rev() {
+        let l = line.trim();
+        if file_patterns.iter().any(|p| l.starts_with(p))
+            && (l.contains(".rs") || l.contains(".ts") || l.contains(".py")
+                || l.contains(".js") || l.contains(".go") || l.contains(".toml"))
+        {
+            lines.push(format!("file: {}", crate::safe_slice(l, 100)));
+        }
+    }
+
+    // Fallback: last 5 non-empty lines
+    if lines.is_empty() {
+        lines = agent.output.iter().rev()
+            .filter(|l| !l.trim().is_empty())
+            .take(5)
+            .rev()
+            .cloned()
+            .collect();
+    }
+
+    if lines.is_empty() {
+        format!("Agent {} completed (no output captured).", &agent.id[..8])
+    } else {
+        format!(
+            "Agent {} [{}] completed:\n{}",
+            &agent.id[..8],
+            agent.agent_type,
+            lines.iter().take(15).cloned().collect::<Vec<_>>().join("\n")
+        )
+    }
+}
+
+/// Tauri command: auto-spawn the best agent for a task.
+#[tauri::command]
+pub async fn agent_auto_spawn(
+    app: tauri::AppHandle,
+    task: String,
+    project_dir: String,
+) -> Result<String, String> {
+    auto_spawn_agent(&app, &task, &project_dir).await
+}
+
+/// Tauri command: spawn a Codex agent (falls back to Claude Code).
+#[tauri::command]
+pub async fn agent_spawn_codex(
+    app: tauri::AppHandle,
+    task: String,
+    project_dir: String,
+) -> Result<String, String> {
+    spawn_codex_agent(&app, &task, &project_dir).await
 }
