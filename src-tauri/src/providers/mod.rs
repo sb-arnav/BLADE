@@ -98,7 +98,17 @@ pub async fn complete_turn(
     // If a custom base_url is set, always use the OpenAI-compatible client —
     // Vercel AI Gateway, Cloudflare AI Gateway, Azure, etc. all speak OpenAI format.
     if base_url.is_some() && provider != "ollama" {
-        return openai::complete(api_key, model, messages, tools, base_url).await;
+        let result = openai::complete(api_key, model, messages, tools, base_url).await;
+        // Some custom endpoints (NVIDIA NIM, etc.) return 404 when tools are sent to a
+        // model that doesn't support function calling. Retry without tools in that case.
+        if !tools.is_empty() {
+            if let Err(ref e) = result {
+                if e.contains("404") {
+                    return openai::complete(api_key, model, messages, &[], base_url).await;
+                }
+            }
+        }
+        return result;
     }
     match provider {
         "gemini" => gemini::complete(api_key, model, messages, tools).await,
@@ -157,6 +167,12 @@ pub async fn stream_text_thinking(
 /// (claude-haiku or gemini-flash), bypassing the user's configured model.
 /// Used to give immediate feedback (<500 ms) while the real request is still running.
 pub async fn stream_fast_acknowledgment(message: &str, config: &crate::config::BladeConfig) -> Result<String, String> {
+    // Custom base_url providers (NVIDIA NIM, DeepSeek, etc.) — skip fast-ack entirely.
+    // The ack logic tries to route to a cheap known model, which breaks custom endpoints.
+    if config.base_url.is_some() {
+        return Ok(String::new());
+    }
+
     // Pick the cheapest available fast model. Prefer Anthropic Haiku if the key is set.
     // Fall back through providers in order of speed.
     // All fields are owned Strings to avoid lifetime tangles.
