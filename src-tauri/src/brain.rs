@@ -230,17 +230,10 @@ fn build_system_prompt_inner(
         parts.push(role_injection);
     }
 
-    // DEEP SCAN IDENTITY — compact snapshot of the user's machine identity.
-    // Injected into every prompt so the AI always knows what apps, languages, repos,
-    // and tools this specific user has — no guessing, no generic answers.
-    // Loaded from ~/.blade/identity/scan_results.json (written by deep_scan_start).
+    // DEEP SCAN IDENTITY — compact snapshot: who the user is, what they run, what they build.
+    // 3-5 lines max. Tells the AI exactly who it's talking to without guessing.
     if let Some(identity_block) = crate::deep_scan::load_scan_summary() {
-        parts.push(format!(
-            "## User's Machine Identity\n\n{}\n\n\
-             _(From last deep scan — use this to personalise tool recommendations, \
-             code suggestions, and workflow advice.)_",
-            identity_block
-        ));
+        parts.push(format!("## Identity\n\n{}", identity_block));
     }
 
     // Core identity reference — tools, workflows, OS-specific notes, personalisation.
@@ -474,6 +467,28 @@ fn build_system_prompt_inner(
         parts.push(health_ctx);
     }
 
+    // SCREEN TIME NUDGE — soft reminder if user has been working 90+ min without a break.
+    // One line only. Never inject if they're at a normal work level.
+    {
+        let stats = crate::health_guardian::get_health_stats();
+        let streak_mins = stats["current_streak_minutes"].as_i64().unwrap_or(0);
+        if streak_mins >= 90 {
+            let hours = streak_mins / 60;
+            let mins = streak_mins % 60;
+            let duration_str = if hours > 0 && mins > 0 {
+                format!("{}h {}min", hours, mins)
+            } else if hours > 0 {
+                format!("{}h", hours)
+            } else {
+                format!("{}min", mins)
+            };
+            parts.push(format!(
+                "Note: user has been working for {} without a break.",
+                duration_str
+            ));
+        }
+    }
+
     // Habit Engine — inject today's habit status (streaks, completions, alerts)
     let habits = crate::habit_engine::get_habits_context();
     if !habits.is_empty() {
@@ -596,11 +611,60 @@ fn build_system_prompt_inner(
         }
     }
 
+    // TEMPORAL CONTEXT — Upcoming meeting within 30 min. ONE line only. Skip if nothing soon.
+    {
+        let state = crate::integration_bridge::get_integration_state();
+        if let Some(soonest) = state.upcoming_events.first() {
+            if soonest.minutes_until >= 0 && soonest.minutes_until <= 30 {
+                parts.push(format!(
+                    "Upcoming: \"{}\" in {} min.",
+                    crate::safe_slice(&soonest.title, 50),
+                    soonest.minutes_until
+                ));
+            }
+        }
+    }
+
+    // SECURITY ALERT — Only inject if there are flagged connections. Never inject if clean.
+    if let Some(alert) = crate::security_monitor::get_security_alert_for_prompt() {
+        parts.push(alert);
+    }
+
     // Activity Monitor — real-time awareness of what Arnav is doing right now
     {
         let activity_ctx = crate::activity_monitor::get_activity_context();
         if !activity_ctx.trim().is_empty() {
             parts.push(activity_ctx);
+        }
+    }
+
+    // LIVE PERCEPTION — ONE line: what's on screen right now from the last God Mode tick.
+    // Only inject if perception is actually running (i.e. God Mode has ticked at least once).
+    // Format: "Right now: VS Code — commands.rs (focused, 45 min streak)"
+    if let Some(p) = crate::perception_fusion::get_latest() {
+        if !p.active_app.is_empty() {
+            let title_part = if !p.active_title.is_empty() && p.active_title != p.active_app {
+                format!(" — {}", crate::safe_slice(&p.active_title, 60))
+            } else {
+                String::new()
+            };
+            // Append streak if meaningful (>= 5 min active)
+            let streak_stats = crate::health_guardian::get_health_stats();
+            let streak_mins = streak_stats["current_streak_minutes"].as_i64().unwrap_or(0);
+            let streak_part = if streak_mins >= 5 {
+                format!(", {} min streak", streak_mins)
+            } else {
+                String::new()
+            };
+            let state_label = if p.user_state == "focused" {
+                "focused".to_string()
+            } else {
+                p.user_state.clone()
+            };
+            parts.push(format!(
+                "Right now: {}{} ({}{}).",
+                p.active_app, title_part, state_label, streak_part
+            ));
         }
     }
 

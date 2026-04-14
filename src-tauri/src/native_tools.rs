@@ -514,6 +514,8 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
     .chain(crate::system_control::tool_definitions())
     // Append security monitor tool definitions (security scan, URL safety check)
     .chain(crate::security_monitor::tool_definitions())
+    // Append IoT / smart home + Spotify tools
+    .chain(crate::iot_bridge::tool_definitions())
     .collect()
 }
 
@@ -1213,6 +1215,76 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
             match crate::security_monitor::execute_tool(name, args).await {
                 Some(result) => result,
                 None => (format!("Security tool dispatch error for: {}", name), true),
+            }
+        }
+
+        // ── IoT / Smart Home + Spotify ────────────────────────────────────────
+        "blade_iot_control" => {
+            let entity_id = match args["entity_id"].as_str() {
+                Some(e) => e.to_string(),
+                None => return ("Missing required argument: entity_id".to_string(), true),
+            };
+            let action = match args["action"].as_str() {
+                Some(a) => a.to_string(),
+                None => return ("Missing required argument: action".to_string(), true),
+            };
+            let brightness = args["brightness"].as_u64();
+
+            let config = crate::config::load_config();
+            let token = crate::config::get_provider_key("homeassistant");
+
+            // Determine domain from entity_id (e.g. "light.living_room" → "light")
+            let domain = entity_id.split('.').next().unwrap_or("homeassistant").to_string();
+
+            // Build optional extra data (e.g. brightness for lights)
+            let extra_data: Option<serde_json::Value> = brightness.map(|b| {
+                serde_json::json!({ "brightness": b })
+            });
+
+            match crate::iot_bridge::ha_call_service(
+                &config.ha_base_url,
+                &token,
+                &domain,
+                &action,
+                &entity_id,
+                extra_data,
+            ).await {
+                Ok(()) => (format!("Called {}.{} on {}", domain, action, entity_id), false),
+                Err(e) => (format!("IoT control failed: {}", e), true),
+            }
+        }
+        "blade_spotify_control" => {
+            let action = match args["action"].as_str() {
+                Some(a) => a,
+                None => return ("Missing required argument: action".to_string(), true),
+            };
+            match action {
+                "now_playing" => {
+                    match crate::iot_bridge::spotify_now_playing().await {
+                        Ok(Some(track)) => (format!(
+                            "{} — {} ({})\nStatus: {}",
+                            track.title,
+                            track.artist,
+                            track.album,
+                            if track.is_playing { "playing" } else { "paused" }
+                        ), false),
+                        Ok(None) => ("Spotify is idle — nothing is playing.".to_string(), false),
+                        Err(e) => (format!("Spotify error: {}", e), true),
+                    }
+                }
+                "play_pause" => {
+                    match crate::iot_bridge::spotify_play_pause().await {
+                        Ok(()) => ("Spotify toggled play/pause.".to_string(), false),
+                        Err(e) => (format!("Spotify error: {}", e), true),
+                    }
+                }
+                "next" => {
+                    match crate::iot_bridge::spotify_next_track().await {
+                        Ok(()) => ("Skipped to next Spotify track.".to_string(), false),
+                        Err(e) => (format!("Spotify error: {}", e), true),
+                    }
+                }
+                other => (format!("Unknown Spotify action '{}'. Use: now_playing, play_pause, next", other), true),
             }
         }
 

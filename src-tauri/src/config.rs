@@ -128,6 +128,9 @@ struct DiskConfig {
     integration_polling_enabled: bool,
     #[serde(default = "default_tts_speed")]
     tts_speed: f32,
+    /// Home Assistant base URL, e.g. "http://homeassistant.local:8123" (empty = disabled)
+    #[serde(default)]
+    ha_base_url: String,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -189,6 +192,7 @@ impl Default for DiskConfig {
             last_deep_scan: 0,
             integration_polling_enabled: false,
             tts_speed: 1.0,
+            ha_base_url: String::new(),
             api_key: None,
         }
     }
@@ -276,6 +280,9 @@ pub struct BladeConfig {
     /// TTS playback speed multiplier (0.5 = half speed, 2.0 = double speed, default 1.0)
     #[serde(default = "default_tts_speed")]
     pub tts_speed: f32,
+    /// Home Assistant base URL, e.g. "http://homeassistant.local:8123" (empty = disabled)
+    #[serde(default)]
+    pub ha_base_url: String,
 }
 
 impl BladeConfig {
@@ -325,6 +332,7 @@ impl Default for BladeConfig {
             last_deep_scan: 0,
             integration_polling_enabled: false,
             tts_speed: 1.0,
+            ha_base_url: String::new(),
         }
     }
 }
@@ -438,6 +446,7 @@ pub fn load_config() -> BladeConfig {
         last_deep_scan: disk.last_deep_scan,
         integration_polling_enabled: disk.integration_polling_enabled,
         tts_speed: disk.tts_speed,
+        ha_base_url: disk.ha_base_url,
     }
 }
 
@@ -483,6 +492,7 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         last_deep_scan: config.last_deep_scan,
         integration_polling_enabled: config.integration_polling_enabled,
         tts_speed: config.tts_speed,
+        ha_base_url: config.ha_base_url.clone(),
         api_key: None,
     };
 
@@ -657,6 +667,7 @@ pub fn save_config_field(key: String, value: String) -> Result<(), String> {
         "work_mode" => config.work_mode = value,
         "response_style" => config.response_style = value,
         "trusted_ai_delegate" => config.trusted_ai_delegate = value,
+        "ha_base_url" => config.ha_base_url = value,
         _ => return Err(format!("Unknown config field: {}", key)),
     }
     save_config(&config)

@@ -6,6 +6,7 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 
 // ── Data Types ────────────────────────────────────────────────────────────────
 
@@ -177,6 +178,44 @@ pub fn get_network_summary() -> String {
     } else {
         format!("{} active connections, {} flagged suspicious", total, suspicious)
     }
+}
+
+// ── Prompt-safe security alert cache ─────────────────────────────────────────
+// Populated by a background task so brain.rs never calls netstat inline.
+// Each entry: (suspicious_count, timestamp_secs)
+
+static SECURITY_ALERT_CACHE: OnceLock<Mutex<Option<(usize, i64)>>> = OnceLock::new();
+
+fn security_cache() -> &'static Mutex<Option<(usize, i64)>> {
+    SECURITY_ALERT_CACHE.get_or_init(|| Mutex::new(None))
+}
+
+/// Called from a background task (not on the hot prompt path) to update the cache.
+pub fn update_security_cache() {
+    let (_, suspicious) = cached_network_counts();
+    let ts = Utc::now().timestamp();
+    if let Ok(mut guard) = security_cache().lock() {
+        *guard = Some((suspicious, ts));
+    }
+}
+
+/// Returns a ONE-line security alert for brain.rs, or None if clean / no data.
+/// Never blocks — reads only from the static cache.
+pub fn get_security_alert_for_prompt() -> Option<String> {
+    let guard = security_cache().lock().ok()?;
+    let (suspicious, ts) = (*guard)?;
+    // Ignore stale data (older than 10 minutes)
+    if Utc::now().timestamp() - ts > 600 {
+        return None;
+    }
+    if suspicious == 0 {
+        return None;
+    }
+    Some(format!(
+        "Security: {} suspicious network connection{} detected.",
+        suspicious,
+        if suspicious == 1 { "" } else { "s" }
+    ))
 }
 
 // ── 2. Password Health ────────────────────────────────────────────────────────

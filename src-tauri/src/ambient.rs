@@ -58,6 +58,7 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
         let mut idle_nudged = false;
         let mut tick: u64 = 0;
         let mut last_error_hash: u64 = 0;
+        let mut last_clipboard_action_hash: u64 = 0;
         let session_start = std::time::Instant::now();
         let mut long_session_nudged = false;
         let mut stale_thread_nudged = false;
@@ -106,12 +107,54 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
                         let hash = h.finish();
                         if hash != last_error_hash {
                             last_error_hash = hash;
+                            last_clipboard_action_hash = hash;
                             let headline = error_headline(&text);
                             let _ = app.emit("proactive_nudge", serde_json::json!({
                                 "message": format!("I see an error in your clipboard: {}. Want me to diagnose it?", headline),
                                 "type": "error_detected",
                                 "raw": crate::safe_slice(&text, 800),
                             }));
+
+                            // Route through decision gate — detached so the ambient loop continues
+                            let text_clone = text.clone();
+                            let app_clone = app.clone();
+                            tauri::async_runtime::spawn(async move {
+                                crate::clipboard::clipboard_auto_action(
+                                    &app_clone,
+                                    &text_clone,
+                                    "error",
+                                ).await;
+                            });
+                        }
+                    } else {
+                        // Classify and route non-error clipboard content through the decision gate
+                        use std::hash::{Hash, Hasher};
+                        let mut h = std::collections::hash_map::DefaultHasher::new();
+                        crate::safe_slice(&text, 500).hash(&mut h);
+                        let hash = h.finish();
+                        if hash != last_clipboard_action_hash {
+                            let lower = text.to_lowercase();
+                            let content_type = if lower.starts_with("http://") || lower.starts_with("https://") {
+                                Some("url")
+                            } else {
+                                // Mirror classify_content code-detection logic
+                                let code_signals = ["fn ", "def ", "class ", "const ", "let ", "var ", "import ", "function ", "=>", "->", "{", "};"];
+                                let code_score: usize = code_signals.iter().filter(|s| text.contains(*s)).count();
+                                if code_score >= 2 { Some("code") } else { None }
+                            };
+                            if let Some(ct) = content_type {
+                                last_clipboard_action_hash = hash;
+                                let text_clone = text.clone();
+                                let app_clone = app.clone();
+                                let ct_str = ct.to_string();
+                                tauri::async_runtime::spawn(async move {
+                                    crate::clipboard::clipboard_auto_action(
+                                        &app_clone,
+                                        &text_clone,
+                                        &ct_str,
+                                    ).await;
+                                });
+                            }
                         }
                     }
                 }
