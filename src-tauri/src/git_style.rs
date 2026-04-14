@@ -10,8 +10,8 @@
 
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use std::process::Command;
 
+#[allow(dead_code)]
 const WIKI_FILE: &str = "git_style_wiki.md";
 const MAX_COMMITS_TO_SAMPLE: usize = 80;
 const WIKI_STALE_AFTER_SECS: i64 = 86400 * 3; // 3 days
@@ -54,7 +54,7 @@ pub async fn mine_git_style(repo_path: &str) -> Result<GitStyleWiki, String> {
     }
 
     // Step 1: Get git log — commits with stats
-    let log_output = Command::new("git")
+    let log_output = crate::cmd_util::silent_cmd("git")
         .args([
             "log",
             "--format=%H|%s|%ae",
@@ -96,7 +96,7 @@ pub async fn mine_git_style(repo_path: &str) -> Result<GitStyleWiki, String> {
     let mut languages_seen = std::collections::HashSet::new();
 
     for commit in commits.iter().take(15) {
-        let diff = Command::new("git")
+        let diff = crate::cmd_util::silent_cmd("git")
             .args(["show", "--stat", "--no-color", &commit.hash])
             .current_dir(repo_path)
             .output()

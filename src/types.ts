@@ -5,6 +5,8 @@ export interface Message {
   image_base64?: string;
   timestamp: number;
   refined?: boolean;
+  /** True while this is a fast-ack placeholder before the real stream begins */
+  isAck?: boolean;
 }
 
 export interface McpServerConfig {

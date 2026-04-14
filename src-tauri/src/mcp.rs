@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::io;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
-use tokio::process::{Child, Command};
+use tokio::process::Child;
 use tokio::time::{timeout, Duration};
 
 static REQUEST_ID: AtomicU64 = AtomicU64::new(1);
@@ -77,7 +77,7 @@ impl McpProcess {
         args: &[String],
         env: &HashMap<String, String>,
     ) -> io::Result<Self> {
-        let mut cmd = Command::new(command);
+        let mut cmd = crate::cmd_util::silent_tokio_cmd(command);
         cmd.args(args)
             .envs(env)
             .stdin(std::process::Stdio::piped())
@@ -227,6 +227,7 @@ impl McpManager {
     }
 
     /// Format tools as JSON schema for AI providers
+    #[allow(dead_code)]
     pub fn tools_as_json(&self) -> Vec<serde_json::Value> {
         self.tools
             .iter()
@@ -369,8 +370,24 @@ impl McpManager {
             }
         }
 
+        // Preserve built-in in-process tools (those not backed by a child process)
+        let built_in: Vec<McpTool> = self
+            .tools
+            .iter()
+            .filter(|t| t.server_name == crate::mcp_memory_server::SERVER_NAME)
+            .cloned()
+            .collect();
+        all_tools.extend(built_in);
+
         self.tools = all_tools.clone();
         Ok(all_tools)
+    }
+
+    /// Register the built-in in-process servers (e.g. blade.memory).
+    /// Call once at startup after McpManager is created.
+    pub fn register_built_in_servers(&mut self) {
+        let memory_tools = crate::mcp_memory_server::register_built_in_tools();
+        self.tools.extend(memory_tools);
     }
 
     /// Call a tool by its qualified name
@@ -386,6 +403,11 @@ impl McpManager {
             .find(|t| t.qualified_name == qualified_name)
             .ok_or(format!("Unknown tool: {}", qualified_name))?
             .clone();
+
+        // Dispatch to built-in in-process servers
+        if tool.server_name == crate::mcp_memory_server::SERVER_NAME {
+            return crate::mcp_memory_server::handle_tool_call(&tool.name, arguments).await;
+        }
 
         self.ensure_running(&tool.server_name).await?;
 
@@ -422,6 +444,7 @@ impl McpManager {
     }
 
     /// Shutdown all servers
+    #[allow(dead_code)]
     pub async fn shutdown(&mut self) {
         for (_, mut process) in self.processes.drain() {
             process.kill().await;

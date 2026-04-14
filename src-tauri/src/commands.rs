@@ -346,6 +346,26 @@ pub async fn send_message_stream(
         .map(|m| m.content.clone())
         .unwrap_or_default();
 
+    // ── Fast acknowledgment (two-tier routing) ──────────────────────────────
+    // Immediately fire a cheap/fast model to give the user a <500 ms response
+    // while the real full model is being prepared. Emitted as "chat_ack" so the
+    // frontend can display it before the main stream starts.
+    // Only makes sense for non-trivial messages (>10 chars) and when we have a key.
+    if last_user_text.len() > 10 {
+        let ack_msg = last_user_text.clone();
+        let ack_config = config.clone();
+        let ack_app = app.clone();
+        tokio::spawn(async move {
+            match providers::stream_fast_acknowledgment(&ack_msg, &ack_config).await {
+                Ok(ack) if !ack.is_empty() => {
+                    let _ = ack_app.emit("chat_ack", ack);
+                }
+                _ => {}
+            }
+        });
+    }
+    // ── End fast acknowledgment ──────────────────────────────────────────────
+
     let tool_snapshot = {
         let manager = state.lock().await;
         manager.get_tools().to_vec()
@@ -669,10 +689,23 @@ pub async fn send_message_stream(
         });
 
         if turn.tool_calls.is_empty() {
-            // Final text response — emit word-by-word for streaming feel
-            if !turn.content.is_empty() {
+            // Extract and execute semantic action tags before emitting to frontend.
+            // clean_content has [ACTION:...] tags stripped; actions are dispatched async.
+            let (clean_content, parsed_actions) = crate::action_tags::extract_actions(&turn.content);
+
+            // Execute actions in the background (fire-and-forget)
+            if !parsed_actions.is_empty() {
+                let actions_app = app.clone();
+                let actions_clone = parsed_actions.clone();
+                tokio::spawn(async move {
+                    crate::action_tags::execute_actions(actions_clone, &actions_app).await;
+                });
+            }
+
+            // Final text response — emit word-by-word for streaming feel (action-tags stripped)
+            if !clean_content.is_empty() {
                 let mut buf = String::new();
-                for ch in turn.content.chars() {
+                for ch in clean_content.chars() {
                     buf.push(ch);
                     // Emit on natural boundaries: space, newline, or every 6 chars
                     if ch == ' ' || ch == '\n' || buf.len() >= 6 {
@@ -690,7 +723,8 @@ pub async fn send_message_stream(
             let app2 = app.clone();
             let app3 = app.clone();
             let user_text = last_user_text.clone();
-            let assistant_text = turn.content.clone();
+            // Use clean_content for downstream processing so tags don't pollute memory
+            let assistant_text = clean_content.clone();
             let store_clone = vector_store.inner().clone();
             // Collect tool names used in this loop for skill pattern recording
             let tools_used: Vec<String> = conversation.iter().filter_map(|m| {
@@ -753,6 +787,14 @@ pub async fn send_message_stream(
                 let full_exchange = format!("User: {}\n\nAssistant: {}", user_text, assistant_text);
                 crate::knowledge_graph::grow_graph_from_conversation(&full_exchange).await;
             });
+            // VIRTUAL CONTEXT BLOCKS: update rolling conversation summary (fire-and-forget)
+            {
+                let vcb_user = user_text_thread.clone();
+                let vcb_assistant = assistant_text_thread.clone();
+                tokio::spawn(async move {
+                    let _ = crate::memory::update_conversation_block(&vcb_user, &vcb_assistant).await;
+                });
+            }
             // THREAD: auto-update working memory (spawns its own background task)
             crate::thread::auto_update_thread(app.clone(), user_text_thread.clone(), assistant_text_thread);
 
@@ -1336,7 +1378,7 @@ pub async fn auto_title_conversation(
         &config.api_key,
         model,
         &messages,
-        &[],
+        &[] as &[crate::providers::ToolDefinition],
         config.base_url.as_deref(),
     )
     .await
@@ -1385,4 +1427,146 @@ fn format_tool_result(result: &McpToolResult) -> String {
     } else {
         truncated
     }
+}
+
+// ── Persona onboarding ─────────────────────────────────────────────────────────
+
+/// Returns whether the user has completed the persona onboarding questionnaire.
+#[tauri::command]
+pub fn get_onboarding_status() -> bool {
+    crate::config::load_config().persona_onboarding_complete
+}
+
+/// Receives the 5 onboarding answers, writes them to persona.md, extracts
+/// traits and knowledge graph nodes, and marks onboarding as complete in config.
+///
+/// answers[0] = name + role
+/// answers[1] = current project / what they are building
+/// answers[2] = tools / languages / stack
+/// answers[3] = biggest goal
+/// answers[4] = communication preference
+#[tauri::command]
+pub async fn complete_onboarding(answers: Vec<String>) -> Result<(), String> {
+    if answers.len() < 5 {
+        return Err("Expected 5 answers".to_string());
+    }
+
+    // ── 1. Write persona.md ────────────────────────────────────────────────────
+    let persona_md = format!(
+        "# User Profile\n\n\
+         **Name & Role:** {}\n\n\
+         **Current Project:** {}\n\n\
+         **Stack & Tools:** {}\n\n\
+         **Biggest Goal:** {}\n\n\
+         **Communication Style:** {}\n",
+        answers[0].trim(),
+        answers[1].trim(),
+        answers[2].trim(),
+        answers[3].trim(),
+        answers[4].trim(),
+    );
+
+    let persona_path = crate::config::blade_config_dir().join("persona.md");
+    crate::config::write_blade_file(&persona_path, &persona_md)?;
+
+    // ── 2. Extract persona traits ──────────────────────────────────────────────
+    crate::persona_engine::ensure_tables();
+
+    // Communication preference maps to preferred_depth trait score
+    let comm_pref = answers[4].trim().to_lowercase();
+    let depth_score: f32 = if comm_pref.contains("brief") || comm_pref.contains("blunt") || comm_pref.contains("short") {
+        0.2
+    } else if comm_pref.contains("detail") || comm_pref.contains("thorough") || comm_pref.contains("in-depth") {
+        0.8
+    } else {
+        0.5
+    };
+    crate::persona_engine::update_trait("preferred_depth", depth_score, &answers[4]);
+
+    // Work identity from role answer
+    if !answers[0].trim().is_empty() {
+        crate::persona_engine::update_trait("work_identity", 0.9, answers[0].trim());
+    }
+
+    // Current goal
+    if !answers[3].trim().is_empty() {
+        crate::persona_engine::update_trait("current_goal", 0.9, answers[3].trim());
+    }
+
+    // Bump relationship — user trusted BLADE with personal info
+    crate::persona_engine::update_relationship(5.0, 5.0, Some("Completed persona onboarding".to_string()));
+
+    // ── 3. Knowledge graph nodes ───────────────────────────────────────────────
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+        // Project node from answer[1]
+        let project_answer = answers[1].trim().to_string();
+        if !project_answer.is_empty() {
+            let label = if project_answer.len() > 80 { project_answer[..80].to_string() } else { project_answer.clone() };
+            let slug: String = label.to_lowercase().replace(' ', "-").chars().take(60).collect();
+            let node_id = format!("project:{}", slug);
+            let _ = crate::db::brain_upsert_node(&conn, &node_id, &label, "project", "User current project from onboarding");
+        }
+
+        // Tool nodes from answer[2] — split on common separators
+        let stack_answer = answers[2].trim().to_string();
+        if !stack_answer.is_empty() {
+            let separators: &[char] = &[',', '/', '|', '+', '\n', ';'];
+            let tools: Vec<&str> = stack_answer
+                .split(|c| separators.contains(&c))
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty() && s.len() <= 40)
+                .take(12)
+                .collect();
+
+            for tool in tools {
+                let node_id = format!("tool:{}", tool.to_lowercase().replace(' ', "-"));
+                let _ = crate::db::brain_upsert_node(&conn, &node_id, tool, "tool", "Tool from user onboarding");
+            }
+        }
+    }
+
+    // ── 4. Seed virtual memory blocks with onboarding facts ───────────────────
+    // This immediately populates the human_block so every subsequent conversation
+    // starts with BLADE already knowing who the user is.
+    {
+        let mut blocks = crate::memory::load_memory_blocks();
+        let role_line = format!("User: {}", answers[0].trim());
+        let project_line = format!("Current project: {}", answers[1].trim());
+        let stack_line = format!("Stack/Tools: {}", answers[2].trim());
+        let goal_line = format!("Goal: {}", answers[3].trim());
+        let style_line = format!("Communication style: {}", answers[4].trim());
+        let facts = [role_line, project_line, stack_line, goal_line, style_line]
+            .iter()
+            .filter(|f| f.len() > 10)
+            .map(|f| format!("- {}", f))
+            .collect::<Vec<_>>()
+            .join("\n");
+        if !blocks.human_block.trim().is_empty() {
+            blocks.human_block = format!("{}\n{}", blocks.human_block.trim_end(), facts);
+        } else {
+            blocks.human_block = facts;
+        }
+        let _ = crate::memory::save_memory_blocks(&blocks);
+    }
+
+    // ── 5. Mark onboarding complete in config ──────────────────────────────────
+    let mut config = crate::config::load_config();
+    config.persona_onboarding_complete = true;
+
+    // Populate user_name from the first answer best-effort
+    if config.user_name.is_empty() && !answers[0].trim().is_empty() {
+        let first_word = answers[0].trim().split_whitespace().next().unwrap_or("").to_string();
+        // Looks like a name if it starts uppercase and is a reasonable length
+        if first_word.len() >= 2
+            && first_word.len() <= 20
+            && first_word.chars().next().map(|c| c.is_uppercase()).unwrap_or(false)
+        {
+            config.user_name = first_word;
+        }
+    }
+
+    crate::config::save_config(&config)?;
+
+    Ok(())
 }

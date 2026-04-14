@@ -205,6 +205,8 @@ fn build_machine_context(tier: &str) -> String {
         )
     ];
 
+    // User understanding is always first — it's the most important context
+    if let Some(s) = who_is_the_user_section() { sections.push(s); }
     if let Some(s) = recent_files_section() { sections.push(s); }
     if let Some(s) = downloads_section() { sections.push(s); }
     if let Some(s) = running_apps_section() { sections.push(s); }
@@ -320,13 +322,8 @@ fn downloads_section() -> Option<String> {
 fn running_apps_section() -> Option<String> {
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-
-        let out = Command::new("tasklist")
+        let out = crate::cmd_util::silent_cmd("tasklist")
             .args(["/FO", "CSV", "/NH"])
-            .creation_flags(CREATE_NO_WINDOW)
             .output()
             .ok()?;
 
@@ -358,8 +355,7 @@ fn running_apps_section() -> Option<String> {
 
     #[cfg(target_os = "macos")]
     {
-        use std::process::Command;
-        let out = Command::new("osascript")
+        let out = crate::cmd_util::silent_cmd("osascript")
             .args(["-e", "tell application \"System Events\" to get name of every process whose background only is false"])
             .output()
             .ok()?;
@@ -371,8 +367,7 @@ fn running_apps_section() -> Option<String> {
 
     #[cfg(target_os = "linux")]
     {
-        use std::process::Command;
-        let out = Command::new("ps")
+        let out = crate::cmd_util::silent_cmd("ps")
             .args(["-eo", "comm="])
             .output()
             .ok()?;
@@ -392,6 +387,80 @@ fn running_apps_section() -> Option<String> {
 
     #[allow(unreachable_code)]
     None
+}
+
+/// Synthesize everything BLADE knows about the user into a single context block.
+/// This runs on every god mode scan and is always injected — it's the foundation
+/// of user understanding. Sources: persona.md, persona_engine traits, memory episodes,
+/// knowledge graph nodes, and inferred patterns from recent files/apps.
+fn who_is_the_user_section() -> Option<String> {
+    let mut parts: Vec<String> = Vec::new();
+
+    // 1. Persona.md — manually curated user context (highest trust)
+    let persona_path = crate::config::blade_config_dir().join("persona.md");
+    if let Ok(persona) = std::fs::read_to_string(&persona_path) {
+        let trimmed = persona.trim().to_string();
+        if !trimmed.is_empty() {
+            parts.push(format!("**User-defined context:**\n{}", trimmed));
+        }
+    }
+
+    // 2. Learned persona traits (high-confidence only)
+    let traits = crate::persona_engine::get_all_traits();
+    let confident_traits: Vec<String> = traits
+        .iter()
+        .filter(|t| t.confidence > 0.5 && t.score > 0.4)
+        .map(|t| {
+            let level = if t.score >= 0.75 { "strong" } else { "moderate" };
+            format!("- {} ({} signal, {:.0}% confident)", t.trait_name, level, t.confidence * 100.0)
+        })
+        .collect();
+    if !confident_traits.is_empty() {
+        parts.push(format!("**Learned traits:**\n{}", confident_traits.join("\n")));
+    }
+
+    // 3. Relationship depth
+    let rel = crate::persona_engine::get_relationship_state();
+    if rel.intimacy_score > 0.0 || rel.trust_score > 0.0 {
+        parts.push(format!(
+            "**Relationship:** {:.0}/100 intimacy, {:.0}/100 trust",
+            rel.intimacy_score, rel.trust_score
+        ));
+    }
+
+    // 4. Recent memory episodes (top 2 most important)
+    let episodes = crate::memory_palace::search_episodes("", 2);
+    if !episodes.is_empty() {
+        let ep_lines: Vec<String> = episodes.iter().map(|ep| {
+            format!("- [{}] {}: {}", ep.episode_type, ep.title, ep.summary)
+        }).collect();
+        parts.push(format!("**Key memories:**\n{}", ep_lines.join("\n")));
+    }
+
+    // 5. Knowledge graph — user's known projects/technologies
+    let kg_context = crate::knowledge_graph::get_graph_context("user projects technologies");
+    if !kg_context.trim().is_empty() {
+        // Truncate to keep it compact
+        let capped = if kg_context.len() > 500 {
+            format!("{}...", &kg_context[..500])
+        } else {
+            kg_context
+        };
+        parts.push(format!("**Known projects/tech:**\n{}", capped));
+    }
+
+    if parts.is_empty() {
+        return None;
+    }
+
+    let body = parts.join("\n\n");
+    // Cap at 1500 chars — enough context, won't bloat the system prompt
+    let capped = if body.len() > 1500 {
+        format!("{}...", &body[..1500])
+    } else {
+        body
+    };
+    Some(format!("### Who is this user\n{}", capped))
 }
 
 fn monitor_section() -> Option<String> {
@@ -470,7 +539,6 @@ fn active_errors_section() -> Option<String> {
 /// Scan common code directories for git repos and show their status.
 /// Gives BLADE awareness of branches, dirty working trees, and ahead/behind state.
 fn git_repos_section() -> Option<String> {
-    use std::process::Command;
 
     let home = dirs::home_dir()?;
     // Common places devs keep repos
@@ -500,7 +568,7 @@ fn git_repos_section() -> Option<String> {
             let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
 
             // Get branch
-            let branch = Command::new("git")
+            let branch = crate::cmd_util::silent_cmd("git")
                 .args(["-C", &path.to_string_lossy(), "rev-parse", "--abbrev-ref", "HEAD"])
                 .output()
                 .ok()
@@ -508,7 +576,7 @@ fn git_repos_section() -> Option<String> {
                 .unwrap_or_else(|| "unknown".to_string());
 
             // Dirty state: number of changed files
-            let dirty_count = Command::new("git")
+            let dirty_count = crate::cmd_util::silent_cmd("git")
                 .args(["-C", &path.to_string_lossy(), "status", "--porcelain"])
                 .output()
                 .ok()
@@ -516,7 +584,7 @@ fn git_repos_section() -> Option<String> {
                 .unwrap_or(0);
 
             // Ahead/behind vs upstream
-            let ahead_behind = Command::new("git")
+            let ahead_behind = crate::cmd_util::silent_cmd("git")
                 .args(["-C", &path.to_string_lossy(), "rev-list", "--count", "--left-right", "@{upstream}...HEAD"])
                 .output()
                 .ok()

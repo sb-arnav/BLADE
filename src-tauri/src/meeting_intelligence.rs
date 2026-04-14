@@ -610,6 +610,7 @@ pub async fn extract_recurring_themes(days_back: i32) -> Vec<String> {
 // ── Context injection ─────────────────────────────────────────────────────────
 
 /// Brief meeting context for the system prompt — recent meetings and follow-ups needed.
+#[allow(dead_code)]
 pub fn get_meeting_context() -> String {
     let recent = list_meetings(5);
     if recent.is_empty() {

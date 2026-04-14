@@ -370,6 +370,7 @@ async fn llm_complete(prompt: &str) -> Result<String, String> {
 
 /// Ask the LLM if the text mentions a person and, if so, extract their name and traits.
 /// Returns None if no person is detected.
+#[allow(dead_code)]
 pub async fn extract_contact_from_text(text: &str) -> Option<Contact> {
     let prompt = format!(
         "Does the following text mention a specific person (not a public figure or generic role)?\n\n\

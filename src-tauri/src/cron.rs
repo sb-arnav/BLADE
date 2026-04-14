@@ -343,11 +343,11 @@ async fn execute_task(task: &CronTask, app: &tauri::AppHandle) {
             #[cfg(not(target_os = "windows"))]
             let default_cwd = "/tmp".to_string();
             #[cfg(target_os = "windows")]
-            let mut proc = tokio::process::Command::new("cmd");
+            let mut proc = crate::cmd_util::silent_tokio_cmd("cmd");
             #[cfg(target_os = "windows")]
             let proc = proc.args(["/C", &cmd]);
             #[cfg(not(target_os = "windows"))]
-            let mut proc = tokio::process::Command::new("sh");
+            let mut proc = crate::cmd_util::silent_tokio_cmd("sh");
             #[cfg(not(target_os = "windows"))]
             let proc = proc.args(["-c", &cmd]);
             let output = proc

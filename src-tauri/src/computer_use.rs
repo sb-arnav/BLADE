@@ -34,6 +34,7 @@ pub enum ComputerAction {
     NeedApproval { description: String, action_json: String },
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComputerUseStep {
     pub step: usize,

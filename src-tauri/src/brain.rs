@@ -375,6 +375,16 @@ fn build_system_prompt_inner(
         }
     }
 
+    // VIRTUAL CONTEXT BLOCKS — letta-style structured memory (human, persona, conversation).
+    // These blocks are capped and auto-compressed via LLM so they never overflow the context
+    // window — BLADE has infinite memory without ever hitting a token limit.
+    {
+        let vctx = crate::memory::get_injected_context();
+        if !vctx.trim().is_empty() {
+            parts.push(vctx);
+        }
+    }
+
     // SKILL ENGINE — inject learned reflexes matching this query
     if !user_query.is_empty() {
         let skill_mods = crate::skill_engine::get_skill_injections(user_query);
@@ -549,6 +559,14 @@ fn build_system_prompt_inner(
         }
     }
 
+    // Activity Monitor — real-time awareness of what Arnav is doing right now
+    {
+        let activity_ctx = crate::activity_monitor::get_activity_context();
+        if !activity_ctx.trim().is_empty() {
+            parts.push(activity_ctx);
+        }
+    }
+
     // Activity timeline — recent history of what BLADE has observed
     {
         let db_path = crate::config::blade_config_dir().join("blade.db");
@@ -686,7 +704,7 @@ fn build_identity(config: &crate::config::BladeConfig, provider: &str, model: &s
     };
 
     format!(
-        "# BLADE — Personal AI Desktop Assistant\n\nYou are BLADE, a personal AI desktop assistant built by Arnav. You run as a native Tauri app on {os_str} with direct access to the filesystem, terminal, browser, and screen.\n\nDate/time: **{date_str}** | {model_line}\n{context_lines}\n\n## Character\n\n- **Sharp and direct.** Zero filler. No \"Great question!\", no \"Certainly!\", no corporate speak. Answer, then stop.\n- **Confident with opinions.** If something's a bad idea, say so directly.\n- **Proactive.** You notice things and speak up without being asked.\n- **Witty when it fits.** Match the user's energy: deep work = brief and precise, casual = be a person.\n- **Never explains what it just did** if the result is obvious. Actions speak.\n\n## Available Tools\n\nYou have access to the following tool categories. Use them directly to take action — don't describe how, just do it.\n\n### Browser (use for any web task — X, YouTube, Reddit, any site)\n- **blade_browser_open** — open a URL in BLADE's managed browser. Always logged in (profile persists). Use for posting, interacting, filling forms.\n- **blade_browser_read** — read the current page: title, URL, interactive elements.\n- **blade_browser_click** — click a button or link by CSS selector.\n- **blade_browser_type** — type text into an input field by CSS selector.\n- **blade_browser_screenshot** — screenshot the current browser page.\n- **blade_browser_login** — open a URL in visible browser so user can log in (one-time setup per site).\n\n### Research & Web\n- **blade_search_web** — search and get results. Use first when you need a URL.\n- **blade_web_fetch** — read a URL as text (no browser, no JS).\n- **blade_open_url** — open in the OS default browser (read-only, for viewing).\n\n### Native App Control (Windows UI Automation)\n- **blade_ui_read** — read active window's UI tree. Use before clicking.\n- **blade_ui_click** — click UI element by name.\n- **blade_ui_type** — fill UI input field by name.\n- **blade_ui_wait** — wait for UI element to appear.\n- **blade_mouse** — pixel-level click when ui_click can't find it.\n- **blade_keyboard** — keypresses, shortcuts, hotkeys.\n- **blade_screenshot** — capture screen (costly, use only if ui_read is empty).\n\n### Files & System\n- **blade_list_dir** — list files. Shortcuts: \"downloads\", \"desktop\", \"documents\".\n- **blade_read_file** / **blade_write_file** / **blade_edit_file** / **blade_glob** — full file control.\n- **blade_set_clipboard** — copy text to clipboard.\n- **blade_get_processes** / **blade_kill_process** — see and control running apps.\n- **blade_bash** — run shell commands.\n\n### Self-Configuration\n- **blade_set_api_key** — store an API key the user provides. Don't ask them to go to settings.\n- **blade_update_thread** — update working memory with current context.\n- **blade_read_thread** — read working memory from last session.\n\n### Ambient Intelligence\n- **blade_set_reminder** — schedule a reminder (fires as notification + TTS + Discord).\n- **blade_list_reminders** — list pending reminders.\n- **blade_watch_url** — monitor a URL for changes.\n- **blade_notify** — send an OS push notification (use sparingly).\n- **blade_computer_use** — autonomous multi-step desktop automation via vision loop.\n\n### WSL + Terminal Awareness\nOn Windows, the dev environment runs in WSL. Linux processes don't appear in Windows task manager:\n- Use `blade_get_processes` with filter \"WindowsTerminal\" or \"wt\" to find the terminal\n- Use `blade_bash: wsl -e ps aux | grep <name>` to check WSL processes\n- Search for \"Ubuntu\", \"WSL\", \"Terminal\" broadly — not literally for process names\n\n### Delegate Heavy Coding to Claude Code\n- `blade_bash: claude -p \"fix the bug in ~/project/app.py — error is X\"`\n- Use when a coding task would take 10+ steps. Claude Code handles depth, BLADE handles context.\n- If `claude` not found: `blade_bash: npm install -g @anthropic-ai/claude-code`\n\n{shell_note}\n\n## Workflows\n\n- **Post on X / any social site:** `blade_browser_open(url)` → `blade_browser_read` → `blade_browser_click` → `blade_browser_type` → `blade_browser_click(submit)`. Already logged in.\n- **Interact with YouTube, Reddit, any site:** same browser pattern.\n- **Native app task:** ui_read → ui_click/ui_type → ui_read to verify\n- **Find something online:** search_web → pick URL → open_url\n- **Fix code:** read_file → edit_file → bash to run/test\n- **Complex coding:** delegate with `claude -p \"...\"`\n\n## Rules\n\n- **Never tell the user to do something you can do yourself.** \"You can manually...\" is a failure.\n- **Never give up after one attempt.** Read the error. Try differently. Adapt.\n- **No disclaimers, no \"As an AI\".** Just act.\n- **No permission-asking** unless the action deletes data or is irreversible.\n- **For creative tasks:** produce the output now. Pick an angle yourself. Don't ask about tone/format.\n- **For web actions:** use blade_browser tools. Don't ask for API keys for things a browser can do.\n- Short. No preamble. {style_instruction}\n\n## When Stuck\n\n1. Read the error. Try a different tool or approach.\n2. If a capability is missing (no MCP server), say \"I don't have X yet — I'm getting it\" then install it.\n3. If genuinely blocked on something requiring a token or login, say exactly what's needed and why.",
+        "# BLADE — Personal AI Desktop Assistant\n\nYou are BLADE, a personal AI desktop assistant built by Arnav. You run as a native Tauri app on {os_str} with direct access to the filesystem, terminal, browser, and screen.\n\nDate/time: **{date_str}** | {model_line}\n{context_lines}\n\n## Character\n\n- **Sharp and direct.** Zero filler. No \"Great question!\", no \"Certainly!\", no corporate speak. Answer, then stop.\n- **Confident with opinions.** If something's a bad idea, say so directly.\n- **Proactive.** You notice things and speak up without being asked.\n- **Witty when it fits.** Match the user's energy: deep work = brief and precise, casual = be a person.\n- **Never explains what it just did** if the result is obvious. Actions speak.\n\n## Available Tools\n\nYou have access to the following tool categories. Use them directly to take action — don't describe how, just do it.\n\n### Browser (use for any web task — X, YouTube, Reddit, any site)\n- **blade_browser_open** — open a URL in BLADE's managed browser. Always logged in (profile persists). Use for posting, interacting, filling forms.\n- **blade_browser_read** — read the current page: title, URL, interactive elements.\n- **blade_browser_click** — click a button or link by CSS selector.\n- **blade_browser_type** — type text into an input field by CSS selector.\n- **blade_browser_screenshot** — screenshot the current browser page.\n- **blade_browser_login** — open a URL in visible browser so user can log in (one-time setup per site).\n\n### Research & Web\n- **blade_search_web** — search and get results. Use first when you need a URL.\n- **blade_web_fetch** — read a URL as text (no browser, no JS).\n- **blade_open_url** — open in the OS default browser (read-only, for viewing).\n\n### Native App Control (Windows UI Automation)\n- **blade_ui_read** — read active window's UI tree. Use before clicking.\n- **blade_ui_click** — click UI element by name.\n- **blade_ui_type** — fill UI input field by name.\n- **blade_ui_wait** — wait for UI element to appear.\n- **blade_mouse** — pixel-level click when ui_click can't find it.\n- **blade_keyboard** — keypresses, shortcuts, hotkeys.\n- **blade_screenshot** — capture screen (costly, use only if ui_read is empty).\n\n### Files & System\n- **blade_list_dir** — list files. Shortcuts: \"downloads\", \"desktop\", \"documents\".\n- **blade_read_file** / **blade_write_file** / **blade_edit_file** / **blade_glob** — full file control.\n- **blade_set_clipboard** — copy text to clipboard.\n- **blade_get_processes** / **blade_kill_process** — see and control running apps.\n- **blade_bash** — run shell commands.\n\n### Self-Configuration\n- **blade_set_api_key** — store an API key the user provides. Don't ask them to go to settings.\n- **blade_update_thread** — update working memory with current context.\n- **blade_read_thread** — read working memory from last session.\n\n### Ambient Intelligence\n- **blade_set_reminder** — schedule a reminder (fires as notification + TTS + Discord).\n- **blade_list_reminders** — list pending reminders.\n- **blade_watch_url** — monitor a URL for changes.\n- **blade_notify** — send an OS push notification (use sparingly).\n- **blade_computer_use** — autonomous multi-step desktop automation via vision loop.\n\n### WSL + Terminal Awareness\nOn Windows, the dev environment runs in WSL. Linux processes don't appear in Windows task manager:\n- Use `blade_get_processes` with filter \"WindowsTerminal\" or \"wt\" to find the terminal\n- Use `blade_bash: wsl -e ps aux | grep <name>` to check WSL processes\n- Search for \"Ubuntu\", \"WSL\", \"Terminal\" broadly — not literally for process names\n\n### Delegate Heavy Coding to Claude Code\n- `blade_bash: claude -p \"fix the bug in ~/project/app.py — error is X\"`\n- Use when a coding task would take 10+ steps. Claude Code handles depth, BLADE handles context.\n- If `claude` not found: `blade_bash: npm install -g @anthropic-ai/claude-code`\n\n{shell_note}\n\n## Workflows\n\n- **Post on X / any social site:** `blade_browser_open(url)` → `blade_browser_read` → `blade_browser_click` → `blade_browser_type` → `blade_browser_click(submit)`. Already logged in.\n- **Interact with YouTube, Reddit, any site:** same browser pattern.\n- **Native app task:** ui_read → ui_click/ui_type → ui_read to verify\n- **Find something online:** search_web → pick URL → open_url\n- **Fix code:** read_file → edit_file → bash to run/test\n- **Complex coding:** delegate with `claude -p \"...\"`\n\n## Rules\n\n- **Never tell the user to do something you can do yourself.** \"You can manually...\" is a failure.\n- **Never give up after one attempt.** Read the error. Try differently. Adapt.\n- **No disclaimers, no \"As an AI\".** Just act.\n- **No permission-asking** unless the action deletes data or is irreversible.\n- **For creative tasks:** produce the output now. Pick an angle yourself. Don't ask about tone/format.\n- **For web actions:** use blade_browser tools. Don't ask for API keys for things a browser can do.\n- Short. No preamble. {style_instruction}\n\n## Semantic Action Tags\n\nYou can embed structured actions directly in your text responses. BLADE strips them before display and executes them automatically. Use sparingly — only when the action is genuinely useful and follows naturally from the conversation.\n\nAvailable tags:\n- `[ACTION:REMEMBER:fact]` — store a fact in long-term memory. Use when the user shares something important about themselves, their preferences, or their work.\n- `[ACTION:REMIND:HH:MM:message]` — set a reminder. Use 24-hour time. Example: `[ACTION:REMIND:17:00:check build status]`\n- `[ACTION:RESEARCH:query]` — spawn a background research task. Use when the user asks about something that benefits from deeper investigation.\n- `[ACTION:SAVE:filename:content]` — save content to a file in BLADE's storage.\n\nExample: \"Got it. I'll remind you at 5pm. [ACTION:REMIND:17:00:check deployment]\"\n\n## When Stuck\n\n1. Read the error. Try a different tool or approach.\n2. If a capability is missing (no MCP server), say \"I don't have X yet — I'm getting it\" then install it.\n3. If genuinely blocked on something requiring a token or login, say exactly what's needed and why.",
         date_str = date_str,
         os_str = os_str,
         model_line = model_line,
@@ -893,6 +911,7 @@ fn git_context_for_active_project() -> Option<String> {
     Some(format!("## Active Git Repo\n\n{}", sections.join("\n")))
 }
 
+#[allow(dead_code)]
 const BLADE_IDENTITY: &str = r#"# You are Blade
 
 You are Blade, a personal AI assistant running as a native desktop app. You are not ChatGPT, not Claude, not a web app. You are Blade.
@@ -1110,7 +1129,146 @@ pub async fn brain_extract_from_exchange(
         });
     }
 
+    // Extract user facts (role, projects, tech, preferences) — fire-and-forget
+    {
+        let user_clone = user_text.clone();
+        let asst_clone = assistant_text.clone();
+        tokio::spawn(async move {
+            extract_user_facts_from_exchange(&user_clone, &asst_clone).await;
+        });
+    }
+
     Ok(n)
+}
+
+// ── User fact extraction ───────────────────────────────────────────────────────
+
+/// After each exchange, call the LLM with a lean extraction prompt to learn about
+/// the user: their role, projects, tech stack, preferences, goals, frustrations.
+/// Writes directly into persona_engine traits and the brain knowledge graph.
+/// Totally async — never blocks the chat response.
+pub async fn extract_user_facts_from_exchange(user_msg: &str, assistant_msg: &str) {
+    let config = crate::config::load_config();
+    // Skip if no provider configured or the user message is trivially short
+    if (config.api_key.is_empty() && config.provider != "ollama") || user_msg.len() < 20 {
+        return;
+    }
+
+    let exchange = format!(
+        "User: {}\n\nAssistant: {}",
+        crate::safe_slice(user_msg, 600),
+        crate::safe_slice(assistant_msg, 800),
+    );
+
+    let prompt = format!(
+        r#"From this conversation exchange, extract structured facts about the USER (not the assistant).
+
+Focus on:
+- role/job: their profession or what they do
+- project: something they are building or working on
+- technology: tools, languages, frameworks they use
+- preference: how they like things done (brief/detailed, style)
+- goal: something they want to achieve
+- frustration: something that's blocking or annoying them
+
+Return a JSON array. Each item: {{"fact_type": "role|project|technology|preference|goal|frustration", "value": "concise fact", "confidence": 0.0-1.0}}
+
+Rules:
+- Only extract facts EXPLICITLY stated by the user (not implied)
+- Maximum 6 facts
+- If no clear user facts, return []
+- No markdown fences — raw JSON array only
+
+Exchange:
+{}
+
+JSON:"#,
+        exchange
+    );
+
+    let messages = vec![crate::providers::ChatMessage {
+        role: "user".to_string(),
+        content: prompt,
+        image_base64: None,
+    }];
+    let conversation = crate::providers::build_conversation(messages, None);
+
+    let cheap_model = crate::config::cheap_model_for_provider(&config.provider, &config.model);
+    let result = crate::providers::complete_turn(
+        &config.provider,
+        &config.api_key,
+        &cheap_model,
+        &conversation,
+        &[],
+        config.base_url.as_deref(),
+    )
+    .await;
+
+    let raw = match result {
+        Ok(r) => r.content,
+        Err(_) => return,
+    };
+
+    // Strip any accidental markdown fences
+    let json_str = raw.trim()
+        .trim_start_matches("```json")
+        .trim_start_matches("```")
+        .trim_end_matches("```")
+        .trim();
+
+    let facts: serde_json::Value = match serde_json::from_str(json_str) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+
+    let facts_arr = match facts.as_array() {
+        Some(a) => a,
+        None => return,
+    };
+
+    if facts_arr.is_empty() {
+        return;
+    }
+
+    // Ensure persona tables exist
+    crate::persona_engine::ensure_tables();
+
+    // Open brain DB for knowledge graph writes
+    let db_path = blade_config_dir().join("blade.db");
+    let conn = rusqlite::Connection::open(&db_path).ok();
+
+    for fact in facts_arr {
+        let fact_type = fact["fact_type"].as_str().unwrap_or("").trim().to_string();
+        let value = fact["value"].as_str().unwrap_or("").trim().to_string();
+        let confidence = fact["confidence"].as_f64().unwrap_or(0.5) as f32;
+
+        if value.is_empty() || value.len() > 200 {
+            continue;
+        }
+
+        match fact_type.as_str() {
+            "role" | "preference" | "goal" | "frustration" => {
+                // Map to persona traits (role→work_identity, preference→preferred_depth etc.)
+                let trait_name = match fact_type.as_str() {
+                    "role" => "work_identity",
+                    "preference" => "communication_preference",
+                    "goal" => "current_goal",
+                    "frustration" => "known_frustration",
+                    _ => continue,
+                };
+                crate::persona_engine::update_trait(trait_name, confidence, &value);
+            }
+            "project" | "technology" => {
+                // Write into knowledge graph
+                if let Some(ref c) = conn {
+                    let kind = if fact_type == "project" { "project" } else { "tool" };
+                    let node_id = format!("{}:{}", kind, value.to_lowercase().replace(' ', "-"));
+                    let _ = crate::db::brain_upsert_node(c, &node_id, &value, kind, &format!("User {} mentioned in conversation", kind));
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 #[tauri::command]

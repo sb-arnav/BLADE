@@ -153,6 +153,153 @@ pub async fn stream_text_thinking(
     }
 }
 
+/// Fast acknowledgment: complete a single short turn using a cheap/fast model
+/// (claude-haiku or gemini-flash), bypassing the user's configured model.
+/// Used to give immediate feedback (<500 ms) while the real request is still running.
+pub async fn stream_fast_acknowledgment(message: &str, config: &crate::config::BladeConfig) -> Result<String, String> {
+    // Pick the cheapest available fast model. Prefer Anthropic Haiku if the key is set.
+    // Fall back through providers in order of speed.
+    // All fields are owned Strings to avoid lifetime tangles.
+    let anthropic_key = crate::config::get_provider_key("anthropic");
+    let gemini_key    = crate::config::get_provider_key("gemini");
+    let openai_key    = crate::config::get_provider_key("openai");
+
+    let (provider, api_key, model): (String, String, String) =
+        if !anthropic_key.is_empty() {
+            ("anthropic".into(), anthropic_key, "claude-haiku-4-5-20251001".into())
+        } else if !gemini_key.is_empty() {
+            ("gemini".into(), gemini_key, "gemini-2.0-flash".into())
+        } else if !openai_key.is_empty() {
+            ("openai".into(), openai_key, "gpt-4o-mini".into())
+        } else if config.provider == "openrouter" && !config.api_key.is_empty() {
+            ("openrouter".into(), config.api_key.clone(), "meta-llama/llama-3.3-70b-instruct:free".into())
+        } else if config.provider == "ollama" {
+            ("ollama".into(), String::new(), config.model.clone())
+        } else {
+            // Last resort: use the user's configured provider + model
+            (config.provider.clone(), config.api_key.clone(), config.model.clone())
+        };
+
+    let system = "You are BLADE, a personal AI assistant. \
+        Give a 1-2 sentence acknowledgment that you understood what was asked and are working on it. \
+        Be natural. No filler like 'Certainly!' or 'Great question!' — \
+        just a brief human-sounding response that shows you got it.";
+
+    let messages = vec![
+        ConversationMessage::System(system.to_string()),
+        ConversationMessage::User(message.to_string()),
+    ];
+
+    let no_tools: &[ToolDefinition] = &[];
+    let turn = match provider.as_str() {
+        "anthropic"  => anthropic::complete(&api_key, &model, &messages, no_tools).await?,
+        "gemini"     => gemini::complete(&api_key, &model, &messages, no_tools).await?,
+        "groq"       => groq::complete(&api_key, &model, &messages, no_tools).await?,
+        "openai"     => openai::complete(&api_key, &model, &messages, no_tools, None).await?,
+        "ollama"     => ollama::complete(&model, &messages).await?,
+        "openrouter" => openai::complete(&api_key, &model, &messages, no_tools, Some(OPENROUTER_BASE_URL)).await?,
+        _            => {
+            // Custom base_url providers speak OpenAI-compat
+            let bu = config.base_url.as_deref();
+            openai::complete(&api_key, &model, &messages, no_tools, bu).await?
+        }
+    };
+
+    Ok(turn.content)
+}
+
+// ── Structured output / JSON guardrails ──────────────────────────────────────
+// Stolen from the guidance/constrained-generation pattern:
+// LLMs routinely produce JSON wrapped in markdown fences, with trailing commas,
+// or with preamble text. This utility extracts and repairs JSON so callers
+// never fail on parse errors from well-intentioned but slightly malformed output.
+
+/// Extract valid JSON from an LLM response that may contain markdown fences,
+/// prose preamble, trailing commas, or other common LLM JSON mistakes.
+///
+/// Returns the parsed Value on success, or the raw parse error if repair fails.
+pub fn extract_and_repair_json(raw: &str) -> serde_json::Result<serde_json::Value> {
+    let text = raw.trim();
+
+    // 1. Try direct parse (fast path for already-clean responses)
+    if let Ok(v) = serde_json::from_str(text) {
+        return Ok(v);
+    }
+
+    // 2. Strip markdown code fences (```json ... ``` or ``` ... ```)
+    let stripped = strip_code_fences(text);
+
+    // 3. Try after stripping fences
+    if let Ok(v) = serde_json::from_str(stripped) {
+        return Ok(v);
+    }
+
+    // 4. Extract the first JSON object {...} or array [...] from the text
+    let extracted = extract_json_substring(stripped);
+    if extracted != stripped {
+        if let Ok(v) = serde_json::from_str(extracted) {
+            return Ok(v);
+        }
+    }
+
+    // 5. Repair common issues: trailing commas before } or ]
+    let repaired = repair_trailing_commas(extracted);
+    serde_json::from_str(&repaired)
+}
+
+fn strip_code_fences(s: &str) -> &str {
+    if s.starts_with("```") {
+        let after_fence = s.find('\n').map(|i| &s[i + 1..]).unwrap_or(s);
+        after_fence
+            .rfind("```")
+            .map(|i| after_fence[..i].trim())
+            .unwrap_or(after_fence)
+    } else {
+        s
+    }
+}
+
+fn extract_json_substring(s: &str) -> &str {
+    // Try object first
+    if let (Some(start), Some(end)) = (s.find('{'), s.rfind('}')) {
+        if start < end {
+            return &s[start..=end];
+        }
+    }
+    // Try array
+    if let (Some(start), Some(end)) = (s.find('['), s.rfind(']')) {
+        if start < end {
+            return &s[start..=end];
+        }
+    }
+    s
+}
+
+fn repair_trailing_commas(s: &str) -> String {
+    // Remove trailing commas before closing braces/brackets: ,} and ,]
+    // Simple regex-free approach: scan for ,\s*[}\]]
+    let mut result = String::with_capacity(s.len());
+    let chars: Vec<char> = s.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == ',' {
+            // Look ahead past whitespace for } or ]
+            let mut j = i + 1;
+            while j < chars.len() && chars[j].is_whitespace() {
+                j += 1;
+            }
+            if j < chars.len() && (chars[j] == '}' || chars[j] == ']') {
+                // Skip the trailing comma
+                i += 1;
+                continue;
+            }
+        }
+        result.push(chars[i]);
+        i += 1;
+    }
+    result
+}
+
 pub async fn test_connection(provider: &str, api_key: &str, model: &str, base_url: Option<&str>) -> Result<String, String> {
     if base_url.is_some() && provider != "ollama" {
         return openai::test(api_key, model, base_url).await;

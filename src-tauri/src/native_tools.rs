@@ -1155,7 +1155,6 @@ async fn bash(command: &str, cwd: Option<&str>, timeout_ms: u64) -> (String, boo
 
     #[cfg(target_os = "windows")]
     let spawn_result = {
-        use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
         tokio::process::Command::new("cmd")
             .args(["/C", command])
@@ -1577,7 +1576,7 @@ async fn open_url(url: &str) -> (String, bool) {
     }
 
     #[cfg(target_os = "windows")]
-    let result = tokio::process::Command::new("cmd")
+    let result = crate::cmd_util::silent_tokio_cmd("cmd")
         .args(["/C", "start", "", url])
         .spawn();
 

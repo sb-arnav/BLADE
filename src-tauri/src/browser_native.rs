@@ -469,7 +469,7 @@ async fn launch_browser_debugger() -> Result<(), String> {
     // Try managed Chromium first (auto-download if needed)
     let managed = ensure_chromium().await;
     if let Ok(binary) = managed {
-        let result = std::process::Command::new(&binary)
+        let result = crate::cmd_util::silent_cmd(&binary)
             .args(&args)
             .spawn();
         if result.is_ok() {
@@ -486,7 +486,7 @@ async fn launch_browser_debugger() -> Result<(), String> {
             r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
         ];
         for binary in &binaries {
-            let result = std::process::Command::new(binary).args(&args).spawn();
+            let result = crate::cmd_util::silent_cmd(binary).args(&args).spawn();
             if result.is_ok() {
                 return Ok(());
             }
@@ -498,7 +498,7 @@ async fn launch_browser_debugger() -> Result<(), String> {
     {
         let binaries = ["google-chrome", "chromium-browser", "chromium", "microsoft-edge", "google-chrome-stable"];
         for binary in &binaries {
-            let result = std::process::Command::new(binary).args(&args).spawn();
+            let result = crate::cmd_util::silent_cmd(binary).args(&args).spawn();
             if result.is_ok() {
                 return Ok(());
             }
@@ -514,7 +514,7 @@ async fn launch_browser_debugger() -> Result<(), String> {
             "/Applications/Chromium.app/Contents/MacOS/Chromium",
         ];
         for binary in &binaries {
-            let result = std::process::Command::new(binary).args(&args).spawn();
+            let result = crate::cmd_util::silent_cmd(binary).args(&args).spawn();
             if result.is_ok() {
                 return Ok(());
             }

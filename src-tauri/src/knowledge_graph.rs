@@ -265,6 +265,7 @@ pub fn add_node(n: KnowledgeNode) -> Result<String, String> {
     }
 }
 
+#[allow(dead_code)]
 pub fn get_node(id: &str) -> Option<KnowledgeNode> {
     let conn = open_conn().ok()?;
     conn.prepare(
@@ -308,6 +309,7 @@ pub fn search_nodes(query: &str) -> Vec<KnowledgeNode> {
     .unwrap_or_default()
 }
 
+#[allow(dead_code)]
 pub fn update_node(id: &str, description: &str, importance: f32) -> Result<(), String> {
     let conn = open_conn()?;
     let now = chrono::Utc::now().timestamp();
@@ -348,6 +350,7 @@ pub fn add_edge(from_id: &str, to_id: &str, relation: &str, strength: f32) -> Re
 }
 
 /// Get all edges where node_id is either from or to.
+#[allow(dead_code)]
 pub fn get_edges(node_id: &str) -> Vec<KnowledgeEdge> {
     let conn = match open_conn() {
         Ok(c) => c,
@@ -365,6 +368,7 @@ pub fn get_edges(node_id: &str) -> Vec<KnowledgeEdge> {
     .unwrap_or_default()
 }
 
+#[allow(dead_code)]
 pub fn delete_edge(from_id: &str, to_id: &str) -> Result<(), String> {
     let conn = open_conn()?;
     conn.execute(

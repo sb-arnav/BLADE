@@ -2,7 +2,6 @@ use serde::Deserialize;
 use std::path::PathBuf;
 use tauri::Emitter;
 use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::Command;
 
 #[derive(Debug, Deserialize)]
 struct RunnerEnvelope {
@@ -75,7 +74,7 @@ pub async fn run_managed_agent(
                 .unwrap_or_else(|| PathBuf::from("."))
         });
 
-    let mut child = Command::new("node")
+    let mut child = crate::cmd_util::silent_tokio_cmd("node")
         .arg(&script_path)
         .arg(payload_b64)
         .current_dir(cwd)

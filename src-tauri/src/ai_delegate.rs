@@ -10,7 +10,6 @@
 /// "Make Friends" flow: BLADE introduces itself to the delegate during setup,
 /// asking it to save BLADE's identity to memory so future requests have context.
 
-use std::process::Command;
 
 /// Result of an AI delegate approval
 #[derive(Debug, Clone)]
@@ -115,7 +114,7 @@ fn parse_delegate_response(response: &str) -> DelegateDecision {
 
 /// Check if the Claude Code CLI is available
 pub fn claude_code_available() -> bool {
-    Command::new("claude").arg("--version").output().map(|o| o.status.success()).unwrap_or(false)
+    crate::cmd_util::silent_cmd("claude").arg("--version").output().map(|o| o.status.success()).unwrap_or(false)
 }
 
 /// "Make Friends" — introduce BLADE to Claude Code so it recognizes future requests.

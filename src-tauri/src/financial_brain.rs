@@ -371,6 +371,7 @@ fn compute_vs_last_month(
 
 /// Return monthly totals for a category for the last N months.
 /// Returns Vec of ("YYYY-MM", total_spent).
+#[allow(dead_code)]
 pub fn get_spending_trend(category: &str, months: usize) -> Vec<(String, f64)> {
     let now = chrono::Local::now();
     let mut result = Vec::new();

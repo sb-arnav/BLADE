@@ -17,3 +17,17 @@ pub fn silent_cmd<S: AsRef<OsStr>>(program: S) -> Command {
     }
     c
 }
+
+/// Create a `tokio::process::Command` with `CREATE_NO_WINDOW` set on Windows.
+/// Use this for async process spawning to prevent terminal flash.
+pub fn silent_tokio_cmd<S: AsRef<OsStr>>(program: S) -> tokio::process::Command {
+    let mut c = tokio::process::Command::new(program);
+    #[cfg(target_os = "windows")]
+    {
+        // tokio::process::Command exposes creation_flags directly on Windows
+        // without needing to import std::os::windows::process::CommandExt
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        c.creation_flags(CREATE_NO_WINDOW);
+    }
+    c
+}

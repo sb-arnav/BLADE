@@ -484,6 +484,7 @@ pub async fn forge_if_needed(user_request: &str, error_message: &str) -> Option<
 }
 
 /// Increment `use_count` and set `last_used` timestamp for the named tool.
+#[allow(dead_code)]
 pub fn record_tool_use(name: &str) {
     let conn = match open_db() {
         Ok(c) => c,

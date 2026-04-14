@@ -628,6 +628,9 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
   const [timelineEnabled, setTimelineEnabled] = useState(config.screen_timeline_enabled ?? false);
   const [timelineInterval, setTimelineInterval] = useState(config.timeline_capture_interval ?? 30);
   const [timelineRetention, setTimelineRetention] = useState(config.timeline_retention_days ?? 14);
+  const [showKey, setShowKey] = useState(false);
+  const [testState, setTestState] = useState<"idle" | "testing" | "ok" | "error">("idle");
+  const [testMessage, setTestMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setProvider(config.provider);
@@ -688,21 +691,24 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
   };
 
   const handleTest = async () => {
-    setStatus("Testing connection...");
-    setError(null);
-
+    setTestState("testing");
+    setTestMessage(null);
     try {
       const result = await invoke<string>("test_provider", { provider, apiKey, model, baseUrl: baseUrl || null });
-      setStatus(`Connected: ${result}`);
+      setTestState("ok");
+      setTestMessage(result);
     } catch (cause) {
-      setStatus(null);
-      setError(typeof cause === "string" ? cause : String(cause));
+      setTestState("error");
+      setTestMessage(typeof cause === "string" ? cause : String(cause));
     }
   };
 
   const handleSave = async () => {
-    setStatus("Saving settings...");
+    setStatus("Saving...");
     setError(null);
+    // Auto-test on save so user gets immediate feedback
+    setTestState("testing");
+    setTestMessage(null);
 
     try {
       const godModeEnabled = godModeTier !== "off";
@@ -728,10 +734,20 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
         voice_shortcut: voiceShortcut,
         onboarded: true,
       };
-      setStatus("Settings saved.");
+      setStatus("Saved.");
       onSaved(nextConfig);
+      // Test connection after save
+      try {
+        const result = await invoke<string>("test_provider", { provider, apiKey, model, baseUrl: baseUrl || null });
+        setTestState("ok");
+        setTestMessage(result);
+      } catch (testErr) {
+        setTestState("error");
+        setTestMessage(typeof testErr === "string" ? testErr : String(testErr));
+      }
     } catch (cause) {
       setStatus(null);
+      setTestState("idle");
       setError(typeof cause === "string" ? cause : String(cause));
     }
   };
@@ -1070,39 +1086,50 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
         </>}
 
         {tab === "provider" && <>
+
+        {/* ── Active provider status bar ── */}
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-blade-surface border border-blade-border">
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] uppercase tracking-widest text-blade-muted mb-0.5">Active provider</p>
+            <p className="text-sm font-semibold truncate">
+              {selectedEntry?.name ?? provider} <span className="font-mono text-blade-muted font-normal text-xs">· {model || "no model"}</span>
+            </p>
+          </div>
+          {testState === "testing" && (
+            <span className="text-[10px] px-2 py-1 rounded-full border border-blade-muted/30 text-blade-muted animate-pulse">testing…</span>
+          )}
+          {testState === "ok" && (
+            <span className="text-[10px] px-2 py-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-400">● connected</span>
+          )}
+          {testState === "error" && (
+            <span className="text-[10px] px-2 py-1 rounded-full border border-red-500/40 bg-red-500/10 text-red-400">✕ error</span>
+          )}
+          {testState === "idle" && (
+            <span className="text-[10px] px-2 py-1 rounded-full border border-blade-border text-blade-muted/50">not tested</span>
+          )}
+        </div>
+
+        {/* ── Provider picker ── */}
         <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
-          {/* Provider card grid */}
+
+          {/* Native / cloud APIs */}
           <div>
-            <span className="text-xs uppercase tracking-wide text-blade-muted">Provider</span>
-            <div className="mt-2 grid grid-cols-2 gap-1.5">
-              {PROVIDER_MATRIX.map((entry, i) => {
-                const isSelected = selectedEntry === entry ||
-                  (selectedEntry?.name === entry.name && selectedEntry?.baseUrl === entry.baseUrl);
+            <p className="text-[9px] uppercase tracking-widest text-blade-muted/60 mb-2">Native APIs</p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {PROVIDER_MATRIX.filter(e => !e.baseUrl && e.id !== "ollama").map((entry, i) => {
+                const isSelected = selectedEntry?.name === entry.name && selectedEntry?.baseUrl === entry.baseUrl;
                 return (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => {
-                      setSelectedEntry(entry);
-                      setProvider(entry.id);
-                      if (entry.model) setModel(entry.model);
-                      if (entry.baseUrl !== undefined) setBaseUrl(entry.baseUrl);
-                    }}
-                    className={`flex flex-col items-start gap-0.5 rounded-xl border px-3 py-2 text-left transition-colors ${
-                      isSelected
-                        ? "border-blade-accent bg-blade-accent/10 text-blade-accent"
-                        : "border-blade-border text-blade-muted hover:border-blade-accent/40 hover:text-blade-text"
-                    }`}
+                  <button key={i} type="button"
+                    onClick={() => { setSelectedEntry(entry); setProvider(entry.id); if (entry.model) setModel(entry.model); setBaseUrl(entry.baseUrl ?? ""); setTestState("idle"); setTestMessage(null); }}
+                    className={`flex items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors ${isSelected ? "border-blade-accent bg-blade-accent/10" : "border-blade-border hover:border-blade-accent/40"}`}
                   >
-                    <span className="text-xs font-semibold leading-tight">{entry.name}</span>
-                    <div className="flex flex-wrap gap-1 mt-0.5">
-                      {entry.badges.map((b) => (
-                        <span
-                          key={b}
-                          className={`text-[9px] px-1 rounded ${isSelected ? "bg-blade-accent/20 text-blade-accent" : "bg-blade-bg text-blade-muted"}`}
-                        >
-                          {b}
-                        </span>
+                    <div>
+                      <p className={`text-xs font-semibold leading-tight ${isSelected ? "text-blade-accent" : "text-blade-text"}`}>{entry.name}</p>
+                      <p className="text-[9px] text-blade-muted/60 font-mono mt-0.5 truncate max-w-[120px]">{entry.model}</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 ml-1">
+                      {entry.badges.slice(0, 2).map(b => (
+                        <span key={b} className={`text-[8px] px-1 py-0.5 rounded whitespace-nowrap ${isSelected ? "bg-blade-accent/20 text-blade-accent" : "bg-blade-bg text-blade-muted/70"}`}>{b}</span>
                       ))}
                     </div>
                   </button>
@@ -1111,84 +1138,143 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             </div>
           </div>
 
-          {/* Model + key fields */}
-          <div className="grid gap-3 md:grid-cols-2">
+          {/* OpenAI-compatible providers */}
+          <div>
+            <p className="text-[9px] uppercase tracking-widest text-blade-muted/60 mb-2">OpenAI-Compatible</p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {PROVIDER_MATRIX.filter(e => !!e.baseUrl).map((entry, i) => {
+                const isSelected = selectedEntry?.name === entry.name && selectedEntry?.baseUrl === entry.baseUrl;
+                return (
+                  <button key={i} type="button"
+                    onClick={() => { setSelectedEntry(entry); setProvider(entry.id); if (entry.model) setModel(entry.model); setBaseUrl(entry.baseUrl ?? ""); setTestState("idle"); setTestMessage(null); }}
+                    className={`flex items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors ${isSelected ? "border-blade-accent bg-blade-accent/10" : "border-blade-border hover:border-blade-accent/40"}`}
+                  >
+                    <div>
+                      <p className={`text-xs font-semibold leading-tight ${isSelected ? "text-blade-accent" : "text-blade-text"}`}>{entry.name}</p>
+                      <p className="text-[9px] text-blade-muted/60 font-mono mt-0.5 truncate max-w-[120px]">{entry.model}</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 ml-1">
+                      {entry.badges.slice(0, 2).map(b => (
+                        <span key={b} className={`text-[8px] px-1 py-0.5 rounded whitespace-nowrap ${isSelected ? "bg-blade-accent/20 text-blade-accent" : "bg-blade-bg text-blade-muted/70"}`}>{b}</span>
+                      ))}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Local */}
+          <div>
+            <p className="text-[9px] uppercase tracking-widest text-blade-muted/60 mb-2">Local</p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {PROVIDER_MATRIX.filter(e => e.id === "ollama").map((entry, i) => {
+                const isSelected = selectedEntry?.name === entry.name;
+                return (
+                  <button key={i} type="button"
+                    onClick={() => { setSelectedEntry(entry); setProvider(entry.id); if (entry.model) setModel(entry.model); setBaseUrl(""); setTestState("idle"); setTestMessage(null); }}
+                    className={`flex items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors ${isSelected ? "border-blade-accent bg-blade-accent/10" : "border-blade-border hover:border-blade-accent/40"}`}
+                  >
+                    <div>
+                      <p className={`text-xs font-semibold leading-tight ${isSelected ? "text-blade-accent" : "text-blade-text"}`}>{entry.name}</p>
+                      <p className="text-[9px] text-blade-muted/60 font-mono mt-0.5">{entry.model}</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 ml-1">
+                      {entry.badges.slice(0, 2).map(b => (
+                        <span key={b} className={`text-[8px] px-1 py-0.5 rounded whitespace-nowrap ${isSelected ? "bg-blade-accent/20 text-blade-accent" : "bg-blade-bg text-blade-muted/70"}`}>{b}</span>
+                      ))}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Model + key */}
+          <div className="grid gap-3 grid-cols-2 pt-1 border-t border-blade-border/50">
             <label className="space-y-1.5">
-              <span className="text-xs uppercase tracking-wide text-blade-muted">Model</span>
+              <span className="text-[9px] uppercase tracking-widest text-blade-muted">Model</span>
               <input
                 value={model}
-                onChange={(event) => setModel(event.target.value)}
-                className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none font-mono"
+                onChange={(e) => setModel(e.target.value)}
+                className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none font-mono focus:border-blade-accent/50 transition-colors"
                 placeholder="model-name"
               />
             </label>
 
             {provider !== "ollama" && (
               <label className="space-y-1.5">
-                <span className="text-xs uppercase tracking-wide text-blade-muted">API Key</span>
-                <input
-                  type="password"
-                  value={apiKey}
-                  onChange={(event) => setApiKey(event.target.value)}
-                  className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none"
-                  placeholder={selectedEntry?.keyPlaceholder ?? "your-api-key"}
-                />
+                <span className="text-[9px] uppercase tracking-widest text-blade-muted">API Key</span>
+                <div className="relative">
+                  <input
+                    type={showKey ? "text" : "password"}
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 pr-9 text-sm outline-none font-mono focus:border-blade-accent/50 transition-colors"
+                    placeholder={selectedEntry?.keyPlaceholder ?? "your-api-key"}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowKey(v => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-blade-muted/50 hover:text-blade-muted transition-colors"
+                  >
+                    {showKey ? (
+                      <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24M1 1l22 22"/></svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    )}
+                  </button>
+                </div>
               </label>
             )}
           </div>
 
-          {/* Hermes 3 setup guide — shown when Ollama + hermes3 is selected */}
-          {provider === "ollama" && model === "hermes3" && (
-            <div className="rounded-xl border border-blade-accent/30 bg-blade-accent/5 px-3 py-3 space-y-2">
-              <p className="text-xs font-semibold text-blade-accent">Hermes 3 — Local Tool-Calling AI</p>
-              <p className="text-[11px] text-blade-muted leading-relaxed">
-                Hermes 3 (NousResearch) is the best open-source model for tool use and agent tasks. It runs 100% locally via Ollama.
-                BLADE automatically routes complex agent tasks to Hermes when you use this provider.
-              </p>
-              <div className="rounded-lg bg-blade-bg border border-blade-border px-2.5 py-1.5">
-                <p className="text-[10px] text-blade-muted mb-1">If you haven&apos;t pulled the model yet, run this once:</p>
-                <code className="text-xs font-mono text-blade-accent">ollama pull hermes3</code>
-              </div>
-              <p className="text-[10px] text-blade-muted/60">
-                Make sure Ollama is running before starting a conversation. Default port is 11434.
-                For a bigger context window, try <code className="font-mono">hermes3:8b</code> or <code className="font-mono">hermes3:70b</code>.
-              </p>
-            </div>
-          )}
-
-          {/* Base URL — shown for openai-compat providers or when custom */}
+          {/* Base URL — shown for OpenAI-compat */}
           {(baseUrl || selectedEntry?.name === "Custom") && provider !== "ollama" && (
             <label className="space-y-1.5 block">
-              <span className="text-xs uppercase tracking-wide text-blade-muted">
-                Base URL <span className="normal-case text-blade-muted/60">(OpenAI-compatible endpoint)</span>
+              <span className="text-[9px] uppercase tracking-widest text-blade-muted">
+                Base URL <span className="normal-case text-blade-muted/50 text-[9px]">— OpenAI-compatible endpoint</span>
               </span>
               <input
                 type="text"
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
-                className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none font-mono"
+                className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none font-mono focus:border-blade-accent/50 transition-colors"
                 placeholder="https://api.example.com/v1"
               />
             </label>
           )}
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleTest}
-              className="px-4 py-2 rounded-xl bg-blade-bg border border-blade-border text-sm hover:border-blade-muted transition-colors"
+          {/* Hermes 3 tip */}
+          {provider === "ollama" && model === "hermes3" && (
+            <div className="rounded-xl border border-blade-accent/30 bg-blade-accent/5 px-3 py-3 space-y-1.5">
+              <p className="text-xs font-semibold text-blade-accent">Hermes 3 — best local tool-calling model</p>
+              <code className="block text-xs font-mono text-blade-accent/80 bg-blade-bg rounded-lg px-2.5 py-1.5 border border-blade-border">ollama pull hermes3</code>
+              <p className="text-[10px] text-blade-muted/60">Make sure Ollama is running (port 11434). Try <code className="font-mono">hermes3:8b</code> or <code className="font-mono">hermes3:70b</code> for bigger context.</p>
+            </div>
+          )}
+
+          {/* Actions + status */}
+          <div className="flex items-center gap-2 pt-1 border-t border-blade-border/50">
+            <button onClick={handleTest} disabled={testState === "testing"}
+              className="px-3 py-1.5 rounded-lg bg-blade-bg border border-blade-border text-xs hover:border-blade-muted transition-colors disabled:opacity-50"
             >
-              Test
+              {testState === "testing" ? "Testing…" : "Test"}
             </button>
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 rounded-xl bg-blade-accent text-white text-sm hover:opacity-90 transition-opacity"
+            <button onClick={handleSave}
+              className="px-4 py-1.5 rounded-lg bg-blade-accent text-white text-xs hover:opacity-90 transition-opacity font-medium"
             >
               Save
             </button>
+            {status && <span className="text-xs text-emerald-400">{status}</span>}
+            {error && <span className="text-xs text-red-400 truncate max-w-[180px]" title={error}>{error}</span>}
+            {testState === "error" && testMessage && (
+              <span className="text-xs text-red-400 truncate max-w-[200px]" title={testMessage}>{testMessage}</span>
+            )}
+            {testState === "ok" && testMessage && (
+              <span className="text-xs text-emerald-400 truncate max-w-[200px]">{testMessage}</span>
+            )}
           </div>
-
-          {status && <p className="text-xs text-green-400">{status}</p>}
-          {error && <p className="text-xs text-red-400">{error}</p>}
         </section>
 
         <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
@@ -1205,59 +1291,6 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             <p className="text-xs text-blade-muted mt-0.5">Route different task types to different providers. Code → Claude, quick replies → Groq, vision → Gemini. One brain, best model per job.</p>
           </div>
           <RoutingPanel />
-        </section>
-
-        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
-          <div>
-            <h2 className="text-base font-semibold">Provider Guide</h2>
-            <p className="text-sm text-blade-muted">
-              Quick guidance for choosing a provider without leaving the app.
-            </p>
-          </div>
-          <div className="space-y-3">
-            {PROVIDER_MATRIX.map((providerInfo) => {
-              const isActive = providerInfo.id === provider;
-
-              return (
-                <button
-                  key={providerInfo.id}
-                  onClick={() => {
-                    setProvider(providerInfo.id);
-                    setModel(providerInfo.model);
-                  }}
-                  className={`w-full text-left rounded-xl border px-4 py-3 transition-colors ${
-                    isActive
-                      ? "border-blade-accent bg-blade-bg"
-                      : "border-blade-border bg-blade-bg/60 hover:border-blade-muted"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-medium">{providerInfo.name}</div>
-                      <div className="text-xs text-blade-muted mt-0.5">
-                        Recommended default: {providerInfo.model}
-                      </div>
-                    </div>
-                    {isActive && (
-                      <span className="text-[11px] uppercase tracking-[0.2em] text-blade-accent">
-                        active
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {providerInfo.badges.map((badge) => (
-                      <span
-                        key={badge}
-                        className="text-[11px] rounded-full border border-blade-border bg-blade-surface px-2.5 py-1 text-blade-muted"
-                      >
-                        {badge}
-                      </span>
-                    ))}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
         </section>
         </>}
 

@@ -788,6 +788,7 @@ pub async fn proactive_suggestion(app: &tauri::AppHandle) {
 
 /// Mark a prediction as fulfilled when the user actually asks for it.
 /// Fulfilled predictions reinforce the system's confidence in the underlying patterns.
+#[allow(dead_code)]
 pub fn mark_prediction_fulfilled(prediction_text: &str) {
     let conn = match open_db() {
         Some(c) => c,

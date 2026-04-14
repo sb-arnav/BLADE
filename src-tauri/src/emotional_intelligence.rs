@@ -456,6 +456,7 @@ fn make_trend_recommendation(avg_valence: f32, today_avg: f32, dominant: &str) -
 
 /// Map an emotional state to a response strategy. Uses deterministic mapping
 /// for common states — no LLM call needed.
+#[allow(dead_code)]
 pub async fn get_support_response(emotion: &EmotionalState) -> SupportResponse {
     match emotion.primary_emotion.as_str() {
         "stressed" => SupportResponse {
@@ -677,6 +678,7 @@ pub async fn analyze_emotional_patterns(days_back: i32) -> String {
 
 /// If the user is in a severe negative state (valence < -0.6 AND confidence > 0.7),
 /// suggest a grounding action. Returns None otherwise.
+#[allow(dead_code)]
 pub async fn suggest_emotional_intervention(current_state: &EmotionalState) -> Option<String> {
     if current_state.valence >= -0.6 || current_state.confidence <= 0.7 {
         return None;

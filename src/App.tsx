@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { ActivityFeed, useActivityFeed } from "./components/ActivityFeed";
+import { OnboardingModal } from "./components/OnboardingModal";
 import { ChatWindow } from "./components/ChatWindow";
 import { CommandPalette } from "./components/CommandPalette";
 import { NotificationCenter, useNotifications } from "./components/NotificationCenter";
@@ -172,6 +173,7 @@ export default function App() {
   const [config, setConfig] = useState<BladeConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [route, setRoute] = useState<Route>("chat");
+  const [personaOnboardingOpen, setPersonaOnboardingOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const [systemPromptOpen, setSystemPromptOpen] = useState(false);
@@ -223,6 +225,13 @@ export default function App() {
       const cfg = await invoke<BladeConfig>("get_config");
       console.log("[Blade] Config loaded:", { onboarded: cfg.onboarded, provider: cfg.provider, hasKey: !!cfg.api_key });
       setConfig(cfg);
+      // Check persona onboarding: only show after the main API-key onboarding is done
+      if (cfg.onboarded) {
+        const personaDone = await invoke<boolean>("get_onboarding_status").catch(() => true);
+        if (!personaDone) {
+          setPersonaOnboardingOpen(true);
+        }
+      }
     } catch {
       setConfig({
         provider: "",
@@ -505,6 +514,19 @@ export default function App() {
       notifications.add({ type: "warning", title: "Background AI disabled", message: event.payload.message });
     });
 
+    // Shortcut registration failure — OS conflict, tell user to change it in Settings
+    const unlistenShortcutFailed = listen<{ name: string; shortcut: string; error: string }>(
+      "shortcut_registration_failed",
+      (event) => {
+        notifications.add({
+          type: "warning",
+          title: `Shortcut conflict: ${event.payload.name}`,
+          message: `"${event.payload.shortcut}" couldn't be registered (${event.payload.error}). Change it in Settings → General.`,
+          action: { label: "Fix", callback: () => openRoute("settings") },
+        });
+      }
+    );
+
     // Provider fallback notification — emitted when BLADE auto-switches to fallback provider
     const unlistenFallback = listen<{ type: string; message: string }>("blade_notification", (event) => {
       notifications.add({ type: event.payload.type as "info" | "success" | "error", title: "BLADE", message: event.payload.message });
@@ -607,6 +629,7 @@ export default function App() {
       unlistenAutoskillInstalled.then((fn) => fn());
       unlistenAutoskillSuggestion.then((fn) => fn());
       unlistenBgAiDisabled.then((fn) => fn());
+      unlistenShortcutFailed.then((fn) => fn());
       unlistenFallback.then((fn) => fn());
       unlistenMonitorOff.then((fn) => fn());
       unlistenSelfCode.then((fn) => fn());
@@ -1106,6 +1129,11 @@ export default function App() {
         </Suspense>
       </div>
       <VoiceOrb status={voiceMode.status} mode={voiceMode.mode} onDismissError={voiceMode.stopEverything} />
+      {personaOnboardingOpen && (
+        <OnboardingModal
+          onComplete={() => setPersonaOnboardingOpen(false)}
+        />
+      )}
     </div>
     </ErrorBoundary>
   );

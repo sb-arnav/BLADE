@@ -40,7 +40,7 @@ async fn spawn_task_agent(
         manager.get_tools().to_vec()
     };
 
-    let steps = planner::plan_steps(
+    let plan = planner::plan_full(
         &config.provider,
         &config.api_key,
         &config.model,
@@ -49,11 +49,15 @@ async fn spawn_task_agent(
         &tools,
     )
     .await
-    .unwrap_or_default();
+    .unwrap_or_else(|_| crate::agents::planner::TaskPlan {
+        steps: Vec::new(),
+        synthesis_prompt: String::new(),
+    });
 
     let agent_id = uuid::Uuid::new_v4().to_string();
     let mut agent = Agent::new(agent_id.clone(), enriched_goal);
-    agent.steps = steps;
+    agent.steps = plan.steps;
+    agent.synthesis_prompt = plan.synthesis_prompt;
     agent.status = AgentStatus::Executing;
 
     {

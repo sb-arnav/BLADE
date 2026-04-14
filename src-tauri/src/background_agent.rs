@@ -207,7 +207,7 @@ async fn run_agent(
     cancel: Arc<std::sync::atomic::AtomicBool>,
     app: tauri::AppHandle,
 ) {
-    let mut child = match tokio::process::Command::new(&cmd)
+    let mut child = match crate::cmd_util::silent_tokio_cmd(&cmd)
         .args(&args)
         .current_dir(&cwd)
         .stdout(std::process::Stdio::piped())

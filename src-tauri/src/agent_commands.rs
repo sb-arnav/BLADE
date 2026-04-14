@@ -246,8 +246,8 @@ pub async fn agent_create(
         manager.get_tools().to_vec()
     };
 
-    // Plan steps
-    let steps = planner::plan_steps(
+    // Stage 1: Plan steps with synthesis guidance
+    let plan = planner::plan_full(
         &config.provider,
         &config.api_key,
         &config.model,
@@ -257,7 +257,8 @@ pub async fn agent_create(
     )
     .await?;
 
-    agent.steps = steps;
+    agent.steps = plan.steps;
+    agent.synthesis_prompt = plan.synthesis_prompt;
     agent.status = AgentStatus::Executing;
 
     let agent_id = {
@@ -342,6 +343,8 @@ pub async fn agent_create_desktop(
             result: None,
             started_at: None,
             completed_at: None,
+            dependencies: Vec::new(),
+            reflections: Vec::new(),
         })
         .collect();
 
@@ -427,6 +430,41 @@ pub(crate) async fn run_agent_loop_internal(
             "status": format!("{:?}", status.unwrap_or(AgentStatus::Failed)),
         }),
     );
+
+    // Stage 4: Synthesize a final response when the agent completed successfully
+    let synthesis_data = {
+        let q = queue.lock().await;
+        q.get(agent_id).filter(|a| a.status == AgentStatus::Completed).map(|a| {
+            (a.goal.clone(), a.steps.clone(), a.synthesis_prompt.clone())
+        })
+    };
+
+    if let Some((goal, steps, synthesis_prompt)) = synthesis_data {
+        match planner::synthesize_response(
+            &goal,
+            &steps,
+            &synthesis_prompt,
+            provider,
+            api_key,
+            model,
+            base_url.as_deref(),
+        )
+        .await
+        {
+            Ok(result) => {
+                let _ = app.emit(
+                    "agent_synthesized",
+                    serde_json::json!({
+                        "agent_id": agent_id,
+                        "result": result,
+                    }),
+                );
+            }
+            Err(e) => {
+                log::warn!("Agent {} synthesis failed: {}", agent_id, e);
+            }
+        }
+    }
 }
 
 async fn run_desktop_agent_loop(

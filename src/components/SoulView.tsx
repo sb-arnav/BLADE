@@ -135,18 +135,55 @@ interface Props {
   onBack: () => void;
 }
 
+interface PersonaTrait {
+  trait_name: string;
+  score: number;
+  confidence: number;
+  evidence: string[];
+  updated_at: number;
+}
+
+interface RelationshipState {
+  intimacy_score: number;
+  trust_score: number;
+  shared_context: string[];
+  growth_moments: string[];
+}
+
+interface KnowledgeNode {
+  id: string;
+  label: string;
+  node_type: string;
+  description: string;
+}
+
+interface UserProfile {
+  user_name: string;
+  onboarding_complete: boolean;
+  traits: PersonaTrait[];
+  relationship: RelationshipState;
+  persona_md: string;
+  activity_context: string;
+  knowledge_nodes: KnowledgeNode[];
+}
+
 export function SoulView({ onBack }: Props) {
   const [state, setState] = useState<SoulState | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [snapshotting, setSnapshotting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"you" | "blade" | "diff">("you");
+  const [activeTab, setActiveTab] = useState<"profile" | "you" | "blade" | "diff">("profile");
   const [snapshotResult, setSnapshotResult] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const s = await invoke<SoulState>("soul_get_state");
+      const [s, p] = await Promise.all([
+        invoke<SoulState>("soul_get_state"),
+        invoke<UserProfile>("get_user_profile").catch(() => null),
+      ]);
       setState(s);
+      setProfile(p);
     } catch (e) {
       console.error("[soul] load:", e);
     } finally {
@@ -263,8 +300,8 @@ export function SoulView({ onBack }: Props) {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 px-4 pt-3 shrink-0">
-        {(["you", "blade", "diff"] as const).map((tab) => (
+      <div className="flex gap-1 px-4 pt-3 shrink-0 border-b border-blade-border pb-2">
+        {(["profile", "you", "blade", "diff"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -274,13 +311,150 @@ export function SoulView({ onBack }: Props) {
                 : "text-blade-muted hover:text-blade-text"
             }`}
           >
-            {tab === "you" ? "What BLADE knows about you" : tab === "blade" ? "BLADE's self-perception" : "Weekly diff"}
+            {tab === "profile" ? "Profile" : tab === "you" ? "Bible" : tab === "blade" ? "BLADE" : "Diff"}
           </button>
         ))}
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 pb-4 pt-3 space-y-3">
+
+        {/* ── PROFILE TAB — what BLADE knows about the user ── */}
+        {activeTab === "profile" && (
+          <div className="space-y-4">
+            {/* Header row */}
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-semibold">
+                  {profile?.user_name ? `${profile.user_name}'s Profile` : "Your Profile"}
+                </div>
+                <div className="text-[10px] text-blade-muted mt-0.5">
+                  Everything BLADE has learned about you — built from conversations, activity, and your answers
+                </div>
+              </div>
+              {!profile?.onboarding_complete && (
+                <span className="text-[9px] px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+                  Onboarding pending
+                </span>
+              )}
+            </div>
+
+            {/* Relationship depth */}
+            {profile && (profile.relationship.intimacy_score > 0 || profile.relationship.trust_score > 0) && (
+              <div className="bg-blade-surface border border-blade-border rounded-lg p-3 space-y-2">
+                <div className="text-[10px] uppercase tracking-widest text-blade-muted">Relationship</div>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: "Intimacy", val: profile.relationship.intimacy_score },
+                    { label: "Trust", val: profile.relationship.trust_score },
+                  ].map(({ label, val }) => (
+                    <div key={label}>
+                      <div className="flex justify-between text-[10px] mb-1">
+                        <span className="text-blade-muted">{label}</span>
+                        <span className="text-blade-text">{Math.round(val)}/100</span>
+                      </div>
+                      <div className="h-1 bg-blade-border rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-blade-accent transition-all"
+                          style={{ width: `${Math.min(val, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {profile.relationship.growth_moments.length > 0 && (
+                  <div className="mt-1 space-y-0.5">
+                    {profile.relationship.growth_moments.slice(0, 3).map((m, i) => (
+                      <div key={i} className="text-[10px] text-blade-muted">• {m}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Learned traits */}
+            {profile && profile.traits.length > 0 && (
+              <div className="bg-blade-surface border border-blade-border rounded-lg p-3 space-y-2">
+                <div className="text-[10px] uppercase tracking-widest text-blade-muted">
+                  Learned traits ({profile.traits.length})
+                </div>
+                <div className="space-y-2">
+                  {profile.traits
+                    .sort((a, b) => b.confidence - a.confidence)
+                    .map((t) => (
+                      <div key={t.trait_name} className="flex items-center gap-3">
+                        <div className="w-28 text-[11px] text-blade-text truncate">{t.trait_name.replace(/_/g, " ")}</div>
+                        <div className="flex-1 h-1 bg-blade-border rounded-full overflow-hidden">
+                          <div
+                            className={`h-full transition-all ${t.score > 0.7 ? "bg-green-500" : t.score > 0.4 ? "bg-blade-accent" : "bg-yellow-500"}`}
+                            style={{ width: `${t.score * 100}%` }}
+                          />
+                        </div>
+                        <div className="text-[9px] text-blade-muted w-10 text-right">{Math.round(t.confidence * 100)}% conf</div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Knowledge graph nodes */}
+            {profile && profile.knowledge_nodes.length > 0 && (
+              <div className="bg-blade-surface border border-blade-border rounded-lg p-3 space-y-2">
+                <div className="text-[10px] uppercase tracking-widest text-blade-muted">
+                  Known context ({profile.knowledge_nodes.length} nodes)
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {profile.knowledge_nodes.map((node) => (
+                    <span
+                      key={node.id}
+                      title={node.description}
+                      className={`text-[10px] px-2 py-0.5 rounded-full border ${
+                        node.node_type === "project"
+                          ? "border-blade-accent/40 text-blade-accent bg-blade-accent/5"
+                          : node.node_type === "tool"
+                          ? "border-green-500/30 text-green-400 bg-green-500/5"
+                          : "border-blade-border text-blade-muted"
+                      }`}
+                    >
+                      {node.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Activity context */}
+            {profile?.activity_context && profile.activity_context.trim() && (
+              <div className="bg-blade-surface border border-blade-border rounded-lg p-3 space-y-1">
+                <div className="text-[10px] uppercase tracking-widest text-blade-muted">Live activity</div>
+                <pre className="text-[10px] text-blade-muted whitespace-pre-wrap leading-relaxed font-mono">
+                  {profile.activity_context}
+                </pre>
+              </div>
+            )}
+
+            {/* Persona.md raw */}
+            {profile?.persona_md && profile.persona_md.trim() && (
+              <div className="bg-blade-surface border border-blade-border rounded-lg p-3 space-y-1">
+                <div className="text-[10px] uppercase tracking-widest text-blade-muted">Your self-description</div>
+                <div className="text-[11px] text-blade-text whitespace-pre-wrap leading-relaxed">
+                  {profile.persona_md}
+                </div>
+              </div>
+            )}
+
+            {/* Empty state */}
+            {profile && profile.traits.length === 0 && profile.knowledge_nodes.length === 0 && !profile.persona_md && (
+              <div className="text-center py-8 space-y-2">
+                <div className="text-blade-muted text-sm">BLADE doesn't know you yet.</div>
+                <div className="text-blade-muted text-[11px]">
+                  Chat more, complete the onboarding, or enable God Mode to start building your profile.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === "you" && (
           <>
             {/* Editable Bible sections */}

@@ -110,6 +110,8 @@ struct DiskConfig {
     task_routing: TaskRouting,
     #[serde(default = "default_background_ai_enabled")]
     background_ai_enabled: bool,
+    #[serde(default)]
+    persona_onboarding_complete: bool,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -119,8 +121,8 @@ fn default_background_ai_enabled() -> bool { true }
 fn default_god_mode_tier() -> String { "normal".to_string() }
 fn default_voice_mode() -> String { "off".to_string() }
 fn default_tts_voice() -> String { "system".to_string() }
-fn default_quick_ask_shortcut() -> String { "Alt+Space".to_string() }
-fn default_voice_shortcut() -> String { "Ctrl+Shift+V".to_string() }
+fn default_quick_ask_shortcut() -> String { "Ctrl+Space".to_string() }
+fn default_voice_shortcut() -> String { "Ctrl+Shift+B".to_string() }
 fn default_timeline_interval() -> u32 { 30 }
 fn default_timeline_retention() -> u32 { 14 }
 fn default_wake_word_phrase() -> String { "hey blade".to_string() }
@@ -161,6 +163,7 @@ impl Default for DiskConfig {
             blade_dedicated_monitor: -1,
             task_routing: TaskRouting::default(),
             background_ai_enabled: true,
+            persona_onboarding_complete: false,
             api_key: None,
         }
     }
@@ -227,6 +230,8 @@ pub struct BladeConfig {
     pub task_routing: TaskRouting,
     #[serde(default = "default_background_ai_enabled")]
     pub background_ai_enabled: bool,
+    #[serde(default)]
+    pub persona_onboarding_complete: bool,
 }
 
 impl BladeConfig {
@@ -269,6 +274,7 @@ impl Default for BladeConfig {
             blade_dedicated_monitor: -1,
             task_routing: TaskRouting::default(),
             background_ai_enabled: true,
+            persona_onboarding_complete: false,
         }
     }
 }
@@ -294,6 +300,12 @@ fn get_api_key_from_keyring(provider: &str) -> String {
     keyring::Entry::new(KEYRING_SERVICE, provider)
         .and_then(|entry| entry.get_password())
         .unwrap_or_default()
+}
+
+/// Retrieve the stored API key for any provider. Returns empty string if none.
+/// Used by modules that need to probe available providers (e.g. fast-ack routing).
+pub(crate) fn get_provider_key(provider: &str) -> String {
+    get_api_key_from_keyring(provider)
 }
 
 fn set_api_key_in_keyring(provider: &str, api_key: &str) -> Result<(), String> {
@@ -369,6 +381,7 @@ pub fn load_config() -> BladeConfig {
         blade_dedicated_monitor: disk.blade_dedicated_monitor,
         task_routing: disk.task_routing,
         background_ai_enabled: disk.background_ai_enabled,
+        persona_onboarding_complete: disk.persona_onboarding_complete,
     }
 }
 
@@ -407,6 +420,7 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         blade_dedicated_monitor: config.blade_dedicated_monitor,
         task_routing: config.task_routing.clone(),
         background_ai_enabled: config.background_ai_enabled,
+        persona_onboarding_complete: config.persona_onboarding_complete,
         api_key: None,
     };
 
@@ -496,14 +510,17 @@ pub fn switch_provider(provider: String, model: Option<String>) -> Result<BladeC
     if let Some(m) = model {
         if !m.is_empty() { config.model = m; }
     }
+    // Clear stale base_url when switching to providers that have their own native endpoints.
+    // Without this, a leftover base_url from a custom provider (e.g. DeepSeek) would cause
+    // all requests to route through the OpenAI-compatible path at the wrong endpoint.
+    match provider.as_str() {
+        "anthropic" | "gemini" | "groq" | "openai" | "openrouter" => {
+            config.base_url = None;
+        }
+        _ => {} // Keep base_url for ollama/custom providers
+    }
     save_config(&config)?;
     Ok(config)
-}
-
-/// Get a stored API key for any provider without switching to it.
-/// Used by the routing system to check if a provider has a key before routing to it.
-pub(crate) fn get_provider_key(provider: &str) -> String {
-    get_api_key_from_keyring(provider)
 }
 
 /// Resolve the best (provider, api_key, model) triple for a given task type.

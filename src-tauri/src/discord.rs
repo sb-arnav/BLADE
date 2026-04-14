@@ -65,6 +65,7 @@ struct EmbedFooter<'a> {
 // ── Core post function ────────────────────────────────────────────────────────
 
 /// Post `content` to any webhook URL directly. Used by watcher.rs for per-alert routing.
+#[allow(dead_code)]
 pub async fn post_to_webhook_url(url: &str, content: &str) -> Result<(), String> {
     post_to_webhook(url, content, false, 0).await
 }
