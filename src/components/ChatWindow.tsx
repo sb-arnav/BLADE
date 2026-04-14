@@ -153,7 +153,7 @@ interface ErrorCardProps {
 function ErrorCard({ error, onRetry, onOpenSettings }: ErrorCardProps) {
   const kind = classifyError(error);
   return (
-    <div className="mx-3 mt-2.5 mb-1 rounded-xl border border-red-500/15 bg-red-500/4 animate-fade-up overflow-hidden shadow-glow-error/30">
+    <div className="mx-3 mt-2.5 mb-1 rounded-xl border border-red-500/15 bg-red-500/5 animate-fade-up overflow-hidden">
       <div className="flex items-start gap-2.5 px-3 py-2.5">
         <div className="shrink-0 mt-0.5 w-4 h-4 rounded-full bg-red-500/12 flex items-center justify-center">
           <svg viewBox="0 0 24 24" className="w-2.5 h-2.5 text-red-400" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -599,7 +599,7 @@ export function ChatWindow({
           {groupedConversations.map((group) => (
             <div key={group.label ?? "results"}>
               {group.label && (
-                <div className="px-2 pt-3 pb-1 text-[9px] font-semibold uppercase tracking-[0.2em] text-blade-muted/40">
+                <div className="px-2.5 pt-3.5 pb-1 text-3xs font-semibold uppercase tracking-[0.25em] text-blade-muted/35">
                   {group.label}
                 </div>
               )}
@@ -610,7 +610,7 @@ export function ChatWindow({
                     key={conv.id}
                     className={`group relative rounded-lg px-2.5 py-2 mb-0.5 cursor-pointer transition-all duration-150 ${
                       isActive
-                        ? "bg-blade-accent/8 border-l-2 border-blade-accent text-blade-text pl-2"
+                        ? "bg-blade-accent/10 border-l-2 border-blade-accent text-blade-text pl-2"
                         : "border-l-2 border-transparent text-blade-secondary hover:bg-blade-surface-hover hover:text-blade-text"
                     }`}
                     onClick={() => { if (renamingId !== conv.id) { onSwitchConversation(conv.id); toggleSidebar(false); } }}
@@ -658,18 +658,18 @@ export function ChatWindow({
             </div>
           ))}
         </div>
-        <div className="border-t border-blade-border px-3 py-2 space-y-1">
+        <div className="border-t border-blade-border/40 px-3 py-2.5 space-y-1">
           {(streakDays || totalMessages) ? (
-            <div className="flex items-center gap-3 text-2xs text-blade-muted/50 py-0.5">
-              {streakDays ? <span>🔥 {streakDays}d streak</span> : null}
+            <div className="flex items-center gap-3 text-2xs text-blade-muted/40 py-0.5 font-mono">
+              {streakDays ? <span>{streakDays}d</span> : null}
               {totalMessages ? <span>{totalMessages} msgs</span> : null}
             </div>
           ) : null}
           <button
             onClick={() => { onOpenSettings(); toggleSidebar(false); }}
-            className="flex items-center gap-2 text-xs text-blade-muted hover:text-blade-secondary transition-colors py-1 w-full"
+            className="flex items-center gap-2 text-xs text-blade-muted/50 hover:text-blade-secondary transition-all duration-150 py-1 w-full rounded-md px-1 hover:bg-blade-surface-hover"
           >
-            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 opacity-70" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="3" />
               <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
             </svg>
@@ -682,29 +682,29 @@ export function ChatWindow({
       <div className="flex flex-1 min-w-0 overflow-hidden">
       <div className="flex flex-col flex-1 min-w-0">
         {/* Header */}
-        <div className="flex items-center justify-between h-10 px-3 border-b border-blade-border/50 shrink-0">
+        <div className="flex items-center justify-between h-10 px-3 border-b border-blade-border/30 bg-blade-bg/60 backdrop-blur-sm shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={() => toggleSidebar(true)}
-              className="text-blade-muted hover:text-blade-secondary transition-colors shrink-0"
+              className="text-blade-muted/50 hover:text-blade-secondary transition-all duration-150 shrink-0 hover:bg-blade-surface w-7 h-7 rounded-md flex items-center justify-center"
               aria-label="History"
             >
-              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M3.5 7h17M3.5 12h17M3.5 17h17" />
               </svg>
             </button>
-            <span className="text-xs text-blade-secondary truncate max-w-[120px]">
+            <span className="text-xs text-blade-secondary/80 truncate max-w-[150px] font-medium">
               {conversations.find((c) => c.id === currentConversationId)?.title ?? "New conversation"}
             </span>
             {provider && (
               <button
                 onClick={onOpenSettings}
-                className="text-2xs text-blade-muted/70 bg-blade-surface px-1.5 py-0.5 rounded-md font-mono shrink-0 hover:text-blade-secondary hover:border-blade-accent/30 border border-transparent transition-colors"
+                className="text-2xs text-blade-muted/40 bg-blade-surface/60 px-2 py-0.5 rounded-md font-mono shrink-0 hover:text-blade-muted hover:bg-blade-surface hover:border-blade-border/60 border border-blade-border/20 transition-all duration-150"
                 title="Open provider and model settings"
               >
                 {provider}{model ? ` · ${model.split("/").pop()?.split("-").slice(0, 2).join("-")}` : ""}
                 {lastResponseTime != null && (
-                  <span className="text-blade-muted/40 ml-1.5">
+                  <span className="text-blade-muted/25 ml-1.5">
                     {lastResponseTime < 1000 ? `${lastResponseTime}ms` : `${(lastResponseTime / 1000).toFixed(1)}s`}
                   </span>
                 )}
@@ -715,29 +715,29 @@ export function ChatWindow({
             {/* InsightsBar toggle */}
             <button
               onClick={() => setShowInsightsBar((v) => !v)}
-              className={`h-7 px-2 rounded-md text-2xs flex items-center gap-1 transition-colors ${
+              className={`h-7 px-2 rounded-md text-2xs flex items-center gap-1.5 transition-all duration-150 ${
                 showInsightsBar
-                  ? "text-blade-accent bg-blade-accent/10"
-                  : "text-blade-muted hover:text-blade-secondary hover:bg-blade-surface"
+                  ? "text-blade-accent bg-blade-accent/10 border border-blade-accent/20"
+                  : "text-blade-muted/50 hover:text-blade-secondary hover:bg-blade-surface border border-transparent"
               }`}
               title={showInsightsBar ? "Hide Intel bar" : "Show Intel bar"}
             >
-              <span style={{ fontSize: "11px" }}>◧</span>
-              <span>Intel</span>
+              <span style={{ fontSize: "10px" }}>◧</span>
+              <span className="font-medium tracking-wide">Intel</span>
             </button>
             {/* Runtime status indicator */}
             {runtimeStrip.length > 0 && onOpenOperators && (
               <button
                 onClick={onOpenOperators}
-                className="relative h-7 px-2 rounded-md text-2xs flex items-center gap-1.5 text-blade-muted hover:text-blade-secondary hover:bg-blade-surface transition-colors"
+                className="relative h-7 px-2 rounded-md text-2xs flex items-center gap-1.5 text-blade-muted/50 hover:text-blade-secondary hover:bg-blade-surface transition-all duration-150"
                 title="Operators"
               >
                 {(() => {
                   const hasIssue = runtimeStrip.some(r => !r.installed || !r.authenticated);
                   const activeTasks = runtimeStrip.reduce((s, r) => s + r.active_tasks, 0);
                   if (activeTasks > 0) return <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />;
-                  if (hasIssue) return <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />;
-                  return <span className="w-1.5 h-1.5 rounded-full bg-blade-muted/40" />;
+                  if (hasIssue) return <span className="w-1.5 h-1.5 rounded-full bg-amber-400/80" />;
+                  return <span className="w-1.5 h-1.5 rounded-full bg-blade-muted/30" />;
                 })()}
                 <span className="font-mono">ops</span>
                 {runtimeStrip.reduce((s, r) => s + r.active_tasks, 0) > 0 && (
@@ -747,17 +747,18 @@ export function ChatWindow({
             )}
             {/* Voice status pill — only when active */}
             {voiceModeStatus && !["idle", "off"].includes(voiceModeStatus) && (
-              <span className={`h-7 px-2 rounded-md text-2xs flex items-center gap-1 ${
-                voiceModeStatus === "listening" ? "text-emerald-400" :
-                voiceModeStatus === "recording" || voiceModeStatus === "detecting" ? "text-red-400" :
-                voiceModeStatus === "processing" ? "text-amber-400" :
-                voiceModeStatus === "error" ? "text-red-500" : "text-blade-muted"
+              <span className={`h-7 px-2.5 rounded-md text-2xs flex items-center gap-1.5 border font-medium ${
+                voiceModeStatus === "listening"  ? "text-emerald-400 bg-emerald-400/10 border-emerald-500/20" :
+                voiceModeStatus === "recording" || voiceModeStatus === "detecting" ? "text-red-400 bg-red-500/10 border-red-500/20" :
+                voiceModeStatus === "processing" ? "text-amber-400 bg-amber-500/10 border-amber-500/20" :
+                voiceModeStatus === "error"      ? "text-red-500 bg-red-500/10 border-red-500/20" :
+                "text-blade-muted border-transparent"
               }`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${
-                  voiceModeStatus === "listening" ? "bg-emerald-400 animate-pulse" :
+                  voiceModeStatus === "listening"  ? "bg-emerald-400 animate-pulse" :
                   voiceModeStatus === "recording" || voiceModeStatus === "detecting" ? "bg-red-400 animate-pulse" :
                   voiceModeStatus === "processing" ? "bg-amber-400 animate-pulse" :
-                  "bg-blade-muted"
+                  "bg-blade-muted/50"
                 }`} />
                 {voiceModeStatus}
               </span>
@@ -765,14 +766,14 @@ export function ChatWindow({
             {onOpenNotifications && (
               <button
                 onClick={onOpenNotifications}
-                className="relative w-7 h-7 rounded-md flex items-center justify-center text-blade-muted hover:text-blade-secondary hover:bg-blade-surface transition-colors"
+                className="relative w-7 h-7 rounded-md flex items-center justify-center text-blade-muted/50 hover:text-blade-secondary hover:bg-blade-surface transition-all duration-150"
                 title="Notifications"
               >
-                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" />
                 </svg>
                 {(unreadNotificationCount ?? 0) > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-blade-accent text-white text-[8px] font-bold flex items-center justify-center leading-none">
+                  <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-blade-accent text-white text-[8px] font-bold flex items-center justify-center leading-none shadow-glow-accent-sm">
                     {unreadNotificationCount! > 9 ? "9+" : unreadNotificationCount}
                   </span>
                 )}
@@ -781,10 +782,10 @@ export function ChatWindow({
             {/* Voice conversation button */}
             <button
               onClick={voiceConvActive ? stopConversation : () => { startConversation(); }}
-              className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
+              className={`w-7 h-7 rounded-md flex items-center justify-center transition-all duration-150 ${
                 voiceConvActive
-                  ? "text-emerald-400 bg-emerald-400/10 hover:bg-emerald-400/20"
-                  : "text-blade-muted hover:text-blade-secondary hover:bg-blade-surface"
+                  ? "text-emerald-400 bg-emerald-400/10 hover:bg-emerald-400/15 border border-emerald-500/20"
+                  : "text-blade-muted/50 hover:text-blade-secondary hover:bg-blade-surface border border-transparent"
               }`}
               title={voiceConvActive ? "Stop voice conversation" : "Start voice conversation"}
             >
@@ -806,20 +807,20 @@ export function ChatWindow({
             </button>
             <button
               onClick={ttsSpeaking ? onStopTTS : onToggleTTS}
-              className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
+              className={`w-7 h-7 rounded-md flex items-center justify-center transition-all duration-150 ${
                 ttsEnabled
-                  ? "text-blade-accent hover:bg-blade-surface"
-                  : "text-blade-muted hover:text-blade-secondary hover:bg-blade-surface"
+                  ? "text-blade-accent bg-blade-accent/10 hover:bg-blade-accent/15"
+                  : "text-blade-muted/50 hover:text-blade-secondary hover:bg-blade-surface"
               }`}
               title={ttsEnabled ? (ttsSpeaking ? "Stop speaking" : "TTS on — click to disable") : "Enable TTS"}
             >
               {ttsSpeaking ? (
-                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
                   <rect x="6" y="4" width="4" height="16" rx="1" />
                   <rect x="14" y="4" width="4" height="16" rx="1" />
                 </svg>
               ) : (
-                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
                   <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
                   {ttsEnabled && <path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14" />}
                 </svg>
@@ -827,16 +828,16 @@ export function ChatWindow({
             </button>
             <button
               onClick={onClear}
-              className="h-7 px-2 rounded-md text-2xs text-blade-muted hover:text-blade-secondary hover:bg-blade-surface transition-colors"
+              className="h-7 px-2 rounded-md text-2xs text-blade-muted/40 hover:text-blade-secondary hover:bg-blade-surface transition-all duration-150 font-mono"
             >
-              clear
+              clr
             </button>
             <button
               onClick={onOpenSettings}
-              className="w-7 h-7 rounded-md text-blade-muted hover:text-blade-secondary hover:bg-blade-surface transition-colors flex items-center justify-center"
+              className="w-7 h-7 rounded-md text-blade-muted/50 hover:text-blade-secondary hover:bg-blade-surface transition-all duration-150 flex items-center justify-center"
               aria-label="Settings"
             >
-              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <circle cx="12" cy="12" r="3" />
                 <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
               </svg>
@@ -878,30 +879,30 @@ export function ChatWindow({
 
         {/* Smart clipboard bar */}
         {clipboardDetection && !loading && (
-          <div className="mx-4 mb-2 px-3 py-2 rounded-lg bg-blade-surface border border-blade-border animate-fade-in">
+          <div className="mx-3 mb-2 px-3 py-2.5 rounded-xl bg-blade-surface/80 border border-blade-border/50 animate-fade-up backdrop-blur-sm shadow-surface-sm">
             <div className="flex items-center gap-2">
-              <span className="text-2xs font-mono text-blade-accent shrink-0 w-5 text-center">
+              <span className="text-2xs font-mono text-blade-accent/70 shrink-0 w-5 text-center font-semibold">
                 {TYPE_ICONS[clipboardDetection.type] ?? "T"}
               </span>
-              <span className="text-2xs text-blade-muted truncate flex-1" title={clipboardDetection.preview}>
-                <span className="text-blade-secondary/60 uppercase tracking-wider mr-1.5">{clipboardDetection.type}</span>
+              <span className="text-2xs text-blade-muted/70 truncate flex-1" title={clipboardDetection.preview}>
+                <span className="text-blade-secondary/50 uppercase tracking-[0.12em] mr-1.5 text-[9px]">{clipboardDetection.type}</span>
                 {clipboardDetection.preview}
               </span>
               <button
                 onClick={onDismissClipboard}
-                className="text-blade-muted hover:text-blade-secondary transition-colors shrink-0"
+                className="text-blade-muted/40 hover:text-blade-secondary transition-all duration-150 shrink-0 hover:bg-blade-surface-hover rounded p-0.5"
               >
                 <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M6 6l12 12M18 6L6 18" />
                 </svg>
               </button>
             </div>
-            <div className="flex items-center gap-1.5 mt-1.5">
+            <div className="flex items-center gap-1.5 mt-2">
               {clipboardDetection.actions.map((action) => (
                 <button
                   key={action.label}
                   onClick={() => { onSend(action.prompt); onDismissClipboard(); }}
-                  className="text-2xs px-2 py-0.5 rounded-md bg-blade-surface-hover text-blade-secondary hover:text-blade-text transition-colors"
+                  className="text-2xs px-2.5 py-1 rounded-lg bg-blade-surface-hover border border-blade-border/50 text-blade-secondary hover:text-blade-text hover:border-blade-accent/30 transition-all duration-150 font-medium"
                 >
                   {action.label}
                 </button>
@@ -912,22 +913,22 @@ export function ChatWindow({
 
         {/* Extended thinking indicator — shown when Claude is reasoning */}
         {thinkingText && loading && (
-          <div className="mx-3 mb-1.5 px-3 py-2 rounded-xl border border-blade-accent/20 bg-blade-accent/5">
-            <div className="flex items-start gap-2">
-              <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full bg-blade-accent animate-pulse" />
+          <div className="mx-3 mb-2 px-3 py-2.5 rounded-xl border border-blade-accent/15 bg-blade-accent/5 backdrop-blur-sm shadow-surface-sm">
+            <div className="flex items-start gap-2.5">
+              <div className="shrink-0 mt-1 w-1.5 h-1.5 rounded-full bg-blade-accent/70 animate-pulse-subtle" />
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <p className="text-[10px] font-semibold text-blade-accent/70 uppercase tracking-wide">Thinking</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-2xs font-semibold text-blade-accent/60 uppercase tracking-[0.15em]">Thinking</p>
                   {thinkingText.length > 200 && (
                     <button
                       onClick={() => setThinkingExpanded((e) => !e)}
-                      className="text-[9px] text-blade-accent/50 hover:text-blade-accent/80 transition-colors font-mono"
+                      className="text-2xs text-blade-accent/40 hover:text-blade-accent/70 transition-all duration-150 font-mono"
                     >
-                      {thinkingExpanded ? "collapse" : `+${thinkingText.length - 200} chars`}
+                      {thinkingExpanded ? "collapse ↑" : `+${thinkingText.length - 200} chars ↓`}
                     </button>
                   )}
                 </div>
-                <p className={`text-[11px] text-blade-muted/70 leading-relaxed font-mono ${thinkingExpanded ? "" : "line-clamp-2"}`}>
+                <p className={`text-2xs text-blade-muted/60 leading-relaxed font-mono ${thinkingExpanded ? "" : "line-clamp-2"}`}>
                   {thinkingExpanded ? thinkingText : thinkingText.slice(-200)}
                 </p>
               </div>
@@ -937,13 +938,13 @@ export function ChatWindow({
 
         {/* God Mode indicator — appears briefly after each context refresh */}
         {godModeStatus && (
-          <div className="flex items-center gap-1.5 px-3 py-1 mx-3 mb-1 rounded-md border border-emerald-500/20 bg-emerald-500/5 text-emerald-400/70 font-mono text-[9px] tracking-widest uppercase animate-fade-in">
+          <div className="flex items-center gap-2 px-3 py-1.5 mx-3 mb-1.5 rounded-lg border border-emerald-500/15 bg-emerald-500/5 text-emerald-400/60 font-mono text-2xs tracking-widest uppercase animate-fade-up">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60 animate-pulse" />
-            <span>GOD MODE</span>
-            <span className="text-emerald-400/40">•</span>
-            <span>{godModeStatus.tier}</span>
-            <span className="text-emerald-400/40">•</span>
-            <span>{(godModeStatus.bytes / 1024).toFixed(1)}KB context</span>
+            <span className="font-semibold">GOD MODE</span>
+            <span className="text-emerald-400/30 mx-0.5">·</span>
+            <span className="opacity-80">{godModeStatus.tier}</span>
+            <span className="text-emerald-400/30 mx-0.5">·</span>
+            <span>{(godModeStatus.bytes / 1024).toFixed(1)}KB</span>
           </div>
         )}
 
@@ -986,73 +987,71 @@ export function ChatWindow({
       {/* Voice Conversation Overlay — shown when conversational mode is active */}
       {voiceConvActive && (
         <div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-blade-bg/95 backdrop-blur-md"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-blade-bg/96 backdrop-blur-xl"
           style={{ top: "2.25rem" }}
         >
-          {/* State label */}
-          <div className="mb-6 flex flex-col items-center gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-blade-muted/60">
+          {/* Card */}
+          <div className="flex flex-col items-center gap-5 px-8 py-8 rounded-2xl bg-blade-surface/80 border border-blade-border/60 shadow-surface-xl backdrop-blur-sm">
+            <p className="text-2xs font-semibold uppercase tracking-[0.3em] text-blade-muted/50">
               Voice Conversation
             </p>
 
-            {/* Waveform / pulse animation */}
-            <div className="flex items-end gap-1 h-10">
-              {Array.from({ length: 7 }).map((_, i) => (
+            {/* Waveform */}
+            <div className="flex items-end gap-1.5 h-12">
+              {Array.from({ length: 9 }).map((_, i) => (
                 <div
                   key={i}
-                  className={`w-1 rounded-full transition-all duration-150 ${
-                    conversationState === "listening"
-                      ? "bg-emerald-400/70"
-                      : conversationState === "thinking"
-                      ? "bg-amber-400/70"
-                      : conversationState === "speaking"
-                      ? "bg-blade-accent/80"
-                      : "bg-blade-muted/30"
+                  className={`w-1 rounded-full transition-colors duration-300 ${
+                    conversationState === "listening"  ? "bg-emerald-400/80"
+                    : conversationState === "thinking" ? "bg-amber-400/80"
+                    : conversationState === "speaking" ? "bg-blade-accent/90"
+                    : "bg-blade-muted/20"
                   }`}
                   style={{
                     height: conversationState === "listening"
-                      ? `${12 + Math.sin(i * 1.4) * 8}px`
+                      ? `${14 + Math.sin(i * 1.4) * 10}px`
                       : conversationState === "thinking"
-                      ? `${8 + ((i % 3) * 6)}px`
+                      ? `${8 + ((i % 3) * 7)}px`
                       : conversationState === "speaking"
-                      ? `${10 + Math.abs(Math.sin(i * 0.9)) * 20}px`
-                      : "8px",
+                      ? `${12 + Math.abs(Math.sin(i * 0.9)) * 22}px`
+                      : "6px",
                     animation: conversationState !== "idle"
-                      ? `voice-bar-${(i % 3) + 1} 0.8s ease-in-out infinite alternate`
+                      ? `voice-bar-${(i % 3) + 1} ${0.7 + (i % 3) * 0.1}s ease-in-out infinite alternate`
                       : "none",
-                    animationDelay: `${i * 0.1}s`,
+                    animationDelay: `${i * 0.08}s`,
                   }}
                 />
               ))}
             </div>
 
-            {/* State text */}
-            <p className={`text-sm font-medium tracking-wide ${
-              conversationState === "listening" ? "text-emerald-400" :
-              conversationState === "thinking" ? "text-amber-400" :
-              conversationState === "speaking" ? "text-blade-accent" :
-              "text-blade-muted"
+            {/* State label */}
+            <p className={`text-sm font-semibold tracking-widest uppercase ${
+              conversationState === "listening" ? "text-emerald-400"
+              : conversationState === "thinking" ? "text-amber-400"
+              : conversationState === "speaking" ? "text-blade-accent"
+              : "text-blade-muted/60"
             }`}>
-              {conversationState === "listening" && "Listening..."}
-              {conversationState === "thinking" && "Thinking..."}
-              {conversationState === "speaking" && "Speaking..."}
+              {conversationState === "listening" && "Listening"}
+              {conversationState === "thinking"  && "Thinking"}
+              {conversationState === "speaking"  && "Speaking"}
+              {(!conversationState || conversationState === "idle") && "Ready"}
             </p>
           </div>
 
           {/* Recent transcript — last 4 turns */}
           {voiceTranscript.length > 0 && (
-            <div className="w-full max-w-sm px-4 mb-6 space-y-1.5 max-h-48 overflow-y-auto">
+            <div className="w-full max-w-xs mt-4 mb-2 space-y-1.5 max-h-40 overflow-y-auto px-1">
               {voiceTranscript.slice(-4).map((turn, i) => (
                 <div
                   key={i}
-                  className={`px-3 py-1.5 rounded-lg text-xs ${
+                  className={`px-3 py-2 rounded-xl text-xs leading-relaxed animate-fade-up ${
                     turn.role === "user"
-                      ? "bg-blade-surface text-blade-secondary ml-8"
-                      : "bg-blade-accent/10 text-blade-text mr-8"
+                      ? "bg-blade-surface/80 text-blade-secondary ml-6 border border-blade-border/40"
+                      : "bg-blade-accent/10 text-blade-text mr-6 border border-blade-accent/15"
                   }`}
                 >
-                  <span className={`text-[9px] uppercase tracking-wider font-semibold mr-1.5 ${
-                    turn.role === "user" ? "text-blade-muted/50" : "text-blade-accent/60"
+                  <span className={`text-3xs uppercase tracking-[0.15em] font-bold mr-1.5 ${
+                    turn.role === "user" ? "text-blade-muted/40" : "text-blade-accent/50"
                   }`}>
                     {turn.role === "user" ? "You" : "BLADE"}
                   </span>
@@ -1065,15 +1064,15 @@ export function ChatWindow({
           {/* Stop button */}
           <button
             onClick={stopConversation}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blade-surface border border-blade-border text-blade-secondary hover:text-blade-text hover:bg-blade-surface-hover hover:border-red-400/30 transition-all text-xs font-medium"
+            className="mt-4 flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blade-surface/80 border border-blade-border/60 text-blade-secondary hover:text-blade-text hover:bg-blade-surface-hover hover:border-red-400/30 transition-all duration-200 text-xs font-medium shadow-surface-sm"
           >
-            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="4" y="4" width="16" height="16" rx="2" fill="currentColor" />
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor">
+              <rect x="4" y="4" width="16" height="16" rx="3" />
             </svg>
             Stop conversation
           </button>
 
-          <p className="mt-3 text-2xs text-blade-muted/40">
+          <p className="mt-3 text-2xs text-blade-muted/30">
             Say "stop", "bye", or "that's all" to end naturally
           </p>
         </div>
