@@ -446,15 +446,66 @@ pub async fn send_message_stream(
     let mut tools = mcp_tools;
     tools.extend(native_tools);
 
+    // Capture message count before build_conversation moves the Vec.
+    let input_message_count = messages.len();
     let conversation = providers::build_conversation(messages, Some(system_prompt));
 
-    // Check if any message has an image (vision request)
-    let has_image = conversation
+    // Check if any message has an image (vision request).
+    // Used by the fast-path heuristic: image-only queries are conversational
+    // (no code/shell keywords) and stream_text handles them natively.
+    // Kept as metadata for potential future routing decisions.
+    let _has_image = conversation
         .iter()
         .any(|m| matches!(m, ConversationMessage::UserWithImage { .. }));
 
-    // No tools configured and no images → stream directly (fast path, best UX)
-    if tools.is_empty() && !has_image {
+    // Fast path: stream directly when we can confidently skip the tool loop.
+    //
+    // Conditions for the fast path:
+    //   A) No tools at all — always stream.
+    //   B) Only native tools (no MCP tools) AND the message looks conversational
+    //      (short, no action verbs, no technical triggers).
+    //
+    // Images are fine on the fast path — stream_text passes them to the provider API
+    // (Anthropic/OpenAI serialize_simple handles UserWithImage).
+    //
+    // We do NOT bypass the tool loop if:
+    //   - MCP tools are present (user explicitly configured agent capabilities)
+    //   - The message contains code fences, shell keywords, or file operation words
+    //   - The conversation is long (>6 turns) — ongoing sessions often need tool continuity
+    //
+    // When in doubt we fall through to the tool loop which is always safe.
+    let only_native_tools = !tools.is_empty()
+        && tools.iter().all(|t| crate::native_tools::is_native(&t.name));
+    let is_conversational = {
+        let txt = last_user_text.trim();
+        let txt_lower = txt.to_lowercase();
+        txt.len() < 160
+            && !txt.contains("```")
+            && !txt_lower.contains("run ")
+            && !txt_lower.contains("execute ")
+            && !txt_lower.contains("install ")
+            && !txt_lower.contains("build ")
+            && !txt_lower.contains("open ")
+            && !txt_lower.contains("search ")
+            && !txt_lower.contains("find ")
+            && !txt_lower.contains("fetch ")
+            && !txt_lower.contains("read file")
+            && !txt_lower.contains("write ")
+            && !txt_lower.contains("delete ")
+            && !txt_lower.contains("create ")
+            && !txt_lower.contains("git ")
+            && !txt_lower.contains("npm ")
+            && !txt_lower.contains("cargo ")
+            && !txt_lower.contains("python ")
+            && !txt_lower.contains("bash ")
+            && !txt_lower.contains("terminal")
+            && !txt_lower.contains("command")
+    };
+    // Short conversations (≤6 messages) are safe to fast-path; longer sessions
+    // may have tool-call context the model needs to continue properly.
+    let is_short_conversation = input_message_count <= 6;
+
+    if tools.is_empty() || (only_native_tools && is_conversational && is_short_conversation) {
         let span = trace::TraceSpan::new(&config.provider, &config.model, "stream_text");
         let result = if use_extended_thinking && config.provider == "anthropic" {
             providers::stream_text_thinking(
@@ -717,7 +768,9 @@ pub async fn send_message_stream(
                 });
             }
 
-            // Final text response — emit word-by-word for streaming feel (action-tags stripped)
+            // Final text response — emit word-by-word for streaming feel (action-tags stripped).
+            // We yield between chunks so the Tauri IPC channel can flush each batch to the
+            // frontend individually, giving real progressive rendering rather than one big burst.
             if !clean_content.is_empty() {
                 let mut buf = String::new();
                 for ch in clean_content.chars() {
@@ -726,11 +779,18 @@ pub async fn send_message_stream(
                     if ch == ' ' || ch == '\n' || buf.len() >= 6 {
                         let _ = app.emit("chat_token", buf.clone());
                         buf.clear();
+                        // Yield to the async runtime so the IPC channel flushes this chunk
+                        // before the next one — this produces a real streaming feel.
+                        tokio::task::yield_now().await;
                     }
                 }
                 if !buf.is_empty() {
                     let _ = app.emit("chat_token", buf);
                 }
+            } else {
+                // AI returned an empty response after tool calls — emit a brief fallback
+                // so the user doesn't see a blank assistant bubble.
+                let _ = app.emit("chat_token", "Done.".to_string());
             }
             let _ = app.emit("chat_done", ());
             let _ = app.emit("blade_status", "idle");
@@ -842,8 +902,14 @@ pub async fn send_message_stream(
             return Ok(());
         }
 
-        // Detect identical tool call loops — same name+args repeated 3× means stuck
-        let sig = format!("{:?}", &turn.tool_calls);
+        // Detect identical tool call loops — same tool name+args repeated 3× means stuck.
+        // We deliberately exclude the tool call ID from the signature because providers
+        // generate a fresh UUID per call, so the same logical call always has a new ID.
+        // Comparing only name+args catches true stuck loops.
+        let sig = turn.tool_calls.iter()
+            .map(|tc| format!("{}:{}", tc.name, tc.arguments))
+            .collect::<Vec<_>>()
+            .join("|");
         if sig == last_tool_signature {
             repeat_count += 1;
             if repeat_count >= 3 {
@@ -1093,6 +1159,46 @@ pub async fn send_message_stream(
 
     // Loop exhausted or stuck — do a final tool-free call so the model can
     // summarise what it accomplished rather than showing a raw error.
+    //
+    // IMPORTANT: If the last assistant message has outstanding tool_calls that
+    // have no corresponding Tool result messages, providers like Anthropic and
+    // OpenAI will reject the request with a validation error.  We must inject
+    // synthetic tool-result stubs for every unresolved call before adding the
+    // summary user prompt.
+    {
+        // Collect tool call IDs from the last assistant message that have no result
+        let pending_ids: Vec<(String, String)> = conversation
+            .iter()
+            .rev()
+            .find_map(|m| match m {
+                ConversationMessage::Assistant { tool_calls, .. } if !tool_calls.is_empty() => {
+                    Some(tool_calls.iter().map(|tc| (tc.id.clone(), tc.name.clone())).collect())
+                }
+                _ => None,
+            })
+            .unwrap_or_default();
+
+        // Which of those already have a Tool result in the conversation?
+        let resolved_ids: std::collections::HashSet<String> = conversation
+            .iter()
+            .filter_map(|m| match m {
+                ConversationMessage::Tool { tool_call_id, .. } => Some(tool_call_id.clone()),
+                _ => None,
+            })
+            .collect();
+
+        // Inject stubs for any unresolved tool calls
+        for (id, name) in pending_ids {
+            if !resolved_ids.contains(&id) {
+                conversation.push(ConversationMessage::Tool {
+                    tool_call_id: id,
+                    tool_name: name,
+                    content: "[Tool execution did not complete — loop limit reached]".to_string(),
+                    is_error: true,
+                });
+            }
+        }
+    }
     conversation.push(ConversationMessage::User(
         "Summarise what you've done so far and whether the task is complete.".to_string(),
     ));
