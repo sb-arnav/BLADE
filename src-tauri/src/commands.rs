@@ -366,11 +366,11 @@ fn count_task_steps(query: &str) -> usize {
 
 /// Build a human-readable explanation for a tool failure, including suggestions
 /// for alternative approaches and similar files/tools.
-async fn explain_tool_failure(
+fn explain_tool_failure(
     tool_name: &str,
     args: &serde_json::Value,
     error: &str,
-    app: Option<&tauri::AppHandle>,
+    _app: Option<&tauri::AppHandle>,
 ) -> String {
     let lower_err = error.to_lowercase();
 
@@ -470,8 +470,12 @@ fn find_similar_files(filename: &str, search_dir: &str) -> Vec<String> {
         for entry in entries.flatten() {
             let name = entry.file_name();
             let name_str = name.to_string_lossy().to_lowercase();
-            // Simple fuzzy: shares a common prefix of 4+ chars, or name contains the stem
-            if stem.len() >= 3 && (name_str.contains(&stem) || stem.contains(name_str.trim_end_matches(|c: char| c == '.' || c.is_alphanumeric() && false))) {
+            // Simple fuzzy: name contains the stem, or stem contains the name's stem
+            let name_stem = std::path::Path::new(&*name.to_string_lossy())
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_lowercase())
+                .unwrap_or_default();
+            if stem.len() >= 3 && (name_str.contains(stem.as_str()) || name_stem.contains(stem.as_str())) {
                 matches.push(entry.path().to_string_lossy().to_string());
                 if matches.len() >= 5 { break; }
             }
@@ -1494,7 +1498,7 @@ pub async fn send_message_stream(
                                             &tool_call.arguments,
                                             &format!("Tool failed even after installing {}: {}", name, e2),
                                             Some(&app),
-                                        ).await;
+                                        );
                                         (msg, true)
                                     }
                                 }
@@ -1505,7 +1509,7 @@ pub async fn send_message_stream(
                                     &tool_call.arguments,
                                     &e,
                                     Some(&app),
-                                ).await;
+                                );
                                 (msg, true)
                             }
                         }
@@ -1521,7 +1525,7 @@ pub async fn send_message_stream(
                     &tool_call.arguments,
                     &raw_error,
                     Some(&app),
-                ).await;
+                );
                 // Only replace if the enriched version adds new information
                 if enriched.len() > raw_error.len() || enriched.contains("Similar files") || enriched.contains("not installed") {
                     content = enriched;

@@ -762,9 +762,10 @@ pub fn suggest_tools_for_query(query: &str) -> Vec<String> {
     }
 
     // Sort by score descending, return top 10 positively-scored tools
+    // HashMap<String, i32> iterates as (name, score)
     let mut ranked: Vec<(i32, String)> = scores
         .into_iter()
-        .filter(|(score, _)| *score > 0)
+        .filter(|(_, score)| *score > 0)
         .map(|(name, score)| (score, name))
         .collect();
     ranked.sort_by(|a, b| b.0.cmp(&a.0));
