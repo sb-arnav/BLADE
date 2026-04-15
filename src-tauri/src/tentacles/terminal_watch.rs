@@ -271,6 +271,91 @@ pub fn intent_suggestion(intent: &CommandIntent, cmd: &str) -> Option<String> {
     }
 }
 
+// ── Multi-command sequence detection ─────────────────────────────────────────
+
+/// A recognised sequence pattern: the list of command roots that define it,
+/// the inferred investigation label, and the suggestion to surface.
+#[allow(dead_code)]
+struct SequencePattern {
+    roots: &'static [&'static str],
+    label: &'static str,
+    suggestion: &'static str,
+}
+
+const SEQUENCE_PATTERNS: &[SequencePattern] = &[
+    SequencePattern {
+        roots: &["git", "git", "git"],
+        label: "deep_git_investigation",
+        suggestion: "You're doing a deep git investigation (log → diff → stash). \
+                     Want me to summarise what changed, who touched it, and when?",
+    },
+    SequencePattern {
+        roots: &["cargo", "cargo", "cargo"],
+        label: "iterative_rust_debug",
+        suggestion: "You've run cargo multiple times in a row. \
+                     Want me to look at the compiler errors and suggest a fix?",
+    },
+    SequencePattern {
+        roots: &["grep", "grep", "grep"],
+        label: "code_spelunking",
+        suggestion: "You're doing deep code search. \
+                     Want me to run a semantic search across the codebase instead?",
+    },
+    SequencePattern {
+        roots: &["npm", "npm", "npm"],
+        label: "npm_struggle",
+        suggestion: "You've run npm multiple times. \
+                     Common fixes: rm -rf node_modules && npm ci, or check for lockfile conflicts.",
+    },
+    SequencePattern {
+        roots: &["docker", "docker"],
+        label: "docker_iteration",
+        suggestion: "You're iterating on Docker. \
+                     Want me to check the build context or Dockerfile for common issues?",
+    },
+];
+
+/// Check the recent command history for known multi-step sequences.
+/// Returns Some(suggestion) if the last N commands match a known pattern.
+fn detect_command_sequence(
+    recent: &[(String, i64)],
+    window_secs: i64,
+) -> Option<String> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+
+    // Collect command roots from within the window, most recent first
+    let recent_roots: Vec<&str> = recent
+        .iter()
+        .rev()
+        .filter(|(_, ts)| (now - ts) <= window_secs)
+        .take(10)
+        .map(|(cmd, _)| {
+            cmd.split_whitespace()
+                .next()
+                .unwrap_or("")
+        })
+        .collect();
+
+    for pattern in SEQUENCE_PATTERNS {
+        let n = pattern.roots.len();
+        if recent_roots.len() < n {
+            continue;
+        }
+        // Check if the last N roots match the pattern
+        let matches = pattern.roots.iter().rev()
+            .zip(recent_roots.iter())
+            .all(|(expected, actual)| actual.eq_ignore_ascii_case(*expected));
+        if matches {
+            return Some(pattern.suggestion.to_string());
+        }
+    }
+
+    None
+}
+
 // ── Workflow pattern learning ─────────────────────────────────────────────────
 
 /// Learn from (trigger, followup) pairs in the recent command history.
@@ -625,6 +710,22 @@ fn tick_terminal_watcher(app: &AppHandle) {
                 }),
             );
         }
+    }
+
+    // Multi-command sequence detection — runs once per tick across the full recent buffer
+    let sequence_hint = {
+        let state = watcher_state().lock().unwrap();
+        detect_command_sequence(&state.recent_commands, 300) // 5-min window
+    };
+    if let Some(hint) = sequence_hint {
+        let _ = app.emit(
+            "proactive_suggestion",
+            serde_json::json!({
+                "source": "terminal_watch",
+                "title": "Command sequence detected",
+                "body": hint,
+            }),
+        );
     }
 
     // Retry detection across the new batch
