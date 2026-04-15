@@ -1136,6 +1136,28 @@ pub fn run() {
             tentacles::calendar_tentacle::calendar_post_meeting_with_draft,
             // Filesystem Tentacle — approve a suggested file move (learning loop)
             tentacles::filesystem_watch::filesystem_approve_move,
+            // Discord Deep Tentacle — community management, moderation, summaries, welcomes
+            tentacles::discord_deep::discord_process_mentions,
+            tentacles::discord_deep::discord_moderate_server,
+            tentacles::discord_deep::discord_summarize_channels,
+            tentacles::discord_deep::discord_welcome_new_members,
+            // Linear/Jira Tentacle — Git→ticket sync, blocker detection, sprint reports
+            tentacles::linear_jira::linear_sync_git_to_tickets,
+            tentacles::linear_jira::linear_detect_blockers,
+            tentacles::linear_jira::linear_generate_sprint_report,
+            tentacles::linear_jira::linear_auto_create_ticket,
+            // Log Monitor Tentacle — tail, anomaly detection, error chains, Sentry groups
+            tentacles::log_monitor::log_start_tailing,
+            tentacles::log_monitor::log_detect_anomalies,
+            tentacles::log_monitor::log_correlate_errors,
+            tentacles::log_monitor::log_get_error_groups,
+            tentacles::log_monitor::log_search,
+            // Cloud Costs Tentacle — AWS Cost Explorer, anomalies, savings, weekly report
+            tentacles::cloud_costs::cloud_check_aws_costs,
+            tentacles::cloud_costs::cloud_detect_cost_anomalies,
+            tentacles::cloud_costs::cloud_suggest_savings,
+            tentacles::cloud_costs::cloud_weekly_cost_report,
+            tentacles::cloud_costs::cloud_weekly_cost_report_live,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state

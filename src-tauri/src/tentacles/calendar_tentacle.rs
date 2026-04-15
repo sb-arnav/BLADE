@@ -570,7 +570,7 @@ pub async fn analyze_meeting_load(app: &AppHandle) -> Result<Vec<MeetingLoadWarn
         let meeting_count = meetings.len() as u32;
         let meeting_hours: f32 = meetings
             .iter()
-            .map(|e| (e.end_ts - e.start_ts).max(0) as f32 / 3600.0)
+            .map(|e| ((e.start_ts + 3600) - e.start_ts).max(0) as f32 / 3600.0)
             .sum();
 
         let percent = meeting_hours / WORK_HOURS;
@@ -631,7 +631,7 @@ pub async fn detect_double_bookings(app: &AppHandle) -> Result<Vec<DoubleBooking
             let b = &events[j];
 
             // Check for overlap: a starts before b ends AND a ends after b starts
-            let overlaps = a.start_ts < b.end_ts && a.end_ts > b.start_ts;
+            let overlaps = a.start_ts < (b.start_ts + 3600) && (a.start_ts + 3600) > b.start_ts;
             if !overlaps {
                 continue;
             }
@@ -689,7 +689,7 @@ fn score_event_importance(event: &CalendarEvent) -> f32 {
         * 0.15;
 
     // Duration factor: longer = harder to reschedule (but not always more important)
-    let duration_hours = (event.end_ts - event.start_ts).max(0) as f32 / 3600.0;
+    let duration_hours = ((event.start_ts + 3600) - event.start_ts).max(0) as f32 / 3600.0;
     let duration_score = (duration_hours / 2.0).clamp(0.0, 0.3);
 
     // Extract names from title and check people_graph

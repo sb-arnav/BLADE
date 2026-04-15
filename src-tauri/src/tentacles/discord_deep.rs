@@ -656,3 +656,29 @@ fn simulated_moderation_actions(guild_id: &str) -> Vec<ModerationAction> {
         confidence: 0.92,
     }]
 }
+
+// ── Tauri commands ────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn discord_process_mentions(token: String) -> Vec<DiscordAction> {
+    process_mentions(&token).await
+}
+
+#[tauri::command]
+pub async fn discord_moderate_server(token: String, guild_id: String) -> Vec<ModerationAction> {
+    moderate_server(&token, &guild_id).await
+}
+
+#[tauri::command]
+pub async fn discord_summarize_channels(
+    token: String,
+    guild_id: String,
+    channels: Vec<String>,
+) -> Vec<ChannelSummary> {
+    summarize_channels(&token, &guild_id, &channels).await
+}
+
+#[tauri::command]
+pub async fn discord_welcome_new_members(token: String, guild_id: String) -> u32 {
+    welcome_new_members(&token, &guild_id).await
+}

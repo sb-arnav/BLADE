@@ -1027,6 +1027,29 @@ fn build_system_prompt_inner(
         }
     }
 
+    // HOT FILES — most-accessed files from filesystem watcher. Surfaces what the user
+    // actually works with most so BLADE can proactively reference or open them.
+    {
+        let hot = crate::tentacles::filesystem_watch::get_hot_files(5);
+        if !hot.is_empty() {
+            let lines: Vec<String> = hot
+                .iter()
+                .map(|(path, count)| {
+                    let name = std::path::Path::new(path)
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or(path.as_str());
+                    format!("- {} (opened {}×)", name, count)
+                })
+                .collect();
+            parts.push(format!(
+                "## Most-Accessed Files\n\n{}\n\n\
+                 These are the files Arnav works with most. Proactively reference them when relevant.",
+                lines.join("\n")
+            ));
+        }
+    }
+
     // GIT CONTEXT — auto-detect active git repo from window title and inject branch + recent commits.
     // No setup needed. The moment you're in a git project, BLADE knows where you are.
     if let Some(git_ctx) = git_context_for_active_project() {

@@ -548,12 +548,7 @@ async fn draft_one_reply(email: &EmailSummary) -> Result<DraftReply, String> {
     let conversation_snippets = {
         use crate::embeddings::smart_context_recall;
         let query = format!("{} {}", sender_name, email.subject);
-        smart_context_recall(&query, 3)
-            .unwrap_or_default()
-            .iter()
-            .map(|s| s.as_str().to_string())
-            .collect::<Vec<_>>()
-            .join("\n---\n")
+        smart_context_recall(&query)
     };
 
     // Build a rich context block to include in draft

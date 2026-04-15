@@ -828,3 +828,28 @@ fn simulated_blocker_alerts() -> Vec<BlockerAlert> {
         suggested_action: "Assign to an available team member or break into smaller tasks.".to_string(),
     }]
 }
+
+// ── Tauri commands ────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn linear_sync_git_to_tickets() -> Vec<TicketUpdate> {
+    sync_git_to_tickets().await
+}
+
+#[tauri::command]
+pub async fn linear_detect_blockers() -> Vec<BlockerAlert> {
+    detect_blockers().await
+}
+
+#[tauri::command]
+pub async fn linear_generate_sprint_report() -> String {
+    generate_sprint_report().await
+}
+
+#[tauri::command]
+pub async fn linear_auto_create_ticket(
+    description: String,
+    source: String,
+) -> Result<String, String> {
+    auto_create_ticket(&description, &source).await
+}
