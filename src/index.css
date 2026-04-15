@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,6 +7,14 @@
 /* ─── BLADE Design System — Apple Design Language ───────────────────────────── */
 
 :root {
+  --glass-bg: rgba(255,255,255,0.07);
+  --glass-border: rgba(255,255,255,0.13);
+  --glass-shine: rgba(255,255,255,0.18);
+  --glass-blur: blur(44px) saturate(1.6) brightness(0.88);
+  --glass-radius: 20px;
+  --glass-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 24px 60px rgba(0,0,0,0.35);
+  --spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --spring-card: cubic-bezier(0.22, 1, 0.36, 1);
   color-scheme: dark;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -34,7 +44,7 @@ body,
 body {
   background: #000000;
   color: #ffffff;
-  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  font-family: 'Bricolage Grotesque', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   font-size: 14px;
   line-height: 1.5;
@@ -174,6 +184,42 @@ body {
   .interactive:hover {
     background: rgba(255, 255, 255, 0.06);
   }
+}
+
+/* ─── Blade Glass Material ───────────────────────────────────────────────────── */
+
+.blade-glass {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  box-shadow: var(--glass-shadow);
+  position: relative;
+  overflow: hidden;
+}
+.blade-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.055) 0%, transparent 55%);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ─── Blade Animations ───────────────────────────────────────────────────────── */
+
+@keyframes blade-card-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes blade-shimmer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+@keyframes blade-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
 }
 
 /* ─── Markdown Rendering ─────────────────────────────────────────────────────── */
