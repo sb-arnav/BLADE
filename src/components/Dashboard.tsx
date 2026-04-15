@@ -1,1249 +1,456 @@
-import { useState, useEffect, useCallback, useRef, type CSSProperties, type ReactNode } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import { AgentPixelWorld } from "./AgentPixelWorld";
-import { AutoFixCard } from "./AutoFixCard";
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { NavRail, NavRailRoute } from "./NavRail";
+import { HistoryDrawer } from "./HistoryDrawer";
+import { ChatPanel, ChatPanelProps } from "./ChatPanel";
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-interface EvolutionLevel {
-  level: number;
-  score: number;
-  breakdown: string[];
-  next_unlock: string | null;
-}
-
-interface BackgroundAgent {
-  id: string;
-  agent_type: string;
-  task: string;
-  cwd: string;
-  status: "Running" | "Completed" | "Failed" | "Cancelled";
-  output: string[];
-  exit_code: number | null;
-  started_at: number;
-  finished_at: number | null;
-}
-
-interface CronTask {
-  id: string;
-  name: string;
-  description: string;
-  enabled: boolean;
-  last_run: number | null;
-  next_run: number | null;
-  run_count: number;
-}
-
-interface TimelineStats {
-  total_entries: number;
-  disk_bytes: number;
-  oldest_timestamp: number | null;
-  newest_timestamp: number | null;
-}
-
-interface BladeConfig {
-  god_mode: boolean;
-  god_mode_tier: string;
-  wake_word_enabled: boolean;
-  screen_timeline_enabled: boolean;
-  background_ai_enabled: boolean;
-  provider: string;
-  model: string;
-  voice_mode: string;
+interface DashboardProps {
+  onNavigate: (route: string) => void;
+  chatPanelProps: Omit<ChatPanelProps, "open" | "onClose">;
+  activeRoute: string;
 }
 
 interface PerceptionState {
-  timestamp: number;
   active_app: string;
   active_title: string;
   user_state: string;
-  delta_summary: string;
-  context_tags: string[];
   ram_used_gb: number;
   disk_free_gb: number;
-  top_cpu_process: string;
-  visible_errors: string[];
+  context_tags: string[];
 }
 
-interface HealthStats {
-  current_streak_minutes: number;
-  daily_total_minutes: number;
-  breaks_taken: number;
-  status: string;
+interface CalendarEvent {
+  title: string;
+  start_ts: number;
+  minutes_until: number;
 }
 
 interface IntegrationState {
   unread_emails: number;
-  upcoming_events: number;
+  upcoming_events: CalendarEvent[];
   slack_mentions: number;
   github_notifications: number;
-  last_updated: string | null;
+  last_updated: number;
 }
 
-interface SecurityOverview {
-  network: { total_connections: number; suspicious_count: number };
-  sensitive_files: unknown[];
-  last_scan: string | null;
-}
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
-interface GodModeUpdate {
-  bytes: number;
-  tier: string;
-  delta: string;
-  user_state: string;
-}
-
-interface ProactiveTask {
-  id: string;
-  suggestion: string;
-  category: string;
-  created_at: number;
-}
-
-interface Props {
-  onBack: () => void;
-  onNavigate: (route: string) => void;
-}
-
-// ── Apple color palette ───────────────────────────────────────────────────────
-
-const ap = {
-  bg:          "#000000",
-  surface:     "#1c1c1e",
-  surface2:    "#2c2c2e",
-  separator:   "rgba(255,255,255,0.08)",
-  text:        "#ffffff",
-  secondary:   "rgba(235,235,245,0.6)",
-  muted:       "#8e8e93",
-  green:       "#30d158",
-  blue:        "#007AFF",
-  purple:      "#5856D6",
-  orange:      "#ff9f0a",
-  red:         "#ff453a",
-  yellow:      "#ffd60a",
-  teal:        "#5ac8fa",
-} as const;
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function fmt(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function relTime(ts: number | null): string {
-  if (!ts) return "never";
-  const diff = Math.floor(Date.now() / 1000) - ts;
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
-
-function countdown(ts: number | null): string {
-  if (!ts) return "—";
-  const diff = ts - Math.floor(Date.now() / 1000);
-  if (diff <= 0) return "now";
-  if (diff < 60) return `${diff}s`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
-  return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}m`;
-}
-
-function fmtMinutes(m: number): string {
-  if (m <= 0) return "0m";
-  const h = Math.floor(m / 60);
-  const rem = m % 60;
-  if (h === 0) return `${rem}m`;
-  if (rem === 0) return `${h}h`;
-  return `${h}h ${rem}m`;
-}
-
-function userStateColor(state: string): string {
-  if (state === "focused") return ap.green;
-  if (state === "idle") return ap.orange;
-  return ap.muted;
-}
-
-function securityColor(overview: SecurityOverview | null): string {
-  if (!overview) return ap.muted;
-  if (overview.network.suspicious_count > 0) return ap.red;
-  return ap.green;
-}
-
-function integrationCount(state: IntegrationState | null): number {
-  if (!state) return 0;
-  return state.unread_emails + state.slack_mentions + state.github_notifications;
-}
-
-function tierColor(tier: string): string {
-  if (tier === "extreme") return ap.red;
-  if (tier === "intermediate") return ap.orange;
-  return ap.green;
-}
-
-
-function categoryColor(cat: string): string {
-  if (cat === "error") return ap.red;
-  if (cat === "optimization") return ap.blue;
-  if (cat === "reminder") return ap.orange;
-  if (cat === "insight") return ap.purple;
-  return ap.muted;
-}
-
-// ── Animation style helpers ───────────────────────────────────────────────────
-
-
-function breatheStyle(delay = "0s", active = true): CSSProperties {
-  if (!active) return {};
-  return {
-    animation: `statusPulse 2.5s ease-in-out infinite`,
-    animationDelay: delay,
-  };
-}
-
-/** Animated number that counts up/down to `target` with easing */
-function AnimatedNumber({ target, suffix = "", decimals = 0 }: { target: number; suffix?: string; decimals?: number }) {
-  const [display, setDisplay] = useState(target);
-  const prev = useRef(target);
-  const raf = useRef<number>(0);
-
-  useEffect(() => {
-    const from = prev.current;
-    const to = target;
-    if (from === to) return;
-    const duration = 600;
-    const start = performance.now();
-    const animate = (now: number) => {
-      const t = Math.min(1, (now - start) / duration);
-      // ease-out cubic
-      const eased = 1 - Math.pow(1 - t, 3);
-      setDisplay(from + (to - from) * eased);
-      if (t < 1) {
-        raf.current = requestAnimationFrame(animate);
-      } else {
-        prev.current = to;
-        setDisplay(to);
-      }
-    };
-    raf.current = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(raf.current);
-  }, [target]);
-
-  const formatted = decimals > 0 ? display.toFixed(decimals) : Math.round(display).toString();
-  return <>{formatted}{suffix}</>;
-}
-
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-/** Single status pill — Apple style: small dot + label + value */
-function StatusPill({
-  label,
-  value,
-  active,
-  color,
-  onClick,
-}: {
-  label: string;
-  value: ReactNode;
-  active: boolean;
-  color: string;
-  onClick?: () => void;
-}) {
-  const Tag = onClick ? "button" : "div";
-
+function Dot({ color, glow }: { color: string; glow?: boolean }) {
   return (
-    <Tag
-      type={onClick ? "button" : undefined}
-      onClick={onClick as React.MouseEventHandler | undefined}
-      className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] transition-all duration-250"
+    <span
+      className="w-[6px] h-[6px] rounded-full flex-shrink-0 inline-block"
       style={{
-        background: active ? `${color}14` : "rgba(255,255,255,0.04)",
-        border: `1px solid ${active ? `${color}30` : "rgba(255,255,255,0.06)"}`,
-        color: active ? ap.text : ap.muted,
-        cursor: onClick ? "pointer" : "default",
+        background: color,
+        boxShadow: glow ? `0 0 7px ${color}` : undefined,
+        animation: glow ? "blade-pulse 2s ease-in-out infinite" : undefined,
       }}
-    >
-      <span
-        className="block h-1.5 w-1.5 shrink-0 rounded-full"
-        style={{
-          backgroundColor: active ? color : "rgba(142,142,147,0.4)",
-          ...breatheStyle("0s", active),
-        }}
-      />
-      <span className="font-normal" style={{ color: ap.muted }}>{label}</span>
-      <span className="font-semibold tabular-nums">{value}</span>
-    </Tag>
+    />
   );
 }
 
-/** Section card — Apple Health/Home dashboard style */
-function Panel({
-  title,
-  accent = ap.blue,
-  children,
-  className = "",
-  style,
-}: {
-  title: string;
-  accent?: string;
-  children: ReactNode;
-  className?: string;
-  style?: CSSProperties;
-}) {
+function Chip({ children, color = "accent" }: { children: React.ReactNode; color?: "accent" | "green" | "amber" | "dim" }) {
+  const styles = {
+    accent: "bg-[rgba(129,140,248,0.15)] text-[#818cf8] border-[rgba(129,140,248,0.28)]",
+    green:  "bg-[rgba(74,222,128,0.12)] text-[#4ade80] border-[rgba(74,222,128,0.22)]",
+    amber:  "bg-[rgba(251,191,36,0.1)] text-[#fbbf24] border-[rgba(251,191,36,0.2)]",
+    dim:    "bg-[rgba(255,255,255,0.05)] text-[rgba(255,255,255,0.28)] border-[rgba(255,255,255,0.08)]",
+  }[color];
   return (
-    <section
-      className={`relative overflow-hidden rounded-xl ${className}`}
-      style={{
-        background: ap.surface,
-        border: "1px solid rgba(255,255,255,0.06)",
-        boxShadow: "0 0 0 1px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08)",
-        ...style,
-      }}
-    >
-      <div className="flex flex-col h-full">
-        {/* Section header — small uppercase tracking */}
-        <div
-          className="flex items-center gap-2 px-4 pt-4 pb-2 shrink-0"
-        >
-          <span
-            className="block h-1.5 w-1.5 rounded-full shrink-0"
-            style={{ backgroundColor: accent }}
-          />
-          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: ap.muted }}>
-            {title}
-          </span>
-        </div>
-        <div className="flex-1 px-4 pb-4">{children}</div>
-      </div>
-    </section>
+    <span className={`text-[9.5px] font-bold tracking-[0.05em] px-[8px] py-[2px] rounded-full border ${styles}`}>
+      {children}
+    </span>
   );
 }
 
-/** Horizontal key/value data line — Apple-style clean row */
-function DataRow({
-  label,
-  value,
-  accent = ap.blue,
-  mono = true,
-}: {
-  label: string;
-  value: ReactNode;
-  accent?: string;
-  mono?: boolean;
-}) {
+function CardLabel({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div
-      className="flex items-center justify-between gap-2 py-2 border-b"
-      style={{ borderColor: "rgba(255,255,255,0.06)" }}
-    >
-      <span className="text-xs" style={{ color: ap.muted }}>{label}</span>
-      <span
-        className={`text-xs font-semibold ${mono ? "tabular-nums" : ""}`}
-        style={{ color: accent }}
-      >
-        {value}
+    <div className="flex items-center gap-[7px] text-[9.5px] font-bold tracking-[0.14em] uppercase text-[rgba(255,255,255,0.28)]">
+      <span className="w-[18px] h-[18px] rounded-[5px] flex items-center justify-center bg-[rgba(129,140,248,0.15)] text-[#818cf8]">
+        {icon}
       </span>
+      {children}
     </div>
   );
 }
 
-/** Compact action button — Apple-style rounded card */
-function ActionBtn({
-  label,
-  icon,
-  color = ap.blue,
-  onClick,
-  loading = false,
-  disabled = false,
-}: {
-  label: string;
-  icon: ReactNode;
-  color?: string;
-  onClick: () => void;
-  loading?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled || loading}
-      className="flex flex-col items-center justify-center gap-1.5 rounded-xl p-3 text-center transition-all duration-250 active:scale-95 disabled:opacity-30"
-      style={{
-        background: `${color}12`,
-        border: `1px solid ${color}25`,
-        color,
-        minHeight: "68px",
-      }}
-    >
-      <span className="text-lg leading-none">{loading ? "…" : icon}</span>
-      <span className="text-[10px] font-medium leading-tight" style={{ color: ap.muted }}>{label}</span>
-    </button>
-  );
+// ── Wallpaper hook ─────────────────────────────────────────────────────────────
+
+function useWallpaper() {
+  const [wallpaperUrl, setWallpaperUrl] = useState<string | null>(null);
+  useEffect(() => {
+    invoke<string>("get_wallpaper_path")
+      .then((path) => {
+        if (path) setWallpaperUrl(convertFileSrc(path));
+      })
+      .catch(() => null); // fallback to gradient
+  }, []);
+  return wallpaperUrl;
 }
 
-/** Compact agent row */
-function AgentRowCompact({ agent }: { agent: BackgroundAgent }) {
-  const statusColor = {
-    Running: ap.green,
-    Completed: ap.teal,
-    Failed: ap.red,
-    Cancelled: ap.muted,
-  }[agent.status];
+// ── Live data hooks ─────────────────────────────────────────────────────────────
 
-  const elapsedSecs = agent.status === "Running"
-    ? Math.floor((Date.now() / 1000) - agent.started_at)
-    : null;
-  const estimatedPct = elapsedSecs !== null
-    ? Math.min(95, Math.round((1 - Math.exp(-elapsedSecs / 40)) * 100))
-    : null;
-
-  return (
-    <div
-      className="grid gap-2 border-b px-3 py-2 text-[11px]"
-      style={{
-        gridTemplateColumns: "3.5rem minmax(0,1fr) 5rem",
-        borderColor: "rgba(255,255,255,0.06)",
-      }}
-    >
-      <div>
-        <div className="font-semibold" style={{ color: ap.orange }}>{agent.id.slice(0, 4)}</div>
-        <div className="text-[10px]" style={{ color: ap.muted }}>{agent.agent_type.slice(0, 6)}</div>
-      </div>
-      <div className="min-w-0">
-        <div className="truncate font-medium" style={{ color: ap.text }}>{agent.task}</div>
-        {estimatedPct !== null && (
-          <div className="mt-1 h-1 w-full rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
-            <div
-              className="h-full rounded-full"
-              style={{
-                width: `${estimatedPct}%`,
-                background: ap.green,
-                transition: "width 1s linear",
-              }}
-            />
-          </div>
-        )}
-        <div className="truncate text-[10px]" style={{ color: ap.muted }}>{agent.cwd.split(/[\\/]/).pop()}</div>
-      </div>
-      <div className="text-right">
-        <div className="flex items-center justify-end gap-1 font-semibold" style={{ color: statusColor }}>
-          <span
-            className="block h-1.5 w-1.5 shrink-0 rounded-full"
-            style={{ backgroundColor: statusColor }}
-          />
-          {agent.status}
-        </div>
-        <div className="text-[10px]" style={{ color: ap.muted }}>{relTime(agent.started_at)}</div>
-      </div>
-    </div>
-  );
-}
-
-/** Proactive suggestion card — Apple-style */
-function SuggestionCard({
-  task,
-  onDismiss,
-  onApprove,
-}: {
-  task: ProactiveTask;
-  onDismiss: (id: string) => void;
-  onApprove: (task: ProactiveTask) => void;
-}) {
-  const color = categoryColor(task.category);
-
-  return (
-    <div
-      className="rounded-xl p-3 flex flex-col gap-2 animate-fade-up"
-      style={{
-        background: `${color}0e`,
-        border: `1px solid ${color}25`,
-      }}
-    >
-      <div className="flex items-start gap-2.5">
-        <span className="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5" style={{ backgroundColor: color }} />
-        <div className="flex-1 min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color }}>
-            {task.category}
-          </div>
-          <div className="text-xs leading-relaxed" style={{ color: ap.secondary }}>
-            {task.suggestion}
-          </div>
-        </div>
-      </div>
-      <div className="flex gap-2 justify-end">
-        <button
-          type="button"
-          onClick={() => onDismiss(task.id)}
-          className="px-3 py-1 rounded-lg text-xs font-medium transition-all duration-250 active:scale-95"
-          style={{ background: "rgba(255,255,255,0.06)", color: ap.muted, border: "1px solid rgba(255,255,255,0.08)" }}
-        >
-          Dismiss
-        </button>
-        <button
-          type="button"
-          onClick={() => onApprove(task)}
-          className="px-3 py-1 rounded-lg text-xs font-medium transition-all duration-250 active:scale-95"
-          style={{ background: `${color}18`, color, border: `1px solid ${color}40` }}
-        >
-          Approve
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ── Main Dashboard ────────────────────────────────────────────────────────────
-
-export function Dashboard({ onBack, onNavigate }: Props) {
-  // ── Core data ───────────────────────────────────────────────────────────────
-  const [level, setLevel] = useState<EvolutionLevel | null>(null);
-  const [agents, setAgents] = useState<BackgroundAgent[]>([]);
-  const [crons, setCrons] = useState<CronTask[]>([]);
-  const [timeline, setTimeline] = useState<TimelineStats | null>(null);
-  const [config, setConfig] = useState<BladeConfig | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  // ── Live status strip data ──────────────────────────────────────────────────
+function usePerception() {
   const [perception, setPerception] = useState<PerceptionState | null>(null);
-  const [health, setHealth] = useState<HealthStats | null>(null);
-  const [integration, setIntegration] = useState<IntegrationState | null>(null);
-  const [security, setSecurity] = useState<SecurityOverview | null>(null);
-  const [voiceActive, setVoiceActive] = useState(false);
-
-  // ── Intelligence brief ─────────────────────────────────────────────────────
-  const [godModeUpdate, setGodModeUpdate] = useState<GodModeUpdate | null>(null);
-  const [briefFile, setBriefFile] = useState<string | null>(null);
-
-  // ── Proactive suggestions ──────────────────────────────────────────────────
-  const [suggestions, setSuggestions] = useState<ProactiveTask[]>([]);
-
-  // ── Ghost Mode state ───────────────────────────────────────────────────────
-  const [ghostActive, setGhostActive] = useState(false);
-
-  // ── Auto-Fix card visibility (shown when Hive detects a CI failure) ─────────
-  const [showAutoFix, setShowAutoFix] = useState(false);
-
-  // ── Quick action loading states ─────────────────────────────────────────────
-  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
-
-  // ── Ticker — updates every second for real-time clock ──────────────────────
-  const [now, setNow] = useState(Date.now());
-  const tickRef = useRef(0);
   useEffect(() => {
-    // Sync to nearest second boundary for clean ticking
-    const msToNextSecond = 1000 - (Date.now() % 1000);
-    const syncTimeout = setTimeout(() => {
-      setNow(Date.now());
-      tickRef.current = window.setInterval(() => setNow(Date.now()), 1000);
-    }, msToNextSecond);
-    return () => {
-      clearTimeout(syncTimeout);
-      clearInterval(tickRef.current);
+    const load = () => {
+      invoke<PerceptionState | null>("perception_get_latest")
+        .then((p) => { if (p) setPerception(p); })
+        .catch(() => null);
     };
+    load();
+    const interval = setInterval(load, 5000);
+    return () => clearInterval(interval);
   }, []);
+  return perception;
+}
 
-  // ── Load core data ──────────────────────────────────────────────────────────
-  const loadCore = useCallback(async () => {
-    const results = await Promise.allSettled([
-      invoke<EvolutionLevel>("evolution_get_level"),
-      invoke<BackgroundAgent[]>("agent_list_background"),
-      invoke<CronTask[]>("cron_list"),
-      invoke<TimelineStats>("timeline_get_stats_cmd"),
-      invoke<BladeConfig>("get_config"),
-    ]);
-    if (results[0].status === "fulfilled") setLevel(results[0].value);
-    if (results[1].status === "fulfilled") setAgents(results[1].value);
-    if (results[2].status === "fulfilled") setCrons(results[2].value);
-    if (results[3].status === "fulfilled") setTimeline(results[3].value);
-    if (results[4].status === "fulfilled") setConfig(results[4].value);
-    setLoading(false);
-  }, []);
-
-  // ── Load live status data ───────────────────────────────────────────────────
-  const loadStatus = useCallback(async () => {
-    const results = await Promise.allSettled([
-      invoke<PerceptionState>("perception_get_latest"),
-      invoke<HealthStats>("health_guardian_stats"),
-      invoke<IntegrationState>("integration_get_state"),
-      invoke<SecurityOverview>("security_overview"),
-      invoke<boolean>("voice_conversation_active"),
-      invoke<ProactiveTask[]>("get_proactive_tasks"),
-      invoke<{ active: boolean }>("ghost_get_status"),
-    ]);
-    if (results[0].status === "fulfilled" && results[0].value) setPerception(results[0].value);
-    if (results[1].status === "fulfilled") setHealth(results[1].value as HealthStats);
-    if (results[2].status === "fulfilled") setIntegration(results[2].value);
-    if (results[3].status === "fulfilled") setSecurity(results[3].value);
-    if (results[4].status === "fulfilled") setVoiceActive(results[4].value);
-    if (results[5].status === "fulfilled") setSuggestions(results[5].value);
-    if (results[6].status === "fulfilled" && results[6].value) setGhostActive((results[6].value as { active: boolean }).active);
-  }, []);
-
-  // ── Polling ─────────────────────────────────────────────────────────────────
+function useIntegrations() {
+  const [integrations, setIntegrations] = useState<IntegrationState>({
+    unread_emails: 0,
+    upcoming_events: [],
+    slack_mentions: 0,
+    github_notifications: 0,
+    last_updated: 0,
+  });
   useEffect(() => {
-    loadCore();
-    loadStatus();
-    const coreInterval = setInterval(loadCore, 15_000);
-    const statusInterval = setInterval(loadStatus, 5_000);
-    return () => {
-      clearInterval(coreInterval);
-      clearInterval(statusInterval);
-    };
-  }, [loadCore, loadStatus]);
-
-  // ── Live event listeners ────────────────────────────────────────────────────
-  useEffect(() => {
-    let unlistenGodMode: (() => void) | null = null;
-    let unlistenSuggestion: (() => void) | null = null;
-
-    listen<GodModeUpdate>("godmode_update", (e) => {
-      setGodModeUpdate(e.payload);
-      // Also refresh config + perception on god mode tick
-      invoke<BladeConfig>("get_config").then(setConfig).catch(() => {});
-      invoke<PerceptionState>("perception_get_latest").then((p) => { if (p) setPerception(p); }).catch(() => {});
-    }).then((fn) => { unlistenGodMode = fn; });
-
-    listen<ProactiveTask>("proactive_suggestion", (e) => {
-      setSuggestions((prev) => {
-        const exists = prev.some((t) => t.id === e.payload.id);
-        if (exists) return prev;
-        return [e.payload, ...prev].slice(0, 8);
-      });
-    }).then((fn) => { unlistenSuggestion = fn; });
-
-    // Track Ghost Mode state from HUD events
-    const unlistenGhostStart = listen<{ active: boolean }>("ghost_meeting_state", (e) => {
-      setGhostActive(e.payload.active);
-    });
-    const unlistenGhostEnd = listen("ghost_meeting_ended", () => {
-      setGhostActive(false);
-    });
-
-    // Show AutoFixCard when Hive triggers the auto-fix pipeline
-    const unlistenAutoFix = listen("hive_auto_fix_started", () => {
-      setShowAutoFix(true);
-    });
-
-    return () => {
-      unlistenGodMode?.();
-      unlistenSuggestion?.();
-      unlistenGhostStart.then((fn) => fn());
-      unlistenGhostEnd.then((fn) => fn());
-      unlistenAutoFix.then((fn) => fn());
-    };
+    const load = () => invoke<IntegrationState>("integration_get_state").then(setIntegrations).catch(() => null);
+    load();
+    const interval = setInterval(load, 30000);
+    return () => clearInterval(interval);
   }, []);
+  return integrations;
+}
 
-  // ── Intelligence brief file reader ─────────────────────────────────────────
-  useEffect(() => {
-    // Refresh brief content whenever godModeUpdate fires
-    if (!godModeUpdate) return;
-    invoke<string>("get_god_mode_context").then(setBriefFile).catch(() => {});
-  }, [godModeUpdate]);
+// ── Card components ────────────────────────────────────────────────────────────
 
-  // ── Derived values ───────────────────────────────────────────────────────────
-  const runningAgents = agents.filter((a) => a.status === "Running");
-  const unreadCount = integrationCount(integration);
-  const secColor = securityColor(security);
-
-  // ── Handlers ────────────────────────────────────────────────────────────────
-  async function quickAction(key: string, fn: () => Promise<unknown>) {
-    setActionLoading((prev) => ({ ...prev, [key]: true }));
-    try { await fn(); } catch { /* ignore */ }
-    setActionLoading((prev) => ({ ...prev, [key]: false }));
-    loadStatus();
-  }
-
-  function dismissSuggestion(id: string) {
-    setSuggestions((prev) => prev.filter((t) => t.id !== id));
-    invoke("dismiss_proactive_task", { taskId: id }).catch(() => {});
-  }
-
-  function approveSuggestion(task: ProactiveTask) {
-    // Navigate to chat with the suggestion pre-loaded — best we can do without a specific action invoke
-    onNavigate("chat");
-    dismissSuggestion(task.id);
-  }
-
-  // ── Loading screen ──────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div
-        className="flex h-full items-center justify-center text-sm"
-        style={{ color: ap.muted, backgroundColor: ap.bg }}
-      >
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-5 h-5 rounded-full border-2 border-t-blade-accent border-blade-surface-2 animate-spin" />
-          <span className="text-xs uppercase tracking-wider">Loading</span>
-        </div>
-      </div>
-    );
-  }
-
-  const cfg = config;
-  const godActive = !!cfg?.god_mode;
-  const godTier = cfg?.god_mode_tier ?? "normal";
-  const voiceMode = cfg?.voice_mode ?? "off";
-
-  // XP bar
-  const xpBlockCount = 20;
-  const xpProgress = Math.min(100, ((level?.score ?? 0) % 10) * 10);
-  void Math.round((xpProgress / 100) * xpBlockCount); // xpFilledBlocks used in legacy view
-
-  // Brief lines from godmode_context.md
-  const briefLines: string[] = briefFile
-    ? briefFile.split("\n").filter((l) => l.trim().length > 0).slice(0, 12)
-    : [];
+function GodModeCard({ perception }: { perception: PerceptionState | null }) {
+  const appName = perception?.active_app || "VS Code";
+  const filePath = perception?.active_title || "—";
+  const userState = perception?.user_state || "Idle";
 
   return (
-    <div
-      className="relative flex h-full flex-col overflow-hidden"
-      style={{ background: ap.bg, color: ap.text }}
-    >
-      {/* ── Header — clean Apple-style ── */}
-      <header
-        className="relative z-10 flex shrink-0 items-center gap-3 border-b px-4 py-3"
-        style={{
-          borderColor: "rgba(255,255,255,0.08)",
-          background: "rgba(28,28,30,0.9)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
-        }}
-      >
-        <button
-          onClick={onBack}
-          className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-250 active:scale-95"
-          style={{ background: "rgba(255,255,255,0.06)", color: ap.muted, border: "1px solid rgba(255,255,255,0.08)" }}
-        >
-          ← Back
-        </button>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold" style={{ color: ap.text }}>
-              BLADE
-            </span>
-            <span className="text-xs uppercase tracking-wider" style={{ color: ap.muted }}>
-              Dashboard
-            </span>
-            {godActive && (
-              <span
-                className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                style={{
-                  background: `${tierColor(godTier)}14`,
-                  color: tierColor(godTier),
-                  border: `1px solid ${tierColor(godTier)}30`,
-                }}
-              >
-                God Mode · {godTier}
-              </span>
-            )}
-          </div>
-          <div className="text-xs mt-0.5 flex items-center gap-1.5" style={{ color: ap.muted }}>
-            <span className="tabular-nums font-medium" style={{ color: ap.secondary }}>
-              {new Date(now).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-            </span>
-            {godModeUpdate && (
-              <span>· {godModeUpdate.bytes}b last scan</span>
-            )}
-          </div>
-        </div>
-        <button
-          onClick={async () => {
-            try { await invoke("toggle_background_ai", { enabled: false }); } catch { /* ignore */ }
-          }}
-          className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-250 active:scale-95"
-          style={{ background: "rgba(255,69,58,0.1)", color: ap.red, border: "1px solid rgba(255,69,58,0.2)" }}
-        >
-          Kill BG AI
-        </button>
-        <button
-          onClick={() => { loadCore(); loadStatus(); }}
-          className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-250 active:scale-95"
-          style={{ background: "rgba(255,255,255,0.06)", color: ap.muted, border: "1px solid rgba(255,255,255,0.08)" }}
-        >
-          Refresh
-        </button>
-      </header>
-
-      {/* ── STATUS STRIP — clean pills ── */}
-      <div
-        className="relative z-10 shrink-0 flex flex-wrap gap-1.5 border-b px-4 py-2.5"
-        style={{ borderColor: "rgba(255,255,255,0.08)", background: "rgba(0,0,0,0.3)" }}
-      >
-        <StatusPill
-          label="God Mode"
-          value={godActive ? godTier : "off"}
-          active={godActive}
-          color={tierColor(godTier)}
-          onClick={async () => {
-            const next = !godActive;
-            try { await invoke("toggle_god_mode", { enabled: next, tier: next ? godTier : null }); } catch { /* ignore */ }
-            loadCore();
-          }}
-        />
-        <StatusPill
-          label="Perception"
-          value={perception?.user_state ?? "unknown"}
-          active={!!perception}
-          color={userStateColor(perception?.user_state ?? "")}
-        />
-        <StatusPill
-          label="Screen Time"
-          value={health ? fmtMinutes(health.current_streak_minutes) : "—"}
-          active={!!health && health.current_streak_minutes > 0}
-          color={health && health.current_streak_minutes > 90 ? ap.red : health && health.current_streak_minutes > 45 ? ap.orange : ap.green}
-        />
-        <StatusPill
-          label="Integrations"
-          value={unreadCount > 0 ? `${unreadCount} unread` : "clear"}
-          active={unreadCount > 0}
-          color={unreadCount > 5 ? ap.orange : ap.blue}
-          onClick={() => onNavigate("integrations")}
-        />
-        <StatusPill
-          label="Security"
-          value={security ? (security.network.suspicious_count > 0 ? `${security.network.suspicious_count} suspicious` : "clear") : "—"}
-          active={!!security}
-          color={secColor}
-          onClick={() => onNavigate("security")}
-        />
-        <StatusPill
-          label="Voice"
-          value={voiceActive ? "active" : voiceMode === "off" ? "off" : voiceMode}
-          active={voiceActive}
-          color={ap.purple}
-          onClick={async () => {
-            if (voiceActive) {
-              try { await invoke("stop_voice_conversation"); } catch { /* ignore */ }
-            } else {
-              try { await invoke("start_voice_conversation"); } catch { /* ignore */ }
-            }
-            loadStatus();
-          }}
-        />
-        <StatusPill
-          label="Ghost Mode"
-          value={ghostActive ? "active" : "off"}
-          active={ghostActive}
-          color="#8b5cf6"
-          onClick={async () => {
-            try {
-              if (ghostActive) {
-                await invoke("ghost_stop");
-                setGhostActive(false);
-              } else {
-                await invoke("ghost_start");
-                setGhostActive(true);
-              }
-            } catch { /* ignore */ }
-          }}
-        />
-        {runningAgents.length > 0 && (
-          <StatusPill
-            label="Agents"
-            value={`${runningAgents.length} running`}
-            active
-            color={ap.green}
-            onClick={() => onNavigate("bg-agents")}
-          />
-        )}
+    <div className="blade-glass flex flex-col p-5 gap-0 animate-[blade-card-in_0.5s_cubic-bezier(0.22,1,0.36,1)_0.03s_both]">
+      <div className="flex items-center justify-between mb-4">
+        <CardLabel icon={<svg viewBox="0 0 12 12" className="w-[10px] h-[10px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="6" r="4.5" strokeDasharray="1.8 2.5"/></svg>}>
+          God Mode
+        </CardLabel>
+        <Chip color="accent">Extreme</Chip>
       </div>
 
-      {/* ── Auto-Fix Card — shown when Hive detects a CI failure ── */}
-      {showAutoFix && (
-        <div className="relative z-20 px-4 pt-3">
-          <AutoFixCard onDismiss={() => setShowAutoFix(false)} />
+      <div className="flex-1 flex flex-col justify-center">
+        <div className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[rgba(255,255,255,0.28)] mb-1">
+          Currently in
         </div>
-      )}
-
-      {/* ── Main grid ── */}
-      <div className="relative z-10 flex-1 overflow-y-auto px-4 pb-4 pt-4">
-
-        {/* Row 1: Brief + Suggestions */}
-        <div className="grid gap-3 mb-3" style={{ gridTemplateColumns: "minmax(0,1fr) 280px" }}>
-
-          {/* ── INTELLIGENCE BRIEF ── */}
-          <Panel title="Intelligence Brief" accent={ap.blue}>
-            {godActive ? (
-              <div className="h-full flex flex-col gap-3">
-                {/* Perception vitals */}
-                {perception && (
-                  <div className="grid grid-cols-3 gap-3 border-b pb-3" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-                    <div className="flex flex-col gap-1">
-                      <div className="text-[10px] uppercase tracking-wider" style={{ color: ap.muted }}>Focus</div>
-                      <div className="text-sm font-semibold truncate" style={{ color: userStateColor(perception.user_state) }}>
-                        {perception.user_state}
-                      </div>
-                      <div className="text-xs truncate" style={{ color: ap.muted }}>{perception.active_app}</div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <div className="text-[10px] uppercase tracking-wider" style={{ color: ap.muted }}>System</div>
-                      <div className="text-xs font-semibold tabular-nums" style={{ color: ap.teal }}>
-                        RAM {perception.ram_used_gb.toFixed(1)}GB
-                      </div>
-                      <div className="text-xs" style={{ color: ap.muted }}>
-                        DISK {perception.disk_free_gb.toFixed(0)}GB free
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <div className="text-[10px] uppercase tracking-wider" style={{ color: ap.muted }}>Delta</div>
-                      <div className="text-xs leading-tight" style={{ color: ap.orange }}>
-                        {perception.delta_summary.slice(0, 60) || "No changes"}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Context tags */}
-                {perception && perception.context_tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 border-b pb-3" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-                    {perception.context_tags.slice(0, 8).map((tag) => (
-                      <span
-                        key={tag}
-                        className="px-2 py-0.5 rounded-full text-[10px] font-medium"
-                        style={{ background: `${ap.blue}14`, color: ap.blue, border: `1px solid ${ap.blue}25` }}
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Brief content lines */}
-                {briefLines.length > 0 ? (
-                  <div className="flex-1 overflow-y-auto space-y-1.5">
-                    {briefLines.map((line, i) => {
-                      const isBold = line.startsWith("**") && line.includes("**:");
-                      const key = line.replace(/\*\*/g, "").split(":")[0];
-                      const val = line.replace(/\*\*/g, "").split(":").slice(1).join(":").trim();
-                      const lineColor =
-                        key.includes("Focus") ? ap.teal :
-                        key.includes("Delta") || key.includes("Changed") ? ap.orange :
-                        key.includes("Error") ? ap.red :
-                        key.includes("Memory") || key.includes("Recall") ? ap.purple :
-                        ap.secondary;
-                      return isBold ? (
-                        <div key={i} className="flex gap-2 text-xs">
-                          <span className="font-semibold shrink-0 uppercase tracking-wider" style={{ color: lineColor }}>
-                            {key}
-                          </span>
-                          <span style={{ color: ap.secondary }}>{val}</span>
-                        </div>
-                      ) : (
-                        <div key={i} className="text-xs leading-relaxed" style={{ color: ap.muted }}>
-                          {line}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="flex-1 flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="text-xs font-medium" style={{ color: ap.muted }}>
-                        Waiting for scan...
-                      </div>
-                      {godModeUpdate && (
-                        <div className="mt-1 text-xs" style={{ color: ap.muted }}>
-                          Last update: {godModeUpdate.bytes}b · {godModeUpdate.tier}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Visible errors */}
-                {perception && perception.visible_errors.length > 0 && (
-                  <div className="border-t pt-2 space-y-1" style={{ borderColor: "rgba(255,69,58,0.2)" }}>
-                    {perception.visible_errors.slice(0, 3).map((err, i) => (
-                      <div key={i} className="flex gap-1.5 text-xs" style={{ color: ap.red }}>
-                        <span className="shrink-0">!</span>
-                        <span className="truncate">{err}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex h-full flex-col items-center justify-center gap-3 py-6 text-center">
-                <div className="text-xs font-medium" style={{ color: ap.muted }}>
-                  God Mode offline
-                </div>
-                <div className="text-xs max-w-[200px] leading-relaxed" style={{ color: ap.muted }}>
-                  Enable God Mode in Settings to see live context — active app, system state, and AI-generated briefs.
-                </div>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try { await invoke("toggle_god_mode", { enabled: true, tier: "normal" }); loadCore(); } catch { /* ignore */ }
-                  }}
-                  className="px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-250 active:scale-95"
-                  style={{ background: `${ap.orange}14`, color: ap.orange, border: `1px solid ${ap.orange}30` }}
-                >
-                  Enable God Mode
-                </button>
-              </div>
-            )}
-          </Panel>
-
-          {/* ── PROACTIVE SUGGESTIONS ── */}
-          <Panel title={`Suggestions (${suggestions.length})`} accent={ap.purple}>
-            {suggestions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full py-6 gap-2">
-                <div className="text-xs font-medium" style={{ color: ap.muted }}>
-                  All clear
-                </div>
-                <div className="text-xs" style={{ color: ap.muted }}>
-                  No pending suggestions
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-2 overflow-y-auto max-h-52">
-                {suggestions.map((task) => (
-                  <SuggestionCard
-                    key={task.id}
-                    task={task}
-                    onDismiss={dismissSuggestion}
-                    onApprove={approveSuggestion}
-                  />
-                ))}
-              </div>
-            )}
-          </Panel>
+        <div className="text-[44px] font-extrabold leading-[0.95] tracking-[-0.03em] text-white mb-2 truncate">
+          {appName}
         </div>
+        <div className="font-mono text-[12px] text-[#60a5fa] mb-4 truncate">
+          {filePath.length > 50 ? `…${filePath.slice(-48)}` : filePath}
+        </div>
+        <div className="inline-flex items-center gap-[6px] px-3 py-[5px] rounded-full
+          bg-[rgba(74,222,128,0.1)] border border-[rgba(74,222,128,0.22)]
+          text-[#4ade80] text-[11px] font-semibold self-start">
+          <Dot color="#4ade80" glow />
+          {userState}
+        </div>
+      </div>
 
-        {/* Row 2: Stats panels */}
-        <div className="grid grid-cols-3 gap-3 mb-3">
-
-          {/* Evolution */}
-          <Panel title="Evolution" accent={ap.orange}>
-            <div className="space-y-3">
-              <div className="flex items-end justify-between gap-3">
-                <div>
-                  <div className="text-xs uppercase tracking-wider mb-1" style={{ color: ap.muted }}>Level</div>
-                  <div
-                    className="text-5xl font-bold leading-none tabular-nums"
-                    style={{ color: ap.orange }}
-                  >
-                    {level?.level ?? 0}
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between text-xs mb-1.5">
-                    <span style={{ color: ap.muted }}>XP {(level?.score ?? 0).toLocaleString()}</span>
-                    <span style={{ color: ap.orange }}>{xpProgress}%</span>
-                  </div>
-                  {/* Progress bar */}
-                  <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${xpProgress}%`, background: ap.orange }}
-                    />
-                  </div>
-                  {level?.next_unlock && (
-                    <div className="mt-1.5 text-xs truncate" style={{ color: ap.muted }}>
-                      Next: {level.next_unlock}
-                    </div>
-                  )}
-                </div>
-              </div>
-              {level && level.breakdown.slice(0, 3).map((item, i) => (
-                <div
-                  key={i}
-                  className="border-l-2 pl-2.5 text-xs"
-                  style={{ borderColor: `${ap.orange}50`, color: ap.muted }}
-                >
-                  {item}
-                </div>
-              ))}
+      <div className="mt-4 pt-4 border-t border-[rgba(255,255,255,0.07)] flex gap-4">
+        {[
+          { label: "Agents", value: "3", color: "text-white" },
+          { label: "Memories", value: "1.2k", color: "text-[#60a5fa]" },
+          { label: "Mic", value: "On", color: "text-[#4ade80]" },
+          { label: "Spend", value: "$0.84", color: "text-[#fbbf24]" },
+        ].map(({ label, value, color }, i) => (
+          <React.Fragment key={label}>
+            {i > 0 && <div className="w-px bg-[rgba(255,255,255,0.08)] self-stretch" />}
+            <div className="flex flex-col gap-[2px]">
+              <div className={`text-[18px] font-bold tracking-[-0.03em] leading-none ${color}`}>{value}</div>
+              <div className="text-[9.5px] font-semibold tracking-[0.08em] uppercase text-[rgba(255,255,255,0.28)]">{label}</div>
             </div>
-          </Panel>
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
 
-          {/* Health */}
-          <Panel title="Health Guardian" accent={ap.green}>
-            {health ? (
-              <div className="space-y-0">
-                <DataRow label="Streak" value={fmtMinutes(health.current_streak_minutes)} accent={health.current_streak_minutes > 90 ? ap.red : ap.green} />
-                <DataRow label="Daily Total" value={fmtMinutes(health.daily_total_minutes)} accent={ap.teal} />
-                <DataRow label="Breaks Taken" value={<AnimatedNumber target={health.breaks_taken} />} accent={ap.orange} />
-                <DataRow label="Status" value={health.status} accent={ap.green} mono={false} />
-              </div>
-            ) : (
-              <div className="text-xs" style={{ color: ap.muted }}>Health guardian offline</div>
-            )}
-            <button
-              type="button"
-              onClick={() => onNavigate("health-panel")}
-              className="mt-3 w-full py-2 rounded-lg text-xs font-medium transition-all duration-250 active:scale-95"
-              style={{ background: `${ap.green}10`, color: ap.green, border: `1px solid ${ap.green}25` }}
-            >
-              Health Panel →
-            </button>
-          </Panel>
+function AgentsCard() {
+  const agents = [
+    { name: "Code Reviewer", task: "PR #47 · blade auth refactor", pct: 72, elapsed: "04:12" },
+    { name: "Morning Briefing", task: "Digest from 8 sources", pct: 38, elapsed: "01:03" },
+    { name: "Security Monitor", task: "Network watch · 0 anomalies", pct: 100, elapsed: "∞" },
+  ];
+  return (
+    <div className="blade-glass flex flex-col p-4 gap-3 animate-[blade-card-in_0.5s_cubic-bezier(0.22,1,0.36,1)_0.08s_both]">
+      <div className="flex items-center justify-between">
+        <CardLabel icon={<svg viewBox="0 0 12 12" className="w-[10px] h-[10px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="4" cy="4" r="1.5"/><circle cx="9" cy="3" r="1.5"/><circle cx="9" cy="9" r="1.5"/><path d="M5.5 4h1.5a2 2 0 010 4H4M9 4.5v3"/></svg>}>
+          Agents
+        </CardLabel>
+        <Chip color="green">3 running</Chip>
+      </div>
+      <div className="flex flex-col gap-[10px] flex-1">
+        {agents.map((ag) => (
+          <div key={ag.name} className="flex flex-col gap-[3px]">
+            <div className="flex items-center justify-between">
+              <span className="text-[12px] font-semibold">{ag.name}</span>
+              <span className="font-mono text-[10px] text-[rgba(255,255,255,0.28)]">{ag.elapsed}</span>
+            </div>
+            <div className="text-[11px] text-[rgba(255,255,255,0.55)] truncate">{ag.task}</div>
+            <div className="h-[2px] bg-[rgba(255,255,255,0.07)] rounded-full overflow-hidden mt-[2px]">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#818cf8] to-[#a78bfa]"
+                style={{ width: `${ag.pct}%`, opacity: ag.pct === 100 ? 0.25 : 1, animation: "blade-shimmer 2.2s ease-in-out infinite" }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
-          {/* Total Recall */}
-          <Panel title="Total Recall" accent={ap.blue}>
-            {cfg?.screen_timeline_enabled && timeline ? (
-              <div className="space-y-0">
-                <DataRow label="Captures" value={<AnimatedNumber target={timeline.total_entries} />} accent={ap.blue} />
-                <DataRow label="Disk Used" value={fmt(timeline.disk_bytes)} accent={ap.teal} />
-                <DataRow label="Last Cap" value={relTime(timeline.newest_timestamp)} accent={ap.muted} mono={false} />
-              </div>
-            ) : (
-              <div className="text-xs" style={{ color: ap.muted }}>
-                {cfg?.screen_timeline_enabled ? "No captures yet" : "Disabled"}
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={() => onNavigate("screen-timeline")}
-              className="mt-3 w-full py-2 rounded-lg text-xs font-medium transition-all duration-250 active:scale-95"
-              style={{ background: `${ap.blue}10`, color: ap.blue, border: `1px solid ${ap.blue}25` }}
-            >
-              Open Timeline →
-            </button>
-          </Panel>
-        </div>
+function IntegrationsCard({ integrations }: { integrations: IntegrationState }) {
+  const eventCount = integrations.upcoming_events.length;
+  const tiles = [
+    { name: "Email", value: String(integrations.unread_emails || 0), sub: "unread", color: integrations.unread_emails > 0 ? "#fbbf24" : "#4ade80" },
+    { name: "Slack", value: String(integrations.slack_mentions || 0), sub: "mentions", color: integrations.slack_mentions > 0 ? "#fbbf24" : "#4ade80" },
+    { name: "GitHub", value: integrations.github_notifications > 0 ? String(integrations.github_notifications) : "✓", sub: integrations.github_notifications > 0 ? "notifs" : "CI passing", color: "#4ade80" },
+    { name: "Calendar", value: String(eventCount), sub: "today", color: "#818cf8" },
+  ];
+  return (
+    <div className="blade-glass flex flex-col p-4 gap-3 animate-[blade-card-in_0.5s_cubic-bezier(0.22,1,0.36,1)_0.13s_both]">
+      <div className="flex items-center justify-between">
+        <CardLabel icon={<svg viewBox="0 0 12 12" className="w-[10px] h-[10px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="1" y="1" width="4" height="4" rx="1"/><rect x="7" y="1" width="4" height="4" rx="1"/><rect x="1" y="7" width="4" height="4" rx="1"/><path d="M9 7v4M11 9H7"/></svg>}>
+          Integrations
+        </CardLabel>
+      </div>
+      <div className="grid grid-cols-2 gap-[6px] flex-1">
+        {tiles.map((t) => (
+          <div key={t.name} className="p-[9px_10px] rounded-[11px] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.07)] flex flex-col gap-[3px] hover:bg-[rgba(255,255,255,0.07)] transition-colors cursor-default">
+            <div className="text-[9.5px] font-semibold tracking-[0.1em] uppercase text-[rgba(255,255,255,0.28)]">{t.name}</div>
+            <div className="text-[24px] font-bold tracking-[-0.04em] leading-none" style={{ color: t.color }}>{t.value}</div>
+            <div className="text-[10px] text-[rgba(255,255,255,0.55)]">{t.sub}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
-        {/* Row 3: Active Agents */}
-        <div className="mb-3">
-          <Panel title={`Active Agents (${agents.length})`} accent={ap.green}>
-            <div className="flex gap-3">
-              {agents.length > 0 ? (
-                <>
-                  <div className="shrink-0" style={{ width: 160 }}>
-                    <AgentPixelWorld agents={agents} height={80} width={160} />
-                  </div>
-                  <div className="flex-1 min-w-0 rounded-lg overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
-                    <div
-                      className="grid gap-2 border-b px-3 py-2 text-[10px] font-semibold uppercase tracking-wider"
-                      style={{ gridTemplateColumns: "3.5rem minmax(0,1fr) 5rem", borderColor: "rgba(255,255,255,0.06)", color: ap.muted }}
-                    >
-                      <div>PID</div>
-                      <div>Task</div>
-                      <div className="text-right">Status</div>
-                    </div>
-                    {agents.slice(0, 4).map((a) => (
-                      <AgentRowCompact key={a.id} agent={a} />
-                    ))}
-                    {agents.length > 4 && (
-                      <div className="px-3 py-1.5 text-xs" style={{ color: ap.muted }}>
-                        +{agents.length - 4} more
-                      </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <div className="text-xs" style={{ color: ap.muted }}>No agents running</div>
+function CalendarCard({ integrations }: { integrations: IntegrationState }) {
+  const realEvents = integrations.upcoming_events.slice(0, 3);
+  const mockEvents = [
+    { time: "3:00 PM", name: "Staq sync — Federico", meta: "Solana Reputation Protocol", badge: "in 47 min", isNext: true },
+    { time: "5:30 PM", name: "PollPe standup", meta: "Google Meet · 5 attendees", badge: null as string | null, isNext: false },
+    { time: "Tmrw 10:00", name: "Investor call · demo prep", meta: "Zoom · Staq deck needed", badge: null as string | null, isNext: false },
+  ];
+
+  const events = realEvents.length > 0
+    ? realEvents.map((ev, i) => ({
+        time: new Date(ev.start_ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        name: ev.title,
+        meta: ev.minutes_until > 0 ? `in ${ev.minutes_until} min` : "happening now",
+        badge: i === 0 && ev.minutes_until > 0 ? `in ${ev.minutes_until} min` : null as string | null,
+        isNext: i === 0,
+      }))
+    : mockEvents;
+
+  return (
+    <div className="blade-glass flex flex-col p-[18px] gap-[14px] animate-[blade-card-in_0.5s_cubic-bezier(0.22,1,0.36,1)_0.18s_both]">
+      <CardLabel icon={<svg viewBox="0 0 12 12" className="w-[10px] h-[10px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="1" y="2" width="10" height="9" rx="1.5"/><path d="M1 5h10M4 1v2M8 1v2"/></svg>}>
+        Calendar
+      </CardLabel>
+      <div className="flex flex-col relative">
+        <div className="absolute left-[6px] top-[8px] bottom-[8px] w-px bg-[rgba(255,255,255,0.08)]" />
+        {events.map((ev, i) => (
+          <div key={i} className="flex gap-[14px] items-start py-[10px] rounded-[11px] hover:bg-[rgba(255,255,255,0.04)] transition-colors cursor-default pl-0 pr-2">
+            <div className="w-[13px] h-[13px] rounded-full flex-shrink-0 flex items-center justify-center mt-[2px] relative z-[1]"
+              style={{
+                border: ev.isNext ? "1.5px solid #818cf8" : "1.5px solid rgba(255,255,255,0.12)",
+                background: ev.isNext ? "rgba(129,140,248,0.15)" : "rgba(255,255,255,0.04)",
+              }}>
+              <span className="w-[7px] h-[7px] rounded-full block"
+                style={{
+                  background: ev.isNext ? "#818cf8" : "rgba(255,255,255,0.2)",
+                  boxShadow: ev.isNext ? "0 0 8px #818cf8" : undefined,
+                  animation: ev.isNext ? "blade-pulse 2s ease-in-out infinite" : undefined,
+                }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-mono text-[10px] mb-[2px]" style={{ color: ev.isNext ? "#818cf8" : "rgba(255,255,255,0.28)" }}>{ev.time}</div>
+              <div className="text-[13px] font-semibold truncate">{ev.name}</div>
+              <div className="text-[11px] text-[rgba(255,255,255,0.55)] mt-[2px]">{ev.meta}</div>
+              {ev.badge && (
+                <span className="mt-[5px] inline-block text-[9px] font-bold tracking-[0.07em] uppercase px-[7px] py-[2px] rounded-full bg-[rgba(129,140,248,0.14)] text-[#818cf8]">
+                  {ev.badge}
+                </span>
               )}
             </div>
-            <div className="flex gap-2 mt-3">
-              <button
-                type="button"
-                onClick={() => onNavigate("swarm")}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-250 active:scale-95"
-                style={{ background: `${ap.green}10`, color: ap.green, border: `1px solid ${ap.green}25` }}
-              >
-                Swarm →
-              </button>
-              <button
-                type="button"
-                onClick={() => onNavigate("bg-agents")}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-250 active:scale-95"
-                style={{ background: `${ap.orange}10`, color: ap.orange, border: `1px solid ${ap.orange}25` }}
-              >
-                BG Agents →
-              </button>
-            </div>
-          </Panel>
-        </div>
-
-        {/* Row 4: Cron Queue */}
-        {crons.length > 0 && (
-          <div className="mb-3">
-            <Panel title={`Scheduled Tasks (${crons.length})`} accent={ap.muted}>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {crons.slice(0, 6).map((c) => (
-                  <div
-                    key={c.id}
-                    className="rounded-lg px-3 py-2 text-xs"
-                    style={{
-                      background: c.enabled ? `${ap.blue}0a` : "rgba(255,255,255,0.03)",
-                      border: `1px solid ${c.enabled ? `${ap.blue}20` : "rgba(255,255,255,0.06)"}`,
-                    }}
-                  >
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <span
-                        className="h-1.5 w-1.5 rounded-full shrink-0"
-                        style={{ background: c.enabled ? ap.green : ap.muted }}
-                      />
-                      <span className="truncate font-medium" style={{ color: c.enabled ? ap.text : ap.muted }}>
-                        {c.name}
-                      </span>
-                    </div>
-                    <div className="text-[10px]" style={{ color: ap.muted }}>
-                      {c.enabled ? `in ${countdown(c.next_run)}` : "paused"} · {c.run_count}x
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Panel>
           </div>
-        )}
+        ))}
+      </div>
+    </div>
+  );
+}
 
-        {/* Row 5: Quick Actions */}
-        <div>
-          <Panel title="Quick Actions" accent={ap.orange}>
-            <div className="grid grid-cols-6 gap-2">
-              <ActionBtn
-                label="Lock Screen"
-                icon="🔒"
-                color={ap.red}
-                loading={actionLoading["lock"]}
-                onClick={() => quickAction("lock", () => invoke("lock_screen"))}
-              />
-              <ActionBtn
-                label="Take Break"
-                icon="☕"
-                color={ap.green}
-                loading={actionLoading["break"]}
-                onClick={() => quickAction("break", () => invoke("health_take_break"))}
-              />
-              <ActionBtn
-                label="Standup"
-                icon="📋"
-                color={ap.blue}
-                onClick={() => onNavigate("temporal")}
-              />
-              <ActionBtn
-                label="Scan System"
-                icon="⬡"
-                color={ap.orange}
-                loading={actionLoading["scan"]}
-                onClick={() => quickAction("scan", () => invoke("deep_scan_start"))}
-              />
-              <ActionBtn
-                label="Security"
-                icon="⚿"
-                color={ap.purple}
-                onClick={() => onNavigate("security")}
-              />
-              <ActionBtn
-                label="Voice Mode"
-                icon={voiceActive ? "◉" : "◎"}
-                color={ap.purple}
-                loading={actionLoading["voice"]}
-                onClick={() => quickAction("voice", () =>
-                  voiceActive ? invoke("stop_voice_conversation") : invoke("start_voice_conversation")
-                )}
-              />
+function QueueCard() {
+  const items = [
+    { title: "Reply to Rohan — API timeline", sub: "Draft ready · Slack · 2h ago", cta: "Review", accent: "#fbbf24" },
+    { title: "Approve PR merge — blade#47", sub: "Review complete · CI passing", cta: "Approve", accent: "#818cf8" },
+    { title: "Accept calendar invite", sub: "Tomorrow 10 AM · Zoom · investor", cta: "Accept", accent: "#4ade80" },
+  ];
+  return (
+    <div className="blade-glass flex flex-col p-4 gap-3 flex-1 min-h-0 animate-[blade-card-in_0.5s_cubic-bezier(0.22,1,0.36,1)_0.22s_both]">
+      <div className="flex items-center justify-between">
+        <CardLabel icon={<svg viewBox="0 0 12 12" className="w-[10px] h-[10px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="6" cy="6" r="5"/><path d="M6 4v2l1.5 1.5"/></svg>}>
+          Action Queue
+        </CardLabel>
+        <Chip color="amber">3 waiting</Chip>
+      </div>
+      <div className="flex flex-col gap-[5px] flex-1 overflow-hidden">
+        {items.map((item) => (
+          <div key={item.title}
+            className="flex items-center gap-[10px] px-[10px] py-[9px] rounded-[11px]
+              bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)]
+              cursor-pointer hover:bg-[rgba(255,255,255,0.07)] hover:border-[rgba(255,255,255,0.12)]
+              hover:-translate-y-[1px] hover:shadow-[0_6px_20px_rgba(0,0,0,0.25)]
+              transition-all group">
+            <div className="w-[3px] self-stretch rounded-full flex-shrink-0" style={{ background: item.accent }} />
+            <div className="flex-1 min-w-0">
+              <div className="text-[12px] font-semibold truncate">{item.title}</div>
+              <div className="text-[10.5px] text-[rgba(255,255,255,0.55)] mt-[1px]">{item.sub}</div>
             </div>
-          </Panel>
+            <div className="text-[9.5px] font-bold tracking-[0.05em] px-[9px] py-[3px] rounded-[6px]
+              border border-[rgba(129,140,248,0.28)] bg-[rgba(129,140,248,0.12)] text-[#818cf8]
+              flex-shrink-0 whitespace-nowrap group-hover:bg-[rgba(129,140,248,0.22)] transition-colors">
+              {item.cta}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StatsStrip() {
+  const stats = [
+    { label: "Chats", value: "12", delta: "↑ 3", up: true },
+    { label: "Spend", value: "$0.84", delta: "under budget", up: true },
+    { label: "Memories", value: "1.2k", delta: "+14", up: true },
+    { label: "Screen", value: "4h 21m", delta: "↑ above avg", up: false },
+  ];
+  return (
+    <div className="blade-glass p-[14px_16px] flex-shrink-0 animate-[blade-card-in_0.5s_cubic-bezier(0.22,1,0.36,1)_0.26s_both]">
+      <div className="grid grid-cols-4 gap-[6px]">
+        {stats.map((s) => (
+          <div key={s.label} className="p-[10px_12px] rounded-[11px] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.07)] flex flex-col gap-[2px] hover:bg-[rgba(255,255,255,0.07)] transition-colors cursor-default">
+            <div className="text-[9.5px] font-semibold tracking-[0.1em] uppercase text-[rgba(255,255,255,0.28)]">{s.label}</div>
+            <div className="text-[22px] font-bold tracking-[-0.04em] leading-[1.1]">{s.value}</div>
+            <div className={`text-[9.5px] font-medium mt-[1px] ${s.up ? "text-[#4ade80]" : "text-[#f87171]"}`}>{s.delta}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Dashboard (shell) ─────────────────────────────────────────────────────────
+
+export function Dashboard({ onNavigate, chatPanelProps, activeRoute }: DashboardProps) {
+  const [chatOpen, setChatOpen] = useState(false);
+  const [histOpen, setHistOpen] = useState(false);
+  const wallpaperUrl = useWallpaper();
+  const perception = usePerception();
+  const integrations = useIntegrations();
+
+  const handleNavigate = useCallback((route: NavRailRoute) => {
+    onNavigate(route);
+  }, [onNavigate]);
+
+  return (
+    <div className="relative w-full h-full overflow-hidden">
+      {/* Wallpaper background */}
+      <div
+        className="fixed inset-0 z-0 bg-cover bg-center"
+        style={{
+          backgroundImage: wallpaperUrl
+            ? `url(${wallpaperUrl})`
+            : "radial-gradient(ellipse 90% 70% at 15% 25%, rgba(88,50,220,0.65) 0%, transparent 65%), radial-gradient(ellipse 70% 90% at 85% 15%, rgba(40,20,140,0.55) 0%, transparent 60%), radial-gradient(ellipse 80% 60% at 70% 85%, rgba(160,30,90,0.4) 0%, transparent 65%), #06060f",
+        }}
+      />
+      {/* Dark scrim */}
+      <div className="fixed inset-0 z-[1] pointer-events-none" style={{ background: "rgba(0,0,0,0.38)" }} />
+
+      {/* Nav rail */}
+      <div className="relative z-[200]">
+        <NavRail
+          activeRoute={activeRoute}
+          onNavigate={handleNavigate}
+          onOpenHistory={() => setHistOpen((v) => !v)}
+        />
+      </div>
+
+      {/* History drawer */}
+      <HistoryDrawer
+        open={histOpen}
+        conversations={chatPanelProps.conversations}
+        currentConversationId={chatPanelProps.currentConversationId}
+        onClose={() => setHistOpen(false)}
+        onSelect={(id) => { chatPanelProps.onSwitchConversation(id); setChatOpen(true); }}
+        onNew={() => { chatPanelProps.onNewConversation(); setChatOpen(true); setHistOpen(false); }}
+      />
+
+      {/* Main grid */}
+      <div
+        className="relative z-[10] flex flex-col ml-[62px] mt-[34px] h-[calc(100vh-34px)] p-[12px] gap-[10px] overflow-hidden transition-[margin-right] duration-[460ms]"
+        style={{
+          transitionTimingFunction: "cubic-bezier(0.32,0.72,0,1)",
+          marginRight: chatOpen ? "400px" : "0px",
+        }}
+      >
+        {/* Top row: 1.7fr 1fr 0.75fr */}
+        <div className="grid gap-[10px] min-h-0" style={{ gridTemplateColumns: "1.7fr 1fr 0.75fr", flex: "0 0 47%" }}>
+          <GodModeCard perception={perception} />
+          <AgentsCard />
+          <IntegrationsCard integrations={integrations} />
         </div>
 
-        <span className="sr-only">{now}</span>
+        {/* Bottom row: 1.05fr 1.3fr */}
+        <div className="grid gap-[10px] flex-1 min-h-0" style={{ gridTemplateColumns: "1.05fr 1.3fr" }}>
+          <CalendarCard integrations={integrations} />
+          <div className="flex flex-col gap-[10px] min-h-0">
+            <QueueCard />
+            <StatsStrip />
+          </div>
+        </div>
       </div>
+
+      {/* Chat panel */}
+      <ChatPanel
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        {...chatPanelProps}
+      />
+
+      {/* FAB — opens chat */}
+      {!chatOpen && (
+        <button
+          onClick={() => setChatOpen(true)}
+          className="fixed bottom-[20px] right-[20px] w-[50px] h-[50px] rounded-[16px] z-[170]
+            bg-[#818cf8] border-none cursor-pointer flex items-center justify-center text-white
+            shadow-[0_6px_24px_rgba(129,140,248,0.45),0_12px_40px_rgba(0,0,0,0.4)]
+            hover:scale-105 hover:shadow-[0_8px_32px_rgba(129,140,248,0.55)]
+            active:scale-[0.92] transition-all duration-200"
+        >
+          <svg viewBox="0 0 20 20" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 13a2 2 0 01-2 2H6l-4 3V4a2 2 0 012-2h12a2 2 0 012 2v9z"/>
+          </svg>
+        </button>
+      )}
     </div>
   );
 }
