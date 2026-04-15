@@ -1119,11 +1119,21 @@ pub fn run() {
             tentacles::github_deep::github_draft_release,
             tentacles::github_deep::github_auto_merge_dependabot,
             tentacles::github_deep::github_community_health,
+            // GitHub Smart — reviewer assignment, breaking change detection, smart review/triage
+            tentacles::github_deep::github_smart_assign_reviewer,
+            tentacles::github_deep::github_detect_breaking_changes,
+            tentacles::github_deep::github_smart_review_pr,
+            tentacles::github_deep::github_smart_triage_issues,
             // Calendar Tentacle — schedule, meeting prep, focus blocks, post-meeting summaries
             tentacles::calendar_tentacle::calendar_get_today,
             tentacles::calendar_tentacle::calendar_prep_meeting,
             tentacles::calendar_tentacle::calendar_auto_block_focus,
             tentacles::calendar_tentacle::calendar_post_meeting_summary,
+            // Calendar Smart — meeting load, double-booking detection, smart prep, summary drafts
+            tentacles::calendar_tentacle::calendar_analyze_meeting_load,
+            tentacles::calendar_tentacle::calendar_detect_double_bookings,
+            tentacles::calendar_tentacle::calendar_smart_prep_meeting,
+            tentacles::calendar_tentacle::calendar_post_meeting_with_draft,
             // Filesystem Tentacle — approve a suggested file move (learning loop)
             tentacles::filesystem_watch::filesystem_approve_move,
         ])

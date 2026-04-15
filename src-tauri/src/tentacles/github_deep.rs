@@ -1073,6 +1073,716 @@ pub async fn check_community_health(owner: &str, repo: &str) -> CommunityReport 
     report
 }
 
+// ── 6. Smart Reviewer Assignment ─────────────────────────────────────────────
+
+/// Result of smart reviewer assignment.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewerAssignment {
+    pub pr_number: u32,
+    pub recommended: String,
+    pub reason: String,
+    pub expertise_files: Vec<String>,
+    pub open_review_count: u32,
+    pub similar_pr_count: u32,
+}
+
+/// Pick the best reviewer for a PR based on:
+///   - Git blame expertise on the changed files
+///   - Open review load (fewest pending reviews)
+///   - History of reviewing similar code paths
+pub async fn smart_assign_reviewer(
+    owner: &str,
+    repo: &str,
+    pr_number: u32,
+) -> Result<ReviewerAssignment, String> {
+    let token = github_token();
+    if token.is_empty() {
+        return Err("[github_deep] No GitHub token configured.".to_string());
+    }
+
+    // Fetch the PR's changed files
+    let files_url = format!(
+        "https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}/files"
+    );
+    let files_resp = gh_get(&files_url, &token).await?;
+    let files: Vec<GhFile> = files_resp
+        .json()
+        .await
+        .map_err(|e| format!("[github_deep] Failed to parse PR files: {e}"))?;
+
+    let changed_files: Vec<String> = files.iter().map(|f| f.filename.clone()).collect();
+
+    // For each changed file, fetch git blame stats (contributors via /contributors or commits per file)
+    // We approximate via commits-per-path
+    let mut author_file_touches: HashMap<String, u32> = HashMap::new();
+    for file in changed_files.iter().take(10) {
+        let commits_url = format!(
+            "https://api.github.com/repos/{owner}/{repo}/commits?path={file}&per_page=20"
+        );
+        if let Ok(resp) = gh_get(&commits_url, &token).await {
+            if let Ok(commits) = resp.json::<Vec<serde_json::Value>>().await {
+                for commit in commits {
+                    let login = commit
+                        .get("author")
+                        .and_then(|a| a.get("login"))
+                        .and_then(|l| l.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    if !login.is_empty() {
+                        *author_file_touches.entry(login).or_insert(0) += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    // Fetch open review requests to gauge bandwidth
+    // We use the search API: PRs where the user is a requested reviewer
+    let open_prs_url = format!(
+        "https://api.github.com/repos/{owner}/{repo}/pulls?state=open&per_page=100"
+    );
+    let open_prs: Vec<serde_json::Value> = if let Ok(resp) = gh_get(&open_prs_url, &token).await {
+        resp.json().await.unwrap_or_default()
+    } else {
+        vec![]
+    };
+
+    let mut reviewer_open_reviews: HashMap<String, u32> = HashMap::new();
+    for pr in &open_prs {
+        if let Some(reviewers) = pr.get("requested_reviewers").and_then(|r| r.as_array()) {
+            for reviewer in reviewers {
+                let login = reviewer
+                    .get("login")
+                    .and_then(|l| l.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if !login.is_empty() {
+                    *reviewer_open_reviews.entry(login).or_insert(0) += 1;
+                }
+            }
+        }
+    }
+
+    // Fetch PR author to exclude self-review
+    let pr_url = format!("https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}");
+    let pr_author: String = if let Ok(resp) = gh_get(&pr_url, &token).await {
+        resp.json::<GhPull>()
+            .await
+            .map(|p| p.user.login)
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
+
+    // Score: expertise_touches * 2 - open_reviews * 1
+    // Higher is better
+    let mut candidates: Vec<(String, i64)> = author_file_touches
+        .iter()
+        .filter(|(login, _)| *login != &pr_author && !login.starts_with("dependabot"))
+        .map(|(login, &touches)| {
+            let load = *reviewer_open_reviews.get(login).unwrap_or(&0) as i64;
+            let score = (touches as i64) * 2 - load;
+            (login.clone(), score)
+        })
+        .collect();
+
+    candidates.sort_by(|a, b| b.1.cmp(&a.1));
+
+    let best = candidates.first().cloned().unwrap_or_else(|| ("(no candidates found)".to_string(), 0));
+    let open_count = *reviewer_open_reviews.get(&best.0).unwrap_or(&0);
+    let expertise_count = *author_file_touches.get(&best.0).unwrap_or(&0);
+
+    // Ask LLM to generate a human-friendly reason
+    let reason_prompt = format!(
+        "In one sentence, explain why {} is the best reviewer for PR #{} in {}/{} \
+         given they have touched {} of the changed files and have {} open reviews pending.",
+        best.0, pr_number, owner, repo, expertise_count, open_count
+    );
+    let reason = llm_call(
+        "You are a concise engineering manager.",
+        &reason_prompt,
+    )
+    .await
+    .unwrap_or_else(|_| format!("{} has the most expertise and bandwidth.", best.0));
+
+    // Assign the reviewer via GitHub API
+    let assign_url = format!(
+        "https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}/requested_reviewers"
+    );
+    let _ = gh_post(
+        &assign_url,
+        &token,
+        serde_json::json!({ "reviewers": [best.0] }),
+    )
+    .await;
+
+    Ok(ReviewerAssignment {
+        pr_number,
+        recommended: best.0,
+        reason,
+        expertise_files: changed_files,
+        open_review_count: open_count,
+        similar_pr_count: expertise_count,
+    })
+}
+
+// ── 7. Breaking Change Detection ─────────────────────────────────────────────
+
+/// A detected breaking change in a PR diff.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BreakingChange {
+    pub kind: String,   // "removed_function" | "changed_signature" | "db_schema" | "deleted_import"
+    pub file: String,
+    pub description: String,
+    pub severity: String, // "critical" | "high" | "medium"
+}
+
+/// Analyse a PR diff for breaking changes:
+///   - Removed public functions / methods
+///   - Changed API signatures (function parameter changes)
+///   - Modified database schemas (ALTER TABLE / DROP COLUMN)
+///   - Deleted files that other files import
+pub async fn detect_breaking_changes(
+    owner: &str,
+    repo: &str,
+    pr_number: u32,
+) -> Result<Vec<BreakingChange>, String> {
+    let token = github_token();
+    if token.is_empty() {
+        return Err("[github_deep] No GitHub token configured.".to_string());
+    }
+
+    let files_url = format!(
+        "https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}/files"
+    );
+    let files_resp = gh_get(&files_url, &token).await?;
+    let files: Vec<GhFile> = files_resp
+        .json()
+        .await
+        .map_err(|e| format!("[github_deep] Failed to parse PR files: {e}"))?;
+
+    let mut breaking: Vec<BreakingChange> = Vec::new();
+
+    // Heuristic pass — fast, no LLM
+    for file in &files {
+        let patch = file.patch.as_deref().unwrap_or("");
+
+        // Deleted files that others might import
+        if file.status == "removed" {
+            breaking.push(BreakingChange {
+                kind: "deleted_import".to_string(),
+                file: file.filename.clone(),
+                description: format!(
+                    "`{}` was deleted — any files importing it will break.",
+                    file.filename
+                ),
+                severity: "critical".to_string(),
+            });
+            continue;
+        }
+
+        // Database schema changes
+        let patch_lower = patch.to_lowercase();
+        let schema_patterns = ["drop table", "drop column", "alter table", "rename column", "rename table"];
+        for pat in &schema_patterns {
+            if patch_lower.contains(pat) {
+                breaking.push(BreakingChange {
+                    kind: "db_schema".to_string(),
+                    file: file.filename.clone(),
+                    description: format!(
+                        "Database schema change detected (`{}`) in `{}`.",
+                        pat, file.filename
+                    ),
+                    severity: "critical".to_string(),
+                });
+            }
+        }
+
+        // Removed public functions (lines starting with `-pub fn`, `-pub async fn`, `-export function`, etc.)
+        for line in patch.lines() {
+            let trimmed = line.trim_start_matches('-');
+            let is_removal = line.starts_with('-') && !line.starts_with("---");
+            if !is_removal {
+                continue;
+            }
+            let tl = trimmed.trim();
+            if (tl.starts_with("pub fn ")
+                || tl.starts_with("pub async fn ")
+                || tl.starts_with("export function ")
+                || tl.starts_with("export default function ")
+                || tl.starts_with("export const "))
+                && !tl.contains("//")
+            {
+                let fn_name = tl
+                    .split_whitespace()
+                    .skip_while(|w| !w.contains("fn") && !w.contains("function") && !w.contains("const"))
+                    .nth(1)
+                    .unwrap_or("unknown")
+                    .trim_end_matches('(')
+                    .to_string();
+
+                breaking.push(BreakingChange {
+                    kind: "removed_function".to_string(),
+                    file: file.filename.clone(),
+                    description: format!(
+                        "Public function/export `{}` was removed from `{}`.",
+                        fn_name, file.filename
+                    ),
+                    severity: "high".to_string(),
+                });
+            }
+        }
+    }
+
+    // LLM deep-pass on the full diff for signature changes
+    let diff_text: String = files
+        .iter()
+        .map(|f| {
+            format!(
+                "// {}\n{}",
+                f.filename,
+                f.patch.as_deref().unwrap_or("")
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n");
+
+    if !diff_text.trim().is_empty() {
+        let system = "You are a breaking-change detector. Analyse this pull request diff for API changes.\n\
+                      Look for: changed function signatures (added/removed/retyped parameters), \
+                      renamed exports, modified interface/struct fields, changed return types.\n\
+                      For each breaking change output exactly:\n\
+                      FILE: <filename>\n\
+                      KIND: changed_signature\n\
+                      DESCRIPTION: <one sentence>\n\
+                      SEVERITY: critical|high|medium\n\
+                      ---\n\
+                      If no signature changes, output: NONE";
+
+        let llm_resp = llm_call(system, &crate::safe_slice(&diff_text, 6000))
+            .await
+            .unwrap_or_default();
+
+        if !llm_resp.trim().eq_ignore_ascii_case("none") {
+            for block in llm_resp.split("---") {
+                let file = extract_field(block, "FILE");
+                let kind = extract_field(block, "KIND");
+                let description = extract_field(block, "DESCRIPTION");
+                let severity = extract_field(block, "SEVERITY");
+                if !file.is_empty() && !description.is_empty() {
+                    breaking.push(BreakingChange {
+                        kind: if kind.is_empty() { "changed_signature".to_string() } else { kind },
+                        file,
+                        description,
+                        severity: if severity.is_empty() { "medium".to_string() } else { severity },
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(breaking)
+}
+
+fn extract_field(block: &str, field: &str) -> String {
+    block
+        .lines()
+        .find(|l| l.trim().starts_with(&format!("{field}:")))
+        .and_then(|l| l.splitn(2, ':').nth(1))
+        .map(|s| s.trim().to_string())
+        .unwrap_or_default()
+}
+
+// ── 8. Smart PR Review (enhanced) ────────────────────────────────────────────
+
+/// Enhanced PR review that includes: repo coding conventions, recent commit
+/// patterns, and context about whether the PR author is a first-time contributor.
+pub async fn smart_review_pr(
+    owner: &str,
+    repo: &str,
+    pr_number: u32,
+) -> Result<PrReview, String> {
+    let token = github_token();
+    if token.is_empty() {
+        return Err("[github_deep] No GitHub token configured.".to_string());
+    }
+
+    // Fetch PR metadata
+    let pr_url = format!("https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}");
+    let pr: GhPull = gh_get(&pr_url, &token)
+        .await?
+        .json()
+        .await
+        .map_err(|e| format!("[github_deep] Failed to parse PR: {e}"))?;
+
+    // Fetch PR files
+    let files_url = format!(
+        "https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}/files"
+    );
+    let files: Vec<GhFile> = gh_get(&files_url, &token)
+        .await?
+        .json()
+        .await
+        .map_err(|e| format!("[github_deep] Failed to parse PR files: {e}"))?;
+
+    // Check if author is a first-time contributor
+    let author = &pr.user.login;
+    let contrib_url = format!(
+        "https://api.github.com/repos/{owner}/{repo}/commits?author={author}&per_page=5"
+    );
+    let author_commits: Vec<serde_json::Value> =
+        if let Ok(resp) = gh_get(&contrib_url, &token).await {
+            resp.json().await.unwrap_or_default()
+        } else {
+            vec![]
+        };
+    let is_first_time = author_commits.is_empty();
+
+    // Fetch recent commits for pattern context
+    let recent_commits_url = format!(
+        "https://api.github.com/repos/{owner}/{repo}/commits?per_page=10"
+    );
+    let recent_commits: Vec<serde_json::Value> =
+        if let Ok(resp) = gh_get(&recent_commits_url, &token).await {
+            resp.json().await.unwrap_or_default()
+        } else {
+            vec![]
+        };
+    let recent_commit_msgs: Vec<String> = recent_commits
+        .iter()
+        .filter_map(|c| {
+            c.get("commit")
+                .and_then(|commit| commit.get("message"))
+                .and_then(|m| m.as_str())
+                .map(|m| m.lines().next().unwrap_or("").to_string())
+        })
+        .collect();
+
+    // Coding conventions from git_style
+    let config = crate::config::load_config();
+    let style_context = crate::git_style::style_context_for_repo(&config.blade_source_path);
+
+    // Build diff text
+    let mut diff_text = format!(
+        "PR #{pr_number}: {}\nBranch: {} → {}\nAuthor: {}{}\n\n",
+        pr.title,
+        pr.head.ref_name,
+        pr.base.ref_name,
+        author,
+        if is_first_time { " (FIRST-TIME CONTRIBUTOR)" } else { "" }
+    );
+    let mut total_chars = diff_text.len();
+    const MAX_DIFF_CHARS: usize = 7_000;
+
+    for file in &files {
+        let entry = format!(
+            "--- {}\n+{} -{} ({})\n{}\n",
+            file.filename,
+            file.additions,
+            file.deletions,
+            file.status,
+            file.patch.as_deref().unwrap_or("(binary or no diff)")
+        );
+        if total_chars + entry.len() > MAX_DIFF_CHARS {
+            diff_text.push_str("... (diff truncated)\n");
+            break;
+        }
+        diff_text.push_str(&entry);
+        total_chars += entry.len();
+    }
+
+    let first_time_guidance = if is_first_time {
+        "\nNOTE: This is a FIRST-TIME contributor. Be welcoming and educational in your \
+         review. Explain the 'why' behind requests, not just the 'what'. Thank them \
+         for contributing."
+    } else {
+        ""
+    };
+
+    let recent_patterns = if !recent_commit_msgs.is_empty() {
+        format!(
+            "\nRecent commit message patterns in this repo:\n{}",
+            recent_commit_msgs.iter().take(5).map(|m| format!("  - {m}")).collect::<Vec<_>>().join("\n")
+        )
+    } else {
+        String::new()
+    };
+
+    let system_prompt = format!(
+        "You are an expert code reviewer embedded in this project.\n\
+         Categorise findings into: BUG_RISK, STYLE, PERFORMANCE, SECURITY.\n\
+         Format your response as:\n\
+         VERDICT: APPROVE | REQUEST_CHANGES | COMMENT\n\
+         CATEGORIES: comma-separated list\n\
+         BODY:\n<markdown review body>\n\n\
+         Be concise and actionable. If there are no issues, say so briefly.\n\
+         {style_context}{first_time_guidance}{recent_patterns}"
+    );
+
+    let review_text = llm_call(&system_prompt, &diff_text).await?;
+
+    let verdict = if review_text.contains("VERDICT: APPROVE") {
+        "APPROVE"
+    } else if review_text.contains("VERDICT: REQUEST_CHANGES") {
+        "REQUEST_CHANGES"
+    } else {
+        "COMMENT"
+    }
+    .to_string();
+
+    let categories: Vec<String> = {
+        let line = review_text
+            .lines()
+            .find(|l| l.starts_with("CATEGORIES:"))
+            .unwrap_or("CATEGORIES:");
+        line.trim_start_matches("CATEGORIES:")
+            .split(',')
+            .map(|s| s.trim().to_lowercase())
+            .filter(|s| !s.is_empty())
+            .collect()
+    };
+
+    let body = review_text
+        .split_once("BODY:")
+        .map(|(_, b)| b.trim().to_string())
+        .unwrap_or_else(|| review_text.clone());
+
+    // Post review to GitHub
+    let review_url = format!(
+        "https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}/reviews"
+    );
+    let payload = serde_json::json!({
+        "body": body,
+        "event": verdict,
+        "comments": []
+    });
+    let post_resp = gh_post(&review_url, &token, payload).await?;
+    let github_review_id: Option<u64> = if post_resp.status().is_success() {
+        post_resp
+            .json::<serde_json::Value>()
+            .await
+            .ok()
+            .and_then(|v| v.get("id").and_then(|id| id.as_u64()))
+    } else {
+        log::warn!(
+            "[github_deep] Failed to post smart review for PR #{pr_number}: HTTP {}",
+            post_resp.status()
+        );
+        None
+    };
+
+    Ok(PrReview {
+        pr_number,
+        github_review_id,
+        body,
+        categories,
+        verdict,
+    })
+}
+
+// ── 9. Smart Issue Triage (reporter history aware) ────────────────────────────
+
+/// Triage issues with awareness of reporter history:
+/// serial reporters (many open issues) get a different response than one-off reporters.
+pub async fn smart_triage_issues(
+    owner: &str,
+    repo: &str,
+) -> Result<Vec<TriagedIssue>, String> {
+    let token = github_token();
+    if token.is_empty() {
+        return Err("[github_deep] No GitHub token configured.".to_string());
+    }
+
+    // Fetch all open issues
+    let all_issues_url = format!(
+        "https://api.github.com/repos/{owner}/{repo}/issues?state=open&per_page=100"
+    );
+    let all_issues: Vec<GhIssue> = gh_get(&all_issues_url, &token)
+        .await?
+        .json()
+        .await
+        .map_err(|e| format!("[github_deep] Failed to parse issues: {e}"))?;
+
+    let real_issues: Vec<&GhIssue> = all_issues
+        .iter()
+        .filter(|i| i.pull_request.is_none())
+        .collect();
+
+    let unlabelled: Vec<&GhIssue> = real_issues
+        .iter()
+        .copied()
+        .filter(|i| i.labels.is_empty())
+        .collect();
+
+    // Count open issues per reporter to detect serial reporters
+    let mut reporter_issue_counts: HashMap<String, u32> = HashMap::new();
+    for issue in &real_issues {
+        *reporter_issue_counts
+            .entry(issue.user.login.clone())
+            .or_insert(0) += 1;
+    }
+
+    let corpus: Vec<(u32, String)> = real_issues
+        .iter()
+        .map(|i| (i.number, format!("#{}: {}", i.number, crate::safe_slice(&i.title, 120))))
+        .collect();
+
+    let mut results = Vec::new();
+    let now_timestamp = chrono::Utc::now();
+
+    for issue in unlabelled {
+        let body_text = issue.body.as_deref().unwrap_or("").trim().to_string();
+        let age_days = chrono::DateTime::parse_from_rfc3339(&issue.updated_at)
+            .map(|dt| now_timestamp.signed_duration_since(dt).num_days())
+            .unwrap_or(0);
+
+        if age_days >= 90 {
+            let stale_comment = format!(
+                "This issue has been inactive for {age_days} days. \
+                 Closing as stale — if it's still relevant, please reopen with updated details."
+            );
+            let comment_url = format!(
+                "https://api.github.com/repos/{owner}/{repo}/issues/{}/comments",
+                issue.number
+            );
+            let _ = gh_post(&comment_url, &token, serde_json::json!({ "body": stale_comment })).await;
+            let close_url = format!(
+                "https://api.github.com/repos/{owner}/{repo}/issues/{}",
+                issue.number
+            );
+            let _ = gh_client()
+                .patch(&close_url)
+                .header("Authorization", format!("Bearer {token}"))
+                .header("Accept", "application/vnd.github+json")
+                .header("X-GitHub-Api-Version", "2022-11-28")
+                .header("User-Agent", "BLADE-Hive/1.0")
+                .json(&serde_json::json!({ "state": "closed", "state_reason": "not_planned" }))
+                .send()
+                .await
+                .ok();
+            results.push(TriagedIssue {
+                number: issue.number,
+                title: issue.title.clone(),
+                classification: "stale".to_string(),
+                labels_applied: vec!["stale".to_string()],
+                duplicate_of: None,
+                closed_as_stale: true,
+            });
+            continue;
+        }
+
+        let reporter = &issue.user.login;
+        let reporter_count = *reporter_issue_counts.get(reporter).unwrap_or(&1);
+        let is_serial_reporter = reporter_count >= 3;
+
+        let corpus_str = corpus
+            .iter()
+            .filter(|(n, _)| *n != issue.number)
+            .map(|(_, s)| s.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let reporter_context = if is_serial_reporter {
+            format!(
+                "\nReporter context: @{reporter} has {reporter_count} open issues in this repo \
+                 (serial reporter). Consider whether this issue is a duplicate or part of a \
+                 broader theme — suggest linking related issues in your response."
+            )
+        } else {
+            format!(
+                "\nReporter context: @{reporter} is a one-off reporter. \
+                 Be welcoming and ask for any missing reproduction steps."
+            )
+        };
+
+        let system = format!(
+            "You are a GitHub issue triage assistant. \
+             Classify the issue as exactly one of: bug, feature, question, duplicate. \
+             If duplicate, state which issue number it duplicates (e.g. 'duplicate of #42'). \
+             Reply in this exact format:\n\
+             CLASSIFICATION: <bug|feature|question|duplicate>\n\
+             REASON: <one sentence>\n\
+             DUPLICATE_OF: <number or none>{reporter_context}"
+        );
+
+        let user = format!(
+            "Title: {}\nBody: {}\n\nExisting open issues:\n{corpus_str}",
+            issue.title,
+            crate::safe_slice(&body_text, 600)
+        );
+
+        let classification_raw = llm_call(&system, &user).await.unwrap_or_default();
+
+        let classification = {
+            let line = classification_raw
+                .lines()
+                .find(|l| l.starts_with("CLASSIFICATION:"))
+                .unwrap_or("CLASSIFICATION: question");
+            let raw = line.trim_start_matches("CLASSIFICATION:").trim().to_lowercase();
+            match raw.as_str() {
+                "bug" | "feature" | "question" | "duplicate" => raw,
+                _ => "question".to_string(),
+            }
+        };
+
+        let duplicate_of: Option<u32> = if classification == "duplicate" {
+            classification_raw
+                .lines()
+                .find(|l| l.starts_with("DUPLICATE_OF:"))
+                .and_then(|l| {
+                    l.trim_start_matches("DUPLICATE_OF:")
+                        .trim()
+                        .trim_start_matches('#')
+                        .parse::<u32>()
+                        .ok()
+                })
+        } else {
+            None
+        };
+
+        let label = match classification.as_str() {
+            "bug" => "bug",
+            "feature" => "enhancement",
+            "question" => "question",
+            "duplicate" => "duplicate",
+            _ => "needs-triage",
+        };
+
+        let label_url = format!(
+            "https://api.github.com/repos/{owner}/{repo}/issues/{}/labels",
+            issue.number
+        );
+        let label_resp = gh_post(&label_url, &token, serde_json::json!({ "labels": [label] })).await;
+
+        let labels_applied = match label_resp {
+            Ok(r) if r.status().is_success() => vec![label.to_string()],
+            _ => vec![],
+        };
+
+        if let Some(orig) = duplicate_of {
+            let dup_comment = format!(
+                "This appears to be a duplicate of #{orig}. Marking as duplicate."
+            );
+            let comment_url = format!(
+                "https://api.github.com/repos/{owner}/{repo}/issues/{}/comments",
+                issue.number
+            );
+            let _ = gh_post(&comment_url, &token, serde_json::json!({ "body": dup_comment })).await;
+        }
+
+        results.push(TriagedIssue {
+            number: issue.number,
+            title: issue.title.clone(),
+            classification,
+            labels_applied,
+            duplicate_of,
+            closed_as_stale: false,
+        });
+    }
+
+    Ok(results)
+}
+
 // ── Tauri commands ────────────────────────────────────────────────────────────
 
 /// Tauri command: review a PR and post the review to GitHub.
@@ -1120,4 +1830,43 @@ pub async fn github_community_health(
     repo: String,
 ) -> CommunityReport {
     check_community_health(&owner, &repo).await
+}
+
+/// Tauri command: smart-assign the best reviewer for a PR.
+#[tauri::command]
+pub async fn github_smart_assign_reviewer(
+    owner: String,
+    repo: String,
+    pr_number: u32,
+) -> Result<ReviewerAssignment, String> {
+    smart_assign_reviewer(&owner, &repo, pr_number).await
+}
+
+/// Tauri command: detect breaking changes in a PR.
+#[tauri::command]
+pub async fn github_detect_breaking_changes(
+    owner: String,
+    repo: String,
+    pr_number: u32,
+) -> Result<Vec<BreakingChange>, String> {
+    detect_breaking_changes(&owner, &repo, pr_number).await
+}
+
+/// Tauri command: smart PR review with author history + coding conventions.
+#[tauri::command]
+pub async fn github_smart_review_pr(
+    owner: String,
+    repo: String,
+    pr_number: u32,
+) -> Result<PrReview, String> {
+    smart_review_pr(&owner, &repo, pr_number).await
+}
+
+/// Tauri command: smart issue triage with reporter-history awareness.
+#[tauri::command]
+pub async fn github_smart_triage_issues(
+    owner: String,
+    repo: String,
+) -> Result<Vec<TriagedIssue>, String> {
+    smart_triage_issues(&owner, &repo).await
 }

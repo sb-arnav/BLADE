@@ -24,6 +24,10 @@ struct WatcherState {
     recent_commands: Vec<(String, i64)>,
     /// Frequency map: command_root → count.
     frequency: HashMap<String, u32>,
+    /// Workflow pattern: (trigger_pattern, expected_followup, times_seen, times_skipped)
+    workflow_patterns: Vec<(String, String, u32, u32)>,
+    /// Consecutive build failure tracker: (error_snippet, count, first_seen_ts)
+    build_failures: Vec<(String, u32, i64)>,
 }
 
 static WATCHER_STATE: OnceLock<Mutex<WatcherState>> = OnceLock::new();
@@ -187,6 +191,197 @@ fn detect_retries(new_cmds: &[String]) -> Vec<(String, Option<String>)> {
     results
 }
 
+// ── Intent understanding ──────────────────────────────────────────────────────
+
+/// What the user is trying to do, inferred from a command pattern.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum CommandIntent {
+    FindTodos,
+    InvestigatingHistory,
+    Debugging,
+    BuildingProject,
+    DeployingCode,
+    SearchingFiles,
+    ManagingDependencies,
+    Unknown,
+}
+
+/// Infer what the user is trying to accomplish from a command.
+pub fn infer_intent(cmd: &str) -> CommandIntent {
+    let c = cmd.trim().to_lowercase();
+
+    if c.contains("grep") && (c.contains("todo") || c.contains("fixme") || c.contains("hack")) {
+        return CommandIntent::FindTodos;
+    }
+    if c.starts_with("git log") || c.starts_with("git diff") || c.starts_with("git show") {
+        return CommandIntent::InvestigatingHistory;
+    }
+    if c.starts_with("cargo build")
+        || c.starts_with("cargo run")
+        || c.starts_with("npm run build")
+        || c.starts_with("yarn build")
+        || c.starts_with("make ")
+    {
+        return CommandIntent::BuildingProject;
+    }
+    if c.contains("kubectl") || c.contains("docker push") || c.starts_with("git push") {
+        return CommandIntent::DeployingCode;
+    }
+    if c.contains("grep -r") || c.contains("find .") || c.starts_with("rg ") {
+        return CommandIntent::SearchingFiles;
+    }
+    if c.starts_with("npm install")
+        || c.starts_with("yarn add")
+        || c.starts_with("cargo add")
+        || c.starts_with("pip install")
+    {
+        return CommandIntent::ManagingDependencies;
+    }
+    if c.starts_with("gdb") || c.contains("strace") || c.contains("lldb") || c.contains("valgrind") {
+        return CommandIntent::Debugging;
+    }
+
+    CommandIntent::Unknown
+}
+
+/// Generate a context-aware suggestion based on inferred intent.
+pub fn intent_suggestion(intent: &CommandIntent, cmd: &str) -> Option<String> {
+    match intent {
+        CommandIntent::FindTodos => Some(
+            "You're looking for TODOs. Want me to compile a task list from these and add them to your memory?".to_string()
+        ),
+        CommandIntent::InvestigatingHistory => Some(
+            "You're investigating the git history. Want me to summarise recent changes or find who last touched a specific file?".to_string()
+        ),
+        CommandIntent::BuildingProject => None, // handled by build failure detection
+        CommandIntent::DeployingCode => Some(
+            "You're deploying. Want me to check for any open issues or failing tests before this goes out?".to_string()
+        ),
+        CommandIntent::SearchingFiles => Some(
+            format!("You're searching files. If you're looking for something specific in the codebase, I can run a semantic search across your project instead of grep.")
+        ),
+        CommandIntent::ManagingDependencies => Some(
+            "You're installing dependencies. Want me to check for known vulnerabilities in the packages you're adding?".to_string()
+        ),
+        CommandIntent::Debugging => Some(
+            "You're debugging. Want me to check the error logs or recent commits that might have introduced this issue?".to_string()
+        ),
+        CommandIntent::Unknown => None,
+    }
+}
+
+// ── Workflow pattern learning ─────────────────────────────────────────────────
+
+/// Learn from (trigger, followup) pairs in the recent command history.
+/// Called after each tick to record patterns like "edit src/ → run tests".
+fn learn_workflow_pattern(recent: &mut Vec<(String, String, u32, u32)>, new_cmd: &str, prev_cmd: Option<&str>) {
+    let known_workflows: &[(&str, &str)] = &[
+        ("edit", "cargo test"),
+        ("edit", "npm test"),
+        ("git commit", "git push"),
+        ("cargo build", "cargo test"),
+        ("npm run build", "npm test"),
+        ("git add", "git commit"),
+    ];
+
+    let Some(prev) = prev_cmd else { return };
+
+    for (trigger, followup) in known_workflows {
+        let prev_matches = prev.to_lowercase().contains(trigger);
+        let new_matches = new_cmd.to_lowercase().contains(followup);
+        let new_is_different = !new_cmd.to_lowercase().contains(followup);
+
+        if prev_matches {
+            // Find or create pattern entry
+            if let Some(entry) = recent.iter_mut().find(|(t, f, _, _)| t == trigger && f == followup) {
+                if new_matches {
+                    entry.2 += 1; // seen count
+                } else if new_is_different {
+                    entry.3 += 1; // skipped count
+                }
+            } else {
+                let seen = if new_matches { 1 } else { 0 };
+                let skipped = if !new_matches && new_is_different { 1 } else { 0 };
+                recent.push((trigger.to_string(), followup.to_string(), seen, skipped));
+            }
+        }
+    }
+}
+
+/// Check if the user is breaking a known workflow pattern (e.g. edited but didn't test).
+/// Returns Some(reminder) if a pattern was broken.
+fn check_workflow_deviation(
+    patterns: &[(String, String, u32, u32)],
+    recent: &[(String, i64)],
+    new_cmd: &str,
+) -> Option<String> {
+    // Look at the last 5 commands
+    let last_5: Vec<&str> = recent
+        .iter()
+        .rev()
+        .take(5)
+        .map(|(c, _)| c.as_str())
+        .collect();
+
+    for (trigger, followup, seen, skipped) in patterns {
+        if *seen < 3 {
+            continue; // not enough data
+        }
+        // If the trigger was recently run and current command is NOT the followup
+        let trigger_found = last_5.iter().any(|c| c.to_lowercase().contains(trigger.as_str()));
+        let followup_found = last_5.iter().any(|c| c.to_lowercase().contains(followup.as_str()));
+        let current_is_followup = new_cmd.to_lowercase().contains(followup.as_str());
+
+        if trigger_found && !followup_found && !current_is_followup {
+            // User ran the trigger but skipped the followup
+            return Some(format!(
+                "You usually run `{followup}` after `{trigger}` (done so {seen}x) — you haven't this time."
+            ));
+        }
+    }
+    None
+}
+
+// ── Build failure tracking ────────────────────────────────────────────────────
+
+/// Track consecutive build failures. Returns Some(alert) if same error repeats 3+ times.
+fn track_build_failure(
+    failures: &mut Vec<(String, u32, i64)>,
+    cmd: &str,
+    ts: i64,
+) -> Option<String> {
+    // Only track build commands
+    let build_cmds = ["cargo build", "cargo run", "npm run", "yarn build", "make ", "python ", "go build"];
+    if !build_cmds.iter().any(|b| cmd.to_lowercase().starts_with(b)) {
+        return None;
+    }
+
+    // We can't read stdout here, so we track rapid retries of the same build command as proxy for failure
+    let cmd_root = cmd.split_whitespace().take(3).collect::<Vec<_>>().join(" ");
+
+    if let Some(entry) = failures.iter_mut().find(|(key, _, first_ts)| {
+        key == &cmd_root && (ts - first_ts) < 600 // within 10 min
+    }) {
+        entry.1 += 1;
+        if entry.1 >= 3 {
+            return Some(format!(
+                "This is the {}th time you've run `{}` in the last {} minutes. \
+                 Want me to look at the error?",
+                entry.1,
+                cmd_root,
+                (ts - entry.2) / 60
+            ));
+        }
+    } else {
+        // Clean up old entries
+        failures.retain(|(_, _, first_ts)| (ts - first_ts) < 600);
+        failures.push((cmd_root, 1, ts));
+    }
+
+    None
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /// Suggest a better version of a known shell anti-pattern.
@@ -304,7 +499,6 @@ fn tick_terminal_watcher(app: &AppHandle) {
     };
 
     if total <= last_count {
-        // No new commands.
         return;
     }
 
@@ -321,18 +515,15 @@ fn tick_terminal_watcher(app: &AppHandle) {
             *state.frequency.entry(root).or_insert(0) += 1;
             state.recent_commands.push((cmd.clone(), ts));
         }
-        // Trim ring buffer to last 200 entries
         if state.recent_commands.len() > 200 {
             let overflow = state.recent_commands.len() - 200;
             state.recent_commands.drain(0..overflow);
         }
     }
 
-    // Process each new command
-    for cmd in &new_cmds {
+    for (i, cmd) in new_cmds.iter().enumerate() {
         let class = classify_command(cmd);
 
-        // Emit new command event
         let _ = app.emit(
             "terminal_new_command",
             serde_json::json!({
@@ -342,7 +533,7 @@ fn tick_terminal_watcher(app: &AppHandle) {
             }),
         );
 
-        // Suggest a better command if applicable
+        // Better command suggestion
         if let Some(suggestion) = suggest_better_command(cmd) {
             let _ = app.emit(
                 "proactive_suggestion",
@@ -355,7 +546,21 @@ fn tick_terminal_watcher(app: &AppHandle) {
             );
         }
 
-        // Loop detection (≥3 times within 10 min)
+        // Intent understanding — what is the user trying to do?
+        let intent = infer_intent(cmd);
+        if let Some(intent_hint) = intent_suggestion(&intent, cmd) {
+            let _ = app.emit(
+                "proactive_suggestion",
+                serde_json::json!({
+                    "source": "terminal_watch",
+                    "title": "I noticed what you're doing",
+                    "body": intent_hint,
+                    "intent": format!("{:?}", intent),
+                }),
+            );
+        }
+
+        // Loop detection
         let loop_msg = {
             let state = watcher_state().lock().unwrap();
             detect_loop_pattern(&state.recent_commands, cmd, 600, 3)
@@ -367,6 +572,56 @@ fn tick_terminal_watcher(app: &AppHandle) {
                     "source": "terminal_watch",
                     "title": "Possible loop detected",
                     "body": msg,
+                }),
+            );
+        }
+
+        // Build failure tracking
+        let build_alert = {
+            let mut state = watcher_state().lock().unwrap();
+            track_build_failure(&mut state.build_failures, cmd, ts)
+        };
+        if let Some(alert) = build_alert {
+            let _ = app.emit(
+                "proactive_suggestion",
+                serde_json::json!({
+                    "source": "terminal_watch",
+                    "title": "Repeated build failure",
+                    "body": alert,
+                    "action": "analyze_error",
+                }),
+            );
+        }
+
+        // Workflow pattern learning and deviation detection
+        let prev_cmd = if i > 0 {
+            Some(new_cmds[i - 1].as_str())
+        } else {
+            let state = watcher_state().lock().unwrap();
+            state.recent_commands
+                .iter()
+                .rev()
+                .nth(1)
+                .map(|(c, _)| c.as_str() as *const str)
+                .map(|p| unsafe { &*p })
+        };
+
+        {
+            let mut state = watcher_state().lock().unwrap();
+            learn_workflow_pattern(&mut state.workflow_patterns, cmd, prev_cmd);
+        }
+
+        let workflow_reminder = {
+            let state = watcher_state().lock().unwrap();
+            check_workflow_deviation(&state.workflow_patterns, &state.recent_commands, cmd)
+        };
+        if let Some(reminder) = workflow_reminder {
+            let _ = app.emit(
+                "proactive_suggestion",
+                serde_json::json!({
+                    "source": "terminal_watch",
+                    "title": "Workflow pattern deviation",
+                    "body": reminder,
                 }),
             );
         }

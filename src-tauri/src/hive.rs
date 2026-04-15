@@ -1258,11 +1258,41 @@ async fn call_mcp_tool(
 
 // ── Head processing ───────────────────────────────────────────────────────────
 
-/// A Head model processes its reports and produces decisions.
-/// Normal + requires_action → cheap LLM call to draft a real response.
-/// High → full model analysis + escalation if autonomy < 0.7.
-/// Critical → always escalate to Big Agent.
+/// Route reports to the correct domain Head's specialized think function.
+///
+/// Each Head receives only the reports from its own tentacles and applies
+/// domain-specific intelligence:
+///   - "communications" → comms_head_think: cross-platform messaging synthesis,
+///     style-matched reply drafting, overload triage
+///   - "development"    → dev_head_think: CI failure analysis, SDLC flow,
+///     PR management, deploy pattern detection
+///   - "operations"     → ops_head_think: incident response, service state
+///     tracking, cost anomaly detection
+///   - "intelligence"   → intel_head_think: memory ingestion, cross-domain
+///     insight detection, knowledge gap analysis, periodic briefs
 async fn head_process_reports_async(
+    head: &HeadModel,
+    reports: &[TentacleReport],
+) -> Vec<Decision> {
+    use crate::tentacles::heads;
+
+    match head.domain.as_str() {
+        "communications" => heads::comms_head_think(reports).await,
+        "development" => heads::dev_head_think(reports).await,
+        "operations" => heads::ops_head_think(reports).await,
+        "intelligence" => heads::intel_head_think(reports).await,
+        other => {
+            // Unknown domain — fall back to generic priority-based logic
+            log::warn!("[Hive] Unknown head domain '{}' — using generic fallback", other);
+            generic_head_fallback(head, reports).await
+        }
+    }
+}
+
+/// Generic fallback for any head domain not recognized above.
+/// Preserves the original priority-switch logic so nothing breaks if a new
+/// head is added before its think function is written.
+async fn generic_head_fallback(
     head: &HeadModel,
     reports: &[TentacleReport],
 ) -> Vec<Decision> {
@@ -1277,7 +1307,6 @@ async fn head_process_reports_async(
 
             Priority::Normal => {
                 if report.requires_action {
-                    // Cheap LLM call to draft a real response
                     let draft = llm_draft_response(&config, report, false).await;
                     Decision::Reply {
                         platform: tentacle_platform_from_id(&report.tentacle_id),
@@ -1293,7 +1322,6 @@ async fn head_process_reports_async(
             }
 
             Priority::High => {
-                // Full model for analysis
                 let analysis = llm_draft_response(&config, report, true).await;
                 if head.autonomy_level >= 0.7 {
                     Decision::Act {
@@ -1313,13 +1341,10 @@ async fn head_process_reports_async(
                 }
             }
 
-            Priority::Critical => {
-                // Always escalates — Big Agent will handle cross-domain correlation
-                Decision::Escalate {
-                    reason: format!("[CRITICAL] {}", report.summary),
-                    context: report.details.to_string(),
-                }
-            }
+            Priority::Critical => Decision::Escalate {
+                reason: format!("[CRITICAL] {}", report.summary),
+                context: report.details.to_string(),
+            },
         };
 
         decisions.push(decision);
@@ -1697,10 +1722,23 @@ pub fn initialize_hive() -> Hive {
         config.hive_autonomy,
     );
 
+    // Intelligence Head — cross-domain memory, insights, and knowledge management.
+    // It receives a copy of ALL reports (see hive_tick routing below) so it can
+    // build cross-domain connections. Its tentacle list is intentionally empty here;
+    // the routing in hive_tick feeds it the full all_reports slice.
+    let intel_head = HeadModel::new(
+        "head-intelligence",
+        "intelligence",
+        vec![], // sees all reports via special routing in hive_tick
+        format!("{}/{}", config.provider, config.model),
+        config.hive_autonomy,
+    );
+
     let mut heads = HashMap::new();
     heads.insert("head-communications".to_string(), comms_head);
     heads.insert("head-development".to_string(), dev_head);
     heads.insert("head-operations".to_string(), ops_head);
+    heads.insert("head-intelligence".to_string(), intel_head);
 
     // ── Tentacles ─────────────────────────────────────────────────────────────
     let mut tentacles: HashMap<String, Tentacle> = HashMap::new();
@@ -1807,7 +1845,7 @@ pub async fn hive_tick(app: &AppHandle) {
         return;
     }
 
-    // Route reports to heads
+    // Route reports to domain heads (each head sees only its tentacles' reports)
     let mut head_reports: HashMap<String, Vec<TentacleReport>> = HashMap::new();
     {
         let hive = hive_lock().lock().unwrap();
@@ -1819,9 +1857,16 @@ pub async fn hive_tick(app: &AppHandle) {
                     .push(report.clone());
             }
         }
+        // Intelligence Head receives ALL reports for cross-domain synthesis
+        if hive.heads.contains_key("head-intelligence") {
+            head_reports
+                .entry("head-intelligence".to_string())
+                .or_default()
+                .extend(all_reports.clone());
+        }
     }
 
-    // Each head processes its slice asynchronously (LLM for non-trivial)
+    // Each head processes its slice asynchronously via its specialized think function
     let mut all_decisions: Vec<Decision> = Vec::new();
     {
         let head_data: Vec<(HeadModel, Vec<TentacleReport>)> = {
