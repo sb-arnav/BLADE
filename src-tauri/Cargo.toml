@@ -1,6 +1,6 @@
 [package]
 name = "blade"
-version = "0.6.0"
+version = "0.6.2"
 description = "Blade - Personal AI"
 authors = ["Arnav Maurya"]
 edition = "2021"
