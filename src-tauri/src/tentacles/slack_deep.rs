@@ -117,7 +117,7 @@ async fn estimate_answer_confidence(msg: &InboundSlackMessage) -> f32 {
     // Questions (?) are harder — reduce confidence slightly
     let question_penalty = if msg.text.contains('?') { 0.1 } else { 0.0 };
 
-    (base - question_penalty).clamp(0.0, 1.0)
+    (base - question_penalty).clamp(0.0_f32, 1.0_f32)
 }
 
 // ── Channel tone detection ────────────────────────────────────────────────────

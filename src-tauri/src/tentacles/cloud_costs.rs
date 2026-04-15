@@ -923,3 +923,32 @@ fn simulated_savings() -> Vec<SavingSuggestion> {
         },
     ]
 }
+
+// ── Tauri commands ────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn cloud_check_aws_costs() -> Result<CloudCostReport, String> {
+    check_aws_costs().await
+}
+
+#[tauri::command]
+pub async fn cloud_detect_cost_anomalies(
+    report: CloudCostReport,
+) -> Vec<CostAlert> {
+    detect_cost_anomalies(&report).await
+}
+
+#[tauri::command]
+pub async fn cloud_suggest_savings() -> Vec<SavingSuggestion> {
+    suggest_savings().await
+}
+
+#[tauri::command]
+pub fn cloud_weekly_cost_report() -> String {
+    generate_weekly_cost_report()
+}
+
+#[tauri::command]
+pub async fn cloud_weekly_cost_report_live() -> String {
+    generate_weekly_cost_report_async().await
+}

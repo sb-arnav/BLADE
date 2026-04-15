@@ -565,6 +565,33 @@ pub fn get_error_groups() -> Vec<ErrorGroup> {
     }
 }
 
+// ── Tauri commands ────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn log_start_tailing(app: tauri::AppHandle, paths: Vec<String>) {
+    start_log_tailing(app, paths).await
+}
+
+#[tauri::command]
+pub async fn log_detect_anomalies(logs: Vec<String>) -> Vec<LogAnomaly> {
+    detect_anomalies(&logs).await
+}
+
+#[tauri::command]
+pub async fn log_correlate_errors(anomalies: Vec<LogAnomaly>) -> Vec<ErrorChain> {
+    correlate_errors(&anomalies).await
+}
+
+#[tauri::command]
+pub fn log_get_error_groups() -> Vec<ErrorGroup> {
+    get_error_groups()
+}
+
+#[tauri::command]
+pub fn log_search(query: String, limit: u32) -> Vec<ErrorGroup> {
+    search_logs(&query, limit)
+}
+
 /// Full-text search across stored log entries.
 pub fn search_logs(query: &str, limit: u32) -> Vec<ErrorGroup> {
     let conn = match open_db() {
