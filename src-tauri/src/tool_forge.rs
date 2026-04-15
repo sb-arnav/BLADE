@@ -7,6 +7,7 @@
 //
 // Tools are Python/bash/Node scripts saved to ~/.blade/tools/.
 // Each tool has a companion manifest (name.json) describing its invocation.
+#[allow(dead_code)]
 
 use rusqlite::params;
 use serde::{Deserialize, Serialize};

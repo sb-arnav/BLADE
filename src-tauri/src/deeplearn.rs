@@ -6,6 +6,7 @@
 /// into the character bible.
 ///
 /// This is not onboarding. This is Blade's first act of intelligence.
+#[allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

@@ -5,6 +5,7 @@
 /// argue both sides, predict counterarguments, and help craft winning positions.
 ///
 /// Think: a debate coach, devil's advocate, and negotiation strategist in one.
+#[allow(dead_code)]
 
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
@@ -157,7 +158,7 @@ pub async fn build_argument(topic: &str, position: &str, context: &str) -> Resul
 
     use crate::providers::{complete_turn, ConversationMessage};
     let conv = vec![ConversationMessage::User(prompt)];
-    let turn = complete_turn(&provider, &api_key, &model, &conv, &[], None).await
+    let turn = complete_turn(&provider, &api_key, &model, &conv, &crate::providers::no_tools(), None).await
         .map_err(|e| format!("LLM error in build_argument: {e}"))?;
 
     let raw = strip_json_fences(turn.content.trim());
@@ -204,7 +205,7 @@ pub async fn steelman_opponent(topic: &str, opponent_position: &str) -> Result<A
 
     use crate::providers::{complete_turn, ConversationMessage};
     let conv = vec![ConversationMessage::User(prompt)];
-    let turn = complete_turn(&provider, &api_key, &model, &conv, &[], None).await
+    let turn = complete_turn(&provider, &api_key, &model, &conv, &crate::providers::no_tools(), None).await
         .map_err(|e| format!("LLM error in steelman_opponent: {e}"))?;
 
     let raw = strip_json_fences(turn.content.trim());
@@ -248,7 +249,7 @@ pub async fn find_common_ground(pos_a: &str, pos_b: &str, topic: &str) -> Result
 
     use crate::providers::{complete_turn, ConversationMessage};
     let conv = vec![ConversationMessage::User(prompt)];
-    let turn = complete_turn(&provider, &api_key, &model, &conv, &[], None).await
+    let turn = complete_turn(&provider, &api_key, &model, &conv, &crate::providers::no_tools(), None).await
         .map_err(|e| format!("LLM error in find_common_ground: {e}"))?;
 
     Ok(turn.content.trim().to_string())
@@ -342,7 +343,7 @@ pub async fn start_debate(topic: &str, user_position: &str) -> Result<DebateSess
 
     use crate::providers::{complete_turn, ConversationMessage};
     let conv = vec![ConversationMessage::User(coaching_prompt)];
-    let coaching_turn = complete_turn(&provider, &api_key, &model, &conv, &[], None).await
+    let coaching_turn = complete_turn(&provider, &api_key, &model, &conv, &crate::providers::no_tools(), None).await
         .map_err(|e| format!("LLM error generating coaching: {e}"))?;
 
     let first_round = DebateRound {
@@ -417,7 +418,7 @@ pub async fn debate_round(
     );
 
     let user_conv = vec![ConversationMessage::User(user_arg_prompt)];
-    let user_turn = complete_turn(&provider, &api_key, &model, &user_conv, &[], None).await
+    let user_turn = complete_turn(&provider, &api_key, &model, &user_conv, &crate::providers::no_tools(), None).await
         .map_err(|e| format!("LLM error building user argument: {e}"))?;
 
     let user_arg_raw = strip_json_fences(user_turn.content.trim());
@@ -468,7 +469,7 @@ pub async fn debate_round(
     );
 
     let opp_conv = vec![ConversationMessage::User(opp_prompt)];
-    let opp_turn = complete_turn(&provider, &api_key, &model, &opp_conv, &[], None).await
+    let opp_turn = complete_turn(&provider, &api_key, &model, &opp_conv, &crate::providers::no_tools(), None).await
         .map_err(|e| format!("LLM error generating opponent argument: {e}"))?;
 
     let opp_raw = strip_json_fences(opp_turn.content.trim());
@@ -510,7 +511,7 @@ pub async fn debate_round(
     );
 
     let coach_conv = vec![ConversationMessage::User(coaching_prompt)];
-    let coach_turn = complete_turn(&provider, &api_key, &model, &coach_conv, &[], None).await
+    let coach_turn = complete_turn(&provider, &api_key, &model, &coach_conv, &crate::providers::no_tools(), None).await
         .map_err(|e| format!("LLM error generating coaching: {e}"))?;
 
     let round = DebateRound {
@@ -577,7 +578,7 @@ pub async fn conclude_debate(session_id: &str) -> Result<String, String> {
 
     use crate::providers::{complete_turn, ConversationMessage};
     let conv = vec![ConversationMessage::User(prompt)];
-    let turn = complete_turn(&provider, &api_key, &model, &conv, &[], None).await
+    let turn = complete_turn(&provider, &api_key, &model, &conv, &crate::providers::no_tools(), None).await
         .map_err(|e| format!("LLM error in conclude_debate: {e}"))?;
 
     let verdict = turn.content.trim().to_string();
@@ -695,7 +696,7 @@ pub async fn analyze_negotiation(
 
     use crate::providers::{complete_turn, ConversationMessage};
     let conv = vec![ConversationMessage::User(prompt)];
-    let turn = complete_turn(&provider, &api_key, &model, &conv, &[], None).await
+    let turn = complete_turn(&provider, &api_key, &model, &conv, &crate::providers::no_tools(), None).await
         .map_err(|e| format!("LLM error in analyze_negotiation: {e}"))?;
 
     let raw = strip_json_fences(turn.content.trim());
@@ -744,7 +745,7 @@ pub async fn roleplay_negotiation(scenario_id: &str, their_message: &str) -> Res
 
     use crate::providers::{complete_turn, ConversationMessage};
     let conv = vec![ConversationMessage::User(prompt)];
-    let turn = complete_turn(&provider, &api_key, &model, &conv, &[], None).await
+    let turn = complete_turn(&provider, &api_key, &model, &conv, &crate::providers::no_tools(), None).await
         .map_err(|e| format!("LLM error in roleplay_negotiation: {e}"))?;
 
     Ok(turn.content.trim().to_string())
@@ -781,7 +782,7 @@ pub async fn critique_negotiation_move(scenario_id: &str, user_move: &str) -> Re
 
     use crate::providers::{complete_turn, ConversationMessage};
     let conv = vec![ConversationMessage::User(prompt)];
-    let turn = complete_turn(&provider, &api_key, &model, &conv, &[], None).await
+    let turn = complete_turn(&provider, &api_key, &model, &conv, &crate::providers::no_tools(), None).await
         .map_err(|e| format!("LLM error in critique_negotiation_move: {e}"))?;
 
     Ok(turn.content.trim().to_string())

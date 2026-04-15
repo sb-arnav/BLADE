@@ -396,7 +396,7 @@ async fn llm_json(provider: &str, api_key: &str, model: &str, prompt: &str) -> R
     use crate::providers::{complete_turn, ConversationMessage};
 
     let messages = vec![ConversationMessage::User(prompt.to_string())];
-    let turn = complete_turn(provider, api_key, model, &messages, &[], None).await?;
+    let turn = complete_turn(provider, api_key, model, &messages, &crate::providers::no_tools(), None).await?;
     Ok(turn.content)
 }
 

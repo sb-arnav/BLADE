@@ -11,6 +11,7 @@
 ///
 /// This is Blade's equivalent of MemGPT's core memory: explicit, agent-controlled,
 /// always visible, limited in size so it forces prioritization.
+#[allow(dead_code)]
 
 use tauri::Emitter;
 use crate::providers::ConversationMessage;

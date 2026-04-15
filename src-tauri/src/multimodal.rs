@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine as _;
 use serde::{Deserialize, Serialize};

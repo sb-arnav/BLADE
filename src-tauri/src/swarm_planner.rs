@@ -110,7 +110,7 @@ pub async fn decompose_goal_to_dag_with_tools(
     }];
     let conversation = build_conversation(messages, None);
 
-    let turn = complete_turn(provider, api_key, model, &conversation, &[], base_url).await?;
+    let turn = complete_turn(provider, api_key, model, &conversation, &crate::providers::no_tools(), base_url).await?;
 
     let content = turn.content.trim();
 
@@ -330,7 +330,7 @@ pub async fn synthesize_final_result_with_scratchpad(
     }];
     let conversation = build_conversation(messages, None);
 
-    match complete_turn(provider, api_key, model, &conversation, &[], base_url).await {
+    match complete_turn(provider, api_key, model, &conversation, &crate::providers::no_tools(), base_url).await {
         Ok(turn) => turn.content.trim().to_string(),
         Err(e) => format!("Synthesis failed: {}", e),
     }

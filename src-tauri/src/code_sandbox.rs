@@ -565,7 +565,7 @@ Please explain what the code does and what the output means. If there were error
 
     let (provider, api_key, model) = get_provider();
     let messages = vec![ConversationMessage::User(prompt)];
-    let turn = complete_turn(&provider, &api_key, &model, &messages, &[], None).await?;
+    let turn = complete_turn(&provider, &api_key, &model, &messages, &crate::providers::no_tools(), None).await?;
 
     // Combine: sandbox result summary + LLM explanation
     let mut response = format!(
@@ -630,7 +630,7 @@ Return only the fixed code:"#,
         );
 
         let messages = vec![ConversationMessage::User(fix_prompt)];
-        let turn = complete_turn(&provider, &api_key, &model, &messages, &[], None).await?;
+        let turn = complete_turn(&provider, &api_key, &model, &messages, &crate::providers::no_tools(), None).await?;
 
         // Strip any accidental markdown code fences
         let fixed_code = strip_code_fences(turn.content.trim());

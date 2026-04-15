@@ -149,7 +149,7 @@ pub async fn score_relevance(query: &str, chunk: &str) -> f32 {
 
     let messages = vec![crate::providers::ConversationMessage::User(prompt)];
     let turn =
-        match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &[], None)
+        match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &crate::providers::no_tools(), None)
             .await
         {
             Ok(t) => t,

@@ -1425,6 +1425,9 @@ pub fn run() {
                 hive::start_hive(app.handle().clone(), startup_god_config.hive_autonomy);
             }
 
+            // Agent Factory — restore previously-deployed agents as Hive tentacles
+            agent_factory::restore_active_agents_to_hive();
+
             // Hive Tentacles — always-on background watchers
             tentacles::terminal_watch::start_terminal_watcher(app.handle().clone());
             tentacles::filesystem_watch::start_filesystem_watcher(app.handle().clone());

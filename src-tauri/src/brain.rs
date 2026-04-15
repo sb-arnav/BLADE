@@ -185,6 +185,7 @@ const SYSTEM_PROMPT_CHAR_BUDGET: usize = 150_000;
 /// Drop sections from the end of `parts` until the total char count is under
 /// the budget. The first `keep` entries are never removed (they are the
 /// highest-priority always-on sections).
+#[allow(dead_code)]
 fn enforce_budget(parts: &mut Vec<String>, keep: usize) {
     loop {
         let total: usize = parts.iter().map(|p| p.len()).sum();
@@ -289,7 +290,7 @@ pub fn score_context_relevance(query: &str, context_type: &str) -> f32 {
             &["source", "link", "url", "web", "online"],
             &[],
         ),
-        _ => (&[], &[], &[]),
+        _ => (&[], &crate::providers::no_tools(), &[]),
     };
 
     let mut score: f32 = 0.0;
@@ -438,20 +439,49 @@ fn build_system_prompt_inner(
     model: &str,
     message_count: usize,
 ) -> String {
+    // ── Token budget ──────────────────────────────────────────────────────────
+    // 1500 tokens ≈ 6000 chars. Anything above this on a cold "hi" is waste.
+    // Static sections (always-on) must stay under ~4000 chars combined.
+    // Dynamic sections are added only if non-empty AND relevant.
+    const TOKEN_BUDGET: usize = 1500;
+    const CHAR_BUDGET: usize = TOKEN_BUDGET * 4; // 6000 chars
+
+    // Priority order for budget enforcement (lower index = higher priority):
+    //   0 static_core   — BLADE.md identity + runtime supplement (always keep)
+    //   1 memory_core   — L0 facts + character bible (always keep if non-empty)
+    //   2 role          — active specialist role (always keep if active)
+    //   3 identity_ext  — deep scan + user model (compact, keep if populated)
+    //   4 project       — active project CLAUDE.md (keep if in a project)
+    //   5 thread        — working memory after msg 1
+    //   6 pentest       — only when pentest mode active
+    //   7 perception    — live app/state (God Mode only; 1 line)
+    //   8 memory_recall — typed memory + knowledge graph + episodic (query-gated)
+    //   9 context_now   — clipboard, God Mode, active window (when populated)
+    //  10 integrations  — Gmail/Calendar/Slack (schedule/people queries + imminent meeting)
+    //  11 code_index    — indexed codebases (code queries only)
+    //  12 git           — active git repo (code queries only)
+    //  13 security      — alerts + expertise (only when alert exists or security query)
+    //  14 health        — screen time nudge (streak >= 90 min only)
+    //  15 world_model   — machine state (system queries only)
+    //  16 misc          — predictions, habits, meetings, social, research, hot files
+    //  17 scaffold      — reasoning scaffold for non-Frontier models
+
     let mut parts: Vec<String> = Vec::new();
     let config = crate::config::load_config();
 
-    // BLADE.md — SHORT, AUTHORITATIVE IDENTITY LAYER. Loaded FIRST.
-    // This mirrors how Claude Code loads CLAUDE.md: short file, top of context, highest weight.
-    // Rules here override everything else. The big build_identity() below is reference material.
-    // ensure_default_blade_md() already ran at startup so this always returns Some.
+    // ── STATIC CORE (priority 0) ──────────────────────────────────────────────
+    // BLADE.md is the authoritative identity. Always inject first.
+    // build_identity_supplement() adds only the runtime data that BLADE.md can't know:
+    // current date/time, user name, model/provider, OS shell note.
     if let Some(blade_md) = load_blade_md() {
         if !blade_md.trim().is_empty() {
             parts.push(blade_md);
         }
     }
+    parts.push(build_identity_supplement(&config, provider, model));
 
-    // L0 MEMORY — always-on critical facts (MemPalace wake-up layer).
+    // ── MEMORY CORE (priority 1) ──────────────────────────────────────────────
+    // L0 critical facts — always-on, capped at source
     let db_path = crate::config::blade_config_dir().join("blade.db");
     if let Ok(conn) = rusqlite::Connection::open(&db_path) {
         let l0 = crate::db::brain_l0_critical_facts(&conn);
@@ -460,195 +490,54 @@ fn build_system_prompt_inner(
         }
     }
 
-    // ROLE INJECTION — active specialist mode shapes everything below
+    // Character bible (SQLite) — the most compact persistent-memory representation
+    {
+        let db_path = crate::config::blade_config_dir().join("blade.db");
+        if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+            let ctx = crate::db::brain_build_context(&conn, 400);
+            if !ctx.trim().is_empty() {
+                parts.push(ctx);
+            }
+        } else if let Some(bible) = crate::character::bible_summary() {
+            if !bible.trim().is_empty() {
+                parts.push(format!("## About the User\n\n{}", bible));
+            }
+        }
+    }
+
+    // ── ROLE (priority 2) ────────────────────────────────────────────────────
     let role_injection = crate::roles::role_system_injection(&config.active_role);
     if !role_injection.trim().is_empty() {
         parts.push(role_injection);
     }
 
-    // DEEP SCAN IDENTITY — compact snapshot: who the user is, what they run, what they build.
-    // 3-5 lines max. Tells the AI exactly who it's talking to without guessing.
-    if let Some(identity_block) = crate::deep_scan::load_scan_summary() {
-        parts.push(format!("## Identity\n\n{}", identity_block));
-    }
-
-    // USER MODEL — unified behavioural profile: role, expertise, mood, active projects, goals.
-    // Compact 3-4 line summary so BLADE can predict needs and calibrate depth/tone instantly.
-    // Example: "Arnav (full-stack, TS/Rust). 2hr streak, working on BLADE swarm. Mood: productive."
-    if let Some(user_model_summary) = crate::persona_engine::get_user_model_summary() {
-        parts.push(user_model_summary);
-    }
-
-    // Personality mirror — match the user's communication style
-    if let Some(personality_injection) = crate::personality_mirror::get_personality_injection() {
-        parts.push(personality_injection);
-    }
-
-    // Core identity reference — tools, workflows, OS-specific notes, personalisation.
-    // Rules live in BLADE.md above; this section is the "body" (how to use tools, etc.)
-    parts.push(build_identity(&config, provider, model));
-
-    // BLADE SELF-KNOWLEDGE — what BLADE already has built in.
-    // Critical: without this, BLADE invents external tools/scripts for features it already has.
-    // Always keep this (index 1).
-    parts.push(format!(
-        "## BLADE Built-In Features\n\n\
-         Before writing code, installing packages, or building any external tool, check this list.\n\
-         If BLADE already has the capability, USE IT — don't reinvent it.\n\n\
-         **Messaging & Notifications**\n\
-         - Telegram bot bridge: Settings → Integrations → Telegram → paste a BotFather token. \
-           BLADE becomes the bot instantly. No Node.js code, no separate server.\n\
-         - Discord webhook: Settings → Integrations → Discord → paste webhook URL.\n\
-         - OS push notifications: `blade_notify` tool — fires native desktop notification immediately.\n\
-         - Reminders with TTS: `blade_set_reminder` — fires at scheduled time as notification + voice.\n\n\
-         **UI & Input**\n\
-         - Global voice input: Ctrl+Shift+V from anywhere → transcribes via Whisper → fills QuickAsk.\n\
-         - QuickAsk: Alt+Space — opens BLADE from any app.\n\
-         - God Mode: Settings → God Mode — injects live screen/window/clipboard context into every prompt.\n\n\
-         **Automation**\n\
-         - Cron / scheduled tasks: Settings → Cron — schedule recurring BLADE tasks in plain English.\n\
-         - Background agents: Operator Center (sidebar) — spawn Claude Code, Aider, or Goose as workers.\n\
-         - Computer use: `blade_computer_use` — autonomous multi-step desktop automation.\n\n\
-         **Storage & Config**\n\
-         - Config dir: `~/Library/Application Support/blade/` (macOS) | `%APPDATA%\\blade\\` (Windows) | `~/.config/blade/` (Linux)\n\
-         - Database: `blade.db` in the config dir (SQLite — all memory, timeline, preferences)\n\
-         - BLADE.md: drop a `BLADE.md` file in the config dir to give BLADE workspace-level instructions\n\
-         - API keys: `blade_set_api_key` tool — stores in OS keychain, no manual settings needed\n\n\
-         **Code & Terminal**\n\
-         - Delegate complex coding: `blade_bash: claude -p \"task description\"` — Claude Code CLI at `~/.local/bin/claude`\n\
-         - Symbol search across indexed projects: `blade_find_symbol`\n\
-         - Codebase indexing: Settings → Codebase → add a project path\n\
-         - Run code inline: any code block in chat has a ▶ run button — bash/python/js/ts execute immediately\n\n\
-         **Intelligence & Memory**\n\
-         - Extended thinking: prefix with `/think` for Claude to reason before answering (Anthropic only)\n\
-         - Screen Timeline / Total Recall: Settings → Privacy → enables 30s screenshot capture + semantic search\n\
-         - AI Delegate: Settings → Evolution → trust Claude Code to approve tool actions in the background\n\
-         - BLADE Swarm: `/swarm` command — decomposes a goal into parallel agents with dependency graph\n\
-         - Smart interrupt: BLADE notices when the same error persists 5+ min and prompts you to fix it"
-    ));
-
-    // PROJECT CLAUDE.md — auto-detected from active window's project directory.
-    // When the user is working in a project with a CLAUDE.md (or BLADE.md), inject it.
-    // This gives BLADE full project context without any manual setup — just like Claude Code.
-    if let Some((proj_path, proj_instructions)) = load_project_instructions() {
-        let proj_dir = std::path::Path::new(&proj_path)
-            .parent()
-            .and_then(|p| p.file_name())
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_else(|| "project".to_string());
-        parts.push(format!(
-            "## Active Project Instructions ({})\n\nYou are currently working in the `{}` project. These are its operating rules:\n\n{}",
-            proj_path, proj_dir, proj_instructions
-        ));
-    }
-
-    // THREAD — Blade's working memory. Only injected after the first exchange so the
-    // first message of a new conversation feels like a fresh start, not a memory dump.
-    if message_count > 1 {
-        if let Some(thread) = crate::thread::get_active_thread() {
-            parts.push(format!("## Working Memory (What Blade is tracking)\n\n{}", thread));
-        }
-    }
-
-    // PENTEST MODE — inject authorization status and model safety guidance
+    // ── IDENTITY EXTENSION (priority 3) ──────────────────────────────────────
+    // Deep scan identity + user model merged into one section.
+    // Only inject if at least one has content. Avoids duplicating what's in
+    // the character bible — keep it to role/expertise/stack summary only.
     {
-        let active_auths = crate::self_upgrade::pentest_list_auth();
-        if !active_auths.is_empty() {
-            let auth_lines: Vec<String> = active_auths.iter().map(|a| {
-                format!("- Target: {} ({}) | Claim: {} | Scope: {}",
-                    a.target, a.target_type, a.ownership_claim, a.scope_notes)
-            }).collect();
-            let (provider, _, model) = crate::self_upgrade::get_pentest_safe_provider();
-            let model_note = if provider == "none" {
-                "⚠ No safe pentest provider — configure Ollama or Groq".to_string()
-            } else {
-                format!("Use provider '{}' / model '{}' for pentest AI analysis (NOT your Anthropic key)", provider, model)
-            };
-            parts.push(format!(
-                "## Pentest Mode ACTIVE\n\nAuthorized targets:\n{}\n\n{}\n\n\
-                 You have full access to Kali Linux tools for these targets. Execute nmap, nikto, sqlmap, gobuster, \
-                 metasploit, hashcat, hydra etc. directly via blade_bash. No restrictions for authorized targets.",
-                auth_lines.join("\n"),
-                model_note
-            ));
+        let scan = crate::deep_scan::load_scan_summary();
+        let user_model = crate::persona_engine::get_user_model_summary();
+        if scan.is_some() || user_model.is_some() {
+            let mut id_parts = Vec::new();
+            if let Some(s) = scan { id_parts.push(s); }
+            if let Some(u) = user_model { id_parts.push(u); }
+            parts.push(format!("## Who You're Talking To\n\n{}", id_parts.join("\n")));
         }
     }
 
-    // CODEBASE INDEX — inject structural knowledge of known projects.
-    // Only inject when query is code-related (score > 0.3) or when there's no query
-    // (e.g. session start). This keeps the prompt lean for schedule/finance queries.
-    // Cap per-project summary to 4k chars and total section to 25k chars to avoid
-    // blowing the token budget when large projects are indexed.
-    if user_query.is_empty() || score_context_relevance(user_query, "code") > 0.3 {
-        const MAX_PROJECT_CHARS: usize = 4_000;
-        const MAX_INDEX_TOTAL_CHARS: usize = 25_000;
-        let known_projects = crate::indexer::list_indexed_projects();
-        if !known_projects.is_empty() {
-            let mut summaries = Vec::new();
-            let mut total_index_chars = 0usize;
-            for proj in &known_projects {
-                if total_index_chars >= MAX_INDEX_TOTAL_CHARS {
-                    summaries.push(format!("...({} more projects indexed, use `blade_find_symbol` to search them)", known_projects.len().saturating_sub(summaries.len())));
-                    break;
-                }
-                let s = crate::indexer::project_summary_for_prompt(&proj.project);
-                if s.is_empty() { continue; }
-                let capped = if s.len() > MAX_PROJECT_CHARS {
-                    let end = s.char_indices().nth(MAX_PROJECT_CHARS).map(|(i, _)| i).unwrap_or(s.len());
-                    format!("{}\n...(truncated — use `blade_find_symbol` for full index)", &s[..end])
-                } else {
-                    s
-                };
-                total_index_chars += capped.len();
-                summaries.push(capped);
-            }
-            if !summaries.is_empty() {
-                parts.push(format!(
-                    "## Indexed Codebases (Permanent Knowledge)\n\nYou have persistent structural knowledge of these projects — you do not need to re-read files to understand them. Use `blade_find_symbol` to locate specific functions instantly.\n\n{}",
-                    summaries.join("\n\n")
-                ));
+    // Personality mirror — 1 line style match (compress at source; skip if empty)
+    if let Some(pm) = crate::personality_mirror::get_personality_injection() {
+        if !pm.trim().is_empty() {
+            // Take first non-empty line only — personality mirror can be verbose
+            let one_line = pm.lines().find(|l| !l.trim().is_empty()).unwrap_or("").to_string();
+            if !one_line.is_empty() {
+                parts.push(format!("Style note: {}", one_line.trim()));
             }
         }
-    } // end codebase index gate
-
-    // Character Bible — inject from SQLite (structured, compounding knowledge)
-    let db_path = crate::config::blade_config_dir().join("blade.db");
-    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
-        let ctx = crate::db::brain_build_context(&conn, 700);
-        if !ctx.trim().is_empty() {
-            parts.push(format!(
-                "{}\n\n_Note: This context is from BLADE's persistent local memory stored on this machine. If the user asks you to forget something, acknowledge it and stop referencing it — but explain that data can be cleared from Settings → Memory._",
-                ctx
-            ));
-        }
-    } else if let Some(bible) = crate::character::bible_summary() {
-        parts.push(format!("## About the User\n\n{}", bible));
     }
 
-    // User persona (raw notes, supplements the Bible)
-    if let Some(persona) = load_persona() {
-        if !persona.trim().is_empty() {
-            parts.push(format!("## Additional User Context\n\n{}", persona));
-        }
-    }
-
-    // BLADE's own evolving soul — who it has become from experience
-    let soul = crate::character::load_soul();
-    if !soul.trim().is_empty() {
-        parts.push(format!("## Your Own Character (Who You Are)\n\n{}", soul));
-    }
-
-    // PERSONA ENGINE — learned relationship depth, communication traits, tonal guidance
-    {
-        let persona_ctx = crate::persona_engine::get_persona_context();
-        if !persona_ctx.trim().is_empty() {
-            parts.push(persona_ctx);
-        }
-    }
-
-    // VIRTUAL CONTEXT BLOCKS — letta-style structured memory (human, persona, conversation).
-    // These blocks are capped and auto-compressed via LLM so they never overflow the context
-    // window — BLADE has infinite memory without ever hitting a token limit.
+    // Virtual context blocks (Letta-style memory) — already capped at source
     {
         let vctx = crate::memory::get_injected_context();
         if !vctx.trim().is_empty() {
@@ -656,132 +545,133 @@ fn build_system_prompt_inner(
         }
     }
 
-    // SKILL ENGINE — inject learned reflexes matching this query
-    if !user_query.is_empty() {
-        let skill_mods = crate::skill_engine::get_skill_injections(user_query);
-        if !skill_mods.is_empty() {
+    // Top learned preferences — apply to every response
+    {
+        let learned = crate::character::get_top_learned_preferences(3);
+        if !learned.is_empty() {
             parts.push(format!(
-                "## Learned Reflexes\n\nYou have developed these patterns from past experience. Apply them:\n\n{}",
-                skill_mods
+                "## Learned Rules\n\n{}",
+                learned.iter().map(|r| format!("- {}", r)).collect::<Vec<_>>().join("\n")
             ));
         }
     }
 
-    // Security expertise injection — activate when user is doing security work
-    if !user_query.is_empty() && crate::kali::is_security_context(user_query) {
-        parts.push(format!("## Security Expertise\n\n{}", crate::kali::security_system_prompt()));
+    // ── PROJECT (priority 4) ─────────────────────────────────────────────────
+    if let Some((proj_path, proj_instructions)) = load_project_instructions() {
+        let proj_dir = std::path::Path::new(&proj_path)
+            .parent()
+            .and_then(|p| p.file_name())
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "project".to_string());
+        parts.push(format!(
+            "## Project: {}\n\n{}",
+            proj_dir, proj_instructions
+        ));
     }
 
-    // Causal insights — inject if relevant to current query
-    let causal_ctx = crate::causal_graph::get_causal_context(user_query);
-    if !causal_ctx.is_empty() {
-        parts.push(causal_ctx);
+    // ── WORKING MEMORY / THREAD (priority 5) ─────────────────────────────────
+    if message_count > 1 {
+        if let Some(thread) = crate::thread::get_active_thread() {
+            parts.push(format!("## Working Memory\n\n{}", thread));
+        }
     }
 
-    // Memory palace — relevant past experiences (episodic memory)
-    let memory_ctx = crate::memory_palace::get_memory_context(user_query);
-    if !memory_ctx.is_empty() {
-        parts.push(memory_ctx);
+    // ── PENTEST MODE (priority 6) ─────────────────────────────────────────────
+    {
+        let active_auths = crate::self_upgrade::pentest_list_auth();
+        if !active_auths.is_empty() {
+            let auth_lines: Vec<String> = active_auths.iter().map(|a| {
+                format!("- {} ({}) — {}", a.target, a.target_type, a.scope_notes)
+            }).collect();
+            let (prov, _, mdl) = crate::self_upgrade::get_pentest_safe_provider();
+            let model_note = if prov == "none" {
+                "⚠ No safe pentest provider — configure Ollama or Groq".to_string()
+            } else {
+                format!("Use {}/{} for analysis (NOT your Anthropic key)", prov, mdl)
+            };
+            parts.push(format!(
+                "## Pentest Mode ACTIVE\n\nAuthorized:\n{}\n{}\n\nFull Kali tool access via blade_bash.",
+                auth_lines.join("\n"), model_note
+            ));
+        }
     }
 
-    // Typed Memory — Omi-inspired structured facts/preferences/goals proactively surfaced
-    // from the current conversation context tags. Top 3 most relevant are injected here.
+    // ── LIVE PERCEPTION (priority 7) ─────────────────────────────────────────
+    // ONE line. Only when God Mode is running (perception has ticked).
+    if let Some(p) = crate::perception_fusion::get_latest() {
+        if !p.active_app.is_empty() {
+            let title_part = if !p.active_title.is_empty() && p.active_title != p.active_app {
+                format!(" — {}", crate::safe_slice(&p.active_title, 50))
+            } else {
+                String::new()
+            };
+            let streak_mins = crate::health_guardian::get_health_stats()["current_streak_minutes"]
+                .as_i64().unwrap_or(0);
+            let streak_part = if streak_mins >= 5 { format!(", {}min", streak_mins) } else { String::new() };
+            parts.push(format!(
+                "Now: {}{} ({}{}).",
+                p.active_app, title_part, p.user_state, streak_part
+            ));
+        }
+    }
+
+    // ── MEMORY RECALL (priority 8, query-gated) ───────────────────────────────
+    // Only inject when the query has enough signal words (4+ chars) and
+    // the underlying stores return non-empty results.
     if !user_query.is_empty() {
-        // Derive context tags from the user query: split into significant words (4+ chars)
+        // Typed memory
         let context_tags: Vec<String> = user_query
             .split_whitespace()
             .filter(|w| w.len() >= 4)
             .map(|w| w.to_lowercase().trim_matches(|c: char| !c.is_alphanumeric()).to_string())
             .filter(|w| !w.is_empty())
             .collect();
-
         if !context_tags.is_empty() {
             let typed_ctx = crate::typed_memory::get_typed_memory_context(&context_tags);
             if !typed_ctx.is_empty() {
                 parts.push(typed_ctx);
             }
         }
-    }
 
-    // Knowledge graph — semantic concept network (related concepts and their connections)
-    if !user_query.is_empty() {
+        // Knowledge graph
         let graph_ctx = crate::knowledge_graph::get_graph_context(user_query);
         if !graph_ctx.is_empty() {
             parts.push(graph_ctx);
         }
-    }
 
-    // World model — inject current machine state (git, processes, ports, TODOs, system load)
-    let world_summary = crate::world_model::get_world_summary();
-    if !world_summary.is_empty() {
-        parts.push(world_summary);
-    }
-
-    // Accountability context — active objectives and today's focus
-    let accountability_ctx = crate::accountability::get_accountability_context();
-    if !accountability_ctx.is_empty() {
-        parts.push(accountability_ctx);
-    }
-
-    // Financial Brain — only inject when the query is actually about money/spending
-    // (score > 0.3). Avoids polluting code/scheduling queries with financial data.
-    if user_query.is_empty() || score_context_relevance(user_query, "financial") > 0.3 {
-        let fin = crate::financial_brain::get_financial_context();
-        if !fin.is_empty() {
-            parts.push(fin);
+        // Episodic memory palace
+        let memory_ctx = crate::memory_palace::get_memory_context(user_query);
+        if !memory_ctx.is_empty() {
+            parts.push(memory_ctx);
         }
-    }
 
-    // Health Tracker — inject when health-relevant OR when the streak is high enough
-    // to be worth noting regardless of query topic.
-    let health_score = if user_query.is_empty() { 1.0 } else { score_context_relevance(user_query, "health") };
-    let health_streak = crate::health_guardian::get_health_stats()["current_streak_minutes"]
-        .as_i64()
-        .unwrap_or(0);
-    if health_score > 0.3 || health_streak >= 90 {
-        let health_ctx = crate::health_tracker::get_health_context();
-        if !health_ctx.is_empty() {
-            parts.push(health_ctx);
+        // Causal insights
+        let causal_ctx = crate::causal_graph::get_causal_context(user_query);
+        if !causal_ctx.is_empty() {
+            parts.push(causal_ctx);
         }
-    }
 
-    // SCREEN TIME NUDGE — soft reminder if user has been working 90+ min without a break.
-    // One line only. Never inject if they're at a normal work level.
-    {
-        let stats = crate::health_guardian::get_health_stats();
-        let streak_mins = stats["current_streak_minutes"].as_i64().unwrap_or(0);
-        if streak_mins >= 90 {
-            let hours = streak_mins / 60;
-            let mins = streak_mins % 60;
-            let duration_str = if hours > 0 && mins > 0 {
-                format!("{}h {}min", hours, mins)
-            } else if hours > 0 {
-                format!("{}h", hours)
-            } else {
-                format!("{}min", mins)
-            };
-            parts.push(format!(
-                "Note: user has been working for {} without a break.",
-                duration_str
-            ));
+        // Skill engine — learned reflexes
+        let skill_mods = crate::skill_engine::get_skill_injections(user_query);
+        if !skill_mods.is_empty() {
+            parts.push(format!("## Learned Reflexes\n\n{}", skill_mods));
         }
-    }
 
-    // Habit Engine — inject today's habit status (streaks, completions, alerts)
-    let habits = crate::habit_engine::get_habits_context();
-    if !habits.is_empty() {
-        parts.push(habits);
-    }
+        // Semantic recall (vector store)
+        if let Some(store) = vector_store {
+            let recalled = crate::embeddings::recall_relevant(store, user_query, 3);
+            if !recalled.is_empty() {
+                parts.push(format!("## Relevant Past\n\n{}", recalled));
+            }
+        }
 
-    // Meeting Intelligence — inject open action items so BLADE knows what's pending
-    let meeting_action_ctx = crate::meeting_intelligence::get_action_item_context();
-    if !meeting_action_ctx.is_empty() {
-        parts.push(meeting_action_ctx);
-    }
+        // Compounding smart recall
+        let compounding = crate::embeddings::smart_context_recall(user_query);
+        if !compounding.is_empty() {
+            parts.push(compounding);
+        }
 
-    // People Graph — inject relationship context for mentioned contacts.
-    // Extracts capitalized name tokens from the query and looks them up.
-    if !user_query.is_empty() {
+        // People graph — only when names are actually mentioned
         let mentioned_names: Vec<String> = user_query
             .split_whitespace()
             .filter(|w| {
@@ -797,126 +687,32 @@ fn build_system_prompt_inner(
             if !people_ctx.is_empty() {
                 parts.push(people_ctx);
             }
-        }
-    }
-
-    // Social Graph — inject contact profile if the query mentions a known person,
-    // plus a brief relationship-health summary
-    if !user_query.is_empty() {
-        let social_ctx = crate::social_graph::get_social_context(user_query);
-        if !social_ctx.is_empty() {
-            parts.push(social_ctx);
-        }
-    }
-    let social_summary = crate::social_graph::get_social_summary();
-    if !social_summary.is_empty() {
-        parts.push(social_summary);
-    }
-
-    // Prediction Engine — anticipatory intelligence: upcoming patterns and suggestions
-    let pred_ctx = crate::prediction_engine::get_prediction_context();
-    if !pred_ctx.is_empty() {
-        parts.push(pred_ctx);
-    }
-
-    // Document Library — inject summary of ingested documents
-    let lib_ctx = crate::document_intelligence::get_library_context();
-    if !lib_ctx.is_empty() {
-        parts.push(format!(
-            "## Document Library\n\n{}\n\nUse `doc_search` to find documents and `doc_answer_question` to query them.",
-            lib_ctx
-        ));
-    }
-
-    // Forged tools — inject custom tools BLADE has built at runtime
-    let forged = crate::tool_forge::get_tool_usage_for_prompt();
-    if !forged.is_empty() {
-        parts.push(forged);
-    }
-
-    // Emotional Intelligence — adapt tone based on user's detected emotional state
-    let emotional = crate::emotional_intelligence::get_emotional_context();
-    if !emotional.is_empty() {
-        parts.push(emotional);
-    }
-
-    // MCP tools (native tools are described in identity already)
-    if !tools.is_empty() {
-        let tool_list: Vec<String> = tools
-            .iter()
-            .map(|t| format!("- **{}**: {}", t.qualified_name, t.description))
-            .collect();
-        parts.push(format!(
-            "## MCP Tools\n\n{}", tool_list.join("\n")
-        ));
-    }
-
-    // Semantic memory recall — surface past conversations relevant to this query
-    if !user_query.is_empty() {
-        if let Some(store) = vector_store {
-            let recalled = crate::embeddings::recall_relevant(store, user_query, 4);
-            if !recalled.is_empty() {
-                parts.push(format!(
-                    "## Relevant Past Exchanges\n\nThese are previous conversations semantically related to the current message. Use them for context:\n\n{}",
-                    recalled
-                ));
+            let social_ctx = crate::social_graph::get_social_context(user_query);
+            if !social_ctx.is_empty() {
+                parts.push(social_ctx);
             }
         }
     }
 
-    // COMPOUNDING MEMORY — smart context recall from past summaries, KG facts, and preferences.
-    // This is what makes BLADE get smarter over time: every conversation compounds into
-    // recalled context for future ones. Injected close to the query for maximum relevance.
-    if !user_query.is_empty() {
-        let compounding = crate::embeddings::smart_context_recall(user_query);
-        if !compounding.is_empty() {
-            parts.push(compounding);
-        }
-    }
-
-    // TOP LEARNED PREFERENCES — top 3 behavioral rules BLADE has learned from feedback.
-    // Surfaced here so they're always visible to the model when generating responses.
-    {
-        let learned = crate::character::get_top_learned_preferences(3);
-        if !learned.is_empty() {
-            parts.push(format!(
-                "## Behavioral Rules (Learned from Feedback)\n\nApply these rules to every response — they come from the user's direct feedback:\n\n{}",
-                learned.iter().map(|r| format!("- {}", r)).collect::<Vec<_>>().join("\n")
-            ));
-        }
-    }
-
-    // Active window context
-    if let Ok(activity) = crate::context::get_user_activity() {
-        parts.push(format!("## Right Now\n\n{}", activity));
-    }
-
-    // CLIPBOARD INTELLIGENCE — pre-computed analysis of what the user copied.
-    // This runs asynchronously the moment the clipboard changes, so the answer
-    // is ready instantly. User copies an error → they ask about it → we already know.
+    // ── CONTEXT NOW (priority 9) ──────────────────────────────────────────────
+    // Clipboard — only if fresh (< 5 min) and there's actual content
     if let Some(pf) = crate::clipboard::get_latest_prefetch() {
         let age = chrono::Utc::now().timestamp() - pf.prefetched_at;
-        if age < 300 {
+        if age < 300 && !pf.content_preview.is_empty() {
             parts.push(format!(
-                "## Clipboard (pre-analyzed)\n\nThe user recently copied:\n```\n{}\n```\n\nPre-computed analysis: {}",
+                "## Clipboard\n\n```\n{}\n```\n{}",
                 pf.content_preview,
                 pf.analysis,
             ));
         }
     }
 
-    // Context notes
-    if let Some(context) = load_context_notes() {
-        parts.push(format!("## Context\n\n{}", context));
-    }
-
-    // God Mode — live machine context (files, apps, downloads)
-    // Cap to 3k chars — god mode snapshots can be large (OCR text, file lists)
+    // God Mode context — cap to 2k chars (OCR/file lists can be huge)
     if let Some(gm) = crate::godmode::load_godmode_context() {
         if !gm.trim().is_empty() {
-            let capped_gm = if gm.len() > 3_000 {
-                let end = gm.char_indices().nth(3_000).map(|(i, _)| i).unwrap_or(gm.len());
-                format!("{}\n...(god mode context truncated)", &gm[..end])
+            let capped_gm = if gm.len() > 2_000 {
+                let end = gm.char_indices().nth(2_000).map(|(i, _)| i).unwrap_or(gm.len());
+                format!("{}\n...(truncated)", &gm[..end])
             } else {
                 gm
             };
@@ -924,12 +720,24 @@ fn build_system_prompt_inner(
         }
     }
 
-    // Live Integrations — Gmail / Calendar / Slack / GitHub ambient state.
-    // Gate by relevance: only inject when query is about schedule, email, people, or
-    // when there's an imminent meeting (regardless of query topic).
+    // Context notes (user-pinned)
+    if let Some(context) = load_context_notes() {
+        if !context.trim().is_empty() {
+            parts.push(format!("## Context\n\n{}", context));
+        }
+    }
+
+    // Emotional context — tone adaptation
+    let emotional = crate::emotional_intelligence::get_emotional_context();
+    if !emotional.is_empty() {
+        parts.push(emotional);
+    }
+
+    // ── INTEGRATIONS (priority 10) ────────────────────────────────────────────
+    // Only inject when query is schedule/people-related OR meeting is imminent (<= 30 min)
     {
         let integration_score = if user_query.is_empty() {
-            1.0f32
+            0.0f32 // don't auto-inject on cold start
         } else {
             score_context_relevance(user_query, "schedule")
                 .max(score_context_relevance(user_query, "people"))
@@ -943,7 +751,6 @@ fn build_system_prompt_inner(
             if !integration_ctx.trim().is_empty() {
                 parts.push(integration_ctx);
             }
-            // TEMPORAL CONTEXT — Upcoming meeting within 30 min. ONE line only.
             if let Some(soonest) = state.upcoming_events.first() {
                 if soonest.minutes_until >= 0 && soonest.minutes_until <= 30 {
                     parts.push(format!(
@@ -956,70 +763,165 @@ fn build_system_prompt_inner(
         }
     }
 
-    // SECURITY ALERT — Always inject (already gated at the source — only fires
-    // when there are flagged connections). The security context score just adds
-    // a richer explanation block when the query is security-related.
+    // ── CODEBASE INDEX (priority 11, code-gated) ──────────────────────────────
+    if !user_query.is_empty() && score_context_relevance(user_query, "code") > 0.3 {
+        const MAX_PROJECT_CHARS: usize = 3_000;
+        const MAX_INDEX_TOTAL_CHARS: usize = 12_000;
+        let known_projects = crate::indexer::list_indexed_projects();
+        if !known_projects.is_empty() {
+            let mut summaries = Vec::new();
+            let mut total_index_chars = 0usize;
+            for proj in &known_projects {
+                if total_index_chars >= MAX_INDEX_TOTAL_CHARS {
+                    summaries.push(format!("...({} more — use `blade_find_symbol`)", known_projects.len().saturating_sub(summaries.len())));
+                    break;
+                }
+                let s = crate::indexer::project_summary_for_prompt(&proj.project);
+                if s.is_empty() { continue; }
+                let capped = if s.len() > MAX_PROJECT_CHARS {
+                    let end = s.char_indices().nth(MAX_PROJECT_CHARS).map(|(i, _)| i).unwrap_or(s.len());
+                    format!("{}\n...(use `blade_find_symbol` for full index)", &s[..end])
+                } else {
+                    s
+                };
+                total_index_chars += capped.len();
+                summaries.push(capped);
+            }
+            if !summaries.is_empty() {
+                parts.push(format!(
+                    "## Indexed Codebases\n\n{}",
+                    summaries.join("\n\n")
+                ));
+            }
+        }
+    }
+
+    // ── GIT CONTEXT (priority 12, code-gated) ────────────────────────────────
+    if user_query.is_empty() || score_context_relevance(user_query, "code") > 0.3 {
+        if let Some(git_ctx) = git_context_for_active_project() {
+            parts.push(git_ctx);
+        }
+    }
+
+    // ── SECURITY (priority 13) ────────────────────────────────────────────────
+    // Alert: only inject when there's an actual alert (gated at source)
     if let Some(alert) = crate::security_monitor::get_security_alert_for_prompt() {
         parts.push(alert);
     }
-    // Extra security expertise when query is clearly security-focused (beyond
-    // the kali check done above, which is the first pass).
-    if !user_query.is_empty() && score_context_relevance(user_query, "security") > 0.5
-        && !crate::kali::is_security_context(user_query)
-    {
-        // Mild security awareness without the full Kali prompt
-        parts.push("## Security Context\n\nThe user is working on a security-related task. Be precise about risks, mitigations, and tool options.".to_string());
+    // Full security expertise: only when query is clearly security-focused
+    if !user_query.is_empty() && crate::kali::is_security_context(user_query) {
+        parts.push(format!("## Security Expertise\n\n{}", crate::kali::security_system_prompt()));
+    } else if !user_query.is_empty() && score_context_relevance(user_query, "security") > 0.5 {
+        parts.push("## Security\n\nBe precise about risks, mitigations, and tool options.".to_string());
     }
 
-    // Activity Monitor — real-time awareness of what Arnav is doing right now
+    // ── HEALTH NUDGE (priority 14, streak >= 90 min only) ────────────────────
     {
-        let activity_ctx = crate::activity_monitor::get_activity_context();
-        if !activity_ctx.trim().is_empty() {
-            parts.push(activity_ctx);
+        let streak_mins = crate::health_guardian::get_health_stats()["current_streak_minutes"]
+            .as_i64().unwrap_or(0);
+        if streak_mins >= 90 {
+            let h = streak_mins / 60;
+            let m = streak_mins % 60;
+            let dur = if h > 0 && m > 0 { format!("{}h {}min", h, m) }
+                      else if h > 0 { format!("{}h", h) }
+                      else { format!("{}min", m) };
+            parts.push(format!("Note: {} without a break.", dur));
+
+            // Full health context only when health-relevant query
+            let health_score = score_context_relevance(user_query, "health");
+            if health_score > 0.3 {
+                let health_ctx = crate::health_tracker::get_health_context();
+                if !health_ctx.is_empty() {
+                    parts.push(health_ctx);
+                }
+            }
         }
     }
 
-    // LIVE PERCEPTION — ONE line: what's on screen right now from the last God Mode tick.
-    // Only inject if perception is actually running (i.e. God Mode has ticked at least once).
-    // Format: "Right now: VS Code — commands.rs (focused, 45 min streak)"
-    if let Some(p) = crate::perception_fusion::get_latest() {
-        if !p.active_app.is_empty() {
-            let title_part = if !p.active_title.is_empty() && p.active_title != p.active_app {
-                format!(" — {}", crate::safe_slice(&p.active_title, 60))
-            } else {
-                String::new()
-            };
-            // Append streak if meaningful (>= 5 min active)
-            let streak_stats = crate::health_guardian::get_health_stats();
-            let streak_mins = streak_stats["current_streak_minutes"].as_i64().unwrap_or(0);
-            let streak_part = if streak_mins >= 5 {
-                format!(", {} min streak", streak_mins)
-            } else {
-                String::new()
-            };
-            let state_label = if p.user_state == "focused" {
-                "focused".to_string()
-            } else {
-                p.user_state.clone()
-            };
-            parts.push(format!(
-                "Right now: {}{} ({}{}).",
-                p.active_app, title_part, state_label, streak_part
-            ));
+    // ── WORLD MODEL (priority 15, system-gated) ───────────────────────────────
+    // Only inject for system/process queries — not for every message
+    if !user_query.is_empty() && score_context_relevance(user_query, "system") > 0.3 {
+        let world_summary = crate::world_model::get_world_summary();
+        if !world_summary.is_empty() {
+            parts.push(world_summary);
         }
     }
 
-    // Activity timeline — recent history of what BLADE has observed
-    {
+    // ── MISC DYNAMIC (priority 16) ────────────────────────────────────────────
+    // Accountability — active objectives (only if non-empty)
+    let accountability_ctx = crate::accountability::get_accountability_context();
+    if !accountability_ctx.is_empty() {
+        parts.push(accountability_ctx);
+    }
+
+    // Financial — only for money queries
+    if !user_query.is_empty() && score_context_relevance(user_query, "financial") > 0.3 {
+        let fin = crate::financial_brain::get_financial_context();
+        if !fin.is_empty() {
+            parts.push(fin);
+        }
+    }
+
+    // Habits — only if the engine has data
+    let habits = crate::habit_engine::get_habits_context();
+    if !habits.is_empty() {
+        parts.push(habits);
+    }
+
+    // Meeting action items
+    let meeting_action_ctx = crate::meeting_intelligence::get_action_item_context();
+    if !meeting_action_ctx.is_empty() {
+        parts.push(meeting_action_ctx);
+    }
+
+    // Prediction engine
+    let pred_ctx = crate::prediction_engine::get_prediction_context();
+    if !pred_ctx.is_empty() {
+        parts.push(pred_ctx);
+    }
+
+    // Document library
+    let lib_ctx = crate::document_intelligence::get_library_context();
+    if !lib_ctx.is_empty() {
+        parts.push(format!(
+            "## Document Library\n\n{}\n\nUse `doc_search` / `doc_answer_question`.",
+            lib_ctx
+        ));
+    }
+
+    // Forged tools (runtime-built tools)
+    let forged = crate::tool_forge::get_tool_usage_for_prompt();
+    if !forged.is_empty() {
+        parts.push(forged);
+    }
+
+    // MCP tools list
+    if !tools.is_empty() {
+        let tool_list: Vec<String> = tools
+            .iter()
+            .map(|t| format!("- **{}**: {}", t.qualified_name, t.description))
+            .collect();
+        parts.push(format!("## MCP Tools\n\n{}", tool_list.join("\n")));
+    }
+
+    // Activity monitor
+    let activity_ctx = crate::activity_monitor::get_activity_context();
+    if !activity_ctx.trim().is_empty() {
+        parts.push(activity_ctx);
+    }
+
+    // Activity timeline — only for context-heavy queries (not for "hi")
+    // Gate: only inject when there's a non-trivial query or message count > 3
+    if message_count > 3 || (!user_query.is_empty() && user_query.split_whitespace().count() > 3) {
         let db_path = crate::config::blade_config_dir().join("blade.db");
         if let Ok(conn) = rusqlite::Connection::open(&db_path) {
-            if let Ok(events) = crate::db::timeline_recent(&conn, 8, None) {
+            if let Ok(events) = crate::db::timeline_recent(&conn, 5, None) {
                 if !events.is_empty() {
                     let lines: Vec<String> = events.into_iter().map(|e| {
                         let dt = chrono::DateTime::from_timestamp(e.timestamp, 0)
                             .map(|d| d.with_timezone(&chrono::Local).format("%-H:%M").to_string())
                             .unwrap_or_else(|| "?".to_string());
-                        format!("- [{}] **{}**: {}", dt, e.event_type, crate::safe_slice(&e.title, 80))
+                        format!("- [{}] {}: {}", dt, e.event_type, crate::safe_slice(&e.title, 60))
                     }).collect();
                     parts.push(format!("## Recent Activity\n\n{}", lines.join("\n")));
                 }
@@ -1027,10 +929,9 @@ fn build_system_prompt_inner(
         }
     }
 
-    // HOT FILES — most-accessed files from filesystem watcher. Surfaces what the user
-    // actually works with most so BLADE can proactively reference or open them.
-    {
-        let hot = crate::tentacles::filesystem_watch::get_hot_files(5);
+    // Hot files — only for code/file queries
+    if !user_query.is_empty() && (score_context_relevance(user_query, "code") > 0.3 || user_query.to_lowercase().contains("file")) {
+        let hot = crate::tentacles::filesystem_watch::get_hot_files(4);
         if !hot.is_empty() {
             let lines: Vec<String> = hot
                 .iter()
@@ -1039,78 +940,68 @@ fn build_system_prompt_inner(
                         .file_name()
                         .and_then(|n| n.to_str())
                         .unwrap_or(path.as_str());
-                    format!("- {} (opened {}×)", name, count)
+                    format!("- {} ({}×)", name, count)
                 })
                 .collect();
-            parts.push(format!(
-                "## Most-Accessed Files\n\n{}\n\n\
-                 These are the files Arnav works with most. Proactively reference them when relevant.",
-                lines.join("\n")
-            ));
+            parts.push(format!("## Hot Files\n\n{}", lines.join("\n")));
         }
     }
 
-    // GIT CONTEXT — auto-detect active git repo from window title and inject branch + recent commits.
-    // No setup needed. The moment you're in a git project, BLADE knows where you are.
-    if let Some(git_ctx) = git_context_for_active_project() {
-        parts.push(git_ctx);
+    // Background research
+    let research_ctx = crate::research::research_context_for_prompt();
+    if !research_ctx.is_empty() {
+        parts.push(format!("## Background Research\n\n{}", research_ctx));
     }
 
-    // AMBIENT RESEARCH — what BLADE has been looking up in the background
-    {
-        let research_ctx = crate::research::research_context_for_prompt();
-        if !research_ctx.is_empty() {
-            parts.push(format!(
-                "## Background Research\n\nBLADE has been researching these topics autonomously. Reference when relevant:\n\n{}",
-                research_ctx
-            ));
-        }
-    }
-
-    // CODE HEALTH — proactive scan results from indexed projects
-    {
+    // Code health
+    if !user_query.is_empty() && score_context_relevance(user_query, "code") > 0.3 {
         let health_summaries = crate::health::health_summary_all();
         if !health_summaries.is_empty() {
-            parts.push(format!(
-                "## Code Health\n\n{}\n\nUse `blade_find_symbol` and `blade_bash` to investigate or fix flagged issues proactively.",
-                health_summaries.join("\n")
-            ));
+            parts.push(format!("## Code Health\n\n{}", health_summaries.join("\n")));
         }
     }
 
-    // SESSION HANDOFF — what happened last session (commands, failures, pending items)
+    // Session handoff
     if let Some(handoff) = crate::session_handoff::handoff_for_prompt() {
         parts.push(format!("## Last Session\n\n{}", handoff));
     }
 
-    // Obsidian vault — tell Blade where to read/write notes
+    // Obsidian vault
     if !config.obsidian_vault_path.is_empty() {
         parts.push(format!(
-            "## Obsidian Vault\n\nThe user's Obsidian vault is at `{}`. \
-             Use `blade_file_read` / `blade_file_write` to interact with it directly.\n\
-             - Daily notes go in `{}/Daily Notes/` as `YYYY-MM-DD.md`\n\
-             - When the user says \"take a note\", \"remember this\", or \"add to Obsidian\", write to the vault\n\
-             - For quick notes: append to today's daily note (create it if missing)\n\
-             - When reading context from the vault, scan the last 7 daily notes for recent threads",
-            config.obsidian_vault_path,
+            "Obsidian vault: `{}`. Daily notes in `Daily Notes/YYYY-MM-DD.md`.",
             config.obsidian_vault_path
         ));
     }
 
-    // MODEL SCAFFOLD — inject reasoning strategy for non-Frontier models.
-    // This is the "intelligence amplifier": weak models get explicit thinking patterns
-    // and concrete tool call examples, closing the gap to Frontier performance.
+    // User persona (raw notes)
+    if let Some(persona) = load_persona() {
+        if !persona.trim().is_empty() {
+            parts.push(format!("## User Notes\n\n{}", persona));
+        }
+    }
+
+    // BLADE soul
+    let soul = crate::character::load_soul();
+    if !soul.trim().is_empty() {
+        parts.push(format!("## Your Character\n\n{}", soul));
+    }
+
+    // Persona engine context
+    let persona_ctx = crate::persona_engine::get_persona_context();
+    if !persona_ctx.trim().is_empty() {
+        parts.push(persona_ctx);
+    }
+
+    // ── MODEL SCAFFOLD (priority 17) ──────────────────────────────────────────
     if let Some(scaffold) = reasoning_scaffold(tier) {
         parts.push(scaffold);
     }
 
-    // HUMOR INJECTION — situational one-liner appended to the character section.
-    // Skipped for Small models (no point wasting tokens) and for frustrated/error contexts.
+    // ── HUMOR (non-Small, non-frustrated only) ────────────────────────────────
     if *tier != ModelTier::Small {
         let latest_perception = crate::perception_fusion::get_latest();
         let perception_ref = latest_perception.as_ref();
-
-        // Detect mood from user query: look for frustration signals
         let user_mood = {
             let q = user_query.to_lowercase();
             if q.contains("wtf") || q.contains("why isn't") || q.contains("why doesn't")
@@ -1123,212 +1014,75 @@ fn build_system_prompt_inner(
                 "neutral"
             }
         };
-
         if let Some(humor) = maybe_add_humor(perception_ref, user_mood) {
-            parts.push(format!("## A Note for This Session\n\n{}", humor));
+            parts.push(humor);
         }
     }
 
-    // For Small models, trim aggressively to fit limited context windows (4–8k tokens).
-    // ~16k chars ≈ 4k tokens (rough 1 token per 4 chars).
+    // ── TOKEN BUDGET ENFORCEMENT ──────────────────────────────────────────────
+    // Estimate tokens (chars / 4). Keep first 2 parts (static core) always.
+    // Drop from the end until under budget.
+    // For Small models: hard trim to 4k tokens (16k chars).
     if *tier == ModelTier::Small {
         trim_for_small_model(&mut parts, 14_000);
     }
 
-    // Hard budget cap for all model tiers.
-    // Keep the first 4 parts (identity, self-knowledge, BLADE.md, thread) always.
-    // Drop from the end until we're under SYSTEM_PROMPT_CHAR_BUDGET (~37k tokens).
-    enforce_budget(&mut parts, 4);
+    // Soft budget: 1500 tokens = 6000 chars for the "hi" case (static only).
+    // For real queries we allow up to the hard limit — dynamic context earns its place.
+    let effective_budget = if user_query.is_empty() || user_query.split_whitespace().count() <= 1 {
+        CHAR_BUDGET // strict for cold start / greetings
+    } else {
+        SYSTEM_PROMPT_CHAR_BUDGET // generous for real queries (existing hard cap)
+    };
+
+    let keep = 2; // always keep static core (BLADE.md + supplement)
+    loop {
+        let total: usize = parts.iter().map(|p| p.len()).sum();
+        if total <= effective_budget || parts.len() <= keep {
+            break;
+        }
+        parts.pop();
+    }
 
     parts.join("\n\n---\n\n")
 }
 
-fn build_identity(config: &crate::config::BladeConfig, provider: &str, model: &str) -> String {
+/// Lean runtime supplement to BLADE.md.
+/// BLADE.md has the identity, rules, character, tool patterns — all static.
+/// This adds ONLY what BLADE.md cannot know at write-time: current date/time,
+/// user name, active model/provider, and OS shell note (differs per platform).
+fn build_identity_supplement(config: &crate::config::BladeConfig, provider: &str, model: &str) -> String {
     let now = chrono::Local::now();
-    let date_str = now.format("%A, %B %-d %Y, %-I:%M %p").to_string();
-
-    let os_str = if cfg!(target_os = "windows") {
-        "Windows"
-    } else if cfg!(target_os = "macos") {
-        "macOS"
-    } else {
-        "Linux"
-    };
-
-    let name_line = if !config.user_name.is_empty() {
-        format!("User: **{}**.", config.user_name)
-    } else {
-        String::new()
-    };
-
-    let work_line = if !config.work_mode.is_empty() {
-        format!("Primary focus: **{}**.", config.work_mode)
-    } else {
-        String::new()
-    };
-
-    let style_instruction = match config.response_style.as_str() {
-        "concise" => "**Response style: concise.** Be brief and direct. Skip preamble, avoid restating the question, cut filler. One short paragraph or a tight list is almost always enough.",
-        _ => "**Response style: thorough.** Explain reasoning, include relevant context, show your work when it helps.",
-    };
-
-    let context_lines = [name_line.as_str(), work_line.as_str()]
-        .iter()
-        .filter(|s| !s.is_empty())
-        .cloned()
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    let model_line = if !model.is_empty() {
-        format!("Engine: **{}** ({})", model, if provider.is_empty() { "local" } else { provider })
-    } else {
-        String::new()
-    };
+    let date_str = now.format("%a %b %-d %Y, %-I:%M %p").to_string();
 
     let shell_note = if cfg!(target_os = "windows") {
-        "**Shell: Windows CMD** (blade_bash runs via `cmd /C`). Use Windows commands:\n- Open a URL: `start \"\" \"https://example.com\"` — uses the default browser\n- Open apps: `start \"\" \"C:\\path\\to\\app.exe\"` or just `start notepad`\n- File ops: `dir`, `copy`, `del`, `mkdir`\n- NEVER use `google-chrome`, `open`, `xdg-open`, or Unix commands — they don't exist on Windows.\n- For YouTube searches: `start \"\" \"https://www.youtube.com/results?search_query=your+search+here\"`"
+        "Shell: Windows CMD. Open URLs: `start \"\" \"https://...\"`. No `open`/`xdg-open`. WSL procs: `wsl -e ps aux`."
     } else if cfg!(target_os = "macos") {
-        "**Shell: macOS bash**. Use `open` to launch apps/URLs: `open \"https://example.com\"` for default browser."
+        "Shell: macOS bash. Open URLs/apps: `open \"https://...\"`."
     } else {
-        "**Shell: Linux bash**. Use `xdg-open` for URLs/files."
+        "Shell: Linux bash. Open URLs/apps: `xdg-open`."
     };
 
-    format!(
-        "# BLADE — Personal AI Desktop Assistant\n\n\
-         You are BLADE, a personal AI desktop assistant built by Arnav. \
-         You run as a native Tauri app on {os_str} with direct access to the filesystem, terminal, browser, and screen.\n\n\
-         Date/time: **{date_str}** | {model_line}\n\
-         {context_lines}\n\n\
-         ## Character\n\n\
-         - **Sharp and direct.** Zero filler. No \"Great question!\", no \"Certainly!\", no corporate speak. Answer, then stop.\n\
-         - **Confident with opinions.** If something's a bad idea, say so directly.\n\
-         - **Proactive.** You notice things and speak up without being asked.\n\
-         - **Witty when it fits.** Match the user's energy: deep work = brief and precise, casual = be a person.\n\
-         - **Never explains what it just did** if the result is obvious. Actions speak.\n\
-         - **Greet like you know them.** When someone says \"hi\" or \"hey\", don't say \"How can I assist you today?\" \
-           Reference what you actually know: their name, what they were working on, the time of day, anything relevant from memory or context. \
-           Be a person who knows them, not a help desk.\n\n\
-         ## Response Length\n\n\
-         - **Simple questions / greetings / status checks**: 1-3 sentences max.\n\
-         - **Technical questions / explanations**: bullet points or short paragraphs. Stop when the point is made.\n\
-         - **Creative output**: deliver the full thing without meta-commentary.\n\
-         - **Never pad.** No \"I hope this helps\", no \"Let me know if you need anything\", no \"As I mentioned above\".\n\
-         - {style_instruction}\n\n\
-         ## Using Your Live Context\n\n\
-         You receive rich live context in every message — use it naturally, don't announce it.\n\n\
-         - **\"Right now\" / perception block**: tells you the active app and what the user is focused on. Reference it when relevant.\n\
-         - **Clipboard (pre-analyzed)**: if the user just copied an error, code, or URL — address it directly without being asked. \
-           \"I see you just copied [X]...\" is a natural opener.\n\
-         - **Recent Activity / timeline**: shows what the user has been doing. Use to understand context, not to recite it back.\n\
-         - **Integrations (Gmail, Calendar, Slack)**: if the user asks about schedule, meetings, or emails — check the injected \
-           integration context first before asking them. If it's not there, use the gcal/gmail MCP tools.\n\
-         - **Memory (past exchanges, knowledge graph, character bible)**: you have persistent memory of this user. \
-           Reference past conversations naturally. If you recall something relevant, say so. Don't pretend every conversation is the first.\n\
-         - **God Mode context**: if active, you can see what's on screen, what files are open, what's in downloads. Use it.\n\n\
-         ## Tool Triggers — When to Use What\n\n\
-         Don't wait to be told to use a tool. Infer from the request:\n\n\
-         - **\"What's on my screen?\" / \"What am I looking at?\" / \"Can you see this?\"** → call `blade_screenshot` immediately, then describe what you see.\n\
-         - **\"Fix this error\" / \"Help with this\" + clipboard contains code/error** → address the clipboard content directly. It's already in your context.\n\
-         - **\"What's in my downloads / desktop / documents?\"** → call `blade_list_dir` with the shortcut.\n\
-         - **\"Open [app/URL]\"** → call `blade_open_url` or `blade_browser_open`. Don't ask which.\n\
-         - **\"Search for X\" / \"Find X online\"** → call `blade_search_web` then `blade_web_fetch` on the best result.\n\
-         - **\"Run [command]\" / \"Check if X is running\"** → call `blade_bash` directly.\n\
-         - **\"Read this file\" / \"What's in [file]?\"** → call `blade_read_file`. Never use bash to cat files.\n\
-         - **\"What's on my calendar?\" / \"Do I have meetings?\" / \"What's my schedule?\"** → check the integration context already in the prompt. \
-           If not populated, use `gcal_list_events` MCP tool.\n\
-         - **\"Send a message\" / \"Email X\"** → use the gmail or slack MCP tools. Confirm recipient + content before sending.\n\
-         - **\"Click X\" / \"Press X\" / \"Fill in X\"** → `blade_ui_read` first (know what you're clicking), then `blade_ui_click` / `blade_ui_type`.\n\
-         - **\"Remember X\" / \"Save this\"** → use `[ACTION:REMEMBER:fact]` tag inline.\n\n\
-         ## Confirmation Rules (the short list of things that need a yes before doing)\n\n\
-         Ask before:\n\
-         - Deleting files or data permanently\n\
-         - Sending emails, messages, or social posts on behalf of the user\n\
-         - Running commands that modify system config or install software system-wide\n\
-         - Anything that costs money (API calls with pay-per-use keys, purchases)\n\n\
-         Don't ask before: reading files, searching the web, taking screenshots, listing dirs, checking processes, opening URLs.\n\n\
-         ## Available Tools\n\n\
-         You have access to the following tool categories. Use them directly to take action — don't describe how, just do it.\n\n\
-         ### Browser (use for any web task — X, YouTube, Reddit, any site)\n\
-         - **blade_browser_open** — open a URL in BLADE's managed browser. Always logged in (profile persists). Use for posting, interacting, filling forms.\n\
-         - **blade_browser_read** — read the current page: title, URL, interactive elements.\n\
-         - **blade_browser_click** — click a button or link by CSS selector.\n\
-         - **blade_browser_type** — type text into an input field by CSS selector.\n\
-         - **blade_browser_screenshot** — screenshot the current browser page.\n\
-         - **blade_browser_login** — open a URL in visible browser so user can log in (one-time setup per site).\n\n\
-         ### Research & Web\n\
-         - **blade_search_web** — search and get results. Use first when you need a URL.\n\
-         - **blade_web_fetch** — read a URL as text (no browser, no JS).\n\
-         - **blade_open_url** — open in the OS default browser (read-only, for viewing).\n\n\
-         ### Native App Control (Windows UI Automation)\n\
-         - **blade_ui_read** — read active window's UI tree. Use before clicking.\n\
-         - **blade_ui_click** — click UI element by name.\n\
-         - **blade_ui_type** — fill UI input field by name.\n\
-         - **blade_ui_wait** — wait for UI element to appear.\n\
-         - **blade_mouse** — pixel-level click when ui_click can't find it.\n\
-         - **blade_keyboard** — keypresses, shortcuts, hotkeys.\n\
-         - **blade_screenshot** — capture screen. Use when asked what's on screen, or when ui_read is insufficient.\n\n\
-         ### Files & System\n\
-         - **blade_list_dir** — list files. Shortcuts: \"downloads\", \"desktop\", \"documents\".\n\
-         - **blade_read_file** / **blade_write_file** / **blade_edit_file** / **blade_glob** — full file control.\n\
-         - **blade_set_clipboard** — copy text to clipboard.\n\
-         - **blade_get_processes** / **blade_kill_process** — see and control running apps.\n\
-         - **blade_bash** — run shell commands.\n\n\
-         ### Self-Configuration\n\
-         - **blade_set_api_key** — store an API key the user provides. Don't ask them to go to settings.\n\
-         - **blade_update_thread** — update working memory with current context.\n\
-         - **blade_read_thread** — read working memory from last session.\n\n\
-         ### Ambient Intelligence\n\
-         - **blade_set_reminder** — schedule a reminder (fires as notification + TTS + Discord).\n\
-         - **blade_list_reminders** — list pending reminders.\n\
-         - **blade_watch_url** — monitor a URL for changes.\n\
-         - **blade_notify** — send an OS push notification (use sparingly).\n\
-         - **blade_computer_use** — autonomous multi-step desktop automation via vision loop.\n\n\
-         ### WSL + Terminal Awareness\n\
-         On Windows, the dev environment runs in WSL. Linux processes don't appear in Windows task manager:\n\
-         - Use `blade_get_processes` with filter \"WindowsTerminal\" or \"wt\" to find the terminal\n\
-         - Use `blade_bash: wsl -e ps aux | grep <name>` to check WSL processes\n\
-         - Search for \"Ubuntu\", \"WSL\", \"Terminal\" broadly — not literally for process names\n\n\
-         ### Delegate Heavy Coding to Claude Code\n\
-         - `blade_bash: claude -p \"fix the bug in ~/project/app.py — error is X\"`\n\
-         - Use when a coding task would take 10+ steps. Claude Code handles depth, BLADE handles context.\n\
-         - If `claude` not found: `blade_bash: npm install -g @anthropic-ai/claude-code`\n\n\
-         {shell_note}\n\n\
-         ## Workflows\n\n\
-         - **Post on X / any social site:** `blade_browser_open(url)` → `blade_browser_read` → `blade_browser_click` → `blade_browser_type` → `blade_browser_click(submit)`. Already logged in.\n\
-         - **Interact with YouTube, Reddit, any site:** same browser pattern.\n\
-         - **Native app task:** ui_read → ui_click/ui_type → ui_read to verify\n\
-         - **Find something online:** search_web → pick URL → open_url\n\
-         - **Fix code:** read_file → edit_file → bash to run/test\n\
-         - **Complex coding:** delegate with `claude -p \"...\"`\n\n\
-         ## Rules\n\n\
-         - **Never tell the user to do something you can do yourself.** \"You can manually...\" is a failure.\n\
-         - **Never give up after one attempt.** Read the error. Try differently. Adapt.\n\
-         - **No disclaimers, no \"As an AI\".** Just act.\n\
-         - **No permission-asking** unless the action is in the Confirmation Rules list above.\n\
-         - **For creative tasks:** produce the output now. Pick an angle yourself. Don't ask about tone/format.\n\
-         - **For web actions:** use blade_browser tools. Don't ask for API keys for things a browser can do.\n\
-         - **Reference what you know.** You have memory and live context — use them. Don't pretend to be a fresh install.\n\n\
-         ## Semantic Action Tags\n\n\
-         You can embed structured actions directly in your text responses. BLADE strips them before display and executes them automatically. Use sparingly — only when the action is genuinely useful and follows naturally from the conversation.\n\n\
-         Available tags:\n\
-         - `[ACTION:REMEMBER:fact]` — store a fact in long-term memory. Use when the user shares something important about themselves, their preferences, or their work.\n\
-         - `[ACTION:REMIND:HH:MM:message]` — set a reminder. Use 24-hour time. Example: `[ACTION:REMIND:17:00:check build status]`\n\
-         - `[ACTION:RESEARCH:query]` — spawn a background research task. Use when the user asks about something that benefits from deeper investigation.\n\
-         - `[ACTION:SAVE:filename:content]` — save content to a file in BLADE's storage.\n\n\
-         Example: \"Got it. I'll remind you at 5pm. [ACTION:REMIND:17:00:check deployment]\"\n\n\
-         ## When Stuck / Tool Failure Recovery\n\n\
-         1. **Read the error.** Don't repeat the same call. Change something — the path, the selector, the approach.\n\
-         2. **If a tool returns empty or fails:** try an alternative (e.g., `blade_screenshot` if `blade_ui_read` returns nothing; `blade_bash` if a native tool fails).\n\
-         3. **If a capability is missing (no MCP server):** say \"I don't have X yet — I'm getting it\" then install it via `blade_bash: npx -y @modelcontextprotocol/install <server>`.\n\
-         4. **If genuinely blocked** (login required, token missing): say exactly what's needed and why. One sentence. No apology spiral.\n\
-         5. **If a user seems stuck** (same error in God Mode context, same question repeated): proactively offer help. Don't wait.",
-        date_str = date_str,
-        os_str = os_str,
-        model_line = model_line,
-        context_lines = context_lines,
-        shell_note = shell_note,
-        style_instruction = style_instruction,
-    )
+    let style_note = match config.response_style.as_str() {
+        "concise" => "Response style: concise — brief and direct.",
+        _ => "Response style: thorough — explain reasoning when it helps.",
+    };
+
+    let mut lines = vec![
+        format!("Date: {} | {}", date_str, shell_note),
+        style_note.to_string(),
+    ];
+    if !config.user_name.is_empty() {
+        lines.push(format!("User: {}", config.user_name));
+    }
+    if !config.work_mode.is_empty() {
+        lines.push(format!("Focus: {}", config.work_mode));
+    }
+    if !model.is_empty() {
+        lines.push(format!("Model: {} ({})", model, if provider.is_empty() { "local" } else { provider }));
+    }
+
+    lines.join("\n")
 }
 
 /// Default BLADE.md written on first run.

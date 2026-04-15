@@ -23,6 +23,7 @@
 /// Conflict detection ("prefers tabs" vs "prefers spaces") preserves the newer entry
 /// and lowers the confidence of the older one. A monthly "BLADE knows about you" summary
 /// can be generated on demand.
+#[allow(dead_code)]
 
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};

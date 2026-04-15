@@ -10,6 +10,7 @@
 /// - The Evolution dashboard
 ///
 /// This is not search-on-demand. This is BLADE staying current on your behalf.
+#[allow(dead_code)]
 
 use rusqlite::params;
 use serde::{Deserialize, Serialize};

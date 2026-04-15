@@ -7,6 +7,7 @@
 ///
 /// All DB work is done synchronously before any `.await` points so no
 /// rusqlite::Connection is held across an await boundary.
+#[allow(dead_code)]
 
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
@@ -360,7 +361,7 @@ async fn llm_complete(prompt: &str) -> Result<String, String> {
     let (provider, api_key, model) =
         crate::config::resolve_provider_for_task(&config, &crate::router::TaskType::Complex);
     let messages = vec![crate::providers::ConversationMessage::User(prompt.to_string())];
-    let turn = crate::providers::complete_turn(&provider, &api_key, &model, &messages, &[], None)
+    let turn = crate::providers::complete_turn(&provider, &api_key, &model, &messages, &crate::providers::no_tools(), None)
         .await
         .map_err(|e| format!("LLM error: {e}"))?;
     Ok(turn.content)

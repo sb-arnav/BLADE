@@ -74,7 +74,7 @@ async fn llm_call(system: &str, user_msg: &str) -> Result<String, String> {
         ConversationMessage::System(system.to_string()),
         ConversationMessage::User(user_msg.to_string()),
     ];
-    let turn = complete_turn(provider, api_key, &model, &messages, &[], base_url)
+    let turn = complete_turn(provider, api_key, &model, &messages, &crate::providers::no_tools(), base_url)
         .await
         .map_err(|e| { crate::config::check_and_disable_on_402(&e); e })?;
     Ok(turn.content)

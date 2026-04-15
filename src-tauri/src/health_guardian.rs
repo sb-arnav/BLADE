@@ -3,6 +3,13 @@
 /// Runs a background loop every 5 minutes. Tracks continuous screen time,
 /// fires health break reminders at 90 min and 3 hours, suggests winding down
 /// after 22:00, and stores daily stats to blade.db.
+///
+/// NOT a duplicate of health_tracker.rs:
+///   - health_guardian.rs = passive monitor (screen time, break reminders, idle detection)
+///   - health_tracker.rs  = active logging (sleep, mood, energy, exercise) + LLM insights
+///
+/// Commands: health_guardian_stats, health_take_break
+#[allow(dead_code)]
 
 use chrono::Timelike;
 use rusqlite::params;

@@ -693,7 +693,7 @@ async fn llm_call(prompt: String) -> Result<String, String> {
         crate::config::resolve_provider_for_task(&config, &crate::router::TaskType::Complex);
 
     let messages = vec![crate::providers::ConversationMessage::User(prompt)];
-    match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &[], None).await {
+    match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &crate::providers::no_tools(), None).await {
         Ok(t) => Ok(t.content),
         Err(e) => Err(format!("LLM call failed: {e}")),
     }

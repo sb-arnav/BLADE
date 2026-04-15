@@ -140,7 +140,7 @@ async fn prefetch_analysis(text: String, kind: ClipboardContentType, app: AppHan
     let msgs = vec![crate::providers::ConversationMessage::User(prompt)];
 
     match crate::providers::complete_turn(
-        &provider, &key, &model, &msgs, &[], config.base_url.as_deref()
+        &provider, &key, &model, &msgs, &crate::providers::no_tools(), config.base_url.as_deref()
     ).await {
         Ok(turn) if !turn.content.trim().is_empty() => {
             let pf = ClipboardPrefetch {

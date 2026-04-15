@@ -1,3 +1,16 @@
+// discovery.rs — Lightweight dev-environment scanner.
+//
+// Scans the user's machine for AI tools, code projects, dev environment,
+// and Claude Code MCP server configs. Runs on demand / during onboarding.
+//
+// NOT a duplicate of deep_scan.rs:
+//   - discovery.rs  = lightweight, synchronous, dev-focused (AI tools, git repos, editors)
+//   - deep_scan.rs  = heavy 12-parallel-scanner first-run identity builder (all installed
+//                     apps, IDE extensions, shell history, WSL distros, Docker, SSH keys…)
+//
+// Commands: run_discovery, discover_mcp_servers
+
+#[allow(dead_code)]
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ffi::OsString;

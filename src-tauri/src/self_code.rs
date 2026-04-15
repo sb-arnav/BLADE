@@ -12,6 +12,7 @@
 ///     → spawns Claude Code agent on ~/blade/ (or configured path)
 ///     → Claude Code reads CLAUDE.md, implements the feature
 ///     → cargo check runs, result emitted as blade_self_code_result
+#[allow(dead_code)]
 
 use tauri::Emitter;
 use serde::{Deserialize, Serialize};

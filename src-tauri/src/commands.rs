@@ -866,6 +866,14 @@ pub async fn send_message_stream(
                     });
                 }
             }
+            // People graph + personality mirror (streaming path, same as tool-loop path)
+            {
+                let pg_user = last_user_text.clone();
+                tokio::spawn(async move {
+                    crate::people_graph::learn_from_conversation_text(&pg_user, "").await;
+                    crate::personality_mirror::learn_from_exchange(&pg_user, "").await;
+                });
+            }
         } else {
             let _ = app.emit("blade_status", "error");
         }
@@ -1203,6 +1211,10 @@ pub async fn send_message_stream(
                 // Knowledge graph — extract concepts and grow the semantic network
                 let full_exchange = format!("User: {}\n\nAssistant: {}", user_text, assistant_text);
                 crate::knowledge_graph::grow_graph_from_conversation(&full_exchange).await;
+                // People graph — extract names mentioned and learn communication context
+                crate::people_graph::learn_from_conversation_text(&user_text, &assistant_text).await;
+                // Personality mirror — extract BLADE's chat style from this exchange
+                crate::personality_mirror::learn_from_exchange(&user_text, &assistant_text).await;
             });
             // CONVERSATION SUMMARIZATION — for 5+ turn conversations, generate a 2-sentence
             // summary episode so "what did we discuss about X last week?" actually works.
@@ -1712,7 +1724,11 @@ pub async fn toggle_god_mode(app: tauri::AppHandle, enabled: bool, tier: Option<
     if let Some(t) = tier { config.god_mode_tier = t; }
     save_config(&config)?;
     if enabled {
-        crate::godmode::start_god_mode(app, &config.god_mode_tier);
+        crate::godmode::start_god_mode(app.clone(), &config.god_mode_tier);
+        // Start audio timeline capture when God Mode turns on (if configured)
+        if config.audio_capture_enabled {
+            crate::audio_timeline::start_audio_timeline_capture(app.clone());
+        }
     } else {
         crate::godmode::stop_god_mode();
     }

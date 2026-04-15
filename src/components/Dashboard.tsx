@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, type CSSProperties, type Reac
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { AgentPixelWorld } from "./AgentPixelWorld";
+import { AutoFixCard } from "./AutoFixCard";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -519,6 +520,12 @@ export function Dashboard({ onBack, onNavigate }: Props) {
   // ── Proactive suggestions ──────────────────────────────────────────────────
   const [suggestions, setSuggestions] = useState<ProactiveTask[]>([]);
 
+  // ── Ghost Mode state ───────────────────────────────────────────────────────
+  const [ghostActive, setGhostActive] = useState(false);
+
+  // ── Auto-Fix card visibility (shown when Hive detects a CI failure) ─────────
+  const [showAutoFix, setShowAutoFix] = useState(false);
+
   // ── Quick action loading states ─────────────────────────────────────────────
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
 
@@ -564,6 +571,7 @@ export function Dashboard({ onBack, onNavigate }: Props) {
       invoke<SecurityOverview>("security_overview"),
       invoke<boolean>("voice_conversation_active"),
       invoke<ProactiveTask[]>("get_proactive_tasks"),
+      invoke<{ active: boolean }>("ghost_get_status"),
     ]);
     if (results[0].status === "fulfilled" && results[0].value) setPerception(results[0].value);
     if (results[1].status === "fulfilled") setHealth(results[1].value as HealthStats);
@@ -571,6 +579,7 @@ export function Dashboard({ onBack, onNavigate }: Props) {
     if (results[3].status === "fulfilled") setSecurity(results[3].value);
     if (results[4].status === "fulfilled") setVoiceActive(results[4].value);
     if (results[5].status === "fulfilled") setSuggestions(results[5].value);
+    if (results[6].status === "fulfilled" && results[6].value) setGhostActive((results[6].value as { active: boolean }).active);
   }, []);
 
   // ── Polling ─────────────────────────────────────────────────────────────────
@@ -605,9 +614,25 @@ export function Dashboard({ onBack, onNavigate }: Props) {
       });
     }).then((fn) => { unlistenSuggestion = fn; });
 
+    // Track Ghost Mode state from HUD events
+    const unlistenGhostStart = listen<{ active: boolean }>("ghost_meeting_state", (e) => {
+      setGhostActive(e.payload.active);
+    });
+    const unlistenGhostEnd = listen("ghost_meeting_ended", () => {
+      setGhostActive(false);
+    });
+
+    // Show AutoFixCard when Hive triggers the auto-fix pipeline
+    const unlistenAutoFix = listen("hive_auto_fix_started", () => {
+      setShowAutoFix(true);
+    });
+
     return () => {
       unlistenGodMode?.();
       unlistenSuggestion?.();
+      unlistenGhostStart.then((fn) => fn());
+      unlistenGhostEnd.then((fn) => fn());
+      unlistenAutoFix.then((fn) => fn());
     };
   }, []);
 
@@ -798,6 +823,23 @@ export function Dashboard({ onBack, onNavigate }: Props) {
             loadStatus();
           }}
         />
+        <StatusPill
+          label="Ghost Mode"
+          value={ghostActive ? "active" : "off"}
+          active={ghostActive}
+          color="#8b5cf6"
+          onClick={async () => {
+            try {
+              if (ghostActive) {
+                await invoke("ghost_stop");
+                setGhostActive(false);
+              } else {
+                await invoke("ghost_start");
+                setGhostActive(true);
+              }
+            } catch { /* ignore */ }
+          }}
+        />
         {runningAgents.length > 0 && (
           <StatusPill
             label="Agents"
@@ -808,6 +850,13 @@ export function Dashboard({ onBack, onNavigate }: Props) {
           />
         )}
       </div>
+
+      {/* ── Auto-Fix Card — shown when Hive detects a CI failure ── */}
+      {showAutoFix && (
+        <div className="relative z-20 px-4 pt-3">
+          <AutoFixCard onDismiss={() => setShowAutoFix(false)} />
+        </div>
+      )}
 
       {/* ── Main grid ── */}
       <div className="relative z-10 flex-1 overflow-y-auto px-4 pb-4 pt-4">

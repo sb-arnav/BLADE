@@ -6,6 +6,7 @@
 ///
 /// The journal is stored at ~/.config/blade/journal/{date}.md
 /// It's readable by the user but written for BLADE.
+#[allow(dead_code)]
 
 use std::path::PathBuf;
 

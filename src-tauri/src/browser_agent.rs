@@ -235,7 +235,7 @@ pub async fn browser_agent_loop(
         ];
 
         // 3. Ask the LLM for the next action
-        let turn = complete_turn(provider, api_key, model, &messages, &[], None).await
+        let turn = complete_turn(provider, api_key, model, &messages, &crate::providers::no_tools(), None).await
             .map_err(|e| format!("LLM error at step {}: {}", step + 1, e))?;
 
         let raw = turn.content.trim().to_string();

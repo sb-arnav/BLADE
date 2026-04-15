@@ -391,7 +391,7 @@ pub async fn analyze_conversation_for_traits(
     use crate::providers::{complete_turn, ConversationMessage};
     let conv = vec![ConversationMessage::User(prompt)];
 
-    let turn = match complete_turn(&provider, &api_key, &model, &conv, &[], None).await {
+    let turn = match complete_turn(&provider, &api_key, &model, &conv, &crate::providers::no_tools(), None).await {
         Ok(t) => t,
         Err(_) => return Vec::new(),
     };
@@ -514,7 +514,7 @@ pub async fn detect_frustration(message: &str) -> bool {
     use crate::providers::{complete_turn, ConversationMessage};
     let conv = vec![ConversationMessage::User(prompt)];
 
-    match complete_turn(&provider, &api_key, &model, &conv, &[], None).await {
+    match complete_turn(&provider, &api_key, &model, &conv, &crate::providers::no_tools(), None).await {
         Ok(turn) => {
             let answer = turn.content.trim().to_lowercase();
             let is_frustrated = answer.starts_with("yes");
@@ -1089,7 +1089,7 @@ pub async fn predict_next_need(
             );
             use crate::providers::{complete_turn, ConversationMessage};
             let conv = vec![ConversationMessage::User(prompt)];
-            if let Ok(turn) = complete_turn(&provider, &api_key, &llm_model, &conv, &[], None).await {
+            if let Ok(turn) = complete_turn(&provider, &api_key, &llm_model, &conv, &crate::providers::no_tools(), None).await {
                 let answer = turn.content.trim().to_lowercase();
                 if !answer.contains("nothing specific") && !answer.is_empty() {
                     return Some(turn.content.trim().to_string());

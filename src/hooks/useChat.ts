@@ -3,6 +3,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ConversationSummary, Message, StoredConversation, ToolApprovalRequest, ToolExecution } from "../types";
 
+// Warn the user if their message exceeds this character count (~25k tokens).
+const MAX_INPUT_CHARS = 100_000;
+
 function sortConversations(items: ConversationSummary[]) {
   return [...items].sort((a, b) => b.updated_at - a.updated_at);
 }
@@ -75,7 +78,13 @@ export function useChat() {
     setError(null);
     setPendingApproval(null);
     setThinkingText(null);
-    await persistConversation(conversationId, []);
+    // Persist immediately — but don't let a DB failure block the UI from showing the
+    // new conversation.  The debounced persist will retry on the next message anyway.
+    try {
+      await persistConversation(conversationId, []);
+    } catch {
+      // Non-fatal: the conversation is live in memory; the next chat_done will re-save it.
+    }
     return conversationId;
   }, [persistConversation]);
 
@@ -99,22 +108,34 @@ export function useChat() {
     };
 
     bootstrap().catch((cause) => {
+      // Reset the guard so a subsequent mount (e.g. hot-reload, Strict Mode double-invoke)
+      // can attempt bootstrap again rather than silently doing nothing.
+      bootstrappedRef.current = false;
       setError(typeof cause === "string" ? cause : String(cause));
     });
   }, [createConversation, loadConversation]);
 
   useEffect(() => {
     let active = true;
+    // thinkingTimeout must be tracked locally so it can be cleaned up on unmount
+    let thinkingTimeout: ReturnType<typeof setTimeout> | null = null;
 
     // Fast acknowledgment — emitted by the cheap/fast model before the real stream starts.
     const unlistenAck = listen<string>("chat_ack", (event) => {
       if (!active) return;
+      // Guard: ignore stale acks that arrive after a new request has started.
+      // Snapshot the request ID at emit time — if it's blank or mismatched, discard.
+      const myRequestId = streamRequestId.current;
+      if (!myRequestId) return;
+
       // Only show if the stream hasn't already produced real tokens.
       if (streamBuffer.current.length > 0) return;
       awaitingRealStream.current = true;
       setAckText(event.payload);
       // Render the ack in the assistant bubble (italicised via ackText state)
       setMessages((prev) => {
+        // Double-check: if request was superseded while waiting for setState, bail out.
+        if (streamRequestId.current !== myRequestId) return prev;
         const last = prev[prev.length - 1];
         if (last?.role === "assistant" && last.content === "") {
           return [
@@ -135,13 +156,16 @@ export function useChat() {
       if (!myRequestId) return; // no active request — discard
 
       // If this is the first real token after a fast-ack, clear the ack display.
-      if (awaitingRealStream.current) {
+      // IMPORTANT: only do this if the token actually belongs to the CURRENT request.
+      // Without this check a stale ack token could wipe the buffer for the new request.
+      if (awaitingRealStream.current && streamRequestId.current === myRequestId) {
         awaitingRealStream.current = false;
         setAckText(null);
-        streamBuffer.current = ""; // ensure buffer starts clean for this request
+        // Do NOT clear the buffer here — sendMessage already zeroed it when the
+        // request started.  Wiping it again would drop any tokens that beat the ack.
       }
 
-      // Append only if still the same request (double-check after potential state update above)
+      // Discard entirely if this token belongs to a stale (superseded) request.
       if (streamRequestId.current !== myRequestId) return;
 
       streamBuffer.current += event.payload;
@@ -180,49 +204,80 @@ export function useChat() {
       setToolExecutions([]);
       setThinkingText(null);
 
-      // Persist the conversation immediately after every chat completes
+      // If the backend sent zero tokens (empty response), replace the empty
+      // assistant bubble with a placeholder so the user never sees a blank message.
+      if (!assembledBuffer) {
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.role === "assistant" && (!last.content || last.isAck)) {
+            return [
+              ...prev.slice(0, -1),
+              { ...last, content: "...", isAck: false },
+            ];
+          }
+          return prev;
+        });
+      }
+
+      // Persist the conversation immediately after every chat completes.
+      // We patch the last assistant message with assembledBuffer before saving so
+      // that the save isn't racing against React's state flush of the final token.
+      // Cancel the debounced persist so it doesn't fire a redundant second save.
+      if (persistTimerRef.current) {
+        clearTimeout(persistTimerRef.current);
+        persistTimerRef.current = null;
+      }
       const convId = currentConversationIdRef.current;
       const msgs = messagesRef.current;
       if (convId && msgs.length > 0) {
-        invoke("history_save_conversation", { conversationId: convId, messages: msgs }).catch(() => {});
-      }
+        // Ensure the saved copy always has the definitive assistant text.
+        const msgsToSave = assembledBuffer
+          ? msgs.map((m, i) =>
+              i === msgs.length - 1 && m.role === "assistant"
+                ? { ...m, content: assembledBuffer, isAck: false }
+                : m
+            )
+          : msgs;
+        invoke("history_save_conversation", { conversationId: convId, messages: msgsToSave }).catch(() => {});
 
-      // Record streak activity — every completed chat counts toward the streak
-      invoke("streak_record_activity").catch(() => {});
+        // Record streak activity — every completed chat counts toward the streak
+        invoke("streak_record_activity").catch(() => {});
 
-      // Fire-and-forget: let the backend learn from the completed conversation
-      invoke("learn_from_conversation", { messages: msgs }).catch(() => {});
+        // Fire-and-forget: let the backend learn from the completed conversation
+        invoke("learn_from_conversation", { messages: msgsToSave }).catch(() => {});
 
-      // Let the people graph learn who was mentioned in this conversation
-      invoke("people_learn_from_conversation", { messages: msgs }).catch(() => {});
+        // Let the people graph learn who was mentioned in this conversation
+        invoke("people_learn_from_conversation", { messages: msgsToSave }).catch(() => {});
 
-      // Background entity extraction + full exchange embedding — use assembled text
-      const lastUser = [...msgs].reverse().find((m) => m.role === "user");
-      const lastAssistant = assembledBuffer ||
-        ([...msgs].reverse().find((m) => m.role === "assistant")?.content ?? "");
-      if (lastUser && lastAssistant) {
-        invoke("brain_extract_from_exchange", {
-          userText: lastUser.content,
-          assistantText: lastAssistant,
-        }).catch(() => {});
-        // Auto-update working thread for streaming path (tool loop path does this in Rust)
-        invoke("blade_thread_auto_update", {
-          userText: lastUser.content,
-          assistantText: lastAssistant,
-        }).catch(() => {});
-        // Auto-title after the FIRST exchange (2 messages: user + assistant)
-        const convId2 = currentConversationIdRef.current;
-        if (msgs.length === 2 && convId2) {
-          invoke("auto_title_conversation", {
-            conversationId: convId2,
+        // Background entity extraction + full exchange embedding — use assembled text
+        const lastUser = [...msgsToSave].reverse().find((m) => m.role === "user");
+        const lastAssistant = assembledBuffer ||
+          ([...msgsToSave].reverse().find((m) => m.role === "assistant")?.content ?? "");
+        if (lastUser && lastAssistant) {
+          invoke("brain_extract_from_exchange", {
             userText: lastUser.content,
             assistantText: lastAssistant,
           }).catch(() => {});
+          // Auto-update working thread for streaming path (tool loop path does this in Rust)
+          invoke("blade_thread_auto_update", {
+            userText: lastUser.content,
+            assistantText: lastAssistant,
+          }).catch(() => {});
+          // Auto-title after the FIRST exchange (2 messages: user + assistant)
+          const convId2 = currentConversationIdRef.current;
+          if (msgsToSave.length === 2 && convId2) {
+            invoke("auto_title_conversation", {
+              conversationId: convId2,
+              userText: lastUser.content,
+              assistantText: lastAssistant,
+            }).catch(() => {});
+          }
         }
       }
     });
 
     const unlistenToolExecuting = listen<{ name: string; arguments?: unknown; risk: string }>("tool_executing", (event) => {
+      if (!active) return;
       // arguments arrives as a JSON Value (object) from Rust, not a string — normalize it
       const rawArgs = event.payload.arguments;
       const argsStr = rawArgs == null
@@ -242,6 +297,7 @@ export function useChat() {
     });
 
     const unlistenToolCompleted = listen<{ name: string; is_error: boolean; result?: string }>("tool_completed", (event) => {
+      if (!active) return;
       setToolExecutions((prev) => {
         // Match the LAST (most recently started) executing tool with this name.
         // This handles parallel tools with the same name correctly — each completion
@@ -263,6 +319,7 @@ export function useChat() {
     });
 
     const unlistenApproval = listen<Omit<ToolApprovalRequest, "arguments"> & { arguments: unknown }>("tool_approval_needed", (event) => {
+      if (!active) return;
       const rawArgs = event.payload.arguments;
       const argsStr = rawArgs == null
         ? "{}"
@@ -274,7 +331,6 @@ export function useChat() {
 
     // Extended thinking events from Anthropic
     const thinkingBuffer = { current: "" };
-    let thinkingTimeout: ReturnType<typeof setTimeout> | null = null;
 
     const resetThinkingBuffer = () => {
       thinkingBuffer.current = "";
@@ -324,6 +380,15 @@ export function useChat() {
 
     return () => {
       active = false;
+      // Clear any pending timers so they don't fire against unmounted state
+      if (safetyTimerRef.current) {
+        clearTimeout(safetyTimerRef.current);
+        safetyTimerRef.current = null;
+      }
+      if (thinkingTimeout) {
+        clearTimeout(thinkingTimeout);
+        thinkingTimeout = null;
+      }
       unlistenAck.then((fn) => fn());
       unlistenToken.then((fn) => fn());
       unlistenDone.then((fn) => fn());
@@ -364,6 +429,15 @@ export function useChat() {
   const sendMessage = useCallback(
     async (content: string, imageBase64?: string) => {
       if (!content?.trim() && !imageBase64) return;
+
+      // Warn on excessively long messages — context window limits will cause backend errors.
+      if (content.length > MAX_INPUT_CHARS) {
+        setError(
+          `Message is too long (${content.length.toLocaleString()} characters). Please shorten it to under ${MAX_INPUT_CHARS.toLocaleString()} characters.`
+        );
+        return;
+      }
+
       const conversationId = currentConversationId ?? (await createConversation());
       const userMsg: Message = {
         id: crypto.randomUUID(),
@@ -407,10 +481,27 @@ export function useChat() {
       safetyTimerRef.current = setTimeout(() => {
         // Only fire if this same request is still active (not superseded by a newer one)
         if (streamRequestId.current === thisRequestId) {
+          // Replace the empty OR partial assistant bubble with a visible error.
+          // A partial response that's forever frozen is just as bad as an empty one.
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last?.role === "assistant") {
+              const suffix = last.content ? "\n\n*(timed out — response may be incomplete)*" : "Request timed out — no response received.";
+              return [
+                ...prev.slice(0, -1),
+                { ...last, content: (last.content || "") + suffix, isAck: false },
+              ];
+            }
+            return prev;
+          });
           streamBuffer.current = "";
           streamRequestId.current = "";
+          awaitingRealStream.current = false;
+          setAckText(null);
           safetyTimerRef.current = null;
           setLoading(false);
+          setToolExecutions([]);
+          setThinkingText(null);
           setError("Request timed out — no response received. Check your API key and model in Settings.");
         }
       }, 120_000);
@@ -432,7 +523,24 @@ export function useChat() {
         }
         streamBuffer.current = "";
         streamRequestId.current = "";
-        setError(typeof cause === "string" ? cause : String(cause));
+        awaitingRealStream.current = false;
+        setAckText(null);
+        setToolExecutions([]);
+        setThinkingText(null);
+        const errorMsg = typeof cause === "string" ? cause : String(cause);
+        // Replace the assistant bubble (whether empty or partially streamed) with the
+        // error text so the conversation stays readable and the user understands what happened.
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.role === "assistant") {
+            return [
+              ...prev.slice(0, -1),
+              { ...last, content: `Error: ${errorMsg}`, isAck: false },
+            ];
+          }
+          return prev;
+        });
+        setError(errorMsg);
         setLoading(false);
       }
     },
@@ -442,7 +550,7 @@ export function useChat() {
   // Retry last failed message — removes empty assistant msg and resends
   const retryLastMessage = useCallback(async () => {
     const msgs = messagesRef.current;
-    // Find the last user message (skip trailing empty assistant)
+    // Find the last user message (skip trailing empty/error assistant)
     let lastUserIdx = -1;
     for (let i = msgs.length - 1; i >= 0; i--) {
       if (msgs[i].role === "user") { lastUserIdx = i; break; }

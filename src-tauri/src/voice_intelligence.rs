@@ -145,7 +145,7 @@ async fn llm_call(
         ConversationMessage::System(system.to_string()),
         ConversationMessage::User(user_msg.to_string()),
     ];
-    let turn = complete_turn(provider, api_key, model, &messages, &[], base_url).await?;
+    let turn = complete_turn(provider, api_key, model, &messages, &crate::providers::no_tools(), base_url).await?;
     Ok(turn.content)
 }
 

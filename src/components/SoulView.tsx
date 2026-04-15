@@ -185,6 +185,7 @@ export function SoulView({ onBack }: Props) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [streak, setStreak] = useState<StreakStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [snapshotting, setSnapshotting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<"profile" | "you" | "blade" | "diff">("profile");
@@ -192,6 +193,8 @@ export function SoulView({ onBack }: Props) {
   const graphCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const load = useCallback(async () => {
+    setError(null);
+    setLoading(true);
     try {
       const [s, p, st] = await Promise.all([
         invoke<SoulState>("soul_get_state"),
@@ -202,7 +205,7 @@ export function SoulView({ onBack }: Props) {
       setProfile(p);
       setStreak(st);
     } catch (e) {
-      console.error("[soul] load:", e);
+      setError(typeof e === "string" ? e : String(e));
     } finally {
       setLoading(false);
     }
@@ -314,7 +317,40 @@ export function SoulView({ onBack }: Props) {
     );
   }
 
-  const s = state!;
+  if (error || !state) {
+    return (
+      <div className="h-full flex flex-col bg-blade-bg text-blade-text">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-blade-border shrink-0">
+          <button onClick={onBack} className="text-blade-muted hover:text-blade-text transition-colors text-sm">
+            ← Back
+          </button>
+          <span className="text-sm font-semibold">SOUL</span>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center py-12 gap-4 text-center px-4">
+          <div className="w-10 h-10 rounded-xl bg-red-900/20 border border-red-700/40 flex items-center justify-center">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-red-400">
+              <circle cx="8" cy="8" r="6" />
+              <path d="M8 5v3.5M8 10.5v.5" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-blade-secondary">Could not load SOUL data</p>
+            <p className="text-xs text-blade-muted mt-1 max-w-xs">
+              {error ?? "No data returned. BLADE may still be starting up."}
+            </p>
+          </div>
+          <button
+            onClick={load}
+            className="px-4 py-1.5 text-xs font-medium rounded border border-blade-border text-blade-secondary hover:border-blade-accent/50 hover:text-blade-accent transition-all bg-blade-surface"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const s = state;
   const bible = s.character_bible;
   const daysSinceSnapshot = s.last_snapshot_at
     ? Math.floor((Date.now() / 1000 - s.last_snapshot_at) / 86400)
