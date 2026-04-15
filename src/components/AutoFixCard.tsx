@@ -76,17 +76,13 @@ function _stepLabel(step: PipelineStep): string {
 // ── Palette ───────────────────────────────────────────────────────────────────
 
 const p = {
-  bg: "#07090a",
-  panel: "#0b0f10",
-  border: "#1a2426",
-  green: "#00ff41",
-  cyan: "#00e5ff",
-  amber: "#ffb000",
-  red: "#ff0040",
-  violet: "#b388ff",
-  muted: "#4a6068",
-  text: "#c8d8dc",
-  textDim: "#6b8a90",
+  green: "#34c759",
+  amber: "#f59e0b",
+  red: "#ff3b30",
+  accent: "#6366f1",
+  muted: "rgba(255,255,255,0.35)",
+  text: "rgba(255,255,255,0.85)",
+  textDim: "rgba(255,255,255,0.45)",
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -259,9 +255,8 @@ export function AutoFixCard({ onDismiss }: AutoFixCardProps) {
     state.ciPassed !== false;
 
   const resultColor = isSuccess ? p.green : p.red;
-  const resultIcon = isSuccess ? "✓" : "✗";
   const resultLabel = isSuccess
-    ? `Fixed · ${state.result?.data?.commit_hash ?? ""}`
+    ? `Fixed${state.result?.data?.commit_hash ? ` · ${state.result.data.commit_hash}` : ""}`
     : state.result?.data?.reason ?? "Fix failed";
 
   if (state.step === "idle" && !state.repoName) {
@@ -273,63 +268,44 @@ export function AutoFixCard({ onDismiss }: AutoFixCardProps) {
   return (
     <div
       style={{
-        background: p.panel,
-        border: `1px solid ${p.border}`,
-        borderRadius: 10,
-        padding: "16px 20px",
+        background: "rgba(18,18,22,0.96)",
+        border: "1px solid rgba(255,255,255,0.1)",
+        borderRadius: 12,
+        padding: "16px 18px",
         position: "relative",
         minWidth: 320,
         maxWidth: 480,
-        boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
-        fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+        boxShadow: "0 4px 24px rgba(0,0,0,0.4)",
+        fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       }}
     >
       {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 12,
-        }}
-      >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 16 }}>🔧</span>
-          <span
-            style={{
-              color: p.cyan,
-              fontSize: 13,
-              fontWeight: 700,
-              letterSpacing: "0.04em",
-            }}
-          >
-            AUTO-FIX
-          </span>
-          <span
-            style={{
+          <span style={{ fontSize: 14, color: p.text, fontWeight: 600 }}>Auto-Fix</span>
+          {state.repoName && (
+            <span style={{
               color: p.textDim,
-              fontSize: 11,
-              background: "#111c1f",
-              borderRadius: 4,
-              padding: "1px 6px",
-            }}
-          >
-            {state.repoName || "repo"}
-          </span>
+              fontSize: 12,
+              background: "rgba(255,255,255,0.06)",
+              borderRadius: 6,
+              padding: "2px 7px",
+            }}>
+              {state.repoName}
+            </span>
+          )}
         </div>
 
-        {/* Close / Cancel */}
         {!isFinished ? (
           <button
             onClick={handleCancel}
-            title="Cancel auto-fix"
             style={{
-              background: "transparent",
-              border: `1px solid ${p.muted}`,
-              color: p.muted,
-              borderRadius: 4,
-              padding: "2px 8px",
-              fontSize: 11,
+              background: "rgba(255,255,255,0.06)",
+              border: "none",
+              color: p.textDim,
+              borderRadius: 6,
+              padding: "4px 10px",
+              fontSize: 12,
               cursor: "pointer",
             }}
           >
@@ -338,15 +314,7 @@ export function AutoFixCard({ onDismiss }: AutoFixCardProps) {
         ) : (
           <button
             onClick={handleDismiss}
-            title="Dismiss"
-            style={{
-              background: "transparent",
-              border: "none",
-              color: p.muted,
-              fontSize: 16,
-              cursor: "pointer",
-              lineHeight: 1,
-            }}
+            style={{ background: "none", border: "none", color: p.muted, fontSize: 18, cursor: "pointer", lineHeight: 1 }}
           >
             ×
           </button>
@@ -355,29 +323,24 @@ export function AutoFixCard({ onDismiss }: AutoFixCardProps) {
 
       {/* Error summary */}
       {state.errorSummary && (
-        <div
-          style={{
-            color: p.textDim,
-            fontSize: 11,
-            marginBottom: 12,
-            lineHeight: 1.5,
-            borderLeft: `2px solid ${p.amber}`,
-            paddingLeft: 8,
-            wordBreak: "break-word",
-          }}
-        >
-          {state.errorSummary.length > 120
-            ? state.errorSummary.slice(0, 120) + "…"
-            : state.errorSummary}
-        </div>
+        <p style={{
+          color: p.textDim,
+          fontSize: 13,
+          marginBottom: 14,
+          lineHeight: 1.5,
+          borderLeft: `2px solid ${p.amber}`,
+          paddingLeft: 10,
+          wordBreak: "break-word",
+        }}>
+          {state.errorSummary.length > 120 ? state.errorSummary.slice(0, 120) + "…" : state.errorSummary}
+        </p>
       )}
 
-      {/* Step list */}
-      <div style={{ marginBottom: 14 }}>
+      {/* Step list — checkmarks, not progress bars */}
+      <div style={{ marginBottom: 16 }}>
         {STEPS.filter((s) => s.key !== "failed").map((s) => {
           const isDone = currentIdx > s.index;
-          const isActive =
-            state.step !== "failed" && state.step !== "complete" && state.step === s.key;
+          const isActive = state.step !== "failed" && state.step !== "complete" && state.step === s.key;
           const isFailed = state.step === "failed" && currentIdx === s.index;
 
           return (
@@ -386,70 +349,54 @@ export function AutoFixCard({ onDismiss }: AutoFixCardProps) {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 8,
-                marginBottom: 4,
-                opacity: isDone || isActive ? 1 : 0.35,
+                gap: 10,
+                padding: "5px 0",
+                opacity: !isDone && !isActive && !isFailed ? 0.3 : 1,
+                transition: "opacity 0.25s ease",
               }}
             >
-              <span
-                style={{
-                  fontSize: 12,
-                  color: isFailed ? p.red : isDone ? p.green : isActive ? p.amber : p.muted,
-                  minWidth: 14,
-                  textAlign: "center",
-                }}
-              >
-                {isFailed ? "✗" : isDone ? "✓" : isActive ? "›" : "·"}
+              {/* Step icon */}
+              <span style={{
+                width: 16,
+                fontSize: 13,
+                textAlign: "center",
+                color: isFailed ? p.red : isDone ? p.green : isActive ? p.accent : p.muted,
+                flexShrink: 0,
+              }}>
+                {isFailed ? "✕" : isDone ? "✓" : isActive ? "›" : "·"}
               </span>
-              <span
-                style={{
-                  fontSize: 12,
-                  color: isFailed ? p.red : isDone ? p.green : isActive ? p.text : p.muted,
-                }}
-              >
+
+              <span style={{
+                fontSize: 13,
+                color: isActive ? p.text : isDone ? "rgba(255,255,255,0.65)" : p.muted,
+                fontWeight: isActive ? 500 : 400,
+                transition: "color 0.25s ease",
+              }}>
                 {s.label}
-                {s.key === "editing" && state.filesTotal > 0 && isActive
-                  ? ` (${state.filesTotal} file${state.filesTotal !== 1 ? "s" : ""})`
-                  : ""}
-                {s.key === "editing" && state.filesEdited > 0 && isDone
-                  ? ` · ${state.filesEdited} edited`
-                  : ""}
+                {s.key === "editing" && state.filesTotal > 0 && isActive ? ` (${state.filesTotal} file${state.filesTotal !== 1 ? "s" : ""})` : ""}
+                {s.key === "editing" && state.filesEdited > 0 && isDone ? ` · ${state.filesEdited} edited` : ""}
               </span>
+
+              {/* Active indicator dot */}
               {isActive && !isFinished && (
-                <span
-                  style={{
-                    fontSize: 10,
-                    color: p.amber,
-                    animation: "pulse 1.2s ease-in-out infinite",
-                  }}
-                >
-                  ···
-                </span>
+                <span style={{
+                  width: 6, height: 6, borderRadius: "50%",
+                  background: p.accent, flexShrink: 0,
+                  animation: "activeDot 1.4s ease-in-out infinite",
+                }} />
               )}
             </div>
           );
         })}
       </div>
 
-      {/* Progress bar */}
-      <div
-        style={{
-          height: 3,
-          background: "#1a2426",
-          borderRadius: 2,
-          overflow: "hidden",
-          marginBottom: 12,
-        }}
-      >
+      {/* Progress bar — thin, rounded, accent color */}
+      <div style={{ height: 4, background: "rgba(255,255,255,0.07)", borderRadius: 2, overflow: "hidden", marginBottom: 14 }}>
         <div
           style={{
             height: "100%",
             width: `${progress}%`,
-            background: isFinished
-              ? isSuccess
-                ? p.green
-                : p.red
-              : p.cyan,
+            background: isFinished ? (isSuccess ? p.green : p.red) : p.accent,
             borderRadius: 2,
             transition: "width 0.4s ease",
           }}
@@ -458,73 +405,44 @@ export function AutoFixCard({ onDismiss }: AutoFixCardProps) {
 
       {/* Result banner */}
       {isFinished && state.result && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            gap: 8,
-            background: isSuccess ? "rgba(0,255,65,0.06)" : "rgba(255,0,64,0.06)",
-            border: `1px solid ${resultColor}33`,
-            borderRadius: 6,
-            padding: "8px 10px",
-            marginBottom: state.result.type === "NeedHumanHelp" ? 10 : 0,
-          }}
-        >
-          <span
-            style={{
-              color: resultColor,
-              fontSize: 16,
-              lineHeight: 1,
-              marginTop: 1,
-              flexShrink: 0,
-            }}
-          >
-            {resultIcon}
-          </span>
+        <div style={{
+          display: "flex", alignItems: "flex-start", gap: 10,
+          background: isSuccess ? "rgba(52,199,89,0.08)" : "rgba(255,59,48,0.08)",
+          border: `1px solid ${isSuccess ? "rgba(52,199,89,0.2)" : "rgba(255,59,48,0.2)"}`,
+          borderRadius: 8,
+          padding: "10px 12px",
+          marginBottom: state.result.type === "NeedHumanHelp" ? 12 : 0,
+        }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: resultColor, flexShrink: 0, marginTop: 5 }} />
           <div>
-            <div
-              style={{
-                color: resultColor,
-                fontSize: 12,
-                fontWeight: 700,
-                marginBottom: 2,
-              }}
-            >
-              {resultLabel}
-            </div>
-            {state.result.type === "NeedHumanHelp" &&
-              state.result.data?.suggestion && (
-                <div style={{ color: p.textDim, fontSize: 11, lineHeight: 1.4 }}>
-                  {state.result.data.suggestion}
-                </div>
-              )}
-            {state.result.type === "Fixed" &&
-              state.result.data?.files_changed &&
-              state.result.data.files_changed.length > 0 && (
-                <div style={{ color: p.textDim, fontSize: 11 }}>
-                  {state.result.data.files_changed.length} file
-                  {state.result.data.files_changed.length !== 1 ? "s" : ""} changed
-                </div>
-              )}
+            <div style={{ color: resultColor, fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{resultLabel}</div>
+            {state.result.type === "NeedHumanHelp" && state.result.data?.suggestion && (
+              <div style={{ color: p.textDim, fontSize: 12, lineHeight: 1.5 }}>{state.result.data.suggestion}</div>
+            )}
+            {state.result.type === "Fixed" && state.result.data?.files_changed && state.result.data.files_changed.length > 0 && (
+              <div style={{ color: p.textDim, fontSize: 12 }}>
+                {state.result.data.files_changed.length} file{state.result.data.files_changed.length !== 1 ? "s" : ""} changed
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Retry button for failures */}
+      {/* Retry */}
       {isFinished && !isSuccess && (
         <button
           onClick={handleRetry}
           style={{
-            marginTop: 8,
-            width: "100%",
-            background: "transparent",
-            border: `1px solid ${p.cyan}44`,
-            color: p.cyan,
-            borderRadius: 5,
-            padding: "6px 0",
-            fontSize: 12,
+            marginTop: 10, width: "100%",
+            background: "rgba(99,102,241,0.12)",
+            border: "none",
+            color: "#a5b4fc",
+            borderRadius: 8,
+            padding: "8px 0",
+            fontSize: 13,
+            fontWeight: 500,
             cursor: "pointer",
-            letterSpacing: "0.04em",
+            transition: "background 0.25s ease",
           }}
         >
           Retry Pipeline
@@ -533,18 +451,17 @@ export function AutoFixCard({ onDismiss }: AutoFixCardProps) {
 
       {/* Workflow label */}
       {state.workflowName && (
-        <div
-          style={{
-            marginTop: 8,
-            color: p.muted,
-            fontSize: 10,
-            textAlign: "right",
-          }}
-        >
-          {state.workflowName}
-          {state.runId > 0 ? ` · run #${state.runId}` : ""}
+        <div style={{ marginTop: 10, color: p.muted, fontSize: 11, textAlign: "right" }}>
+          {state.workflowName}{state.runId > 0 ? ` · run #${state.runId}` : ""}
         </div>
       )}
+
+      <style>{`
+        @keyframes activeDot {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+      `}</style>
     </div>
   );
 }

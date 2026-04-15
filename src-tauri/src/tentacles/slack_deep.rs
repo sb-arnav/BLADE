@@ -105,7 +105,7 @@ async fn estimate_answer_confidence(msg: &InboundSlackMessage) -> f32 {
     let knows_person = crate::people_graph::get_person(&msg.sender).is_some();
 
     // Heuristic: DMs from known people with memory context = high confidence
-    let base = match (msg.is_dm, knows_person, has_context) {
+    let base: f32 = match (msg.is_dm, knows_person, has_context) {
         (true, true, true) => 0.85,
         (true, true, false) => 0.65,
         (true, false, _) => 0.4,
@@ -114,10 +114,9 @@ async fn estimate_answer_confidence(msg: &InboundSlackMessage) -> f32 {
         (false, false, _) => 0.35,
     };
 
-    // Questions (?) are harder — reduce confidence slightly
-    let question_penalty = if msg.text.contains('?') { 0.1 } else { 0.0 };
+    let question_penalty: f32 = if msg.text.contains('?') { 0.1 } else { 0.0 };
 
-    (base - question_penalty).clamp(0.0_f32, 1.0_f32)
+    (base - question_penalty).clamp(0.0, 1.0)
 }
 
 // ── Channel tone detection ────────────────────────────────────────────────────

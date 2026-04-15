@@ -229,11 +229,11 @@ fn sigv4_auth_header(
     );
 
     let k_date    = hmac_sha256(format!("AWS4{secret_key}").as_bytes(), date.as_bytes());
-    let k_region  = hmac_sha256(&k_date, region.as_bytes());
-    let k_service = hmac_sha256(&k_region, service.as_bytes());
-    let k_signing = hmac_sha256(&k_service, b"aws4_request");
+    let k_region  = hmac_sha256(k_date.as_slice(), region.as_bytes());
+    let k_service = hmac_sha256(k_region.as_slice(), service.as_bytes());
+    let k_signing = hmac_sha256(k_service.as_slice(), b"aws4_request");
 
-    let signature = hmac_sha256_hex(&k_signing, string_to_sign.as_bytes());
+    let signature = hmac_sha256_hex(k_signing.as_slice(), string_to_sign.as_bytes());
 
     format!(
         "AWS4-HMAC-SHA256 Credential={access_key}/{credential_scope}, SignedHeaders={signed_headers}, Signature={signature}"

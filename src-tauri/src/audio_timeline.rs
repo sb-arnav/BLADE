@@ -219,13 +219,14 @@ Transcript:
 
     use crate::providers::ConversationMessage;
     let messages = vec![ConversationMessage::User(prompt)];
+    let no_tools: Vec<crate::providers::ToolDefinition> = vec![];
 
     let result = crate::providers::complete_turn(
         &config.provider,
         &config.api_key,
         &model,
         &messages,
-        &[],
+        &no_tools,
         config.base_url.as_deref(),
     )
     .await;
@@ -301,7 +302,8 @@ fn embed_audio_entry(
         text
     };
 
-    match crate::embeddings::embed_texts(&[text.clone()]) {
+    let embed_input = vec![text.clone()];
+    match crate::embeddings::embed_texts(&embed_input) {
         Ok(embeddings) => {
             if let Some(embedding) = embeddings.into_iter().next() {
                 if let Ok(mut s) = store.lock() {
@@ -797,13 +799,14 @@ Return a JSON object (no markdown fences):
 
     use crate::providers::ConversationMessage;
     let messages = vec![ConversationMessage::User(prompt)];
+    let no_tools: Vec<crate::providers::ToolDefinition> = vec![];
 
     let (title, summary, sentiment, participants) = match crate::providers::complete_turn(
         &config.provider,
         &config.api_key,
         &model,
         &messages,
-        &[],
+        &no_tools,
         config.base_url.as_deref(),
     )
     .await
@@ -867,7 +870,8 @@ pub async fn search_everything(
         return vec![];
     }
 
-    let embeddings = match crate::embeddings::embed_texts(&[query.to_string()]) {
+    let embed_input = vec![query.to_string()];
+    let embeddings = match crate::embeddings::embed_texts(&embed_input) {
         Ok(e) => e,
         Err(_) => return vec![],
     };
@@ -1043,7 +1047,8 @@ pub fn audio_timeline_search(
     query: &str,
     limit: usize,
 ) -> Vec<AudioTimelineEntry> {
-    let embeddings = match crate::embeddings::embed_texts(&[query.to_string()]) {
+    let embed_input = vec![query.to_string()];
+    let embeddings = match crate::embeddings::embed_texts(&embed_input) {
         Ok(e) => e,
         Err(_) => return vec![],
     };

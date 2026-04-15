@@ -14,11 +14,10 @@ interface DetectedPattern {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function SectionHeader({ icon, title }: { icon: string; title: string }) {
+function SectionHeader({ title }: { icon: string; title: string }) {
   return (
     <div className="flex items-center gap-2 mb-3">
-      <span className="text-base">{icon}</span>
-      <h2 className="text-sm font-semibold text-blade-text uppercase tracking-wider">{title}</h2>
+      <h2 style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.7)", letterSpacing: "0.06em", textTransform: "uppercase" }}>{title}</h2>
     </div>
   );
 }
@@ -26,15 +25,15 @@ function SectionHeader({ icon, title }: { icon: string; title: string }) {
 function ConfidenceBar({ confidence }: { confidence: number }) {
   const pct = Math.round(Math.min(1, Math.max(0, confidence)) * 100);
   const color =
-    pct >= 75 ? "bg-green-500" :
-    pct >= 50 ? "bg-amber-500" :
-    "bg-red-500";
+    pct >= 75 ? "#34c759" :
+    pct >= 50 ? "#f59e0b" :
+    "#ff3b30";
   return (
-    <div className="flex items-center gap-2 mt-1">
-      <div className="flex-1 h-1 rounded-full bg-blade-surface overflow-hidden">
-        <div className={`h-full rounded-full ${color} transition-all duration-500`} style={{ width: `${pct}%` }} />
+    <div className="flex items-center gap-2 mt-1.5">
+      <div className="flex-1 rounded-full overflow-hidden" style={{ height: 4, background: "rgba(255,255,255,0.08)" }}>
+        <div style={{ height: "100%", borderRadius: 2, background: color, width: `${pct}%`, transition: "width 0.5s ease" }} />
       </div>
-      <span className="text-2xs text-blade-muted w-8 text-right">{pct}%</span>
+      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", width: 32, textAlign: "right" }}>{pct}%</span>
     </div>
   );
 }
@@ -133,7 +132,7 @@ export function TemporalPanel({ onBack }: TemporalPanelProps) {
         </button>
         <div>
           <h1 className="text-sm font-semibold text-blade-text">Temporal Intelligence</h1>
-          <p className="text-2xs text-blade-muted">What were you doing? Patterns. Standup prep.</p>
+          <p className="text-xs text-blade-muted">What were you doing? Patterns. Standup prep.</p>
         </div>
       </div>
 
@@ -146,7 +145,7 @@ export function TemporalPanel({ onBack }: TemporalPanelProps) {
 
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <label className="text-2xs text-blade-muted w-20 flex-shrink-0">Hours ago</label>
+              <label className="text-xs text-blade-muted w-20 flex-shrink-0">Hours ago</label>
               <input
                 type="range"
                 min={1}
@@ -172,7 +171,7 @@ export function TemporalPanel({ onBack }: TemporalPanelProps) {
                 }}
                 className="w-20 px-2 py-1.5 rounded-lg bg-blade-bg border border-blade-border text-xs text-blade-text focus:outline-none focus:border-blade-accent/60"
               />
-              <span className="text-2xs text-blade-muted">hours ago</span>
+              <span className="text-xs text-blade-muted">hours ago</span>
               <div className="flex-1" />
               <button
                 onClick={fetchActivity}
