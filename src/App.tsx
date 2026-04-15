@@ -97,7 +97,7 @@ const BackgroundAgentsPanel = lazy(() => import("./components/BackgroundAgentsPa
 const ScreenTimeline = lazy(() => import("./components/ScreenTimeline").then((m) => ({ default: m.ScreenTimeline })));
 const SwarmView = lazy(() => import("./components/SwarmView").then((m) => ({ default: m.SwarmView })));
 const SoulView = lazy(() => import("./components/SoulView").then((m) => ({ default: m.SoulView })));
-const DashboardView = lazy(() => import("./components/Dashboard").then((m) => ({ default: m.Dashboard })));
+import { Dashboard } from "./components/Dashboard";
 const SkillPackView = lazy(() => import("./components/SkillPackView").then((m) => ({ default: m.SkillPackView })));
 const GoalView = lazy(() => import("./components/GoalView").then((m) => ({ default: m.GoalView })));
 const KaliView = lazy(() => import("./components/KaliView").then((m) => ({ default: m.KaliView })));
@@ -196,7 +196,7 @@ const ROUTE_INTENT_LABELS: Partial<Record<Route, { title: string; note: string }
 export default function App() {
   const [config, setConfig] = useState<BladeConfig | null>(null);
   const [loading, setLoading] = useState(true);
-  const [route, setRoute] = useState<Route>("chat");
+  const [route, setRoute] = useState<Route>("dashboard");
   const [chatPanelOpen, setChatPanelOpen] = useState(true);
   const [personaOnboardingOpen, setPersonaOnboardingOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -1072,7 +1072,6 @@ export default function App() {
     "screen-timeline": <ScreenTimeline onBack={() => openRoute("dashboard")} />,
     "swarm": <SwarmView onBack={() => openRoute("dashboard")} />,
     "soul": <SoulView onBack={() => openRoute("dashboard")} />,
-    "dashboard": <DashboardView onBack={() => openRoute("dashboard")} onNavigate={(r) => openRoute(r as Route)} />,
     "skill-packs": <SkillPackView onBack={() => openRoute("dashboard")} />,
     "goals": <GoalView onBack={() => openRoute("dashboard")} />,
     "kali": <KaliView onBack={() => openRoute("dashboard")} />,
@@ -1201,7 +1200,55 @@ export default function App() {
       {/* ── Main content ── */}
       <div className="flex-1 min-h-0 flex flex-row overflow-hidden">
         <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-          {route === "chat" || route === "dashboard" ? (
+          {route === "dashboard" ? (
+            <Dashboard
+              activeRoute={route}
+              onNavigate={(r) => openRoute(r as Route)}
+              chatPanelProps={{
+                messages: chat.messages,
+                loading: chat.loading,
+                error: chat.error,
+                toolExecutions: chat.toolExecutions,
+                clipboardText: chat.clipboardText,
+                conversations: chat.conversations,
+                currentConversationId: chat.currentConversationId,
+                onSend: sendWithStats,
+                onClear: chat.clearMessages,
+                onNewConversation: chat.newConversation,
+                onSwitchConversation: chat.switchConversation,
+                onOpenSettings: () => openRoute("settings"),
+                onDismissClipboard: chat.dismissClipboard,
+                pendingApproval: chat.pendingApproval,
+                onRespondApproval: chat.respondToApproval,
+                onDeleteConversation: chat.deleteConversation,
+                onUpdateConversationTitle: chat.updateConversationTitle,
+                onRetry: chat.retryLastMessage,
+                onSlashCommand: handleSlashCommand,
+                provider: config?.provider,
+                model: config?.model,
+                streakDays: stats.streakDays,
+                totalMessages: stats.totalMessages,
+                lastResponseTime: chat.lastResponseTime,
+                ttsEnabled: tts.enabled,
+                ttsSpeaking: tts.speaking,
+                onToggleTTS: tts.toggleEnabled,
+                onStopTTS: tts.stop,
+                activeWindow: contextAwareness.context.activeWindow,
+                contextSuggestions: contextAwareness.context.suggestedActions,
+                onOpenWorkspace: (workspace) => openRoute(workspace),
+                runtimes: runtimeCenter.runtimes,
+                onOpenOperators: () => openRoute("agents"),
+                voiceDraft: voiceDraft,
+                onVoiceDraftConsumed: () => setVoiceDraft(null),
+                voiceModeStatus: voiceMode.status,
+                voiceModeOnPttDown: voiceMode.onPttMouseDown,
+                voiceModeOnPttUp: voiceMode.onPttMouseUp,
+                thinkingText: chat.thinkingText,
+                onOpenNotifications: () => setNotificationsOpen(true),
+                unreadNotificationCount: notifications.unreadCount,
+              }}
+            />
+          ) : route === "chat" ? (
             <ChatWindow
               messages={chat.messages}
               loading={chat.loading}
