@@ -24,7 +24,7 @@ import { useRuntimes } from "./hooks/useRuntimes";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
 import { ToastProvider } from "./components/Toast";
-import { Sidebar } from "./components/Sidebar";
+// import { Sidebar } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
 // DashboardGlance available for future sidebar layout
 // import { DashboardGlance } from "./components/DashboardGlance";
@@ -40,12 +40,15 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, EBState> {
   render() {
     if (this.state.error) {
       return (
-        <div className="fixed inset-0 bg-blade-bg flex flex-col items-center justify-center gap-4 p-6">
-          <div className="w-2 h-2 rounded-full bg-red-400" />
-          <p className="text-sm font-semibold text-blade-text">Something crashed</p>
-          <p className="text-2xs text-blade-muted text-center max-w-xs break-words font-mono">
+        <div style={{ position: "fixed", inset: 0, background: "#1a0000", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: 24 }}>
+          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ff4444" }} />
+          <p style={{ fontSize: 16, fontWeight: 700, color: "#ff6666" }}>BLADE crashed</p>
+          <p style={{ fontSize: 13, color: "#ff9999", textAlign: "center", maxWidth: 400, wordBreak: "break-all", fontFamily: "monospace" }}>
             {this.state.error.message}
           </p>
+          <pre style={{ fontSize: 11, color: "#ff777766", maxWidth: 500, maxHeight: 200, overflow: "auto", whiteSpace: "pre-wrap" }}>
+            {this.state.error.stack}
+          </pre>
           <button
             onClick={() => this.setState({ error: null })}
             className="px-4 py-1.5 rounded-lg bg-blade-surface border border-blade-border text-xs text-blade-secondary hover:text-blade-text transition-colors"
@@ -193,7 +196,7 @@ const ROUTE_INTENT_LABELS: Partial<Record<Route, { title: string; note: string }
 export default function App() {
   const [config, setConfig] = useState<BladeConfig | null>(null);
   const [loading, setLoading] = useState(true);
-  const [route, setRoute] = useState<Route>("dashboard");
+  const [route, setRoute] = useState<Route>("chat");
   const [chatPanelOpen, setChatPanelOpen] = useState(true);
   const [personaOnboardingOpen, setPersonaOnboardingOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -218,6 +221,7 @@ export default function App() {
   const runtimeCenter = useRuntimes();
 
   const [voiceDraft, setVoiceDraft] = useState<string | null>(null);
+  void voiceDraft;
   const voiceSendRef = useRef<(text: string) => void>(() => {});
   const voiceMode = useVoiceMode({
     config: config ?? { provider: "", api_key: "", model: "", onboarded: false, mcp_servers: [] },
@@ -1141,19 +1145,13 @@ export default function App() {
     </>
   );
 
-  // Sidebar navigation handler — "chat" toggles the right panel, everything else routes
-  const handleSidebarNav = useCallback((sidebarRoute: string) => {
-    if (sidebarRoute === "chat") {
-      setChatPanelOpen((p) => !p);
-    } else {
-      openRoute(sidebarRoute as Route);
-    }
-  }, [openRoute]);
+  // Sidebar nav handler (for future sidebar integration)
+  void chatPanelOpen; void setChatPanelOpen;
 
   return (
     <ToastProvider>
     <ErrorBoundary>
-    <div className="h-screen flex flex-col bg-blade-bg text-blade-text relative overflow-hidden">
+    <div className="h-screen flex flex-col bg-[#09090b] text-[#e4e4e7] relative overflow-hidden">
       {/* File drop overlay */}
       {isDragging && (
         <div className="absolute inset-0 z-50 bg-blade-bg/90 backdrop-blur-sm flex items-center justify-center border-2 border-dashed border-blade-accent/40 rounded-xl m-2 pointer-events-none animate-fade-in">
@@ -1200,98 +1198,62 @@ export default function App() {
         onAction={(r) => { openRoute(r as Route); setNotificationsOpen(false); }}
       />
 
-      {/* ── New 3-column layout: Sidebar | Content | Chat Panel ── */}
+      {/* ── Main content ── */}
       <div className="flex-1 min-h-0 flex flex-row overflow-hidden">
-
-        {/* Left: sidebar navigation */}
-        <Sidebar
-          activeRoute={route}
-          onNavigate={handleSidebarNav}
-          chatUnread={notifications.unreadCount}
-        />
-
-        {/* Center: main content */}
         <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-            {mainContent}
-          </div>
+          {route === "chat" || route === "dashboard" ? (
+            <ChatWindow
+              messages={chat.messages}
+              loading={chat.loading}
+              error={chat.error}
+              toolExecutions={chat.toolExecutions}
+              clipboardText={chat.clipboardText}
+              conversations={chat.conversations}
+              currentConversationId={chat.currentConversationId}
+              onSend={sendWithStats}
+              onClear={chat.clearMessages}
+              onNewConversation={chat.newConversation}
+              onSwitchConversation={chat.switchConversation}
+              onOpenSettings={() => openRoute("settings")}
+              onDismissClipboard={chat.dismissClipboard}
+              pendingApproval={chat.pendingApproval}
+              onRespondApproval={chat.respondToApproval}
+              onDeleteConversation={chat.deleteConversation}
+              onUpdateConversationTitle={chat.updateConversationTitle}
+              onRetry={chat.retryLastMessage}
+              onSlashCommand={handleSlashCommand}
+              provider={config?.provider}
+              model={config?.model}
+              streakDays={stats.streakDays}
+              totalMessages={stats.totalMessages}
+              lastResponseTime={chat.lastResponseTime}
+              ttsEnabled={tts.enabled}
+              ttsSpeaking={tts.speaking}
+              onToggleTTS={tts.toggleEnabled}
+              onStopTTS={tts.stop}
+              activeWindow={contextAwareness.context.activeWindow}
+              contextSuggestions={contextAwareness.context.suggestedActions}
+              onOpenWorkspace={(workspace) => openRoute(workspace)}
+              runtimes={runtimeCenter.runtimes}
+              onOpenOperators={() => openRoute("agents")}
+              voiceDraft={voiceDraft}
+              onVoiceDraftConsumed={() => setVoiceDraft(null)}
+              voiceModeStatus={voiceMode.status}
+              voiceModeOnPttDown={voiceMode.onPttMouseDown}
+              voiceModeOnPttUp={voiceMode.onPttMouseUp}
+              thinkingText={chat.thinkingText}
+              onOpenNotifications={() => setNotificationsOpen(true)}
+              unreadNotificationCount={notifications.unreadCount}
+            />
+          ) : (
+            <Suspense fallback={<div className="flex-1 flex items-center justify-center text-white/30">Loading...</div>}>
+              <div className="flex-1 min-h-0 flex flex-col overflow-y-auto">
+                {mainContent}
+              </div>
+            </Suspense>
+          )}
+
         </div>
-
-        {/* Right: persistent chat panel */}
-        <div
-          className="flex flex-col bg-[#0a0a0c] border-l border-white/[0.06] shrink-0 overflow-hidden"
-          style={{
-            width: chatPanelOpen ? "clamp(320px, 38%, 560px)" : 0,
-            transition: "width 280ms cubic-bezier(0.25,0.1,0.25,1)",
-          }}
-        >
-          {/* Chat panel header */}
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06] shrink-0">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/30">Chat</span>
-            <div className="flex items-center gap-2">
-              <span className="text-[9px] text-white/20 hidden sm:inline">Esc</span>
-              <button
-                onClick={() => setChatPanelOpen(false)}
-                className="w-5 h-5 rounded flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/[0.06] transition-colors"
-                title="Close chat"
-              >
-                <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* ChatWindow fills the panel */}
-          <div className="flex-1 min-h-0 min-w-0">
-            {chatPanelOpen && (
-              <ChatWindow
-                messages={chat.messages}
-                loading={chat.loading}
-                error={chat.error}
-                toolExecutions={chat.toolExecutions}
-                clipboardText={chat.clipboardText}
-                conversations={chat.conversations}
-                currentConversationId={chat.currentConversationId}
-                onSend={sendWithStats}
-                onClear={chat.clearMessages}
-                onNewConversation={chat.newConversation}
-                onSwitchConversation={chat.switchConversation}
-                onOpenSettings={() => openRoute("settings")}
-                onDismissClipboard={chat.dismissClipboard}
-                pendingApproval={chat.pendingApproval}
-                onRespondApproval={chat.respondToApproval}
-                onDeleteConversation={chat.deleteConversation}
-                onUpdateConversationTitle={chat.updateConversationTitle}
-                onRetry={chat.retryLastMessage}
-                onSlashCommand={handleSlashCommand}
-                provider={config?.provider}
-                streakDays={stats.streakDays}
-                totalMessages={stats.totalMessages}
-                lastResponseTime={chat.lastResponseTime}
-                model={config?.model}
-                ttsEnabled={tts.enabled}
-                ttsSpeaking={tts.speaking}
-                onToggleTTS={tts.toggleEnabled}
-                onStopTTS={tts.stop}
-                activeWindow={contextAwareness.context.activeWindow}
-                contextSuggestions={contextAwareness.context.suggestedActions}
-                onOpenWorkspace={(workspace) => openRoute(workspace)}
-                runtimes={runtimeCenter.runtimes}
-                onOpenOperators={() => openRoute("agents")}
-                voiceDraft={voiceDraft}
-                onVoiceDraftConsumed={() => setVoiceDraft(null)}
-                voiceModeStatus={voiceMode.status}
-                voiceModeOnPttDown={voiceMode.onPttMouseDown}
-                voiceModeOnPttUp={voiceMode.onPttMouseUp}
-                thinkingText={chat.thinkingText}
-                onOpenNotifications={() => setNotificationsOpen(true)}
-                unreadNotificationCount={notifications.unreadCount}
-              />
-            )}
-          </div>
-        </div>
-
       </div>
 
       {/* ── Status bar — full width, bottom ── */}

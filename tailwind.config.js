@@ -6,7 +6,7 @@ export default {
       colors: {
         blade: {
           // Apple dark palette
-          bg:               "#000000",
+          bg:               "#09090b",
           surface:          "#1c1c1e",        // Apple's dark surface
           "surface-2":      "#2c2c2e",        // elevated surface
           "surface-hover":  "#2c2c2e",
