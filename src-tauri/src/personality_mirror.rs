@@ -84,7 +84,7 @@ struct StyleCounters {
     sample_messages: Vec<String>, // up to 200 user messages for LLM analysis
 }
 
-static EMOJI_RANGES: &[(u32, u32)] = &[
+const EMOJI_RANGES: [(u32, u32); 4] = [
     (0x1F300, 0x1F9FF),
     (0x2600, 0x27BF),
     (0x1F000, 0x1F02F),
@@ -278,13 +278,14 @@ Be specific and honest. Output ONLY the summary paragraph, no headers, no JSON."
 
     let model = crate::config::cheap_model_for_provider(&config.provider, &config.model);
     let conv = vec![ConversationMessage::User(prompt)];
+    let no_tools: Vec<crate::providers::ToolDefinition> = vec![];
 
     let turn = complete_turn(
         &config.provider,
         &config.api_key,
         &model,
         &conv,
-        &[],
+        &no_tools,
         config.base_url.as_deref(),
     ).await.map_err(|e| { crate::config::check_and_disable_on_402(&e); e })?;
 
