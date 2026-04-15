@@ -14,6 +14,35 @@ pub use crate::integration_bridge::CalendarEvent;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+/// A detected meeting load problem.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MeetingLoadWarning {
+    pub day_name: String,
+    pub total_meetings: u32,
+    pub meeting_hours: f32,
+    pub day_hours: f32,
+    pub percent_of_day: f32,
+    pub suggestion: String,
+}
+
+/// A double-booking conflict.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DoubleBooking {
+    pub event_a: CalendarEvent,
+    pub event_b: CalendarEvent,
+    pub recommended_keep: String, // title of the one to keep
+    pub reason: String,
+}
+
+/// A drafted post-meeting summary ready for user approval before sending.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MeetingSummaryDraft {
+    pub summary: MeetingSummary,
+    pub email_draft: String, // pre-formatted email body for attendees
+    pub attendee_emails: Vec<String>,
+    pub approved: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttendeeContext {
     pub name: String,
@@ -513,6 +542,357 @@ fn extract_names_from_title(title: &str) -> Vec<String> {
         .collect()
 }
 
+// ── Meeting load analysis ──────────────────────────────────────────────────────
+
+/// Analyse the week's schedule and warn if any day is overwhelmed with meetings.
+/// Suggests moving async-friendly meetings to protect deep-work time.
+pub async fn analyze_meeting_load(app: &AppHandle) -> Result<Vec<MeetingLoadWarning>, String> {
+    let events = get_today_schedule().await?;
+    let mut warnings = Vec::new();
+
+    // Group events by day of week
+    let mut day_meetings: HashMap<u32, Vec<&CalendarEvent>> = HashMap::new();
+    for event in &events {
+        let day = chrono::DateTime::from_timestamp(event.start_ts, 0)
+            .map(|dt| {
+                use chrono::Datelike;
+                dt.weekday().num_days_from_monday()
+            })
+            .unwrap_or(0);
+        day_meetings.entry(day).or_default().push(event);
+    }
+
+    let day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+    const WORK_HOURS: f32 = 8.0;
+    const WARNING_THRESHOLD: f32 = 0.6; // 60% of the day in meetings
+
+    for (day, meetings) in &day_meetings {
+        let meeting_count = meetings.len() as u32;
+        let meeting_hours: f32 = meetings
+            .iter()
+            .map(|e| (e.end_ts - e.start_ts).max(0) as f32 / 3600.0)
+            .sum();
+
+        let percent = meeting_hours / WORK_HOURS;
+        if percent < WARNING_THRESHOLD || meeting_count < 3 {
+            continue;
+        }
+
+        let day_name = day_names.get(*day as usize).unwrap_or(&"this day");
+        let meeting_titles: Vec<&str> = meetings.iter().map(|m| m.title.as_str()).collect();
+
+        let prompt = format!(
+            "You have {meeting_count} meetings on {day_name} ({meeting_hours:.1} hours = {:.0}% of your day):\n\
+             {}\n\n\
+             In one sentence, suggest which 1-2 meetings could be converted to async (email/doc) \
+             to reclaim focus time.",
+            percent * 100.0,
+            meeting_titles.join(", ")
+        );
+
+        let suggestion = llm_complete(
+            app,
+            "You are a scheduling optimizer. Be concise.",
+            &prompt,
+        )
+        .await
+        .unwrap_or_else(|_| {
+            format!(
+                "Consider converting some of your {day_name} meetings to async updates."
+            )
+        });
+
+        warnings.push(MeetingLoadWarning {
+            day_name: day_name.to_string(),
+            total_meetings: meeting_count,
+            meeting_hours,
+            day_hours: WORK_HOURS,
+            percent_of_day: percent,
+            suggestion,
+        });
+    }
+
+    Ok(warnings)
+}
+
+// ── Double-booking detection ───────────────────────────────────────────────────
+
+/// Find overlapping events and recommend which one to keep based on:
+///   - Relationship importance of attendees (people_graph)
+///   - Topic urgency keywords
+///   - Meeting duration (shorter = easier to reschedule)
+pub async fn detect_double_bookings(app: &AppHandle) -> Result<Vec<DoubleBooking>, String> {
+    let events = get_today_schedule().await?;
+    let mut conflicts = Vec::new();
+
+    for i in 0..events.len() {
+        for j in (i + 1)..events.len() {
+            let a = &events[i];
+            let b = &events[j];
+
+            // Check for overlap: a starts before b ends AND a ends after b starts
+            let overlaps = a.start_ts < b.end_ts && a.end_ts > b.start_ts;
+            if !overlaps {
+                continue;
+            }
+
+            // Score each event to decide which to keep
+            let score_a = score_event_importance(a);
+            let score_b = score_event_importance(b);
+
+            let (keep, drop) = if score_a >= score_b {
+                (&a.title, &b.title)
+            } else {
+                (&b.title, &a.title)
+            };
+
+            let reason_prompt = format!(
+                "Two meetings conflict: '{keep_title}' and '{drop_title}'.\n\
+                 Based on typical workplace priorities, in one sentence explain why \
+                 keeping '{keep_title}' and rescheduling '{drop_title}' makes sense.",
+                keep_title = keep,
+                drop_title = drop
+            );
+
+            let reason = llm_complete(
+                app,
+                "You are a scheduling assistant.",
+                &reason_prompt,
+            )
+            .await
+            .unwrap_or_else(|_| {
+                format!("'{keep}' appears higher priority based on attendees and topic.")
+            });
+
+            conflicts.push(DoubleBooking {
+                event_a: a.clone(),
+                event_b: b.clone(),
+                recommended_keep: keep.clone(),
+                reason,
+            });
+        }
+    }
+
+    Ok(conflicts)
+}
+
+/// Score a calendar event by importance (for double-booking resolution).
+fn score_event_importance(event: &CalendarEvent) -> f32 {
+    let title_lower = event.title.to_lowercase();
+
+    // Urgency keywords in title
+    let urgent_keywords = ["urgent", "critical", "deadline", "board", "exec", "investor", "client", "launch"];
+    let urgency_score: f32 = urgent_keywords
+        .iter()
+        .filter(|kw| title_lower.contains(*kw))
+        .count() as f32
+        * 0.15;
+
+    // Duration factor: longer = harder to reschedule (but not always more important)
+    let duration_hours = (event.end_ts - event.start_ts).max(0) as f32 / 3600.0;
+    let duration_score = (duration_hours / 2.0).clamp(0.0, 0.3);
+
+    // Extract names from title and check people_graph
+    let attendee_names = crate::tentacles::calendar_tentacle::extract_names_from_title_pub(&event.title);
+    let relationship_score: f32 = attendee_names
+        .iter()
+        .filter_map(|name| crate::people_graph::get_person(name))
+        .map(|p| match p.relationship.as_str() {
+            "manager" | "director" | "vp" | "ceo" | "exec" => 0.9,
+            "client" | "customer" => 0.8,
+            "lead" => 0.6,
+            _ => 0.3,
+        })
+        .fold(0.0f32, f32::max);
+
+    (urgency_score + duration_score * 0.5 + relationship_score * 0.5).clamp(0.0, 1.0)
+}
+
+// ── Smart meeting prep (agenda from open threads) ─────────────────────────────
+
+/// Enhanced meeting prep that generates agenda suggestions based on:
+///   - Open Slack threads with attendees
+///   - Unresolved email threads with attendees
+///   - Unfinished action items from prior meetings
+pub async fn smart_prep_for_meeting(
+    app: &AppHandle,
+    event: &CalendarEvent,
+) -> Result<MeetingPrep, String> {
+    let attendee_names: Vec<String> = extract_names_from_title(&event.title);
+    let attendee_contexts = build_attendee_contexts(&attendee_names);
+    let open_action_items = fetch_open_action_items(&attendee_names);
+
+    // Search for open Slack threads with these attendees
+    let slack_context: String = {
+        let mut snippets = Vec::new();
+        for name in &attendee_names {
+            let tags = vec![name.clone(), "slack".to_string()];
+            let mems = crate::typed_memory::get_relevant_memories_for_context(&tags, 2);
+            for m in mems {
+                snippets.push(format!("[Slack with {}] {}", name, crate::safe_slice(&m.content, 150)));
+            }
+        }
+        snippets.join("\n")
+    };
+
+    // Search for recent emails with these attendees
+    let email_context: String = {
+        let mut snippets = Vec::new();
+        for name in &attendee_names {
+            let tags = vec![name.clone(), "email".to_string()];
+            let mems = crate::typed_memory::get_relevant_memories_for_context(&tags, 2);
+            for m in mems {
+                snippets.push(format!("[Email with {}] {}", name, crate::safe_slice(&m.content, 150)));
+            }
+        }
+        snippets.join("\n")
+    };
+
+    let attendee_summary: Vec<String> = attendee_contexts
+        .iter()
+        .map(|a| {
+            format!(
+                "{} ({}). Last seen {} days ago. Style: {}. Topics: {}",
+                a.name,
+                a.relationship,
+                if a.last_interaction_days_ago >= 0 { a.last_interaction_days_ago.to_string() } else { "never".to_string() },
+                a.communication_style,
+                a.common_topics.join(", ")
+            )
+        })
+        .collect();
+
+    let open_items_text: Vec<String> = open_action_items
+        .iter()
+        .map(|i| format!("- {} (from: {})", i.description, i.created_from))
+        .collect();
+
+    let llm_prompt = format!(
+        "Meeting: {}\n\
+         Attendees:\n{}\n\n\
+         Open action items with these people:\n{}\n\n\
+         Recent Slack context:\n{}\n\n\
+         Recent email context:\n{}\n\n\
+         Generate:\n\
+         1. A concise meeting brief (2-3 sentences)\n\
+         2. A focused agenda (3-5 bullet points) based on the OPEN THREADS and ACTION ITEMS above\n\
+         Prioritise unresolved items over generic recurring-meeting topics.",
+        event.title,
+        attendee_summary.join("\n"),
+        if open_items_text.is_empty() { "None".to_string() } else { open_items_text.join("\n") },
+        if slack_context.is_empty() { "No recent Slack context.".to_string() } else { crate::safe_slice(&slack_context, 800).to_string() },
+        if email_context.is_empty() { "No recent email context.".to_string() } else { crate::safe_slice(&email_context, 800).to_string() },
+    );
+
+    let llm_response = llm_complete(
+        app,
+        "You are BLADE, an AI chief of staff. Be concise and actionable. \
+         Focus the agenda on unresolved issues, not generic topics.",
+        &llm_prompt,
+    )
+    .await
+    .unwrap_or_else(|_| "Meeting prep unavailable.".to_string());
+
+    let suggested_agenda: Vec<String> = llm_response
+        .lines()
+        .filter(|l| {
+            let t = l.trim();
+            t.starts_with('-') || t.starts_with("•") || (t.len() > 2 && t.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false))
+        })
+        .map(|l| l.trim_start_matches(|c: char| !c.is_alphabetic()).trim().to_string())
+        .filter(|l| !l.is_empty())
+        .take(5)
+        .collect();
+
+    Ok(MeetingPrep {
+        event_title: event.title.clone(),
+        attendee_contexts,
+        open_action_items,
+        brief: llm_response,
+        suggested_agenda,
+    })
+}
+
+// ── Post-meeting summary with attendee email draft ────────────────────────────
+
+/// Like post_meeting_summary but also drafts an email to attendees for approval.
+pub async fn post_meeting_summary_with_draft(
+    app: &AppHandle,
+    transcript: &str,
+    meeting_title: &str,
+    attendee_names: &[String],
+) -> Result<MeetingSummaryDraft, String> {
+    let summary = post_meeting_summary(app, transcript, meeting_title).await?;
+
+    // Gather attendee email addresses from people_graph
+    let attendee_emails: Vec<String> = attendee_names
+        .iter()
+        .filter_map(|name| {
+            crate::people_graph::get_person(name)
+                .and_then(|p| {
+                    // Use notes field to find email — people_graph stores contact info there
+                    if p.notes.contains('@') {
+                        p.notes.split_whitespace().find(|w| w.contains('@')).map(|s| s.to_string())
+                    } else {
+                        None
+                    }
+                })
+        })
+        .collect();
+
+    // Draft the email body
+    let decisions_text = summary.decisions.iter().map(|d| format!("- {d}")).collect::<Vec<_>>().join("\n");
+    let actions_text = summary.action_items.iter()
+        .map(|a| {
+            let owner = a.owner.as_deref().unwrap_or("TBD");
+            let due = a.due_date.as_deref().unwrap_or("TBD");
+            format!("- {} (Owner: {}, Due: {})", a.description, owner, due)
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let email_prompt = format!(
+        "Write a professional meeting follow-up email body (no subject line needed) for: {meeting_title}\n\n\
+         Decisions made:\n{decisions_text}\n\n\
+         Action items:\n{actions_text}\n\n\
+         Key topics discussed: {}\n\n\
+         Keep it concise and clear. End with next steps.",
+        summary.key_topics.join(", ")
+    );
+
+    let email_draft = llm_complete(
+        app,
+        "You are drafting a professional meeting follow-up email. Be clear and concise.",
+        &email_prompt,
+    )
+    .await
+    .unwrap_or_else(|_| {
+        format!(
+            "Hi all,\n\nThanks for the meeting. Here are the key takeaways:\n\n\
+             Decisions:\n{decisions_text}\n\nAction items:\n{actions_text}\n\nBest"
+        )
+    });
+
+    let draft = MeetingSummaryDraft {
+        summary,
+        email_draft,
+        attendee_emails,
+        approved: false, // user must approve before sending
+    };
+
+    // Emit for UI — user sees draft and can approve/edit
+    let _ = app.emit("meeting_summary_draft_ready", &draft);
+
+    Ok(draft)
+}
+
+// ── Utility (public for use by score_event_importance) ────────────────────────
+
+/// Public wrapper around extract_names_from_title for use within this module.
+pub fn extract_names_from_title_pub(title: &str) -> Vec<String> {
+    extract_names_from_title(title)
+}
+
 // ── Tauri commands ────────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -540,4 +920,32 @@ pub async fn calendar_post_meeting_summary(
     meeting_title: String,
 ) -> Result<MeetingSummary, String> {
     post_meeting_summary(&app, &transcript, &meeting_title).await
+}
+
+#[tauri::command]
+pub async fn calendar_analyze_meeting_load(app: AppHandle) -> Result<Vec<MeetingLoadWarning>, String> {
+    analyze_meeting_load(&app).await
+}
+
+#[tauri::command]
+pub async fn calendar_detect_double_bookings(app: AppHandle) -> Result<Vec<DoubleBooking>, String> {
+    detect_double_bookings(&app).await
+}
+
+#[tauri::command]
+pub async fn calendar_smart_prep_meeting(
+    app: AppHandle,
+    event: CalendarEvent,
+) -> Result<MeetingPrep, String> {
+    smart_prep_for_meeting(&app, &event).await
+}
+
+#[tauri::command]
+pub async fn calendar_post_meeting_with_draft(
+    app: AppHandle,
+    transcript: String,
+    meeting_title: String,
+    attendee_names: Vec<String>,
+) -> Result<MeetingSummaryDraft, String> {
+    post_meeting_summary_with_draft(&app, &transcript, &meeting_title, &attendee_names).await
 }

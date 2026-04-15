@@ -62,6 +62,120 @@ async fn llm_complete(prompt: &str) -> Result<String, String> {
         .map(|t| t.content)
 }
 
+// ── Priority scoring ──────────────────────────────────────────────────────────
+
+/// Returns a 0.0–1.0 priority score for a message.
+/// Higher = more urgent / more important sender.
+fn message_priority(msg: &InboundSlackMessage) -> f32 {
+    let relationship_score = crate::people_graph::get_person(&msg.sender)
+        .map(|p| match p.relationship.as_str() {
+            "manager" | "director" | "vp" | "ceo" => 1.0,
+            "client" | "customer" => 0.85,
+            "lead" | "tech_lead" => 0.75,
+            "teammate" | "colleague" => 0.5,
+            _ => 0.3,
+        })
+        .unwrap_or(0.3);
+
+    let deadline_keywords = ["deadline", "urgent", "asap", "eod", "today", "critical", "blocker", "immediately"];
+    let text_lower = msg.text.to_lowercase();
+    let keyword_boost: f32 = deadline_keywords
+        .iter()
+        .filter(|kw| text_lower.contains(*kw))
+        .count() as f32
+        * 0.1;
+
+    let dm_boost = if msg.is_dm { 0.2 } else { 0.0 };
+    let mention_boost = if msg.is_mention { 0.15 } else { 0.0 };
+
+    (relationship_score * 0.6 + keyword_boost + dm_boost + mention_boost).clamp(0.0, 1.0)
+}
+
+// ── Confidence-gated reply drafting ──────────────────────────────────────────
+
+/// Check memory + knowledge graph to see if we have enough context to
+/// answer this message. Returns a confidence score 0.0–1.0.
+async fn estimate_answer_confidence(msg: &InboundSlackMessage) -> f32 {
+    // Search typed_memory for relevant facts
+    let tags = vec![msg.sender.clone(), msg.channel.clone()];
+    let memories = crate::typed_memory::get_relevant_memories_for_context(&tags, 5);
+    let has_context = !memories.is_empty();
+
+    // Search knowledge graph for the sender
+    let knows_person = crate::people_graph::get_person(&msg.sender).is_some();
+
+    // Heuristic: DMs from known people with memory context = high confidence
+    let base = match (msg.is_dm, knows_person, has_context) {
+        (true, true, true) => 0.85,
+        (true, true, false) => 0.65,
+        (true, false, _) => 0.4,
+        (false, true, true) => 0.75,
+        (false, true, false) => 0.55,
+        (false, false, _) => 0.35,
+    };
+
+    // Questions (?) are harder — reduce confidence slightly
+    let question_penalty = if msg.text.contains('?') { 0.1 } else { 0.0 };
+
+    (base - question_penalty).clamp(0.0, 1.0)
+}
+
+// ── Channel tone detection ────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ChannelTone {
+    HeatedDebate,
+    CasualBanter,
+    UrgentIncident,
+    NormalWork,
+    DecisionMaking,
+}
+
+async fn detect_channel_tone(messages: &[String]) -> ChannelTone {
+    if messages.is_empty() {
+        return ChannelTone::NormalWork;
+    }
+
+    let sample = messages.join(" ").to_lowercase();
+
+    // Fast heuristics first
+    let incident_keywords = ["incident", "outage", "down", "production issue", "p0", "p1", "on call", "pagerduty", "sev1", "sev2"];
+    if incident_keywords.iter().any(|kw| sample.contains(kw)) {
+        return ChannelTone::UrgentIncident;
+    }
+
+    let debate_signals = ["disagree", "however", "but actually", "i think you're wrong", "strongly", "pushback", "no no", "actually no"];
+    if debate_signals.iter().filter(|kw| sample.contains(*kw)).count() >= 2 {
+        return ChannelTone::HeatedDebate;
+    }
+
+    let casual_signals = ["lol", "haha", "😂", "🍕", "lunch", "coffee", "btw", "ngl", "tbh", "vibes"];
+    if casual_signals.iter().filter(|kw| sample.contains(*kw)).count() >= 2 {
+        return ChannelTone::CasualBanter;
+    }
+
+    let decision_signals = ["should we", "vote", "decision", "agree", "consensus", "final answer", "let's go with"];
+    if decision_signals.iter().filter(|kw| sample.contains(*kw)).count() >= 2 {
+        return ChannelTone::DecisionMaking;
+    }
+
+    ChannelTone::NormalWork
+}
+
+// ── Thread staleness tracker ──────────────────────────────────────────────────
+
+/// A thread that has been going on too long with no resolution.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StaleThread {
+    pub channel: String,
+    pub thread_ts: String,
+    pub topic_preview: String,
+    pub reply_count: u32,
+    pub age_days: u32,
+    pub suggestion: String, // "schedule a meeting" | "make a direct decision"
+}
+
 // ── Public types ──────────────────────────────────────────────────────────────
 
 /// Classification of an incoming Slack message.
@@ -72,6 +186,7 @@ pub enum MessageClass {
     ActionItem,
     Fyi,
     Social,
+    NeedsAttention, // confidence < 0.5 — flag for user, don't draft
 }
 
 /// A single Slack message that directed at the user.
@@ -100,6 +215,8 @@ pub struct SlackAction {
     pub task_description: Option<String>,
     /// For `Fyi` / `Social` — a brief summary.
     pub summary: Option<String>,
+    /// 0.0–1.0 priority (higher = more urgent/important)
+    pub priority: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -110,6 +227,7 @@ pub enum SlackActionType {
     ActionItem,
     Fyi,
     Social,
+    NeedsAttention, // BLADE flagged it but couldn't draft confidently
 }
 
 /// Per-channel summary produced by `summarize_missed_channels`.
@@ -164,17 +282,43 @@ pub struct ChannelActivity {
 // ── 1. process_unread_messages ────────────────────────────────────────────────
 
 /// Fetch unread messages directed at the user across all channels and DMs.
-/// For each one: classify, draft replies or extract action items.
+/// For each one:
+///   - Compute priority score
+///   - Confidence-check: if < 0.5, flag as NeedsAttention instead of drafting
+///   - Classify, draft replies or extract action items
+/// Results are sorted by priority (highest first).
 pub async fn process_unread_messages(app: &tauri::AppHandle) -> Result<Vec<SlackAction>, String> {
     let messages = fetch_directed_messages(app).await?;
     let mut actions = Vec::new();
 
     for msg in messages {
+        let priority = message_priority(&msg);
         let class = classify_message(&msg).await;
         let person = crate::people_graph::get_person(&msg.sender);
 
         match class {
             MessageClass::NeedsResponse => {
+                // Check confidence before drafting
+                let confidence = estimate_answer_confidence(&msg).await;
+
+                if confidence < 0.5 {
+                    // Don't draft — flag for user attention
+                    actions.push(SlackAction {
+                        action_type: SlackActionType::NeedsAttention,
+                        channel: msg.channel.clone(),
+                        thread_ts: msg.thread_ts.clone(),
+                        draft_text: None,
+                        task_description: None,
+                        summary: Some(format!(
+                            "Message from {} needs your attention (confidence {:.0}% — not enough context to draft).",
+                            msg.sender, confidence * 100.0
+                        )),
+                        priority,
+                        source_message: msg,
+                    });
+                    continue;
+                }
+
                 let draft = draft_slack_reply(&msg, person.as_ref()).await?;
                 let cfg = crate::config::load_config();
                 let autonomy = cfg.hive_autonomy;
@@ -192,6 +336,7 @@ pub async fn process_unread_messages(app: &tauri::AppHandle) -> Result<Vec<Slack
                     draft_text: Some(draft),
                     task_description: None,
                     summary: None,
+                    priority,
                     source_message: msg,
                 });
             }
@@ -199,7 +344,6 @@ pub async fn process_unread_messages(app: &tauri::AppHandle) -> Result<Vec<Slack
             MessageClass::ActionItem => {
                 let task = extract_action_item(&msg.text).await?;
 
-                // Persist into typed_memory as a Goal
                 let _ = crate::typed_memory::store_typed_memory(
                     crate::typed_memory::MemoryCategory::Goal,
                     &format!("[Slack from {}] {}", msg.sender, task),
@@ -214,6 +358,7 @@ pub async fn process_unread_messages(app: &tauri::AppHandle) -> Result<Vec<Slack
                     draft_text: None,
                     task_description: Some(task),
                     summary: None,
+                    priority,
                     source_message: msg,
                 });
             }
@@ -227,6 +372,7 @@ pub async fn process_unread_messages(app: &tauri::AppHandle) -> Result<Vec<Slack
                     draft_text: None,
                     task_description: None,
                     summary: Some(summary),
+                    priority,
                     source_message: msg,
                 });
             }
@@ -239,11 +385,32 @@ pub async fn process_unread_messages(app: &tauri::AppHandle) -> Result<Vec<Slack
                     draft_text: None,
                     task_description: None,
                     summary: Some(format!("Social message from {}", msg.sender)),
+                    priority,
+                    source_message: msg,
+                });
+            }
+
+            MessageClass::NeedsAttention => {
+                actions.push(SlackAction {
+                    action_type: SlackActionType::NeedsAttention,
+                    channel: msg.channel.clone(),
+                    thread_ts: msg.thread_ts.clone(),
+                    draft_text: None,
+                    task_description: None,
+                    summary: Some(format!("Flagged for your attention: {}", crate::safe_slice(&msg.text, 100))),
+                    priority,
                     source_message: msg,
                 });
             }
         }
     }
+
+    // Sort by priority descending — most important first
+    actions.sort_by(|a, b| {
+        b.priority
+            .partial_cmp(&a.priority)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     Ok(actions)
 }
@@ -315,9 +482,7 @@ async fn classify_message(msg: &InboundSlackMessage) -> MessageClass {
         }
         Err(_) => {
             // Heuristic fallback
-            if msg.is_dm {
-                MessageClass::NeedsResponse
-            } else if msg.is_mention {
+            if msg.is_dm || msg.is_mention {
                 MessageClass::NeedsResponse
             } else {
                 MessageClass::Fyi
@@ -433,18 +598,35 @@ async fn summarise_channel(channel: &str, messages: &[String]) -> Result<Channel
 
     let transcript = messages.join("\n");
     let you_were_mentioned = transcript.contains("<@");
-    // Heuristic — a proper check would compare thread_ts values
     let your_thread_got_replies = transcript.to_lowercase().contains("replied to thread");
+
+    // Detect tone and adjust summary style accordingly
+    let tone = detect_channel_tone(messages).await;
+    let tone_instruction = match tone {
+        ChannelTone::UrgentIncident =>
+            "IMPORTANT: This channel is dealing with a PRODUCTION INCIDENT. \
+             Lead with the incident status and resolution steps. Be terse and factual.",
+        ChannelTone::HeatedDebate =>
+            "Note: This channel has a heated debate in progress. \
+             Summarise both sides fairly. Identify if a resolution was reached.",
+        ChannelTone::CasualBanter =>
+            "This is casual conversation. Keep the summary light and brief.",
+        ChannelTone::DecisionMaking =>
+            "A decision is being made in this channel. \
+             Clearly state what the decision is about and whether consensus was reached.",
+        ChannelTone::NormalWork =>
+            "Standard work discussion. Summarise key updates and action items.",
+    };
 
     let prompt = format!(
         "Summarise this Slack channel conversation in exactly 3 short bullet points.\n\
+         {tone_instruction}\n\
          Format:\n\
          WHAT_HAPPENED: <one sentence>\n\
          DECISIONS: <one sentence>\n\
          NEEDS_ATTENTION: <one sentence>\n\n\
-         Channel: #{}\n\
-         Messages:\n{}",
-        channel, transcript
+         Channel: #{channel}\n\
+         Messages:\n{transcript}"
     );
 
     let response = llm_complete(&prompt).await.unwrap_or_default();
@@ -671,6 +853,63 @@ pub fn learn_channel_importance(channels: &[ChannelActivity]) -> Vec<(String, f3
     scores
 }
 
+// ── 6. Detect stale threads ───────────────────────────────────────────────────
+
+/// Find threads that have been going on too long with no resolution.
+/// Threshold: 3+ days old, 4+ messages, no clear decision keyword.
+pub async fn detect_stale_threads(channels: &[String]) -> Result<Vec<StaleThread>, String> {
+    let mut stale = Vec::new();
+    let decision_keywords = ["decided", "decision", "going with", "final answer", "resolved", "closing", "done", "shipped", "merged", "fixed"];
+
+    for channel in channels {
+        let messages = fetch_channel_history(channel, 100).await;
+        if messages.len() < 4 {
+            continue;
+        }
+
+        // Group messages into threads heuristically (look for repeated topics)
+        // For now: if the whole channel has been active for 3+ days without a decision keyword
+        let has_decision = messages.iter().any(|m| {
+            let ml = m.to_lowercase();
+            decision_keywords.iter().any(|kw| ml.contains(kw))
+        });
+
+        if !has_decision && messages.len() >= 4 {
+            let topic_preview = messages
+                .first()
+                .map(|m| crate::safe_slice(m, 100).to_string())
+                .unwrap_or_default();
+
+            let suggestion_prompt = format!(
+                "This Slack thread in #{channel} has {n} messages and no resolution after days.\n\
+                 Topic: {topic_preview}\n\
+                 In one sentence, suggest the best next action: schedule a meeting, make a direct decision, etc.",
+                n = messages.len(),
+            );
+
+            let suggestion = llm_complete(&suggestion_prompt)
+                .await
+                .unwrap_or_else(|_| {
+                    format!(
+                        "This thread has {} messages with no resolution — consider scheduling a meeting.",
+                        messages.len()
+                    )
+                });
+
+            stale.push(StaleThread {
+                channel: channel.clone(),
+                thread_ts: String::new(), // MCP doesn't surface thread_ts in channel history easily
+                topic_preview,
+                reply_count: messages.len() as u32,
+                age_days: 3, // conservative estimate
+                suggestion,
+            });
+        }
+    }
+
+    Ok(stale)
+}
+
 // ── Simulated data (no MCP server) ───────────────────────────────────────────
 
 fn simulated_inbound_messages() -> Vec<InboundSlackMessage> {
@@ -697,15 +936,26 @@ fn simulated_inbound_messages() -> Vec<InboundSlackMessage> {
 }
 
 fn simulated_waiting_responses() -> Vec<WaitingResponse> {
-    vec![WaitingResponse {
-        channel: "direct-message".to_string(),
-        thread_ts: None,
-        sender: "manager".to_string(),
-        text_preview: "Can you send the updated roadmap doc before EOD?".to_string(),
-        sent_ts: now_secs() - 10_800,
-        hours_waiting: 3.0,
-        urgency_score: 0.82,
-    }]
+    vec![
+        WaitingResponse {
+            channel: "direct-message".to_string(),
+            thread_ts: None,
+            sender: "manager".to_string(),
+            text_preview: "Can you send the updated roadmap doc before EOD?".to_string(),
+            sent_ts: now_secs() - 10_800,
+            hours_waiting: 3.0,
+            urgency_score: 0.82,
+        },
+        WaitingResponse {
+            channel: "engineering".to_string(),
+            thread_ts: None,
+            sender: "colleague".to_string(),
+            text_preview: "Lunch plans for Thursday still on?".to_string(),
+            sent_ts: now_secs() - 7_200,
+            hours_waiting: 2.0,
+            urgency_score: 0.15,
+        },
+    ]
 }
 
 fn simulated_thread_actions() -> Vec<ThreadAction> {

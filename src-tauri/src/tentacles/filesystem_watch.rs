@@ -13,6 +13,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter};
+use chrono::Datelike;
 
 // ── Static state ──────────────────────────────────────────────────────────────
 
@@ -41,6 +42,65 @@ fn seen_files() -> &'static Mutex<std::collections::HashSet<PathBuf>> {
 }
 
 const AUTO_MOVE_THRESHOLD: u32 = 5;
+
+// ── File access pattern learning ─────────────────────────────────────────────
+
+/// Persistent store for file access patterns.
+fn access_log_path() -> std::path::PathBuf {
+    crate::config::blade_config_dir().join("fs_access_log.json")
+}
+
+/// log: path → (access_count, last_access_ts, day_of_week_bitmap)
+type AccessLog = HashMap<String, (u32, i64, u8)>;
+
+fn load_access_log() -> AccessLog {
+    std::fs::read_to_string(access_log_path())
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+fn save_access_log(log: &AccessLog) {
+    if let Ok(json) = serde_json::to_string_pretty(log) {
+        let _ = std::fs::write(access_log_path(), json);
+    }
+}
+
+/// Record a file access event (call from brain.rs or file open hooks when possible).
+pub fn record_file_access(path: &str) {
+    let now = now_secs();
+    let day_of_week = chrono::DateTime::from_timestamp(now, 0)
+        .map(|dt| dt.weekday().num_days_from_monday() as u8)
+        .unwrap_or(0);
+
+    let mut log = load_access_log();
+    let entry = log.entry(path.to_string()).or_insert((0, 0, 0));
+    entry.0 += 1;
+    entry.1 = now;
+    entry.2 |= 1 << day_of_week; // set bit for this day of week
+    save_access_log(&log);
+}
+
+/// Get the top N most-accessed files (path, count) sorted by access count.
+pub fn get_hot_files(n: usize) -> Vec<(String, u32)> {
+    let mut log: Vec<(String, u32)> = load_access_log()
+        .into_iter()
+        .map(|(path, (count, _, _))| (path, count))
+        .collect();
+    log.sort_by(|a, b| b.1.cmp(&a.1));
+    log.truncate(n);
+    log
+}
+
+/// Get files that are typically accessed on a given day of week (0=Mon … 6=Sun).
+pub fn files_for_day_of_week(day: u8) -> Vec<String> {
+    let mask = 1u8 << day;
+    load_access_log()
+        .into_iter()
+        .filter(|(_, (count, _, dow_bitmap))| *count >= 2 && (dow_bitmap & mask) != 0)
+        .map(|(path, _)| path)
+        .collect()
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -373,10 +433,30 @@ fn tick_filesystem_watcher(app: &AppHandle) {
     }
 
     for file_path in new_files {
+        // Sensitive file detection — check BEFORE categorising
+        if is_sensitive_file(&file_path) {
+            let safe_loc = suggest_safe_location(&file_path);
+            let _ = app.emit(
+                "proactive_suggestion",
+                serde_json::json!({
+                    "source": "filesystem_watch",
+                    "title": "Sensitive file detected in unsafe location",
+                    "body": format!(
+                        "`{}` looks like a sensitive file (secrets/credentials). {}",
+                        file_path.file_name().and_then(|n| n.to_str()).unwrap_or("file"),
+                        safe_loc.as_deref().unwrap_or("Move it to a project directory and add it to .gitignore.")
+                    ),
+                    "severity": "warning",
+                    "file": file_path.display().to_string(),
+                    "action": "secure_file",
+                }),
+            );
+            continue;
+        }
+
         let category = categorise(&file_path);
         let dest_opt = suggested_destination(category);
 
-        // Check if we should auto-move
         let should_auto = {
             let learning = category_learning().lock().unwrap();
             *learning.approvals.get(category).unwrap_or(&0) >= AUTO_MOVE_THRESHOLD
@@ -386,9 +466,10 @@ fn tick_filesystem_watcher(app: &AppHandle) {
             if let Some(dest) = &dest_opt {
                 if let Some(file_name) = file_path.file_name() {
                     let target = dest.join(file_name);
-                    // Ensure destination exists
                     let _ = std::fs::create_dir_all(dest);
                     if std::fs::rename(&file_path, &target).is_ok() {
+                        // Record access for the moved file's new location
+                        record_file_access(&target.display().to_string());
                         let _ = app.emit(
                             "proactive_suggestion",
                             serde_json::json!({
@@ -408,7 +489,6 @@ fn tick_filesystem_watcher(app: &AppHandle) {
             }
         }
 
-        // Suggest the move
         let suggestion = serde_json::json!({
             "source": "filesystem_watch",
             "title": format!("New {} file in Downloads", category),
@@ -428,6 +508,144 @@ fn tick_filesystem_watcher(app: &AppHandle) {
             "action": "move_file",
         });
         let _ = app.emit("proactive_suggestion", suggestion);
+    }
+
+    // Surface day-of-week file patterns (e.g. "You always open README.md on Mondays")
+    let now = now_secs();
+    let current_day = chrono::DateTime::from_timestamp(now, 0)
+        .map(|dt| dt.weekday().num_days_from_monday() as u8)
+        .unwrap_or(0);
+
+    let day_files = files_for_day_of_week(current_day);
+    if !day_files.is_empty() {
+        let day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+        let day_name = day_names.get(current_day as usize).unwrap_or(&"today");
+        let preview: Vec<&str> = day_files.iter()
+            .take(3)
+            .filter_map(|p| Path::new(p).file_name().and_then(|n| n.to_str()))
+            .collect();
+        if !preview.is_empty() {
+            let _ = app.emit(
+                "filesystem_pattern_reminder",
+                serde_json::json!({
+                    "source": "filesystem_watch",
+                    "title": format!("Your usual {} files", day_name),
+                    "body": format!(
+                        "You typically access {} on {}s. Opening them for you?",
+                        preview.join(", "), day_name
+                    ),
+                    "files": day_files,
+                }),
+            );
+        }
+    }
+
+    // Periodic stale project check (once per watcher tick = every 5 min, but only emit occasionally)
+    check_stale_projects(app);
+}
+
+/// Detect sensitive files in unsafe locations (Desktop, Downloads, home root).
+fn is_sensitive_file(path: &Path) -> bool {
+    let name = path.file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    let sensitive_names = [
+        ".env", ".env.local", ".env.production", ".env.development",
+        "secrets.json", "credentials.json", "credentials.csv",
+        "id_rsa", "id_ed25519", "id_ecdsa",
+        ".pem", ".key", ".p12", ".pfx",
+        "service-account.json", "serviceaccount.json",
+        "aws_credentials", ".aws_credentials",
+        "token.json", "access_token.txt",
+    ];
+
+    let sensitive_extensions = [".pem", ".key", ".p12", ".pfx", ".cer", ".crt"];
+
+    // Check by exact name
+    if sensitive_names.iter().any(|s| name == *s || name.starts_with(*s)) {
+        return true;
+    }
+    // Check by extension
+    if sensitive_extensions.iter().any(|ext| name.ends_with(ext)) {
+        return true;
+    }
+    // Check if it looks like it contains secrets by path context
+    // File is in Downloads or Desktop (not in a project directory)
+    let path_str = path.display().to_string().to_lowercase();
+    let in_unsafe = path_str.contains("downloads") || path_str.contains("desktop");
+    if in_unsafe && (name.contains("secret") || name.contains("credential") || name.contains("password") || name.contains("token")) {
+        return true;
+    }
+
+    false
+}
+
+/// Suggest a safe location for a sensitive file.
+fn suggest_safe_location(path: &Path) -> Option<String> {
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    Some(format!(
+        "Move `{name}` to your project directory and add it to `.gitignore`. \
+         Never commit secrets to version control."
+    ))
+}
+
+/// Check for project directories that haven't been touched in weeks.
+fn check_stale_projects(app: &AppHandle) {
+    let home = match home_dir() {
+        Some(h) => h,
+        None => return,
+    };
+
+    let project_dirs = ["code", "projects", "dev", "src", "workspace"];
+    let stale_threshold_days: u64 = 21;
+    let now = now_secs() as u64;
+
+    for dir_name in &project_dirs {
+        let parent = home.join(dir_name);
+        if !parent.is_dir() {
+            continue;
+        }
+        let Ok(entries) = std::fs::read_dir(&parent) else { continue };
+
+        for entry in entries.flatten() {
+            let proj = entry.path();
+            if !proj.is_dir() {
+                continue;
+            }
+            // Get last modified time of the directory
+            let last_modified = std::fs::metadata(&proj)
+                .ok()
+                .and_then(|m| m.modified().ok())
+                .and_then(|t| t.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+
+            if last_modified == 0 {
+                continue;
+            }
+            let age_days = (now.saturating_sub(last_modified)) / 86400;
+            if age_days >= stale_threshold_days {
+                let proj_name = proj.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("project");
+                let _ = app.emit(
+                    "filesystem_stale_project",
+                    serde_json::json!({
+                        "source": "filesystem_watch",
+                        "title": format!("Stale project: {}", proj_name),
+                        "body": format!(
+                            "You haven't worked on `{}` in {} days. Archive it or keep?",
+                            proj_name, age_days
+                        ),
+                        "path": proj.display().to_string(),
+                        "age_days": age_days,
+                        "action": "archive_or_keep",
+                    }),
+                );
+            }
+        }
     }
 }
 

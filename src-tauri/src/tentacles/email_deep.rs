@@ -85,6 +85,100 @@ async fn llm_complete(prompt: &str) -> Result<String, String> {
         .map(|t| t.content)
 }
 
+// ── Sender behaviour learning ─────────────────────────────────────────────────
+
+/// Stored per-sender behaviour: response latency + ignore rate.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct SenderBehavior {
+    /// Total interactions (replies) logged
+    reply_count: u32,
+    /// Sum of response latencies in minutes
+    total_reply_minutes: u64,
+    /// How many times user skipped replying entirely
+    ignore_count: u32,
+}
+
+fn behavior_db_path() -> std::path::PathBuf {
+    crate::config::blade_config_dir().join("email_sender_behavior.json")
+}
+
+fn load_sender_behaviors() -> std::collections::HashMap<String, SenderBehavior> {
+    let path = behavior_db_path();
+    std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+fn save_sender_behaviors(map: &std::collections::HashMap<String, SenderBehavior>) {
+    if let Ok(json) = serde_json::to_string_pretty(map) {
+        let _ = std::fs::write(behavior_db_path(), json);
+    }
+}
+
+/// Record a reply to a sender (call when user actually sends a reply).
+pub fn record_reply_to_sender(sender: &str, reply_latency_minutes: u64) {
+    let mut behaviors = load_sender_behaviors();
+    let entry = behaviors.entry(sender.to_string()).or_default();
+    entry.reply_count += 1;
+    entry.total_reply_minutes += reply_latency_minutes;
+    save_sender_behaviors(&behaviors);
+}
+
+/// Record that the user ignored an email from this sender.
+pub fn record_ignore_sender(sender: &str) {
+    let mut behaviors = load_sender_behaviors();
+    let entry = behaviors.entry(sender.to_string()).or_default();
+    entry.ignore_count += 1;
+    save_sender_behaviors(&behaviors);
+}
+
+/// Get learned priority boost for a sender based on historical behaviour.
+/// Returns a value in -0.3..+0.3 (positive = always replies fast, negative = always ignores).
+fn sender_learned_boost(sender: &str) -> f32 {
+    let behaviors = load_sender_behaviors();
+    let b = match behaviors.get(sender) {
+        Some(b) => b.clone(),
+        None => return 0.0,
+    };
+    let total = (b.reply_count + b.ignore_count) as f32;
+    if total < 3.0 {
+        return 0.0; // not enough data
+    }
+    let reply_rate = b.reply_count as f32 / total;
+    let avg_latency = if b.reply_count > 0 {
+        b.total_reply_minutes as f32 / b.reply_count as f32
+    } else {
+        f32::MAX
+    };
+    // Fast replies (< 60 min) AND high reply rate → big boost
+    // Always ignored → penalty
+    let latency_factor = if avg_latency < 60.0 { 1.0 } else if avg_latency < 240.0 { 0.5 } else { 0.0 };
+    (reply_rate - 0.5) * 0.4 + latency_factor * 0.2
+}
+
+// ── Circular thread detection ─────────────────────────────────────────────────
+
+/// A thread that is going in circles with no decision.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CircularThread {
+    pub thread_id: String,
+    pub subject: String,
+    pub reply_count: u32,
+    pub age_days: u32,
+    pub suggestion: String,
+}
+
+/// Sentiment classification for triage priority boost.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum EmailSentiment {
+    Calm,
+    Urgent,
+    Panicked,
+    Frustrated,
+}
+
 // ── Public types ──────────────────────────────────────────────────────────────
 
 /// Compact representation of a single email used across all functions.
@@ -142,24 +236,63 @@ pub struct Invoice {
 
 /// Fetch unread emails and classify them into priority buckets.
 /// Meeting invites are checked against the calendar for conflicts.
+/// Uses learned sender behaviour to boost/penalise priority.
+/// Applies sentiment analysis to bump panicked emails to critical.
 pub async fn triage_inbox() -> Result<InboxTriage, String> {
     let emails = fetch_unread_emails().await?;
     let mut triage = InboxTriage::default();
 
     for email in emails {
+        // Extract sender key (strip display name formatting)
+        let sender_key = email.from
+            .split('<')
+            .last()
+            .unwrap_or(&email.from)
+            .trim_end_matches('>')
+            .trim()
+            .to_lowercase();
+
         let category = classify_email(&email).await;
 
-        match category.as_str() {
+        // Sentiment check — panicked/urgent emails get bumped to critical
+        let sentiment = detect_email_sentiment(&email).await;
+        let sentiment_bump = matches!(sentiment, EmailSentiment::Panicked | EmailSentiment::Urgent);
+
+        // Learned behaviour adjustment
+        let learned_boost = sender_learned_boost(&sender_key);
+        // If sender is always ignored AND no urgency → auto-archive candidate
+        let behaviors = load_sender_behaviors();
+        let should_auto_archive = if let Some(b) = behaviors.get(&sender_key) {
+            let total = (b.reply_count + b.ignore_count) as f32;
+            total >= 5.0 && b.reply_count == 0
+        } else {
+            false
+        };
+
+        if should_auto_archive && !sentiment_bump && category == "fyi" {
+            // User always ignores this sender — move to spam bucket
+            triage.spam.push(email);
+            continue;
+        }
+
+        let effective_category = if sentiment_bump && (category == "needs_response" || category == "fyi") {
+            "critical".to_string()
+        } else if learned_boost > 0.2 && category == "needs_response" {
+            // Fast responder to this sender → escalate to critical
+            "critical".to_string()
+        } else {
+            category.clone()
+        };
+
+        match effective_category.as_str() {
             "critical" => triage.critical.push(email),
             "needs_response" => triage.needs_response.push(email),
             "fyi" => triage.fyi.push(email),
             "spam" | "marketing" => triage.spam.push(email),
             "invoice" | "receipt" => triage.invoices.push(email),
             "meeting_invite" => {
-                // Check for calendar conflicts before routing
                 let has_conflict = check_calendar_conflict(&email).await;
                 if !has_conflict {
-                    // Auto-accept if calendar is free (best-effort, logs failure)
                     let _ = accept_meeting_invite(&email).await;
                 }
                 triage.meeting_invites.push(email);
@@ -169,6 +302,29 @@ pub async fn triage_inbox() -> Result<InboxTriage, String> {
     }
 
     Ok(triage)
+}
+
+/// Detect the emotional tone of an email from subject + snippet.
+async fn detect_email_sentiment(email: &EmailSummary) -> EmailSentiment {
+    let text = format!("{} {}", email.subject, email.snippet).to_lowercase();
+
+    // Fast heuristics
+    let panic_signals = ["urgent!!", "critical!!", "emergency", "disaster", "everything is broken", "on fire", "going down", "!!!", "asap asap", "please help", "help us"];
+    if panic_signals.iter().any(|kw| text.contains(kw)) {
+        return EmailSentiment::Panicked;
+    }
+
+    let urgent_signals = ["urgent", "asap", "immediately", "time sensitive", "deadline today", "end of day", "eod today", "right now"];
+    if urgent_signals.iter().any(|kw| text.contains(kw)) {
+        return EmailSentiment::Urgent;
+    }
+
+    let frustrated_signals = ["still waiting", "following up again", "as i mentioned", "i already said", "this is unacceptable", "disappointed"];
+    if frustrated_signals.iter().any(|kw| text.contains(kw)) {
+        return EmailSentiment::Frustrated;
+    }
+
+    EmailSentiment::Calm
 }
 
 async fn fetch_unread_emails() -> Result<Vec<EmailSummary>, String> {
@@ -378,14 +534,38 @@ async fn draft_one_reply(email: &EmailSummary) -> Result<DraftReply, String> {
         .map(|p| p.communication_style.clone())
         .unwrap_or_else(|| "formal".to_string());
 
-    // Check for past conversations in typed_memory
+    // Pull relevant memory — including pricing, past decisions, last conversation date
     let memory_context = {
         let tags = vec![sender_name.clone(), email.subject.clone()];
-        let mems = crate::typed_memory::get_relevant_memories_for_context(&tags, 3);
+        let mems = crate::typed_memory::get_relevant_memories_for_context(&tags, 5);
         mems.iter()
-            .map(|m| m.content.as_str())
+            .map(|m| format!("[{}] {}", m.source, m.content))
             .collect::<Vec<_>>()
             .join("\n")
+    };
+
+    // Search conversation history for relevant prior threads
+    let conversation_snippets = {
+        use crate::embeddings::smart_context_recall;
+        let query = format!("{} {}", sender_name, email.subject);
+        smart_context_recall(&query, 3)
+            .unwrap_or_default()
+            .iter()
+            .map(|s| s.as_str().to_string())
+            .collect::<Vec<_>>()
+            .join("\n---\n")
+    };
+
+    // Build a rich context block to include in draft
+    let context_block = {
+        let mut parts: Vec<String> = Vec::new();
+        if !memory_context.is_empty() {
+            parts.push(format!("Relevant memories about this person/topic:\n{memory_context}"));
+        }
+        if !conversation_snippets.is_empty() {
+            parts.push(format!("Prior conversation context:\n{}", crate::safe_slice(&conversation_snippets, 1000)));
+        }
+        parts.join("\n\n")
     };
 
     // Detect routine confirmations that can be auto-handled
@@ -403,11 +583,14 @@ async fn draft_one_reply(email: &EmailSummary) -> Result<DraftReply, String> {
             "Draft a reply to this email on behalf of the user.\n\
              Sender: {} | Relationship: {}\n\
              User's style: {}\n\
-             Past context with this person: {}\n\
+             {}\n\
              Subject: {}\nEmail preview: {}\n\n\
-             Match the tone and length to the relationship. Do not add a subject line.",
+             IMPORTANT: If the context block mentions previous pricing, commitments, or dates, \
+             naturally weave them into the reply so the user doesn't have to look them up. \
+             For example: 'As I mentioned in our March 12 conversation, our pricing is $X/month.'\n\
+             Match tone and length to the relationship. Do not add a subject line.",
             email.from, relationship, style_hint,
-            if memory_context.is_empty() { "(no prior context)" } else { &memory_context },
+            if context_block.is_empty() { "No prior context found.".to_string() } else { context_block },
             email.subject, email.snippet
         )
     };
@@ -678,6 +861,91 @@ fn route_to_financial_brain(invoice: &Invoice) {
         "[email_deep] routed invoice to financial_brain: {} {} from {}",
         invoice.currency, invoice.amount, invoice.vendor
     );
+}
+
+// ── 5. Detect circular email threads ─────────────────────────────────────────
+
+/// Find email threads that are going in circles: many replies, no clear decision.
+/// Returns threads with a suggestion (schedule a meeting, make a direct decision, etc.)
+pub async fn detect_circular_threads(emails: &[EmailSummary]) -> Result<Vec<CircularThread>, String> {
+    // Group by thread_id
+    let mut thread_map: std::collections::HashMap<String, Vec<&EmailSummary>> =
+        std::collections::HashMap::new();
+    for email in emails {
+        if !email.thread_id.is_empty() {
+            thread_map
+                .entry(email.thread_id.clone())
+                .or_default()
+                .push(email);
+        }
+    }
+
+    let mut circular = Vec::new();
+    let decision_keywords = ["decided", "decision", "agreed", "confirmed", "let's go with", "done", "resolved"];
+
+    for (thread_id, thread_emails) in &thread_map {
+        if thread_emails.len() < 4 {
+            continue;
+        }
+
+        // Fetch full thread to count actual replies
+        let all_text: String = thread_emails
+            .iter()
+            .map(|e| format!("{} {}", e.subject, e.snippet))
+            .collect::<Vec<_>>()
+            .join(" ")
+            .to_lowercase();
+
+        let has_decision = decision_keywords.iter().any(|kw| all_text.contains(kw));
+        if has_decision {
+            continue;
+        }
+
+        let first = thread_emails.first().unwrap();
+        let reply_count = thread_emails.len() as u32;
+
+        // Parse age from date field (rough)
+        let age_days = {
+            let oldest_date = thread_emails
+                .iter()
+                .map(|e| e.date.clone())
+                .min()
+                .unwrap_or_default();
+            // Simple heuristic: assume date is a unix timestamp string
+            oldest_date.parse::<i64>()
+                .map(|ts| {
+                    let now = now_secs();
+                    ((now - ts) / 86400).max(0) as u32
+                })
+                .unwrap_or(1)
+        };
+
+        if age_days < 1 && reply_count < 6 {
+            continue; // too short / too recent
+        }
+
+        let suggestion_prompt = format!(
+            "An email thread titled '{}' has {reply_count} replies over {age_days} days with no clear decision.\n\
+             Suggest in one sentence the best next step (schedule a meeting, ask for a direct decision, etc.).",
+            first.subject
+        );
+
+        let suggestion = llm_complete(&suggestion_prompt)
+            .await
+            .unwrap_or_else(|_| {
+                "This thread has multiple replies with no resolution — consider scheduling a 15-minute call to decide.".to_string()
+            });
+
+        circular.push(CircularThread {
+            thread_id: thread_id.clone(),
+            subject: first.subject.clone(),
+            reply_count,
+            age_days,
+            suggestion,
+        });
+    }
+
+    Ok(circular)
 }
 
 // ── Simulated data (no MCP server) ───────────────────────────────────────────

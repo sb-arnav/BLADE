@@ -23,3 +23,4 @@ pub mod email_deep;
 pub mod terminal_watch;
 pub mod filesystem_watch;
 pub mod calendar_tentacle;
+pub mod heads;
