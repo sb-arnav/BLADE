@@ -575,12 +575,13 @@ async fn llm_fix_retry(repo_path: &str, plan: &FixPlan, changed_files: &[String]
 
     let model = crate::config::cheap_model_for_provider(&config.provider, &config.model);
 
+    let no_tools: Vec<crate::providers::ToolDefinition> = vec![];
     let result = crate::providers::complete_turn(
         &config.provider,
         &config.api_key,
         &model,
         &messages,
-        &[],
+        &no_tools,
         config.base_url.as_deref(),
     )
     .await;

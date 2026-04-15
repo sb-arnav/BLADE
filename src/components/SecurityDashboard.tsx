@@ -66,32 +66,16 @@ function StatusCard({
   status: "green" | "yellow" | "red" | "neutral";
   detail?: string;
 }) {
-  const statusClasses = {
-    green: "border-green-700/50 bg-green-500/5",
-    yellow: "border-yellow-700/50 bg-yellow-500/5",
-    red: "border-red-700/50 bg-red-500/5",
-    neutral: "border-blade-border bg-blade-surface",
-  };
-  const dotClasses = {
-    green: "bg-green-400",
-    yellow: "bg-yellow-400",
-    red: "bg-red-400",
-    neutral: "bg-blade-muted",
-  };
-  const valueClasses = {
-    green: "text-green-400",
-    yellow: "text-yellow-400",
-    red: "text-red-400",
-    neutral: "text-blade-text",
-  };
+  const dotColor = { green: "#34c759", yellow: "#f59e0b", red: "#ff3b30", neutral: "rgba(255,255,255,0.25)" }[status];
+  const valueColor = { green: "#34c759", yellow: "#f59e0b", red: "#ff3b30", neutral: "rgba(255,255,255,0.88)" }[status];
   return (
-    <div className={`border rounded-lg p-3 space-y-1 ${statusClasses[status]}`}>
+    <div className="border rounded-xl p-4 space-y-2 border-blade-border bg-blade-surface">
       <div className="flex items-center gap-1.5">
-        <span className={`w-1.5 h-1.5 rounded-full ${dotClasses[status]}`} />
-        <span className="text-[10px] text-blade-muted uppercase tracking-wide">{label}</span>
+        <span style={{ width: 6, height: 6, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
+        <span className="text-xs text-blade-muted uppercase tracking-wide">{label}</span>
       </div>
-      <p className={`text-base font-bold ${valueClasses[status]}`}>{value}</p>
-      {detail && <p className="text-[10px] text-blade-muted">{detail}</p>}
+      <p className="text-xl font-bold tabular-nums" style={{ color: valueColor }}>{value}</p>
+      {detail && <p className="text-xs text-blade-muted">{detail}</p>}
     </div>
   );
 }
@@ -274,7 +258,7 @@ export function SecurityDashboard({ onBack }: { onBack: () => void }) {
                 <span className="text-xs font-semibold text-blade-secondary uppercase tracking-wide">
                   Network Connections
                 </span>
-                <span className="ml-auto text-[10px] text-blade-muted">
+                <span className="ml-auto text-xs text-blade-muted">
                   {overview.network.total_connections} total
                   {overview.network.suspicious_count > 0 && (
                     <span className="text-red-400 ml-1">· {overview.network.suspicious_count} suspicious</span>
@@ -287,7 +271,7 @@ export function SecurityDashboard({ onBack }: { onBack: () => void }) {
                 <div className="overflow-x-auto max-h-64 overflow-y-auto">
                   <table className="w-full text-xs">
                     <thead className="sticky top-0 bg-blade-surface/90">
-                      <tr className="text-blade-muted text-[10px] uppercase tracking-wide">
+                      <tr className="text-blade-muted text-xs uppercase tracking-wide">
                         <th className="text-left px-3 py-1.5">Remote</th>
                         <th className="text-left px-3 py-1.5">Protocol</th>
                         <th className="text-left px-3 py-1.5">State</th>
@@ -301,7 +285,7 @@ export function SecurityDashboard({ onBack }: { onBack: () => void }) {
                           key={i}
                           className={`border-t border-blade-border/40 transition-colors ${conn.suspicious ? "bg-red-900/10 hover:bg-red-900/15" : "hover:bg-blade-surface/40"}`}
                         >
-                          <td className={`px-3 py-1.5 font-mono text-[11px] ${conn.suspicious ? "text-red-400" : "text-blade-text"}`}>
+                          <td className={`px-3 py-1.5 font-mono text-xs ${conn.suspicious ? "text-red-400" : "text-blade-text"}`}>
                             {conn.remote_addr ?? "—"}
                           </td>
                           <td className="px-3 py-1.5 text-blade-muted">{conn.protocol ?? "—"}</td>
@@ -309,11 +293,11 @@ export function SecurityDashboard({ onBack }: { onBack: () => void }) {
                           <td className="px-3 py-1.5 text-blade-muted truncate max-w-[120px]">{conn.process ?? "—"}</td>
                           <td className="px-3 py-1.5">
                             {conn.suspicious ? (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-700/40 font-medium">
+                              <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-700/40 font-medium">
                                 suspicious
                               </span>
                             ) : (
-                              <span className="text-[9px] text-blade-muted">ok</span>
+                              <span className="text-xs text-blade-muted">ok</span>
                             )}
                           </td>
                         </tr>
@@ -330,7 +314,7 @@ export function SecurityDashboard({ onBack }: { onBack: () => void }) {
                 <span className="text-xs font-semibold text-blade-secondary uppercase tracking-wide">
                   Sensitive Files
                 </span>
-                <span className="ml-auto text-[10px] text-blade-muted">{overview.sensitive_files.length} tracked</span>
+                <span className="ml-auto text-xs text-blade-muted">{overview.sensitive_files.length} tracked</span>
               </div>
               {overview.sensitive_files.length === 0 ? (
                 <div className="px-3 py-4 text-xs text-blade-muted italic text-center">No sensitive files detected</div>
@@ -345,22 +329,22 @@ export function SecurityDashboard({ onBack }: { onBack: () => void }) {
                           i === 0 ? "border-t-0" : ""
                         } ${!isProtected ? "bg-yellow-500/3" : ""}`}
                       >
-                        <span className={`font-mono text-[11px] truncate ${!isProtected ? "text-yellow-400/80" : "text-blade-muted"}`}>
+                        <span className={`font-mono text-xs truncate ${!isProtected ? "text-yellow-400/80" : "text-blade-muted"}`}>
                           {file.path}
                         </span>
                         <div className="flex gap-1.5 shrink-0">
                           {file.gitignored && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-700/30">
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-700/30">
                               gitignored
                             </span>
                           )}
                           {file.protected && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-700/30">
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-700/30">
                               protected
                             </span>
                           )}
                           {!isProtected && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-700/30">
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-700/30">
                               exposed
                             </span>
                           )}
@@ -412,7 +396,7 @@ export function SecurityDashboard({ onBack }: { onBack: () => void }) {
                     {urlResult.safe ? "Safe" : "Potentially unsafe"}
                   </span>
                   {urlResult.score !== undefined && (
-                    <span className="text-[10px] text-blade-muted ml-auto">Score: {urlResult.score}</span>
+                    <span className="text-xs text-blade-muted ml-auto">Score: {urlResult.score}</span>
                   )}
                 </div>
                 {urlResult.message && (
@@ -421,7 +405,7 @@ export function SecurityDashboard({ onBack }: { onBack: () => void }) {
                 {urlResult.categories && urlResult.categories.length > 0 && (
                   <div className="flex flex-wrap gap-1 pt-0.5">
                     {urlResult.categories.map((cat, i) => (
-                      <span key={i} className="text-[9px] px-1.5 py-0.5 rounded bg-blade-border/30 text-blade-muted border border-blade-border/20">
+                      <span key={i} className="text-xs px-1.5 py-0.5 rounded bg-blade-border/30 text-blade-muted border border-blade-border/20">
                         {cat}
                       </span>
                     ))}

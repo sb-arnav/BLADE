@@ -11,6 +11,8 @@ export interface TentacleNode {
   uptime: number; // seconds
   messageCount: number;
   actionsToday: number;
+  messagesProcessed: number; // lifetime total
+  lastPollTime: number; // unix seconds — last time tentacle polled its platform
   headModel: string;
   autonomyOverride?: number; // 0-100, undefined = use global
   notificationsEnabled: boolean;
@@ -166,6 +168,39 @@ export function TentacleDetail({ tentacle, onClose, onUpdate, onReconnect }: Ten
             >
               <div className="text-[9px] uppercase tracking-widest text-gray-600 mb-0.5">{s.label}</div>
               <div className="text-xs font-semibold text-gray-200 truncate">{s.value}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Live stats row */}
+        <div
+          className="grid grid-cols-3 gap-px shrink-0"
+          style={{ background: "rgba(99,102,241,0.06)", borderBottom: "1px solid rgba(99,102,241,0.12)" }}
+        >
+          {[
+            { label: "Processed", value: tentacle.messagesProcessed.toLocaleString() },
+            { label: "Last poll", value: relTime(tentacle.lastPollTime) },
+            {
+              label: "Status",
+              value: tentacle.status.toUpperCase(),
+              color: tentacle.status === "online" ? "#22c55e"
+                : tentacle.status === "degraded" ? "#f59e0b"
+                : tentacle.status === "offline" ? "#ef4444"
+                : "#6b7280",
+            },
+          ].map((s) => (
+            <div
+              key={s.label}
+              className="px-3 py-2"
+              style={{ background: "#0e0e12" }}
+            >
+              <div className="text-[9px] uppercase tracking-widest text-gray-600 mb-0.5">{s.label}</div>
+              <div
+                className="text-xs font-semibold truncate"
+                style={{ color: (s as { color?: string }).color ?? "#d1d5db" }}
+              >
+                {s.value}
+              </div>
             </div>
           ))}
         </div>

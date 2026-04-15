@@ -127,6 +127,7 @@ mod streak_stats;
 mod hive;
 mod auto_fix;
 mod tentacles;
+mod agent_factory;
 
 use chrono::Timelike;
 use std::sync::Arc;
@@ -1158,6 +1159,12 @@ pub fn run() {
             tentacles::cloud_costs::cloud_suggest_savings,
             tentacles::cloud_costs::cloud_weekly_cost_report,
             tentacles::cloud_costs::cloud_weekly_cost_report_live,
+            // Agent Factory — NosShip-inspired "describe it, deploy it" agent builder
+            agent_factory::factory_create_agent,
+            agent_factory::factory_deploy_agent,
+            agent_factory::factory_list_agents,
+            agent_factory::factory_pause_agent,
+            agent_factory::factory_delete_agent,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state

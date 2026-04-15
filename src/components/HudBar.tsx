@@ -1,12 +1,4 @@
-/// BLADE HUD Bar — fighter-jet heads-up display. Always-on-top, 30px at top of screen.
-///
-/// Displays: time (monospaced, glowing), active app (typing reveal animation),
-/// God Mode status, unread count, next meeting countdown (amber/<15min, red/<5min),
-/// tiny waveform when audio capture is active, camera blink when screenshot taken.
-///
-/// Alert pulses: red for errors/security, amber for warnings.
-/// Scan line effect: subtle 1px horizontal lines scrolling slowly.
-/// Double-click opens main BLADE window.
+/// BLADE HUD Bar — clean always-on-top status bar. Frosted glass, Apple style.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -63,8 +55,8 @@ function godModeColor(status: string): string {
   switch (status) {
     case "extreme": return "#f59e0b";
     case "intermediate": return "#6366f1";
-    case "normal": return "#10b981";
-    default: return "rgba(255,255,255,0.2)";
+    case "normal": return "#34c759";
+    default: return "rgba(255,255,255,0.25)";
   }
 }
 
@@ -78,32 +70,9 @@ function godModeLabel(status: string): string {
 }
 
 function confidenceColor(c: number): string {
-  if (c >= 0.85) return "#10b981";
+  if (c >= 0.85) return "#34c759";
   if (c >= 0.65) return "#f59e0b";
-  return "#f87171";
-}
-
-// ── Waveform bars component ───────────────────────────────────────────────────
-
-function AudioWaveform() {
-  const BAR_COUNT = 5;
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: "1.5px", height: "12px" }}>
-      {Array.from({ length: BAR_COUNT }, (_, i) => (
-        <div
-          key={i}
-          style={{
-            width: "2px",
-            height: "3px",
-            borderRadius: "1px",
-            background: "#10b981",
-            animation: `waveBar ${0.6 + i * 0.1}s ease-in-out infinite alternate`,
-            animationDelay: `${i * 0.07}s`,
-          }}
-        />
-      ))}
-    </div>
-  );
+  return "#ff3b30";
 }
 
 // ── Camera icon (blinks on screenshot) ───────────────────────────────────────
@@ -116,52 +85,18 @@ function CameraIcon({ blinking }: { blinking: boolean }) {
       height="10"
       fill="none"
       style={{
-        opacity: blinking ? 1 : 0.25,
-        transition: "opacity 0.15s",
-        filter: blinking ? "drop-shadow(0 0 3px #3b82f6)" : "none",
+        opacity: blinking ? 1 : 0.3,
+        transition: "opacity 0.25s ease",
       }}
     >
       <path
         d="M4.5 1h3l1 1.5H11a.5.5 0 01.5.5v5a.5.5 0 01-.5.5H1a.5.5 0 01-.5-.5V3a.5.5 0 01.5-.5h2.5L4.5 1z"
-        stroke={blinking ? "#3b82f6" : "rgba(255,255,255,0.35)"}
+        stroke="rgba(255,255,255,0.5)"
         strokeWidth="1"
       />
-      <circle cx="6" cy="5" r="1.5" stroke={blinking ? "#3b82f6" : "rgba(255,255,255,0.35)"} strokeWidth="1" />
+      <circle cx="6" cy="5" r="1.5" stroke="rgba(255,255,255,0.5)" strokeWidth="1" />
     </svg>
   );
-}
-
-// ── Typing reveal for active app name ────────────────────────────────────────
-
-function useTypingReveal(text: string, delay = 18) {
-  const [displayed, setDisplayed] = useState(text);
-  const [revealing, setRevealing] = useState(false);
-  const prevTextRef = useRef(text);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (text === prevTextRef.current) return;
-    prevTextRef.current = text;
-
-    if (timerRef.current) clearTimeout(timerRef.current);
-    setRevealing(true);
-    setDisplayed("");
-
-    let i = 0;
-    const reveal = () => {
-      i++;
-      setDisplayed(text.slice(0, i));
-      if (i < text.length) {
-        timerRef.current = setTimeout(reveal, delay);
-      } else {
-        setRevealing(false);
-      }
-    };
-    timerRef.current = setTimeout(reveal, delay);
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [text, delay]);
-
-  return { displayed, revealing };
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
@@ -185,7 +120,7 @@ export function HudBar() {
   const [isCopying, setIsCopying] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
 
-  // HUD alert pulse state: null | "error" | "warning"
+  // HUD alert state: null | "error" | "warning"
   const [alertPulse, setAlertPulse] = useState<"error" | "warning" | null>(null);
 
   // Audio capture active
@@ -195,7 +130,7 @@ export function HudBar() {
   const [cameraBlink, setCameraBlink] = useState(false);
   const cameraBlinkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Screen flash (blue border)
+  // Screen flash (subtle border)
   const [screenFlash, setScreenFlash] = useState(false);
   const screenFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -204,8 +139,8 @@ export function HudBar() {
   const [localSecs, setLocalSecs] = useState<number | null>(null);
   const alertTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Typing reveal for active app name
-  const { displayed: displayedApp, revealing: appRevealing } = useTypingReveal(data.active_app);
+  // Active app display
+  const displayedApp = data.active_app;
 
   // ── Data listener ──────────────────────────────────────────────────────────
 
@@ -437,13 +372,9 @@ export function HudBar() {
   const displayCountdown = localSecs ?? data.next_meeting_secs;
 
   // Countdown urgency
-  const countdownUrgent = displayCountdown !== null && displayCountdown < 300;    // < 5 min
-  const countdownAmber  = displayCountdown !== null && displayCountdown < 900;    // < 15 min
-  const countdownColor  = countdownUrgent ? "#f87171" : countdownAmber ? "#f59e0b" : "rgba(255,255,255,0.45)";
-
-  // Alert pulse bar color
-  const alertBarColor = alertPulse === "error" ? "rgba(248,113,113,0.22)" : alertPulse === "warning" ? "rgba(245,158,11,0.18)" : null;
-  const alertBorderColor = alertPulse === "error" ? "rgba(248,113,113,0.5)" : alertPulse === "warning" ? "rgba(245,158,11,0.4)" : null;
+  const countdownUrgent = displayCountdown !== null && displayCountdown < 300;
+  const countdownAmber  = displayCountdown !== null && displayCountdown < 900;
+  const countdownColor  = countdownUrgent ? "#ff3b30" : countdownAmber ? "#f59e0b" : "rgba(255,255,255,0.45)";
 
   return (
     <div
@@ -458,7 +389,7 @@ export function HudBar() {
         zIndex: 9998,
       }}
     >
-      {/* Screen edge flash on screenshot (blue border around screen edges) */}
+      {/* Subtle screen-edge flash on screenshot */}
       {screenFlash && (
         <div
           style={{
@@ -466,14 +397,13 @@ export function HudBar() {
             inset: 0,
             pointerEvents: "none",
             zIndex: 10002,
-            boxShadow: "inset 0 0 0 3px rgba(59,130,246,0.7)",
-            borderRadius: "0",
+            boxShadow: "inset 0 0 0 2px rgba(255,255,255,0.15)",
             animation: "screenFlashFade 0.6s ease-out forwards",
           }}
         />
       )}
 
-      {/* HUD bar strip */}
+      {/* HUD bar strip — frosted glass */}
       <div
         style={{
           position: "fixed",
@@ -482,232 +412,171 @@ export function HudBar() {
           right: 0,
           width: "100vw",
           height: "30px",
-          background: alertBarColor
-            ? alertBarColor
-            : isMeeting
-            ? "rgba(99,102,241,0.18)"
-            : "rgba(6,6,10,0.88)",
-          backdropFilter: "blur(20px) saturate(200%)",
-          WebkitBackdropFilter: "blur(20px) saturate(200%)",
-          borderBottom: alertBorderColor
-            ? `1px solid ${alertBorderColor}`
-            : isMeeting
-            ? "1px solid rgba(99,102,241,0.4)"
-            : "1px solid rgba(255,255,255,0.05)",
-          boxShadow: alertPulse === "error"
-            ? "0 0 18px rgba(248,113,113,0.25), inset 0 -1px 0 rgba(248,113,113,0.1)"
+          background: alertPulse === "error"
+            ? "rgba(255,59,48,0.12)"
             : alertPulse === "warning"
-            ? "0 0 18px rgba(245,158,11,0.2), inset 0 -1px 0 rgba(245,158,11,0.1)"
-            : "0 1px 0 rgba(0,0,0,0.4)",
+            ? "rgba(245,158,11,0.10)"
+            : isMeeting
+            ? "rgba(99,102,241,0.12)"
+            : "rgba(10,10,14,0.86)",
+          backdropFilter: "blur(20px) saturate(1.8)",
+          WebkitBackdropFilter: "blur(20px) saturate(1.8)",
+          borderBottom: alertPulse === "error"
+            ? "1px solid rgba(255,59,48,0.3)"
+            : alertPulse === "warning"
+            ? "1px solid rgba(245,158,11,0.25)"
+            : isMeeting
+            ? "1px solid rgba(99,102,241,0.2)"
+            : "1px solid rgba(255,255,255,0.06)",
+          boxShadow: "0 1px 0 rgba(0,0,0,0.3)",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "0 12px",
+          padding: "0 14px",
           userSelect: "none",
           cursor: "default",
-          fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace",
+          fontFamily: "'SF Mono', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
           fontSize: "11px",
-          letterSpacing: "0.02em",
-          color: "rgba(255,255,255,0.7)",
+          color: "rgba(255,255,255,0.65)",
           zIndex: 9999,
           boxSizing: "border-box",
           pointerEvents: "auto",
-          // Scan line effect via repeating gradient
-          backgroundImage: alertBarColor
-            ? `repeating-linear-gradient(
-                180deg,
-                transparent,
-                transparent 4px,
-                rgba(0,0,0,0.04) 4px,
-                rgba(0,0,0,0.04) 5px
-              ), linear-gradient(${alertBarColor}, ${alertBarColor})`
-            : `repeating-linear-gradient(
-                180deg,
-                transparent,
-                transparent 4px,
-                rgba(0,0,0,0.05) 4px,
-                rgba(0,0,0,0.05) 5px
-              ), linear-gradient(${isMeeting ? "rgba(99,102,241,0.18)" : "rgba(6,6,10,0.88)"}, ${isMeeting ? "rgba(99,102,241,0.18)" : "rgba(6,6,10,0.88)"})`,
-          transition: "background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease",
+          transition: "background 0.25s ease, border-color 0.25s ease",
         }}
         onDoubleClick={openMain}
       >
-        {/* LEFT: time + active app (or meeting info) */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, overflow: "hidden" }}>
-          {/* Time — monospaced, subtle glow */}
+        {/* LEFT: time · app name (or meeting info) */}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, overflow: "hidden" }}>
+          {/* Time */}
           <span
             style={{
               fontVariantNumeric: "tabular-nums",
-              color: "rgba(255,255,255,0.92)",
-              fontWeight: 600,
+              color: "rgba(255,255,255,0.88)",
+              fontWeight: 500,
               fontSize: "12px",
-              letterSpacing: "0.08em",
+              letterSpacing: "0.05em",
               flexShrink: 0,
-              textShadow: "0 0 8px rgba(255,255,255,0.25), 0 0 16px rgba(99,102,241,0.15)",
             }}
           >
             {data.time}
           </span>
 
-          {/* Divider */}
-          <div style={{ width: "1px", height: "12px", background: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
+          {/* Dot separator */}
+          <span style={{ color: "rgba(255,255,255,0.18)", fontSize: "10px", flexShrink: 0 }}>·</span>
 
           {isMeeting ? (
             <>
-              {/* Meeting badge */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "5px",
-                  padding: "2px 7px",
-                  borderRadius: "3px",
-                  background: "rgba(99,102,241,0.2)",
-                  border: "1px solid rgba(99,102,241,0.4)",
-                  flexShrink: 0,
-                }}
-              >
+              {/* Meeting live dot + name */}
+              <div style={{ display: "flex", alignItems: "center", gap: "5px", flexShrink: 0 }}>
                 <span
                   style={{
-                    width: "5px",
-                    height: "5px",
+                    width: "6px",
+                    height: "6px",
                     borderRadius: "50%",
-                    background: "#f87171",
-                    animation: "hudPulse 1.5s ease-in-out infinite",
+                    background: "#ff3b30",
                     flexShrink: 0,
+                    animation: "dotPulse 2s ease-in-out infinite",
                   }}
                 />
-                <span style={{ color: "rgba(255,255,255,0.92)", fontWeight: 600, letterSpacing: "0.04em" }}>
-                  {data.meeting_name ?? "MEETING"}
+                <span style={{ color: "rgba(255,255,255,0.88)", fontWeight: 500, fontSize: "11px" }}>
+                  {data.meeting_name ?? "Meeting"}
                 </span>
               </div>
               {data.speaker_name && (
-                <span style={{ color: "rgba(255,255,255,0.4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "10px" }}>
-                  {data.speaker_name} speaking
-                </span>
+                <>
+                  <span style={{ color: "rgba(255,255,255,0.18)", fontSize: "10px" }}>·</span>
+                  <span style={{ color: "rgba(255,255,255,0.45)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px" }}>
+                    {data.speaker_name}
+                  </span>
+                </>
               )}
             </>
           ) : (
-            /* Active app with typing reveal */
             data.active_app && (
               <span
                 style={{
-                  color: appRevealing ? "rgba(99,102,241,0.8)" : "rgba(255,255,255,0.4)",
+                  color: "rgba(255,255,255,0.4)",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
-                  maxWidth: "220px",
-                  fontSize: "10px",
-                  letterSpacing: "0.03em",
-                  transition: "color 0.4s ease",
+                  maxWidth: "200px",
+                  fontSize: "11px",
                 }}
               >
                 {displayedApp}
-                {appRevealing && (
-                  <span style={{ borderRight: "1px solid rgba(99,102,241,0.8)", marginLeft: "1px", animation: "cursorBlink 0.6s step-end infinite" }} />
-                )}
               </span>
             )
           )}
         </div>
 
-        {/* RIGHT: camera icon, audio waveform, god mode, unread, next meeting, ghost toggle */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-          {/* Camera icon — blinks when screenshot is taken */}
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <CameraIcon blinking={cameraBlink} />
-          </div>
+        {/* RIGHT: camera, audio dot, god mode dot, unread, countdown, ghost toggle */}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
+          {/* Camera icon */}
+          <CameraIcon blinking={cameraBlink} />
 
-          {/* Audio waveform — visible only when audio capture is active */}
+          {/* Audio active dot */}
           {audioActive && (
-            <div style={{ display: "flex", alignItems: "center" }}>
-              <AudioWaveform />
-            </div>
+            <span
+              style={{
+                width: "6px",
+                height: "6px",
+                borderRadius: "50%",
+                background: "#34c759",
+                flexShrink: 0,
+              }}
+              title="Audio capture active"
+            />
           )}
 
-          {/* Vertical separator */}
-          <div style={{ width: "1px", height: "12px", background: "rgba(255,255,255,0.06)", flexShrink: 0 }} />
+          {/* Dot separator */}
+          <div style={{ width: "1px", height: "10px", background: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
 
-          {/* Next meeting countdown */}
+          {/* Next meeting countdown — just text, changes color */}
           {!isMeeting && displayCountdown !== null && data.next_meeting_name && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-                padding: "2px 6px",
-                borderRadius: "3px",
-                background: countdownUrgent
-                  ? "rgba(248,113,113,0.12)"
-                  : countdownAmber
-                  ? "rgba(245,158,11,0.10)"
-                  : "rgba(255,255,255,0.04)",
-                border: `1px solid ${countdownUrgent ? "rgba(248,113,113,0.3)" : countdownAmber ? "rgba(245,158,11,0.25)" : "rgba(255,255,255,0.07)"}`,
-                animation: countdownUrgent ? "hudPulse 2s ease-in-out infinite" : "none",
-              }}
-            >
-              <svg viewBox="0 0 12 12" width="9" height="9" fill="none" style={{ flexShrink: 0 }}>
-                <circle cx="6" cy="6" r="5" stroke={countdownColor} strokeWidth="1.2" />
-                <path d="M6 3.5V6l2 1.5" stroke={countdownColor} strokeWidth="1.2" strokeLinecap="round" />
-              </svg>
-              <span style={{ color: countdownColor, fontWeight: 600, fontSize: "10px" }}>
-                {formatCountdown(displayCountdown)}
-              </span>
-            </div>
+            <span style={{ color: countdownColor, fontSize: "11px", fontWeight: countdownUrgent ? 600 : 400, transition: "color 0.25s ease" }}>
+              {formatCountdown(displayCountdown)}
+            </span>
           )}
 
           {/* Unread count */}
           {data.unread_count > 0 && (
-            <div
-              style={{
-                padding: "1px 5px",
-                borderRadius: "3px",
-                background: "rgba(248,113,113,0.12)",
-                border: "1px solid rgba(248,113,113,0.22)",
-                color: "#f87171",
-                fontSize: "10px",
-                fontWeight: 700,
-                letterSpacing: "0.02em",
-              }}
-            >
+            <span style={{ color: "#ff3b30", fontSize: "11px", fontWeight: 600 }}>
               {data.unread_count > 99 ? "99+" : data.unread_count}
-            </div>
+            </span>
           )}
 
-          {/* God Mode badge */}
-          <div
+          {/* God Mode status dot */}
+          <span
             style={{
-              padding: "1px 5px",
-              borderRadius: "3px",
-              background: `${gmColor}12`,
-              border: `1px solid ${gmColor}30`,
-              color: gmColor,
-              fontSize: "9px",
-              fontWeight: 700,
-              letterSpacing: "0.08em",
-              textShadow: data.god_mode_status !== "off" ? `0 0 6px ${gmColor}` : "none",
+              width: "6px",
+              height: "6px",
+              borderRadius: "50%",
+              background: gmColor,
+              flexShrink: 0,
+              transition: "background 0.25s ease",
             }}
-          >
+            title={`God Mode: ${data.god_mode_status}`}
+          />
+          <span style={{ color: gmColor, fontSize: "10px", fontWeight: 600, letterSpacing: "0.06em", transition: "color 0.25s ease" }}>
             {godModeLabel(data.god_mode_status)}
-          </div>
+          </span>
 
-          {/* Ghost card toggle (only visible during meeting) */}
+          {/* Ghost card toggle — only in meeting */}
           {isMeeting && ghost && (
             <button
               onClick={() => setGhostVisible((v) => !v)}
-              title="Toggle response card (Ctrl+G)"
+              title="Toggle suggestion card (Ctrl+G)"
               style={{
-                padding: "2px 7px",
-                borderRadius: "3px",
-                background: ghostVisible ? "rgba(99,102,241,0.3)" : "rgba(99,102,241,0.12)",
-                border: "1px solid rgba(99,102,241,0.4)",
-                color: "rgba(255,255,255,0.85)",
+                padding: "2px 8px",
+                borderRadius: "4px",
+                background: ghostVisible ? "rgba(99,102,241,0.25)" : "rgba(255,255,255,0.08)",
+                border: "none",
+                color: ghostVisible ? "#a5b4fc" : "rgba(255,255,255,0.55)",
                 cursor: "pointer",
-                fontSize: "9px",
-                fontWeight: 700,
-                letterSpacing: "0.06em",
+                fontSize: "11px",
+                fontWeight: 500,
                 outline: "none",
-                textShadow: "0 0 6px rgba(99,102,241,0.6)",
+                transition: "all 0.25s ease",
               }}
             >
               BLADE
@@ -716,182 +585,174 @@ export function HudBar() {
         </div>
       </div>
 
-      {/* Ghost suggestion card */}
+      {/* Ghost suggestion card — frosted glass, slides in from right */}
       {ghost && ghostVisible && (
         <div
           style={{
             position: "fixed",
             top: "38px",
             right: "12px",
-            width: "340px",
-            background: "rgba(6,6,10,0.92)",
-            backdropFilter: "blur(24px) saturate(180%)",
-            WebkitBackdropFilter: "blur(24px) saturate(180%)",
-            borderRadius: "10px",
-            border: "1px solid rgba(99,102,241,0.3)",
-            boxShadow: "0 16px 48px rgba(0,0,0,0.75), 0 0 0 0.5px rgba(255,255,255,0.04), 0 0 20px rgba(99,102,241,0.08)",
-            padding: "12px",
+            width: "320px",
+            background: "rgba(18,18,22,0.92)",
+            backdropFilter: "blur(24px) saturate(1.8)",
+            WebkitBackdropFilter: "blur(24px) saturate(1.8)",
+            borderRadius: "12px",
+            border: "1px solid rgba(255,255,255,0.1)",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.06) inset",
+            padding: "16px",
             fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
             zIndex: 10000,
             pointerEvents: "auto",
+            animation: "slideInRight 0.25s ease",
           }}
         >
           {/* Header */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <div
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+              <span
                 style={{
-                  width: "16px", height: "16px", borderRadius: "4px",
-                  background: "rgba(99,102,241,0.2)", display: "flex",
-                  alignItems: "center", justifyContent: "center",
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  background: confidenceColor(ghost.confidence),
+                  flexShrink: 0,
                 }}
-              >
-                <svg viewBox="0 0 16 16" width="10" height="10" fill="none">
-                  <path d="M8 2L14 8L8 14L2 8L8 2Z" fill="#6366f1" fillOpacity="0.9" />
-                </svg>
-              </div>
-              <span style={{ color: "rgba(255,255,255,0.5)", fontSize: "10px" }}>
-                {ghost.speaker ? `${ghost.speaker} asked` : "Suggested response"}
+              />
+              <span style={{ color: "rgba(255,255,255,0.55)", fontSize: "12px" }}>
+                {ghost.speaker ? ghost.speaker : "Suggestion"}
               </span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span
-                style={{ width: "6px", height: "6px", borderRadius: "50%", background: confidenceColor(ghost.confidence), flexShrink: 0 }}
-                title={`Confidence: ${Math.round(ghost.confidence * 100)}%`}
-              />
-              <button
-                onClick={() => setGhostVisible(false)}
-                style={{ background: "none", border: "none", color: "rgba(255,255,255,0.25)", cursor: "pointer", padding: 0, lineHeight: 1, fontSize: "14px" }}
-              >
-                ×
-              </button>
-            </div>
+            <button
+              onClick={() => setGhostVisible(false)}
+              style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", cursor: "pointer", padding: "2px", lineHeight: 1, fontSize: "16px" }}
+            >
+              ×
+            </button>
           </div>
 
           {/* Trigger */}
           {ghost.trigger && (
-            <div
+            <p
               style={{
-                padding: "5px 8px", borderRadius: "5px", background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.06)", fontSize: "10px",
-                color: "rgba(255,255,255,0.35)", marginBottom: "8px",
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                fontSize: "12px",
+                color: "rgba(255,255,255,0.35)",
+                marginBottom: "10px",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                fontStyle: "italic",
               }}
             >
               "{ghost.trigger.length > 80 ? ghost.trigger.slice(0, 80) + "…" : ghost.trigger}"
-            </div>
+            </p>
           )}
 
           {/* Response text */}
-          <div
+          <p
             style={{
-              fontSize: "12px", lineHeight: "1.6", color: "rgba(255,255,255,0.88)",
-              marginBottom: "10px", wordBreak: "break-word", whiteSpace: "pre-wrap",
+              fontSize: "13px",
+              lineHeight: "1.6",
+              color: "rgba(255,255,255,0.88)",
+              marginBottom: "14px",
+              wordBreak: "break-word",
+              whiteSpace: "pre-wrap",
             }}
           >
             {ghost.response}
-          </div>
-
-          {/* Confidence bar */}
-          <div style={{ marginBottom: "10px" }}>
-            <div style={{ height: "2px", borderRadius: "1px", background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
-              <div
-                style={{
-                  height: "100%", width: `${Math.round(ghost.confidence * 100)}%`,
-                  background: confidenceColor(ghost.confidence), borderRadius: "1px",
-                  transition: "width 0.4s ease",
-                }}
-              />
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "3px" }}>
-              <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.2)" }}>confidence</span>
-              <span style={{ fontSize: "9px", color: confidenceColor(ghost.confidence) }}>
-                {Math.round(ghost.confidence * 100)}%
-              </span>
-            </div>
-          </div>
+          </p>
 
           {/* Action buttons */}
-          <div style={{ display: "flex", gap: "6px" }}>
+          <div style={{ display: "flex", gap: "8px" }}>
             <button
               onClick={typeResponse}
               disabled={isTyping}
               style={{
-                flex: 1, padding: "5px 10px", borderRadius: "5px",
-                background: isTyping ? "rgba(99,102,241,0.15)" : "rgba(99,102,241,0.25)",
-                border: "1px solid rgba(99,102,241,0.4)", color: "rgba(255,255,255,0.85)",
-                cursor: isTyping ? "not-allowed" : "pointer", fontSize: "11px",
-                fontWeight: 500, outline: "none", transition: "background 0.15s",
+                flex: 1, padding: "7px 12px", borderRadius: "8px",
+                background: "rgba(99,102,241,0.2)",
+                border: "none",
+                color: isTyping ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.88)",
+                cursor: isTyping ? "not-allowed" : "pointer",
+                fontSize: "13px",
+                fontWeight: 500,
+                outline: "none",
+                transition: "background 0.25s ease",
               }}
             >
-              {isTyping ? "Typing…" : "Type it"}
+              {isTyping ? "Typing…" : "Use"}
             </button>
             <button
               onClick={copyResponse}
               style={{
-                flex: 1, padding: "5px 10px", borderRadius: "5px",
-                background: isCopying ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.06)",
-                border: `1px solid ${isCopying ? "rgba(16,185,129,0.35)" : "rgba(255,255,255,0.1)"}`,
-                color: isCopying ? "#10b981" : "rgba(255,255,255,0.6)",
-                cursor: "pointer", fontSize: "11px", fontWeight: 500,
-                outline: "none", transition: "all 0.15s",
+                flex: 1, padding: "7px 12px", borderRadius: "8px",
+                background: isCopying ? "rgba(52,199,89,0.18)" : "rgba(255,255,255,0.07)",
+                border: "none",
+                color: isCopying ? "#34c759" : "rgba(255,255,255,0.55)",
+                cursor: "pointer",
+                fontSize: "13px",
+                fontWeight: 500,
+                outline: "none",
+                transition: "all 0.25s ease",
               }}
             >
-              {isCopying ? "Copied!" : "Copy"}
+              {isCopying ? "Copied" : "Copy"}
             </button>
           </div>
 
-          <div style={{ marginTop: "8px", fontSize: "9px", color: "rgba(255,255,255,0.18)", textAlign: "center" }}>
+          <p style={{ marginTop: "10px", fontSize: "11px", color: "rgba(255,255,255,0.2)", textAlign: "center" }}>
             Ctrl+G to toggle
-          </div>
+          </p>
         </div>
       )}
 
-      {/* Toast stack */}
+      {/* Toast stack — slides in from right */}
       {toasts.length > 0 && (
         <div
           style={{
-            position: "fixed", top: "38px", left: "12px",
-            display: "flex", flexDirection: "column", gap: "6px",
+            position: "fixed", top: "38px", right: "12px",
+            display: "flex", flexDirection: "column", gap: "8px",
             zIndex: 10001, pointerEvents: "auto",
           }}
         >
           {toasts.map((toast) => {
-            const { border, accent } = toastLevelStyle(toast.level);
+            const { accent } = toastLevelStyle(toast.level);
             return (
               <div
                 key={toast.id}
                 style={{
-                  width: "300px",
-                  background: "rgba(6,6,10,0.94)",
-                  backdropFilter: "blur(20px)",
-                  WebkitBackdropFilter: "blur(20px)",
-                  borderRadius: "8px",
-                  border: `1px solid ${border}`,
-                  padding: "9px 12px",
-                  boxShadow: "0 8px 24px rgba(0,0,0,0.6)",
+                  width: "280px",
+                  background: "rgba(18,18,22,0.94)",
+                  backdropFilter: "blur(20px) saturate(1.8)",
+                  WebkitBackdropFilter: "blur(20px) saturate(1.8)",
+                  borderRadius: "10px",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  padding: "12px 14px",
+                  boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
                   opacity: toast.exiting ? 0 : 1,
-                  transform: toast.exiting ? "translateY(-6px)" : "translateY(0)",
+                  transform: toast.exiting ? "translateX(12px)" : "translateX(0)",
                   transition: "opacity 0.25s ease, transform 0.25s ease",
                   cursor: "pointer",
                   fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                  animation: "slideInRight 0.25s ease",
                 }}
                 onClick={() => dismissToast(toast.id)}
               >
-                <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
-                  <div
+                <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+                  <span
                     style={{
-                      width: "3px", height: "100%", minHeight: "24px",
-                      borderRadius: "2px", background: accent,
-                      flexShrink: 0, marginTop: "2px",
+                      width: "6px",
+                      height: "6px",
+                      borderRadius: "50%",
+                      background: accent,
+                      flexShrink: 0,
+                      marginTop: "5px",
                     }}
                   />
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.9)", marginBottom: "2px" }}>
+                    <div style={{ fontSize: "13px", fontWeight: 500, color: "rgba(255,255,255,0.88)", marginBottom: "2px" }}>
                       {toast.title}
                     </div>
                     {toast.body && (
-                      <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.45)", lineHeight: 1.5 }}>
+                      <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.45)", lineHeight: 1.5 }}>
                         {toast.body}
                       </div>
                     )}
@@ -903,24 +764,19 @@ export function HudBar() {
         </div>
       )}
 
-      {/* Global keyframe animations */}
+      {/* Keyframe animations */}
       <style>{`
-        @keyframes hudPulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(0.9); }
-        }
-        @keyframes cursorBlink {
+        @keyframes dotPulse {
           0%, 100% { opacity: 1; }
-          50% { opacity: 0; }
+          50% { opacity: 0.4; }
         }
         @keyframes screenFlashFade {
           0% { opacity: 1; }
-          60% { opacity: 0.6; }
           100% { opacity: 0; }
         }
-        @keyframes waveBar {
-          from { height: 3px; }
-          to   { height: 11px; }
+        @keyframes slideInRight {
+          from { opacity: 0; transform: translateX(12px); }
+          to { opacity: 1; transform: translateX(0); }
         }
       `}</style>
     </div>

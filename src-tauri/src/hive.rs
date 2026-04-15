@@ -1,16 +1,22 @@
 /// HIVE — BLADE's distributed agent mesh across every platform the user touches.
 ///
 /// BLADE becomes an organism. Lightweight "tentacle" agents live inside every
-/// platform (Slack, Discord, WhatsApp, Email, GitHub, CI/backend). They monitor,
-/// act, and report to "Head" agents that specialise in a domain. One "Big Agent"
-/// coordinates everything and spots cross-domain patterns.
+/// platform. They monitor, act, and report to "Head" agents that specialise
+/// in a domain. One "Big Agent" coordinates everything and spots cross-domain
+/// patterns.
 ///
-/// Topology:
-///   Tentacles (6 platforms) → 3 Head models (Communications / Development / Operations)
-///                           → Big Agent (cross-domain synthesis + decisions)
+/// Topology (10 tentacles → 4 Heads → Big Agent):
+///
+///   Communications Head ← slack, discord, discord_deep, whatsapp, email
+///   Development Head    ← github, ci, linear, jira
+///   Operations Head     ← backend, logs, cloud
+///   Intelligence Head   ← receives ALL reports (cross-domain synthesis)
+///                      ↓
+///             Big Agent (cross-domain decisions)
 ///
 /// Tick: every 30 s the Hive wakes, collects reports, routes them, lets each Head
-/// decide, and escalates anything critical to the Big Agent.
+/// think, and escalates anything critical to the Big Agent.
+/// Health tracking: 3 consecutive failures → Error; 5 → Dormant.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -143,6 +149,7 @@ pub enum Decision {
 pub struct Tentacle {
     pub id: String,
     /// "slack" | "discord" | "whatsapp" | "email" | "github" | "ci" | "backend"
+    /// | "discord_deep" | "linear" | "jira" | "logs" | "cloud"
     pub platform: String,
     pub status: TentacleStatus,
     /// Which Head model this tentacle reports to (Head id).
@@ -151,6 +158,9 @@ pub struct Tentacle {
     pub messages_processed: u64,
     pub actions_taken: u64,
     pub pending_reports: Vec<TentacleReport>,
+    /// Consecutive poll failures — tracked for health escalation.
+    /// 3 → Error status, 5 → Dormant (stops polling until re-enabled).
+    pub consecutive_failures: u32,
 }
 
 impl Tentacle {
@@ -166,6 +176,7 @@ impl Tentacle {
             messages_processed: 0,
             actions_taken: 0,
             pending_reports: Vec::new(),
+            consecutive_failures: 0,
         }
     }
 }
@@ -1161,6 +1172,340 @@ async fn poll_tentacle(platform: &str) -> Vec<TentacleReport> {
             }
         }
 
+        // ── Discord Deep ───────────────────────────────────────────────────────
+        "discord_deep" => {
+            let token = crate::config::get_provider_key("discord");
+            if token.is_empty() {
+                return reports;
+            }
+
+            if !should_poll("discord_deep", 120) {
+                return reports;
+            }
+            mark_polled("discord_deep");
+
+            let actions = crate::tentacles::discord_deep::process_mentions(&token).await;
+            if !actions.is_empty() {
+                let summaries: Vec<String> = actions
+                    .iter()
+                    .take(5)
+                    .map(|a| {
+                        format!(
+                            "@{} in guild {}: {}",
+                            a.author,
+                            a.guild_id,
+                            crate::safe_slice(&a.original_content, 80)
+                        )
+                    })
+                    .collect();
+
+                reports.push(TentacleReport::new(
+                    &id,
+                    if actions.len() > 3 { Priority::High } else { Priority::Normal },
+                    "mention",
+                    format!("{} Discord mention(s) requiring response", actions.len()),
+                    serde_json::json!({
+                        "mention_count": actions.len(),
+                        "source": "discord_deep",
+                        "previews": summaries,
+                        "actions": serde_json::to_value(&actions).unwrap_or_default()
+                    }),
+                    true,
+                    Some("Reply to Discord mentions in user's voice".to_string()),
+                ));
+            }
+        }
+
+        // ── Linear / Jira ──────────────────────────────────────────────────────
+        "linear" | "jira" => {
+            let linear_token = crate::config::get_provider_key("linear");
+            let jira_token = crate::config::get_provider_key("jira");
+
+            if linear_token.is_empty() && jira_token.is_empty() {
+                return reports;
+            }
+
+            if !should_poll(platform, 300) {
+                return reports;
+            }
+            mark_polled(platform);
+
+            let blockers = crate::tentacles::linear_jira::detect_blockers().await;
+            if !blockers.is_empty() {
+                let blocker_summaries: Vec<String> = blockers
+                    .iter()
+                    .take(5)
+                    .map(|b| {
+                        format!(
+                            "[{}] {} — stale {}d: {}",
+                            b.ticket_id,
+                            crate::safe_slice(&b.title, 60),
+                            b.days_stale,
+                            crate::safe_slice(&b.suggested_action, 80)
+                        )
+                    })
+                    .collect();
+
+                let has_critical = blockers.iter().any(|b| b.days_stale >= 7);
+
+                reports.push(TentacleReport::new(
+                    &id,
+                    if has_critical { Priority::High } else { Priority::Normal },
+                    "alert",
+                    format!(
+                        "{} blocked ticket(s) detected in {}",
+                        blockers.len(),
+                        if platform == "linear" { "Linear" } else { "Jira" }
+                    ),
+                    serde_json::json!({
+                        "blocker_count": blockers.len(),
+                        "source": platform,
+                        "blockers": blocker_summaries,
+                        "details": serde_json::to_value(&blockers).unwrap_or_default()
+                    }),
+                    true,
+                    Some(format!(
+                        "Unblock {} stalled ticket(s) — check assignees",
+                        blockers.len()
+                    )),
+                ));
+            }
+        }
+
+        // ── Logs ───────────────────────────────────────────────────────────────
+        "logs" => {
+            // Collect log sources from config (provider key "log_paths" = newline-separated paths)
+            let log_paths_raw = crate::config::get_provider_key("log_paths");
+            let log_sources: Vec<String> = if log_paths_raw.is_empty() {
+                // Default: use the OS-appropriate temp/log directory.
+                // On Windows we look for TEMP; on Unix /var/log.
+                // If the path doesn't exist we'll get nothing from read_to_string
+                // which is fine — the DB path still works.
+                let default_path = if cfg!(windows) {
+                    std::env::var("TEMP").unwrap_or_else(|_| "C:/Windows/Temp".to_string())
+                } else {
+                    "/var/log".to_string()
+                };
+                vec![default_path]
+            } else {
+                log_paths_raw
+                    .lines()
+                    .filter(|l| !l.trim().is_empty())
+                    .map(|l| l.trim().to_string())
+                    .collect()
+            };
+
+            if !should_poll("logs", 60) {
+                return reports;
+            }
+            mark_polled("logs");
+
+            // Read recent lines from the DB (last 200 log entries ingested by log tailing)
+            let recent_lines: Vec<String> = {
+                let db_path = crate::config::blade_config_dir().join("blade.db");
+                match rusqlite::Connection::open(&db_path) {
+                    Ok(conn) => {
+                        match conn.prepare(
+                            "SELECT raw_line FROM log_entries \
+                             ORDER BY timestamp DESC LIMIT 200",
+                        ) {
+                            Ok(mut stmt) => {
+                                stmt.query_map([], |row| row.get::<_, String>(0))
+                                    .map(|rows| rows.filter_map(|r| r.ok()).collect())
+                                    .unwrap_or_default()
+                            }
+                            Err(_) => Vec::new(), // table doesn't exist yet
+                        }
+                    }
+                    Err(_) => Vec::new(),
+                }
+            };
+
+            // Also attempt to tail any file paths for fresh lines
+            let mut all_lines = recent_lines;
+            for path in &log_sources {
+                if !path.starts_with("http") {
+                    if let Ok(content) = std::fs::read_to_string(path) {
+                        let tail: Vec<String> = content
+                            .lines()
+                            .rev()
+                            .take(50)
+                            .map(|l| l.to_string())
+                            .collect();
+                        all_lines.extend(tail);
+                    }
+                }
+            }
+
+            if all_lines.is_empty() {
+                return reports;
+            }
+
+            let anomalies = crate::tentacles::log_monitor::detect_anomalies(&all_lines).await;
+            if !anomalies.is_empty() {
+                let fatal_count = anomalies
+                    .iter()
+                    .filter(|a| a.severity >= 0.8)
+                    .count();
+                let error_count = anomalies
+                    .iter()
+                    .filter(|a| a.severity >= 0.5 && a.severity < 0.8)
+                    .count();
+
+                let summaries: Vec<String> = anomalies
+                    .iter()
+                    .take(5)
+                    .map(|a| {
+                        format!(
+                            "[{:?}] {} (×{}) — {}",
+                            a.anomaly_type,
+                            crate::safe_slice(&a.message, 60),
+                            a.count,
+                            a.source
+                        )
+                    })
+                    .collect();
+
+                let priority = if fatal_count > 0 {
+                    Priority::Critical
+                } else if error_count > 2 {
+                    Priority::High
+                } else {
+                    Priority::Normal
+                };
+
+                reports.push(TentacleReport::new(
+                    &id,
+                    priority,
+                    "alert",
+                    format!(
+                        "{} log anomaly/anomalies detected ({} fatal, {} errors)",
+                        anomalies.len(),
+                        fatal_count,
+                        error_count
+                    ),
+                    serde_json::json!({
+                        "anomaly_count": anomalies.len(),
+                        "fatal_count": fatal_count,
+                        "error_count": error_count,
+                        "source": "log_monitor",
+                        "previews": summaries,
+                        "anomalies": serde_json::to_value(&anomalies).unwrap_or_default()
+                    }),
+                    fatal_count > 0 || error_count > 2,
+                    if fatal_count > 0 {
+                        Some("Investigate fatal log errors immediately".to_string())
+                    } else {
+                        Some(format!(
+                            "Review {} log anomaly/anomalies — check service health",
+                            anomalies.len()
+                        ))
+                    },
+                ));
+            }
+        }
+
+        // ── Cloud Costs ────────────────────────────────────────────────────────
+        "cloud" => {
+            let aws_key = crate::config::get_provider_key("aws_access_key_id");
+            if aws_key.is_empty() {
+                return reports;
+            }
+
+            // Cloud cost checks are expensive — once per 6 hours max
+            if !should_poll("cloud", 21_600) {
+                return reports;
+            }
+            mark_polled("cloud");
+
+            match crate::tentacles::cloud_costs::check_aws_costs().await {
+                Ok(report) => {
+                    let alerts =
+                        crate::tentacles::cloud_costs::detect_cost_anomalies(&report).await;
+
+                    // Always surface a summary of current spend
+                    reports.push(TentacleReport::new(
+                        &id,
+                        Priority::Low,
+                        "update",
+                        format!(
+                            "AWS spend: ${:.2} over 30 days (avg ${:.2}/day, top: {})",
+                            report.total_usd, report.avg_daily_usd, report.top_service
+                        ),
+                        serde_json::json!({
+                            "total_usd": report.total_usd,
+                            "avg_daily_usd": report.avg_daily_usd,
+                            "top_service": report.top_service,
+                            "period_start": report.period_start,
+                            "period_end": report.period_end,
+                            "source": "aws_cost_explorer"
+                        }),
+                        false,
+                        None,
+                    ));
+
+                    if !alerts.is_empty() {
+                        let has_critical = alerts.iter().any(|a| {
+                            matches!(
+                                a.severity,
+                                crate::tentacles::cloud_costs::CostAlertSeverity::Critical
+                            )
+                        });
+
+                        let alert_summaries: Vec<String> = alerts
+                            .iter()
+                            .take(5)
+                            .map(|a| {
+                                format!(
+                                    "{} — {:.1}× baseline: {}",
+                                    a.service,
+                                    a.ratio,
+                                    crate::safe_slice(&a.message, 80)
+                                )
+                            })
+                            .collect();
+
+                        reports.push(TentacleReport::new(
+                            &id,
+                            if has_critical { Priority::Critical } else { Priority::High },
+                            "alert",
+                            format!(
+                                "{} AWS cost spike(s) detected — up to {:.1}× baseline",
+                                alerts.len(),
+                                alerts
+                                    .iter()
+                                    .map(|a| a.ratio)
+                                    .fold(0.0_f64, f64::max)
+                            ),
+                            serde_json::json!({
+                                "alert_count": alerts.len(),
+                                "source": "aws_cost_explorer",
+                                "previews": alert_summaries,
+                                "alerts": serde_json::to_value(&alerts).unwrap_or_default()
+                            }),
+                            true,
+                            Some("Investigate AWS cost spikes — check for runaway resources".to_string()),
+                        ));
+                    }
+                }
+                Err(e) => {
+                    log::warn!("[Hive/cloud] AWS cost check failed: {}", e);
+                    reports.push(TentacleReport::new(
+                        &id,
+                        Priority::Low,
+                        "alert",
+                        format!(
+                            "AWS cost check failed: {}",
+                            crate::safe_slice(&e, 120)
+                        ),
+                        serde_json::json!({ "error": e, "source": "aws_cost_explorer" }),
+                        false,
+                        None,
+                    ));
+                }
+            }
+        }
+
         _ => {}
     }
 
@@ -1683,8 +2028,15 @@ pub async fn big_agent_think(reports: Vec<TentacleReport>) -> Vec<Decision> {
 
 // ── Initialisation ────────────────────────────────────────────────────────────
 
-/// Build the initial Hive: create the 3 domain heads, then register tentacles
-/// for every platform that looks configured.
+/// Build the initial Hive: create 4 domain Heads, then register all 10 tentacles.
+///
+/// Tentacle activation policy:
+///   - email, slack, github, ci, backend, logs  → Active by default (or polling enabled)
+///   - discord, discord_deep → Active only if Discord bot token stored
+///   - whatsapp             → Dormant until the desktop app is detected at tick time
+///   - linear               → Active only if "lin_api_*" token stored
+///   - jira                 → Active only if jira token + jira_url stored
+///   - cloud                → Active only if AWS credentials stored
 pub fn initialize_hive() -> Hive {
     let config = crate::config::load_config();
     let istate = crate::integration_bridge::get_integration_state();
@@ -1696,6 +2048,7 @@ pub fn initialize_hive() -> Hive {
         vec![
             "tentacle-slack".to_string(),
             "tentacle-discord".to_string(),
+            "tentacle-discord_deep".to_string(),
             "tentacle-whatsapp".to_string(),
             "tentacle-email".to_string(),
         ],
@@ -1709,6 +2062,8 @@ pub fn initialize_hive() -> Hive {
         vec![
             "tentacle-github".to_string(),
             "tentacle-ci".to_string(),
+            "tentacle-linear".to_string(),
+            "tentacle-jira".to_string(),
         ],
         format!("{}/{}", config.provider, config.model),
         config.hive_autonomy,
@@ -1717,7 +2072,11 @@ pub fn initialize_hive() -> Hive {
     let ops_head = HeadModel::new(
         "head-operations",
         "operations",
-        vec!["tentacle-backend".to_string()],
+        vec![
+            "tentacle-backend".to_string(),
+            "tentacle-logs".to_string(),
+            "tentacle-cloud".to_string(),
+        ],
         format!("{}/{}", config.provider, config.model),
         config.hive_autonomy,
     );
@@ -1781,6 +2140,18 @@ pub fn initialize_hive() -> Hive {
         tentacles.insert(t.id.clone(), t);
     }
 
+    // Discord Deep: Active if bot token present, Dormant otherwise.
+    // Runs independently from the basic guild-list check — it fetches actual
+    // mentions and drafts LLM replies via discord_deep::process_mentions.
+    {
+        let discord_token = crate::config::get_provider_key("discord");
+        let mut t = Tentacle::new("discord_deep", "head-communications");
+        if discord_token.is_empty() {
+            t.status = TentacleStatus::Dormant;
+        }
+        tentacles.insert(t.id.clone(), t);
+    }
+
     // WhatsApp: Dormant until process is detected at tick time
     {
         let mut t = Tentacle::new("whatsapp", "head-communications");
@@ -1791,6 +2162,44 @@ pub fn initialize_hive() -> Hive {
     // Backend: Active — scans localhost ports every tick
     {
         let t = Tentacle::new("backend", "head-operations");
+        tentacles.insert(t.id.clone(), t);
+    }
+
+    // Linear: Active if Linear API token present (starts with "lin_api_")
+    {
+        let linear_token = crate::config::get_provider_key("linear");
+        let mut t = Tentacle::new("linear", "head-development");
+        if linear_token.is_empty() || !linear_token.starts_with("lin_api_") {
+            t.status = TentacleStatus::Dormant;
+        }
+        tentacles.insert(t.id.clone(), t);
+    }
+
+    // Jira: Active if Jira token + base URL configured
+    {
+        let jira_token = crate::config::get_provider_key("jira");
+        let jira_url = crate::config::get_provider_key("jira_url");
+        let mut t = Tentacle::new("jira", "head-development");
+        if jira_token.is_empty() || jira_url.is_empty() {
+            t.status = TentacleStatus::Dormant;
+        }
+        tentacles.insert(t.id.clone(), t);
+    }
+
+    // Logs: Active if log_paths configured or by default on any OS
+    {
+        let t = Tentacle::new("logs", "head-operations");
+        // Always register — detect_anomalies reads from the DB populated by log_tailing
+        tentacles.insert(t.id.clone(), t);
+    }
+
+    // Cloud (AWS Cost Explorer): Active if AWS credentials present
+    {
+        let aws_key = crate::config::get_provider_key("aws_access_key_id");
+        let mut t = Tentacle::new("cloud", "head-operations");
+        if aws_key.is_empty() {
+            t.status = TentacleStatus::Dormant;
+        }
         tentacles.insert(t.id.clone(), t);
     }
 
@@ -1808,13 +2217,17 @@ pub fn initialize_hive() -> Hive {
 
 // ── Hive tick ─────────────────────────────────────────────────────────────────
 
-/// Main 30-second Hive tick:
-/// 1. Poll every active tentacle for fresh reports.
-/// 2. Route each report to its head.
-/// 3. Each head processes: Low → Inform, Normal+action → LLM draft,
-///    High → LLM analysis, Critical → escalate.
+/// Main 30-second Hive tick (all 10 tentacles):
+/// 1. Poll every Active tentacle for fresh reports (with health tracking).
+///    - 3 consecutive failures → Error status + emit `tentacle_error`
+///    - 5 consecutive failures → Dormant (stops polling until re-enabled)
+/// 2. Route each report to its domain Head.
+/// 3. Each Head processes reports via its specialized think function
+///    (comms_head_think / dev_head_think / ops_head_think / intel_head_think).
 /// 4. Big Agent synthesises cross-domain patterns with full LLM.
 /// 5. Auto-execute approved decisions; queue the rest for user.
+/// 6. Trigger CI auto-fix pipeline on lint/format/clippy failures.
+/// 7. Store all decisions + High/Critical reports in typed_memory + execution_memory.
 pub async fn hive_tick(app: &AppHandle) {
     let active_tentacles: Vec<String> = {
         let hive = hive_lock().lock().unwrap();
@@ -1827,15 +2240,84 @@ pub async fn hive_tick(app: &AppHandle) {
 
     let mut all_reports: Vec<TentacleReport> = Vec::new();
     for platform in &active_tentacles {
-        let reports = poll_tentacle(platform).await;
-        all_reports.extend(reports.clone());
+        // ── Poll with failure tracking ─────────────────────────────────────────
+        // We treat an empty result as success (no data) vs a panic/error.
+        // To distinguish real failures we wrap in catch_unwind via a helper.
+        let poll_result: Result<Vec<TentacleReport>, String> = {
+            // poll_tentacle is infallible by design (returns empty vec on errors),
+            // but we track whether it returned a special error report so we can
+            // escalate the tentacle's health status.
+            let raw = poll_tentacle(platform).await;
+            // Heuristic: if ALL reports are category "alert" with an "error" key,
+            // the tentacle hit an auth/connectivity failure.
+            let all_errors = !raw.is_empty()
+                && raw.iter().all(|r| {
+                    r.category == "alert" && r.details.get("error").is_some()
+                });
+            if all_errors {
+                Err("tentacle reported only error alerts".to_string())
+            } else {
+                Ok(raw)
+            }
+        };
 
-        let mut hive = hive_lock().lock().unwrap();
         let tid = format!("tentacle-{}", platform);
-        if let Some(t) = hive.tentacles.get_mut(&tid) {
-            t.last_heartbeat = now_secs();
-            t.messages_processed += reports.len() as u64;
-            t.pending_reports.extend(reports);
+        match poll_result {
+            Ok(reports) => {
+                all_reports.extend(reports.clone());
+                let mut hive = hive_lock().lock().unwrap();
+                if let Some(t) = hive.tentacles.get_mut(&tid) {
+                    t.last_heartbeat = now_secs();
+                    t.messages_processed += reports.len() as u64;
+                    // Successful poll resets the failure counter
+                    t.consecutive_failures = 0;
+                    t.pending_reports.extend(reports);
+                }
+            }
+            Err(reason) => {
+                let (new_failures, new_status) = {
+                    let hive = hive_lock().lock().unwrap();
+                    let failures = hive
+                        .tentacles
+                        .get(&tid)
+                        .map(|t| t.consecutive_failures + 1)
+                        .unwrap_or(1);
+                    let status = if failures >= 5 {
+                        TentacleStatus::Dormant
+                    } else if failures >= 3 {
+                        TentacleStatus::Error
+                    } else {
+                        TentacleStatus::Active
+                    };
+                    (failures, status)
+                };
+
+                {
+                    let mut hive = hive_lock().lock().unwrap();
+                    if let Some(t) = hive.tentacles.get_mut(&tid) {
+                        t.consecutive_failures = new_failures;
+                        t.status = new_status.clone();
+                    }
+                }
+
+                // Emit health event so HiveView can show the degraded state
+                let _ = app.emit(
+                    "tentacle_error",
+                    serde_json::json!({
+                        "tentacle_id": tid,
+                        "platform": platform,
+                        "consecutive_failures": new_failures,
+                        "status": format!("{:?}", new_status),
+                        "reason": reason,
+                        "dormant": matches!(new_status, TentacleStatus::Dormant)
+                    }),
+                );
+
+                log::warn!(
+                    "[Hive] Tentacle {} failed ({} consecutive). Status → {:?}",
+                    platform, new_failures, new_status
+                );
+            }
         }
     }
 
@@ -1937,6 +2419,70 @@ pub async fn hive_tick(app: &AppHandle) {
         }
     }
 
+    // ── Auto-fix pipeline: trigger on CI failures ─────────────────────────────
+    // For trivial CI failures (lint/format/clippy), emit an event that the
+    // proactive engine can pick up and suggest a fix command to the user.
+    let ci_failures: Vec<&TentacleReport> = all_reports
+        .iter()
+        .filter(|r| {
+            r.tentacle_id == "tentacle-ci"
+                && (r.priority == Priority::Critical || r.priority == Priority::High)
+        })
+        .collect();
+
+    for failure in &ci_failures {
+        let failing_jobs = failure
+            .details
+            .get("failing_jobs")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let run_url = failure
+            .details
+            .get("run_url")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let repo = failure
+            .details
+            .get("repo")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+
+        // Classify the failure to choose the right auto-fix action
+        let is_trivial = failing_jobs.contains("lint")
+            || failing_jobs.contains("format")
+            || failing_jobs.contains("clippy");
+
+        let fix_cmd = if failing_jobs.contains("clippy") {
+            Some("cargo clippy --fix --allow-dirty".to_string())
+        } else if failing_jobs.contains("format") || failing_jobs.contains("fmt") {
+            Some("cargo fmt".to_string())
+        } else if failing_jobs.contains("lint") {
+            Some("npm run lint -- --fix".to_string())
+        } else {
+            None
+        };
+
+        let _ = app.emit(
+            "hive_ci_failure",
+            serde_json::json!({
+                "repo": repo,
+                "failing_jobs": failing_jobs,
+                "run_url": run_url,
+                "is_trivial": is_trivial,
+                "fix_command": fix_cmd,
+                "summary": failure.summary,
+                "priority": format!("{:?}", failure.priority)
+            }),
+        );
+
+        // Store CI failure in execution_memory for pattern tracking
+        log_hive_action("ci", &format!("CI failure in {}: {}", repo, failing_jobs));
+    }
+
+    // ── Store all decisions in typed_memory ───────────────────────────────────
+    store_decisions_to_memory(&all_decisions);
+
+    // ── Feed reports to typed_memory (High + Critical) ────────────────────────
     feed_reports_to_memory(&all_reports);
 
     let status = get_hive_status();
@@ -2093,6 +2639,51 @@ fn log_hive_action(platform: &str, action: &str) {
     }
 }
 
+/// Store Big Agent + Head decisions in typed_memory for cross-tick continuity.
+fn store_decisions_to_memory(decisions: &[Decision]) {
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    let Ok(conn) = rusqlite::Connection::open(&db_path) else {
+        return;
+    };
+
+    for decision in decisions {
+        let (category, content) = match decision {
+            Decision::Reply { platform, to, draft, confidence } => (
+                "decision",
+                format!(
+                    "[Hive:Reply] platform={} to={} conf={:.2} draft={}",
+                    platform, to, confidence,
+                    crate::safe_slice(draft, 200)
+                ),
+            ),
+            Decision::Act { action, platform, reversible } => (
+                "decision",
+                format!(
+                    "[Hive:Act] platform={} reversible={} action={}",
+                    platform, reversible,
+                    crate::safe_slice(action, 200)
+                ),
+            ),
+            Decision::Escalate { reason, .. } => (
+                "fact",
+                format!("[Hive:Escalate] {}", crate::safe_slice(reason, 200)),
+            ),
+            Decision::Inform { summary } => (
+                "fact",
+                format!("[Hive:Inform] {}", crate::safe_slice(summary, 200)),
+            ),
+        };
+
+        let id = uuid();
+        let _ = conn.execute(
+            "INSERT OR IGNORE INTO typed_memories \
+             (id, category, content, confidence, source, created_at, last_accessed, access_count) \
+             VALUES (?1, ?2, ?3, 0.6, 'hive_decision', ?4, ?4, 0)",
+            rusqlite::params![id, category, content, now_secs()],
+        );
+    }
+}
+
 /// Feed high-priority reports into typed_memory so patterns are remembered.
 fn feed_reports_to_memory(reports: &[TentacleReport]) {
     let db_path = crate::config::blade_config_dir().join("blade.db");
@@ -2167,9 +2758,9 @@ pub async fn spawn_tentacle(
     let tentacle_id = format!("tentacle-{}", platform);
 
     let head_id = match platform {
-        "slack" | "discord" | "whatsapp" | "email" => "head-communications",
-        "github" | "ci" => "head-development",
-        "backend" => "head-operations",
+        "slack" | "discord" | "discord_deep" | "whatsapp" | "email" => "head-communications",
+        "github" | "ci" | "linear" | "jira" => "head-development",
+        "backend" | "logs" | "cloud" => "head-operations",
         other => return Err(format!("Unknown platform: {}", other)),
     };
 

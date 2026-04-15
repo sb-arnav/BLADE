@@ -284,33 +284,39 @@ struct SequencePattern {
     suggestion: &'static str,
 }
 
-const SEQUENCE_PATTERNS: &[SequencePattern] = &[
+static SP_GIT: &[&str] = &["git", "git", "git"];
+static SP_CARGO: &[&str] = &["cargo", "cargo", "cargo"];
+static SP_GREP: &[&str] = &["grep", "grep", "grep"];
+static SP_NPM: &[&str] = &["npm", "npm", "npm"];
+static SP_DOCKER: &[&str] = &["docker", "docker"];
+
+static SEQUENCE_PATTERNS: &[SequencePattern] = &[
     SequencePattern {
-        roots: &["git", "git", "git"],
+        roots: SP_GIT,
         label: "deep_git_investigation",
         suggestion: "You're doing a deep git investigation (log → diff → stash). \
                      Want me to summarise what changed, who touched it, and when?",
     },
     SequencePattern {
-        roots: &["cargo", "cargo", "cargo"],
+        roots: SP_CARGO,
         label: "iterative_rust_debug",
         suggestion: "You've run cargo multiple times in a row. \
                      Want me to look at the compiler errors and suggest a fix?",
     },
     SequencePattern {
-        roots: &["grep", "grep", "grep"],
+        roots: SP_GREP,
         label: "code_spelunking",
         suggestion: "You're doing deep code search. \
                      Want me to run a semantic search across the codebase instead?",
     },
     SequencePattern {
-        roots: &["npm", "npm", "npm"],
+        roots: SP_NPM,
         label: "npm_struggle",
         suggestion: "You've run npm multiple times. \
                      Common fixes: rm -rf node_modules && npm ci, or check for lockfile conflicts.",
     },
     SequencePattern {
-        roots: &["docker", "docker"],
+        roots: SP_DOCKER,
         label: "docker_iteration",
         suggestion: "You're iterating on Docker. \
                      Want me to check the build context or Dockerfile for common issues?",
@@ -360,7 +366,7 @@ fn detect_command_sequence(
 /// Learn from (trigger, followup) pairs in the recent command history.
 /// Called after each tick to record patterns like "edit src/ → run tests".
 fn learn_workflow_pattern(recent: &mut Vec<(String, String, u32, u32)>, new_cmd: &str, prev_cmd: Option<&str>) {
-    let known_workflows: &[(&str, &str)] = &[
+    let known_workflows_arr: [(&str, &str); 6] = [
         ("edit", "cargo test"),
         ("edit", "npm test"),
         ("git commit", "git push"),
@@ -368,6 +374,7 @@ fn learn_workflow_pattern(recent: &mut Vec<(String, String, u32, u32)>, new_cmd:
         ("npm run build", "npm test"),
         ("git add", "git commit"),
     ];
+    let known_workflows: &[(&str, &str)] = known_workflows_arr.as_slice();
 
     let Some(prev) = prev_cmd else { return };
 

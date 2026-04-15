@@ -122,7 +122,7 @@ async fn llm_complete(_app: &AppHandle, system: &str, user: &str) -> Result<Stri
     ];
     let no_tools: Vec<crate::providers::ToolDefinition> = vec![];
 
-    crate::providers::complete_turn(&provider, &api_key, &model, &messages, &no_tools, None)
+    crate::providers::complete_turn(&provider, &api_key, &model, &messages, &no_tools, config.base_url.as_deref())
         .await
         .map(|t| t.content)
         .map_err(|e| format!("LLM call failed: {e}"))

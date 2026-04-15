@@ -32,12 +32,12 @@ function ProgressBar({
 }) {
   const pct = Math.min(100, Math.round((value / max) * 100));
   const color =
-    pct >= 100 ? "bg-red-500" : pct >= 75 ? "bg-yellow-500" : "bg-blade-accent";
+    pct >= 100 ? "#ff3b30" : pct >= 75 ? "#f59e0b" : "#6366f1";
   return (
-    <div className={`w-full h-2 rounded-full bg-blade-border overflow-hidden ${className ?? ""}`}>
+    <div className={`w-full rounded-full overflow-hidden ${className ?? ""}`} style={{ height: 4, background: "rgba(255,255,255,0.08)" }}>
       <div
-        className={`h-full rounded-full transition-all duration-500 ${color}`}
-        style={{ width: `${pct}%` }}
+        className="h-full rounded-full transition-all duration-500"
+        style={{ width: `${pct}%`, background: color }}
       />
     </div>
   );
@@ -160,7 +160,7 @@ export function HealthPanel({ onBack }: { onBack: () => void }) {
         <button
           onClick={load}
           disabled={loading}
-          className="text-[10px] text-blade-muted hover:text-blade-accent transition-colors disabled:opacity-40"
+          className="text-xs text-blade-muted hover:text-blade-accent transition-colors disabled:opacity-40"
         >
           {loading ? "Loading..." : "Refresh"}
         </button>
@@ -230,7 +230,7 @@ export function HealthPanel({ onBack }: { onBack: () => void }) {
           <>
             {/* Current streak — hero number */}
             <div className="border border-blade-border rounded-xl bg-blade-surface p-5 text-center space-y-1">
-              <p className="text-[10px] text-blade-muted uppercase tracking-widest">Current Session</p>
+              <p className="text-xs text-blade-muted uppercase tracking-widest">Current Session</p>
               <p className="text-4xl font-bold text-blade-accent tabular-nums leading-none">
                 {formatMinutes(stats.current_streak_minutes)}
               </p>
@@ -248,7 +248,7 @@ export function HealthPanel({ onBack }: { onBack: () => void }) {
                 </span>
               </div>
               <ProgressBar value={stats.daily_total_minutes} max={DAILY_RECOMMENDED_MINUTES} />
-              <div className="flex items-center justify-between text-[10px] text-blade-muted">
+              <div className="flex items-center justify-between text-xs text-blade-muted">
                 <span>{dailyPct}% of daily max</span>
                 {dailyPct >= 100 && (
                   <span className="text-red-400 font-medium">Over limit — take a break</span>
@@ -262,16 +262,16 @@ export function HealthPanel({ onBack }: { onBack: () => void }) {
             {/* Stats grid */}
             <div className="grid grid-cols-2 gap-3">
               <div className="border border-blade-border rounded-lg bg-blade-surface p-3 text-center space-y-0.5">
-                <p className="text-[10px] text-blade-muted uppercase tracking-wide">Weekly Avg</p>
+                <p className="text-xs text-blade-muted uppercase tracking-wide">Weekly Avg</p>
                 <p className="text-xl font-bold text-blade-text tabular-nums">
                   {formatMinutes(stats.weekly_avg_minutes)}
                 </p>
-                <p className="text-[10px] text-blade-muted">per day</p>
+                <p className="text-xs text-blade-muted">per day</p>
               </div>
               <div className="border border-blade-border rounded-lg bg-blade-surface p-3 text-center space-y-0.5">
-                <p className="text-[10px] text-blade-muted uppercase tracking-wide">Breaks Taken</p>
+                <p className="text-xs text-blade-muted uppercase tracking-wide">Breaks Taken</p>
                 <p className="text-xl font-bold text-blade-text tabular-nums">{stats.breaks_taken}</p>
-                <p className="text-[10px] text-blade-muted">today</p>
+                <p className="text-xs text-blade-muted">today</p>
               </div>
             </div>
 
@@ -279,7 +279,7 @@ export function HealthPanel({ onBack }: { onBack: () => void }) {
             <div className="border border-blade-border rounded-lg bg-blade-surface p-4 space-y-3">
               <div>
                 <p className="text-xs font-semibold text-blade-secondary">Ready for a break?</p>
-                <p className="text-[11px] text-blade-muted mt-0.5">
+                <p className="text-xs text-blade-muted mt-0.5">
                   Step away, stretch, rest your eyes. BLADE will log it.
                 </p>
               </div>
@@ -298,7 +298,7 @@ export function HealthPanel({ onBack }: { onBack: () => void }) {
             </div>
 
             {/* Guidance */}
-            <div className="border border-blade-border/50 rounded-lg bg-blade-surface/40 p-3 space-y-1.5 text-[11px] text-blade-muted">
+            <div className="border border-blade-border/50 rounded-lg bg-blade-surface/40 p-3 space-y-1.5 text-xs text-blade-muted">
               <p className="font-medium text-blade-secondary text-xs">Health guidelines</p>
               <ul className="space-y-1 list-none">
                 <li className="flex items-start gap-1.5">

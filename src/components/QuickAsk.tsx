@@ -1,12 +1,4 @@
-/// BLADE QuickAsk — Alt+Space popup with contextual suggestions, command history,
-/// inline results, and slash command support.
-///
-/// Sci-fi upgrades:
-///   - Blurred glass background with border glow
-///   - Input auto-focuses with cursor blink animation
-///   - Results stream in via typewriter effect (not instant)
-///   - "BLADE is thinking" animation (3 dots with wave)
-///   - Recent commands show keyboard shortcuts [1]–[5]
+/// BLADE QuickAsk — Spotlight-style popup. Clean frosted glass, Apple style.
 ///
 /// Slash commands:
 ///   /screenshot  — capture screen + analyze
@@ -42,9 +34,6 @@ const SLASH_COMMANDS = [
   { cmd: "/lock",       desc: "Lock screen",               icon: "🔒" },
   { cmd: "/break",      desc: "Take a break reminder",     icon: "☕" },
 ];
-
-// Typewriter speed: ms per character added to display
-const TYPEWRITER_CHAR_MS = 8;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -123,47 +112,11 @@ function buildSuggestions(
   return suggestions.slice(0, 3);
 }
 
-// ── Thinking dots component ───────────────────────────────────────────────────
-
-function ThinkingDots() {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "4px",
-        padding: "10px 0",
-      }}
-    >
-      <span style={{ fontSize: "10px", color: "rgba(99,102,241,0.6)", marginRight: "4px", letterSpacing: "0.04em" }}>
-        BLADE
-      </span>
-      {[0, 1, 2].map((i) => (
-        <span
-          key={i}
-          style={{
-            display: "inline-block",
-            width: "5px",
-            height: "5px",
-            borderRadius: "50%",
-            background: "rgba(99,102,241,0.7)",
-            animation: `thinkWave 1s ease-in-out infinite`,
-            animationDelay: `${i * 0.16}s`,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function QuickAsk() {
   const [query, setQuery] = useState("");
-  // fullResponse: complete buffered response from streaming
-  const [fullResponse, setFullResponse] = useState("");
-  // displayedResponse: typewriter-revealed portion of fullResponse
-  const [displayedResponse, setDisplayedResponse] = useState("");
+  const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [contextApp, setContextApp] = useState<string | null>(null);
@@ -176,34 +129,6 @@ export function QuickAsk() {
   const streamBuffer = useRef("");
   const messagesRef = useRef<Message[]>([]);
   const clipboardRef = useRef("");
-
-  // Typewriter state
-  const typewriterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const typewriterPosRef = useRef(0);
-
-  // Drive typewriter: reveal fullResponse char-by-char
-  useEffect(() => {
-    if (typewriterTimerRef.current) clearTimeout(typewriterTimerRef.current);
-    if (!fullResponse) {
-      setDisplayedResponse("");
-      typewriterPosRef.current = 0;
-      return;
-    }
-
-    const revealNext = () => {
-      typewriterPosRef.current = Math.min(typewriterPosRef.current + 1, fullResponse.length);
-      setDisplayedResponse(fullResponse.slice(0, typewriterPosRef.current));
-      if (typewriterPosRef.current < fullResponse.length) {
-        typewriterTimerRef.current = setTimeout(revealNext, TYPEWRITER_CHAR_MS);
-      }
-    };
-
-    if (typewriterPosRef.current < fullResponse.length) {
-      typewriterTimerRef.current = setTimeout(revealNext, TYPEWRITER_CHAR_MS);
-    }
-
-    return () => { if (typewriterTimerRef.current) clearTimeout(typewriterTimerRef.current); };
-  }, [fullResponse]);
 
   // ── Context capture on focus ──────────────────────────────────────────────
 
@@ -263,7 +188,7 @@ export function QuickAsk() {
     const unlistenToken = listen<string>("chat_token", (event) => {
       if (!active) return;
       streamBuffer.current += event.payload;
-      setFullResponse(streamBuffer.current);
+      setResponse(streamBuffer.current);
     });
     const unlistenDone = listen("chat_done", () => {
       if (!active) return;
@@ -280,7 +205,7 @@ export function QuickAsk() {
 
   useEffect(() => {
     const handleGlobal = (e: KeyboardEvent) => {
-      if (!showSuggestions || loading || fullResponse) return;
+      if (!showSuggestions || loading || response) return;
       const key = parseInt(e.key);
       if (key >= 1 && key <= 5 && !e.ctrlKey && !e.metaKey && !e.altKey) {
         // Only fire if input is focused and empty
@@ -297,7 +222,7 @@ export function QuickAsk() {
     window.addEventListener("keydown", handleGlobal);
     return () => window.removeEventListener("keydown", handleGlobal);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showSuggestions, loading, fullResponse, history, query]);
+  }, [showSuggestions, loading, response, history, query]);
 
   // ── Slash command handling ────────────────────────────────────────────────
 
@@ -305,11 +230,9 @@ export function QuickAsk() {
     switch (cmd) {
       case "/screenshot": {
         setLoading(true);
-        setFullResponse("");
-        setDisplayedResponse("");
+        setResponse("");
         setError(null);
         streamBuffer.current = "";
-        typewriterPosRef.current = 0;
         try {
           const base64 = await invoke<string>("capture_screen");
           await invoke("send_message_stream", {
@@ -328,7 +251,7 @@ export function QuickAsk() {
         try {
           await invoke("voice_start_recording");
           setQuery("");
-          setFullResponse("Listening… press Ctrl+Space again to stop.");
+          setResponse("Listening… press Ctrl+Space again to stop.");
         } catch (e) {
           setError(typeof e === "string" ? e : "Voice start failed");
         }
@@ -366,15 +289,13 @@ export function QuickAsk() {
 
   const resetState = useCallback(() => {
     setQuery("");
-    setFullResponse("");
-    setDisplayedResponse("");
+    setResponse("");
     setError(null);
     setLoading(false);
     setContextApp(null);
     setShowSuggestions(true);
     setSelectedIdx(-1);
     streamBuffer.current = "";
-    typewriterPosRef.current = 0;
     messagesRef.current = [];
   }, []);
 
@@ -417,9 +338,7 @@ export function QuickAsk() {
     messagesRef.current = nextMessages;
 
     streamBuffer.current = "";
-    typewriterPosRef.current = 0;
-    setFullResponse("");
-    setDisplayedResponse("");
+    setResponse("");
     setError(null);
     setLoading(true);
     setQuery("");
@@ -468,7 +387,7 @@ export function QuickAsk() {
     async (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        if (fullResponse || error) {
+        if (response || error) {
           resetState();
         } else {
           await hide();
@@ -516,62 +435,42 @@ export function QuickAsk() {
         return;
       }
     },
-    [hide, openMain, query, sendMessage, allSuggestions, selectedIdx, fullResponse, error, resetState]
+    [hide, openMain, query, sendMessage, allSuggestions, selectedIdx, response, error, resetState]
   );
 
-  // ── Styles ────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
 
-  const hasResponse = fullResponse.length > 0;
+  const hasResponse = response.length > 0;
   const showSuggestionList = showSuggestions && !loading && !hasResponse && !error && allSuggestions.length > 0;
   const isSlashMode = query.startsWith("/");
-  const typewriterDone = displayedResponse.length >= fullResponse.length;
-
-  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <>
       <style>{`
-        @keyframes thinkWave {
-          0%, 100% { transform: translateY(0); opacity: 0.4; }
-          50% { transform: translateY(-4px); opacity: 1; }
-        }
-        @keyframes inputGlow {
-          0%, 100% { box-shadow: 0 0 0 1px rgba(99,102,241,0.15), 0 32px 64px rgba(0,0,0,0.7); }
-          50% { box-shadow: 0 0 0 1px rgba(99,102,241,0.4), 0 32px 72px rgba(0,0,0,0.75), 0 0 20px rgba(99,102,241,0.08); }
-        }
-        @keyframes cursorPulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0; }
-        }
-        .quickask-input::placeholder { color: rgba(113,113,122,0.6); }
+        .quickask-input::placeholder { color: rgba(160,160,172,0.45); }
         .quickask-input:focus { outline: none; }
       `}</style>
 
       <div
         className="flex flex-col w-full overflow-hidden"
         style={{
-          background: "rgba(6,6,10,0.88)",
-          backdropFilter: "blur(28px) saturate(200%)",
-          WebkitBackdropFilter: "blur(28px) saturate(200%)",
+          background: "rgba(18,18,22,0.92)",
+          backdropFilter: "blur(28px) saturate(1.8)",
+          WebkitBackdropFilter: "blur(28px) saturate(1.8)",
           borderRadius: "14px",
-          border: "1px solid rgba(99,102,241,0.2)",
-          boxShadow: "0 32px 64px rgba(0,0,0,0.7), 0 0 0 0.5px rgba(255,255,255,0.04), 0 0 24px rgba(99,102,241,0.06)",
-          minHeight: "72px",
+          border: "1px solid rgba(255,255,255,0.1)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.06) inset",
+          minHeight: "64px",
           fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-          animation: "inputGlow 4s ease-in-out infinite",
         }}
       >
         {/* Input row */}
-        <div className="flex items-center gap-3 px-4" style={{ height: "72px", flexShrink: 0 }}>
-          {/* BLADE logo */}
-          <div
-            className="flex-shrink-0 w-5 h-5 rounded-md flex items-center justify-center"
-            style={{ background: "rgba(99,102,241,0.2)", boxShadow: "0 0 8px rgba(99,102,241,0.2)" }}
-          >
-            <svg viewBox="0 0 16 16" className="w-3 h-3" fill="none">
-              <path d="M8 2L14 8L8 14L2 8L8 2Z" fill="#6366f1" fillOpacity="0.9" />
-            </svg>
-          </div>
+        <div className="flex items-center gap-3 px-4" style={{ height: "64px", flexShrink: 0 }}>
+          {/* Search icon */}
+          <svg viewBox="0 0 16 16" className="flex-shrink-0 w-4 h-4" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" strokeLinecap="round">
+            <circle cx="7" cy="7" r="4.5" />
+            <path d="M10.5 10.5L14 14" />
+          </svg>
 
           <input
             ref={inputRef}
@@ -583,19 +482,14 @@ export function QuickAsk() {
               setSelectedIdx(-1);
             }}
             onKeyDown={handleKeyDown}
-            placeholder={
-              isSlashMode
-                ? "Type a command…"
-                : "Ask Blade, or type / for commands…"
-            }
+            placeholder={isSlashMode ? "Type a command…" : "Ask BLADE…"}
             disabled={loading}
-            className="quickask-input flex-1 bg-transparent text-blade-text"
+            className="quickask-input flex-1 bg-transparent"
             style={{
-              fontSize: "0.9rem",
+              fontSize: "15px",
               fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-              letterSpacing: "-0.01em",
-              color: isSlashMode ? "#a5b4fc" : "rgba(255,255,255,0.88)",
-              caretColor: "#6366f1",
+              color: "rgba(255,255,255,0.9)",
+              caretColor: "#818cf8",
               border: "none",
             }}
             autoComplete="off"
@@ -603,21 +497,30 @@ export function QuickAsk() {
             autoFocus
           />
 
-          {/* Thinking animation */}
-          {loading && <ThinkingDots />}
+          {/* Loading indicator — simple spinner */}
+          {loading && (
+            <div
+              style={{
+                width: "14px", height: "14px", borderRadius: "50%",
+                border: "1.5px solid rgba(255,255,255,0.12)",
+                borderTopColor: "rgba(255,255,255,0.6)",
+                flexShrink: 0,
+                animation: "spin 0.7s linear infinite",
+              }}
+            />
+          )}
 
           {/* Enter hint */}
           {!loading && query.trim() && (
             <kbd
               className="flex-shrink-0"
               style={{
-                fontSize: "0.6rem",
+                fontSize: "11px",
                 fontFamily: "monospace",
-                color: "rgba(99,102,241,0.5)",
-                padding: "1px 4px",
-                borderRadius: "3px",
-                border: "1px solid rgba(99,102,241,0.2)",
-                background: "rgba(99,102,241,0.05)",
+                color: "rgba(255,255,255,0.3)",
+                padding: "2px 5px",
+                borderRadius: "4px",
+                background: "rgba(255,255,255,0.07)",
               }}
             >
               ↵
@@ -629,12 +532,12 @@ export function QuickAsk() {
             <kbd
               className="flex-shrink-0"
               style={{
-                fontSize: "0.6rem",
+                fontSize: "11px",
                 fontFamily: "monospace",
-                color: "rgba(113,113,122,0.35)",
-                padding: "1px 4px",
-                borderRadius: "3px",
-                border: "1px solid rgba(255,255,255,0.05)",
+                color: "rgba(255,255,255,0.2)",
+                padding: "2px 5px",
+                borderRadius: "4px",
+                background: "rgba(255,255,255,0.05)",
               }}
             >
               Esc
@@ -644,7 +547,7 @@ export function QuickAsk() {
           <button
             onClick={hide}
             className="flex-shrink-0 w-5 h-5 rounded flex items-center justify-center"
-            style={{ color: "rgba(113,113,122,0.4)", background: "none", border: "none", cursor: "pointer" }}
+            style={{ color: "rgba(255,255,255,0.25)", background: "none", border: "none", cursor: "pointer" }}
             title="Close (Esc)"
           >
             <svg viewBox="0 0 16 16" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2">
@@ -653,106 +556,76 @@ export function QuickAsk() {
           </button>
         </div>
 
-        {/* Context pill */}
+        {/* Context label */}
         {contextApp && !hasResponse && !loading && !showSuggestionList && (
-          <div style={{ padding: "0 16px 8px", display: "flex", alignItems: "center", gap: "6px" }}>
-            <div
-              style={{
-                display: "flex", alignItems: "center", gap: "5px",
-                padding: "3px 8px", borderRadius: "6px",
-                background: "rgba(99,102,241,0.07)",
-                border: "1px solid rgba(99,102,241,0.12)",
-              }}
-            >
-              <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "rgba(99,102,241,0.65)", flexShrink: 0 }} />
-              <span style={{
-                fontSize: "0.6rem",
-                color: "rgba(99,102,241,0.75)",
-                fontFamily: "Inter, sans-serif",
-                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                maxWidth: "280px",
-              }}>
-                {contextApp}
-              </span>
-            </div>
+          <div style={{ padding: "0 16px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "rgba(129,140,248,0.6)", flexShrink: 0 }} />
+            <span style={{
+              fontSize: "12px",
+              color: "rgba(129,140,248,0.7)",
+              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+              maxWidth: "280px",
+            }}>
+              {contextApp}
+            </span>
           </div>
         )}
 
-        {/* Suggestions / history / slash commands panel */}
+        {/* Suggestions / history / slash commands list */}
         {showSuggestionList && (
           <>
-            <div style={{ height: "1px", background: "rgba(255,255,255,0.05)", margin: "0 16px" }} />
-            <div style={{ padding: "6px 8px 6px" }}>
-              <div style={{
-                padding: "2px 8px 4px",
-                fontSize: "9px", fontWeight: 700, letterSpacing: "0.08em",
-                color: "rgba(255,255,255,0.18)", textTransform: "uppercase",
-              }}>
-                {isSlashMode ? "Commands" : "Suggestions"}
-              </div>
-
+            <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "0 0" }} />
+            <div style={{ padding: "6px 0 8px" }}>
               {allSuggestions.map((item, i) => (
                 <div
                   key={i}
                   onClick={() => sendMessage(item.text)}
                   onMouseEnter={() => setSelectedIdx(i)}
                   style={{
-                    display: "flex", alignItems: "center", gap: "8px",
-                    padding: "6px 8px", borderRadius: "6px",
-                    background: selectedIdx === i ? "rgba(99,102,241,0.12)" : "transparent",
-                    cursor: "pointer", transition: "background 0.1s",
-                    border: selectedIdx === i ? "1px solid rgba(99,102,241,0.15)" : "1px solid transparent",
+                    display: "flex", alignItems: "center", gap: "10px",
+                    padding: "9px 16px",
+                    background: selectedIdx === i ? "rgba(255,255,255,0.06)" : "transparent",
+                    cursor: "pointer", transition: "background 0.25s ease",
                   }}
                 >
-                  <span style={{ fontSize: "13px", flexShrink: 0 }}>{item.icon}</span>
+                  <span style={{ fontSize: "15px", flexShrink: 0, width: "20px", textAlign: "center" }}>{item.icon}</span>
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{
-                      fontSize: "11px",
-                      color: item.isHistory ? "rgba(255,255,255,0.42)" : item.isSlash ? "#a5b4fc" : "rgba(255,255,255,0.75)",
+                      fontSize: "13px",
+                      fontWeight: item.isHistory ? 400 : 500,
+                      color: item.isHistory ? "rgba(255,255,255,0.5)" : item.isSlash ? "#a5b4fc" : "rgba(255,255,255,0.85)",
                       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                     }}>
                       {item.isSlash ? (item as { text: string }).text : item.label ?? item.text}
                     </div>
                     {item.isSlash && item.label && (
-                      <div style={{ fontSize: "9px", color: "rgba(255,255,255,0.22)", marginTop: "1px" }}>
+                      <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)", marginTop: "1px" }}>
                         {item.label}
                       </div>
                     )}
-                    {!item.isSlash && item.label && item.text !== item.label && (
-                      <div style={{
-                        fontSize: "9px", color: "rgba(255,255,255,0.2)",
-                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: "1px",
-                      }}>
-                        {item.text.length > 55 ? item.text.slice(0, 55) + "…" : item.text}
-                      </div>
-                    )}
                   </div>
-                  {/* Keyboard shortcut for history items */}
+                  {/* Keyboard shortcut badge — subtle gray */}
                   {item.isHistory && item.shortcut && (
                     <kbd style={{
-                      marginLeft: "auto", fontSize: "9px", flexShrink: 0,
-                      padding: "1px 4px", borderRadius: "3px",
-                      background: selectedIdx === i ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.05)",
-                      border: `1px solid ${selectedIdx === i ? "rgba(99,102,241,0.3)" : "rgba(255,255,255,0.07)"}`,
-                      color: selectedIdx === i ? "rgba(99,102,241,0.9)" : "rgba(255,255,255,0.2)",
+                      marginLeft: "auto", fontSize: "11px", flexShrink: 0,
+                      padding: "2px 6px", borderRadius: "4px",
+                      background: "rgba(255,255,255,0.07)",
+                      color: "rgba(255,255,255,0.3)",
                       fontFamily: "monospace",
                     }}>
                       {item.shortcut}
                     </kbd>
                   )}
                   {selectedIdx === i && !item.isHistory && (
-                    <kbd style={{
-                      marginLeft: "auto", fontSize: "9px", flexShrink: 0,
-                      color: "rgba(255,255,255,0.2)", fontFamily: "monospace",
-                    }}>↵</kbd>
+                    <span style={{ marginLeft: "auto", fontSize: "12px", color: "rgba(255,255,255,0.25)", fontFamily: "monospace" }}>↵</span>
                   )}
                 </div>
               ))}
 
-              <div style={{ padding: "4px 8px 2px", fontSize: "9px", color: "rgba(255,255,255,0.12)", display: "flex", gap: "8px" }}>
-                <span>↑↓ navigate</span>
-                <span>Tab complete</span>
-                <span>1–5 history</span>
+              <div style={{ padding: "6px 16px 0", display: "flex", gap: "12px" }}>
+                <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.2)" }}>↑↓ navigate</span>
+                <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.2)" }}>Tab complete</span>
+                <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.2)" }}>1–5 history</span>
               </div>
             </div>
           </>
@@ -761,49 +634,40 @@ export function QuickAsk() {
         {/* Response / error area */}
         {(hasResponse || error) && (
           <>
-            <div style={{ height: "1px", background: "rgba(255,255,255,0.05)", margin: "0 16px" }} />
+            <div style={{ height: "1px", background: "rgba(255,255,255,0.07)" }} />
             <div
               className="px-4 py-3 overflow-y-auto"
               style={{
                 maxHeight: "320px",
-                fontSize: "0.8125rem",
+                fontSize: "14px",
                 lineHeight: "1.65",
-                color: error ? "#f87171" : "#ececef",
+                color: error ? "#ff3b30" : "rgba(255,255,255,0.88)",
                 fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-                letterSpacing: "-0.01em",
                 wordBreak: "break-word",
                 whiteSpace: "pre-wrap",
               }}
             >
-              {error ? error : displayedResponse}
-              {/* Blinking cursor while typewriter is running or loading */}
-              {!error && (loading || !typewriterDone) && (
-                <span
-                  style={{
-                    display: "inline-block",
-                    width: "2px",
-                    height: "0.9em",
-                    background: "#6366f1",
-                    marginLeft: "1px",
-                    verticalAlign: "middle",
-                    animation: "cursorPulse 0.7s step-end infinite",
-                  }}
-                />
-              )}
+              {error ? error : response}
             </div>
 
-            {hasResponse && !loading && typewriterDone && (
-              <div className="px-4 pb-2 flex items-center gap-1.5" style={{ fontSize: "0.6rem", color: "rgba(82,82,91,0.55)" }}>
-                <kbd style={{ fontFamily: "monospace" }}>Shift+Enter</kbd>
-                <span>open in Blade</span>
-                <span className="mx-1 opacity-40">·</span>
-                <kbd style={{ fontFamily: "monospace" }}>Esc</kbd>
-                <span>new query</span>
+            {hasResponse && !loading && (
+              <div className="px-4 pb-3 flex items-center gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "8px" }}>
+                <kbd style={{ fontSize: "11px", fontFamily: "monospace", color: "rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.06)", padding: "2px 5px", borderRadius: "4px" }}>Shift+Enter</kbd>
+                <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.25)" }}>open in BLADE</span>
+                <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.15)", margin: "0 4px" }}>·</span>
+                <kbd style={{ fontSize: "11px", fontFamily: "monospace", color: "rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.06)", padding: "2px 5px", borderRadius: "4px" }}>Esc</kbd>
+                <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.25)" }}>clear</span>
               </div>
             )}
           </>
         )}
       </div>
+
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </>
   );
 }

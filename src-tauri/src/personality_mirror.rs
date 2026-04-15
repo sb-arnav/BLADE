@@ -12,7 +12,6 @@ use crate::providers::{complete_turn, ConversationMessage};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::Manager;
 
 // ── Data structures ───────────────────────────────────────────────────────────
 

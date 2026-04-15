@@ -62,11 +62,11 @@ function SummaryCard({
 }) {
   return (
     <div className="flex flex-col gap-1 rounded-xl border border-blade-border bg-blade-surface px-4 py-3 flex-1 min-w-0">
-      <p className="text-2xs uppercase tracking-[0.15em] text-blade-muted">{label}</p>
+      <p className="text-xs uppercase tracking-[0.15em] text-blade-muted">{label}</p>
       <p className={`text-lg font-semibold tabular-nums truncate ${valueClass ?? "text-blade-text"}`}>
         {value}
       </p>
-      {sub && <p className="text-2xs text-blade-muted">{sub}</p>}
+      {sub && <p className="text-xs text-blade-muted">{sub}</p>}
     </div>
   );
 }
@@ -101,7 +101,7 @@ function CategoryBreakdown({ categories }: { categories: CategoryAmount[] }) {
         const color = barColors[i % barColors.length];
         return (
           <div key={cat.category} className="flex items-center gap-3">
-            <p className="text-2xs text-blade-secondary w-28 shrink-0 truncate capitalize">
+            <p className="text-xs text-blade-secondary w-28 shrink-0 truncate capitalize">
               {cat.category}
             </p>
             <div className="flex-1 h-2 rounded-full bg-blade-border overflow-hidden">
@@ -110,7 +110,7 @@ function CategoryBreakdown({ categories }: { categories: CategoryAmount[] }) {
                 style={{ width: `${pct}%` }}
               />
             </div>
-            <p className="text-2xs text-blade-muted tabular-nums w-16 text-right shrink-0">
+            <p className="text-xs text-blade-muted tabular-nums w-16 text-right shrink-0">
               {formatCurrency(cat.amount)}
             </p>
           </div>
@@ -132,7 +132,7 @@ function SubscriptionRow({ sub }: { sub: Subscription }) {
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium text-blade-text truncate">{sub.merchant}</p>
-        <p className="text-2xs text-blade-muted">
+        <p className="text-xs text-blade-muted">
           {sub.occurrences} charge{sub.occurrences !== 1 ? "s" : ""} &middot; last {formatDate(sub.last_charge)}
         </p>
       </div>
@@ -140,7 +140,7 @@ function SubscriptionRow({ sub }: { sub: Subscription }) {
         <p className="text-xs font-semibold text-blade-text tabular-nums">
           {formatCurrency(sub.amount)}/mo
         </p>
-        <p className="text-2xs text-blade-muted tabular-nums">
+        <p className="text-xs text-blade-muted tabular-nums">
           {formatCurrency(sub.annual_cost)}/yr
         </p>
       </div>
@@ -234,7 +234,7 @@ export function FinanceView({ onBack }: { onBack: () => void }) {
           </button>
           <div>
             <h1 className="text-sm font-semibold text-blade-text">Finance</h1>
-            <p className="text-2xs text-blade-muted">Last 30 days</p>
+            <p className="text-xs text-blade-muted">Last 30 days</p>
           </div>
         </div>
         <button
@@ -265,7 +265,7 @@ export function FinanceView({ onBack }: { onBack: () => void }) {
 
         {/* Summary cards */}
         <div>
-          <p className="text-2xs uppercase tracking-[0.15em] text-blade-muted mb-2">This Month</p>
+          <p className="text-xs uppercase tracking-[0.15em] text-blade-muted mb-2">This Month</p>
           {loadingSummary ? (
             <div className="flex items-center gap-2 text-blade-muted text-xs py-2">
               <div className="w-2 h-2 rounded-full bg-blade-accent animate-pulse" />
@@ -295,7 +295,7 @@ export function FinanceView({ onBack }: { onBack: () => void }) {
 
         {/* Category breakdown */}
         <div>
-          <p className="text-2xs uppercase tracking-[0.15em] text-blade-muted mb-3">By Category</p>
+          <p className="text-xs uppercase tracking-[0.15em] text-blade-muted mb-3">By Category</p>
           <div className="rounded-xl border border-blade-border bg-blade-surface px-4 py-3">
             {loadingSummary ? (
               <div className="flex items-center gap-2 text-blade-muted text-xs py-2">
@@ -311,14 +311,14 @@ export function FinanceView({ onBack }: { onBack: () => void }) {
         {/* Subscriptions */}
         <div>
           <div className="flex items-baseline justify-between mb-3">
-            <p className="text-2xs uppercase tracking-[0.15em] text-blade-muted">
+            <p className="text-xs uppercase tracking-[0.15em] text-blade-muted">
               Recurring Charges
               {subscriptions.length > 0 && (
-                <span className="ml-1 opacity-50">({subscriptions.length})</span>
+                <span className="ml-1 text-blade-muted">({subscriptions.length})</span>
               )}
             </p>
             {subscriptions.length > 0 && (
-              <p className="text-2xs text-blade-muted tabular-nums">
+              <p className="text-xs text-blade-muted tabular-nums">
                 {formatCurrency(totalAnnualSubscriptions)}/yr total
               </p>
             )}
@@ -332,7 +332,7 @@ export function FinanceView({ onBack }: { onBack: () => void }) {
             ) : subscriptions.length === 0 ? (
               <div className="py-6 text-center">
                 <p className="text-xs text-blade-secondary">No recurring charges detected</p>
-                <p className="text-2xs text-blade-muted mt-1">
+                <p className="text-xs text-blade-muted mt-1">
                   Import transactions to detect subscriptions.
                 </p>
               </div>
@@ -357,7 +357,7 @@ export function FinanceView({ onBack }: { onBack: () => void }) {
             </div>
             <div>
               <p className="text-base font-semibold text-blade-text">Import your first bank statement</p>
-              <p className="text-2xs text-blade-muted mt-1.5 max-w-xs leading-relaxed">
+              <p className="text-xs text-blade-muted mt-1.5 max-w-xs leading-relaxed">
                 BLADE will analyse your spending, detect recurring subscriptions, and show category breakdowns — all locally, never uploaded.
               </p>
             </div>
