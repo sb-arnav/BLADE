@@ -126,6 +126,7 @@ mod auto_reply;
 mod streak_stats;
 mod hive;
 mod auto_fix;
+mod tentacles;
 
 use chrono::Timelike;
 use std::sync::Arc;
@@ -1112,6 +1113,19 @@ pub fn run() {
             auto_fix::auto_fix_analyze,
             auto_fix::auto_fix_execute,
             auto_fix::auto_fix_full_pipeline,
+            // GitHub Deep Tentacle — PR review, issue triage, releases, dependabot, health
+            tentacles::github_deep::github_review_pr,
+            tentacles::github_deep::github_triage_issues,
+            tentacles::github_deep::github_draft_release,
+            tentacles::github_deep::github_auto_merge_dependabot,
+            tentacles::github_deep::github_community_health,
+            // Calendar Tentacle — schedule, meeting prep, focus blocks, post-meeting summaries
+            tentacles::calendar_tentacle::calendar_get_today,
+            tentacles::calendar_tentacle::calendar_prep_meeting,
+            tentacles::calendar_tentacle::calendar_auto_block_focus,
+            tentacles::calendar_tentacle::calendar_post_meeting_summary,
+            // Filesystem Tentacle — approve a suggested file move (learning loop)
+            tentacles::filesystem_watch::filesystem_approve_move,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
@@ -1371,6 +1385,10 @@ pub fn run() {
             if startup_god_config.hive_enabled {
                 hive::start_hive(app.handle().clone(), startup_god_config.hive_autonomy);
             }
+
+            // Hive Tentacles — always-on background watchers
+            tentacles::terminal_watch::start_terminal_watcher(app.handle().clone());
+            tentacles::filesystem_watch::start_filesystem_watcher(app.handle().clone());
 
             // Register shortcuts from config (or defaults)
             register_all_shortcuts(app.handle());
