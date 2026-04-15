@@ -28,6 +28,8 @@ struct WatcherState {
     workflow_patterns: Vec<(String, String, u32, u32)>,
     /// Consecutive build failure tracker: (error_snippet, count, first_seen_ts)
     build_failures: Vec<(String, u32, i64)>,
+    /// Last sequence hint emitted — avoids re-firing the same hint every tick.
+    last_sequence_hint: Option<String>,
 }
 
 static WATCHER_STATE: OnceLock<Mutex<WatcherState>> = OnceLock::new();
@@ -321,10 +323,7 @@ fn detect_command_sequence(
     recent: &[(String, i64)],
     window_secs: i64,
 ) -> Option<String> {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0);
+    let now = now_secs();
 
     // Collect command roots from within the window, most recent first
     let recent_roots: Vec<&str> = recent
@@ -712,20 +711,35 @@ fn tick_terminal_watcher(app: &AppHandle) {
         }
     }
 
-    // Multi-command sequence detection — runs once per tick across the full recent buffer
+    // Multi-command sequence detection — runs once per tick across the full recent buffer.
+    // Deduplicates: only emits when the detected hint changes from last tick.
     let sequence_hint = {
         let state = watcher_state().lock().unwrap();
         detect_command_sequence(&state.recent_commands, 300) // 5-min window
     };
-    if let Some(hint) = sequence_hint {
-        let _ = app.emit(
-            "proactive_suggestion",
-            serde_json::json!({
-                "source": "terminal_watch",
-                "title": "Command sequence detected",
-                "body": hint,
-            }),
-        );
+    if let Some(ref hint) = sequence_hint {
+        let already_fired = {
+            let state = watcher_state().lock().unwrap();
+            state.last_sequence_hint.as_deref() == Some(hint.as_str())
+        };
+        if !already_fired {
+            {
+                let mut state = watcher_state().lock().unwrap();
+                state.last_sequence_hint = Some(hint.clone());
+            }
+            let _ = app.emit(
+                "proactive_suggestion",
+                serde_json::json!({
+                    "source": "terminal_watch",
+                    "title": "Command sequence detected",
+                    "body": hint,
+                }),
+            );
+        }
+    } else {
+        // Clear the last hint when no sequence is active (so it can re-fire next time)
+        let mut state = watcher_state().lock().unwrap();
+        state.last_sequence_hint = None;
     }
 
     // Retry detection across the new batch
