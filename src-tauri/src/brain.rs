@@ -290,7 +290,7 @@ pub fn score_context_relevance(query: &str, context_type: &str) -> f32 {
             &["source", "link", "url", "web", "online"],
             &[],
         ),
-        _ => (&[], &crate::providers::no_tools(), &[]),
+        _ => (&[] as &[&str], &[] as &[&str], &[] as &[&str]),
     };
 
     let mut score: f32 = 0.0;
