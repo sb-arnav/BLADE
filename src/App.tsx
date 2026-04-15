@@ -26,7 +26,8 @@ import { BladeConfig } from "./types";
 import { ToastProvider } from "./components/Toast";
 import { Sidebar } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
-import { DashboardGlance } from "./components/DashboardGlance";
+// DashboardGlance available for future sidebar layout
+// import { DashboardGlance } from "./components/DashboardGlance";
 
 // ── Error boundary ────────────────────────────────────────────────────────────
 interface EBState { error: Error | null }
