@@ -311,6 +311,12 @@ fn stash_app_handle(app: AppHandle) {
     *guard = Some(app);
 }
 
+/// Return a clone of the stashed AppHandle if one has been set.
+/// Used by hive.rs to call MCP tools without a direct AppHandle parameter.
+pub fn get_app_handle() -> Option<AppHandle> {
+    APP_HANDLE.lock().unwrap().clone()
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /// Spawns the background polling loop. Call once from lib.rs setup when

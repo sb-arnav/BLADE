@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -28,16 +28,11 @@ fn now_secs() -> i64 {
 }
 
 fn uuid() -> String {
-    use std::time::SystemTime;
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.subsec_nanos())
         .unwrap_or(0);
-    format!(
-        "{:x}-{:x}",
-        now_secs(),
-        nanos
-    )
+    format!("{:x}-{:x}", now_secs(), nanos)
 }
 
 // ── Core types ────────────────────────────────────────────────────────────────
@@ -59,6 +54,7 @@ pub enum Priority {
 }
 
 impl Priority {
+    #[allow(dead_code)]
     fn as_score(&self) -> u8 {
         match self {
             Priority::Critical => 0,
@@ -278,186 +274,891 @@ fn hive_lock() -> &'static Mutex<Hive> {
 static HIVE_RUNNING: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
-// ── Initialisation ────────────────────────────────────────────────────────────
+// ── Rate limiting ─────────────────────────────────────────────────────────────
 
-/// Build the initial Hive: create the 3 domain heads, then register tentacles
-/// for every platform that looks configured (based on integration_bridge state).
-pub fn initialize_hive() -> Hive {
-    let config = crate::config::load_config();
+/// Tracks the last time each tentacle platform was polled (for rate limiting).
+static LAST_POLL: OnceLock<Mutex<HashMap<String, i64>>> = OnceLock::new();
 
-    // Determine which integrations are active by checking integration_bridge state.
-    // We look for non-zero metric values as a proxy for "connected".
-    let istate = crate::integration_bridge::get_integration_state();
+fn last_poll_map() -> &'static Mutex<HashMap<String, i64>> {
+    LAST_POLL.get_or_init(|| Mutex::new(HashMap::new()))
+}
 
-    // ── 3 Head models ─────────────────────────────────────────────────────────
-    // Communications head: Slack + Discord + WhatsApp + Email
-    let comms_head = HeadModel::new(
-        "head-communications",
-        "communications",
-        vec![
-            "tentacle-slack".to_string(),
-            "tentacle-discord".to_string(),
-            "tentacle-whatsapp".to_string(),
-            "tentacle-email".to_string(),
-        ],
-        // Cheap model for routine comms triage
-        format!("{}/{}", config.provider, config.model),
-        config.hive_autonomy,
-    );
+/// Returns true if enough time has passed since the last poll on this platform.
+fn should_poll(platform: &str, min_interval_secs: i64) -> bool {
+    let map = last_poll_map().lock().unwrap();
+    let last = map.get(platform).copied().unwrap_or(0);
+    now_secs() - last >= min_interval_secs
+}
 
-    // Development head: GitHub + CI
-    let dev_head = HeadModel::new(
-        "head-development",
-        "development",
-        vec![
-            "tentacle-github".to_string(),
-            "tentacle-ci".to_string(),
-        ],
-        format!("{}/{}", config.provider, config.model),
-        config.hive_autonomy,
-    );
+fn mark_polled(platform: &str) {
+    let mut map = last_poll_map().lock().unwrap();
+    map.insert(platform.to_string(), now_secs());
+}
 
-    // Operations head: backend / server monitoring
-    let ops_head = HeadModel::new(
-        "head-operations",
-        "operations",
-        vec!["tentacle-backend".to_string()],
-        format!("{}/{}", config.provider, config.model),
-        config.hive_autonomy,
-    );
+/// Tracks last-known up/down state of localhost ports so we can detect changes.
+static PORT_STATES: OnceLock<Mutex<HashMap<u16, bool>>> = OnceLock::new();
 
-    let mut heads = HashMap::new();
-    heads.insert("head-communications".to_string(), comms_head);
-    heads.insert("head-development".to_string(), dev_head);
-    heads.insert("head-operations".to_string(), ops_head);
+fn port_states_map() -> &'static Mutex<HashMap<u16, bool>> {
+    PORT_STATES.get_or_init(|| Mutex::new(HashMap::new()))
+}
 
-    // ── Tentacles — only spawn what appears configured ─────────────────────
-    let mut tentacles: HashMap<String, Tentacle> = HashMap::new();
+// ── GitHub REST API caller ────────────────────────────────────────────────────
 
-    // Email: always available if integration polling is on
-    if config.integration_polling_enabled || istate.unread_emails > 0 {
-        let t = Tentacle::new("email", "head-communications");
-        tentacles.insert(t.id.clone(), t);
+/// Make an authenticated GET to the GitHub API. Returns the parsed JSON Value.
+async fn github_get(token: &str, path: &str) -> Result<serde_json::Value, String> {
+    let url = if path.starts_with("https://") {
+        path.to_string()
+    } else {
+        format!("https://api.github.com{}", path)
+    };
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .user_agent("BLADE-Hive/1.0")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let mut req = client.get(&url);
+    if !token.is_empty() {
+        req = req.header("Authorization", format!("Bearer {}", token));
+    }
+    req = req
+        .header("Accept", "application/vnd.github+json")
+        .header("X-GitHub-Api-Version", "2022-11-28");
+
+    let resp = req.send().await.map_err(|e| e.to_string())?;
+    let status = resp.status();
+    let body = resp.text().await.map_err(|e| e.to_string())?;
+
+    if !status.is_success() {
+        return Err(format!(
+            "GitHub API {} → {}: {}",
+            url,
+            status,
+            crate::safe_slice(&body, 200)
+        ));
     }
 
-    // Slack: configured if slack_mentions seen or config flag set
-    if istate.slack_mentions > 0 || config.integration_polling_enabled {
-        let t = Tentacle::new("slack", "head-communications");
-        tentacles.insert(t.id.clone(), t);
-    }
+    serde_json::from_str(&body).map_err(|e| e.to_string())
+}
 
-    // GitHub: configured if github_notifications seen
-    if istate.github_notifications > 0 || config.integration_polling_enabled {
-        let t = Tentacle::new("github", "head-development");
-        tentacles.insert(t.id.clone(), t);
+/// Parse "owner/repo" from a remote URL.
+/// Supports https://github.com/owner/repo[.git] and git@github.com:owner/repo[.git].
+fn parse_owner_repo(remote_url: &str) -> Option<(String, String)> {
+    // HTTPS
+    if let Some(rest) = remote_url.strip_prefix("https://github.com/") {
+        let without_git = rest.trim_end_matches(".git");
+        let mut parts = without_git.splitn(2, '/');
+        let owner = parts.next()?.to_string();
+        let repo = parts.next()?.trim_end_matches(".git").to_string();
+        if !owner.is_empty() && !repo.is_empty() {
+            return Some((owner, repo));
+        }
     }
-
-    // CI: sibling to GitHub — always pair them
-    if tentacles.contains_key("tentacle-github") {
-        let t = Tentacle::new("ci", "head-development");
-        tentacles.insert(t.id.clone(), t);
+    // SSH
+    if let Some(rest) = remote_url.strip_prefix("git@github.com:") {
+        let without_git = rest.trim_end_matches(".git");
+        let mut parts = without_git.splitn(2, '/');
+        let owner = parts.next()?.to_string();
+        let repo = parts.next()?.trim_end_matches(".git").to_string();
+        if !owner.is_empty() && !repo.is_empty() {
+            return Some((owner, repo));
+        }
     }
-
-    // Discord: always register, starts Dormant unless explicitly spawned
-    {
-        let mut t = Tentacle::new("discord", "head-communications");
-        t.status = TentacleStatus::Dormant;
-        tentacles.insert(t.id.clone(), t);
-    }
-
-    // WhatsApp: always register, starts Dormant (needs browser CDP)
-    {
-        let mut t = Tentacle::new("whatsapp", "head-communications");
-        t.status = TentacleStatus::Dormant;
-        tentacles.insert(t.id.clone(), t);
-    }
-
-    // Backend: operations head — starts Dormant until configured
-    {
-        let mut t = Tentacle::new("backend", "head-operations");
-        t.status = TentacleStatus::Dormant;
-        tentacles.insert(t.id.clone(), t);
-    }
-
-    Hive {
-        tentacles,
-        heads,
-        approved_queue: Vec::new(),
-        autonomy: config.hive_autonomy,
-        running: false,
-        last_tick: 0,
-        total_reports_processed: 0,
-        total_actions_taken: 0,
-    }
+    None
 }
 
 // ── Tentacle platform polling ─────────────────────────────────────────────────
 
 /// Poll the given tentacle's platform and produce any fresh reports.
-/// For now each platform polls its integration_bridge equivalent or simulates data.
 async fn poll_tentacle(platform: &str) -> Vec<TentacleReport> {
     let mut reports = Vec::new();
     let id = format!("tentacle-{}", platform);
 
     match platform {
+        // ── Email ──────────────────────────────────────────────────────────────
         "email" => {
-            let state = crate::integration_bridge::get_integration_state();
-            if state.unread_emails > 0 {
-                reports.push(TentacleReport::new(
-                    &id,
-                    if state.unread_emails > 10 { Priority::High } else { Priority::Normal },
-                    "update",
-                    format!("{} unread email(s) in inbox", state.unread_emails),
-                    serde_json::json!({ "unread": state.unread_emails }),
-                    state.unread_emails > 5,
-                    if state.unread_emails > 5 {
-                        Some("Review and triage inbox".to_string())
-                    } else {
-                        None
-                    },
-                ));
+            let config = crate::config::load_config();
+            let has_gmail_mcp = config
+                .mcp_servers
+                .iter()
+                .any(|s| s.name.eq_ignore_ascii_case("gmail"));
+
+            if has_gmail_mcp {
+                let args = serde_json::json!({ "query": "is:unread", "maxResults": 50 });
+                match call_mcp_tool("gmail", "gmail_search_messages", args).await {
+                    Ok(text) => {
+                        let messages: Vec<serde_json::Value> =
+                            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) {
+                                if let Some(arr) = v.as_array() {
+                                    arr.clone()
+                                } else if let Some(arr) = v["messages"].as_array() {
+                                    arr.clone()
+                                } else {
+                                    vec![]
+                                }
+                            } else {
+                                vec![]
+                            };
+
+                        let count = messages.len() as u32;
+                        if count > 0 {
+                            let previews: Vec<String> = messages
+                                .iter()
+                                .take(5)
+                                .map(|m| {
+                                    let from = m["from"]
+                                        .as_str()
+                                        .or_else(|| {
+                                            m["payload"]["headers"].as_array().and_then(|h| {
+                                                h.iter()
+                                                    .find(|hdr| {
+                                                        hdr["name"].as_str() == Some("From")
+                                                    })
+                                                    .and_then(|hdr| hdr["value"].as_str())
+                                            })
+                                        })
+                                        .unwrap_or("unknown");
+                                    let subject = m["subject"]
+                                        .as_str()
+                                        .or_else(|| {
+                                            m["payload"]["headers"].as_array().and_then(|h| {
+                                                h.iter()
+                                                    .find(|hdr| {
+                                                        hdr["name"].as_str() == Some("Subject")
+                                                    })
+                                                    .and_then(|hdr| hdr["value"].as_str())
+                                            })
+                                        })
+                                        .unwrap_or("(no subject)");
+                                    format!("From: {} — {}", from, subject)
+                                })
+                                .collect();
+
+                            reports.push(TentacleReport::new(
+                                &id,
+                                if count > 10 { Priority::High } else { Priority::Normal },
+                                "update",
+                                format!("{} unread email(s) via Gmail MCP", count),
+                                serde_json::json!({
+                                    "unread": count,
+                                    "source": "gmail_mcp",
+                                    "previews": previews
+                                }),
+                                count > 5,
+                                if count > 5 {
+                                    Some("Triage unread emails".to_string())
+                                } else {
+                                    None
+                                },
+                            ));
+                        }
+                    }
+                    Err(e) => {
+                        log::warn!("[Hive/email] Gmail MCP call failed: {}", e);
+                        // Fall back to integration_bridge state
+                        let state = crate::integration_bridge::get_integration_state();
+                        if state.unread_emails > 0 {
+                            reports.push(TentacleReport::new(
+                                &id,
+                                if state.unread_emails > 10 { Priority::High } else { Priority::Normal },
+                                "update",
+                                format!(
+                                    "{} unread email(s) (integration_bridge fallback)",
+                                    state.unread_emails
+                                ),
+                                serde_json::json!({
+                                    "unread": state.unread_emails,
+                                    "source": "integration_bridge"
+                                }),
+                                state.unread_emails > 5,
+                                if state.unread_emails > 5 {
+                                    Some("Triage inbox".to_string())
+                                } else {
+                                    None
+                                },
+                            ));
+                        }
+                    }
+                }
+            } else {
+                // No Gmail MCP — fall back to integration_bridge
+                let state = crate::integration_bridge::get_integration_state();
+                if state.unread_emails > 0 {
+                    reports.push(TentacleReport::new(
+                        &id,
+                        if state.unread_emails > 10 { Priority::High } else { Priority::Normal },
+                        "update",
+                        format!("{} unread email(s)", state.unread_emails),
+                        serde_json::json!({
+                            "unread": state.unread_emails,
+                            "source": "integration_bridge",
+                            "note": "Configure Gmail MCP for real email data"
+                        }),
+                        state.unread_emails > 5,
+                        if state.unread_emails > 5 {
+                            Some("Triage inbox".to_string())
+                        } else {
+                            None
+                        },
+                    ));
+                }
             }
         }
 
+        // ── Slack ──────────────────────────────────────────────────────────────
         "slack" => {
-            let state = crate::integration_bridge::get_integration_state();
-            if state.slack_mentions > 0 {
-                reports.push(TentacleReport::new(
-                    &id,
-                    if state.slack_mentions > 3 { Priority::High } else { Priority::Normal },
-                    "mention",
-                    format!("{} unread Slack mention(s)", state.slack_mentions),
-                    serde_json::json!({ "mentions": state.slack_mentions }),
-                    true,
-                    Some("Draft replies in user's voice".to_string()),
-                ));
+            let config = crate::config::load_config();
+            let has_slack_mcp = config
+                .mcp_servers
+                .iter()
+                .any(|s| s.name.eq_ignore_ascii_case("slack"));
+
+            if has_slack_mcp {
+                let args =
+                    serde_json::json!({ "query": "is:dm has:mention", "count": 20 });
+                match call_mcp_tool("slack", "slack_search_public_and_private", args).await {
+                    Ok(text) => {
+                        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) {
+                            let matches = v["messages"]["matches"]
+                                .as_array()
+                                .cloned()
+                                .unwrap_or_default();
+                            let count = matches.len() as u32;
+                            if count > 0 {
+                                let previews: Vec<String> = matches
+                                    .iter()
+                                    .take(5)
+                                    .map(|m| {
+                                        let user =
+                                            m["username"].as_str().unwrap_or("unknown");
+                                        let text_preview =
+                                            m["text"].as_str().unwrap_or("");
+                                        let channel = m["channel"]["name"]
+                                            .as_str()
+                                            .unwrap_or("?");
+                                        format!(
+                                            "@{} in #{}: {}",
+                                            user,
+                                            channel,
+                                            crate::safe_slice(text_preview, 80)
+                                        )
+                                    })
+                                    .collect();
+
+                                let sender = matches
+                                    .first()
+                                    .and_then(|m| m["username"].as_str())
+                                    .unwrap_or("")
+                                    .to_string();
+
+                                reports.push(TentacleReport::new(
+                                    &id,
+                                    if count > 3 { Priority::High } else { Priority::Normal },
+                                    "mention",
+                                    format!("{} unread Slack mention(s)", count),
+                                    serde_json::json!({
+                                        "mentions": count,
+                                        "source": "slack_mcp",
+                                        "previews": previews,
+                                        "sender": sender
+                                    }),
+                                    true,
+                                    Some("Draft replies in user's voice".to_string()),
+                                ));
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        log::warn!("[Hive/slack] Slack MCP call failed: {}", e);
+                        let state = crate::integration_bridge::get_integration_state();
+                        if state.slack_mentions > 0 {
+                            reports.push(TentacleReport::new(
+                                &id,
+                                if state.slack_mentions > 3 {
+                                    Priority::High
+                                } else {
+                                    Priority::Normal
+                                },
+                                "mention",
+                                format!(
+                                    "{} unread Slack mention(s) (fallback)",
+                                    state.slack_mentions
+                                ),
+                                serde_json::json!({
+                                    "mentions": state.slack_mentions,
+                                    "source": "integration_bridge"
+                                }),
+                                true,
+                                Some("Draft replies in user's voice".to_string()),
+                            ));
+                        }
+                    }
+                }
+            } else {
+                let state = crate::integration_bridge::get_integration_state();
+                if state.slack_mentions > 0 {
+                    reports.push(TentacleReport::new(
+                        &id,
+                        if state.slack_mentions > 3 { Priority::High } else { Priority::Normal },
+                        "mention",
+                        format!("{} unread Slack mention(s)", state.slack_mentions),
+                        serde_json::json!({
+                            "mentions": state.slack_mentions,
+                            "source": "integration_bridge",
+                            "note": "Configure Slack MCP for real message data"
+                        }),
+                        true,
+                        Some("Draft replies in user's voice".to_string()),
+                    ));
+                }
             }
         }
 
+        // ── GitHub ─────────────────────────────────────────────────────────────
         "github" => {
-            let state = crate::integration_bridge::get_integration_state();
-            if state.github_notifications > 0 {
+            // Hard rate limit: at most once per minute
+            if !should_poll("github", 60) {
+                return reports;
+            }
+
+            let token = crate::config::get_provider_key("github");
+
+            if token.is_empty() {
                 reports.push(TentacleReport::new(
                     &id,
-                    if state.github_notifications > 5 { Priority::High } else { Priority::Normal },
-                    "update",
-                    format!("{} GitHub notification(s)", state.github_notifications),
-                    serde_json::json!({ "notifications": state.github_notifications }),
-                    state.github_notifications > 0,
-                    Some("Review PRs and issue comments".to_string()),
+                    Priority::Low,
+                    "alert",
+                    "GitHub not connected — store a token via Settings → Integrations → GitHub Token",
+                    serde_json::json!({ "configured": false }),
+                    false,
+                    Some(
+                        "Add your GitHub personal access token in Settings under provider 'github'"
+                            .to_string(),
+                    ),
                 ));
+                return reports;
+            }
+
+            mark_polled("github");
+
+            // 1. Unread notifications
+            match github_get(&token, "/notifications?all=false&per_page=50").await {
+                Ok(v) => {
+                    if let Some(notifications) = v.as_array() {
+                        let unread: Vec<&serde_json::Value> = notifications
+                            .iter()
+                            .filter(|n| n["unread"].as_bool().unwrap_or(false))
+                            .collect();
+
+                        if !unread.is_empty() {
+                            let summaries: Vec<String> = unread
+                                .iter()
+                                .take(10)
+                                .map(|n| {
+                                    let repo = n["repository"]["full_name"]
+                                        .as_str()
+                                        .unwrap_or("?");
+                                    let title =
+                                        n["subject"]["title"].as_str().unwrap_or("(no title)");
+                                    let kind =
+                                        n["subject"]["type"].as_str().unwrap_or("?");
+                                    format!("[{}] {} — {}", kind, repo, title)
+                                })
+                                .collect();
+
+                            let count = unread.len();
+                            reports.push(TentacleReport::new(
+                                &id,
+                                if count > 5 { Priority::High } else { Priority::Normal },
+                                "update",
+                                format!("{} unread GitHub notification(s)", count),
+                                serde_json::json!({
+                                    "count": count,
+                                    "source": "github_api",
+                                    "notifications": summaries
+                                }),
+                                count > 0,
+                                Some(
+                                    "Review at github.com/notifications".to_string(),
+                                ),
+                            ));
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::warn!("[Hive/github] Notifications fetch failed: {}", e);
+                    reports.push(TentacleReport::new(
+                        &id,
+                        Priority::Low,
+                        "alert",
+                        format!(
+                            "GitHub API error: {}",
+                            crate::safe_slice(&e, 100)
+                        ),
+                        serde_json::json!({ "error": e }),
+                        false,
+                        None,
+                    ));
+                }
+            }
+
+            // 2. Open PRs on repos from deep_scan
+            if let Some(scan) = crate::deep_scan::load_results_pub() {
+                for repo in scan.git_repos.iter().take(5) {
+                    let Some(remote) = &repo.remote_url else { continue };
+                    let Some((owner, repo_name)) = parse_owner_repo(remote) else {
+                        continue;
+                    };
+
+                    match github_get(
+                        &token,
+                        &format!(
+                            "/repos/{}/{}/pulls?state=open&per_page=10",
+                            owner, repo_name
+                        ),
+                    )
+                    .await
+                    {
+                        Ok(v) => {
+                            if let Some(prs) = v.as_array() {
+                                let open_prs: Vec<serde_json::Value> = prs
+                                    .iter()
+                                    .filter(|pr| {
+                                        !pr["draft"].as_bool().unwrap_or(false)
+                                    })
+                                    .cloned()
+                                    .collect();
+
+                                if !open_prs.is_empty() {
+                                    let pr_list: Vec<String> = open_prs
+                                        .iter()
+                                        .take(5)
+                                        .map(|pr| {
+                                            let num =
+                                                pr["number"].as_u64().unwrap_or(0);
+                                            let title = pr["title"]
+                                                .as_str()
+                                                .unwrap_or("?");
+                                            let author = pr["user"]["login"]
+                                                .as_str()
+                                                .unwrap_or("?");
+                                            format!(
+                                                "#{} by @{}: {}",
+                                                num,
+                                                author,
+                                                crate::safe_slice(title, 80)
+                                            )
+                                        })
+                                        .collect();
+
+                                    reports.push(TentacleReport::new(
+                                        &id,
+                                        Priority::Normal,
+                                        "update",
+                                        format!(
+                                            "{} open PR(s) in {}/{}",
+                                            open_prs.len(),
+                                            owner,
+                                            repo_name
+                                        ),
+                                        serde_json::json!({
+                                            "repo": format!("{}/{}", owner, repo_name),
+                                            "open_prs": pr_list,
+                                            "source": "github_api"
+                                        }),
+                                        false,
+                                        None,
+                                    ));
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            log::debug!(
+                                "[Hive/github] PR fetch for {}/{} failed: {}",
+                                owner,
+                                repo_name,
+                                e
+                            );
+                        }
+                    }
+                }
             }
         }
 
+        // ── CI (GitHub Actions) ────────────────────────────────────────────────
         "ci" => {
-            // CI tentacle looks for recent execution memory for build failures
-            // and surfaces them alongside GitHub reports for cross-domain insight.
-            // In a future iteration this calls a real CI API endpoint.
+            // Rate limit: once per minute (same cadence as GitHub)
+            if !should_poll("ci", 60) {
+                return reports;
+            }
+
+            let token = crate::config::get_provider_key("github");
+            if token.is_empty() {
+                return reports;
+            }
+
+            mark_polled("ci");
+
+            let Some(scan) = crate::deep_scan::load_results_pub() else {
+                return reports;
+            };
+
+            for repo in scan.git_repos.iter().take(5) {
+                let Some(remote) = &repo.remote_url else { continue };
+                let Some((owner, repo_name)) = parse_owner_repo(remote) else {
+                    continue;
+                };
+
+                match github_get(
+                    &token,
+                    &format!(
+                        "/repos/{}/{}/actions/runs?per_page=5",
+                        owner, repo_name
+                    ),
+                )
+                .await
+                {
+                    Ok(v) => {
+                        let runs = match v["workflow_runs"].as_array() {
+                            Some(r) => r.clone(),
+                            None => continue,
+                        };
+
+                        if runs.is_empty() {
+                            continue;
+                        }
+
+                        // Find the latest completed run
+                        let latest = runs
+                            .iter()
+                            .find(|r| r["status"].as_str() == Some("completed"));
+
+                        let Some(latest_run) = latest else { continue };
+
+                        let conclusion =
+                            latest_run["conclusion"].as_str().unwrap_or("unknown");
+                        let run_id = latest_run["id"].as_u64().unwrap_or(0);
+                        let run_url = latest_run["html_url"]
+                            .as_str()
+                            .unwrap_or("")
+                            .to_string();
+                        let run_name = latest_run["name"]
+                            .as_str()
+                            .unwrap_or("workflow")
+                            .to_string();
+                        let branch = latest_run["head_branch"]
+                            .as_str()
+                            .unwrap_or("?")
+                            .to_string();
+
+                        match conclusion {
+                            "failure" | "timed_out" | "startup_failure" => {
+                                // Fetch failing job details
+                                let failing_info = match github_get(
+                                    &token,
+                                    &format!(
+                                        "/repos/{}/{}/actions/runs/{}/jobs",
+                                        owner, repo_name, run_id
+                                    ),
+                                )
+                                .await
+                                {
+                                    Ok(jv) => {
+                                        let empty = vec![];
+                                        let jobs =
+                                            jv["jobs"].as_array().unwrap_or(&empty);
+                                        let failing: Vec<String> = jobs
+                                            .iter()
+                                            .filter(|j| {
+                                                j["conclusion"].as_str()
+                                                    == Some("failure")
+                                            })
+                                            .map(|j| {
+                                                let job_name = j["name"]
+                                                    .as_str()
+                                                    .unwrap_or("?");
+                                                let failing_step = j["steps"]
+                                                    .as_array()
+                                                    .and_then(|steps| {
+                                                        steps.iter().find(|s| {
+                                                            s["conclusion"].as_str()
+                                                                == Some("failure")
+                                                        })
+                                                    })
+                                                    .and_then(|s| s["name"].as_str())
+                                                    .unwrap_or("unknown step");
+                                                format!(
+                                                    "job '{}' failed at step '{}'",
+                                                    job_name, failing_step
+                                                )
+                                            })
+                                            .collect();
+                                        failing.join("; ")
+                                    }
+                                    Err(_) => format!("conclusion={}", conclusion),
+                                };
+
+                                reports.push(TentacleReport::new(
+                                    &id,
+                                    Priority::Critical,
+                                    "alert",
+                                    format!(
+                                        "CI FAILED: {}/{} ({}) on branch '{}'",
+                                        owner, repo_name, run_name, branch
+                                    ),
+                                    serde_json::json!({
+                                        "repo": format!("{}/{}", owner, repo_name),
+                                        "run_id": run_id,
+                                        "run_url": run_url,
+                                        "conclusion": conclusion,
+                                        "branch": branch,
+                                        "workflow": run_name,
+                                        "failing_jobs": failing_info,
+                                        "source": "github_actions_api"
+                                    }),
+                                    true,
+                                    Some(format!(
+                                        "Investigate CI failure: {} — {}",
+                                        failing_info, run_url
+                                    )),
+                                ));
+                            }
+                            "success" => {
+                                reports.push(TentacleReport::new(
+                                    &id,
+                                    Priority::Low,
+                                    "update",
+                                    format!(
+                                        "CI passing: {}/{} ({}) on '{}'",
+                                        owner, repo_name, run_name, branch
+                                    ),
+                                    serde_json::json!({
+                                        "repo": format!("{}/{}", owner, repo_name),
+                                        "run_url": run_url,
+                                        "conclusion": "success",
+                                        "branch": branch,
+                                        "source": "github_actions_api"
+                                    }),
+                                    false,
+                                    None,
+                                ));
+                            }
+                            _ => {
+                                // in_progress / skipped / cancelled — not actionable
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        log::debug!(
+                            "[Hive/ci] Workflow runs fetch for {}/{} failed: {}",
+                            owner,
+                            repo_name,
+                            e
+                        );
+                    }
+                }
+            }
         }
 
-        "discord" | "whatsapp" | "backend" => {
-            // These tentacles are Dormant until explicitly configured via spawn_tentacle.
-            // Nothing to poll yet.
+        // ── Backend / localhost port scanning ──────────────────────────────────
+        "backend" => {
+            const PORTS: &[u16] = &[3000, 4000, 5000, 8000, 8080, 8888];
+
+            let client = match reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(1))
+                .build()
+            {
+                Ok(c) => c,
+                Err(e) => {
+                    log::warn!("[Hive/backend] Could not build HTTP client: {}", e);
+                    return reports;
+                }
+            };
+
+            // Snapshot previous port states before we overwrite them
+            let prev_states = { port_states_map().lock().unwrap().clone() };
+            let mut new_states = prev_states.clone();
+
+            for &port in PORTS {
+                let url = format!("http://127.0.0.1:{}/", port);
+                let is_up = client.get(&url).send().await.is_ok();
+                let was_up = prev_states.get(&port).copied();
+
+                if was_up == Some(true) && !is_up {
+                    // Service just went down
+                    reports.push(TentacleReport::new(
+                        &id,
+                        Priority::High,
+                        "alert",
+                        format!("Service on port {} just went DOWN", port),
+                        serde_json::json!({
+                            "port": port,
+                            "url": url,
+                            "status": "down",
+                            "was_up": true
+                        }),
+                        true,
+                        Some(format!(
+                            "Port {} was running and is now unreachable — check the process",
+                            port
+                        )),
+                    ));
+                } else if was_up == Some(false) && is_up {
+                    // Service came back up
+                    reports.push(TentacleReport::new(
+                        &id,
+                        Priority::Normal,
+                        "update",
+                        format!("Service on port {} is now UP", port),
+                        serde_json::json!({ "port": port, "url": url, "status": "up" }),
+                        false,
+                        None,
+                    ));
+                } else if was_up.is_none() && is_up {
+                    // First time we see it
+                    reports.push(TentacleReport::new(
+                        &id,
+                        Priority::Low,
+                        "update",
+                        format!("Service detected on localhost:{}", port),
+                        serde_json::json!({ "port": port, "url": url, "status": "up" }),
+                        false,
+                        None,
+                    ));
+                }
+
+                new_states.insert(port, is_up);
+            }
+
+            *port_states_map().lock().unwrap() = new_states;
+        }
+
+        // ── Discord ────────────────────────────────────────────────────────────
+        "discord" => {
+            let token = crate::config::get_provider_key("discord");
+            if token.is_empty() {
+                return reports;
+            }
+
+            if !should_poll("discord", 60) {
+                return reports;
+            }
+            mark_polled("discord");
+
+            let client = match reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(10))
+                // Discord requires a proper user-agent for bots
+                .user_agent("DiscordBot (https://blade.dev, 1.0)")
+                .build()
+            {
+                Ok(c) => c,
+                Err(e) => {
+                    log::warn!("[Hive/discord] HTTP client error: {}", e);
+                    return reports;
+                }
+            };
+
+            let resp = client
+                .get("https://discord.com/api/v10/users/@me/guilds")
+                .header("Authorization", format!("Bot {}", token))
+                .send()
+                .await;
+
+            match resp {
+                Ok(r) if r.status().is_success() => {
+                    if let Ok(guilds) = r.json::<serde_json::Value>().await {
+                        if let Some(arr) = guilds.as_array() {
+                            let guild_names: Vec<String> = arr
+                                .iter()
+                                .take(5)
+                                .filter_map(|g| g["name"].as_str().map(|s| s.to_string()))
+                                .collect();
+                            if !guild_names.is_empty() {
+                                reports.push(TentacleReport::new(
+                                    &id,
+                                    Priority::Low,
+                                    "update",
+                                    format!(
+                                        "Discord bot active in {} server(s): {}",
+                                        arr.len(),
+                                        guild_names.join(", ")
+                                    ),
+                                    serde_json::json!({
+                                        "guild_count": arr.len(),
+                                        "guilds": guild_names,
+                                        "source": "discord_api"
+                                    }),
+                                    false,
+                                    None,
+                                ));
+                            }
+                        }
+                    }
+                }
+                Ok(r) if r.status().as_u16() == 401 => {
+                    reports.push(TentacleReport::new(
+                        &id,
+                        Priority::Normal,
+                        "alert",
+                        "Discord bot token is invalid — update it in Settings",
+                        serde_json::json!({ "error": "401 Unauthorized" }),
+                        false,
+                        Some(
+                            "Go to Settings and update the Discord bot token under provider 'discord'"
+                                .to_string(),
+                        ),
+                    ));
+                }
+                Ok(r) => {
+                    log::warn!("[Hive/discord] API returned {}", r.status());
+                }
+                Err(e) => {
+                    log::warn!("[Hive/discord] API error: {}", e);
+                }
+            }
+        }
+
+        // ── WhatsApp ───────────────────────────────────────────────────────────
+        "whatsapp" => {
+            let wa_running = check_whatsapp_process().await;
+            if !wa_running {
+                return reports;
+            }
+
+            let unread = read_whatsapp_unread_via_cdp().await;
+            match unread {
+                Some(count) if count > 0 => {
+                    reports.push(TentacleReport::new(
+                        &id,
+                        Priority::Normal,
+                        "update",
+                        format!(
+                            "{} unread WhatsApp conversation(s) (badge count)",
+                            count
+                        ),
+                        serde_json::json!({
+                            "unread": count,
+                            "source": "whatsapp_cdp",
+                            "note": "Badge count only — no message content read for privacy"
+                        }),
+                        false,
+                        None,
+                    ));
+                }
+                Some(_) => {}
+                None => {
+                    reports.push(TentacleReport::new(
+                        &id,
+                        Priority::Low,
+                        "update",
+                        "WhatsApp Web is open (unread count unavailable via CDP)",
+                        serde_json::json!({ "wa_open": true, "cdp_available": false }),
+                        false,
+                        None,
+                    ));
+                }
+            }
         }
 
         _ => {}
@@ -466,21 +1167,177 @@ async fn poll_tentacle(platform: &str) -> Vec<TentacleReport> {
     reports
 }
 
+// ── WhatsApp helpers ──────────────────────────────────────────────────────────
+
+/// Check if a WhatsApp process (Desktop app) is running.
+async fn check_whatsapp_process() -> bool {
+    let result = crate::cmd_util::silent_tokio_cmd("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            "Get-Process | Where-Object { $_.Name -like '*WhatsApp*' } | Select-Object -First 1 -ExpandProperty Name",
+        ])
+        .output()
+        .await;
+
+    match result {
+        Ok(out) => !String::from_utf8_lossy(&out.stdout).trim().is_empty(),
+        Err(_) => false,
+    }
+}
+
+/// Attempt to read WhatsApp Web unread count via the document title in a CDP tab.
+/// WhatsApp Web puts "(N)" at the start of the title when there are N unread chats.
+/// This reads no message content — purely the tab title.
+async fn read_whatsapp_unread_via_cdp() -> Option<u32> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(2))
+        .build()
+        .ok()?;
+
+    // Chrome/Edge/Brave expose CDP at 9222 when started with --remote-debugging-port=9222
+    let resp = client
+        .get("http://127.0.0.1:9222/json")
+        .send()
+        .await
+        .ok()?;
+    let tabs: serde_json::Value = resp.json().await.ok()?;
+    let tabs_arr = tabs.as_array()?;
+
+    let wa_tab = tabs_arr.iter().find(|t| {
+        t["url"]
+            .as_str()
+            .map(|u| u.contains("web.whatsapp.com"))
+            .unwrap_or(false)
+    })?;
+
+    let ws_url = wa_tab["webSocketDebuggerUrl"].as_str()?;
+
+    match crate::browser_native::cdp_evaluate(ws_url, "document.title").await {
+        Ok(title) => {
+            if title.starts_with('(') {
+                if let Some(end) = title.find(')') {
+                    return title[1..end].parse::<u32>().ok();
+                }
+            }
+            Some(0)
+        }
+        Err(_) => None,
+    }
+}
+
+// ── MCP tool call helper ──────────────────────────────────────────────────────
+
+/// Call an MCP tool through the McpManager held in Tauri's app state.
+/// Requires integration_bridge to have been started (it stashes the AppHandle).
+async fn call_mcp_tool(
+    server_name: &str,
+    tool_name: &str,
+    args: serde_json::Value,
+) -> Result<String, String> {
+    let handle = crate::integration_bridge::get_app_handle()
+        .ok_or_else(|| "AppHandle not available — integration_bridge not started".to_string())?;
+
+    let manager_state = handle
+        .try_state::<crate::commands::SharedMcpManager>()
+        .ok_or("McpManager state not found in app state")?;
+
+    let mut manager: tokio::sync::MutexGuard<'_, crate::mcp::McpManager> = manager_state.lock().await;
+    let qualified = format!("mcp__{}_{}", server_name, tool_name);
+    let result = manager.call_tool(&qualified, args).await?;
+
+    let text = result
+        .content
+        .iter()
+        .filter_map(|c| c.text.as_deref())
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    Ok(text)
+}
+
 // ── Head processing ───────────────────────────────────────────────────────────
 
 /// A Head model processes its reports and produces decisions.
-/// Trivial → auto-handle (Inform), important → decide (Reply/Act), critical → Escalate.
-fn head_process_reports(
+/// Normal + requires_action → cheap LLM call to draft a real response.
+/// High → full model analysis + escalation if autonomy < 0.7.
+/// Critical → always escalate to Big Agent.
+async fn head_process_reports_async(
     head: &HeadModel,
     reports: &[TentacleReport],
 ) -> Vec<Decision> {
     let mut decisions = Vec::new();
+    let config = crate::config::load_config();
 
     for report in reports {
         let decision = match report.priority {
             Priority::Low => Decision::Inform {
                 summary: report.summary.clone(),
             },
+
+            Priority::Normal => {
+                if report.requires_action {
+                    // Cheap LLM call to draft a real response
+                    let draft = llm_draft_response(&config, report, false).await;
+                    Decision::Reply {
+                        platform: tentacle_platform_from_id(&report.tentacle_id),
+                        to: "user".to_string(),
+                        draft,
+                        confidence: 0.6,
+                    }
+                } else {
+                    Decision::Inform {
+                        summary: report.summary.clone(),
+                    }
+                }
+            }
+
+            Priority::High => {
+                // Full model for analysis
+                let analysis = llm_draft_response(&config, report, true).await;
+                if head.autonomy_level >= 0.7 {
+                    Decision::Act {
+                        action: analysis,
+                        platform: tentacle_platform_from_id(&report.tentacle_id),
+                        reversible: true,
+                    }
+                } else {
+                    Decision::Escalate {
+                        reason: report.summary.clone(),
+                        context: format!(
+                            "LLM analysis: {}\n\nRaw details: {}",
+                            analysis,
+                            crate::safe_slice(&report.details.to_string(), 500)
+                        ),
+                    }
+                }
+            }
+
+            Priority::Critical => {
+                // Always escalates — Big Agent will handle cross-domain correlation
+                Decision::Escalate {
+                    reason: format!("[CRITICAL] {}", report.summary),
+                    context: report.details.to_string(),
+                }
+            }
+        };
+
+        decisions.push(decision);
+    }
+
+    decisions
+}
+
+/// Kept for any legacy sync call sites. In hive_tick we use the async version.
+#[allow(dead_code)]
+fn head_process_reports(
+    head: &HeadModel,
+    reports: &[TentacleReport],
+) -> Vec<Decision> {
+    let mut decisions = Vec::new();
+    for report in reports {
+        let decision = match report.priority {
+            Priority::Low => Decision::Inform { summary: report.summary.clone() },
             Priority::Normal => {
                 if report.requires_action {
                     if let Some(ref action) = report.suggested_action {
@@ -491,20 +1348,17 @@ fn head_process_reports(
                             confidence: 0.6,
                         }
                     } else {
-                        Decision::Inform {
-                            summary: report.summary.clone(),
-                        }
+                        Decision::Inform { summary: report.summary.clone() }
                     }
                 } else {
-                    Decision::Inform {
-                        summary: report.summary.clone(),
-                    }
+                    Decision::Inform { summary: report.summary.clone() }
                 }
             }
             Priority::High => {
                 if head.autonomy_level >= 0.7 {
                     Decision::Act {
-                        action: report.suggested_action
+                        action: report
+                            .suggested_action
                             .clone()
                             .unwrap_or_else(|| format!("Handle: {}", report.summary)),
                         platform: tentacle_platform_from_id(&report.tentacle_id),
@@ -522,11 +1376,65 @@ fn head_process_reports(
                 context: report.details.to_string(),
             },
         };
-
         decisions.push(decision);
     }
-
     decisions
+}
+
+/// Call the LLM to draft a response or analysis for a report.
+/// `use_full_model` — when true uses the user's full configured model.
+async fn llm_draft_response(
+    config: &crate::config::BladeConfig,
+    report: &TentacleReport,
+    use_full_model: bool,
+) -> String {
+    let platform = tentacle_platform_from_id(&report.tentacle_id);
+    let system_prompt = format!(
+        "You are BLADE, a JARVIS-level AI assistant embedded in the user's desktop. \
+         A monitoring tentacle has flagged activity on {}. \
+         Category: {}. Priority level: {:?}. \
+         Your job: produce a concise, actionable response in the user's voice. \
+         Be direct, specific, and reference actual names/repos/errors from the report.",
+        platform, report.category, report.priority
+    );
+
+    let user_prompt = format!(
+        "Tentacle report:\n{}\n\nFull details:\n{}\n\nSuggested action: {}\n\n\
+         Draft a brief response or recommended next action (2-4 sentences). \
+         Be specific — use the actual repo names, people, or error details.",
+        report.summary,
+        crate::safe_slice(&report.details.to_string(), 600),
+        report.suggested_action.as_deref().unwrap_or("none")
+    );
+
+    let messages = vec![
+        crate::providers::ConversationMessage::System(system_prompt),
+        crate::providers::ConversationMessage::User(user_prompt),
+    ];
+
+    let _ = use_full_model; // same model for now; can route to mini/full in future
+    let model = format!("{}/{}", config.provider, config.model);
+    let no_tools: Vec<crate::providers::ToolDefinition> = vec![];
+
+    match crate::providers::complete_turn(
+        &config.provider,
+        &config.api_key,
+        &model,
+        &messages,
+        &no_tools,
+        config.base_url.as_deref(),
+    )
+    .await
+    {
+        Ok(turn) => turn.content,
+        Err(e) => {
+            log::warn!("[Hive/llm_draft] LLM call failed: {}", e);
+            report
+                .suggested_action
+                .clone()
+                .unwrap_or_else(|| format!("Review: {}", report.summary))
+        }
+    }
 }
 
 fn tentacle_platform_from_id(tentacle_id: &str) -> String {
@@ -536,17 +1444,21 @@ fn tentacle_platform_from_id(tentacle_id: &str) -> String {
         .to_string()
 }
 
-// ── Big Agent ────────────────────────────────────────────────────────────────
+// ── Big Agent ─────────────────────────────────────────────────────────────────
 
-/// The Big Agent sees ALL reports from ALL heads and can spot cross-domain patterns.
-/// "Sarah asked about the API in Slack AND there is a failing CI build on that repo
-///  → connect the dots and draft a reply that includes the CI error and a fix."
+/// The Big Agent sees ALL reports from ALL tentacles simultaneously.
+/// It uses the full LLM model to:
+///   - Correlate across domains (CI failure + Slack question → one reply)
+///   - Draft cross-platform responses when patterns are found
+///   - Escalate anything Critical directly to the user
 pub async fn big_agent_think(reports: Vec<TentacleReport>) -> Vec<Decision> {
     if reports.is_empty() {
         return Vec::new();
     }
 
-    // Group reports by platform for cross-domain pattern matching.
+    let config = crate::config::load_config();
+
+    // Group by platform for pattern detection
     let mut by_platform: HashMap<String, Vec<&TentacleReport>> = HashMap::new();
     for r in &reports {
         let platform = tentacle_platform_from_id(&r.tentacle_id);
@@ -555,14 +1467,11 @@ pub async fn big_agent_think(reports: Vec<TentacleReport>) -> Vec<Decision> {
 
     let mut decisions = Vec::new();
 
-    // ── People-graph enrichment ───────────────────────────────────────────────
-    // For every report that mentions a person (Slack, email), look them up in
-    // people_graph so cross-domain decisions can reference relationship context.
+    // ── People-graph enrichment ────────────────────────────────────────────────
     let mut people_context: Vec<String> = Vec::new();
     for r in &reports {
         let platform = tentacle_platform_from_id(&r.tentacle_id);
-        if platform == "slack" || platform == "email" || platform == "discord" {
-            // Heuristic: the sender field if present in details, else skip.
+        if matches!(platform.as_str(), "slack" | "email" | "discord") {
             if let Some(sender) = r.details.get("sender").and_then(|v| v.as_str()) {
                 if let Some(person) = crate::people_graph::get_person(sender) {
                     people_context.push(format!(
@@ -577,57 +1486,7 @@ pub async fn big_agent_think(reports: Vec<TentacleReport>) -> Vec<Decision> {
         }
     }
 
-    // Cross-domain pattern: Slack mention + GitHub/CI activity → connect them.
-    let has_slack = by_platform.contains_key("slack");
-    let has_github = by_platform.contains_key("github");
-    let has_ci = by_platform.contains_key("ci");
-
-    if has_slack && (has_github || has_ci) {
-        // Build a synthesis prompt for the LLM.
-        let slack_summaries: Vec<String> = by_platform
-            .get("slack")
-            .map(|rs| rs.iter().map(|r| r.summary.clone()).collect())
-            .unwrap_or_default();
-        let github_summaries: Vec<String> = by_platform
-            .get("github")
-            .map(|rs| rs.iter().map(|r| r.summary.clone()).collect())
-            .unwrap_or_default();
-        let ci_summaries: Vec<String> = by_platform
-            .get("ci")
-            .map(|rs| rs.iter().map(|r| r.summary.clone()).collect())
-            .unwrap_or_default();
-
-        let context = format!(
-            "Slack: {}\nGitHub: {}\nCI: {}\nPeople: {}",
-            slack_summaries.join("; "),
-            github_summaries.join("; "),
-            ci_summaries.join("; "),
-            if people_context.is_empty() {
-                "none identified".to_string()
-            } else {
-                people_context.join(", ")
-            }
-        );
-
-        decisions.push(Decision::Inform {
-            summary: format!(
-                "[Big Agent cross-domain] Activity detected across Slack + \
-                 Dev channels. Context: {}",
-                crate::safe_slice(&context, 400)
-            ),
-        });
-    }
-
-    // Email + GitHub: someone emailed about a PR?
-    if by_platform.contains_key("email") && by_platform.contains_key("github") {
-        decisions.push(Decision::Inform {
-            summary: "[Big Agent] Email and GitHub both active — check for \
-                      related PR/issue discussion."
-                .to_string(),
-        });
-    }
-
-    // Critical escalation: any Critical-priority report goes straight to user.
+    // ── Immediate escalation for Critical ────────────────────────────────────
     for r in &reports {
         if r.priority == Priority::Critical {
             decisions.push(Decision::Escalate {
@@ -637,13 +1496,159 @@ pub async fn big_agent_think(reports: Vec<TentacleReport>) -> Vec<Decision> {
         }
     }
 
-    // If no cross-domain pattern found, fall back to a high-level Inform.
+    // ── LLM cross-domain correlation ──────────────────────────────────────────
+    // Run if there are multiple platforms active or any High/Critical reports
+    let has_multiple_platforms = by_platform.len() > 1;
+    let has_high_priority = reports
+        .iter()
+        .any(|r| r.priority == Priority::High || r.priority == Priority::Critical);
+
+    if has_multiple_platforms || has_high_priority {
+        // Build a rich context for the LLM
+        let mut report_lines: Vec<String> = Vec::new();
+        for r in &reports {
+            let platform = tentacle_platform_from_id(&r.tentacle_id);
+            report_lines.push(format!(
+                "[{}/{}] {:?} — {}",
+                platform, r.category, r.priority, r.summary
+            ));
+            // Include message previews
+            if let Some(previews) = r.details.get("previews").and_then(|p| p.as_array()) {
+                for preview in previews.iter().take(3) {
+                    if let Some(s) = preview.as_str() {
+                        report_lines.push(format!("  > {}", crate::safe_slice(s, 120)));
+                    }
+                }
+            }
+            // Include CI failure details
+            if let Some(failing) = r.details.get("failing_jobs").and_then(|v| v.as_str()) {
+                if !failing.is_empty() {
+                    report_lines.push(format!("  > Failures: {}", failing));
+                }
+            }
+            if let Some(run_url) = r.details.get("run_url").and_then(|v| v.as_str()) {
+                report_lines.push(format!("  > CI URL: {}", run_url));
+            }
+        }
+
+        let people_str = if people_context.is_empty() {
+            "No people context available.".to_string()
+        } else {
+            format!("Known people in these reports: {}", people_context.join("; "))
+        };
+
+        let platforms_list: Vec<&str> = by_platform.keys().map(|s| s.as_str()).collect();
+
+        let system_prompt = "You are BLADE's Big Agent — the top-level cross-platform \
+            intelligence coordinator. You receive reports from all platform tentacles \
+            and your job is to:\n\
+            1. Detect cross-domain patterns (e.g. CI failure on repo X + Slack message \
+               asking about repo X — these are obviously related)\n\
+            2. Produce 1-3 specific, actionable insights that reference actual data \
+               (repo names, people, error messages, channel names)\n\
+            3. When Slack/email + CI failure are correlated: draft a concrete Slack \
+               reply that explains the CI situation using the actual error details\n\
+            4. When email + GitHub are correlated: note the relationship explicitly\n\n\
+            Be direct and specific. Do NOT give generic advice. Reference actual \
+            names, repos, errors, and channels from the reports provided."
+            .to_string();
+
+        let user_prompt = format!(
+            "Active platforms this tick: {}\n\n\
+             All Hive reports:\n{}\n\n{}\n\n\
+             Identify cross-domain patterns and provide actionable insights. \
+             If CI failure + Slack/email activity share a repo or topic, \
+             draft a reply the user can send to explain the situation.",
+            platforms_list.join(", "),
+            report_lines.join("\n"),
+            people_str
+        );
+
+        let messages = vec![
+            crate::providers::ConversationMessage::System(system_prompt),
+            crate::providers::ConversationMessage::User(user_prompt),
+        ];
+
+        let model = format!("{}/{}", config.provider, config.model);
+        let no_tools: Vec<crate::providers::ToolDefinition> = vec![];
+
+        match crate::providers::complete_turn(
+            &config.provider,
+            &config.api_key,
+            &model,
+            &messages,
+            &no_tools,
+            config.base_url.as_deref(),
+        )
+        .await
+        {
+            Ok(turn) => {
+                let analysis = turn.content;
+
+                if !analysis.trim().is_empty() {
+                    let has_slack = by_platform.contains_key("slack");
+                    let has_email = by_platform.contains_key("email");
+                    let has_ci_failure = reports.iter().any(|r| {
+                        r.tentacle_id == "tentacle-ci"
+                            && matches!(r.priority, Priority::Critical | Priority::High)
+                    });
+
+                    if (has_slack || has_email) && has_ci_failure {
+                        // Cross-domain: comms + CI failure — surface as a Reply draft
+                        let platform = if has_slack { "slack" } else { "email" };
+                        decisions.push(Decision::Reply {
+                            platform: platform.to_string(),
+                            to: "team".to_string(),
+                            // Below default autonomy threshold so it shows in UI for review
+                            draft: analysis.clone(),
+                            confidence: 0.55,
+                        });
+                    } else {
+                        decisions.push(Decision::Inform {
+                            summary: format!(
+                                "[Big Agent] {}",
+                                crate::safe_slice(&analysis, 600)
+                            ),
+                        });
+                    }
+                }
+            }
+            Err(e) => {
+                log::warn!("[Hive/BigAgent] LLM call failed: {}", e);
+                // Rule-based fallback
+                let has_slack = by_platform.contains_key("slack");
+                let has_github = by_platform.contains_key("github");
+                let has_ci = by_platform.contains_key("ci");
+                if has_slack && (has_github || has_ci) {
+                    let slack_sum: Vec<String> = by_platform
+                        .get("slack")
+                        .map(|rs| rs.iter().map(|r| r.summary.clone()).collect())
+                        .unwrap_or_default();
+                    let ci_sum: Vec<String> = by_platform
+                        .get("ci")
+                        .map(|rs| rs.iter().map(|r| r.summary.clone()).collect())
+                        .unwrap_or_default();
+                    decisions.push(Decision::Inform {
+                        summary: format!(
+                            "[Big Agent] Cross-domain: Slack ({}) + Dev ({}). \
+                             Check for related issues. (LLM unavailable: {})",
+                            slack_sum.join("; "),
+                            ci_sum.join("; "),
+                            crate::safe_slice(&e, 60)
+                        ),
+                    });
+                }
+            }
+        }
+    }
+
+    // If nothing was produced, emit a simple count summary
     if decisions.is_empty() {
-        let count = reports.len();
         decisions.push(Decision::Inform {
             summary: format!(
-                "Hive processed {} report(s) — no cross-domain patterns detected.",
-                count
+                "Hive processed {} report(s) across {} platform(s) — no cross-domain patterns detected.",
+                reports.len(),
+                by_platform.len()
             ),
         });
     }
@@ -651,129 +1656,128 @@ pub async fn big_agent_think(reports: Vec<TentacleReport>) -> Vec<Decision> {
     decisions
 }
 
-// ── Auto-Fix integration ──────────────────────────────────────────────────────
+// ── Initialisation ────────────────────────────────────────────────────────────
 
-/// Inspect all reports from the current tick. If the CI tentacle has produced a
-/// Critical-priority report, the Dev Head attempts to auto-fix it by spawning the
-/// full pipeline as a background task. Emits `hive_auto_fix_started` so the
-/// Dashboard can render the `AutoFixCard`.
-async fn maybe_trigger_auto_fix(app: &AppHandle, reports: &[TentacleReport]) {
-    for report in reports {
-        if report.tentacle_id != "tentacle-ci" {
-            continue;
+/// Build the initial Hive: create the 3 domain heads, then register tentacles
+/// for every platform that looks configured.
+pub fn initialize_hive() -> Hive {
+    let config = crate::config::load_config();
+    let istate = crate::integration_bridge::get_integration_state();
+
+    // ── Head models ───────────────────────────────────────────────────────────
+    let comms_head = HeadModel::new(
+        "head-communications",
+        "communications",
+        vec![
+            "tentacle-slack".to_string(),
+            "tentacle-discord".to_string(),
+            "tentacle-whatsapp".to_string(),
+            "tentacle-email".to_string(),
+        ],
+        format!("{}/{}", config.provider, config.model),
+        config.hive_autonomy,
+    );
+
+    let dev_head = HeadModel::new(
+        "head-development",
+        "development",
+        vec![
+            "tentacle-github".to_string(),
+            "tentacle-ci".to_string(),
+        ],
+        format!("{}/{}", config.provider, config.model),
+        config.hive_autonomy,
+    );
+
+    let ops_head = HeadModel::new(
+        "head-operations",
+        "operations",
+        vec!["tentacle-backend".to_string()],
+        format!("{}/{}", config.provider, config.model),
+        config.hive_autonomy,
+    );
+
+    let mut heads = HashMap::new();
+    heads.insert("head-communications".to_string(), comms_head);
+    heads.insert("head-development".to_string(), dev_head);
+    heads.insert("head-operations".to_string(), ops_head);
+
+    // ── Tentacles ─────────────────────────────────────────────────────────────
+    let mut tentacles: HashMap<String, Tentacle> = HashMap::new();
+
+    // Email: Active if integration polling on or emails already seen
+    if config.integration_polling_enabled || istate.unread_emails > 0 {
+        let t = Tentacle::new("email", "head-communications");
+        tentacles.insert(t.id.clone(), t);
+    }
+
+    // Slack: Active if mentions seen or polling enabled
+    if istate.slack_mentions > 0 || config.integration_polling_enabled {
+        let t = Tentacle::new("slack", "head-communications");
+        tentacles.insert(t.id.clone(), t);
+    }
+
+    // GitHub: Active if token present, notifications seen, or polling enabled
+    let github_token = crate::config::get_provider_key("github");
+    if istate.github_notifications > 0
+        || !github_token.is_empty()
+        || config.integration_polling_enabled
+    {
+        let t = Tentacle::new("github", "head-development");
+        tentacles.insert(t.id.clone(), t);
+    }
+
+    // CI: pairs with GitHub
+    if tentacles.contains_key("tentacle-github") {
+        let t = Tentacle::new("ci", "head-development");
+        tentacles.insert(t.id.clone(), t);
+    }
+
+    // Discord: Active if bot token present, Dormant otherwise
+    {
+        let discord_token = crate::config::get_provider_key("discord");
+        let mut t = Tentacle::new("discord", "head-communications");
+        if discord_token.is_empty() {
+            t.status = TentacleStatus::Dormant;
         }
-        if report.priority != Priority::Critical {
-            continue;
-        }
-        if report.processed {
-            continue;
-        }
+        tentacles.insert(t.id.clone(), t);
+    }
 
-        // Extract repo_path, run_id, and error log from the report details.
-        let repo_path = report
-            .details
-            .get("repo_path")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
+    // WhatsApp: Dormant until process is detected at tick time
+    {
+        let mut t = Tentacle::new("whatsapp", "head-communications");
+        t.status = TentacleStatus::Dormant;
+        tentacles.insert(t.id.clone(), t);
+    }
 
-        let run_id = report
-            .details
-            .get("run_id")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0);
+    // Backend: Active — scans localhost ports every tick
+    {
+        let t = Tentacle::new("backend", "head-operations");
+        tentacles.insert(t.id.clone(), t);
+    }
 
-        let error_log = report
-            .details
-            .get("error_log")
-            .and_then(|v| v.as_str())
-            .unwrap_or(&report.summary)
-            .to_string();
-
-        let workflow_name = report
-            .details
-            .get("workflow_name")
-            .and_then(|v| v.as_str())
-            .unwrap_or("unknown")
-            .to_string();
-
-        let error_type_str = report
-            .details
-            .get("error_type")
-            .and_then(|v| v.as_str())
-            .unwrap_or("unknown");
-
-        let error_type = match error_type_str {
-            "typescript" | "TypeScript" => crate::auto_fix::ErrorType::TypeScript,
-            "rust" | "RustCompile" => crate::auto_fix::ErrorType::RustCompile,
-            "lint" | "Lint" => crate::auto_fix::ErrorType::Lint,
-            "test" | "Test" => crate::auto_fix::ErrorType::Test,
-            "build" | "Build" => crate::auto_fix::ErrorType::Build,
-            _ => crate::auto_fix::ErrorType::Unknown,
-        };
-
-        if repo_path.is_empty() {
-            log::warn!("[Hive] CI critical report missing repo_path — cannot auto-fix");
-            continue;
-        }
-
-        let failure = crate::auto_fix::CIFailure {
-            repo_path: repo_path.clone(),
-            workflow_name: workflow_name.clone(),
-            run_id,
-            job_name: report
-                .details
-                .get("job_name")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown")
-                .to_string(),
-            step_name: report
-                .details
-                .get("step_name")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown")
-                .to_string(),
-            error_log,
-            error_type,
-        };
-
-        // Emit the started event so the Dashboard can open AutoFixCard.
-        let _ = app.emit(
-            "hive_auto_fix_started",
-            serde_json::json!({
-                "repo_path": repo_path,
-                "workflow_name": workflow_name,
-                "run_id": run_id,
-                "summary": report.summary
-            }),
-        );
-
-        log::info!(
-            "[Hive] Dev Head triggering auto-fix pipeline for {}",
-            repo_path
-        );
-
-        // Spawn in background — the pipeline emits its own progress events.
-        let app_clone = app.clone();
-        tauri::async_runtime::spawn(async move {
-            let _result = crate::auto_fix::full_auto_fix_pipeline(&app_clone, failure).await;
-        });
-
-        // Only trigger once per tick.
-        break;
+    Hive {
+        tentacles,
+        heads,
+        approved_queue: Vec::new(),
+        autonomy: config.hive_autonomy,
+        running: false,
+        last_tick: 0,
+        total_reports_processed: 0,
+        total_actions_taken: 0,
     }
 }
 
-// ── Hive tick ────────────────────────────────────────────────────────────────
+// ── Hive tick ─────────────────────────────────────────────────────────────────
 
 /// Main 30-second Hive tick:
 /// 1. Poll every active tentacle for fresh reports.
 /// 2. Route each report to its head.
-/// 3. Each head processes: trivial → auto-handle, important → decide, critical → escalate.
-/// 4. Big Agent synthesises cross-domain patterns.
-/// 5. Approved (high-confidence) decisions execute; rest queue for user.
+/// 3. Each head processes: Low → Inform, Normal+action → LLM draft,
+///    High → LLM analysis, Critical → escalate.
+/// 4. Big Agent synthesises cross-domain patterns with full LLM.
+/// 5. Auto-execute approved decisions; queue the rest for user.
 pub async fn hive_tick(app: &AppHandle) {
-    // Collect active tentacle platforms.
     let active_tentacles: Vec<String> = {
         let hive = hive_lock().lock().unwrap();
         hive.tentacles
@@ -783,13 +1787,11 @@ pub async fn hive_tick(app: &AppHandle) {
             .collect()
     };
 
-    // Poll each tentacle.
     let mut all_reports: Vec<TentacleReport> = Vec::new();
     for platform in &active_tentacles {
         let reports = poll_tentacle(platform).await;
         all_reports.extend(reports.clone());
 
-        // Store into tentacle's pending queue.
         let mut hive = hive_lock().lock().unwrap();
         let tid = format!("tentacle-{}", platform);
         if let Some(t) = hive.tentacles.get_mut(&tid) {
@@ -805,7 +1807,7 @@ pub async fn hive_tick(app: &AppHandle) {
         return;
     }
 
-    // Route reports to heads.
+    // Route reports to heads
     let mut head_reports: HashMap<String, Vec<TentacleReport>> = HashMap::new();
     {
         let hive = hive_lock().lock().unwrap();
@@ -819,27 +1821,31 @@ pub async fn hive_tick(app: &AppHandle) {
         }
     }
 
-    // Each head processes its slice.
+    // Each head processes its slice asynchronously (LLM for non-trivial)
     let mut all_decisions: Vec<Decision> = Vec::new();
     {
-        let hive = hive_lock().lock().unwrap();
-        for (head_id, reports) in &head_reports {
-            if let Some(head) = hive.heads.get(head_id) {
-                let decisions = head_process_reports(head, reports);
-                all_decisions.extend(decisions);
-            }
+        let head_data: Vec<(HeadModel, Vec<TentacleReport>)> = {
+            let hive = hive_lock().lock().unwrap();
+            head_reports
+                .iter()
+                .filter_map(|(head_id, reports)| {
+                    hive.heads
+                        .get(head_id)
+                        .map(|h| (h.clone(), reports.clone()))
+                })
+                .collect()
+        };
+
+        for (head, reports) in &head_data {
+            let decisions = head_process_reports_async(head, reports).await;
+            all_decisions.extend(decisions);
         }
     }
 
-    // Big Agent sees everything.
+    // Big Agent: cross-domain correlation with full LLM
     let big_decisions = big_agent_think(all_reports.clone()).await;
     all_decisions.extend(big_decisions);
 
-    // Dev Head: check if the CI tentacle reported a Critical failure.
-    // If so, hand off to the auto-fix pipeline (runs in a background task).
-    maybe_trigger_auto_fix(app, &all_reports).await;
-
-    // Separate auto-executable from pending.
     let autonomy_level = {
         let hive = hive_lock().lock().unwrap();
         hive.autonomy
@@ -851,9 +1857,9 @@ pub async fn hive_tick(app: &AppHandle) {
     for decision in &all_decisions {
         let auto = match decision {
             Decision::Reply { confidence, .. } => *confidence >= autonomy_level,
-            Decision::Inform { .. } => true,     // always auto: just surface info
+            Decision::Inform { .. } => true,
             Decision::Act { reversible, .. } => *reversible && autonomy_level >= 0.7,
-            Decision::Escalate { .. } => false,   // always show to user
+            Decision::Escalate { .. } => false,
         };
         if auto {
             to_execute.push(decision.clone());
@@ -862,15 +1868,12 @@ pub async fn hive_tick(app: &AppHandle) {
         }
     }
 
-    // Execute auto decisions.
     for decision in &to_execute {
         execute_decision(app, decision).await;
     }
 
-    // Store pending decisions back on heads.
     {
         let mut hive = hive_lock().lock().unwrap();
-        // Distribute queued decisions to the appropriate head based on platform.
         for decision in &to_queue {
             let target_head = decision_to_head(decision, &hive);
             if let Some(head) = hive.heads.get_mut(&target_head) {
@@ -882,7 +1885,6 @@ pub async fn hive_tick(app: &AppHandle) {
         hive.total_reports_processed += all_reports.len() as u64;
         hive.total_actions_taken += to_execute.len() as u64;
 
-        // Mark all tentacle pending_reports as processed.
         for t in hive.tentacles.values_mut() {
             for r in t.pending_reports.iter_mut() {
                 r.processed = true;
@@ -890,19 +1892,19 @@ pub async fn hive_tick(app: &AppHandle) {
         }
     }
 
-    // Feed important reports into typed_memory (Fact / Decision categories).
     feed_reports_to_memory(&all_reports);
 
-    // Emit status update to frontend.
     let status = get_hive_status();
     let _ = app.emit("hive_tick", &status);
 
-    // Emit pending decisions for UI approval.
     if !to_queue.is_empty() {
-        let _ = app.emit("hive_pending_decisions", serde_json::json!({
-            "count": to_queue.len(),
-            "decisions": to_queue
-        }));
+        let _ = app.emit(
+            "hive_pending_decisions",
+            serde_json::json!({
+                "count": to_queue.len(),
+                "decisions": to_queue
+            }),
+        );
     }
 
     log::info!(
@@ -939,30 +1941,40 @@ async fn execute_decision(app: &AppHandle, decision: &Decision) {
     match decision {
         Decision::Inform { summary } => {
             log::debug!("[Hive] Inform: {}", summary);
-            let _ = app.emit(
-                "hive_inform",
-                serde_json::json!({ "summary": summary }),
-            );
+            let _ = app.emit("hive_inform", serde_json::json!({ "summary": summary }));
         }
-        Decision::Reply { platform, to, draft, confidence } => {
+        Decision::Reply {
+            platform,
+            to,
+            draft,
+            confidence,
+        } => {
             log::info!(
                 "[Hive] Auto-reply on {} to {}: {} (conf={:.2})",
-                platform, to, crate::safe_slice(draft, 60), confidence
+                platform,
+                to,
+                crate::safe_slice(draft, 60),
+                confidence
             );
-            // Log action in execution memory.
             log_hive_action(
                 platform,
                 &format!("auto-reply to {}: {}", to, crate::safe_slice(draft, 80)),
             );
-            let _ = app.emit("hive_action", serde_json::json!({
-                "type": "reply",
-                "platform": platform,
-                "to": to,
-                "draft": draft
-            }));
+            let _ = app.emit(
+                "hive_action",
+                serde_json::json!({
+                    "type": "reply",
+                    "platform": platform,
+                    "to": to,
+                    "draft": draft
+                }),
+            );
         }
-        Decision::Act { action, platform, reversible } => {
-            // Route through decision_gate before executing — BLADE's safety layer.
+        Decision::Act {
+            action,
+            platform,
+            reversible,
+        } => {
             let signal = crate::decision_gate::Signal {
                 source: format!("hive:{}", platform),
                 description: action.clone(),
@@ -970,42 +1982,55 @@ async fn execute_decision(app: &AppHandle, decision: &Decision) {
                 reversible: *reversible,
                 time_sensitive: false,
             };
-            let perception = crate::perception_fusion::get_latest()
-                .unwrap_or_default();
+            let perception = crate::perception_fusion::get_latest().unwrap_or_default();
             let gate_outcome = crate::decision_gate::evaluate(&signal, &perception).await;
-            // Only execute if gate approves autonomously.
             let should_exec = matches!(
                 gate_outcome,
                 crate::decision_gate::DecisionOutcome::ActAutonomously { .. }
             );
             if !should_exec {
-                log::info!("[Hive] decision_gate deferred Act on {}: {}", platform, crate::safe_slice(action, 60));
-                let _ = app.emit("hive_action_deferred", serde_json::json!({
-                    "type": "act",
-                    "platform": platform,
-                    "action": action,
-                    "reason": "decision_gate deferred"
-                }));
+                log::info!(
+                    "[Hive] decision_gate deferred Act on {}: {}",
+                    platform,
+                    crate::safe_slice(action, 60)
+                );
+                let _ = app.emit(
+                    "hive_action_deferred",
+                    serde_json::json!({
+                        "type": "act",
+                        "platform": platform,
+                        "action": action,
+                        "reason": "decision_gate deferred"
+                    }),
+                );
                 return;
             }
             log::info!(
                 "[Hive] Act on {}: {} (reversible={})",
-                platform, crate::safe_slice(action, 80), reversible
+                platform,
+                crate::safe_slice(action, 80),
+                reversible
             );
             log_hive_action(platform, action);
-            let _ = app.emit("hive_action", serde_json::json!({
-                "type": "act",
-                "platform": platform,
-                "action": action,
-                "reversible": reversible
-            }));
+            let _ = app.emit(
+                "hive_action",
+                serde_json::json!({
+                    "type": "act",
+                    "platform": platform,
+                    "action": action,
+                    "reversible": reversible
+                }),
+            );
         }
         Decision::Escalate { reason, context } => {
             log::warn!("[Hive] Escalate: {}", reason);
-            let _ = app.emit("hive_escalate", serde_json::json!({
-                "reason": reason,
-                "context": context
-            }));
+            let _ = app.emit(
+                "hive_escalate",
+                serde_json::json!({
+                    "reason": reason,
+                    "context": context
+                }),
+            );
         }
     }
 }
@@ -1015,7 +2040,8 @@ fn log_hive_action(platform: &str, action: &str) {
     if let Ok(conn) = crate::execution_memory::open_db_pub() {
         let cmd = format!("[hive:{}] {}", platform, action);
         let _ = conn.execute(
-            "INSERT INTO executions (command, cwd, stdout, stderr, exit_code, duration_ms, timestamp) \
+            "INSERT INTO executions \
+             (command, cwd, stdout, stderr, exit_code, duration_ms, timestamp) \
              VALUES (?1, '', '', '', 0, 0, ?2)",
             rusqlite::params![cmd, now_secs()],
         );
@@ -1025,7 +2051,9 @@ fn log_hive_action(platform: &str, action: &str) {
 /// Feed high-priority reports into typed_memory so patterns are remembered.
 fn feed_reports_to_memory(reports: &[TentacleReport]) {
     let db_path = crate::config::blade_config_dir().join("blade.db");
-    let Ok(conn) = rusqlite::Connection::open(&db_path) else { return };
+    let Ok(conn) = rusqlite::Connection::open(&db_path) else {
+        return;
+    };
 
     for report in reports {
         if report.priority == Priority::Critical || report.priority == Priority::High {
@@ -1051,7 +2079,7 @@ fn feed_reports_to_memory(reports: &[TentacleReport]) {
 /// Create a configured Hive and store it in static state.
 pub fn start_hive(app: AppHandle, autonomy: f32) {
     if HIVE_RUNNING.swap(true, std::sync::atomic::Ordering::SeqCst) {
-        return; // already running
+        return;
     }
 
     let mut hive = initialize_hive();
@@ -1062,7 +2090,6 @@ pub fn start_hive(app: AppHandle, autonomy: f32) {
 
     tauri::async_runtime::spawn(async move {
         loop {
-            // Check if we should keep running.
             let running = hive_lock().lock().unwrap().running;
             if !running {
                 break;
@@ -1113,13 +2140,11 @@ pub async fn spawn_tentacle(
     let mut t = Tentacle::new(platform, head_id);
     t.status = TentacleStatus::Active;
 
-    // Store any platform-specific config as a note in details (unused for now).
-    drop(config); // config reserved for future per-platform auth tokens etc.
+    drop(config); // reserved for future per-platform auth config
 
     let id = t.id.clone();
     hive.tentacles.insert(id.clone(), t);
 
-    // Ensure the head knows about this tentacle.
     if let Some(head) = hive.heads.get_mut(head_id) {
         if !head.tentacles.contains(&id) {
             head.tentacles.push(id.clone());
@@ -1149,11 +2174,7 @@ pub fn get_hive_status() -> HiveStatus {
         })
         .collect();
 
-    let pending_decisions: usize = hive
-        .heads
-        .values()
-        .map(|h| h.pending_decisions.len())
-        .sum();
+    let pending_decisions: usize = hive.heads.values().map(|h| h.pending_decisions.len()).sum();
 
     let pending_reports: usize = hive
         .tentacles
@@ -1212,7 +2233,8 @@ pub fn approve_decision(head_id: &str, decision_index: usize) -> Result<Decision
     }
 
     let decision = head.pending_decisions.remove(decision_index);
-    hive.approved_queue.push((head_id.to_string(), decision.clone()));
+    hive.approved_queue
+        .push((head_id.to_string(), decision.clone()));
     Ok(decision)
 }
 
@@ -1272,7 +2294,6 @@ pub fn hive_approve_decision(
 #[tauri::command]
 pub fn hive_set_autonomy(level: f32) -> Result<(), String> {
     set_autonomy(level);
-    // Persist to config.
     let mut cfg = crate::config::load_config();
     cfg.hive_autonomy = level.clamp(0.0, 1.0);
     crate::config::save_config(&cfg)

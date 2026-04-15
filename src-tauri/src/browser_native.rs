@@ -1033,6 +1033,13 @@ async fn eval_js(ws_url: &str, expression: &str) -> Result<String, String> {
     Ok(text)
 }
 
+/// Evaluate a JavaScript expression in a tab identified by its raw CDP WebSocket URL.
+/// This is a lightweight one-shot call — it opens a WS connection, runs the expression,
+/// and returns the result as a string. Used by hive.rs for WhatsApp badge reading.
+pub(crate) async fn cdp_evaluate(ws_url: &str, expression: &str) -> Result<String, String> {
+    eval_js(ws_url, expression).await
+}
+
 async fn wait_for_page_ready(ws_url: &str) -> Result<(), String> {
     let started = std::time::Instant::now();
     while started.elapsed() < std::time::Duration::from_secs(10) {

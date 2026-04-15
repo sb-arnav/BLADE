@@ -68,7 +68,8 @@ function stepIndex(step: PipelineStep): number {
   return STEPS.find((s) => s.key === step)?.index ?? 0;
 }
 
-function stepLabel(step: PipelineStep): string {
+// @ts-ignore
+function _stepLabel(step: PipelineStep): string {
   return STEPS.find((s) => s.key === step)?.label ?? step;
 }
 
@@ -103,7 +104,7 @@ export function AutoFixCard({ onDismiss }: AutoFixCardProps) {
     ciPassed: null,
   });
 
-  const [cancelled, setCancelled] = useState(false);
+  const [_cancelled, setCancelled] = useState(false);
 
   // ── Event listeners ──────────────────────────────────────────────────────
 
@@ -113,7 +114,8 @@ export function AutoFixCard({ onDismiss }: AutoFixCardProps) {
     // Pipeline started by Hive.
     const started = listen<AutoFixStartedPayload>("hive_auto_fix_started", (e) => {
       const { repo_path, workflow_name, run_id, summary } = e.payload;
-      const repoName = repo_path.split("/").at(-1) ?? repo_path;
+      const parts = repo_path.split("/");
+      const repoName = parts[parts.length - 1] ?? repo_path;
       setState((prev) => ({
         ...prev,
         repoName,
