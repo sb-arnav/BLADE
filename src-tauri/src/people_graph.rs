@@ -447,6 +447,33 @@ pub async fn people_learn_from_conversation(
     learn_person_from_conversation(&messages, &platform).await;
 }
 
+/// Called from the post-chat pipeline in commands.rs with raw text strings
+/// (not HistoryMessage objects) so the caller doesn't need to build a struct.
+pub async fn learn_from_conversation_text(user_text: &str, assistant_text: &str) {
+    if user_text.len() < 30 {
+        return;
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let msgs = vec![
+        crate::history::HistoryMessage {
+            id: "tmp-user".to_string(),
+            role: "user".to_string(),
+            content: user_text.to_string(),
+            timestamp: now,
+        },
+        crate::history::HistoryMessage {
+            id: "tmp-assistant".to_string(),
+            role: "assistant".to_string(),
+            content: assistant_text.to_string(),
+            timestamp: now,
+        },
+    ];
+    learn_person_from_conversation(&msgs, "chat").await;
+}
+
 #[tauri::command]
 pub fn people_get_context_for_prompt(names: Vec<String>) -> String {
     ensure_tables();

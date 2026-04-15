@@ -24,6 +24,9 @@ import { useRuntimes } from "./hooks/useRuntimes";
 import { copyConversation } from "./utils/exportConversation";
 import { BladeConfig } from "./types";
 import { ToastProvider } from "./components/Toast";
+import { Sidebar } from "./components/Sidebar";
+import { StatusBar } from "./components/StatusBar";
+import { DashboardGlance } from "./components/DashboardGlance";
 
 // ── Error boundary ────────────────────────────────────────────────────────────
 interface EBState { error: Error | null }
@@ -190,7 +193,7 @@ export default function App() {
   const [config, setConfig] = useState<BladeConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [route, setRoute] = useState<Route>("dashboard");
-  const [chatPanelOpen, setChatPanelOpen] = useState(false);
+  const [chatPanelOpen, setChatPanelOpen] = useState(true);
   const [personaOnboardingOpen, setPersonaOnboardingOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
@@ -799,10 +802,9 @@ export default function App() {
     setWorkspaceIntent(intent ? { route: nextRoute, ...intent } : ROUTE_INTENT_LABELS[nextRoute] ? { route: nextRoute, ...ROUTE_INTENT_LABELS[nextRoute]! } : null);
   }, []);
 
-  // Open the chat slide-out panel and return to dashboard if on a transient "chat" pseudo-route
+  // Open the chat panel (toggle if already open when triggered from sidebar "Chat" item)
   const openChatPanel = useCallback(() => {
-    setChatPanelOpen(true);
-    setRoute((r) => r === "chat" ? "dashboard" : r);
+    setChatPanelOpen((prev) => !prev);
   }, []);
 
   const handleSlashCommand = useCallback((action: string) => {
@@ -905,39 +907,55 @@ export default function App() {
   });
 
   const commands = [
-    { id: "new", label: "New conversation", description: "Start a fresh thread in chat", section: "Chat Core", shortcut: "Ctrl+N", action: () => chat.newConversation() },
-    { id: "clear", label: "Clear thread", description: "Remove messages from the current conversation", section: "Chat Core", action: () => chat.clearMessages() },
-    { id: "export", label: "Export conversation", description: "Copy the current conversation as Markdown", section: "Chat Core", action: () => copyConversation(chat.messages, chat.currentConversation?.title) },
-    { id: "chat", label: "Open chat panel", description: "Open the chat panel (or press Enter / /)", section: "Chat Core", action: () => setChatPanelOpen(true) },
+    // ── Home ──────────────────────────────────────────────────────────────────
+    { id: "dashboard", label: "Home", description: "Go to the dashboard overview", section: "Home", shortcut: "Ctrl+H", action: () => openRoute("dashboard") },
+    { id: "chat", label: "Chat", description: "Open the chat panel", section: "Home", action: () => setChatPanelOpen((p) => !p) },
+    { id: "new", label: "New conversation", description: "Start a fresh thread in chat", section: "Home", shortcut: "Ctrl+N", action: () => chat.newConversation() },
+    { id: "clear", label: "Clear thread", description: "Remove messages from the current conversation", section: "Home", action: () => chat.clearMessages() },
+    { id: "export", label: "Export conversation", description: "Copy the current conversation as Markdown", section: "Home", action: () => copyConversation(chat.messages, chat.currentConversation?.title) },
+    { id: "branches", label: "Conversation branches", description: "Fork the conversation and explore alternate paths", section: "Home", shortcut: "Ctrl+B", action: () => setBranchOpen(true) },
+    { id: "insights", label: "Conversation insights", description: "Surface metadata and patterns from the current thread", section: "Home", action: () => setInsightsOpen(true) },
+    { id: "notifications", label: "Show notifications", description: "Review unread activity and alerts", section: "Home", action: () => setNotificationsOpen(true) },
+    { id: "focus", label: "Focus mode", description: "Switch into the distraction-free chat view", section: "Home", shortcut: "Ctrl+F", action: () => setFocusMode(true) },
+    { id: "pulse", label: "Pulse — what is Blade thinking?", description: "Trigger an unsolicited thought from Blade's background mind", section: "Home", action: () => invoke<string>("pulse_now").then((t) => { if (t) sendWithStats(t); }).catch(() => {}) },
+    { id: "pulse-explain", label: "Explain last pulse", description: "Ask Blade to reveal the reasoning behind its last observation", section: "Home", action: () => invoke<string>("pulse_explain").then((e) => sendWithStats(`Explain your reasoning: ${e}`)).catch(() => {}) },
 
-    { id: "hive", label: "Open Hive Control Center", description: "Mission control for BLADE's distributed agent mesh — tentacle map, live feed, pending decisions", section: "Operators", action: () => openRoute("hive") },
-    { id: "agent-factory", label: "Open Agent Factory", description: "Describe an agent in plain English and deploy it as a live Hive tentacle", section: "Operators", action: () => openRoute("agent-factory") },
-    { id: "agents", label: "Open Operator Center", description: "Launch the multi-runtime control plane", section: "Operators", action: () => openRoute("agents") },
-    { id: "managed-agents", label: "Open Claude operator view", description: "Jump into the Claude-focused operator workflow", section: "Operators", action: () => openRoute("managed-agents") },
-    { id: "agent-teams", label: "Open agent teams", description: "Coordinate multi-role execution plans", section: "Operators", action: () => openRoute("agent-teams") },
-    { id: "terminal", label: "Open terminal workspace", description: "Run commands and send output back into chat", section: "Operators", action: () => openRoute("terminal") },
-    { id: "files", label: "Open file workspace", description: "Inspect local files and feed context back into Blade", section: "Operators", action: () => openRoute("files") },
-    { id: "git", label: "Open git workspace", description: "Inspect repository state and share it back to chat", section: "Operators", action: () => openRoute("git") },
-    { id: "web-auto", label: "Open web automation", description: "Drive browser and scraping workflows", section: "Operators", action: () => openRoute("web-auto") },
-    { id: "workflows", label: "Open workflow builder", description: "Turn repeated tasks into reusable flows", section: "Operators", action: () => openRoute("workflows") },
+    // ── Work ──────────────────────────────────────────────────────────────────
+    { id: "terminal", label: "Terminal", description: "Run commands and send output back into chat", section: "Work", action: () => openRoute("terminal") },
+    { id: "git", label: "Git", description: "Inspect repository state and share it back to chat", section: "Work", action: () => openRoute("git") },
+    { id: "files", label: "Files", description: "Inspect local files and feed context back into Blade", section: "Work", action: () => openRoute("files") },
+    { id: "web-auto", label: "Browser automation", description: "Drive browser and scraping workflows", section: "Work", action: () => openRoute("web-auto") },
+    { id: "canvas", label: "Canvas", description: "Sketch ideas visually and move them back into chat", section: "Work", action: () => openRoute("canvas") },
+    { id: "workflows", label: "Workflow builder", description: "Turn repeated tasks into reusable flows", section: "Work", action: () => openRoute("workflows") },
+    { id: "hive", label: "Hive Control Center", description: "Mission control for BLADE's distributed agent mesh", section: "Work", action: () => openRoute("hive") },
+    { id: "agent-factory", label: "Agent Factory", description: "Describe an agent in plain English and deploy it as a live Hive tentacle", section: "Work", action: () => openRoute("agent-factory") },
+    { id: "agents", label: "Operator Center", description: "Launch the multi-runtime control plane", section: "Work", action: () => openRoute("agents") },
+    { id: "agent-teams", label: "Agent teams", description: "Coordinate multi-role execution plans", section: "Work", action: () => openRoute("agent-teams") },
+    { id: "bg-agents", label: "Background agents", description: "See Claude Code, Aider, Goose agents BLADE has spawned", section: "Work", action: () => openRoute("bg-agents") },
+    { id: "swarm", label: "Agent swarm", description: "Launch parallel DAG-based agent orchestration", section: "Work", action: () => openRoute("swarm") },
+    { id: "computer-use", label: "Computer use", description: "BLADE takes control: screenshots + clicks + types to complete a task", section: "Work", action: () => openRoute("computer-use") },
+    { id: "computer-use-stop", label: "Stop computer use", description: "Halt any ongoing autonomous screen operation", section: "Work", action: () => { void invoke("computer_use_stop"); } },
+    { id: "email", label: "Email workspace", description: "Read and draft email with Blade assistance", section: "Work", action: () => openRoute("email") },
+    { id: "docs", label: "Document generator", description: "Generate longer-form structured drafts", section: "Work", action: () => openRoute("docs") },
+    { id: "self-code", label: "JITRO — Blade codes itself", description: "Ask BLADE to add a feature to itself using Claude Code on its own source", section: "Work", action: () => { const f = prompt("What feature should BLADE add to itself?"); if (f) invoke("blade_self_code", { feature: f }).then(() => notifications.add({ type: "success", title: "BLADE is coding itself", message: `Claude Code is working on: ${f.slice(0, 60)}` })).catch((e: unknown) => notifications.add({ type: "error", title: "Self-code failed", message: String(e) })); } },
+    { id: "skill-packs", label: "Skill packs", description: "Browse and install domain MCP tools for your active role", section: "Work", action: () => openRoute("skill-packs") },
+    { id: "kali", label: "Kali workspace", description: "Security-focused Linux environment", section: "Work", action: () => openRoute("kali") },
+    { id: "code-sandbox", label: "Code sandbox", description: "Isolated code execution environment", section: "Work", action: () => openRoute("code-sandbox") },
+    { id: "screenshot", label: "Capture screen", description: "Send the current screen into chat for analysis", section: "Work", action: handleScreenshot },
 
-    { id: "knowledge", label: "Open knowledge base", description: "Search and reuse saved notes and context", section: "Knowledge", action: () => openRoute("knowledge") },
-    { id: "character", label: "Open Character Bible", description: "Inspect Blade's learned identity and memory", section: "Knowledge", action: () => openRoute("character") },
-    { id: "soul", label: "Read Blade's soul", description: "See who Blade has become through experience", section: "Knowledge", action: () => invoke<string>("blade_get_soul").then((s) => { if (s) sendWithStats(`Read your own self-characterization back to me:\n\n${s}`); else sendWithStats("You haven't developed a self-characterization yet. Use the app more and it will evolve."); }).catch(() => {}) },
-    { id: "journal", label: "Read Blade's journal", description: "See what Blade has been writing about in its internal log", section: "Knowledge", action: () => invoke<string>("journal_get_recent", { days: 7 }).then((j) => { if (j) { sendWithStats(`Show me what you've written in your journal recently.\n\n${j}`); } else { sendWithStats("What have you been reflecting on lately? (Your journal is empty so far.)"); } }).catch(() => {}) },
-    { id: "journal-write", label: "Write today's journal entry", description: "Force Blade to write tonight's journal entry now", section: "Knowledge", action: () => { void invoke("journal_write_now").then(() => notifications.add({ type: "success", title: "Journal written", message: "Today's entry is ready" })).catch(() => {}); } },
-    { id: "reports", label: "Open capability reports", description: "Review what Blade could not do and why", section: "Knowledge", action: () => openRoute("reports") },
-    { id: "dashboard", label: "Open BLADE dashboard", description: "Mission control — status, agents, memory, cron, evolution at a glance", section: "Knowledge", action: () => openRoute("dashboard") },
-    { id: "skill-packs", label: "Install skill packs", description: "Browse and install domain MCP tools for your active role", section: "Knowledge", action: () => openRoute("skill-packs") },
-    { id: "self-code", label: "Code a new BLADE feature (JITRO)", description: "Ask BLADE to add a feature to itself using Claude Code on its own source", section: "Knowledge", action: () => { const f = prompt("What feature should BLADE add to itself?"); if (f) invoke("blade_self_code", { feature: f }).then(() => notifications.add({ type: "success", title: "BLADE is coding itself", message: `Claude Code is working on: ${f.slice(0, 60)}` })).catch((e: unknown) => notifications.add({ type: "error", title: "Self-code failed", message: String(e) })); } },
-    { id: "analytics", label: "Open analytics", description: "Inspect activity and usage trends", section: "Knowledge", action: () => openRoute("analytics") },
-    { id: "activity", label: "Open activity feed", description: "See recent events across the app", section: "Knowledge", action: () => openRoute("activity") },
-    { id: "comparison", label: "Compare models", description: "Inspect model behavior side by side", section: "Knowledge", action: () => openRoute("comparison") },
-    { id: "insights", label: "Show conversation insights", description: "Surface metadata and patterns from the current thread", section: "Knowledge", action: () => setInsightsOpen(true) },
-    { id: "branches", label: "Conversation branches", description: "Fork the conversation and explore alternate paths", section: "Chat Core", shortcut: "Ctrl+B", action: () => setBranchOpen(true) },
-
-    { id: "obsidian-daily", label: "Open today's Obsidian note", description: "Create or open today's daily note in your vault", section: "Knowledge", action: () => invoke("obsidian_ensure_daily_note").catch(() => {}) },
-    { id: "obsidian-save", label: "Save conversation to Obsidian", description: "Write a summary of this conversation to your vault", section: "Knowledge", action: async () => {
+    // ── Life ──────────────────────────────────────────────────────────────────
+    { id: "health", label: "Health", description: "Screen time, break reminders, vitals", section: "Life", action: () => openRoute("health") },
+    { id: "finance", label: "Finance", description: "View spending summary, categories, and recurring charges", section: "Life", action: () => openRoute("finance") },
+    { id: "meetings", label: "Calendar", description: "Upcoming meetings and schedule", section: "Life", action: () => openRoute("meetings") },
+    { id: "social-graph", label: "People", description: "Contacts, relationships, and communication history", section: "Life", action: () => openRoute("social-graph") },
+    { id: "habits", label: "Habits", description: "Track routines and behavioral patterns", section: "Life", action: () => openRoute("habits") },
+    { id: "goals", label: "Goals", description: "Long-term objectives and milestones", section: "Life", action: () => openRoute("goals") },
+    { id: "emotional-intel", label: "Emotional intelligence", description: "Sentiment patterns and mood tracking", section: "Life", action: () => openRoute("emotional-intel") },
+    { id: "predictions", label: "Predictions", description: "Forecast patterns from your data", section: "Life", action: () => openRoute("predictions") },
+    { id: "decision-log", label: "Decision log", description: "Browse decisions BLADE has logged across conversations", section: "Life", action: () => openRoute("decision-log") },
+    { id: "smart-home", label: "Smart Home", description: "Control IoT devices and Spotify via Home Assistant", section: "Life", action: () => openRoute("smart-home") },
+    { id: "obsidian-daily", label: "Today's Obsidian note", description: "Create or open today's daily note in your vault", section: "Life", action: () => invoke("obsidian_ensure_daily_note").catch(() => {}) },
+    { id: "obsidian-save", label: "Save to Obsidian", description: "Write a summary of this conversation to your vault", section: "Life", action: async () => {
       const msgs = chat.messages;
       if (!msgs.length) return;
       const title = chat.currentConversation?.title ?? `Conversation ${new Date().toLocaleDateString()}`;
@@ -945,36 +963,35 @@ export default function App() {
       const id = chat.currentConversation?.id ?? "unknown";
       await invoke("obsidian_save_conversation", { title, summary, conversationId: id }).catch(() => {});
     }},
-    { id: "pulse", label: "Pulse — ask Blade what it's thinking", description: "Trigger an unsolicited thought from Blade's background mind", section: "System", action: () => invoke<string>("pulse_now").then((t) => { if (t) sendWithStats(t); }).catch(() => {}) },
-    { id: "pulse-explain", label: "Why? — explain the last pulse thought", description: "Ask Blade to reveal the reasoning behind its last observation", section: "System", action: () => invoke<string>("pulse_explain").then((e) => sendWithStats(`Explain your reasoning: ${e}`)).catch(() => {}) },
-    { id: "deeplearn", label: "Deep Learn — let Blade read your digital life", description: "Re-run Blade's ingestion of your shell history, git, notes, and conversations", section: "System", action: () => openRoute("deeplearn") },
-    { id: "settings", label: "Open settings", description: "Configure providers, memory, and Blade behavior", section: "System", shortcut: "Ctrl+,", action: () => openRoute("settings") },
-    { id: "sync", label: "Open sync settings", description: "Inspect sync and persistence controls", section: "System", action: () => openRoute("sync") },
-    { id: "diagnostics", label: "Open diagnostics", description: "Inspect system status and troubleshooting data", section: "System", action: () => openRoute("diagnostics") },
-    { id: "discovery", label: "Run discovery scan", description: "Refresh local tooling and environment discovery", section: "System", action: () => openRoute("discovery") },
+
+    // ── System (Settings + Security) ─────────────────────────────────────────
+    { id: "security", label: "Security", description: "Audit permissions, secrets, and active tool access", section: "System", action: () => openRoute("security") },
+    { id: "settings", label: "Settings", description: "Configure providers, memory, and Blade behavior", section: "System", shortcut: "Ctrl+,", action: () => openRoute("settings") },
+    { id: "knowledge", label: "Knowledge base", description: "Search and reuse saved notes and context", section: "System", action: () => openRoute("knowledge") },
+    { id: "character", label: "Character Bible", description: "Inspect Blade's learned identity and memory", section: "System", action: () => openRoute("character") },
+    { id: "soul", label: "Blade's soul", description: "See who Blade has become through experience", section: "System", action: () => invoke<string>("blade_get_soul").then((s) => { if (s) sendWithStats(`Read your own self-characterization back to me:\n\n${s}`); else sendWithStats("You haven't developed a self-characterization yet. Use the app more and it will evolve."); }).catch(() => {}) },
+    { id: "journal", label: "Blade's journal", description: "See what Blade has been writing about in its internal log", section: "System", action: () => invoke<string>("journal_get_recent", { days: 7 }).then((j) => { if (j) { sendWithStats(`Show me what you've written in your journal recently.\n\n${j}`); } else { sendWithStats("What have you been reflecting on lately? (Your journal is empty so far.)"); } }).catch(() => {}) },
+    { id: "journal-write", label: "Write journal entry now", description: "Force Blade to write tonight's journal entry now", section: "System", action: () => { void invoke("journal_write_now").then(() => notifications.add({ type: "success", title: "Journal written", message: "Today's entry is ready" })).catch(() => {}); } },
+    { id: "reports", label: "Capability reports", description: "Review what Blade could not do and why", section: "System", action: () => openRoute("reports") },
+    { id: "analytics", label: "Analytics", description: "Inspect activity and usage trends", section: "System", action: () => openRoute("analytics") },
+    { id: "activity", label: "Activity feed", description: "See recent events across the app", section: "System", action: () => openRoute("activity") },
+    { id: "comparison", label: "Model comparison", description: "Inspect model behavior side by side", section: "System", action: () => openRoute("comparison") },
+    { id: "temporal", label: "Temporal intelligence", description: "Replay what you were doing, detect work patterns, generate standups", section: "System", action: () => openRoute("temporal") },
+    { id: "knowledge-graph", label: "Knowledge graph", description: "Visual entity-relationship map of your memory", section: "System", action: () => openRoute("knowledge-graph") },
+    { id: "screen-timeline", label: "Screen timeline", description: "Visual history of your screen activity", section: "System", action: () => openRoute("screen-timeline") },
+    { id: "integrations", label: "Integrations", description: "Manage Gmail, Calendar, Slack, and GitHub integration status", section: "System", action: () => openRoute("integrations") },
+    { id: "deeplearn", label: "Deep Learn", description: "Re-run Blade's ingestion of your shell history, git, notes, and conversations", section: "System", action: () => openRoute("deeplearn") },
+    { id: "sync", label: "Sync settings", description: "Inspect sync and persistence controls", section: "System", action: () => openRoute("sync") },
+    { id: "diagnostics", label: "Diagnostics", description: "Inspect system status and troubleshooting data", section: "System", action: () => openRoute("diagnostics") },
+    { id: "discovery", label: "Discovery scan", description: "Refresh local tooling and environment discovery", section: "System", action: () => openRoute("discovery") },
+    { id: "health-panel", label: "System health panel", description: "Memory usage, background process status", section: "System", action: () => openRoute("health-panel") },
     { id: "sysprompt", label: "View system prompt", description: "Inspect the prompt Blade assembles behind the scenes", section: "System", action: () => setSystemPromptOpen(true) },
-    { id: "templates", label: "Open prompt templates", description: "Use a saved template as a starting point", section: "System", action: () => setTemplateManagerOpen(true) },
-    { id: "themes", label: "Change theme", description: "Adjust Blade's visual style", section: "System", action: () => setThemePickerOpen(true) },
-    { id: "notifications", label: "Show notifications", description: "Review unread activity and alerts", section: "System", action: () => setNotificationsOpen(true) },
-    { id: "shortcuts", label: "Show keyboard shortcuts", description: "Reveal the keyboard cheat sheet", section: "System", shortcut: "Ctrl+/", action: () => setShortcutHelpOpen(true) },
-    { id: "focus", label: "Enter focus mode", description: "Switch into the distraction-free chat view", section: "System", shortcut: "Ctrl+F", action: () => setFocusMode(true) },
+    { id: "templates", label: "Prompt templates", description: "Use a saved template as a starting point", section: "System", action: () => setTemplateManagerOpen(true) },
+    { id: "themes", label: "Theme", description: "Adjust Blade's visual style", section: "System", action: () => setThemePickerOpen(true) },
+    { id: "shortcuts", label: "Keyboard shortcuts", description: "Reveal the keyboard cheat sheet", section: "System", shortcut: "Ctrl+/", action: () => setShortcutHelpOpen(true) },
     { id: "tts", label: tts.enabled ? "Disable voice output" : "Enable voice output", description: "Toggle spoken responses", section: "System", action: tts.toggleEnabled },
     { id: "sound", label: sound.enabled ? "Disable notification sound" : "Enable notification sound", description: "Toggle Blade's audible alerts", section: "System", action: sound.toggleEnabled },
-    { id: "screenshot", label: "Capture screen", description: "Send the current screen into chat for analysis", section: "System", action: handleScreenshot },
-    { id: "computer-use", label: "Computer use — let Blade operate screen", description: "BLADE takes control: screenshots + clicks + types to complete a task", section: "System", action: () => openRoute("computer-use") },
-    { id: "bg-agents", label: "Background agents — watch running AI agents", description: "See Claude Code, Aider, Goose agents BLADE has spawned, and their live output", section: "System", action: () => openRoute("bg-agents") },
-    { id: "computer-use-stop", label: "Stop computer use", description: "Halt any ongoing autonomous screen operation", section: "System", action: () => { void invoke("computer_use_stop"); } },
-    { id: "canvas", label: "Open canvas workspace", description: "Sketch ideas visually and move them back into chat", section: "System", action: () => openRoute("canvas") },
-    { id: "email", label: "Open email workspace", description: "Read and draft email with Blade assistance", section: "System", action: () => openRoute("email") },
-    { id: "docs", label: "Open document workspace", description: "Generate longer-form structured drafts", section: "System", action: () => openRoute("docs") },
-    { id: "init", label: "Re-run Blade setup", description: "Reset onboarding and configure Blade from scratch", section: "System", action: () => openRoute("init") },
-    { id: "decision-log", label: "Open decision log", description: "Browse decisions BLADE has logged across conversations", section: "Knowledge", action: () => openRoute("decision-log") },
-    { id: "security", label: "Open security dashboard", description: "Audit permissions, secrets, and active tool access", section: "System", action: () => openRoute("security") },
-    { id: "health-panel", label: "Open health panel", description: "System health, memory usage, and background process status", section: "System", action: () => openRoute("health-panel") },
-    { id: "temporal", label: "Open temporal intelligence", description: "Replay what you were doing, detect work patterns, generate standups", section: "Knowledge", action: () => openRoute("temporal") },
-    { id: "integrations", label: "Open integration bridge", description: "Manage Gmail, Calendar, Slack, and GitHub integration status", section: "System", action: () => openRoute("integrations") },
-    { id: "smart-home", label: "Open Smart Home", description: "Control IoT devices and Spotify via Home Assistant", section: "System", action: () => openRoute("smart-home") },
-    { id: "finance", label: "Open Finance", description: "View spending summary, categories, and recurring charges", section: "Knowledge", action: () => openRoute("finance") },
+    { id: "init", label: "Re-run setup", description: "Reset onboarding and configure Blade from scratch", section: "System", action: () => openRoute("init") },
   ];
 
   if (focusMode && config?.onboarded) {
@@ -1123,6 +1140,15 @@ export default function App() {
     </>
   );
 
+  // Sidebar navigation handler — "chat" toggles the right panel, everything else routes
+  const handleSidebarNav = useCallback((sidebarRoute: string) => {
+    if (sidebarRoute === "chat") {
+      setChatPanelOpen((p) => !p);
+    } else {
+      openRoute(sidebarRoute as Route);
+    }
+  }, [openRoute]);
+
   return (
     <ToastProvider>
     <ErrorBoundary>
@@ -1142,6 +1168,7 @@ export default function App() {
         </div>
       )}
 
+      {/* TitleBar is now embedded in Sidebar's logo row via drag region — keep for window controls */}
       <TitleBar />
       <CommandPalette commands={commands} open={paletteOpen} onClose={closePalette} />
       <Suspense fallback={null}>
@@ -1172,28 +1199,47 @@ export default function App() {
         onAction={(r) => { openRoute(r as Route); setNotificationsOpen(false); }}
       />
 
-      {/* ── Main layout: workspace + slide-out chat panel ── */}
-      <div className="flex-1 min-h-0 flex flex-col relative">
+      {/* ── New 3-column layout: Sidebar | Content | Chat Panel ── */}
+      <div className="flex-1 min-h-0 flex flex-row overflow-hidden">
 
-        {/* Main content shifts left when chat panel opens */}
-        <div className={`flex-1 min-h-0 flex flex-col transition-all duration-300 ${chatPanelOpen ? "mr-[40%]" : ""}`}>
-          {mainContent}
+        {/* Left: sidebar navigation */}
+        <Sidebar
+          activeRoute={route}
+          onNavigate={handleSidebarNav}
+          chatUnread={notifications.unreadCount}
+        />
+
+        {/* Center: main content */}
+        <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+          {route === "dashboard" ? (
+            <DashboardGlance
+              onNavigate={(r) => openRoute(r as Route)}
+              onOpenChat={() => setChatPanelOpen(true)}
+            />
+          ) : (
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              {mainContent}
+            </div>
+          )}
         </div>
 
-        {/* ── Slide-out chat panel — right side, 40% width ── */}
+        {/* Right: persistent chat panel */}
         <div
-          className={`absolute top-0 right-0 h-full w-[40%] min-w-[320px] max-w-[600px] flex flex-col bg-blade-bg border-l border-blade-border/50 shadow-surface-xl transition-transform duration-300 ease-out z-30 ${chatPanelOpen ? "translate-x-0" : "translate-x-full"}`}
-          style={{ willChange: "transform" }}
+          className="flex flex-col bg-[#0a0a0c] border-l border-white/[0.06] shrink-0 overflow-hidden"
+          style={{
+            width: chatPanelOpen ? "clamp(320px, 38%, 560px)" : 0,
+            transition: "width 280ms cubic-bezier(0.25,0.1,0.25,1)",
+          }}
         >
-          {/* Panel header */}
-          <div className="flex items-center justify-between px-3 py-2 border-b border-blade-border/30 shrink-0">
-            <span className="text-2xs uppercase tracking-[0.18em] text-blade-muted/60 font-semibold">Chat</span>
+          {/* Chat panel header */}
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06] shrink-0">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/30">Chat</span>
             <div className="flex items-center gap-2">
-              <span className="text-[9px] text-blade-muted/30">Esc to close</span>
+              <span className="text-[9px] text-white/20 hidden sm:inline">Esc</span>
               <button
                 onClick={() => setChatPanelOpen(false)}
-                className="w-5 h-5 rounded flex items-center justify-center text-blade-muted/40 hover:text-blade-secondary hover:bg-blade-surface transition-colors"
-                title="Close chat panel"
+                className="w-5 h-5 rounded flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/[0.06] transition-colors"
+                title="Close chat"
               >
                 <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <path d="M18 6L6 18M6 6l12 12" />
@@ -1203,80 +1249,63 @@ export default function App() {
           </div>
 
           {/* ChatWindow fills the panel */}
-          <div className="flex-1 min-h-0">
-            <ChatWindow
-              messages={chat.messages}
-              loading={chat.loading}
-              error={chat.error}
-              toolExecutions={chat.toolExecutions}
-              clipboardText={chat.clipboardText}
-              conversations={chat.conversations}
-              currentConversationId={chat.currentConversationId}
-              onSend={sendWithStats}
-              onClear={chat.clearMessages}
-              onNewConversation={chat.newConversation}
-              onSwitchConversation={chat.switchConversation}
-              onOpenSettings={() => openRoute("settings")}
-              onDismissClipboard={chat.dismissClipboard}
-              pendingApproval={chat.pendingApproval}
-              onRespondApproval={chat.respondToApproval}
-              onDeleteConversation={chat.deleteConversation}
-              onUpdateConversationTitle={chat.updateConversationTitle}
-              onRetry={chat.retryLastMessage}
-              onSlashCommand={handleSlashCommand}
-              provider={config?.provider}
-              streakDays={stats.streakDays}
-              totalMessages={stats.totalMessages}
-              lastResponseTime={chat.lastResponseTime}
-              model={config?.model}
-              ttsEnabled={tts.enabled}
-              ttsSpeaking={tts.speaking}
-              onToggleTTS={tts.toggleEnabled}
-              onStopTTS={tts.stop}
-              activeWindow={contextAwareness.context.activeWindow}
-              contextSuggestions={contextAwareness.context.suggestedActions}
-              onOpenWorkspace={(workspace) => openRoute(workspace)}
-              runtimes={runtimeCenter.runtimes}
-              onOpenOperators={() => openRoute("agents")}
-              voiceDraft={voiceDraft}
-              onVoiceDraftConsumed={() => setVoiceDraft(null)}
-              voiceModeStatus={voiceMode.status}
-              voiceModeOnPttDown={voiceMode.onPttMouseDown}
-              voiceModeOnPttUp={voiceMode.onPttMouseUp}
-              thinkingText={chat.thinkingText}
-              onOpenNotifications={() => setNotificationsOpen(true)}
-              unreadNotificationCount={notifications.unreadCount}
-            />
+          <div className="flex-1 min-h-0 min-w-0">
+            {chatPanelOpen && (
+              <ChatWindow
+                messages={chat.messages}
+                loading={chat.loading}
+                error={chat.error}
+                toolExecutions={chat.toolExecutions}
+                clipboardText={chat.clipboardText}
+                conversations={chat.conversations}
+                currentConversationId={chat.currentConversationId}
+                onSend={sendWithStats}
+                onClear={chat.clearMessages}
+                onNewConversation={chat.newConversation}
+                onSwitchConversation={chat.switchConversation}
+                onOpenSettings={() => openRoute("settings")}
+                onDismissClipboard={chat.dismissClipboard}
+                pendingApproval={chat.pendingApproval}
+                onRespondApproval={chat.respondToApproval}
+                onDeleteConversation={chat.deleteConversation}
+                onUpdateConversationTitle={chat.updateConversationTitle}
+                onRetry={chat.retryLastMessage}
+                onSlashCommand={handleSlashCommand}
+                provider={config?.provider}
+                streakDays={stats.streakDays}
+                totalMessages={stats.totalMessages}
+                lastResponseTime={chat.lastResponseTime}
+                model={config?.model}
+                ttsEnabled={tts.enabled}
+                ttsSpeaking={tts.speaking}
+                onToggleTTS={tts.toggleEnabled}
+                onStopTTS={tts.stop}
+                activeWindow={contextAwareness.context.activeWindow}
+                contextSuggestions={contextAwareness.context.suggestedActions}
+                onOpenWorkspace={(workspace) => openRoute(workspace)}
+                runtimes={runtimeCenter.runtimes}
+                onOpenOperators={() => openRoute("agents")}
+                voiceDraft={voiceDraft}
+                onVoiceDraftConsumed={() => setVoiceDraft(null)}
+                voiceModeStatus={voiceMode.status}
+                voiceModeOnPttDown={voiceMode.onPttMouseDown}
+                voiceModeOnPttUp={voiceMode.onPttMouseUp}
+                thinkingText={chat.thinkingText}
+                onOpenNotifications={() => setNotificationsOpen(true)}
+                unreadNotificationCount={notifications.unreadCount}
+              />
+            )}
           </div>
         </div>
 
-        {/* Transparent scrim behind the panel — click to close */}
-        {chatPanelOpen && (
-          <div
-            className="absolute inset-0 z-20"
-            onClick={() => setChatPanelOpen(false)}
-            style={{ right: "40%" }}
-          />
-        )}
       </div>
 
-      {/* ── Chat open button — bottom-right, just left of VoiceOrb ── */}
-      {!chatPanelOpen && (
-        <button
-          onClick={openChatPanel}
-          className="fixed bottom-6 right-20 z-40 w-9 h-9 rounded-full bg-blade-surface/90 border border-blade-border/50 shadow-surface-xl backdrop-blur-sm flex items-center justify-center text-blade-muted/60 hover:text-blade-secondary hover:border-blade-border transition-all duration-200"
-          title="Open chat (Enter or /)"
-        >
-          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
-          {notifications.unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-blade-accent text-[8px] font-bold text-blade-bg flex items-center justify-center">
-              {notifications.unreadCount > 9 ? "9+" : notifications.unreadCount}
-            </span>
-          )}
-        </button>
-      )}
+      {/* ── Status bar — full width, bottom ── */}
+      <StatusBar
+        provider={config?.provider}
+        model={config?.model}
+        streakDays={stats.streakDays}
+      />
 
       {/* ── VoiceOrb: PRIMARY input — always visible, wired to voice conversation ── */}
       <VoiceOrb

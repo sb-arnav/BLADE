@@ -147,7 +147,7 @@ async fn summarise_change(
     ];
 
     let model = cheapest_model(&config.provider, &config.model);
-    match crate::providers::complete_turn(&config.provider, &config.api_key, &model, &conv, &[], config.base_url.as_deref()).await {
+    match crate::providers::complete_turn(&config.provider, &config.api_key, &model, &conv, &crate::providers::no_tools(), config.base_url.as_deref()).await {
         Ok(turn) => turn.content,
         Err(_) => format!("Content at {} has changed.", url),
     }

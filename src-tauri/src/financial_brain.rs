@@ -456,7 +456,7 @@ pub async fn generate_insights(months_back: usize) -> Vec<FinancialInsight> {
         crate::config::resolve_provider_for_task(&config, &crate::router::TaskType::Complex);
 
     let messages = vec![crate::providers::ConversationMessage::User(prompt)];
-    let turn = match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &[], None).await {
+    let turn = match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &crate::providers::no_tools(), None).await {
         Ok(t) => t,
         Err(e) => {
             eprintln!("[financial_brain] LLM error: {e}");
@@ -487,7 +487,7 @@ pub async fn investment_suggestions(monthly_surplus: f64, risk_tolerance: &str) 
         crate::config::resolve_provider_for_task(&config, &crate::router::TaskType::Complex);
 
     let messages = vec![crate::providers::ConversationMessage::User(prompt)];
-    match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &[], None).await {
+    match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &crate::providers::no_tools(), None).await {
         Ok(t) => t.content,
         Err(e) => format!("Could not generate investment suggestions: {e}"),
     }
@@ -526,7 +526,7 @@ pub async fn generate_budget_recommendation() -> String {
         crate::config::resolve_provider_for_task(&config, &crate::router::TaskType::Complex);
 
     let messages = vec![crate::providers::ConversationMessage::User(prompt)];
-    match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &[], None).await {
+    match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &crate::providers::no_tools(), None).await {
         Ok(t) => t.content,
         Err(e) => format!("Could not generate budget recommendation: {e}"),
     }
@@ -1063,7 +1063,7 @@ pub async fn auto_categorize_transaction(description: String) -> Result<String, 
         crate::config::resolve_provider_for_task(&config, &crate::router::TaskType::Simple);
 
     let messages = vec![crate::providers::ConversationMessage::User(prompt)];
-    match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &[], None).await {
+    match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &crate::providers::no_tools(), None).await {
         Ok(t) => {
             let cat = t.content.trim().to_lowercase();
             let valid = ["groceries","subscription","transport","dining","utilities",

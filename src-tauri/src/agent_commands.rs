@@ -1092,7 +1092,7 @@ Respond with ONLY valid JSON matching one of these shapes:
         });
     }
     let conversation = providers::build_conversation(messages, None);
-    let turn = providers::complete_turn(provider, api_key, model, &conversation, &[], base_url).await?;
+    let turn = providers::complete_turn(provider, api_key, model, &conversation, &crate::providers::no_tools(), base_url).await?;
     let decision = parse_desktop_decision(&turn.content)?;
 
     if let Some(summary) = detect_repeated_desktop_action(queue, agent_id, &decision.action).await?

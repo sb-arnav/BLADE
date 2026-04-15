@@ -179,7 +179,7 @@ async fn llm_extract_meeting(
 
     let messages = vec![crate::providers::ConversationMessage::User(prompt)];
     let turn =
-        crate::providers::complete_turn(&provider, &api_key, &model, &messages, &[], None)
+        crate::providers::complete_turn(&provider, &api_key, &model, &messages, &crate::providers::no_tools(), None)
             .await
             .map_err(|e| format!("LLM error: {e}"))?;
 
@@ -466,7 +466,7 @@ pub async fn generate_follow_up_email(meeting_id: &str, recipient: &str) -> Stri
         crate::config::resolve_provider_for_task(&config, &crate::router::TaskType::Complex);
 
     let messages = vec![crate::providers::ConversationMessage::User(prompt)];
-    match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &[], None).await {
+    match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &crate::providers::no_tools(), None).await {
         Ok(t) => t.content,
         Err(e) => format!("Failed to generate follow-up email: {e}"),
     }
@@ -519,7 +519,7 @@ pub async fn compare_meetings(ids: Vec<String>) -> String {
         crate::config::resolve_provider_for_task(&config, &crate::router::TaskType::Complex);
 
     let messages = vec![crate::providers::ConversationMessage::User(prompt)];
-    match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &[], None).await {
+    match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &crate::providers::no_tools(), None).await {
         Ok(t) => t.content,
         Err(e) => format!("Failed to compare meetings: {e}"),
     }
@@ -592,7 +592,7 @@ pub async fn extract_recurring_themes(days_back: i32) -> Vec<String> {
         crate::config::resolve_provider_for_task(&config, &crate::router::TaskType::Complex);
 
     let messages = vec![crate::providers::ConversationMessage::User(prompt)];
-    let turn = match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &[], None).await {
+    let turn = match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &crate::providers::no_tools(), None).await {
         Ok(t) => t,
         Err(e) => {
             eprintln!("[meeting_intelligence] LLM error: {e}");

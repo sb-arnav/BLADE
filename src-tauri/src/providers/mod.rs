@@ -107,6 +107,10 @@ pub struct ToolDefinition {
     pub input_schema: serde_json::Value,
 }
 
+/// Helper: returns an empty `&[ToolDefinition]` slice. Use this instead of `&[]`
+/// when calling `complete_turn` — avoids the `&[T; 0]` → `&[T]` coercion issue.
+pub fn no_tools() -> Vec<ToolDefinition> { Vec::new() }
+
 #[derive(Debug, Clone)]
 pub struct ToolCall {
     pub id: String,

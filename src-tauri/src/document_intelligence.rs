@@ -2,6 +2,7 @@
 ///
 /// Deep document reading: ingest PDFs, text, and markdown — extract insights,
 /// answer questions, build a searchable library, synthesize across everything.
+#[allow(dead_code)]
 
 use rusqlite::params;
 use serde::{Deserialize, Serialize};

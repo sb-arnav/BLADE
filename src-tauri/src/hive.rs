@@ -2475,6 +2475,19 @@ pub async fn hive_tick(app: &AppHandle) {
             }),
         );
 
+        // Wire AutoFixCard: emit the event it listens for so the card activates in the UI.
+        // AutoFixCard.tsx listens on "hive_auto_fix_started" and drives the pipeline UI.
+        let run_id_val = failure.details.get("run_id").and_then(|v| v.as_u64()).unwrap_or(0);
+        let _ = app.emit(
+            "hive_auto_fix_started",
+            serde_json::json!({
+                "repo_path": repo,
+                "workflow_name": failing_jobs,
+                "run_id": run_id_val,
+                "summary": failure.summary
+            }),
+        );
+
         // Store CI failure in execution_memory for pattern tracking
         log_hive_action("ci", &format!("CI failure in {}: {}", repo, failing_jobs));
     }
@@ -2789,6 +2802,51 @@ pub async fn spawn_tentacle(
 
     log::info!("[Hive] Spawned tentacle: {}", id);
     Ok(id)
+}
+
+/// Register a custom agent-factory tentacle with the Hive.
+/// Called by agent_factory::deploy_agent so every deployed agent participates
+/// in the Hive tick loop and appears in the HiveView dashboard.
+/// The tentacle is routed to head-intelligence (cross-domain) by default.
+pub fn register_factory_tentacle(agent_id: &str, agent_name: &str) {
+    let tentacle_id = format!("tentacle-factory-{}", agent_id);
+    let platform = format!("factory:{}", agent_name);
+    let head_id = "head-intelligence";
+
+    let mut hive = hive_lock().lock().unwrap();
+
+    if hive.tentacles.contains_key(&tentacle_id) {
+        // Already registered — reactivate
+        if let Some(t) = hive.tentacles.get_mut(&tentacle_id) {
+            t.status = TentacleStatus::Active;
+            t.last_heartbeat = now_secs();
+        }
+        return;
+    }
+
+    let mut t = Tentacle::new(&platform, head_id);
+    t.id = tentacle_id.clone();
+    t.status = TentacleStatus::Active;
+
+    hive.tentacles.insert(tentacle_id.clone(), t);
+
+    if let Some(head) = hive.heads.get_mut(head_id) {
+        if !head.tentacles.contains(&tentacle_id) {
+            head.tentacles.push(tentacle_id.clone());
+        }
+    }
+
+    log::info!("[Hive] Registered factory agent as tentacle: {}", tentacle_id);
+}
+
+/// Deactivate a factory tentacle when an agent is paused or deleted.
+pub fn deregister_factory_tentacle(agent_id: &str) {
+    let tentacle_id = format!("tentacle-factory-{}", agent_id);
+    let mut hive = hive_lock().lock().unwrap();
+    if let Some(t) = hive.tentacles.get_mut(&tentacle_id) {
+        t.status = TentacleStatus::Dormant;
+        log::info!("[Hive] Deregistered factory tentacle: {}", tentacle_id);
+    }
 }
 
 /// Return a serialisable snapshot of the Hive.

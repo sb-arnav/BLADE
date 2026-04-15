@@ -2,6 +2,8 @@
 // BLADE Hive Control Center — 4 domain heads, 10 tentacles, Big Agent cross-domain insights.
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { TentacleDetail, TentacleNode } from "./TentacleDetail";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -1376,6 +1378,85 @@ export function HiveView({ onBack }: HiveViewProps) {
     : onlineCount >= totalCount * 0.6 ? "HIVE DEGRADED"
     : "HIVE CRITICAL";
 
+  // ── Real backend wiring ───────────────────────────────────────────────────────
+  // Load live Hive status on mount and subscribe to tick events.
+  useEffect(() => {
+    // Load initial status
+    invoke<{
+      running: boolean;
+      autonomy: number;
+      tentacles: Array<{ id: string; platform: string; status: string; messages_processed: number; actions_taken: number }>;
+      pending_decisions: number;
+      pending_reports: number;
+    }>("hive_get_status").then((status) => {
+      setAutonomy(Math.round(status.autonomy * 100));
+      // Overlay real backend data onto seed tentacles where IDs match
+      setTentacles((prev) => prev.map((t): TentacleNode => {
+        const real = status.tentacles.find((rt: any) => rt.id === t.id || rt.platform === t.platform);
+        if (!real) return t;
+        return {
+          ...t,
+          status: real.status === "Active" ? "online" as const : real.status === "Dormant" ? "dormant" as const : "offline" as const,
+          messageCount: real.messages_processed,
+          actionsToday: real.actions_taken,
+        };
+      }));
+    }).catch(() => {});
+
+    // Load live reports
+    invoke<Array<{ id: string; tentacle_id: string; summary: string; priority: string; category: string; requires_action: boolean; timestamp: number }>>("hive_get_reports")
+      .then((rpts) => {
+        const mapped = rpts.slice(0, 20).map((r) => ({
+          id: r.id,
+          tentacleId: r.tentacle_id,
+          platform: r.tentacle_id.replace("tentacle-", ""),
+          icon: "🔔",
+          status: r.requires_action ? "pending" as const : "approved" as const,
+        }));
+        if (mapped.length > 0) setReports(mapped as any);
+      }).catch(() => {});
+
+    // Subscribe to real-time hive ticks
+    const unlistenTick = listen<{
+      running: boolean;
+      autonomy: number;
+      tentacles: Array<{ id: string; platform: string; status: string; messages_processed: number; actions_taken: number }>;
+    }>("hive_tick", (e) => {
+      const status = e.payload;
+      setAutonomy(Math.round(status.autonomy * 100));
+      setTentacles((prev) => prev.map((t): TentacleNode => {
+        const real = status.tentacles.find((rt: any) => rt.id === t.id || rt.platform === t.platform);
+        if (!real) return t;
+        return {
+          ...t,
+          status: real.status === "Active" ? "online" as const : real.status === "Dormant" ? "dormant" as const : "offline" as const,
+          messageCount: real.messages_processed,
+          actionsToday: real.actions_taken,
+        };
+      }));
+    });
+
+    // Subscribe to pending decisions
+    const unlistenDecisions = listen<{ count: number; decisions: unknown[] }>("hive_pending_decisions", () => {
+      invoke<Array<{ id: string; tentacle_id: string; summary: string; priority: string; category: string; requires_action: boolean; timestamp: number }>>("hive_get_reports")
+        .then((rpts) => {
+          const mapped = rpts.slice(0, 20).map((r) => ({
+            id: r.id,
+            tentacleId: r.tentacle_id,
+            platform: r.tentacle_id.replace("tentacle-", ""),
+            icon: "🔔",
+            status: r.requires_action ? "pending" as const : "approved" as const,
+          }));
+          if (mapped.length > 0) setReports(mapped as any);
+        }).catch(() => {});
+    });
+
+    return () => {
+      unlistenTick.then((fn) => fn());
+      unlistenDecisions.then((fn) => fn());
+    };
+  }, []);
+
   // Auto-scroll feed
   useEffect(() => {
     if (feedPaused) return;
@@ -1385,7 +1466,7 @@ export function HiveView({ onBack }: HiveViewProps) {
     return () => clearInterval(iv);
   }, [feedPaused]);
 
-  // Simulate executing → done
+  // Simulate executing → done (fallback for seed data; real data comes from hive_tick)
   useEffect(() => {
     const iv = setInterval(() => {
       setDecisions((prev) =>
@@ -1488,7 +1569,11 @@ export function HiveView({ onBack }: HiveViewProps) {
           <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Autonomy</span>
           <input
             type="range" min={0} max={100} value={autonomy}
-            onChange={(e) => setAutonomy(Number(e.target.value))}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              setAutonomy(val);
+              invoke("hive_set_autonomy", { level: val / 100 }).catch(() => {});
+            }}
             className="w-24 accent-indigo-500"
           />
           <span
@@ -1502,9 +1587,17 @@ export function HiveView({ onBack }: HiveViewProps) {
           </span>
         </div>
 
-        {/* Kill switch */}
+        {/* Kill switch — wired to real hive_start / hive_stop */}
         <button
-          onClick={() => setPaused((p) => !p)}
+          onClick={() => {
+            const next = !paused;
+            setPaused(next);
+            if (next) {
+              invoke("hive_stop").catch(() => {});
+            } else {
+              invoke("hive_start").catch(() => {});
+            }
+          }}
           className="flex items-center gap-1.5 shrink-0"
           style={{
             padding: "5px 12px", borderRadius: 8, border: "none",

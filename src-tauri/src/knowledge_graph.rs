@@ -175,7 +175,7 @@ async fn llm_complete(prompt: &str) -> Result<String, String> {
     }
 
     let messages = vec![crate::providers::ConversationMessage::User(prompt.to_string())];
-    let turn = crate::providers::complete_turn(&provider, &api_key, &model, &messages, &[], None).await?;
+    let turn = crate::providers::complete_turn(&provider, &api_key, &model, &messages, &crate::providers::no_tools(), None).await?;
     Ok(turn.content)
 }
 

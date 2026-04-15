@@ -6,6 +6,7 @@
 ///
 /// All DB work is done synchronously before any `.await` points so no
 /// rusqlite::Connection is held across an await boundary.
+#[allow(dead_code)]
 
 use chrono::{Datelike, Local, NaiveDate};
 use rusqlite::params;
@@ -579,7 +580,7 @@ pub async fn generate_habit_insights() -> Vec<HabitInsight> {
         crate::config::resolve_provider_for_task(&config, &crate::router::TaskType::Complex);
 
     let messages = vec![crate::providers::ConversationMessage::User(prompt)];
-    let turn = match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &[], None).await {
+    let turn = match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &crate::providers::no_tools(), None).await {
         Ok(t) => t,
         Err(e) => {
             eprintln!("[habit_engine] LLM error: {e}");
@@ -618,7 +619,7 @@ pub async fn suggest_habit_design(goal: &str) -> String {
         crate::config::resolve_provider_for_task(&config, &crate::router::TaskType::Complex);
 
     let messages = vec![crate::providers::ConversationMessage::User(prompt)];
-    match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &[], None).await {
+    match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &crate::providers::no_tools(), None).await {
         Ok(t) => t.content,
         Err(e) => format!("Could not generate habit design: {e}"),
     }

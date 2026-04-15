@@ -428,7 +428,7 @@ async fn attempt_step(
         }];
         let conversation = providers::build_conversation(messages, None);
 
-        match providers::complete_turn(provider, api_key, model, &conversation, &[], base_url).await {
+        match providers::complete_turn(provider, api_key, model, &conversation, &crate::providers::no_tools(), base_url).await {
             Ok(turn) => Ok(turn.content),
             Err(e) => Err(e),
         }
@@ -461,7 +461,7 @@ async fn generate_reflection(
     }];
     let conversation = providers::build_conversation(messages, None);
 
-    match providers::complete_turn(provider, api_key, &cheap_model, &conversation, &[], base_url).await {
+    match providers::complete_turn(provider, api_key, &cheap_model, &conversation, &crate::providers::no_tools(), base_url).await {
         Ok(turn) => turn.content,
         Err(_) => format!(
             "Attempt {} failed with: {}. Will try a different approach.",
@@ -508,7 +508,7 @@ async fn synthesize_partial_result(
     }];
     let conversation = providers::build_conversation(messages, None);
 
-    match providers::complete_turn(provider, api_key, &cheap_model, &conversation, &[], base_url).await {
+    match providers::complete_turn(provider, api_key, &cheap_model, &conversation, &crate::providers::no_tools(), base_url).await {
         Ok(turn) => turn.content,
         Err(_) => format!(
             "Step '{}' failed: {}. Partial results from earlier steps are available above.",

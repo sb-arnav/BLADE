@@ -9,6 +9,7 @@
 /// scans for blockers, regressions, and progress patterns — then injects
 /// relevant insights into the system prompt so the next conversation is
 /// already context-aware.
+#[allow(dead_code)]
 
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
@@ -247,7 +248,7 @@ async fn llm_complete(prompt: &str) -> Result<String, String> {
     }
 
     let messages = vec![crate::providers::ConversationMessage::User(prompt.to_string())];
-    let turn = crate::providers::complete_turn(&provider, &api_key, &model, &messages, &[], None).await?;
+    let turn = crate::providers::complete_turn(&provider, &api_key, &model, &messages, &crate::providers::no_tools(), None).await?;
     Ok(turn.content)
 }
 

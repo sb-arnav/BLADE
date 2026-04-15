@@ -13,6 +13,7 @@
 ///   next conversation → get_skill_injections() → injected into system prompt
 ///
 /// Inspired by: Hermes GEPA, DSPy prompt optimization, Letta skills
+#[allow(dead_code)]
 
 use crate::db::{skill_candidate_delete, skill_candidate_record, skill_candidates_ripe};
 use crate::providers::ConversationMessage;

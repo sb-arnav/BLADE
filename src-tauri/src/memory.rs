@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 use crate::config::{blade_config_dir, load_config, write_blade_file};
 use rusqlite;
 

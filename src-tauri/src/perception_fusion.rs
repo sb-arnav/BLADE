@@ -90,8 +90,27 @@ pub fn update_perception() -> PerceptionState {
 
     // ── Derived fields ────────────────────────────────────────────────────────
     let visible_errors = extract_visible_errors(&active_title, &screen_ocr_text, &clipboard_preview, &clipboard_type);
-    let context_tags = extract_context_tags(&active_app, &active_title, &screen_ocr_text);
+    let mut context_tags = extract_context_tags(&active_app, &active_title, &screen_ocr_text);
     let user_state = classify_user_state(&active_app, idle_secs);
+
+    // ── Integration Bridge signals → context tags ─────────────────────────────
+    // Surface unread/pending counts from email, Slack, GitHub, and calendar
+    // so brain.rs can see these signals without needing a full perception query.
+    {
+        let istate = crate::integration_bridge::get_integration_state();
+        if istate.unread_emails > 0 {
+            context_tags.push(format!("inbox:{}", istate.unread_emails));
+        }
+        if istate.slack_mentions > 0 {
+            context_tags.push(format!("slack:{}", istate.slack_mentions));
+        }
+        if istate.github_notifications > 0 {
+            context_tags.push(format!("github:{}", istate.github_notifications));
+        }
+        if !istate.upcoming_events.is_empty() {
+            context_tags.push(format!("calendar:{}", istate.upcoming_events.len()));
+        }
+    }
 
     let mut state = PerceptionState {
         timestamp: now,
@@ -189,6 +208,22 @@ pub fn get_delta(current: &PerceptionState, previous: &PerceptionState) -> Strin
     // Disk space warning
     if current.disk_free_gb < 5.0 && previous.disk_free_gb >= 5.0 {
         changes.push(format!("Disk low: {:.1}GB free", current.disk_free_gb));
+    }
+
+    // Integration bridge: flag new unread counts (parsed from context_tags)
+    let prev_inbox = previous.context_tags.iter().find(|t| t.starts_with("inbox:"))
+        .and_then(|t| t.split(':').nth(1)?.parse::<u32>().ok()).unwrap_or(0);
+    let curr_inbox = current.context_tags.iter().find(|t| t.starts_with("inbox:"))
+        .and_then(|t| t.split(':').nth(1)?.parse::<u32>().ok()).unwrap_or(0);
+    if curr_inbox > prev_inbox {
+        changes.push(format!("New email: {} unread", curr_inbox));
+    }
+    let prev_slack = previous.context_tags.iter().find(|t| t.starts_with("slack:"))
+        .and_then(|t| t.split(':').nth(1)?.parse::<u32>().ok()).unwrap_or(0);
+    let curr_slack = current.context_tags.iter().find(|t| t.starts_with("slack:"))
+        .and_then(|t| t.split(':').nth(1)?.parse::<u32>().ok()).unwrap_or(0);
+    if curr_slack > prev_slack {
+        changes.push(format!("New Slack mentions: {}", curr_slack));
     }
 
     if changes.is_empty() {

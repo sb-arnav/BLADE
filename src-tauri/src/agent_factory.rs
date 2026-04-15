@@ -229,8 +229,8 @@ pub async fn create_agent_from_description(description: &str) -> Result<AgentBlu
 }
 
 /// Activate a blueprint: mark it `active`, record `deployed_at`.
-/// In a real deployment this would wire up a polling loop via the Hive;
-/// here we commit the active state and return the agent ID for the frontend.
+/// Registers the agent as a Hive tentacle so it participates in the tick loop
+/// and appears in HiveView as an active node.
 pub async fn deploy_agent(blueprint: &AgentBlueprint) -> Result<String, String> {
     let conn = open_db()?;
     ensure_table(&conn)?;
@@ -242,8 +242,27 @@ pub async fn deploy_agent(blueprint: &AgentBlueprint) -> Result<String, String> 
     )
     .map_err(|e| format!("DB update error: {e}"))?;
 
-    log::info!("[AgentFactory] Deployed agent '{}' ({})", blueprint.name, blueprint.id);
+    // Wire into Hive so the agent shows up as an active tentacle
+    crate::hive::register_factory_tentacle(&blueprint.id, &blueprint.name);
+
+    log::info!("[AgentFactory] Deployed agent '{}' ({}) — registered as Hive tentacle", blueprint.name, blueprint.id);
     Ok(blueprint.id.clone())
+}
+
+/// Re-register all previously-active agents as Hive tentacles on startup.
+/// Called from lib.rs setup so agents survive restarts without re-deploying.
+pub fn restore_active_agents_to_hive() {
+    let agents = match open_db() {
+        Ok(conn) => {
+            let _ = ensure_table(&conn);
+            load_all_blueprints(&conn)
+        }
+        Err(_) => return,
+    };
+    for agent in agents.iter().filter(|a| a.active) {
+        crate::hive::register_factory_tentacle(&agent.id, &agent.name);
+        log::info!("[AgentFactory] Restored agent '{}' as Hive tentacle on startup", agent.name);
+    }
 }
 
 /// Return all stored blueprints (active and inactive).
@@ -261,6 +280,7 @@ pub fn list_deployed_agents() -> Vec<AgentBlueprint> {
 }
 
 /// Pause (deactivate) an agent without deleting its blueprint.
+/// Also deactivates the corresponding Hive tentacle.
 pub fn pause_agent(agent_id: &str) -> Result<(), String> {
     let conn = open_db()?;
     ensure_table(&conn)?;
@@ -269,11 +289,13 @@ pub fn pause_agent(agent_id: &str) -> Result<(), String> {
         params![agent_id],
     )
     .map_err(|e| format!("DB update error: {e}"))?;
+    crate::hive::deregister_factory_tentacle(agent_id);
     log::info!("[AgentFactory] Paused agent {agent_id}");
     Ok(())
 }
 
 /// Permanently delete a blueprint.
+/// Also deactivates the corresponding Hive tentacle.
 pub fn delete_agent(agent_id: &str) -> Result<(), String> {
     let conn = open_db()?;
     ensure_table(&conn)?;
@@ -282,6 +304,7 @@ pub fn delete_agent(agent_id: &str) -> Result<(), String> {
         params![agent_id],
     )
     .map_err(|e| format!("DB delete error: {e}"))?;
+    crate::hive::deregister_factory_tentacle(agent_id);
     log::info!("[AgentFactory] Deleted agent {agent_id}");
     Ok(())
 }

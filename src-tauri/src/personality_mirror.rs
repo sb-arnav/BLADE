@@ -756,3 +756,66 @@ pub fn get_personality_injection() -> Option<String> {
 pub fn personality_get_profile() -> Option<PersonalityProfile> {
     load_profile()
 }
+
+/// Called from the post-chat pipeline in commands.rs.
+/// Incrementally updates the personality profile from a single chat exchange
+/// (user message only — BLADE's style is extracted from the user's writing, not its own).
+/// This is lightweight: heuristic only, no LLM call.
+pub async fn learn_from_exchange(user_text: &str, _assistant_text: &str) {
+    if user_text.len() < 20 {
+        return;
+    }
+
+    let mut counters = StyleCounters::default();
+    counters.total_messages += 1;
+    counters.total_chars += user_text.len() as u64;
+    count_signals(user_text, &mut counters);
+    if counters.sample_messages.len() < 200 {
+        counters.sample_messages.push(user_text.to_string());
+    }
+
+    let new_partial = counters_to_partial_profile(&counters);
+
+    let mut profile = load_profile().unwrap_or_default();
+    let old_count = profile.messages_analyzed as f32;
+    let new_count = new_partial.messages_analyzed as f32;
+    let total = (old_count + new_count).max(1.0);
+    let w_old = old_count / total;
+    let w_new = new_count / total;
+
+    profile.messages_analyzed += new_partial.messages_analyzed;
+    profile.emoji_frequency = profile.emoji_frequency * w_old + new_partial.emoji_frequency * w_new;
+    profile.formality_level = profile.formality_level * w_old + new_partial.formality_level * w_new;
+    profile.technical_depth = profile.technical_depth * w_old + new_partial.technical_depth * w_new;
+
+    for phrase in new_partial.signature_phrases {
+        if !profile.signature_phrases.contains(&phrase) {
+            profile.signature_phrases.push(phrase);
+        }
+    }
+    profile.signature_phrases.truncate(10);
+
+    if new_partial.humor_style != "none" && profile.humor_style == "none" {
+        profile.humor_style = new_partial.humor_style;
+    }
+    if new_partial.greeting_style != "none" && profile.greeting_style == "none" {
+        profile.greeting_style = new_partial.greeting_style;
+    }
+    if !profile.sources.contains(&"chat".to_string()) {
+        profile.sources.push("chat".to_string());
+    }
+    profile.last_updated = chrono::Utc::now().to_rfc3339();
+
+    // Only regenerate the LLM summary every 50 messages to avoid cost
+    if profile.messages_analyzed % 50 == 0 {
+        let sample = counters.sample_messages.clone();
+        let p_clone = profile.clone();
+        let summary = generate_llm_summary(&sample, &p_clone, 0).await
+            .unwrap_or_else(|_| build_fallback_summary(&p_clone));
+        profile.summary = summary;
+    } else if profile.summary.is_empty() {
+        profile.summary = build_fallback_summary(&profile);
+    }
+
+    let _ = save_profile(&profile);
+}

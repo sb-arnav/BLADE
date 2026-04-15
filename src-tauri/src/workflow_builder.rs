@@ -283,7 +283,7 @@ async fn execute_node(
             }
             messages.push(ConversationMessage::User(prompt));
 
-            let turn = complete_turn(&provider, &api_key, &model, &messages, &[], None).await?;
+            let turn = complete_turn(&provider, &api_key, &model, &messages, &crate::providers::no_tools(), None).await?;
             Ok(turn.content)
         }
 
@@ -799,7 +799,7 @@ Return ONLY valid JSON with no markdown fences."#;
         ConversationMessage::User(prompt),
     ];
 
-    let turn = complete_turn(&provider, &api_key, &model, &messages, &[], None).await?;
+    let turn = complete_turn(&provider, &api_key, &model, &messages, &crate::providers::no_tools(), None).await?;
     let raw = turn.content.trim();
 
     // Strip markdown fences if any

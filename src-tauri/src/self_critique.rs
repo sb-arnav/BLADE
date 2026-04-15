@@ -9,6 +9,7 @@
 /// The flow: critique_response → maybe rebuild → save to DB → return.
 /// Called async in background so the user never waits. Only the rebuilt
 /// response surfaces if the original wasn't good enough.
+#[allow(dead_code)]
 
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
@@ -123,7 +124,7 @@ async fn llm_call(
         ConversationMessage::User(user_msg.to_string()),
     ];
 
-    let turn = complete_turn(provider, api_key, model, &messages, &[], base_url).await?;
+    let turn = complete_turn(provider, api_key, model, &messages, &crate::providers::no_tools(), base_url).await?;
     Ok(turn.content)
 }
 
@@ -354,7 +355,7 @@ Respond ONLY as JSON:
         ConversationMessage::User(user_msg.clone()),
     ];
 
-    let raw = match complete_turn(provider, api_key, &model, &messages, &[], base_url).await {
+    let raw = match complete_turn(provider, api_key, &model, &messages, &crate::providers::no_tools(), base_url).await {
         Ok(t) => t.content,
         Err(_) => return None,
     };

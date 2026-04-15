@@ -854,7 +854,7 @@ async fn evolve_from_failures(app: &tauri::AppHandle) {
     };
 
     let rule_text = match crate::providers::complete_turn(
-        &analysis_provider, &analysis_key, &analysis_model, &msgs, &[], config.base_url.as_deref()
+        &analysis_provider, &analysis_key, &analysis_model, &msgs, &crate::providers::no_tools(), config.base_url.as_deref()
     ).await {
         Ok(t) if !t.content.trim().is_empty() => t.content.trim().to_string(),
         Ok(_) => return,

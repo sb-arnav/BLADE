@@ -211,7 +211,7 @@ pub async fn detect_emotion(message: &str, conversation_context: &str) -> Emotio
 
     let messages = vec![crate::providers::ConversationMessage::User(prompt)];
     let turn = match crate::providers::complete_turn(
-        &provider, &api_key, &model, &messages, &[], None,
+        &provider, &api_key, &model, &messages, &crate::providers::no_tools(), None,
     )
     .await
     {
@@ -665,7 +665,7 @@ pub async fn analyze_emotional_patterns(days_back: i32) -> String {
         crate::config::resolve_provider_for_task(&config, &crate::router::TaskType::Complex);
 
     let messages = vec![crate::providers::ConversationMessage::User(prompt)];
-    match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &[], None).await {
+    match crate::providers::complete_turn(&provider, &api_key, &model, &messages, &crate::providers::no_tools(), None).await {
         Ok(t) => t.content,
         Err(e) => {
             eprintln!("[emotional_intelligence] pattern analysis LLM error: {e}");
