@@ -1211,16 +1211,9 @@ export default function App() {
 
         {/* Center: main content */}
         <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-          {route === "dashboard" ? (
-            <DashboardGlance
-              onNavigate={(r) => openRoute(r as Route)}
-              onOpenChat={() => setChatPanelOpen(true)}
-            />
-          ) : (
-            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-              {mainContent}
-            </div>
-          )}
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            {mainContent}
+          </div>
         </div>
 
         {/* Right: persistent chat panel */}
