@@ -2182,3 +2182,40 @@ pub async fn complete_onboarding(answers: Vec<String>) -> Result<(), String> {
 
     Ok(())
 }
+
+#[tauri::command]
+pub async fn get_wallpaper_path() -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use winreg::enums::*;
+        use winreg::RegKey;
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let desktop = hkcu
+            .open_subkey(r"Control Panel\Desktop")
+            .map_err(|e| format!("Registry error: {e}"))?;
+        let path: String = desktop
+            .get_value("WallPaper")
+            .map_err(|e| format!("WallPaper value error: {e}"))?;
+        return Ok(path);
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let output = std::process::Command::new("osascript")
+            .args(["-e", "tell app \"Finder\" to get POSIX path of (desktop picture as alias)"])
+            .output()
+            .map_err(|e| format!("osascript error: {e}"))?;
+        return Ok(String::from_utf8_lossy(&output.stdout).trim().to_string());
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let output = std::process::Command::new("gsettings")
+            .args(["get", "org.gnome.desktop.background", "picture-uri"])
+            .output()
+            .map_err(|e| format!("gsettings error: {e}"))?;
+        let raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let path = raw.trim_matches('\'').replace("file://", "");
+        return Ok(path);
+    }
+    #[allow(unreachable_code)]
+    Err("Unsupported platform".to_string())
+}
