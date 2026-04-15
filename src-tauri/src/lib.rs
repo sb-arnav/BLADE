@@ -1165,6 +1165,7 @@ pub fn run() {
             agent_factory::factory_list_agents,
             agent_factory::factory_pause_agent,
             agent_factory::factory_delete_agent,
+            commands::get_wallpaper_path,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
