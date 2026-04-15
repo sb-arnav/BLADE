@@ -1174,17 +1174,91 @@ pub async fn smart_assign_reviewer(
         String::new()
     };
 
-    // Score: expertise_touches * 2 - open_reviews * 1
+    // Fetch closed PR reviews to find who has reviewed similar code paths before.
+    // We look at the last 50 merged PRs and record who reviewed PRs that touched
+    // the same directories as this one.
+    let changed_dirs: std::collections::HashSet<String> = changed_files
+        .iter()
+        .filter_map(|f| std::path::Path::new(f).parent().and_then(|p| p.to_str()).map(|s| s.to_string()))
+        .collect();
+
+    let mut prior_reviewer_score: HashMap<String, u32> = HashMap::new();
+    let closed_prs_url = format!(
+        "https://api.github.com/repos/{owner}/{repo}/pulls?state=closed&per_page=50"
+    );
+    if let Ok(resp) = gh_get(&closed_prs_url, &token).await {
+        if let Ok(closed_prs) = resp.json::<Vec<serde_json::Value>>().await {
+            for closed_pr in &closed_prs {
+                let pr_num = closed_pr.get("number").and_then(|n| n.as_u64()).unwrap_or(0);
+                if pr_num == 0 { continue; }
+
+                // Fetch files for this closed PR
+                let cf_url = format!(
+                    "https://api.github.com/repos/{owner}/{repo}/pulls/{pr_num}/files"
+                );
+                let cf_files: Vec<GhFile> = if let Ok(r) = gh_get(&cf_url, &token).await {
+                    r.json().await.unwrap_or_default()
+                } else {
+                    continue
+                };
+
+                // Check if any of its files share a directory with our PR
+                let pr_dirs: std::collections::HashSet<String> = cf_files
+                    .iter()
+                    .filter_map(|f| std::path::Path::new(&f.filename).parent().and_then(|p| p.to_str()).map(|s| s.to_string()))
+                    .collect();
+
+                if pr_dirs.is_disjoint(&changed_dirs) {
+                    continue; // no overlap
+                }
+
+                // Count reviewers who approved or commented on this closed PR
+                let reviews_url = format!(
+                    "https://api.github.com/repos/{owner}/{repo}/pulls/{pr_num}/reviews"
+                );
+                if let Ok(r) = gh_get(&reviews_url, &token).await {
+                    if let Ok(reviews) = r.json::<Vec<serde_json::Value>>().await {
+                        for review in &reviews {
+                            let login = review
+                                .get("user")
+                                .and_then(|u| u.get("login"))
+                                .and_then(|l| l.as_str())
+                                .unwrap_or("")
+                                .to_string();
+                            if !login.is_empty() && login != pr_author {
+                                *prior_reviewer_score.entry(login).or_insert(0) += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Score: expertise_touches * 2 + prior_similar_reviews * 1 - open_reviews * 1
     // Higher is better
     let mut candidates: Vec<(String, i64)> = author_file_touches
         .iter()
         .filter(|(login, _)| *login != &pr_author && !login.starts_with("dependabot"))
         .map(|(login, &touches)| {
             let load = *reviewer_open_reviews.get(login).unwrap_or(&0) as i64;
-            let score = (touches as i64) * 2 - load;
+            let prior = *prior_reviewer_score.get(login).unwrap_or(&0) as i64;
+            let score = (touches as i64) * 2 + prior - load;
             (login.clone(), score)
         })
         .collect();
+
+    // Also consider reviewers from prior reviews who didn't commit to the files directly
+    for (login, &prior) in &prior_reviewer_score {
+        if login == &pr_author || login.starts_with("dependabot") {
+            continue;
+        }
+        if candidates.iter().any(|(l, _)| l == login) {
+            continue; // already scored above
+        }
+        let load = *reviewer_open_reviews.get(login).unwrap_or(&0) as i64;
+        candidates.push((login.clone(), prior as i64 - load));
+    }
 
     candidates.sort_by(|a, b| b.1.cmp(&a.1));
 
@@ -1193,10 +1267,12 @@ pub async fn smart_assign_reviewer(
     let expertise_count = *author_file_touches.get(&best.0).unwrap_or(&0);
 
     // Ask LLM to generate a human-friendly reason
+    let prior_reviews = *prior_reviewer_score.get(&best.0).unwrap_or(&0);
     let reason_prompt = format!(
         "In one sentence, explain why {} is the best reviewer for PR #{} in {}/{} \
-         given they have touched {} of the changed files and have {} open reviews pending.",
-        best.0, pr_number, owner, repo, expertise_count, open_count
+         given they have touched {} of the changed files, reviewed {} similar PRs before, \
+         and currently have {} open review requests pending.",
+        best.0, pr_number, owner, repo, expertise_count, prior_reviews, open_count
     );
     let reason = llm_call(
         "You are a concise engineering manager.",
@@ -1222,7 +1298,7 @@ pub async fn smart_assign_reviewer(
         reason,
         expertise_files: changed_files,
         open_review_count: open_count,
-        similar_pr_count: expertise_count,
+        similar_pr_count: prior_reviews,
     })
 }
 
