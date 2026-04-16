@@ -1142,6 +1142,8 @@ pub fn run() {
             organ::organ_get_autonomy,
             homeostasis::homeostasis_get,
             homeostasis::homeostasis_get_directive,
+            homeostasis::homeostasis_get_circadian,
+            homeostasis::homeostasis_relearn_circadian,
             prefrontal::prefrontal_get,
             prefrontal::prefrontal_clear,
             hive::hive_get_reports,

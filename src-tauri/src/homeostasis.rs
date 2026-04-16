@@ -121,40 +121,49 @@ pub fn hypothalamus_tick() {
         state.arousal = (state.arousal + 0.1).min(1.0);
     }
 
-    // ── Pineal gland: circadian rhythm ─────────────────────────────────
-    // Time-of-day awareness affects energy, arousal, and exploration.
-    // Deep night (0-5): minimal activity, dream mode territory
-    // Morning (6-9): gradual ramp-up, morning briefing time
-    // Work hours (9-18): full power
-    // Evening (18-22): gradual wind-down
-    // Late night (22-0): low energy, conservation mode
+    // ── Pineal gland: LEARNED circadian rhythm ──────────────────────────
+    // Instead of hardcoding "9-17 is work hours," BLADE learns the user's
+    // actual schedule from activity_monitor data. A user who works 12pm-3am
+    // gets a completely different circadian curve than a 9-5 worker.
+    //
+    // The learned profile is a 24-slot array (one per hour) where each slot
+    // is the probability the user is active at that hour, based on the last
+    // 14 days of observations.
     let config = crate::config::load_config();
     let hour = chrono::Local::now().format("%H").to_string().parse::<u32>().unwrap_or(12);
 
-    let circadian_energy = match hour {
-        0..=5  => 0.15,  // deep night — minimal, dream mode
-        6..=8  => 0.4,   // morning ramp-up
-        9..=17 => 0.7,   // work hours — full power
-        18..=21 => 0.5,  // evening wind-down
-        22..=23 => 0.25, // late night — conservation
-        _ => 0.5,
+    let profile = load_circadian_profile();
+    let activity_probability = profile[hour as usize];
+
+    // Map activity probability to energy/arousal:
+    // High probability (user usually active now) → full power
+    // Low probability (user usually asleep now) → conservation
+    let circadian_energy = if activity_probability > 0.7 {
+        0.7  // peak hours for this user
+    } else if activity_probability > 0.4 {
+        0.5  // transition period (waking up or winding down)
+    } else if activity_probability > 0.15 {
+        0.3  // occasional activity (maybe checking phone)
+    } else {
+        0.15 // user is almost never active at this hour — deep sleep
     };
 
-    let circadian_arousal_mod = match hour {
-        0..=5  => -0.2,  // suppress arousal at night
-        6..=8  => 0.0,   // neutral
-        9..=17 => 0.1,   // slightly elevated during work
-        18..=21 => -0.05, // slight suppression
-        22..=23 => -0.15, // suppress at night
-        _ => 0.0,
+    let circadian_arousal_mod = if activity_probability > 0.7 {
+        0.1   // work hours — slightly elevated
+    } else if activity_probability > 0.4 {
+        0.0   // transition — neutral
+    } else if activity_probability > 0.15 {
+        -0.1  // off hours — suppress
+    } else {
+        -0.2  // deep sleep — strong suppress
     };
 
-    // Apply circadian rhythm as baseline, then modify from other signals
+    // Apply learned circadian rhythm as baseline
     state.energy_mode = circadian_energy;
     state.arousal = (state.arousal + circadian_arousal_mod).clamp(0.0, 1.0);
 
     if config.token_efficient {
-        state.energy_mode *= 0.6; // user asked to conserve — scale down
+        state.energy_mode *= 0.6;
     }
 
     // If user is actively working, override circadian suppression
@@ -275,6 +284,153 @@ pub fn start_hypothalamus(app: tauri::AppHandle) {
             }));
         }
     });
+}
+
+// ── Learned Circadian Profile ─────────────────────────────────────────────────
+//
+// A 24-slot array where each slot is the probability (0.0-1.0) that the user
+// is active at that hour. Built from the last 14 days of activity_monitor data.
+//
+// For a user who works 12pm-3am:
+//   hours 4-11: ~0.05 (asleep)
+//   hour 12: ~0.4 (waking up)
+//   hours 13-2: ~0.8 (peak work)
+//   hour 3: ~0.3 (winding down)
+//
+// Cached in SQLite settings to avoid recomputing every 60s tick.
+// Recomputed once per day (or on first run).
+
+const CIRCADIAN_DB_KEY: &str = "circadian_profile";
+const CIRCADIAN_RECOMPUTE_INTERVAL: i64 = 86400; // 24 hours
+
+/// Returns a 24-element array of activity probabilities per hour.
+/// Falls back to a flat 0.5 profile if no data is available.
+fn load_circadian_profile() -> [f32; 24] {
+    // Try cached profile first
+    if let Some((profile, computed_at)) = load_cached_profile() {
+        let now = chrono::Utc::now().timestamp();
+        if now - computed_at < CIRCADIAN_RECOMPUTE_INTERVAL {
+            return profile;
+        }
+    }
+
+    // Recompute from activity_monitor data
+    let profile = compute_circadian_from_activity();
+
+    // Cache it
+    save_cached_profile(&profile);
+
+    profile
+}
+
+/// Compute circadian profile from the last 14 days of activity_monitor rows.
+/// Each row has a timestamp + app_name. We count how many 30s observations
+/// fell in each hour slot, then normalize to 0.0-1.0.
+fn compute_circadian_from_activity() -> [f32; 24] {
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    let conn = match rusqlite::Connection::open(&db_path) {
+        Ok(c) => c,
+        Err(_) => return [0.5; 24], // no data — flat profile
+    };
+
+    let cutoff = chrono::Utc::now().timestamp() - (14 * 86400); // 14 days
+
+    // Count observations per hour of day (local time)
+    // We store UTC timestamps, so we convert to local hour in SQL
+    let mut hour_counts = [0u32; 24];
+    let mut total_days_observed = 0u32;
+
+    // Get all timestamps from activity_monitor in the last 14 days
+    let mut stmt = match conn.prepare(
+        "SELECT timestamp FROM activity_monitor WHERE timestamp > ?1"
+    ) {
+        Ok(s) => s,
+        Err(_) => return [0.5; 24],
+    };
+
+    let timestamps: Vec<i64> = stmt
+        .query_map(rusqlite::params![cutoff], |row| row.get::<_, i64>(0))
+        .ok()
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default();
+
+    if timestamps.is_empty() {
+        return [0.5; 24]; // no data — flat profile
+    }
+
+    // Track which days we have data for
+    let mut days_seen = std::collections::HashSet::new();
+
+    for ts in &timestamps {
+        if let Some(dt) = chrono::DateTime::from_timestamp(*ts, 0) {
+            let local = dt.with_timezone(&chrono::Local);
+            let hour = local.format("%H").to_string().parse::<usize>().unwrap_or(0);
+            let day = local.format("%Y-%m-%d").to_string();
+            hour_counts[hour] += 1;
+            days_seen.insert(day);
+        }
+    }
+
+    total_days_observed = days_seen.len() as u32;
+    if total_days_observed == 0 {
+        return [0.5; 24];
+    }
+
+    // Normalize: for each hour, probability = observations / (days * max_observations_per_hour)
+    // Each hour can have at most 120 observations per day (30s intervals × 60 min)
+    let max_per_hour_per_day = 120.0f32;
+    let mut profile = [0.0f32; 24];
+
+    for h in 0..24 {
+        let raw = hour_counts[h] as f32 / (total_days_observed as f32 * max_per_hour_per_day);
+        profile[h] = raw.clamp(0.0, 1.0);
+    }
+
+    // Smooth: apply a simple 3-hour moving average to reduce noise
+    let mut smoothed = [0.0f32; 24];
+    for h in 0..24 {
+        let prev = if h == 0 { 23 } else { h - 1 };
+        let next = if h == 23 { 0 } else { h + 1 };
+        smoothed[h] = (profile[prev] * 0.2 + profile[h] * 0.6 + profile[next] * 0.2).clamp(0.0, 1.0);
+    }
+
+    smoothed
+}
+
+fn load_cached_profile() -> Option<([f32; 24], i64)> {
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    let conn = rusqlite::Connection::open(&db_path).ok()?;
+    let json: String = conn.query_row(
+        "SELECT value FROM settings WHERE key = ?1",
+        rusqlite::params![CIRCADIAN_DB_KEY],
+        |row| row.get(0),
+    ).ok()?;
+
+    #[derive(Deserialize)]
+    struct CachedProfile {
+        profile: [f32; 24],
+        computed_at: i64,
+    }
+
+    let cached: CachedProfile = serde_json::from_str(&json).ok()?;
+    Some((cached.profile, cached.computed_at))
+}
+
+fn save_cached_profile(profile: &[f32; 24]) {
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+        let data = serde_json::json!({
+            "profile": profile,
+            "computed_at": chrono::Utc::now().timestamp(),
+        });
+        if let Ok(json) = serde_json::to_string(&data) {
+            let _ = conn.execute(
+                "INSERT INTO settings (key, value) VALUES (?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                rusqlite::params![CIRCADIAN_DB_KEY, json],
+            );
+        }
+    }
 }
 
 // ── DB persistence ───────────────────────────────────────────────────────────
@@ -462,6 +618,23 @@ pub fn homeostasis_get() -> HormoneState {
 #[tauri::command]
 pub fn homeostasis_get_directive(module: String) -> ModuleDirective {
     get_directive(&module)
+}
+
+/// Returns the learned 24-hour circadian profile.
+/// Each element is the probability (0.0-1.0) the user is active at that hour.
+/// Index 0 = midnight, index 12 = noon, index 23 = 11pm.
+#[tauri::command]
+pub fn homeostasis_get_circadian() -> Vec<f32> {
+    load_circadian_profile().to_vec()
+}
+
+/// Force recompute the circadian profile from activity data.
+/// Useful after first week of use or if schedule changed.
+#[tauri::command]
+pub fn homeostasis_relearn_circadian() -> Vec<f32> {
+    let profile = compute_circadian_from_activity();
+    save_cached_profile(&profile);
+    profile.to_vec()
 }
 
 use tauri::Emitter;
