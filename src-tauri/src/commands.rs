@@ -967,6 +967,7 @@ pub async fn send_message_stream(
                             Ok(t) => t,
                             Err(e2) => {
                                 let _ = app.emit("blade_status", "error");
+                                if brain_plan_used { crate::brain_planner::reject_plan(&last_user_text); }
                                 return Err(format!("Context trimmed but still failed: {}", e2));
                             }
                         }
@@ -1152,6 +1153,11 @@ pub async fn send_message_stream(
             // Complete prefrontal working memory so follow-up messages
             // know what was just accomplished
             crate::prefrontal::complete_task(crate::safe_slice(&clean_content, 200));
+
+            // Plan memory: confirm successful brain-planned tasks so they're cached
+            if brain_plan_used {
+                crate::brain_planner::confirm_plan(&last_user_text);
+            }
 
             // Background: entity extraction + auto-embed + THREAD update + SKILL ENGINE + gap detection
             let app2 = app.clone();
