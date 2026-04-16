@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { PageShell } from "./PageShell";
 
 interface PersonaPageProps {
   onBack: () => void;
@@ -61,14 +62,8 @@ export function PersonaPage({ onBack }: PersonaPageProps) {
     .slice(0, 8);
 
   return (
-    <div className="flex flex-col h-full bg-[#0a0a0f] text-white overflow-y-auto">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-5 py-3 border-b border-[rgba(255,255,255,0.08)]">
-        <button onClick={onBack} className="text-[rgba(255,255,255,0.5)] hover:text-white transition-colors text-sm">← Back</button>
-        <h1 className="text-[15px] font-semibold">Persona</h1>
-      </div>
-
-      <div className="flex-1 p-5 space-y-5">
+    <PageShell title="Persona" subtitle="BLADE's understanding of you" onBack={onBack}>
+      <div className="space-y-5">
         {/* Identity card */}
         <div className="blade-glass p-4 rounded-xl">
           <div className="flex items-center justify-between mb-3">
@@ -153,6 +148,6 @@ export function PersonaPage({ onBack }: PersonaPageProps) {
           </div>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }

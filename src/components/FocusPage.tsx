@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { PageShell } from "./PageShell";
 
 interface FocusScore {
   score: number;
@@ -64,14 +65,8 @@ export function FocusPage({ onBack }: FocusPageProps) {
   const neutral = total - productive - distraction;
 
   return (
-    <div className="flex flex-col h-full bg-[#0a0a0f] text-white overflow-y-auto">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-5 py-3 border-b border-[rgba(255,255,255,0.08)]">
-        <button onClick={onBack} className="text-[rgba(255,255,255,0.5)] hover:text-white transition-colors text-sm">← Back</button>
-        <h1 className="text-[15px] font-semibold">Focus</h1>
-      </div>
-
-      <div className="flex-1 p-5 space-y-5">
+    <PageShell title="Focus" subtitle="Productivity tracking" onBack={onBack}>
+      <div className="space-y-5">
         {/* Score + breakdown */}
         <div className="flex items-center gap-8">
           <ScoreRing score={score} />
@@ -136,7 +131,7 @@ export function FocusPage({ onBack }: FocusPageProps) {
           </div>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }
 
