@@ -55,6 +55,7 @@ mod crypto;
 mod db;
 mod db_commands;
 mod audit;
+mod body_registry;
 mod brain_planner;
 mod cardiovascular;
 mod consequence;
@@ -1169,6 +1170,9 @@ pub fn run() {
             reproductive::reproductive_get_dna,
             reproductive::reproductive_spawn,
             audit::audit_get_log,
+            body_registry::body_get_map,
+            body_registry::body_get_system,
+            body_registry::body_get_summary,
             consequence::consequence_predict,
             metacognition::metacognition_assess,
             social_cognition::social_get_advice,
