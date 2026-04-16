@@ -541,19 +541,20 @@ fn get_idle_seconds() -> u64 {
     }
 }
 
-/// Best-effort OCR text from the most recent Total Recall screenshot.
-/// Returns empty string if not available (no crash, just no data).
+/// Best-effort screen description from the most recent Total Recall screenshot.
+/// screen_timeline stores LLM-generated descriptions (not raw OCR) in the
+/// `description` column. Returns empty string if not available.
 fn try_read_ocr_from_latest_screenshot() -> String {
-    // screen_timeline writes screenshots to a known dir; OCR text is stored in DB
     let db_path = crate::config::blade_config_dir().join("blade.db");
     let conn = match rusqlite::Connection::open(&db_path) {
         Ok(c) => c,
         Err(_) => return String::new(),
     };
 
-    // The screen_timeline table stores ocr_text
+    // screen_timeline.description = LLM vision description of the screenshot
+    // The table uses `timestamp` not `captured_at` as the ordering column
     let result: Result<String, rusqlite::Error> = conn.query_row(
-        "SELECT ocr_text FROM screen_timeline ORDER BY captured_at DESC LIMIT 1",
+        "SELECT description FROM screen_timeline WHERE description != '' ORDER BY timestamp DESC LIMIT 1",
         [],
         |row| row.get(0),
     );

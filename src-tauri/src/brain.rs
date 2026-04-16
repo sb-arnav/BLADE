@@ -657,12 +657,6 @@ fn build_system_prompt_inner(
             parts.push(causal_ctx);
         }
 
-        // Skill engine — learned reflexes
-        let skill_mods = crate::skill_engine::get_skill_injections(user_query);
-        if !skill_mods.is_empty() {
-            parts.push(format!("## Learned Reflexes\n\n{}", skill_mods));
-        }
-
         // Semantic recall (vector store)
         if let Some(store) = vector_store {
             let recalled = crate::embeddings::recall_relevant(store, user_query, 3);
@@ -697,6 +691,16 @@ fn build_system_prompt_inner(
             if !social_ctx.is_empty() {
                 parts.push(social_ctx);
             }
+        }
+    }
+
+    // ── CEREBELLUM: Learned reflexes (always injected, regardless of hive state) ──
+    // Skill engine synthesizes prompt modifiers from repeated tool patterns.
+    // These are motor memory — they make BLADE faster at tasks it's done before.
+    if !user_query.is_empty() {
+        let skill_mods = crate::skill_engine::get_skill_injections(user_query);
+        if !skill_mods.is_empty() {
+            parts.push(format!("## Learned Reflexes\n\n{}", skill_mods));
         }
     }
 
