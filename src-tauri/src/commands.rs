@@ -553,9 +553,11 @@ pub async fn send_message_stream(
     }
 
     // Emit routing decision so the UI can show which model/provider is active for this request
+    let hive_active = !crate::hive::get_hive_digest().is_empty();
     let _ = app.emit("chat_routing", serde_json::json!({
         "provider": &config.provider,
         "model": &config.model,
+        "hive_active": hive_active,
     }));
 
     // Token-efficient mode: downgrade to faster/cheaper model
@@ -621,32 +623,47 @@ pub async fn send_message_stream(
         }
     }
 
-    // ── Multi-step planning detection ─────────────────────────────────────────
-    // Detect complex multi-step requests (3+ implied actions) and inject a
-    // planning instruction so BLADE reasons through the plan before executing.
-    // This prevents the naive "react one tool at a time" anti-pattern.
+    // ── Brain planner for complex tasks ─────────────────────────────────────────
+    // For complex multi-step requests (3+ implied actions), the Brain planner
+    // makes a separate cheap LLM call to produce a structured execution plan.
+    // This replaces the old static "state your plan" instruction with a real
+    // pre-computed plan that references specific organs and tools.
     //
-    // Heuristic: count distinct step-boundary words. If ≥3 detected → complex.
+    // Falls back to the old static instruction if the Brain call fails.
     {
         let plan_score = count_task_steps(&last_user_text);
         if plan_score >= 3 {
-            // Emit plan-mode notification so UI can show "Planning..." status
             let _ = app.emit("blade_planning", serde_json::json!({
                 "query": crate::safe_slice(&last_user_text, 120),
                 "step_count": plan_score,
             }));
-            system_prompt.push_str(
-                "\n\n---\n\n## PLANNING MODE\n\n\
-                 The user's request requires multiple steps. Before calling any tools:\n\
-                 1. **State your plan** in 1-3 sentences: \"I'll [step 1], then [step 2], then [step 3].\"\n\
-                 2. **Execute step-by-step**, calling tools in the planned order.\n\
-                 3. **Check results** between steps — adapt the plan if a step fails.\n\
-                 4. **Summarize** what you accomplished when done.\n\n\
-                 Do NOT skip the plan — say it out loud as your first words."
-            );
+
+            let hive_digest = crate::hive::get_hive_digest();
+            let dna_context = crate::dna::query_for_brain(&last_user_text);
+            let brain_plan = crate::brain_planner::plan_task(
+                &last_user_text,
+                &hive_digest,
+                &dna_context,
+            )
+            .await;
+
+            if !brain_plan.is_empty() {
+                system_prompt.push_str("\n\n---\n\n");
+                system_prompt.push_str(&brain_plan);
+            } else {
+                // Fallback: static planning instruction if Brain planner fails
+                system_prompt.push_str(
+                    "\n\n---\n\n## PLANNING MODE\n\n\
+                     The user's request requires multiple steps. Before calling any tools:\n\
+                     1. **State your plan** in 1-3 sentences.\n\
+                     2. **Execute step-by-step**, calling tools in the planned order.\n\
+                     3. **Check results** between steps — adapt if a step fails.\n\
+                     4. **Summarize** what you accomplished when done."
+                );
+            }
         }
     }
-    // ── End multi-step planning ────────────────────────────────────────────────
+    // ── End brain planner ────────────────────────────────────────────────────
 
     // MCP tools + native built-in tools (bash, file ops, web fetch)
     // Prune to ≤60 tools total — beyond that, accuracy degrades as the model

@@ -9,6 +9,7 @@
 /// The `get_delta()` helper produces a human-readable change summary that is
 /// injected into the God Mode intelligence brief so BLADE knows what is NEW.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 use serde::{Deserialize, Serialize};
 
@@ -54,12 +55,29 @@ impl Default for PerceptionState {
 // ── Static storage ────────────────────────────────────────────────────────────
 
 static LATEST_PERCEPTION: OnceLock<Mutex<Option<PerceptionState>>> = OnceLock::new();
+static LOOP_RUNNING: AtomicBool = AtomicBool::new(false);
 
 fn perception_store() -> &'static Mutex<Option<PerceptionState>> {
     LATEST_PERCEPTION.get_or_init(|| Mutex::new(None))
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
+
+/// Start a 30-second background refresh loop so `get_latest()` always returns
+/// a recent snapshot — even when God Mode is off or on a slow tier.
+/// Safe to call multiple times; only one loop runs.
+pub fn start_perception_loop(_app: tauri::AppHandle) {
+    if LOOP_RUNNING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
+            // spawn_blocking so the sync I/O (arboard, win32, ps) doesn't stall the runtime
+            let _ = tokio::task::spawn_blocking(update_perception).await;
+        }
+    });
+}
 
 /// Gather all signals and return a fresh `PerceptionState`.
 /// The result is also stored internally for `get_latest()`.

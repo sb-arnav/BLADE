@@ -39,6 +39,12 @@ pub struct HudData {
     pub meeting_name: Option<String>,
     /// Speaker currently talking (from ghost_mode)
     pub speaker_name: Option<String>,
+    /// Number of active Hive organs (tentacles monitoring platforms)
+    pub hive_organs_active: usize,
+    /// Number of pending decisions from Hive that need user attention
+    pub hive_pending_decisions: usize,
+    /// One-line hive status summary (most urgent item)
+    pub hive_status_line: String,
 }
 
 /// A BLADE-styled toast notification payload.
@@ -164,6 +170,20 @@ pub fn build_hud_data() -> HudData {
         None
     };
 
+    // Hive status for overlay
+    let hive_status = crate::hive::get_hive_status();
+    let hive_organs_active = hive_status.active_tentacles;
+    let hive_pending_decisions = hive_status.pending_decisions;
+    let hive_status_line = if !hive_status.running {
+        String::new()
+    } else if hive_status.pending_reports > 0 {
+        format!("{} reports pending", hive_status.pending_reports)
+    } else if hive_organs_active > 0 {
+        format!("{} organs active", hive_organs_active)
+    } else {
+        String::new()
+    };
+
     HudData {
         time,
         active_app,
@@ -174,6 +194,9 @@ pub fn build_hud_data() -> HudData {
         meeting_active,
         meeting_name,
         speaker_name: None,
+        hive_organs_active,
+        hive_pending_decisions,
+        hive_status_line,
     }
 }
 

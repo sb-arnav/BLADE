@@ -107,6 +107,23 @@ function usePerception() {
   return perception;
 }
 
+function useHiveDigest() {
+  const [digest, setDigest] = useState<string>("");
+  const [organsActive, setOrgansActive] = useState(0);
+  useEffect(() => {
+    const load = () => {
+      invoke<string>("hive_get_digest").then(setDigest).catch(() => null);
+      invoke<{ active_tentacles: number }>("hive_get_status")
+        .then((s) => setOrgansActive(s.active_tentacles))
+        .catch(() => null);
+    };
+    load();
+    const interval = setInterval(load, 10000);
+    return () => clearInterval(interval);
+  }, []);
+  return { digest, organsActive };
+}
+
 function useIntegrations() {
   const [integrations, setIntegrations] = useState<IntegrationState>({
     unread_emails: 0,
@@ -178,36 +195,43 @@ function GodModeCard({ perception }: { perception: PerceptionState | null }) {
   );
 }
 
-function AgentsCard() {
-  const agents = [
-    { name: "Code Reviewer", task: "PR #47 · blade auth refactor", pct: 72, elapsed: "04:12" },
-    { name: "Morning Briefing", task: "Digest from 8 sources", pct: 38, elapsed: "01:03" },
-    { name: "Security Monitor", task: "Network watch · 0 anomalies", pct: 100, elapsed: "∞" },
-  ];
+function HiveCard({ organsActive, digest }: { organsActive: number; digest: string }) {
+  // Parse organ names from digest (line starting with "**Active organs:**")
+  const organLine = digest.split("\n").find(l => l.includes("Active organs:"));
+  const organNames = organLine
+    ? organLine.replace("**Active organs:**", "").trim().split(", ").filter(Boolean)
+    : [];
+
+  // Parse urgent items (lines starting with "- **platform** URGENT:")
+  const urgentLines = digest.split("\n").filter(l => l.includes("URGENT:"));
+
+  const statusColor = organsActive > 0 ? "#4ade80" : "#fbbf24";
+  const statusLabel = organsActive > 0 ? `${organsActive} active` : "dormant";
+
   return (
     <div className="blade-glass flex flex-col p-4 gap-3 animate-[blade-card-in_0.5s_cubic-bezier(0.22,1,0.36,1)_0.08s_both]">
       <div className="flex items-center justify-between">
         <CardLabel icon={<svg viewBox="0 0 12 12" className="w-[10px] h-[10px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="4" cy="4" r="1.5"/><circle cx="9" cy="3" r="1.5"/><circle cx="9" cy="9" r="1.5"/><path d="M5.5 4h1.5a2 2 0 010 4H4M9 4.5v3"/></svg>}>
-          Agents
+          Hive
         </CardLabel>
-        <Chip color="green">3 running</Chip>
+        <Chip color={organsActive > 0 ? "green" : "amber"}>{statusLabel}</Chip>
       </div>
       <div className="flex flex-col gap-[10px] flex-1">
-        {agents.map((ag) => (
-          <div key={ag.name} className="flex flex-col gap-[3px]">
-            <div className="flex items-center justify-between">
-              <span className="text-[12px] font-semibold">{ag.name}</span>
-              <span className="font-mono text-[10px] text-[rgba(255,255,255,0.28)]">{ag.elapsed}</span>
-            </div>
-            <div className="text-[11px] text-[rgba(255,255,255,0.55)] truncate">{ag.task}</div>
-            <div className="h-[2px] bg-[rgba(255,255,255,0.07)] rounded-full overflow-hidden mt-[2px]">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-[#818cf8] to-[#a78bfa]"
-                style={{ width: `${ag.pct}%`, opacity: ag.pct === 100 ? 0.25 : 1, animation: "blade-shimmer 2.2s ease-in-out infinite" }}
-              />
-            </div>
+        {organNames.length > 0 ? organNames.map((name) => (
+          <div key={name} className="flex items-center gap-[6px]">
+            <Dot color={statusColor} glow />
+            <span className="text-[12px] font-semibold capitalize">{name}</span>
           </div>
-        ))}
+        )) : (
+          <div className="text-[11px] text-[rgba(255,255,255,0.35)] italic">No organs connected yet</div>
+        )}
+        {urgentLines.length > 0 && (
+          <div className="mt-1 pt-2 border-t border-[rgba(255,255,255,0.07)]">
+            {urgentLines.map((line, i) => (
+              <div key={i} className="text-[11px] text-[#fbbf24] truncate">{line.replace(/^- \*\*\w+\*\* /, "")}</div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -366,6 +390,7 @@ export function Dashboard({ onNavigate, chatPanelProps, activeRoute }: Dashboard
   const wallpaperUrl = useWallpaper();
   const perception = usePerception();
   const integrations = useIntegrations();
+  const { digest: hiveDigest, organsActive } = useHiveDigest();
 
   const handleNavigate = useCallback((route: NavRailRoute) => {
     onNavigate(route);
@@ -415,7 +440,7 @@ export function Dashboard({ onNavigate, chatPanelProps, activeRoute }: Dashboard
         {/* Top row: 1.7fr 1fr 0.75fr */}
         <div className="grid gap-[10px] min-h-0" style={{ gridTemplateColumns: "1.7fr 1fr 0.75fr", flex: "0 0 47%" }}>
           <GodModeCard perception={perception} />
-          <AgentsCard />
+          <HiveCard organsActive={organsActive} digest={hiveDigest} />
           <IntegrationsCard integrations={integrations} />
         </div>
 

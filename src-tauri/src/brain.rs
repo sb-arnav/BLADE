@@ -720,6 +720,27 @@ fn build_system_prompt_inner(
         }
     }
 
+    // ── Hive intelligence digest (priority 7.5) ────────────────────────────
+    // The Hive's tentacles monitor platforms (Slack, GitHub, Email, etc.) and
+    // heads synthesize cross-domain intelligence. This compact digest gives
+    // the chat model awareness of what's happening WITHOUT bloating the prompt.
+    {
+        let hive_digest = crate::hive::get_hive_digest();
+        if !hive_digest.is_empty() {
+            parts.push(hive_digest);
+        }
+    }
+
+    // ── DNA query (priority 7.7) ─────────────────────────────────────────────
+    // Unified knowledge layer — pulls identity, people, goals, expertise,
+    // integrations, patterns, and voice as relevant to the current query.
+    {
+        let dna_context = crate::dna::query_for_brain(user_query);
+        if !dna_context.is_empty() {
+            parts.push(dna_context);
+        }
+    }
+
     // Context notes (user-pinned)
     if let Some(context) = load_context_notes() {
         if !context.trim().is_empty() {

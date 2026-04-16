@@ -955,6 +955,9 @@ pub fn start_learning_engine(app: tauri::AppHandle) {
 
             proactive_suggestion(&app).await;
 
+            // Run prediction engine in the same tick — no need for a separate 30-min loop
+            let _ = crate::prediction_engine::generate_predictions(app.clone()).await;
+
             tokio::time::sleep(Duration::from_secs(30 * 60)).await;
         }
     });

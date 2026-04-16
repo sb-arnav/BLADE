@@ -99,16 +99,7 @@ fn get_quality_provider() -> (String, String, String) {
 }
 
 fn strip_json_fences(s: &str) -> &str {
-    let s = s.trim();
-    if s.starts_with("```") {
-        let after = s.trim_start_matches('`');
-        let after = after.trim_start_matches("json").trim_start_matches('\n');
-        if let Some(end) = after.rfind("```") {
-            return after[..end].trim();
-        }
-        return after.trim();
-    }
-    s
+    crate::strip_json_fences(s)
 }
 
 fn now_secs() -> i64 {
