@@ -175,6 +175,7 @@ pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
             }
 
             // Build the intelligence brief using the fresh perception state
+            crate::supervisor::heartbeat("godmode");
             let brief = build_intelligence_brief(&tier, &last_brief, &perception);
 
             // Write context file for injection into chat

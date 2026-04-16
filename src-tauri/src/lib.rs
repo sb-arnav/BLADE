@@ -66,6 +66,7 @@ mod organ;
 mod prefrontal;
 mod proactive_vision;
 mod skeleton;
+mod supervisor;
 mod embeddings;
 mod files;
 mod history;
@@ -1153,6 +1154,8 @@ pub fn run() {
             joints::joints_list_stores,
             cardiovascular::cardio_get_blood_pressure,
             cardiovascular::cardio_get_event_registry,
+            supervisor::supervisor_get_health,
+            supervisor::supervisor_get_service,
             homeostasis::homeostasis_get,
             homeostasis::homeostasis_get_directive,
             homeostasis::homeostasis_get_circadian,

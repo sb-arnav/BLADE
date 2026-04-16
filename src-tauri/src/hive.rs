@@ -2807,6 +2807,7 @@ pub fn start_hive(app: AppHandle, autonomy: f32) {
             }
 
             tick_count += 1;
+            crate::supervisor::heartbeat("hive");
             tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
         }
 
