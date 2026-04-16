@@ -8,6 +8,7 @@ import { ChatWindow } from "./components/ChatWindow";
 import { CommandPalette } from "./components/CommandPalette";
 import { NotificationCenter, useNotifications } from "./components/NotificationCenter";
 import { TitleBar } from "./components/TitleBar";
+import { GlowOverlay } from "./components/GlowOverlay";
 import { useChat } from "./hooks/useChat";
 import { useTTS } from "./hooks/useTTS";
 import { useKeyboard } from "./hooks/useKeyboard";
@@ -62,7 +63,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, EBState> {
   }
 }
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar" | "workflow-builder" | "code-sandbox" | "persona" | "negotiation" | "financial" | "context-engine" | "reasoning" | "social-graph" | "health" | "documents" | "habits" | "knowledge-graph" | "meetings" | "predictions" | "emotional-intel" | "decision-log" | "security" | "health-panel" | "temporal" | "integrations" | "smart-home" | "finance" | "hive" | "agent-factory";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar" | "workflow-builder" | "code-sandbox" | "persona" | "negotiation" | "financial" | "context-engine" | "reasoning" | "social-graph" | "health" | "documents" | "habits" | "knowledge-graph" | "meetings" | "predictions" | "emotional-intel" | "decision-log" | "security" | "health-panel" | "temporal" | "integrations" | "smart-home" | "finance" | "hive" | "agent-factory" | "rewind" | "live-notes";
 
 const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
 const Canvas = lazy(() => import("./components/Canvas"));
@@ -127,6 +128,8 @@ const IntegrationStatus = lazy(() => import("./components/IntegrationStatus").th
 const SmartHomePanel = lazy(() => import("./components/SmartHomePanel").then(m => ({ default: m.SmartHomePanel })));
 const FinanceView = lazy(() => import("./components/FinanceView").then(m => ({ default: m.FinanceView })));
 const HiveView = lazy(() => import("./components/HiveView").then(m => ({ default: m.HiveView })));
+const RewindTimeline = lazy(() => import("./components/RewindTimeline").then(m => ({ default: m.RewindTimeline })));
+const LiveNotes = lazy(() => import("./components/LiveNotes").then(m => ({ default: m.LiveNotes })));
 const AgentFactoryView = lazy(() => import("./components/AgentFactory").then(m => ({ default: m.AgentFactory })));
 
 function ShellFallback({ label = "Loading workspace..." }: { label?: string }) {
@@ -628,6 +631,39 @@ export default function App() {
       }
     );
 
+    // Proactive suggestion from God Mode — surfaces when BLADE detects an insight (no user prompt needed)
+    const unlistenProactiveSuggestion = listen<{ id: string; suggestion: string; category: string }>(
+      "proactive_suggestion",
+      (event) => {
+        const { suggestion, category } = event.payload;
+        const categoryLabel: Record<string, string> = {
+          error: "Error spotted", optimization: "Optimization", reminder: "Reminder", insight: "Insight",
+        };
+        notifications.add({
+          type: category === "error" ? "warning" : "info",
+          title: categoryLabel[category] ?? "BLADE suggests",
+          message: suggestion.slice(0, 120),
+          action: { label: "Ask Blade", callback: () => sendWithStats(suggestion) },
+        });
+        if (tts.enabled) tts.speak(suggestion.slice(0, 80));
+        activity.track("message", "proactive_suggestion", suggestion.slice(0, 80));
+      }
+    );
+
+    // Proactive action from the engine — high-confidence signal passed decision gate
+    const unlistenProactiveAction = listen<{ id: string; action_type: string; trigger: string; content: string; confidence: number }>(
+      "proactive_action",
+      (event) => {
+        const { action_type, content } = event.payload;
+        notifications.add({
+          type: "info",
+          title: `BLADE: ${action_type.replace(/_/g, " ")}`,
+          message: content.slice(0, 120),
+          action: { label: "Discuss", callback: () => sendWithStats(content) },
+        });
+      }
+    );
+
     // Smart interrupt — user stuck on same error for 5+ minutes
     const unlistenSmartInterrupt = listen<{ error_preview: string; elapsed_minutes: number; suggested_prompt: string }>(
       "smart_interrupt",
@@ -679,6 +715,8 @@ export default function App() {
       unlistenDelegateDenied.then((fn) => fn());
       unlistenSmartInterrupt.then((fn) => fn());
       unlistenTitled.then((fn) => fn());
+      unlistenProactiveSuggestion.then((fn) => fn());
+      unlistenProactiveAction.then((fn) => fn());
     };
   }, [tts.enabled]);
 
@@ -933,6 +971,8 @@ export default function App() {
     { id: "canvas", label: "Canvas", description: "Sketch ideas visually and move them back into chat", section: "Work", action: () => openRoute("canvas") },
     { id: "workflows", label: "Workflow builder", description: "Turn repeated tasks into reusable flows", section: "Work", action: () => openRoute("workflows") },
     { id: "hive", label: "Hive Control Center", description: "Mission control for BLADE's distributed agent mesh", section: "Work", action: () => openRoute("hive") },
+    { id: "rewind", label: "Rewind", description: "Scrub through your day — visual screenshot timeline", section: "Features", action: () => openRoute("rewind") },
+    { id: "live-notes", label: "Live Notes", description: "Real-time meeting transcript and action items", section: "Features", action: () => openRoute("live-notes") },
     { id: "agent-factory", label: "Agent Factory", description: "Describe an agent in plain English and deploy it as a live Hive tentacle", section: "Work", action: () => openRoute("agent-factory") },
     { id: "agents", label: "Operator Center", description: "Launch the multi-runtime control plane", section: "Work", action: () => openRoute("agents") },
     { id: "agent-teams", label: "Agent teams", description: "Coordinate multi-role execution plans", section: "Work", action: () => openRoute("agent-teams") },
@@ -1101,6 +1141,8 @@ export default function App() {
     "smart-home": <SmartHomePanel onBack={() => openRoute("dashboard")} />,
     "finance": <FinanceView onBack={() => openRoute("dashboard")} />,
     "hive": <HiveView onBack={() => openRoute("dashboard")} />,
+    "rewind": <RewindTimeline onBack={() => openRoute("dashboard")} />,
+    "live-notes": <LiveNotes onBack={() => openRoute("dashboard")} />,
     "agent-factory": <AgentFactoryView onBack={() => openRoute("dashboard")} />,
   };
 
@@ -1166,6 +1208,8 @@ export default function App() {
         </div>
       )}
 
+      {/* Glow overlay — BLADE's visual heartbeat */}
+      <GlowOverlay />
       {/* TitleBar is now embedded in Sidebar's logo row via drag region — keep for window controls */}
       <TitleBar />
       <CommandPalette commands={commands} open={paletteOpen} onClose={closePalette} />
@@ -1323,6 +1367,7 @@ export default function App() {
         onPttUp={voiceMode.onPttMouseUp}
         onOpenChat={openChatPanel}
         lastResponse={lastOrbResponse}
+        micVolume={voiceConv.micVolume}
       />
 
       {personaOnboardingOpen && (
