@@ -19,14 +19,14 @@ const SEVERITY_STYLE: Record<string, string> = {
   critical: "text-red-300 bg-red-500/10 border-red-500/20",
   high: "text-orange-300 bg-orange-500/10 border-orange-500/20",
   medium: "text-yellow-300 bg-yellow-500/10 border-yellow-500/20",
-  low: "text-slate-300 bg-slate-500/10 border-slate-500/20",
+  low: "text-[rgba(255,255,255,0.7)] bg-[rgba(255,255,255,0.04)]/10 border-[rgba(255,255,255,0.2)]/20",
 };
 
 const STATUS_STYLE: Record<string, string> = {
   open: "text-sky-300 bg-sky-500/10 border-sky-500/20",
   investigating: "text-violet-300 bg-violet-500/10 border-violet-500/20",
   resolved: "text-emerald-300 bg-emerald-500/10 border-emerald-500/20",
-  wont_fix: "text-slate-400 bg-slate-500/10 border-slate-500/20",
+  wont_fix: "text-[rgba(255,255,255,0.5)] bg-[rgba(255,255,255,0.04)]/10 border-[rgba(255,255,255,0.2)]/20",
 };
 
 const CATEGORY_EMOJI: Record<string, string> = {
@@ -195,7 +195,7 @@ export function CapabilityReports({ onBack }: { onBack: () => void }) {
               {lastLoadedAt ? `Updated ${relTime(lastLoadedAt)}` : "Not loaded yet"}
             </div>
           </div>
-          <button onClick={load} className="w-7 h-7 rounded-lg flex items-center justify-center text-[#666] hover:text-[#e5e5e5] hover:bg-[#1f1f1f] transition-colors">
+          <button onClick={load} className="w-7 h-7 rounded-lg flex items-center justify-center text-[#666] hover:text-[#e5e5e5] hover:bg-[rgba(255,255,255,0.04)] transition-colors">
             <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.75">
               <path d="M13.5 8A5.5 5.5 0 112.5 8" /><path d="M13.5 4v4h-4" />
             </svg>
@@ -260,7 +260,7 @@ export function CapabilityReports({ onBack }: { onBack: () => void }) {
               onClick={() => setFilter(s)}
               className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
                 filter === s
-                  ? "bg-[#16172a] text-[#c8cbff] border border-[#6366f1]/30"
+                  ? "bg-[#09090b] text-[#c8cbff] border border-[#6366f1]/30"
                   : "text-[#666] hover:text-[#e5e5e5] hover:bg-[#111]"
               }`}
             >

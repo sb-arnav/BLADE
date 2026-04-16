@@ -112,7 +112,7 @@ const CATEGORY_COLORS: Record<Integration["category"], string> = {
 
 const STATUS_DOT: Record<Integration["status"], string> = {
   connected: "bg-emerald-400",
-  disconnected: "bg-zinc-500",
+  disconnected: "bg-[rgba(255,255,255,0.04)]",
   error: "bg-red-400",
   pending: "bg-amber-400 animate-pulse",
 };
@@ -228,8 +228,8 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
   const renderConfigForm = () => {
     if (!configuring) return null;
     return (
-      <div className="absolute inset-0 z-50 bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+      <div className="absolute inset-0 z-50 bg-[#09090b]/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] rounded-2xl w-full max-w-md p-6 shadow-2xl">
           {/* Header */}
           <div className="flex items-center gap-3 mb-5">
             {renderIcon(configuring.icon, configuring.color)}
@@ -237,7 +237,7 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
               <h3 className="text-white font-semibold text-lg">
                 {editing ? "Edit" : "Connect"} {configuring.name}
               </h3>
-              <p className="text-zinc-400 text-xs mt-0.5">{configuring.description}</p>
+              <p className="text-[rgba(255,255,255,0.5)] text-xs mt-0.5">{configuring.description}</p>
             </div>
           </div>
 
@@ -245,7 +245,7 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
           <div className="space-y-3">
             {configuring.configFields.map(field => (
               <div key={field.key}>
-                <label className="text-xs text-zinc-400 mb-1 block">
+                <label className="text-xs text-[rgba(255,255,255,0.5)] mb-1 block">
                   {field.label}
                   {field.required && <span className="text-red-400 ml-0.5">*</span>}
                 </label>
@@ -254,10 +254,10 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
                   placeholder={field.placeholder}
                   value={configValues[field.key] || ""}
                   onChange={e => setConfigValues(prev => ({ ...prev, [field.key]: e.target.value }))}
-                  className={`w-full bg-zinc-800 border rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                  className={`w-full bg-[rgba(255,255,255,0.04)] border rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                     field.required && !configValues[field.key]?.trim()
-                      ? "border-zinc-700"
-                      : "border-zinc-700"
+                      ? "border-[rgba(255,255,255,0.1)]"
+                      : "border-[rgba(255,255,255,0.1)]"
                   }`}
                 />
               </div>
@@ -266,12 +266,12 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
 
           {/* Webhook URL (if applicable) */}
           {configuring.webhookUrl && (
-            <div className="mt-4 p-3 bg-zinc-800/50 border border-zinc-700 rounded-lg">
-              <p className="text-xs text-zinc-400 mb-1">Webhook URL (paste in your service):</p>
+            <div className="mt-4 p-3 bg-[rgba(255,255,255,0.04)]/50 border border-[rgba(255,255,255,0.1)] rounded-lg">
+              <p className="text-xs text-[rgba(255,255,255,0.5)] mb-1">Webhook URL (paste in your service):</p>
               <code className="text-xs text-cyan-400 break-all select-all">
                 https://hooks.blade.dev/v1/ingest/{"<id>"}
               </code>
-              <p className="text-[10px] text-zinc-600 mt-1">
+              <p className="text-[10px] text-[rgba(255,255,255,0.3)] mt-1">
                 Generated after saving. Copy and add to your service's webhook settings.
               </p>
             </div>
@@ -281,7 +281,7 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
           <div className="flex gap-2 mt-5">
             <button
               onClick={() => { setConfiguring(null); setEditing(null); }}
-              className="flex-1 px-4 py-2 text-sm text-zinc-400 bg-zinc-800 rounded-lg hover:bg-zinc-700 transition"
+              className="flex-1 px-4 py-2 text-sm text-[rgba(255,255,255,0.5)] bg-[rgba(255,255,255,0.04)] rounded-lg hover:bg-[rgba(255,255,255,0.07)] transition"
             >
               Cancel
             </button>
@@ -307,7 +307,7 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
           <button
             key={tpl.id}
             onClick={() => handleStartConfig(tpl)}
-            className="text-left bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-zinc-600 hover:bg-zinc-800/60 transition group"
+            className="text-left bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] rounded-xl p-4 hover:border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.04)]/60 transition group"
           >
             <div className="flex items-start gap-3">
               {renderIcon(tpl.icon, tpl.color)}
@@ -320,12 +320,12 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
                     </span>
                   )}
                 </div>
-                <p className="text-zinc-500 text-xs mt-1 line-clamp-2">{tpl.description}</p>
+                <p className="text-[rgba(255,255,255,0.4)] text-xs mt-1 line-clamp-2">{tpl.description}</p>
                 <div className="flex items-center gap-2 mt-2">
                   <span className={`text-[10px] px-1.5 py-0.5 rounded ${CATEGORY_COLORS[tpl.category]}`}>
                     {CATEGORY_LABELS[tpl.category]}
                   </span>
-                  <span className="text-[10px] text-zinc-600 uppercase">{tpl.type}</span>
+                  <span className="text-[10px] text-[rgba(255,255,255,0.3)] uppercase">{tpl.type}</span>
                 </div>
               </div>
             </div>
@@ -339,7 +339,7 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
     <div className="p-4 space-y-2">
       {filteredIntegrations.length === 0 ? (
         <div className="text-center py-16">
-          <div className="text-zinc-600 text-sm">No integrations connected yet.</div>
+          <div className="text-[rgba(255,255,255,0.3)] text-sm">No integrations connected yet.</div>
           <button
             onClick={() => setView("catalog")}
             className="mt-3 text-xs text-blue-400 hover:text-blue-300 transition"
@@ -351,7 +351,7 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
         filteredIntegrations.map(int => (
           <div
             key={int.id}
-            className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-zinc-700 transition"
+            className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] rounded-xl p-4 hover:border-[rgba(255,255,255,0.1)] transition"
           >
             <div className="flex items-center gap-3">
               {renderIcon(int.icon, int.color)}
@@ -359,9 +359,9 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
                 <div className="flex items-center gap-2">
                   <span className="text-white font-medium text-sm">{int.name}</span>
                   <span className={`w-2 h-2 rounded-full ${STATUS_DOT[int.status]}`} />
-                  <span className="text-[10px] text-zinc-500 capitalize">{int.status}</span>
+                  <span className="text-[10px] text-[rgba(255,255,255,0.4)] capitalize">{int.status}</span>
                 </div>
-                <div className="flex items-center gap-3 mt-1 text-[11px] text-zinc-500">
+                <div className="flex items-center gap-3 mt-1 text-[11px] text-[rgba(255,255,255,0.4)]">
                   <span>Last sync: {timeAgo(int.lastSync)}</span>
                   <span>{int.eventCount} events</span>
                   <span className={`px-1.5 py-0.5 rounded ${CATEGORY_COLORS[int.category]}`}>
@@ -374,7 +374,7 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
                 <button
                   onClick={() => hub.toggleIntegration(int.id)}
                   className={`w-9 h-5 rounded-full transition relative ${
-                    int.enabled ? "bg-emerald-500" : "bg-zinc-700"
+                    int.enabled ? "bg-emerald-500" : "bg-[rgba(255,255,255,0.07)]"
                   }`}
                   title={int.enabled ? "Disable" : "Enable"}
                 >
@@ -388,14 +388,14 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
                 <button
                   onClick={() => handleTest(int.id)}
                   disabled={testing === int.id}
-                  className="px-2.5 py-1 text-[11px] rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 disabled:opacity-50 transition"
+                  className="px-2.5 py-1 text-[11px] rounded-lg bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.7)] hover:bg-[rgba(255,255,255,0.07)] disabled:opacity-50 transition"
                 >
                   {testing === int.id ? "..." : "Test"}
                 </button>
                 {/* Edit */}
                 <button
                   onClick={() => handleEditConfig(int)}
-                  className="px-2.5 py-1 text-[11px] rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition"
+                  className="px-2.5 py-1 text-[11px] rounded-lg bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.7)] hover:bg-[rgba(255,255,255,0.07)] transition"
                 >
                   Edit
                 </button>
@@ -410,7 +410,7 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
                     </button>
                     <button
                       onClick={() => setConfirmRemove(null)}
-                      className="px-2 py-1 text-[11px] rounded-lg bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition"
+                      className="px-2 py-1 text-[11px] rounded-lg bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.5)] hover:bg-[rgba(255,255,255,0.07)] transition"
                     >
                       No
                     </button>
@@ -418,7 +418,7 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
                 ) : (
                   <button
                     onClick={() => setConfirmRemove(int.id)}
-                    className="px-2.5 py-1 text-[11px] rounded-lg bg-zinc-800 text-red-400 hover:bg-red-900/30 transition"
+                    className="px-2.5 py-1 text-[11px] rounded-lg bg-[rgba(255,255,255,0.04)] text-red-400 hover:bg-red-900/30 transition"
                   >
                     Remove
                   </button>
@@ -428,8 +428,8 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
 
             {/* Webhook URL display for webhook-type integrations */}
             {int.webhookSecret && (
-              <div className="mt-3 p-2.5 bg-zinc-800/50 border border-zinc-700/50 rounded-lg">
-                <p className="text-[10px] text-zinc-500 mb-0.5">Webhook URL:</p>
+              <div className="mt-3 p-2.5 bg-[rgba(255,255,255,0.04)]/50 border border-[rgba(255,255,255,0.1)]/50 rounded-lg">
+                <p className="text-[10px] text-[rgba(255,255,255,0.4)] mb-0.5">Webhook URL:</p>
                 <code className="text-[11px] text-cyan-400 break-all select-all">
                   {hub.getWebhookUrl(int.id)}
                 </code>
@@ -445,8 +445,8 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
     <div className="p-4 space-y-2">
       {recentEvents.length === 0 ? (
         <div className="text-center py-16">
-          <div className="text-zinc-600 text-sm">No events yet.</div>
-          <p className="text-zinc-700 text-xs mt-1">
+          <div className="text-[rgba(255,255,255,0.3)] text-sm">No events yet.</div>
+          <p className="text-[rgba(255,255,255,0.2)] text-xs mt-1">
             Events will appear here when your integrations fire.
           </p>
         </div>
@@ -455,7 +455,7 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
           <div className="flex justify-end mb-2">
             <button
               onClick={() => hub.clearEvents()}
-              className="text-[11px] text-zinc-500 hover:text-zinc-300 transition"
+              className="text-[11px] text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] transition"
             >
               Clear all
             </button>
@@ -472,14 +472,14 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
             return (
               <div
                 key={evt.id}
-                className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden"
+                className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] rounded-xl overflow-hidden"
               >
                 <button
                   onClick={() => setExpandedEvent(isExpanded ? null : evt.id)}
-                  className="w-full text-left p-3 flex items-center gap-3 hover:bg-zinc-800/40 transition"
+                  className="w-full text-left p-3 flex items-center gap-3 hover:bg-[rgba(255,255,255,0.04)]/40 transition"
                 >
                   {int ? renderIcon(int.icon, int.color) : (
-                    <div className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center text-zinc-500">
+                    <div className="w-10 h-10 rounded-xl bg-[rgba(255,255,255,0.04)] flex items-center justify-center text-[rgba(255,255,255,0.4)]">
                       ?
                     </div>
                   )}
@@ -488,7 +488,7 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
                       <span className="text-white text-sm font-medium">
                         {int?.name ?? "Unknown"}
                       </span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.5)]">
                         {evt.type}
                       </span>
                       {evt.processed && (
@@ -497,15 +497,15 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
                         </span>
                       )}
                     </div>
-                    <p className="text-zinc-500 text-xs mt-0.5 truncate">
+                    <p className="text-[rgba(255,255,255,0.4)] text-xs mt-0.5 truncate">
                       {truncate(evt.payload, 120)}
                     </p>
                   </div>
-                  <span className="text-[10px] text-zinc-600 shrink-0">
+                  <span className="text-[10px] text-[rgba(255,255,255,0.3)] shrink-0">
                     {timeAgo(evt.timestamp)}
                   </span>
                   <svg
-                    className={`w-4 h-4 text-zinc-500 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                    className={`w-4 h-4 text-[rgba(255,255,255,0.4)] transition-transform ${isExpanded ? "rotate-180" : ""}`}
                     fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -513,8 +513,8 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
                 </button>
 
                 {isExpanded && (
-                  <div className="border-t border-zinc-800 p-3">
-                    <pre className="text-[11px] text-zinc-400 bg-zinc-950 rounded-lg p-3 overflow-auto max-h-48 whitespace-pre-wrap break-words">
+                  <div className="border-t border-[rgba(255,255,255,0.07)] p-3">
+                    <pre className="text-[11px] text-[rgba(255,255,255,0.5)] bg-[#09090b] rounded-lg p-3 overflow-auto max-h-48 whitespace-pre-wrap break-words">
                       {payloadPreview}
                     </pre>
                     <div className="flex gap-2 mt-3">
@@ -526,7 +526,7 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
                       </button>
                       <button
                         onClick={() => navigator.clipboard.writeText(evt.payload)}
-                        className="px-3 py-1.5 text-[11px] rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition"
+                        className="px-3 py-1.5 text-[11px] rounded-lg bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.7)] hover:bg-[rgba(255,255,255,0.07)] transition"
                       >
                         Copy payload
                       </button>
@@ -544,12 +544,12 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
   // ── Main render ──────────────────────────────────────────────────────────
 
   return (
-    <div className="relative flex flex-col h-full bg-zinc-950 text-white overflow-hidden">
+    <div className="relative flex flex-col h-full bg-[#09090b] text-white overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800 shrink-0">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-[rgba(255,255,255,0.07)] shrink-0">
         <button
           onClick={onBack}
-          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-zinc-800 transition text-zinc-400"
+          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[rgba(255,255,255,0.04)] transition text-[rgba(255,255,255,0.5)]"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -567,7 +567,7 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
           </span>
         )}
         <div className="flex-1" />
-        <span className="text-[11px] text-zinc-600">{hub.totalEvents} total events</span>
+        <span className="text-[11px] text-[rgba(255,255,255,0.3)]">{hub.totalEvents} total events</span>
       </div>
 
       {/* View tabs */}
@@ -578,16 +578,16 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
             onClick={() => setView(v)}
             className={`px-3 py-1.5 text-xs rounded-lg transition font-medium capitalize ${
               view === v
-                ? "bg-zinc-800 text-white"
-                : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                ? "bg-[rgba(255,255,255,0.04)] text-white"
+                : "text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] hover:bg-[rgba(255,255,255,0.04)]/50"
             }`}
           >
             {v}
             {v === "connected" && hub.integrations.length > 0 && (
-              <span className="ml-1.5 text-[10px] text-zinc-500">{hub.integrations.length}</span>
+              <span className="ml-1.5 text-[10px] text-[rgba(255,255,255,0.4)]">{hub.integrations.length}</span>
             )}
             {v === "events" && hub.totalEvents > 0 && (
-              <span className="ml-1.5 text-[10px] text-zinc-500">{hub.totalEvents}</span>
+              <span className="ml-1.5 text-[10px] text-[rgba(255,255,255,0.4)]">{hub.totalEvents}</span>
             )}
           </button>
         ))}
@@ -601,8 +601,8 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
             onClick={() => setCategoryFilter(cat)}
             className={`px-2.5 py-1 text-[11px] rounded-lg transition whitespace-nowrap ${
               categoryFilter === cat
-                ? "bg-zinc-800 text-white"
-                : "text-zinc-600 hover:text-zinc-400"
+                ? "bg-[rgba(255,255,255,0.04)] text-white"
+                : "text-[rgba(255,255,255,0.3)] hover:text-[rgba(255,255,255,0.5)]"
             }`}
           >
             {CATEGORY_LABELS[cat]}

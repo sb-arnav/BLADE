@@ -23,7 +23,7 @@ const LANG_COLORS: Record<string, string> = {
   css: "text-purple-400",
   json: "text-emerald-400",
   yaml: "text-pink-400",
-  markdown: "text-slate-300",
+  markdown: "text-[rgba(255,255,255,0.7)]",
   text: "text-blade-muted",
 };
 

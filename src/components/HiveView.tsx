@@ -1128,7 +1128,7 @@ function HeadPanel({
                         background: STATUS_COLORS_CANVAS[t.status].stroke,
                       }}
                     />
-                    <div className="text-gray-400 shrink-0">
+                    <div className="text-[rgba(255,255,255,0.5)] shrink-0">
                       <PlatformIcon platform={t.platform} size={12} />
                     </div>
                     <span style={{ fontSize: 13, color: "rgba(255,255,255,0.75)", flex: 1 }} className="truncate">{t.platform}</span>
@@ -1310,7 +1310,7 @@ function TentacleQuickInfo({
     >
       <div className="flex items-center gap-2.5 mb-1.5">
         <span style={{ width: 6, height: 6, borderRadius: "50%", background: statusColor, flexShrink: 0 }} />
-        <div className="text-gray-400 shrink-0">
+        <div className="text-[rgba(255,255,255,0.5)] shrink-0">
           <PlatformIcon platform={tentacle.platform} size={12} />
         </div>
         <span style={{ fontSize: 13, fontWeight: 500, color: "rgba(255,255,255,0.8)", flex: 1 }}>{tentacle.platform}</span>
@@ -1379,81 +1379,132 @@ export function HiveView({ onBack }: HiveViewProps) {
     : "HIVE CRITICAL";
 
   // ── Real backend wiring ───────────────────────────────────────────────────────
-  // Load live Hive status on mount and subscribe to tick events.
+  // ── Real backend wiring ───────────────────────────────────────────────────────
   useEffect(() => {
-    // Load initial status
-    invoke<{
+    type BackendStatus = {
       running: boolean;
       autonomy: number;
-      tentacles: Array<{ id: string; platform: string; status: string; messages_processed: number; actions_taken: number }>;
+      active_tentacles: number;
       pending_decisions: number;
-      pending_reports: number;
-    }>("hive_get_status").then((status) => {
-      setAutonomy(Math.round(status.autonomy * 100));
-      // Overlay real backend data onto seed tentacles where IDs match
-      setTentacles((prev) => prev.map((t): TentacleNode => {
-        const real = status.tentacles.find((rt: any) => rt.id === t.id || rt.platform === t.platform);
-        if (!real) return t;
-        return {
-          ...t,
-          status: real.status === "Active" ? "online" as const : real.status === "Dormant" ? "dormant" as const : "offline" as const,
-          messageCount: real.messages_processed,
-          actionsToday: real.actions_taken,
-        };
-      }));
-    }).catch(() => {});
-
-    // Load live reports
-    invoke<Array<{ id: string; tentacle_id: string; summary: string; priority: string; category: string; requires_action: boolean; timestamp: number }>>("hive_get_reports")
-      .then((rpts) => {
-        const mapped = rpts.slice(0, 20).map((r) => ({
-          id: r.id,
-          tentacleId: r.tentacle_id,
-          platform: r.tentacle_id.replace("tentacle-", ""),
-          icon: "🔔",
-          status: r.requires_action ? "pending" as const : "approved" as const,
-        }));
-        if (mapped.length > 0) setReports(mapped as any);
-      }).catch(() => {});
-
-    // Subscribe to real-time hive ticks
-    const unlistenTick = listen<{
-      running: boolean;
-      autonomy: number;
+      total_reports_processed: number;
+      total_actions_taken: number;
       tentacles: Array<{ id: string; platform: string; status: string; messages_processed: number; actions_taken: number }>;
-    }>("hive_tick", (e) => {
-      const status = e.payload;
+    };
+
+    function applyStatus(status: BackendStatus) {
       setAutonomy(Math.round(status.autonomy * 100));
+      setPaused(!status.running);
       setTentacles((prev) => prev.map((t): TentacleNode => {
-        const real = status.tentacles.find((rt: any) => rt.id === t.id || rt.platform === t.platform);
+        const real = status.tentacles.find((rt) => rt.id === t.id || rt.platform.toLowerCase() === t.platform.toLowerCase());
         if (!real) return t;
         return {
           ...t,
-          status: real.status === "Active" ? "online" as const : real.status === "Dormant" ? "dormant" as const : "offline" as const,
-          messageCount: real.messages_processed,
+          status: real.status === "Active" ? "online" as const
+               : real.status === "Dormant" ? "dormant" as const
+               : real.status === "Error"   ? "degraded" as const
+               : "offline" as const,
+          messagesProcessed: real.messages_processed,
           actionsToday: real.actions_taken,
         };
       }));
-    });
+    }
 
-    // Subscribe to pending decisions
-    const unlistenDecisions = listen<{ count: number; decisions: unknown[] }>("hive_pending_decisions", () => {
-      invoke<Array<{ id: string; tentacle_id: string; summary: string; priority: string; category: string; requires_action: boolean; timestamp: number }>>("hive_get_reports")
+    // Load initial status
+    invoke<BackendStatus>("hive_get_status").then(applyStatus).catch(() => {});
+
+    // Load initial reports
+    const loadReports = () =>
+      invoke<Array<{ id: string; tentacle_id: string; summary: string; priority: string; requires_action: boolean; timestamp: number }>>("hive_get_reports")
         .then((rpts) => {
-          const mapped = rpts.slice(0, 20).map((r) => ({
+          if (rpts.length === 0) return;
+          const mapped: Report[] = rpts.slice(0, 30).map((r) => ({
             id: r.id,
             tentacleId: r.tentacle_id,
-            platform: r.tentacle_id.replace("tentacle-", ""),
+            platform: r.tentacle_id.replace("tentacle-", "").replace(/^\w/, (c) => c.toUpperCase()),
             icon: "🔔",
-            status: r.requires_action ? "pending" as const : "approved" as const,
+            timestamp: r.timestamp,
+            priority: (["critical", "high", "normal", "low"].includes(r.priority.toLowerCase())
+              ? r.priority.toLowerCase() : "normal") as Report["priority"],
+            summary: r.summary,
+            needsApproval: r.requires_action,
           }));
-          if (mapped.length > 0) setReports(mapped as any);
+          setReports(mapped);
         }).catch(() => {});
+    loadReports();
+
+    // hive_tick — full status refresh every 30s
+    const unlistenTick = listen<BackendStatus>("hive_tick", (e) => {
+      applyStatus(e.payload);
+    });
+
+    // hive_pending_decisions — reload reports when new decisions arrive
+    const unlistenDecisions = listen<{ count: number }>("hive_pending_decisions", () => {
+      loadReports();
+    });
+
+    // hive_inform — Big Agent informational update → add to feed
+    const unlistenInform = listen<{ summary: string }>("hive_inform", (e) => {
+      const r: Report = {
+        id: `inf-${Date.now()}`,
+        tentacleId: "head-intelligence",
+        platform: "Big Agent",
+        icon: "🧠",
+        timestamp: Math.floor(Date.now() / 1000),
+        priority: "normal",
+        summary: e.payload.summary,
+        needsApproval: false,
+      };
+      setReports((prev) => [r, ...prev].slice(0, 50));
+    });
+
+    // hive_action — auto-executed decision → show in feed
+    const unlistenAction = listen<{ type: string; platform: string; action?: string; draft?: string }>("hive_action", (e) => {
+      const { type, platform, action, draft } = e.payload;
+      const r: Report = {
+        id: `act-${Date.now()}`,
+        tentacleId: `tentacle-${platform.toLowerCase()}`,
+        platform,
+        icon: "⚡",
+        timestamp: Math.floor(Date.now() / 1000),
+        priority: "high",
+        summary: type === "reply" ? `Auto-replied on ${platform}: "${(draft ?? "").slice(0, 60)}"` : `Action on ${platform}: ${(action ?? "").slice(0, 80)}`,
+        needsApproval: false,
+      };
+      setReports((prev) => [r, ...prev].slice(0, 50));
+    });
+
+    // hive_escalate — critical escalation → show prominently
+    const unlistenEscalate = listen<{ reason: string; context: string }>("hive_escalate", (e) => {
+      const r: Report = {
+        id: `esc-${Date.now()}`,
+        tentacleId: "head-intelligence",
+        platform: "ESCALATION",
+        icon: "🚨",
+        timestamp: Math.floor(Date.now() / 1000),
+        priority: "critical",
+        summary: `${e.payload.reason} — ${e.payload.context.slice(0, 120)}`,
+        needsApproval: true,
+      };
+      setReports((prev) => [r, ...prev].slice(0, 50));
+      setRightTab("feed");
+    });
+
+    // tentacle_error — health degradation → update tentacle status
+    const unlistenTentacleError = listen<{ tentacle_id: string; platform: string; status: string; dormant: boolean }>("tentacle_error", (e) => {
+      setTentacles((prev) => prev.map((t) =>
+        t.id === e.payload.tentacle_id || t.platform.toLowerCase() === e.payload.platform.toLowerCase()
+          ? { ...t, status: e.payload.dormant ? "dormant" as const : "degraded" as const }
+          : t
+      ));
     });
 
     return () => {
       unlistenTick.then((fn) => fn());
       unlistenDecisions.then((fn) => fn());
+      unlistenInform.then((fn) => fn());
+      unlistenAction.then((fn) => fn());
+      unlistenEscalate.then((fn) => fn());
+      unlistenTentacleError.then((fn) => fn());
     };
   }, []);
 
@@ -1497,8 +1548,21 @@ export function HiveView({ onBack }: HiveViewProps) {
   const handleReportReject = (id: string) =>
     setReports((prev) => prev.map((r) => r.id === id ? { ...r, rejected: true, needsApproval: false } : r));
 
-  const handleDecisionApprove = (id: string) =>
+  const handleDecisionApprove = (id: string) => {
     setDecisions((prev) => prev.map((d) => d.id === id ? { ...d, status: "executing" as const } : d));
+    // Find which head owns this decision and its index
+    const decIdx = decisions.findIndex((d) => d.id === id);
+    if (decIdx >= 0) {
+      // head_id mapping: use platform to infer head
+      const d = decisions[decIdx];
+      const headId = ["slack", "discord", "whatsapp", "email"].includes(d.platform.toLowerCase())
+        ? "head-communications"
+        : ["github", "ci", "linear", "jira"].includes(d.platform.toLowerCase())
+        ? "head-development"
+        : "head-operations";
+      invoke("hive_approve_decision", { headId, decisionIndex: decIdx }).catch(() => {});
+    }
+  };
   const handleDecisionEdit = (id: string) => {
     const d = decisions.find((x) => x.id === id);
     if (!d) return;

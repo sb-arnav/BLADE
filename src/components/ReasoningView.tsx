@@ -47,7 +47,7 @@ const STEP_TYPE_STYLES: Record<string, string> = {
   analyze: "bg-green-900/40 text-green-300 border border-green-700",
   hypothesize: "bg-amber-900/40 text-amber-300 border border-amber-700",
   verify: "bg-purple-900/40 text-purple-300 border border-purple-700",
-  conclude: "bg-gray-700/60 text-white border border-gray-500",
+  conclude: "bg-[rgba(255,255,255,0.07)]/60 text-white border border-[rgba(255,255,255,0.2)]",
 };
 
 function ConfidenceBar({ value }: { value: number }) {
@@ -55,27 +55,27 @@ function ConfidenceBar({ value }: { value: number }) {
   const color = pct >= 70 ? "bg-green-500" : pct >= 40 ? "bg-amber-500" : "bg-red-500";
   return (
     <div className="flex items-center gap-2 mt-1">
-      <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+      <div className="flex-1 h-1.5 bg-[rgba(255,255,255,0.04)] rounded-full overflow-hidden">
         <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
       </div>
-      <span className="text-xs text-gray-400 w-8 text-right">{pct}%</span>
+      <span className="text-xs text-[rgba(255,255,255,0.5)] w-8 text-right">{pct}%</span>
     </div>
   );
 }
 
 function StepCard({ step }: { step: ReasoningStep }) {
-  const typeStyle = STEP_TYPE_STYLES[step.step_type] || "bg-gray-800 text-gray-300 border border-gray-600";
+  const typeStyle = STEP_TYPE_STYLES[step.step_type] || "bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.7)] border border-[rgba(255,255,255,0.15)]";
   return (
-    <div className="border border-gray-700 rounded bg-gray-900/60 p-3 space-y-2">
+    <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/60 p-3 space-y-2">
       <div className="flex items-center gap-2">
-        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-800 border border-gray-600 text-xs font-bold text-green-400">
+        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.15)] text-xs font-bold text-green-400">
           {step.step_number}
         </span>
         <span className={`text-xs px-2 py-0.5 rounded font-mono uppercase tracking-wider ${typeStyle}`}>
           {step.step_type}
         </span>
       </div>
-      <p className="text-sm text-gray-200 leading-relaxed">{step.thought}</p>
+      <p className="text-sm text-[rgba(255,255,255,0.85)] leading-relaxed">{step.thought}</p>
       {step.critiques && step.critiques.length > 0 && (
         <div className="border-l-2 border-red-700 pl-2 space-y-1">
           {step.critiques.map((c, i) => (
@@ -99,11 +99,11 @@ function SocraticNode({ pair, indent = 0 }: { pair: SocraticPair; indent?: numbe
     <div style={{ marginLeft: indent * 16 }} className="space-y-1">
       <div className="flex items-start gap-2">
         <span className="text-green-400 mt-0.5 text-xs">Q:</span>
-        <p className="text-sm text-gray-200">{pair.question}</p>
+        <p className="text-sm text-[rgba(255,255,255,0.85)]">{pair.question}</p>
       </div>
       <div className="flex items-start gap-2">
         <span className="text-blue-400 mt-0.5 text-xs">A:</span>
-        <p className="text-sm text-gray-400">{pair.answer}</p>
+        <p className="text-sm text-[rgba(255,255,255,0.5)]">{pair.answer}</p>
       </div>
       {pair.children && pair.children.map((child, i) => (
         <SocraticNode key={i} pair={child} indent={indent + 1} />
@@ -233,14 +233,14 @@ export function ReasoningView({ onBack }: { onBack: () => void }) {
   const verdictColor: Record<string, string> = {
     supported: "bg-green-800 text-green-200 border-green-600",
     refuted: "bg-red-800 text-red-200 border-red-600",
-    inconclusive: "bg-gray-700 text-gray-200 border-gray-500",
+    inconclusive: "bg-[rgba(255,255,255,0.07)] text-[rgba(255,255,255,0.85)] border-[rgba(255,255,255,0.2)]",
   };
 
   return (
-    <div className="flex flex-col h-full bg-black text-gray-200 font-mono">
+    <div className="flex flex-col h-full bg-black text-[rgba(255,255,255,0.85)] font-mono">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-700 bg-black">
-        <button onClick={onBack} className="text-gray-500 hover:text-green-400 transition-colors">
+      <div className="flex items-center gap-3 px-4 py-2 border-b border-[rgba(255,255,255,0.1)] bg-black">
+        <button onClick={onBack} className="text-[rgba(255,255,255,0.4)] hover:text-green-400 transition-colors">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -249,7 +249,7 @@ export function ReasoningView({ onBack }: { onBack: () => void }) {
         <div className="flex-1" />
         <button
           onClick={() => setSidebarOpen((o) => !o)}
-          className="text-xs text-gray-500 hover:text-green-400 border border-gray-700 px-2 py-1 rounded transition-colors"
+          className="text-xs text-[rgba(255,255,255,0.4)] hover:text-green-400 border border-[rgba(255,255,255,0.1)] px-2 py-1 rounded transition-colors"
         >
           History ({traces.length})
         </button>
@@ -259,12 +259,12 @@ export function ReasoningView({ onBack }: { onBack: () => void }) {
         {/* Main area */}
         <div className="flex flex-col flex-1 overflow-hidden">
           {/* Tabs */}
-          <div className="flex border-b border-gray-700 bg-black px-4">
+          <div className="flex border-b border-[rgba(255,255,255,0.1)] bg-black px-4">
             {(["think", "hypothesis", "socratic"] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`px-4 py-2 text-xs uppercase tracking-wider border-b-2 transition-colors ${tab === t ? "border-green-400 text-green-400" : "border-transparent text-gray-500 hover:text-gray-300"}`}
+                className={`px-4 py-2 text-xs uppercase tracking-wider border-b-2 transition-colors ${tab === t ? "border-green-400 text-green-400" : "border-transparent text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)]"}`}
               >
                 {t === "think" ? "Think" : t === "hypothesis" ? "Test Hypothesis" : "Socratic Drill"}
               </button>
@@ -275,10 +275,10 @@ export function ReasoningView({ onBack }: { onBack: () => void }) {
           {tab === "think" && (
             <div className="flex flex-col flex-1 overflow-hidden">
               {/* Input section */}
-              <div className="border-b border-gray-700 bg-gray-900/30 p-4 space-y-3">
+              <div className="border-b border-[rgba(255,255,255,0.1)] bg-[#09090b]/30 p-4 space-y-3">
                 <div className="flex gap-2">
                   <input
-                    className="flex-1 bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-green-700"
+                    className="flex-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-green-700"
                     placeholder="What should BLADE reason through?"
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
@@ -289,7 +289,7 @@ export function ReasoningView({ onBack }: { onBack: () => void }) {
                       <button
                         key={n}
                         onClick={() => setMaxSteps(n)}
-                        className={`w-8 h-8 text-xs rounded border transition-colors ${maxSteps === n ? "border-green-600 bg-green-900/40 text-green-300" : "border-gray-700 text-gray-500 hover:border-gray-500"}`}
+                        className={`w-8 h-8 text-xs rounded border transition-colors ${maxSteps === n ? "border-green-600 bg-green-900/40 text-green-300" : "border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.4)] hover:border-[rgba(255,255,255,0.2)]"}`}
                       >
                         {n}
                       </button>
@@ -308,7 +308,7 @@ export function ReasoningView({ onBack }: { onBack: () => void }) {
                 <div>
                   <button
                     onClick={() => setContextOpen((o) => !o)}
-                    className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 transition-colors"
+                    className="text-xs text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] flex items-center gap-1 transition-colors"
                   >
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" className={`transition-transform ${contextOpen ? "rotate-90" : ""}`}>
                       <path d="M3 2l4 3-4 3" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -317,7 +317,7 @@ export function ReasoningView({ onBack }: { onBack: () => void }) {
                   </button>
                   {contextOpen && (
                     <textarea
-                      className="w-full mt-2 bg-black border border-gray-700 rounded px-3 py-2 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-green-700 resize-none"
+                      className="w-full mt-2 bg-black border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-xs text-[rgba(255,255,255,0.7)] placeholder-gray-600 focus:outline-none focus:border-green-700 resize-none"
                       rows={3}
                       placeholder="Paste any relevant background knowledge, constraints, or data..."
                       value={context}
@@ -330,7 +330,7 @@ export function ReasoningView({ onBack }: { onBack: () => void }) {
               {/* Steps + answer */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
                 {liveSteps.length === 0 && !result && !loading && (
-                  <div className="text-center py-16 text-gray-600 text-sm">
+                  <div className="text-center py-16 text-[rgba(255,255,255,0.3)] text-sm">
                     Ask a question and BLADE will walk through its reasoning step by step.
                   </div>
                 )}
@@ -351,13 +351,13 @@ export function ReasoningView({ onBack }: { onBack: () => void }) {
                     <div className="flex items-center gap-2 border-b border-green-800 pb-2">
                       <span className="text-green-400 text-xs font-bold uppercase tracking-widest">Final Answer</span>
                       <div className="flex-1" />
-                      <span className="text-xs text-gray-400">
+                      <span className="text-xs text-[rgba(255,255,255,0.5)]">
                         Quality: <span className="text-green-300 font-bold">{result.reasoning_quality}/10</span>
                       </span>
                     </div>
-                    <p className="text-sm text-gray-100 leading-relaxed whitespace-pre-wrap">{result.final_answer}</p>
+                    <p className="text-sm text-white leading-relaxed whitespace-pre-wrap">{result.final_answer}</p>
                     <div>
-                      <p className="text-xs text-gray-500 mb-1">Overall Confidence</p>
+                      <p className="text-xs text-[rgba(255,255,255,0.4)] mb-1">Overall Confidence</p>
                       <ConfidenceBar value={result.overall_confidence} />
                     </div>
                   </div>
@@ -371,18 +371,18 @@ export function ReasoningView({ onBack }: { onBack: () => void }) {
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-gray-500 uppercase tracking-wider">Hypothesis</label>
+                  <label className="text-xs text-[rgba(255,255,255,0.4)] uppercase tracking-wider">Hypothesis</label>
                   <input
-                    className="w-full mt-1 bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-green-700"
+                    className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-green-700"
                     placeholder="State a hypothesis to test..."
                     value={hypothesis}
                     onChange={(e) => setHypothesis(e.target.value)}
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 uppercase tracking-wider">Evidence</label>
+                  <label className="text-xs text-[rgba(255,255,255,0.4)] uppercase tracking-wider">Evidence</label>
                   <textarea
-                    className="w-full mt-1 bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-300 placeholder-gray-600 focus:outline-none focus:border-green-700 resize-none"
+                    className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-sm text-[rgba(255,255,255,0.7)] placeholder-gray-600 focus:outline-none focus:border-green-700 resize-none"
                     rows={5}
                     placeholder="Provide evidence or data to evaluate the hypothesis..."
                     value={evidence}
@@ -399,36 +399,36 @@ export function ReasoningView({ onBack }: { onBack: () => void }) {
               </div>
 
               {hypoResult && (
-                <div className="border border-gray-700 rounded bg-gray-900/40 p-4 space-y-4">
+                <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/40 p-4 space-y-4">
                   <div className="flex items-center gap-2">
-                    <span className={`text-xs px-3 py-1 rounded border font-bold uppercase tracking-wider ${verdictColor[hypoResult.verdict] || "bg-gray-700 text-gray-200 border-gray-500"}`}>
+                    <span className={`text-xs px-3 py-1 rounded border font-bold uppercase tracking-wider ${verdictColor[hypoResult.verdict] || "bg-[rgba(255,255,255,0.07)] text-[rgba(255,255,255,0.85)] border-[rgba(255,255,255,0.2)]"}`}>
                       {hypoResult.verdict}
                     </span>
-                    <span className="text-xs text-gray-400">Confidence: {hypoResult.confidence}%</span>
+                    <span className="text-xs text-[rgba(255,255,255,0.5)]">Confidence: {hypoResult.confidence}%</span>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-xs text-green-400 font-bold uppercase tracking-wider mb-2">Evidence For</p>
                       <ul className="space-y-1">
                         {hypoResult.evidence_for.map((e, i) => (
-                          <li key={i} className="flex items-start gap-1.5 text-xs text-gray-300">
+                          <li key={i} className="flex items-start gap-1.5 text-xs text-[rgba(255,255,255,0.7)]">
                             <span className="text-green-500 mt-0.5">•</span>
                             {e}
                           </li>
                         ))}
-                        {hypoResult.evidence_for.length === 0 && <li className="text-xs text-gray-600 italic">None found</li>}
+                        {hypoResult.evidence_for.length === 0 && <li className="text-xs text-[rgba(255,255,255,0.3)] italic">None found</li>}
                       </ul>
                     </div>
                     <div>
                       <p className="text-xs text-red-400 font-bold uppercase tracking-wider mb-2">Evidence Against</p>
                       <ul className="space-y-1">
                         {hypoResult.evidence_against.map((e, i) => (
-                          <li key={i} className="flex items-start gap-1.5 text-xs text-gray-300">
+                          <li key={i} className="flex items-start gap-1.5 text-xs text-[rgba(255,255,255,0.7)]">
                             <span className="text-red-500 mt-0.5">•</span>
                             {e}
                           </li>
                         ))}
-                        {hypoResult.evidence_against.length === 0 && <li className="text-xs text-gray-600 italic">None found</li>}
+                        {hypoResult.evidence_against.length === 0 && <li className="text-xs text-[rgba(255,255,255,0.3)] italic">None found</li>}
                       </ul>
                     </div>
                   </div>
@@ -442,7 +442,7 @@ export function ReasoningView({ onBack }: { onBack: () => void }) {
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               <div className="flex gap-2 items-start">
                 <input
-                  className="flex-1 bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-green-700"
+                  className="flex-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-green-700"
                   placeholder="Topic or concept to drill into..."
                   value={socraticTopic}
                   onChange={(e) => setSocraticTopic(e.target.value)}
@@ -452,7 +452,7 @@ export function ReasoningView({ onBack }: { onBack: () => void }) {
                     <button
                       key={d}
                       onClick={() => setSocraticDepth(d)}
-                      className={`w-7 h-8 text-xs rounded border transition-colors ${socraticDepth === d ? "border-amber-600 bg-amber-900/40 text-amber-300" : "border-gray-700 text-gray-500 hover:border-gray-500"}`}
+                      className={`w-7 h-8 text-xs rounded border transition-colors ${socraticDepth === d ? "border-amber-600 bg-amber-900/40 text-amber-300" : "border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.4)] hover:border-[rgba(255,255,255,0.2)]"}`}
                     >
                       {d}
                     </button>
@@ -475,7 +475,7 @@ export function ReasoningView({ onBack }: { onBack: () => void }) {
               )}
 
               {socraticResult.length > 0 && (
-                <div className="border border-gray-700 rounded bg-gray-900/30 p-4 space-y-3">
+                <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/30 p-4 space-y-3">
                   {socraticResult.map((pair, i) => (
                     <SocraticNode key={i} pair={pair} indent={0} />
                   ))}
@@ -483,7 +483,7 @@ export function ReasoningView({ onBack }: { onBack: () => void }) {
               )}
 
               {!socraticLoading && socraticResult.length === 0 && (
-                <div className="text-center py-16 text-gray-600 text-sm">
+                <div className="text-center py-16 text-[rgba(255,255,255,0.3)] text-sm">
                   Enter a topic to explore through Socratic questioning.
                 </div>
               )}
@@ -493,26 +493,26 @@ export function ReasoningView({ onBack }: { onBack: () => void }) {
 
         {/* History sidebar */}
         {sidebarOpen && (
-          <div className="w-64 border-l border-gray-700 bg-gray-900/50 flex flex-col overflow-hidden">
-            <div className="px-3 py-2 border-b border-gray-700 flex items-center justify-between">
-              <span className="text-xs text-gray-400 uppercase tracking-wider">Recent Traces</span>
-              <button onClick={() => setSidebarOpen(false)} className="text-gray-600 hover:text-gray-400 text-xs">
+          <div className="w-64 border-l border-[rgba(255,255,255,0.1)] bg-[#09090b]/50 flex flex-col overflow-hidden">
+            <div className="px-3 py-2 border-b border-[rgba(255,255,255,0.1)] flex items-center justify-between">
+              <span className="text-xs text-[rgba(255,255,255,0.5)] uppercase tracking-wider">Recent Traces</span>
+              <button onClick={() => setSidebarOpen(false)} className="text-[rgba(255,255,255,0.3)] hover:text-[rgba(255,255,255,0.5)] text-xs">
                 x
               </button>
             </div>
             <div className="flex-1 overflow-y-auto">
               {traces.length === 0 && (
-                <p className="text-xs text-gray-600 text-center p-4">No traces yet</p>
+                <p className="text-xs text-[rgba(255,255,255,0.3)] text-center p-4">No traces yet</p>
               )}
               {traces.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => replayTrace(t)}
-                  className="w-full text-left px-3 py-2.5 border-b border-gray-800 hover:bg-gray-800/50 transition-colors"
+                  className="w-full text-left px-3 py-2.5 border-b border-[rgba(255,255,255,0.07)] hover:bg-[rgba(255,255,255,0.04)]/50 transition-colors"
                 >
-                  <p className="text-xs text-gray-200 truncate">{t.question}</p>
+                  <p className="text-xs text-[rgba(255,255,255,0.85)] truncate">{t.question}</p>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-gray-600">{new Date(t.created_at).toLocaleDateString()}</span>
+                    <span className="text-xs text-[rgba(255,255,255,0.3)]">{new Date(t.created_at).toLocaleDateString()}</span>
                     <span className="text-xs text-green-600">{t.reasoning_quality}/10</span>
                   </div>
                 </button>

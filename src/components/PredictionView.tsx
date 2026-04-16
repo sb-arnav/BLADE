@@ -48,7 +48,7 @@ function timeWindowBadge(tw: TimeWindow): { label: string; cls: string; blink?: 
     case "TODAY":
       return { label: "TODAY", cls: "bg-blue-900 text-blue-300 border border-blue-700" };
     case "THIS_WEEK":
-      return { label: "THIS WEEK", cls: "bg-gray-800 text-gray-400 border border-gray-600" };
+      return { label: "THIS WEEK", cls: "bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.15)]" };
   }
 }
 
@@ -81,7 +81,7 @@ function PredictionCard({
   const barColor = confidenceBar(prediction.confidence);
 
   return (
-    <div className="border border-gray-700 bg-gray-900/60 rounded p-3 flex flex-col gap-2">
+    <div className="border border-[rgba(255,255,255,0.1)] bg-[#09090b]/60 rounded p-3 flex flex-col gap-2">
       {/* Header row */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
@@ -93,20 +93,20 @@ function PredictionCard({
             </span>
             <span className="text-xs font-semibold text-green-400 truncate">{prediction.title}</span>
           </div>
-          <p className="text-2xs text-gray-400 mt-1 leading-relaxed">{prediction.description}</p>
+          <p className="text-2xs text-[rgba(255,255,255,0.5)] mt-1 leading-relaxed">{prediction.description}</p>
         </div>
       </div>
 
       {/* Confidence bar */}
       <div className="flex items-center gap-2">
-        <span className="text-2xs text-gray-500 w-16 shrink-0">confidence</span>
-        <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+        <span className="text-2xs text-[rgba(255,255,255,0.4)] w-16 shrink-0">confidence</span>
+        <div className="flex-1 h-1.5 bg-[rgba(255,255,255,0.04)] rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all ${barColor}`}
             style={{ width: `${Math.round(prediction.confidence * 100)}%` }}
           />
         </div>
-        <span className="text-2xs text-gray-500 w-8 text-right">
+        <span className="text-2xs text-[rgba(255,255,255,0.4)] w-8 text-right">
           {Math.round(prediction.confidence * 100)}%
         </span>
       </div>
@@ -114,7 +114,7 @@ function PredictionCard({
       {/* Action chip */}
       {prediction.action && (
         <div className="flex items-center gap-1.5">
-          <span className="text-2xs text-gray-500">action:</span>
+          <span className="text-2xs text-[rgba(255,255,255,0.4)]">action:</span>
           <button
             className="text-2xs font-mono px-2 py-0.5 rounded bg-green-900/40 text-green-400 border border-green-800 hover:bg-green-800/50 transition-colors"
             onClick={() => {}}
@@ -138,8 +138,8 @@ function PredictionCard({
             onClick={() => setHelpful((h) => !h)}
             className={`text-2xs px-1.5 py-0.5 rounded border transition-colors ${
               helpful
-                ? "bg-gray-800 text-gray-300 border-gray-600"
-                : "bg-gray-900 text-gray-500 border-gray-700"
+                ? "bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.15)]"
+                : "bg-[#09090b] text-[rgba(255,255,255,0.4)] border-[rgba(255,255,255,0.1)]"
             }`}
             title="Toggle helpful flag before dismissing"
           >
@@ -147,7 +147,7 @@ function PredictionCard({
           </button>
           <button
             onClick={() => onDismiss(prediction.id, helpful)}
-            className="flex items-center gap-1 text-2xs px-2 py-1 rounded bg-gray-900 text-gray-400 border border-gray-700 hover:bg-gray-800 hover:text-gray-300 transition-colors"
+            className="flex items-center gap-1 text-2xs px-2 py-1 rounded bg-[#09090b] text-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.04)] hover:text-[rgba(255,255,255,0.7)] transition-colors"
           >
             <span>✗</span>
             <span>Dismiss</span>
@@ -163,28 +163,28 @@ function PatternCard({ pattern }: { pattern: BehaviorPattern }) {
   const barColor = confidenceBar(pattern.confidence);
 
   return (
-    <div className="border border-gray-700 bg-gray-900/50 rounded p-3 flex flex-col gap-2">
+    <div className="border border-[rgba(255,255,255,0.1)] bg-[#09090b]/50 rounded p-3 flex flex-col gap-2">
       <div className="flex items-center gap-2 flex-wrap">
         <span className={`text-2xs font-mono px-1.5 py-0.5 rounded ${badge.cls}`}>{badge.label}</span>
         {pattern.trigger && (
-          <span className="text-2xs px-1.5 py-0.5 rounded bg-gray-800 text-gray-300 border border-gray-600 font-mono">
+          <span className="text-2xs px-1.5 py-0.5 rounded bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.7)] border border-[rgba(255,255,255,0.15)] font-mono">
             trigger: {pattern.trigger}
           </span>
         )}
-        <span className="ml-auto text-2xs text-gray-500">{pattern.occurrences}× seen</span>
+        <span className="ml-auto text-2xs text-[rgba(255,255,255,0.4)]">{pattern.occurrences}× seen</span>
       </div>
 
-      <p className="text-xs text-gray-300">{pattern.expected_action}</p>
+      <p className="text-xs text-[rgba(255,255,255,0.7)]">{pattern.expected_action}</p>
 
       <div className="flex items-center gap-2">
-        <span className="text-2xs text-gray-500 w-16 shrink-0">confidence</span>
-        <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+        <span className="text-2xs text-[rgba(255,255,255,0.4)] w-16 shrink-0">confidence</span>
+        <div className="flex-1 h-1.5 bg-[rgba(255,255,255,0.04)] rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full ${barColor}`}
             style={{ width: `${Math.round(pattern.confidence * 100)}%` }}
           />
         </div>
-        <span className="text-2xs text-gray-500 w-8 text-right">
+        <span className="text-2xs text-[rgba(255,255,255,0.4)] w-8 text-right">
           {Math.round(pattern.confidence * 100)}%
         </span>
       </div>
@@ -290,21 +290,21 @@ export function PredictionView({ onBack }: { onBack: () => void }) {
   const patternTypeOrder: PatternType[] = ["time_routine", "sequence", "frequency", "context_trigger"];
 
   return (
-    <div className="flex flex-col h-full bg-black text-gray-200 overflow-hidden">
+    <div className="flex flex-col h-full bg-black text-[rgba(255,255,255,0.85)] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700 shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.1)] shrink-0">
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
-            className="text-2xs text-gray-500 hover:text-green-400 transition-colors font-mono"
+            className="text-2xs text-[rgba(255,255,255,0.4)] hover:text-green-400 transition-colors font-mono"
           >
             ← back
           </button>
-          <div className="w-px h-3 bg-gray-700" />
+          <div className="w-px h-3 bg-[rgba(255,255,255,0.07)]" />
           <h1 className="text-sm font-mono text-green-400 tracking-widest uppercase">
             Predictions
           </h1>
-          <span className="text-2xs text-gray-600 font-mono">anticipatory intelligence</span>
+          <span className="text-2xs text-[rgba(255,255,255,0.3)] font-mono">anticipatory intelligence</span>
         </div>
         <div className="flex items-center gap-2">
           {predictions.length > 0 && (
@@ -331,13 +331,13 @@ export function PredictionView({ onBack }: { onBack: () => void }) {
               <span className="text-2xs font-mono text-green-400 uppercase tracking-widest">
                 Active Predictions
               </span>
-              <div className="flex-1 h-px bg-gray-800" />
+              <div className="flex-1 h-px bg-[rgba(255,255,255,0.04)]" />
             </div>
 
             {predictions.length === 0 ? (
-              <div className="border border-gray-800 rounded p-6 text-center">
-                <p className="text-xs text-gray-600 font-mono">No pending predictions</p>
-                <p className="text-2xs text-gray-700 mt-1">
+              <div className="border border-[rgba(255,255,255,0.07)] rounded p-6 text-center">
+                <p className="text-xs text-[rgba(255,255,255,0.3)] font-mono">No pending predictions</p>
+                <p className="text-2xs text-[rgba(255,255,255,0.2)] mt-1">
                   Run "Generate Predictions Now" or use me more to build patterns.
                 </p>
               </div>
@@ -361,14 +361,14 @@ export function PredictionView({ onBack }: { onBack: () => void }) {
               <span className="text-2xs font-mono text-green-400 uppercase tracking-widest">
                 Detected Patterns
               </span>
-              <div className="flex-1 h-px bg-gray-800" />
-              <span className="text-2xs text-gray-600">{patterns.length} patterns</span>
+              <div className="flex-1 h-px bg-[rgba(255,255,255,0.04)]" />
+              <span className="text-2xs text-[rgba(255,255,255,0.3)]">{patterns.length} patterns</span>
             </div>
 
             {patterns.length === 0 ? (
-              <div className="border border-gray-800 rounded p-6 text-center">
-                <p className="text-xs text-gray-600 font-mono">No patterns detected yet</p>
-                <p className="text-2xs text-gray-700 mt-1">
+              <div className="border border-[rgba(255,255,255,0.07)] rounded p-6 text-center">
+                <p className="text-xs text-[rgba(255,255,255,0.3)] font-mono">No patterns detected yet</p>
+                <p className="text-2xs text-[rgba(255,255,255,0.2)] mt-1">
                   Patterns emerge as BLADE observes your behavior over time.
                 </p>
               </div>
@@ -384,11 +384,11 @@ export function PredictionView({ onBack }: { onBack: () => void }) {
                           <span className={`text-2xs font-mono px-1.5 py-0.5 rounded ${badge.cls}`}>
                             {badge.label}
                           </span>
-                          <span className="text-2xs text-gray-600">
+                          <span className="text-2xs text-[rgba(255,255,255,0.3)]">
                             {patternGroups[type].length}
                           </span>
                         </div>
-                        <div className="flex flex-col gap-2 pl-2 border-l border-gray-800">
+                        <div className="flex flex-col gap-2 pl-2 border-l border-[rgba(255,255,255,0.07)]">
                           {patternGroups[type].map((pattern) => (
                             <PatternCard key={pattern.id} pattern={pattern} />
                           ))}
@@ -406,15 +406,15 @@ export function PredictionView({ onBack }: { onBack: () => void }) {
               <span className="text-2xs font-mono text-green-400 uppercase tracking-widest">
                 Controls
               </span>
-              <div className="flex-1 h-px bg-gray-800" />
+              <div className="flex-1 h-px bg-[rgba(255,255,255,0.04)]" />
             </div>
 
             <div className="flex flex-col gap-4">
               {/* Generate now */}
-              <div className="border border-gray-700 bg-gray-900/40 rounded p-3 flex items-center justify-between gap-4">
+              <div className="border border-[rgba(255,255,255,0.1)] bg-[#09090b]/40 rounded p-3 flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-xs text-gray-200">Generate Predictions Now</p>
-                  <p className="text-2xs text-gray-500 mt-0.5">
+                  <p className="text-xs text-[rgba(255,255,255,0.85)]">Generate Predictions Now</p>
+                  <p className="text-2xs text-[rgba(255,255,255,0.4)] mt-0.5">
                     Force BLADE to run the prediction engine using current context.
                   </p>
                 </div>
@@ -435,10 +435,10 @@ export function PredictionView({ onBack }: { onBack: () => void }) {
               </div>
 
               {/* Contextual prediction */}
-              <div className="border border-gray-700 bg-gray-900/40 rounded p-3 flex flex-col gap-3">
+              <div className="border border-[rgba(255,255,255,0.1)] bg-[#09090b]/40 rounded p-3 flex flex-col gap-3">
                 <div>
-                  <p className="text-xs text-gray-200">Contextual Prediction</p>
-                  <p className="text-2xs text-gray-500 mt-0.5">
+                  <p className="text-xs text-[rgba(255,255,255,0.85)]">Contextual Prediction</p>
+                  <p className="text-2xs text-[rgba(255,255,255,0.4)] mt-0.5">
                     Describe your current situation and get instant predictions.
                   </p>
                 </div>
@@ -447,7 +447,7 @@ export function PredictionView({ onBack }: { onBack: () => void }) {
                   onChange={(e) => setContextInput(e.target.value)}
                   placeholder="e.g. I just finished a standup meeting and opened Slack…"
                   rows={3}
-                  className="w-full bg-black border border-gray-700 rounded p-2 text-xs text-gray-300 font-mono placeholder-gray-700 focus:outline-none focus:border-green-700 resize-none"
+                  className="w-full bg-black border border-[rgba(255,255,255,0.1)] rounded p-2 text-xs text-[rgba(255,255,255,0.7)] font-mono placeholder-gray-700 focus:outline-none focus:border-green-700 resize-none"
                 />
                 <div className="flex justify-end">
                   <button
@@ -470,10 +470,10 @@ export function PredictionView({ onBack }: { onBack: () => void }) {
                 {contextPredictions.length > 0 && (
                   <div className="flex flex-col gap-2 mt-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-2xs text-gray-500 font-mono uppercase tracking-widest">
+                      <span className="text-2xs text-[rgba(255,255,255,0.4)] font-mono uppercase tracking-widest">
                         Instant predictions
                       </span>
-                      <div className="flex-1 h-px bg-gray-800" />
+                      <div className="flex-1 h-px bg-[rgba(255,255,255,0.04)]" />
                     </div>
                     {contextPredictions.map((p) => (
                       <PredictionCard

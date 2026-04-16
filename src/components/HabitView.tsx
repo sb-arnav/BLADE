@@ -66,7 +66,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 function categoryDot(category: string) {
-  return CATEGORY_COLORS[category.toLowerCase()] ?? "bg-gray-500";
+  return CATEGORY_COLORS[category.toLowerCase()] ?? "bg-[rgba(255,255,255,0.04)]";
 }
 
 // ── Stars rating ──────────────────────────────────────────────────────────────
@@ -76,7 +76,7 @@ function StarRating({ value, max = 10 }: { value: number; max?: number }) {
   return (
     <span className="text-xs text-yellow-400">
       {"★".repeat(filled)}{"☆".repeat(max - filled)}
-      <span className="text-gray-500 ml-1">({value}/10)</span>
+      <span className="text-[rgba(255,255,255,0.4)] ml-1">({value}/10)</span>
     </span>
   );
 }
@@ -95,11 +95,11 @@ function SkipModal({
   const [reason, setReason] = useState("");
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 w-96">
+      <div className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded-lg p-6 w-96">
         <h3 className="text-green-400 font-mono text-sm mb-1">Skip habit</h3>
-        <p className="text-gray-400 text-xs mb-4">{habitName}</p>
+        <p className="text-[rgba(255,255,255,0.5)] text-xs mb-4">{habitName}</p>
         <textarea
-          className="w-full bg-black border border-gray-700 rounded p-2 text-xs text-gray-200 font-mono resize-none h-20 focus:outline-none focus:border-green-500"
+          className="w-full bg-black border border-[rgba(255,255,255,0.1)] rounded p-2 text-xs text-[rgba(255,255,255,0.85)] font-mono resize-none h-20 focus:outline-none focus:border-green-500"
           placeholder="Why are you skipping? (optional)"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
@@ -107,7 +107,7 @@ function SkipModal({
         <div className="flex gap-2 mt-4 justify-end">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 text-xs text-gray-400 border border-gray-700 rounded hover:border-gray-500"
+            className="px-3 py-1.5 text-xs text-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.1)] rounded hover:border-[rgba(255,255,255,0.2)]"
           >
             Cancel
           </button>
@@ -142,22 +142,22 @@ function AddHabitModal({
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 w-[480px] max-h-[90vh] overflow-y-auto">
+      <div className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded-lg p-6 w-[480px] max-h-[90vh] overflow-y-auto">
         <h3 className="text-green-400 font-mono text-sm mb-4">+ New Habit</h3>
         <div className="space-y-3">
           <div>
-            <label className="text-gray-500 text-xs font-mono">Name *</label>
+            <label className="text-[rgba(255,255,255,0.4)] text-xs font-mono">Name *</label>
             <input
-              className="w-full mt-1 bg-black border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-200 font-mono focus:outline-none focus:border-green-500"
+              className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] font-mono focus:outline-none focus:border-green-500"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Morning meditation"
             />
           </div>
           <div>
-            <label className="text-gray-500 text-xs font-mono">Description</label>
+            <label className="text-[rgba(255,255,255,0.4)] text-xs font-mono">Description</label>
             <input
-              className="w-full mt-1 bg-black border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-200 font-mono focus:outline-none focus:border-green-500"
+              className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] font-mono focus:outline-none focus:border-green-500"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="10 minutes of focused breathing"
@@ -165,9 +165,9 @@ function AddHabitModal({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-gray-500 text-xs font-mono">Frequency</label>
+              <label className="text-[rgba(255,255,255,0.4)] text-xs font-mono">Frequency</label>
               <select
-                className="w-full mt-1 bg-black border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-200 font-mono focus:outline-none focus:border-green-500"
+                className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] font-mono focus:outline-none focus:border-green-500"
                 value={frequency}
                 onChange={(e) => setFrequency(e.target.value as Habit["frequency"])}
               >
@@ -178,19 +178,19 @@ function AddHabitModal({
               </select>
             </div>
             <div>
-              <label className="text-gray-500 text-xs font-mono">Target time</label>
+              <label className="text-[rgba(255,255,255,0.4)] text-xs font-mono">Target time</label>
               <input
                 type="time"
-                className="w-full mt-1 bg-black border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-200 font-mono focus:outline-none focus:border-green-500"
+                className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] font-mono focus:outline-none focus:border-green-500"
                 value={targetTime}
                 onChange={(e) => setTargetTime(e.target.value)}
               />
             </div>
           </div>
           <div>
-            <label className="text-gray-500 text-xs font-mono">Category</label>
+            <label className="text-[rgba(255,255,255,0.4)] text-xs font-mono">Category</label>
             <select
-              className="w-full mt-1 bg-black border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-200 font-mono focus:outline-none focus:border-green-500"
+              className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] font-mono focus:outline-none focus:border-green-500"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
@@ -200,18 +200,18 @@ function AddHabitModal({
             </select>
           </div>
           <div>
-            <label className="text-gray-500 text-xs font-mono">Cue (trigger)</label>
+            <label className="text-[rgba(255,255,255,0.4)] text-xs font-mono">Cue (trigger)</label>
             <input
-              className="w-full mt-1 bg-black border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-200 font-mono focus:outline-none focus:border-green-500"
+              className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] font-mono focus:outline-none focus:border-green-500"
               value={cue}
               onChange={(e) => setCue(e.target.value)}
               placeholder="After I brew my morning coffee"
             />
           </div>
           <div>
-            <label className="text-gray-500 text-xs font-mono">Reward</label>
+            <label className="text-[rgba(255,255,255,0.4)] text-xs font-mono">Reward</label>
             <input
-              className="w-full mt-1 bg-black border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-200 font-mono focus:outline-none focus:border-green-500"
+              className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] font-mono focus:outline-none focus:border-green-500"
               value={reward}
               onChange={(e) => setReward(e.target.value)}
               placeholder="I can then scroll news for 5 min"
@@ -221,7 +221,7 @@ function AddHabitModal({
         <div className="flex gap-2 mt-5 justify-end">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 text-xs text-gray-400 border border-gray-700 rounded hover:border-gray-500"
+            className="px-3 py-1.5 text-xs text-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.1)] rounded hover:border-[rgba(255,255,255,0.2)]"
           >
             Cancel
           </button>
@@ -252,7 +252,7 @@ function DotCalendar({ logs }: { logs: HabitLog[] }) {
     <div className="flex flex-wrap gap-1 mt-2">
       {days.map((day) => {
         const log = logMap.get(day);
-        let color = "bg-gray-800";
+        let color = "bg-[rgba(255,255,255,0.04)]";
         if (log?.completed) color = "bg-green-500";
         else if (log?.skipped) color = "bg-amber-600";
         return (
@@ -288,22 +288,22 @@ function HistoryModal({
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 w-[480px]">
+      <div className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded-lg p-6 w-[480px]">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-green-400 font-mono text-sm">{habit.name} — Last 30 days</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none">✕</button>
+          <button onClick={onClose} className="text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] text-lg leading-none">✕</button>
         </div>
         {loading ? (
-          <p className="text-gray-500 text-xs font-mono">Loading logs...</p>
+          <p className="text-[rgba(255,255,255,0.4)] text-xs font-mono">Loading logs...</p>
         ) : (
           <>
-            <div className="flex gap-4 text-xs text-gray-500 font-mono mb-3">
+            <div className="flex gap-4 text-xs text-[rgba(255,255,255,0.4)] font-mono mb-3">
               <span><span className="inline-block w-3 h-3 bg-green-500 rounded-sm mr-1" />Completed</span>
               <span><span className="inline-block w-3 h-3 bg-amber-600 rounded-sm mr-1" />Skipped</span>
-              <span><span className="inline-block w-3 h-3 bg-gray-800 rounded-sm mr-1" />Missed</span>
+              <span><span className="inline-block w-3 h-3 bg-[rgba(255,255,255,0.04)] rounded-sm mr-1" />Missed</span>
             </div>
             <DotCalendar logs={logs} />
-            <p className="text-gray-600 text-xs font-mono mt-3">
+            <p className="text-[rgba(255,255,255,0.3)] text-xs font-mono mt-3">
               {logs.filter((l) => l.completed).length} completions out of 30 days
             </p>
           </>
@@ -347,16 +347,16 @@ function TodaySection() {
         <h2 className="text-green-400 font-mono text-xs uppercase tracking-widest">Today's Habits</h2>
         <button
           onClick={fetchToday}
-          className="text-xs text-gray-500 border border-gray-700 rounded px-2 py-0.5 hover:border-gray-500 font-mono"
+          className="text-xs text-[rgba(255,255,255,0.4)] border border-[rgba(255,255,255,0.1)] rounded px-2 py-0.5 hover:border-[rgba(255,255,255,0.2)] font-mono"
         >
           Check Due Now
         </button>
       </div>
 
-      {loading && <p className="text-gray-600 text-xs font-mono">Loading...</p>}
+      {loading && <p className="text-[rgba(255,255,255,0.3)] text-xs font-mono">Loading...</p>}
 
       {!loading && todayHabits.length === 0 && (
-        <p className="text-gray-600 text-xs font-mono border border-gray-800 rounded p-4 text-center">
+        <p className="text-[rgba(255,255,255,0.3)] text-xs font-mono border border-[rgba(255,255,255,0.07)] rounded p-4 text-center">
           No habits due today. Great job or nothing set up yet!
         </p>
       )}
@@ -369,8 +369,8 @@ function TodaySection() {
               th.completed
                 ? "border-green-900 bg-green-950/20"
                 : th.skipped
-                ? "border-gray-800 bg-gray-900/50 opacity-60"
-                : "border-gray-700 bg-gray-900"
+                ? "border-[rgba(255,255,255,0.07)] bg-[#09090b]/50 opacity-60"
+                : "border-[rgba(255,255,255,0.1)] bg-[#09090b]"
             }`}
           >
             {/* Category dot */}
@@ -379,12 +379,12 @@ function TodaySection() {
             {/* Info */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-gray-100 text-xs font-mono font-semibold">{th.habit.name}</span>
-                <span className="text-gray-600 text-2xs font-mono border border-gray-800 rounded px-1">
+                <span className="text-white text-xs font-mono font-semibold">{th.habit.name}</span>
+                <span className="text-[rgba(255,255,255,0.3)] text-2xs font-mono border border-[rgba(255,255,255,0.07)] rounded px-1">
                   {th.habit.frequency}
                 </span>
                 {th.habit.target_time && (
-                  <span className="text-gray-600 text-2xs font-mono">⏰ {th.habit.target_time}</span>
+                  <span className="text-[rgba(255,255,255,0.3)] text-2xs font-mono">⏰ {th.habit.target_time}</span>
                 )}
               </div>
               <div className="flex items-center gap-3 mt-0.5">
@@ -410,7 +410,7 @@ function TodaySection() {
                 </button>
                 <button
                   onClick={() => setSkipTarget(th)}
-                  className="text-xs px-2 py-1 border border-gray-700 text-gray-500 rounded hover:border-amber-700 hover:text-amber-400"
+                  className="text-xs px-2 py-1 border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.4)] rounded hover:border-amber-700 hover:text-amber-400"
                   title="Skip"
                 >
                   ⏭
@@ -476,7 +476,7 @@ function AllHabitsSection() {
         </button>
       </div>
 
-      {loading && <p className="text-gray-600 text-xs font-mono">Loading habits...</p>}
+      {loading && <p className="text-[rgba(255,255,255,0.3)] text-xs font-mono">Loading habits...</p>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {habits.map((habit) => {
@@ -484,21 +484,21 @@ function AllHabitsSection() {
           return (
             <div
               key={habit.id}
-              className={`border rounded-lg p-4 bg-gray-900 ${
-                atRisk ? "border-amber-700" : "border-gray-700"
+              className={`border rounded-lg p-4 bg-[#09090b] ${
+                atRisk ? "border-amber-700" : "border-[rgba(255,255,255,0.1)]"
               }`}
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-0.5 ${categoryDot(habit.category)}`} />
-                  <span className="text-gray-100 text-xs font-mono font-semibold">{habit.name}</span>
+                  <span className="text-white text-xs font-mono font-semibold">{habit.name}</span>
                 </div>
-                <span className={`text-2xs font-mono px-1.5 py-0.5 rounded border ${categoryDot(habit.category)} bg-opacity-20 border-gray-700 text-gray-400`}>
+                <span className={`text-2xs font-mono px-1.5 py-0.5 rounded border ${categoryDot(habit.category)} bg-opacity-20 border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)]`}>
                   {habit.category}
                 </span>
               </div>
 
-              <div className="flex gap-4 text-xs text-gray-400 font-mono mb-3">
+              <div className="flex gap-4 text-xs text-[rgba(255,255,255,0.5)] font-mono mb-3">
                 <span>🔥 {habit.current_streak}d</span>
                 <span>🏆 {habit.best_streak}d best</span>
                 {atRisk && <span className="text-amber-500">⚠ at risk</span>}
@@ -506,11 +506,11 @@ function AllHabitsSection() {
 
               {/* Completion rate bar */}
               <div className="mb-1">
-                <div className="flex justify-between text-2xs text-gray-600 font-mono mb-0.5">
+                <div className="flex justify-between text-2xs text-[rgba(255,255,255,0.3)] font-mono mb-0.5">
                   <span>Completion rate</span>
                   <span>{Math.round(habit.completion_rate * 100)}%</span>
                 </div>
-                <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-[rgba(255,255,255,0.04)] rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full ${habit.completion_rate >= 0.8 ? "bg-green-500" : habit.completion_rate >= 0.6 ? "bg-yellow-500" : "bg-red-500"}`}
                     style={{ width: `${habit.completion_rate * 100}%` }}
@@ -520,16 +520,16 @@ function AllHabitsSection() {
 
               {/* Friction score */}
               <div className="flex items-center gap-1 mt-1 mb-3">
-                <span className="text-2xs text-gray-600 font-mono">Friction:</span>
+                <span className="text-2xs text-[rgba(255,255,255,0.3)] font-mono">Friction:</span>
                 <div className="flex gap-0.5">
                   {Array.from({ length: 5 }).map((_, i) => (
                     <div
                       key={i}
-                      className={`w-2 h-2 rounded-sm ${i < habit.friction_score ? "bg-red-500" : "bg-gray-800"}`}
+                      className={`w-2 h-2 rounded-sm ${i < habit.friction_score ? "bg-red-500" : "bg-[rgba(255,255,255,0.04)]"}`}
                     />
                   ))}
                 </div>
-                <span className="text-2xs text-gray-600 font-mono">{habit.friction_score}/5</span>
+                <span className="text-2xs text-[rgba(255,255,255,0.3)] font-mono">{habit.friction_score}/5</span>
               </div>
 
               <div className="flex gap-1.5">
@@ -541,7 +541,7 @@ function AllHabitsSection() {
                 </button>
                 <button
                   onClick={() => archiveHabit(habit.id)}
-                  className="text-2xs text-gray-500 border border-gray-800 rounded px-2 py-0.5 hover:border-gray-600"
+                  className="text-2xs text-[rgba(255,255,255,0.4)] border border-[rgba(255,255,255,0.07)] rounded px-2 py-0.5 hover:border-[rgba(255,255,255,0.15)]"
                 >
                   Archive
                 </button>
@@ -610,11 +610,11 @@ function AIAdvisorSection() {
   return (
     <section className="space-y-6">
       {/* Design a Habit */}
-      <div className="border border-gray-700 rounded-lg p-4 bg-gray-900">
+      <div className="border border-[rgba(255,255,255,0.1)] rounded-lg p-4 bg-[#09090b]">
         <h3 className="text-green-400 font-mono text-xs mb-3">🧠 Design a Habit</h3>
-        <p className="text-gray-500 text-xs font-mono mb-2">Describe your goal and BLADE will design a cue/routine/reward structure.</p>
+        <p className="text-[rgba(255,255,255,0.4)] text-xs font-mono mb-2">Describe your goal and BLADE will design a cue/routine/reward structure.</p>
         <textarea
-          className="w-full bg-black border border-gray-700 rounded p-2 text-xs text-gray-200 font-mono resize-none h-20 focus:outline-none focus:border-green-500"
+          className="w-full bg-black border border-[rgba(255,255,255,0.1)] rounded p-2 text-xs text-[rgba(255,255,255,0.85)] font-mono resize-none h-20 focus:outline-none focus:border-green-500"
           placeholder="e.g. I want to exercise consistently in the morning..."
           value={goalText}
           onChange={(e) => setGoalText(e.target.value)}
@@ -630,15 +630,15 @@ function AIAdvisorSection() {
         {design && (
           <div className="mt-4 space-y-3">
             {(["cue", "routine", "reward"] as const).map((part) => (
-              <div key={part} className="border border-gray-800 rounded p-3">
-                <p className="text-gray-500 text-2xs font-mono uppercase tracking-wider mb-1">{part}</p>
-                <p className="text-gray-200 text-xs font-mono">{design[part]}</p>
+              <div key={part} className="border border-[rgba(255,255,255,0.07)] rounded p-3">
+                <p className="text-[rgba(255,255,255,0.4)] text-2xs font-mono uppercase tracking-wider mb-1">{part}</p>
+                <p className="text-[rgba(255,255,255,0.85)] text-xs font-mono">{design[part]}</p>
               </div>
             ))}
             {design.implementation_intention && (
               <div className="border border-blue-900 rounded p-3">
                 <p className="text-blue-500 text-2xs font-mono uppercase tracking-wider mb-1">Implementation intention</p>
-                <p className="text-gray-200 text-xs font-mono">{design.implementation_intention}</p>
+                <p className="text-[rgba(255,255,255,0.85)] text-xs font-mono">{design.implementation_intention}</p>
               </div>
             )}
           </div>
@@ -646,7 +646,7 @@ function AIAdvisorSection() {
       </div>
 
       {/* Get Insights */}
-      <div className="border border-gray-700 rounded-lg p-4 bg-gray-900">
+      <div className="border border-[rgba(255,255,255,0.1)] rounded-lg p-4 bg-[#09090b]">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-green-400 font-mono text-xs">💡 Habit Insights</h3>
           <button
@@ -659,7 +659,7 @@ function AIAdvisorSection() {
         </div>
 
         {insights.length === 0 && !loadingInsights && (
-          <p className="text-gray-600 text-xs font-mono">Click "Get Insights" to analyze your habit patterns.</p>
+          <p className="text-[rgba(255,255,255,0.3)] text-xs font-mono">Click "Get Insights" to analyze your habit patterns.</p>
         )}
 
         <div className="space-y-2">
@@ -667,12 +667,12 @@ function AIAdvisorSection() {
             <div key={i} className={`border rounded-lg p-3 ${insightColors[ins.kind]}`}>
               <div className="flex items-center gap-2 mb-1">
                 <span>{insightIcons[ins.kind]}</span>
-                <span className="text-gray-100 text-xs font-mono font-semibold">{ins.title}</span>
+                <span className="text-white text-xs font-mono font-semibold">{ins.title}</span>
                 {ins.habit_name && (
-                  <span className="text-gray-500 text-2xs font-mono">({ins.habit_name})</span>
+                  <span className="text-[rgba(255,255,255,0.4)] text-2xs font-mono">({ins.habit_name})</span>
                 )}
               </div>
-              <p className="text-gray-300 text-xs font-mono">{ins.body}</p>
+              <p className="text-[rgba(255,255,255,0.7)] text-xs font-mono">{ins.body}</p>
             </div>
           ))}
         </div>
@@ -693,13 +693,13 @@ export function HabitView({ onBack }: { onBack: () => void }) {
   ];
 
   return (
-    <div className="flex flex-col h-screen bg-black text-gray-200 font-mono">
+    <div className="flex flex-col h-screen bg-black text-[rgba(255,255,255,0.85)] font-mono">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.07)]">
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
-            className="text-gray-500 hover:text-gray-300 text-xs border border-gray-800 rounded px-2 py-1"
+            className="text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] text-xs border border-[rgba(255,255,255,0.07)] rounded px-2 py-1"
           >
             ← Back
           </button>
@@ -708,7 +708,7 @@ export function HabitView({ onBack }: { onBack: () => void }) {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-800 px-4">
+      <div className="flex border-b border-[rgba(255,255,255,0.07)] px-4">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -716,7 +716,7 @@ export function HabitView({ onBack }: { onBack: () => void }) {
             className={`px-4 py-2 text-xs font-mono border-b-2 -mb-px transition-colors ${
               tab === t.id
                 ? "border-green-500 text-green-400"
-                : "border-transparent text-gray-500 hover:text-gray-300"
+                : "border-transparent text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)]"
             }`}
           >
             {t.label}

@@ -243,7 +243,7 @@ export default function CanvasNode({
           onKeyDown={handleKeyDown}
           className={`w-full h-full resize-none border-none outline-none bg-transparent p-2 text-sm leading-relaxed ${
             node.type === "code" ? "font-mono text-xs" : ""
-          } ${node.type === "sticky" ? "text-gray-900 placeholder-gray-600" : "text-blade-text placeholder-blade-muted"}`}
+          } ${node.type === "sticky" ? "text-[rgba(255,255,255,0.4)] placeholder-gray-600" : "text-blade-text placeholder-blade-muted"}`}
           placeholder={
             node.type === "sticky"
               ? "Type your idea..."
@@ -259,9 +259,9 @@ export default function CanvasNode({
     switch (node.type) {
       case "sticky":
         return (
-          <div className="p-3 text-sm leading-relaxed text-gray-900 whitespace-pre-wrap break-words h-full overflow-auto">
+          <div className="p-3 text-sm leading-relaxed text-[rgba(255,255,255,0.4)] whitespace-pre-wrap break-words h-full overflow-auto">
             {node.content || (
-              <span className="text-gray-500 italic">Double-click to edit...</span>
+              <span className="text-[rgba(255,255,255,0.4)] italic">Double-click to edit...</span>
             )}
           </div>
         );
@@ -346,14 +346,14 @@ export default function CanvasNode({
       >
         {/* Drag dots indicator */}
         <div className="flex gap-0.5 opacity-0 group-hover:opacity-40 transition-opacity">
-          <div className={`w-1 h-1 rounded-full ${node.type === "sticky" ? "bg-gray-700" : "bg-blade-muted"}`} />
-          <div className={`w-1 h-1 rounded-full ${node.type === "sticky" ? "bg-gray-700" : "bg-blade-muted"}`} />
-          <div className={`w-1 h-1 rounded-full ${node.type === "sticky" ? "bg-gray-700" : "bg-blade-muted"}`} />
+          <div className={`w-1 h-1 rounded-full ${node.type === "sticky" ? "bg-[rgba(255,255,255,0.07)]" : "bg-blade-muted"}`} />
+          <div className={`w-1 h-1 rounded-full ${node.type === "sticky" ? "bg-[rgba(255,255,255,0.07)]" : "bg-blade-muted"}`} />
+          <div className={`w-1 h-1 rounded-full ${node.type === "sticky" ? "bg-[rgba(255,255,255,0.07)]" : "bg-blade-muted"}`} />
         </div>
 
         {/* Lock indicator */}
         {node.locked && (
-          <svg className={`w-3 h-3 ${node.type === "sticky" ? "text-gray-600" : "text-blade-muted"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className={`w-3 h-3 ${node.type === "sticky" ? "text-[rgba(255,255,255,0.3)]" : "text-blade-muted"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
           </svg>
         )}
@@ -364,7 +364,7 @@ export default function CanvasNode({
         <button
           className={`absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-xs z-10 transition-all ${
             node.type === "sticky"
-              ? "bg-gray-800 text-white hover:bg-red-500"
+              ? "bg-[rgba(255,255,255,0.04)] text-white hover:bg-red-500"
               : "bg-blade-surface-hover text-blade-secondary hover:bg-red-500 hover:text-white"
           }`}
           onClick={(e) => {
@@ -386,7 +386,7 @@ export default function CanvasNode({
             <button
               key={color}
               className={`w-4 h-4 rounded-full border-2 transition-transform hover:scale-125 ${
-                node.color === color ? "border-gray-800 scale-110" : "border-transparent"
+                node.color === color ? "border-[rgba(255,255,255,0.07)] scale-110" : "border-transparent"
               }`}
               style={{ backgroundColor: color }}
               onClick={(e) => {
@@ -415,7 +415,7 @@ export default function CanvasNode({
           onMouseDown={handleResizeStart}
         >
           <svg
-            className={`w-4 h-4 ${node.type === "sticky" ? "text-gray-600" : "text-blade-muted"}`}
+            className={`w-4 h-4 ${node.type === "sticky" ? "text-[rgba(255,255,255,0.3)]" : "text-blade-muted"}`}
             viewBox="0 0 16 16"
             fill="currentColor"
           >

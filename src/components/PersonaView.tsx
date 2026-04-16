@@ -108,13 +108,13 @@ function TraitBar({
   }, [localScore, trait.trait_name, onOverride]);
 
   return (
-    <div className="border border-gray-800 rounded-lg p-3 bg-gray-950 flex flex-col gap-2">
+    <div className="border border-[rgba(255,255,255,0.07)] rounded-lg p-3 bg-[#09090b] flex flex-col gap-2">
       {/* Header row */}
       <div className="flex items-center gap-3">
         <span className={`font-bold text-xs w-40 ${meta.color}`}>{meta.label}</span>
 
         {/* Score bar */}
-        <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
+        <div className="flex-1 h-2 bg-[rgba(255,255,255,0.04)] rounded-full overflow-hidden">
           <div
             className={`h-2 rounded-full transition-all duration-500 ${meta.bg}`}
             style={{ width: `${trait.score}%` }}
@@ -125,18 +125,18 @@ function TraitBar({
 
         {/* Confidence */}
         <div className="flex items-center gap-1 w-24">
-          <div className="h-1.5 flex-1 bg-gray-800 rounded-full overflow-hidden">
+          <div className="h-1.5 flex-1 bg-[rgba(255,255,255,0.04)] rounded-full overflow-hidden">
             <div
-              className="h-1.5 bg-gray-500 rounded-full transition-all duration-500"
+              className="h-1.5 bg-[rgba(255,255,255,0.04)] rounded-full transition-all duration-500"
               style={{ width: `${trait.confidence}%` }}
             />
           </div>
-          <span className="text-2xs text-gray-600 w-8 text-right">{trait.confidence}%</span>
+          <span className="text-2xs text-[rgba(255,255,255,0.3)] w-8 text-right">{trait.confidence}%</span>
         </div>
 
         <button
           onClick={() => setExpanded((p) => !p)}
-          className="text-gray-600 hover:text-gray-400 transition-colors"
+          className="text-[rgba(255,255,255,0.3)] hover:text-[rgba(255,255,255,0.5)] transition-colors"
         >
           {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
         </button>
@@ -144,14 +144,14 @@ function TraitBar({
 
       {/* Expanded: evidence + override slider */}
       {expanded && (
-        <div className="flex flex-col gap-2 mt-1 pl-1 border-l border-gray-800">
+        <div className="flex flex-col gap-2 mt-1 pl-1 border-l border-[rgba(255,255,255,0.07)]">
           {/* Evidence */}
           {trait.evidence.length > 0 && (
             <div>
-              <div className="text-2xs text-gray-600 uppercase tracking-widest mb-1">Evidence</div>
+              <div className="text-2xs text-[rgba(255,255,255,0.3)] uppercase tracking-widest mb-1">Evidence</div>
               <ul className="flex flex-col gap-0.5">
                 {trait.evidence.slice(0, 4).map((e, i) => (
-                  <li key={i} className="text-2xs text-gray-400 font-sans leading-relaxed">• {e}</li>
+                  <li key={i} className="text-2xs text-[rgba(255,255,255,0.5)] font-sans leading-relaxed">• {e}</li>
                 ))}
               </ul>
             </div>
@@ -159,7 +159,7 @@ function TraitBar({
 
           {/* Manual override slider */}
           <div>
-            <div className="text-2xs text-gray-600 uppercase tracking-widest mb-1">Manual override</div>
+            <div className="text-2xs text-[rgba(255,255,255,0.3)] uppercase tracking-widest mb-1">Manual override</div>
             <div className="flex items-center gap-3">
               <input
                 type="range"
@@ -254,10 +254,10 @@ export function PersonaView({ onBack }: { onBack: () => void }) {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col bg-black text-gray-300 font-mono text-xs overflow-hidden">
+    <div className="flex-1 min-h-0 flex flex-col bg-black text-[rgba(255,255,255,0.7)] font-mono text-xs overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-800 shrink-0">
-        <button onClick={onBack} className="text-gray-500 hover:text-green-400 transition-colors">
+      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[rgba(255,255,255,0.07)] shrink-0">
+        <button onClick={onBack} className="text-[rgba(255,255,255,0.4)] hover:text-green-400 transition-colors">
           <ArrowLeft size={15} />
         </button>
         <User size={14} className="text-green-400" />
@@ -295,14 +295,14 @@ export function PersonaView({ onBack }: { onBack: () => void }) {
             </div>
 
             {relationship ? (
-              <div className="border border-gray-800 rounded-lg p-4 bg-gray-950">
+              <div className="border border-[rgba(255,255,255,0.07)] rounded-lg p-4 bg-[#09090b]">
                 <div className="flex items-start gap-6">
                   {/* Circle gauge */}
                   <div className="relative shrink-0">
                     <CircleGauge value={relationship.intimacy_score} color={gaugeColor} />
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
                       <span className="text-2xl font-bold text-green-400">{relationship.intimacy_score}</span>
-                      <span className="text-2xs text-gray-500">intimacy</span>
+                      <span className="text-2xs text-[rgba(255,255,255,0.4)]">intimacy</span>
                     </div>
                   </div>
 
@@ -312,17 +312,17 @@ export function PersonaView({ onBack }: { onBack: () => void }) {
                     {intimacy && (
                       <div>
                         <div className="text-lg font-bold text-green-300">{intimacy.label}</div>
-                        <div className="text-2xs text-gray-500 mt-0.5">{intimacy.desc}</div>
+                        <div className="text-2xs text-[rgba(255,255,255,0.4)] mt-0.5">{intimacy.desc}</div>
                       </div>
                     )}
 
                     {/* Trust bar */}
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-2xs text-gray-500 uppercase tracking-wider">Trust</span>
+                        <span className="text-2xs text-[rgba(255,255,255,0.4)] uppercase tracking-wider">Trust</span>
                         <span className="text-2xs text-blue-400 font-bold">{relationship.trust_score}</span>
                       </div>
-                      <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+                      <div className="h-2 bg-[rgba(255,255,255,0.04)] rounded-full overflow-hidden">
                         <div
                           className="h-2 bg-blue-500 rounded-full transition-all duration-700"
                           style={{ width: `${relationship.trust_score}%` }}
@@ -333,10 +333,10 @@ export function PersonaView({ onBack }: { onBack: () => void }) {
                     {/* Shared context chips */}
                     {relationship.shared_context.length > 0 && (
                       <div>
-                        <div className="text-2xs text-gray-500 uppercase tracking-wider mb-1">Shared Context</div>
+                        <div className="text-2xs text-[rgba(255,255,255,0.4)] uppercase tracking-wider mb-1">Shared Context</div>
                         <div className="flex flex-wrap gap-1">
                           {relationship.shared_context.slice(0, 8).map((ctx, i) => (
-                            <span key={i} className="text-2xs px-2 py-0.5 border border-gray-700 bg-gray-900 rounded-full text-gray-400">
+                            <span key={i} className="text-2xs px-2 py-0.5 border border-[rgba(255,255,255,0.1)] bg-[#09090b] rounded-full text-[rgba(255,255,255,0.5)]">
                               {ctx}
                             </span>
                           ))}
@@ -348,11 +348,11 @@ export function PersonaView({ onBack }: { onBack: () => void }) {
 
                 {/* Growth moments */}
                 {relationship.growth_moments.length > 0 && (
-                  <div className="mt-4 border-t border-gray-800 pt-3">
-                    <div className="text-2xs text-gray-500 uppercase tracking-wider mb-2">Growth Moments</div>
+                  <div className="mt-4 border-t border-[rgba(255,255,255,0.07)] pt-3">
+                    <div className="text-2xs text-[rgba(255,255,255,0.4)] uppercase tracking-wider mb-2">Growth Moments</div>
                     <ul className="flex flex-col gap-1">
                       {relationship.growth_moments.slice(0, 5).map((m, i) => (
-                        <li key={i} className="text-2xs text-gray-400 font-sans leading-relaxed">
+                        <li key={i} className="text-2xs text-[rgba(255,255,255,0.5)] font-sans leading-relaxed">
                           <span className="text-green-700 mr-1">▸</span>{m}
                         </li>
                       ))}
@@ -361,7 +361,7 @@ export function PersonaView({ onBack }: { onBack: () => void }) {
                 )}
               </div>
             ) : (
-              <div className="text-gray-600 text-2xs border border-gray-800 rounded p-4">
+              <div className="text-[rgba(255,255,255,0.3)] text-2xs border border-[rgba(255,255,255,0.07)] rounded p-4">
                 No relationship data yet. Chat more to build your profile.
               </div>
             )}
@@ -372,17 +372,17 @@ export function PersonaView({ onBack }: { onBack: () => void }) {
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1 h-4 bg-purple-500 rounded-full" />
               <span className="text-purple-400 font-bold uppercase tracking-widest text-2xs">Personality Traits</span>
-              <span className="text-2xs text-gray-600 ml-2">Confidence shown as secondary bar · click to expand</span>
+              <span className="text-2xs text-[rgba(255,255,255,0.3)] ml-2">Confidence shown as secondary bar · click to expand</span>
             </div>
 
             {traits.length === 0 ? (
-              <div className="text-gray-600 text-2xs border border-gray-800 rounded p-4">
+              <div className="text-[rgba(255,255,255,0.3)] text-2xs border border-[rgba(255,255,255,0.07)] rounded p-4">
                 No traits analyzed yet. Click "Analyze Now" to build a personality model.
               </div>
             ) : (
               <div className="flex flex-col gap-2">
                 {/* Column headers */}
-                <div className="flex items-center gap-3 px-3 text-2xs text-gray-600">
+                <div className="flex items-center gap-3 px-3 text-2xs text-[rgba(255,255,255,0.3)]">
                   <span className="w-40">Trait</span>
                   <span className="flex-1">Score</span>
                   <span className="w-8 text-right">Val</span>
@@ -405,15 +405,15 @@ export function PersonaView({ onBack }: { onBack: () => void }) {
             </div>
 
             {patterns.length === 0 ? (
-              <div className="text-gray-600 text-2xs border border-gray-800 rounded p-4">
+              <div className="text-[rgba(255,255,255,0.3)] text-2xs border border-[rgba(255,255,255,0.07)] rounded p-4">
                 No communication patterns identified yet.
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {patterns.map((p, i) => (
-                  <div key={i} className="border border-gray-800 rounded-lg p-3 bg-gray-950">
+                  <div key={i} className="border border-[rgba(255,255,255,0.07)] rounded-lg p-3 bg-[#09090b]">
                     <div className="text-2xs text-teal-400 font-bold uppercase tracking-wider mb-1">{p.pattern_type}</div>
-                    <div className="text-2xs text-gray-400 font-sans leading-relaxed">{p.description}</div>
+                    <div className="text-2xs text-[rgba(255,255,255,0.5)] font-sans leading-relaxed">{p.description}</div>
                   </div>
                 ))}
               </div>

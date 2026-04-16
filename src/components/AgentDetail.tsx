@@ -68,7 +68,7 @@ function StepRow({ step, isLast }: { step: AgentStep; isLast: boolean }) {
     <div className="relative flex gap-3">
       {/* Connector line */}
       {!isLast && (
-        <div className="absolute left-[7px] top-5 bottom-0 w-px bg-[#1f1f1f]" />
+        <div className="absolute left-[7px] top-5 bottom-0 w-px bg-[rgba(255,255,255,0.04)]" />
       )}
 
       {/* Icon column */}
@@ -214,7 +214,7 @@ export function AgentDetail({
               <span className="text-xs text-[#6366f1]">Running</span>
             )}
           </div>
-          <div className="h-1 rounded-full bg-[#1f1f1f] overflow-hidden">
+          <div className="h-1 rounded-full bg-[rgba(255,255,255,0.04)] overflow-hidden">
             <div
               className="h-full rounded-full bg-[#6366f1] transition-all duration-500"
               style={{ width: totalCount > 0 ? `${(completedCount / totalCount) * 100}%` : "0%" }}
@@ -275,7 +275,7 @@ export function AgentDetail({
           {isActive && (
             <button
               onClick={onPause}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-[#e5e5e5] bg-[#1f1f1f] hover:bg-[#2a2a2a] border border-[#2a2a2a] hover:border-[#3a3a3a] transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-[#e5e5e5] bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.07)] border border-[#2a2a2a] hover:border-[#3a3a3a] transition-colors"
             >
               <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="currentColor">
                 <rect x="4" y="3" width="3" height="10" rx="1" />
@@ -287,7 +287,7 @@ export function AgentDetail({
           {isPaused && (
             <button
               onClick={onResume}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-[#e5e5e5] bg-[#1f1f1f] hover:bg-[#2a2a2a] border border-[#2a2a2a] hover:border-[#3a3a3a] transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-[#e5e5e5] bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.07)] border border-[#2a2a2a] hover:border-[#3a3a3a] transition-colors"
             >
               <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="currentColor">
                 <path d="M5 3.5l8 4.5-8 4.5V3.5z" />

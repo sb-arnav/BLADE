@@ -77,7 +77,7 @@ const CATEGORY_COLORS: Record<TransactionCategory, string> = {
   shopping: "bg-rose-600",
   income: "bg-green-600",
   savings: "bg-teal-600",
-  other: "bg-gray-600",
+  other: "bg-[rgba(255,255,255,0.04)]",
 };
 
 const CATEGORY_TEXT: Record<TransactionCategory, string> = {
@@ -90,7 +90,7 @@ const CATEGORY_TEXT: Record<TransactionCategory, string> = {
   shopping: "text-rose-400",
   income: "text-green-400",
   savings: "text-teal-400",
-  other: "text-gray-400",
+  other: "text-[rgba(255,255,255,0.5)]",
 };
 
 const INSIGHT_ICONS: Record<InsightType, string> = {
@@ -112,12 +112,12 @@ const INSIGHT_BORDER: Record<InsightType, string> = {
 function BudgetModal({ content, onClose }: { content: string; onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-black border border-gray-700 rounded max-w-lg w-full p-6">
+      <div className="bg-black border border-[rgba(255,255,255,0.1)] rounded max-w-lg w-full p-6">
         <div className="flex items-center justify-between mb-4">
           <span className="text-green-400 font-mono text-sm uppercase tracking-widest">// Budget Recommendation</span>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none">✕</button>
+          <button onClick={onClose} className="text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] text-lg leading-none">✕</button>
         </div>
-        <div className="text-gray-200 text-sm leading-relaxed whitespace-pre-wrap font-mono">{content}</div>
+        <div className="text-[rgba(255,255,255,0.85)] text-sm leading-relaxed whitespace-pre-wrap font-mono">{content}</div>
         <button
           onClick={onClose}
           className="mt-6 w-full bg-green-900/40 border border-green-700 text-green-400 font-mono text-xs py-2 hover:bg-green-900/60 transition-colors"
@@ -132,14 +132,14 @@ function BudgetModal({ content, onClose }: { content: string; onClose: () => voi
 function InvestmentModal({ suggestions, onClose }: { suggestions: InvestmentSuggestion[]; onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-black border border-gray-700 rounded max-w-2xl w-full p-6 max-h-[80vh] overflow-y-auto">
+      <div className="bg-black border border-[rgba(255,255,255,0.1)] rounded max-w-2xl w-full p-6 max-h-[80vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <span className="text-green-400 font-mono text-sm uppercase tracking-widest">// Investment Ideas</span>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none">✕</button>
+          <button onClick={onClose} className="text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] text-lg leading-none">✕</button>
         </div>
         <div className="flex flex-col gap-3">
           {suggestions.map((s, i) => (
-            <div key={i} className="bg-gray-950 border border-gray-800 rounded p-3">
+            <div key={i} className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-3">
               <div className="flex items-start justify-between mb-1">
                 <span className="text-green-400 font-mono text-sm">{s.name}</span>
                 <span className={`font-mono text-xs px-2 py-0.5 rounded ${
@@ -148,14 +148,14 @@ function InvestmentModal({ suggestions, onClose }: { suggestions: InvestmentSugg
                   "bg-red-900/40 text-red-400"
                 }`}>{s.risk.toUpperCase()} RISK</span>
               </div>
-              <div className="text-gray-400 text-xs mb-2">{s.description}</div>
-              <div className="text-gray-500 font-mono text-xs">Expected return: <span className="text-green-400">{s.expected_return}</span></div>
+              <div className="text-[rgba(255,255,255,0.5)] text-xs mb-2">{s.description}</div>
+              <div className="text-[rgba(255,255,255,0.4)] font-mono text-xs">Expected return: <span className="text-green-400">{s.expected_return}</span></div>
             </div>
           ))}
         </div>
         <button
           onClick={onClose}
-          className="mt-4 w-full bg-gray-900 border border-gray-700 text-gray-400 font-mono text-xs py-2 hover:text-gray-200 transition-colors"
+          className="mt-4 w-full bg-[#09090b] border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)] font-mono text-xs py-2 hover:text-[rgba(255,255,255,0.85)] transition-colors"
         >
           CLOSE
         </button>
@@ -239,11 +239,11 @@ function TransactionsTab({ month }: { month: string }) {
   return (
     <div className="flex flex-col gap-4">
       {/* Add form */}
-      <div className="bg-gray-950 border border-gray-800 rounded p-4 flex flex-col gap-3">
+      <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
         <div className="text-green-400 font-mono text-xs uppercase tracking-widest">// Add Transaction</div>
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-gray-500 font-mono text-xs">AMOUNT</label>
+            <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">AMOUNT</label>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setIsIncome((v) => !v)}
@@ -255,7 +255,7 @@ function TransactionsTab({ month }: { month: string }) {
               </button>
               <input
                 type="number"
-                className="flex-1 bg-black border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
+                className="flex-1 bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
                 placeholder="0.00"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
@@ -263,28 +263,28 @@ function TransactionsTab({ month }: { month: string }) {
             </div>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-gray-500 font-mono text-xs">DATE</label>
+            <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">DATE</label>
             <input
               type="date"
-              className="bg-black border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
+              className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
               value={date}
               onChange={(e) => setDate(e.target.value)}
             />
           </div>
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-gray-500 font-mono text-xs">DESCRIPTION</label>
+          <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">DESCRIPTION</label>
           <input
-            className="bg-black border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
+            className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
             placeholder="What was this for?"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-gray-500 font-mono text-xs">CATEGORY</label>
+          <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">CATEGORY</label>
           <select
-            className="bg-black border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
+            className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
             value={category}
             onChange={(e) => setCategory(e.target.value as TransactionCategory)}
           >
@@ -306,29 +306,29 @@ function TransactionsTab({ month }: { month: string }) {
       {/* Transaction list */}
       <div className="flex flex-col gap-2">
         {loading && transactions.length === 0 && (
-          <div className="text-gray-600 font-mono text-xs text-center py-8">Loading...</div>
+          <div className="text-[rgba(255,255,255,0.3)] font-mono text-xs text-center py-8">Loading...</div>
         )}
         {sortedDates.length === 0 && !loading && (
-          <div className="text-gray-700 font-mono text-xs text-center py-8">No transactions for {month}</div>
+          <div className="text-[rgba(255,255,255,0.2)] font-mono text-xs text-center py-8">No transactions for {month}</div>
         )}
         {sortedDates.map((dateKey) => (
           <div key={dateKey} className="flex flex-col gap-1">
-            <div className="text-gray-600 font-mono text-xs px-1">{dateKey}</div>
+            <div className="text-[rgba(255,255,255,0.3)] font-mono text-xs px-1">{dateKey}</div>
             {grouped[dateKey].map((tx) => (
               <div
                 key={tx.id}
-                className="bg-gray-950 border border-gray-800 rounded px-3 py-2 flex items-center gap-3"
+                className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded px-3 py-2 flex items-center gap-3"
               >
                 <span className={`font-mono text-sm font-bold min-w-[90px] text-right ${tx.is_income ? "text-green-400" : "text-red-400"}`}>
                   {tx.is_income ? "+" : "−"}${Math.abs(tx.amount).toFixed(2)}
                 </span>
-                <span className="text-gray-300 text-sm flex-1 truncate">{tx.description}</span>
-                <span className={`font-mono text-xs px-2 py-0.5 rounded ${CATEGORY_TEXT[tx.category]} bg-gray-900`}>
+                <span className="text-[rgba(255,255,255,0.7)] text-sm flex-1 truncate">{tx.description}</span>
+                <span className={`font-mono text-xs px-2 py-0.5 rounded ${CATEGORY_TEXT[tx.category]} bg-[#09090b]`}>
                   {tx.category}
                 </span>
                 <button
                   onClick={() => deleteTransaction(tx.id)}
-                  className="text-gray-700 hover:text-red-400 font-mono text-xs transition-colors ml-1"
+                  className="text-[rgba(255,255,255,0.2)] hover:text-red-400 font-mono text-xs transition-colors ml-1"
                 >
                   ✕
                 </button>
@@ -395,30 +395,30 @@ function AnalyticsTab() {
       )}
 
       {/* Spending breakdown */}
-      <div className="bg-gray-950 border border-gray-800 rounded p-4">
+      <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4">
         <div className="text-green-400 font-mono text-xs uppercase tracking-widest mb-3">// Spending by Category</div>
         {breakdown.length === 0 && (
-          <div className="text-gray-700 font-mono text-xs text-center py-4">No spending data available</div>
+          <div className="text-[rgba(255,255,255,0.2)] font-mono text-xs text-center py-4">No spending data available</div>
         )}
         <div className="flex flex-col gap-2">
           {breakdown.map((item) => {
             const catKey = item.category.toLowerCase() as TransactionCategory;
-            const barColor = CATEGORY_COLORS[catKey] ?? "bg-gray-600";
+            const barColor = CATEGORY_COLORS[catKey] ?? "bg-[rgba(255,255,255,0.04)]";
             const barWidth = Math.round((item.amount / maxAmount) * 100);
             return (
               <div key={item.category} className="flex flex-col gap-1">
                 <div className="flex items-center justify-between">
-                  <span className={`font-mono text-xs ${CATEGORY_TEXT[catKey] ?? "text-gray-400"}`}>
+                  <span className={`font-mono text-xs ${CATEGORY_TEXT[catKey] ?? "text-[rgba(255,255,255,0.5)]"}`}>
                     {item.category.toUpperCase()}
                   </span>
                   <div className="flex items-center gap-3">
-                    <span className="text-gray-400 font-mono text-xs">{item.percentage.toFixed(1)}%</span>
-                    <span className="text-gray-200 font-mono text-xs min-w-[80px] text-right">
+                    <span className="text-[rgba(255,255,255,0.5)] font-mono text-xs">{item.percentage.toFixed(1)}%</span>
+                    <span className="text-[rgba(255,255,255,0.85)] font-mono text-xs min-w-[80px] text-right">
                       ${item.amount.toFixed(2)}
                     </span>
                   </div>
                 </div>
-                <div className="h-2 bg-gray-900 rounded overflow-hidden">
+                <div className="h-2 bg-[#09090b] rounded overflow-hidden">
                   <div
                     className={`h-full ${barColor} transition-all duration-500`}
                     style={{ width: `${barWidth}%` }}
@@ -454,16 +454,16 @@ function AnalyticsTab() {
         <div className="flex flex-col gap-3">
           <div className="text-green-400 font-mono text-xs uppercase tracking-widest">// Insights</div>
           {insights.map((insight, i) => (
-            <div key={i} className={`bg-gray-950 border ${INSIGHT_BORDER[insight.type]} rounded p-4`}>
+            <div key={i} className={`bg-[#09090b] border ${INSIGHT_BORDER[insight.type]} rounded p-4`}>
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-base">{INSIGHT_ICONS[insight.type]}</span>
-                <span className="text-gray-200 font-mono text-sm">{insight.title}</span>
+                <span className="text-[rgba(255,255,255,0.85)] font-mono text-sm">{insight.title}</span>
               </div>
-              <p className="text-gray-400 text-sm mb-3">{insight.description}</p>
+              <p className="text-[rgba(255,255,255,0.5)] text-sm mb-3">{insight.description}</p>
               {insight.action_items.length > 0 && (
                 <ul className="flex flex-col gap-1">
                   {insight.action_items.map((item, j) => (
-                    <li key={j} className="text-gray-500 text-xs flex gap-2">
+                    <li key={j} className="text-[rgba(255,255,255,0.4)] text-xs flex gap-2">
                       <span className="text-green-700">▸</span>
                       {item}
                     </li>
@@ -570,48 +570,48 @@ function GoalsTab() {
         <div className="text-green-400 font-mono text-xs uppercase tracking-widest">// Financial Goals</div>
         <button
           onClick={() => setShowAddGoal((v) => !v)}
-          className="border border-gray-700 text-gray-500 font-mono text-xs px-3 py-1 hover:text-gray-300 hover:border-gray-500 transition-colors"
+          className="border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.4)] font-mono text-xs px-3 py-1 hover:text-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.2)] transition-colors"
         >
           {showAddGoal ? "CANCEL" : "+ ADD GOAL"}
         </button>
       </div>
 
       {showAddGoal && (
-        <div className="bg-gray-950 border border-gray-800 rounded p-4 flex flex-col gap-3">
+        <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
-              <label className="text-gray-500 font-mono text-xs">GOAL NAME</label>
+              <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">GOAL NAME</label>
               <input
-                className="bg-black border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
+                className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
                 placeholder="e.g. Emergency Fund"
                 value={goalName}
                 onChange={(e) => setGoalName(e.target.value)}
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-gray-500 font-mono text-xs">TARGET AMOUNT ($)</label>
+              <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">TARGET AMOUNT ($)</label>
               <input
                 type="number"
-                className="bg-black border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
+                className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
                 placeholder="10000"
                 value={goalTarget}
                 onChange={(e) => setGoalTarget(e.target.value)}
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-gray-500 font-mono text-xs">DEADLINE</label>
+              <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">DEADLINE</label>
               <input
                 type="date"
-                className="bg-black border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
+                className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
                 value={goalDeadline}
                 onChange={(e) => setGoalDeadline(e.target.value)}
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-gray-500 font-mono text-xs">STARTING AMOUNT ($)</label>
+              <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">STARTING AMOUNT ($)</label>
               <input
                 type="number"
-                className="bg-black border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
+                className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
                 placeholder="0"
                 value={goalStarting}
                 onChange={(e) => setGoalStarting(e.target.value)}
@@ -631,33 +631,33 @@ function GoalsTab() {
       {error && <div className="text-red-400 font-mono text-xs">{error}</div>}
 
       {loading && goals.length === 0 && (
-        <div className="text-gray-600 font-mono text-xs text-center py-8">Loading...</div>
+        <div className="text-[rgba(255,255,255,0.3)] font-mono text-xs text-center py-8">Loading...</div>
       )}
 
       {goals.length === 0 && !loading && (
-        <div className="text-gray-700 font-mono text-xs text-center py-8 border border-dashed border-gray-800 rounded">
+        <div className="text-[rgba(255,255,255,0.2)] font-mono text-xs text-center py-8 border border-dashed border-[rgba(255,255,255,0.07)] rounded">
           No goals yet. Add one above.
         </div>
       )}
 
       {goals.map((goal) => {
         const progress = Math.min((goal.current_amount / goal.target_amount) * 100, 100);
-        const statusClass = STATUS_COLOR[goal.status] ?? "text-gray-400 border-gray-700";
+        const statusClass = STATUS_COLOR[goal.status] ?? "text-[rgba(255,255,255,0.5)] border-[rgba(255,255,255,0.1)]";
         return (
-          <div key={goal.id} className="bg-gray-950 border border-gray-800 rounded p-4 flex flex-col gap-3">
+          <div key={goal.id} className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
             <div className="flex items-start justify-between gap-2">
-              <span className="text-gray-200 font-mono text-sm">{goal.name}</span>
+              <span className="text-[rgba(255,255,255,0.85)] font-mono text-sm">{goal.name}</span>
               <span className={`font-mono text-xs px-2 py-0.5 border rounded ${statusClass}`}>
                 {goal.status.replace("_", " ").toUpperCase()}
               </span>
             </div>
             <div className="flex items-center justify-between text-xs font-mono">
-              <span className="text-gray-400">
-                ${goal.current_amount.toLocaleString()} <span className="text-gray-600">/ ${goal.target_amount.toLocaleString()}</span>
+              <span className="text-[rgba(255,255,255,0.5)]">
+                ${goal.current_amount.toLocaleString()} <span className="text-[rgba(255,255,255,0.3)]">/ ${goal.target_amount.toLocaleString()}</span>
               </span>
               <span className="text-green-400">{progress.toFixed(1)}%</span>
             </div>
-            <div className="h-3 bg-gray-900 rounded overflow-hidden border border-gray-800">
+            <div className="h-3 bg-[#09090b] rounded overflow-hidden border border-[rgba(255,255,255,0.07)]">
               <div
                 className={`h-full transition-all duration-700 ${
                   goal.status === "achieved" ? "bg-teal-600" :
@@ -666,7 +666,7 @@ function GoalsTab() {
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <div className="flex items-center justify-between text-xs font-mono text-gray-600">
+            <div className="flex items-center justify-between text-xs font-mono text-[rgba(255,255,255,0.3)]">
               <span>Deadline: {goal.deadline}</span>
               <span>Need: <span className="text-amber-400">${goal.monthly_required.toFixed(0)}/mo</span></span>
             </div>
@@ -675,22 +675,22 @@ function GoalsTab() {
       })}
 
       {/* Investment Ideas */}
-      <div className="bg-gray-950 border border-gray-800 rounded p-4 flex flex-col gap-3">
+      <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
         <div className="text-green-400 font-mono text-xs uppercase tracking-widest">// Investment Ideas</div>
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-gray-500 font-mono text-xs">MONTHLY SURPLUS ($)</label>
+            <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">MONTHLY SURPLUS ($)</label>
             <input
               type="number"
-              className="bg-black border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
+              className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
               value={monthlySurplus}
               onChange={(e) => setMonthlySurplus(e.target.value)}
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-gray-500 font-mono text-xs">RISK TOLERANCE</label>
+            <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">RISK TOLERANCE</label>
             <select
-              className="bg-black border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
+              className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
               value={riskTolerance}
               onChange={(e) => setRiskTolerance(e.target.value as typeof riskTolerance)}
             >
@@ -735,13 +735,13 @@ export function FinancialView({ onBack }: { onBack: () => void }) {
   ];
 
   return (
-    <div className="flex flex-col h-full bg-black text-gray-200">
+    <div className="flex flex-col h-full bg-black text-[rgba(255,255,255,0.85)]">
       {/* Header */}
-      <div className="shrink-0 border-b border-gray-800 px-4 py-3">
+      <div className="shrink-0 border-b border-[rgba(255,255,255,0.07)] px-4 py-3">
         <div className="flex items-center gap-4 mb-3">
           <button
             onClick={onBack}
-            className="text-gray-600 hover:text-gray-300 font-mono text-xs transition-colors"
+            className="text-[rgba(255,255,255,0.3)] hover:text-[rgba(255,255,255,0.7)] font-mono text-xs transition-colors"
           >
             ← BACK
           </button>
@@ -750,10 +750,10 @@ export function FinancialView({ onBack }: { onBack: () => void }) {
             <span className="text-green-400 font-mono text-sm uppercase tracking-widest">FINANCIAL DASHBOARD</span>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <label className="text-gray-600 font-mono text-xs">MONTH</label>
+            <label className="text-[rgba(255,255,255,0.3)] font-mono text-xs">MONTH</label>
             <input
               type="month"
-              className="bg-black border border-gray-700 text-gray-200 font-mono text-xs px-2 py-1 rounded focus:outline-none focus:border-green-700"
+              className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-xs px-2 py-1 rounded focus:outline-none focus:border-green-700"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
             />
@@ -763,16 +763,16 @@ export function FinancialView({ onBack }: { onBack: () => void }) {
         {/* Quick stats */}
         {stats && (
           <div className="grid grid-cols-3 gap-3 mb-3">
-            <div className="bg-gray-950 border border-gray-800 rounded px-3 py-2">
-              <div className="text-gray-600 font-mono text-xs mb-1">INCOME</div>
+            <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded px-3 py-2">
+              <div className="text-[rgba(255,255,255,0.3)] font-mono text-xs mb-1">INCOME</div>
               <div className="text-green-400 font-mono text-sm">${stats.income.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
             </div>
-            <div className="bg-gray-950 border border-gray-800 rounded px-3 py-2">
-              <div className="text-gray-600 font-mono text-xs mb-1">EXPENSES</div>
+            <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded px-3 py-2">
+              <div className="text-[rgba(255,255,255,0.3)] font-mono text-xs mb-1">EXPENSES</div>
               <div className="text-red-400 font-mono text-sm">${stats.expenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
             </div>
-            <div className="bg-gray-950 border border-gray-800 rounded px-3 py-2">
-              <div className="text-gray-600 font-mono text-xs mb-1">SAVINGS RATE</div>
+            <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded px-3 py-2">
+              <div className="text-[rgba(255,255,255,0.3)] font-mono text-xs mb-1">SAVINGS RATE</div>
               <div className={`font-mono text-sm ${stats.savings_rate >= 20 ? "text-green-400" : stats.savings_rate >= 10 ? "text-amber-400" : "text-red-400"}`}>
                 {stats.savings_rate.toFixed(1)}%
               </div>
@@ -789,7 +789,7 @@ export function FinancialView({ onBack }: { onBack: () => void }) {
               className={`font-mono text-xs px-4 py-1.5 border transition-colors ${
                 tab === t.key
                   ? "border-green-700 text-green-400 bg-green-900/20"
-                  : "border-gray-800 text-gray-600 hover:text-gray-300 hover:border-gray-600"
+                  : "border-[rgba(255,255,255,0.07)] text-[rgba(255,255,255,0.3)] hover:text-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.15)]"
               }`}
             >
               {t.label}

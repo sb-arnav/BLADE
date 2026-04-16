@@ -236,7 +236,7 @@ export function AgentManager({ onBack }: { onBack?: () => void }) {
         </div>
         <button
           onClick={refresh}
-          className="w-7 h-7 rounded-lg flex items-center justify-center text-[#666] hover:text-[#e5e5e5] hover:bg-[#1f1f1f] transition-colors"
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-[#666] hover:text-[#e5e5e5] hover:bg-[rgba(255,255,255,0.04)] transition-colors"
           title="Refresh"
         >
           <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.75">
@@ -279,12 +279,12 @@ export function AgentManager({ onBack }: { onBack?: () => void }) {
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2 mt-2">
-          <div className="flex items-center gap-1 p-0.5 rounded-md border border-[#1f1f1f] bg-[#0d0d0f]">
+          <div className="flex items-center gap-1 p-0.5 rounded-md border border-[#1f1f1f] bg-[#09090b]">
             <button
               onClick={() => setDesktopExecutionMode("supervised")}
               className={`text-2xs px-2 py-1 rounded ${
                 desktopExecutionMode === "supervised"
-                  ? "bg-[#1a1a1f] text-[#e5e5e5]"
+                  ? "bg-[rgba(255,255,255,0.04)] text-[#e5e5e5]"
                   : "text-[#666] hover:text-[#e5e5e5]"
               } transition-colors`}
             >
@@ -294,7 +294,7 @@ export function AgentManager({ onBack }: { onBack?: () => void }) {
               onClick={() => setDesktopExecutionMode("auto")}
               className={`text-2xs px-2 py-1 rounded ${
                 desktopExecutionMode === "auto"
-                  ? "bg-[#1a1a1f] text-[#e5e5e5]"
+                  ? "bg-[rgba(255,255,255,0.04)] text-[#e5e5e5]"
                   : "text-[#666] hover:text-[#e5e5e5]"
               } transition-colors`}
             >

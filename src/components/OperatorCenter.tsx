@@ -112,7 +112,7 @@ function capabilityTone(category: string) {
     case "web-intelligence":
       return "text-emerald-200 border-emerald-500/20 bg-emerald-500/10";
     case "self-upgrade":
-      return "text-[#c8cbff] border-[#6366f1]/20 bg-[#16172a]";
+      return "text-[#c8cbff] border-[#6366f1]/20 bg-[#09090b]";
     case "security":
       return "text-amber-200 border-amber-500/20 bg-amber-500/10";
     default:
@@ -558,7 +558,7 @@ export function OperatorCenter({
         </div>
         <button
           onClick={runtimes.refresh}
-          className="w-7 h-7 rounded-lg flex items-center justify-center text-[#666] hover:text-[#e5e5e5] hover:bg-[#1f1f1f] transition-colors"
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-[#666] hover:text-[#e5e5e5] hover:bg-[rgba(255,255,255,0.04)] transition-colors"
           title="Refresh runtimes"
         >
           <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.75">
@@ -580,7 +580,7 @@ export function OperatorCenter({
             onClick={() => setTab(item.id as OperatorTab)}
             className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
               tab === item.id
-                ? "bg-[#16172a] text-[#c8cbff] border border-[#6366f1]/30"
+                ? "bg-[#09090b] text-[#c8cbff] border border-[#6366f1]/30"
                 : "text-[#666] hover:text-[#e5e5e5] hover:bg-[#111]"
             }`}
           >
@@ -643,7 +643,7 @@ export function OperatorCenter({
                     setSelectedRuntimeId("blade-native");
                     setOperatorType("desktop_operator");
                   }}
-                  className="text-2xs px-3 py-1.5 rounded-lg bg-[#16172a] text-[#c8cbff] border border-[#6366f1]/20"
+                  className="text-2xs px-3 py-1.5 rounded-lg bg-[#09090b] text-[#c8cbff] border border-[#6366f1]/20"
                 >
                   desktop quickstart
                 </button>
@@ -660,7 +660,7 @@ export function OperatorCenter({
                     />
                   ))
                 ) : (
-                  <div className="md:col-span-2 rounded-xl border border-blade-border/60 bg-[#0d0d10] px-4 py-5">
+                  <div className="md:col-span-2 rounded-xl border border-blade-border/60 bg-[#09090b] px-4 py-5">
                     <div className="text-sm text-blade-text">No runtimes discovered yet</div>
                     <div className="text-2xs text-blade-muted mt-1">
                       Blade will surface local runtimes here after discovery succeeds. Refresh after installing or authenticating tools.
@@ -688,7 +688,7 @@ export function OperatorCenter({
                       }}
                       rows={4}
                       placeholder="Fix this repo, research a topic, drive the browser, continue a Claude session..."
-                      className="w-full rounded-xl bg-[#0d0d10] border border-blade-border px-3 py-3 text-sm text-blade-text outline-none focus:border-[#6366f1]/40 resize-none"
+                      className="w-full rounded-xl bg-[#09090b] border border-blade-border px-3 py-3 text-sm text-blade-text outline-none focus:border-[#6366f1]/40 resize-none"
                     />
                   </div>
                   {looksLikeSecurityGoal(goal) ? (
@@ -705,7 +705,7 @@ export function OperatorCenter({
                     </div>
                   ) : null}
                   {handoffSourceTaskId ? (
-                    <div className="rounded-xl border border-[#6366f1]/20 bg-[#16172a] px-3 py-2 text-2xs text-[#c8cbff]">
+                    <div className="rounded-xl border border-[#6366f1]/20 bg-[#09090b] px-3 py-2 text-2xs text-[#c8cbff]">
                       Handoff ready from task {handoffSourceTaskId.slice(0, 8)}
                       <button
                         onClick={() => {
@@ -725,7 +725,7 @@ export function OperatorCenter({
                         value={cwd}
                         onChange={(event) => setCwd(event.target.value)}
                         placeholder="/path/to/workspace"
-                        className="w-full rounded-xl bg-[#0d0d10] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
+                        className="w-full rounded-xl bg-[#09090b] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
                       />
                     </div>
                     <div>
@@ -734,7 +734,7 @@ export function OperatorCenter({
                         value={resumeSessionId}
                         onChange={(event) => setResumeSessionId(event.target.value)}
                         placeholder="optional session id"
-                        className="w-full rounded-xl bg-[#0d0d10] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
+                        className="w-full rounded-xl bg-[#09090b] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
                       />
                     </div>
                   </div>
@@ -743,7 +743,7 @@ export function OperatorCenter({
                 <div className="space-y-3">
                   <div>
                     <label className="block text-2xs uppercase tracking-[0.18em] text-blade-muted mb-1">Selected runtime</label>
-                    <div className="rounded-xl border border-blade-border bg-[#0d0d10] px-3 py-3">
+                    <div className="rounded-xl border border-blade-border bg-[#09090b] px-3 py-3">
                       <div className="text-sm text-blade-secondary">{selectedRuntime?.name ?? "No runtime selected"}</div>
                       <div className="text-2xs text-blade-muted mt-1">
                         {selectedRuntime
@@ -779,7 +779,7 @@ export function OperatorCenter({
                         <select
                           value={operatorType}
                           onChange={(event) => setOperatorType(event.target.value as "general_operator" | "desktop_operator")}
-                          className="w-full rounded-xl bg-[#0d0d10] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
+                          className="w-full rounded-xl bg-[#09090b] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
                         >
                           <option value="general_operator">General operator</option>
                           <option value="desktop_operator">Desktop operator</option>
@@ -790,7 +790,7 @@ export function OperatorCenter({
                         <select
                           value={preferredSubstrate}
                           onChange={(event) => setPreferredSubstrate(event.target.value)}
-                          className="w-full rounded-xl bg-[#0d0d10] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
+                          className="w-full rounded-xl bg-[#09090b] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
                         >
                           <option value="">Auto</option>
                           <option value="browser-native">Browser native</option>
@@ -805,7 +805,7 @@ export function OperatorCenter({
                     <button
                       onClick={() => void handleDesignMission()}
                       disabled={!goal.trim()}
-                      className="text-xs px-3 py-2 rounded-xl bg-[#16172a] text-[#c8cbff] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      className="text-xs px-3 py-2 rounded-xl bg-[#09090b] text-[#c8cbff] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
                       Design mission
                     </button>
@@ -873,13 +873,13 @@ export function OperatorCenter({
                         type="checkbox"
                         checked={autoChainMission}
                         onChange={(event) => setAutoChainMission(event.target.checked)}
-                        className="rounded border-blade-border bg-[#0d0d10]"
+                        className="rounded border-blade-border bg-[#09090b]"
                       />
                       Auto-chain mission stages when dependencies complete
                     </label>
                   ) : null}
                   {routeRecommendation ? (
-                    <div className="rounded-xl border border-blade-border bg-[#0d0d10] px-3 py-3">
+                    <div className="rounded-xl border border-blade-border bg-[#09090b] px-3 py-3">
                       <div className="text-xs text-blade-secondary">
                         Recommended: {routeRecommendation.runtime_id}
                         {routeRecommendation.preferred_substrate ? ` · ${routeRecommendation.preferred_substrate}` : ""}
@@ -898,7 +898,7 @@ export function OperatorCenter({
                     </div>
                   ) : null}
                   {mission ? (
-                    <div className="rounded-xl border border-blade-border bg-[#0d0d10] px-3 py-3">
+                    <div className="rounded-xl border border-blade-border bg-[#09090b] px-3 py-3">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="text-xs text-blade-secondary">Mission blueprint</div>
@@ -907,7 +907,7 @@ export function OperatorCenter({
                         <button
                           onClick={() => void launchMission()}
                           disabled={mission.stages.every((stage) => missionExecution[stage.id])}
-                          className="text-2xs px-2.5 py-1.5 rounded-lg bg-[#16172a] text-[#c8cbff] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                          className="text-2xs px-2.5 py-1.5 rounded-lg bg-[#09090b] text-[#c8cbff] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
                           Run mission
                         </button>
@@ -972,25 +972,25 @@ export function OperatorCenter({
                         value={tavilyApiKey}
                         onChange={(event) => setTavilyApiKey(event.target.value)}
                         placeholder="Tavily API key"
-                        className="w-full rounded-xl bg-[#0d0d10] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
+                        className="w-full rounded-xl bg-[#09090b] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
                       />
                       <input
                         value={firecrawlApiKey}
                         onChange={(event) => setFirecrawlApiKey(event.target.value)}
                         placeholder="Firecrawl API key"
-                        className="w-full rounded-xl bg-[#0d0d10] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
+                        className="w-full rounded-xl bg-[#09090b] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
                       />
                       <input
                         value={firecrawlApiUrl}
                         onChange={(event) => setFirecrawlApiUrl(event.target.value)}
                         placeholder="Firecrawl API URL (optional for self-hosting)"
-                        className="md:col-span-2 w-full rounded-xl bg-[#0d0d10] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
+                        className="md:col-span-2 w-full rounded-xl bg-[#09090b] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
                       />
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
                         onClick={() => void handleSaveWebIntelligence()}
-                        className="text-2xs px-3 py-1.5 rounded-lg bg-[#16172a] text-[#c8cbff] hover:text-white transition-colors"
+                        className="text-2xs px-3 py-1.5 rounded-lg bg-[#09090b] text-[#c8cbff] hover:text-white transition-colors"
                       >
                         Save web intelligence
                       </button>
@@ -1012,7 +1012,7 @@ export function OperatorCenter({
                       {runtimes.capabilityBlueprints.map((blueprint) => (
                         <div
                           key={blueprint.id}
-                          className="rounded-lg border border-blade-border/60 bg-[#0d0d10] px-3 py-2"
+                          className="rounded-lg border border-blade-border/60 bg-[#09090b] px-3 py-2"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div>
@@ -1031,7 +1031,7 @@ export function OperatorCenter({
                                   setSelectedRuntimeId(blueprint.runtime_hint);
                                 }
                               }}
-                              className="text-2xs px-2.5 py-1 rounded-lg bg-[#16172a] text-[#c8cbff] hover:text-white transition-colors"
+                              className="text-2xs px-2.5 py-1 rounded-lg bg-[#09090b] text-[#c8cbff] hover:text-white transition-colors"
                             >
                               Load into mission
                             </button>
@@ -1068,7 +1068,7 @@ export function OperatorCenter({
                         runtimes.installedPlugins.map((plugin) => (
                           <div
                             key={plugin.manifest.name}
-                            className="rounded-lg border border-blade-border/60 bg-[#0d0d10] px-3 py-2"
+                            className="rounded-lg border border-blade-border/60 bg-[#09090b] px-3 py-2"
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div>
@@ -1098,7 +1098,7 @@ export function OperatorCenter({
                       )}
                     </div>
                     {runtimes.pluginCommands.length > 0 ? (
-                      <div className="mt-3 rounded-lg border border-blade-border/60 bg-[#0d0d10] px-3 py-2">
+                      <div className="mt-3 rounded-lg border border-blade-border/60 bg-[#09090b] px-3 py-2">
                         <div className="text-2xs text-blade-secondary">Pack commands</div>
                         <div className="mt-2 flex flex-wrap gap-2">
                           {runtimes.pluginCommands.slice(0, 10).map((command) => (
@@ -1124,24 +1124,24 @@ export function OperatorCenter({
                         value={engagementTitle}
                         onChange={(event) => setEngagementTitle(event.target.value)}
                         placeholder="Engagement title"
-                        className="w-full rounded-xl bg-[#0d0d10] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
+                        className="w-full rounded-xl bg-[#09090b] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
                       />
                       <input
                         value={engagementOwner}
                         onChange={(event) => setEngagementOwner(event.target.value)}
                         placeholder="Owner / company"
-                        className="w-full rounded-xl bg-[#0d0d10] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
+                        className="w-full rounded-xl bg-[#09090b] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
                       />
                       <input
                         value={engagementContact}
                         onChange={(event) => setEngagementContact(event.target.value)}
                         placeholder="Contact"
-                        className="w-full rounded-xl bg-[#0d0d10] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
+                        className="w-full rounded-xl bg-[#09090b] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
                       />
                       <select
                         value={engagementAssetKind}
                         onChange={(event) => setEngagementAssetKind(event.target.value)}
-                        className="w-full rounded-xl bg-[#0d0d10] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
+                        className="w-full rounded-xl bg-[#09090b] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
                       >
                         <option value="domain">Domain</option>
                         <option value="repository">Repository</option>
@@ -1153,12 +1153,12 @@ export function OperatorCenter({
                         onChange={(event) => setEngagementScope(event.target.value)}
                         rows={3}
                         placeholder="Scope: domains, repos, hosts, constraints, dates"
-                        className="md:col-span-2 w-full rounded-xl bg-[#0d0d10] border border-blade-border px-3 py-3 text-xs text-blade-text outline-none focus:border-[#6366f1]/40 resize-none"
+                        className="md:col-span-2 w-full rounded-xl bg-[#09090b] border border-blade-border px-3 py-3 text-xs text-blade-text outline-none focus:border-[#6366f1]/40 resize-none"
                       />
                       <select
                         value={engagementVerificationMethod}
                         onChange={(event) => setEngagementVerificationMethod(event.target.value)}
-                        className="w-full rounded-xl bg-[#0d0d10] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
+                        className="w-full rounded-xl bg-[#09090b] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
                       >
                         <option value="dns_txt">DNS TXT challenge</option>
                         <option value="repo_file">Repo proof file</option>
@@ -1169,13 +1169,13 @@ export function OperatorCenter({
                         value={engagementProof}
                         onChange={(event) => setEngagementProof(event.target.value)}
                         placeholder="Proof value or attestation note"
-                        className="w-full rounded-xl bg-[#0d0d10] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
+                        className="w-full rounded-xl bg-[#09090b] border border-blade-border px-3 py-2 text-xs text-blade-text outline-none focus:border-[#6366f1]/40"
                       />
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
                         onClick={() => void handleCreateEngagement()}
-                        className="text-2xs px-3 py-1.5 rounded-lg bg-[#16172a] text-[#c8cbff] hover:text-white transition-colors"
+                        className="text-2xs px-3 py-1.5 rounded-lg bg-[#09090b] text-[#c8cbff] hover:text-white transition-colors"
                       >
                         Create engagement
                       </button>
@@ -1188,7 +1188,7 @@ export function OperatorCenter({
                       </button>
                     </div>
                     {latestSecurityEngagement ? (
-                      <div className="mt-3 rounded-lg border border-blade-border/60 bg-[#0d0d10] px-3 py-2">
+                      <div className="mt-3 rounded-lg border border-blade-border/60 bg-[#09090b] px-3 py-2">
                         <div className="text-2xs text-blade-secondary">{latestSecurityEngagement.title}</div>
                         <div className="mt-1 text-2xs text-blade-muted">
                           {latestSecurityEngagement.asset_kind} · {latestSecurityEngagement.status}
@@ -1207,7 +1207,7 @@ export function OperatorCenter({
                         runtimes.securityEngagements.slice(0, 6).map((engagement) => (
                           <div
                             key={engagement.id}
-                            className="rounded-lg border border-blade-border/60 bg-[#0d0d10] px-3 py-2"
+                            className="rounded-lg border border-blade-border/60 bg-[#09090b] px-3 py-2"
                           >
                             <div className="text-2xs text-blade-secondary">{engagement.title}</div>
                             <div className="mt-1 text-2xs text-blade-muted">
@@ -1232,7 +1232,7 @@ export function OperatorCenter({
                         runtimes.companyObjects.slice(0, 8).map((object) => (
                           <div
                             key={object.id}
-                            className="rounded-lg border border-blade-border/60 bg-[#0d0d10] px-3 py-2"
+                            className="rounded-lg border border-blade-border/60 bg-[#09090b] px-3 py-2"
                           >
                             <div className="text-2xs text-blade-secondary">{object.title}</div>
                             <div className="mt-1 text-2xs text-blade-muted">
@@ -1260,7 +1260,7 @@ export function OperatorCenter({
                             setMission(stored.mission);
                             setGoal(stored.mission.goal);
                           }}
-                          className="w-full text-left rounded-lg border border-blade-border/60 bg-[#0d0d10] px-3 py-2 hover:border-blade-accent/20 transition-colors"
+                          className="w-full text-left rounded-lg border border-blade-border/60 bg-[#09090b] px-3 py-2 hover:border-blade-accent/20 transition-colors"
                         >
                           <div className="text-2xs text-blade-secondary">{stored.mission.goal}</div>
                           <div className="mt-1 text-2xs text-blade-muted">
@@ -1305,7 +1305,7 @@ export function OperatorCenter({
                       />
                     ))
                   ) : (
-                    <div className="rounded-lg border border-blade-border/60 bg-[#0d0d10] px-3 py-4">
+                    <div className="rounded-lg border border-blade-border/60 bg-[#09090b] px-3 py-4">
                       <div className="text-xs text-blade-text">No imported sessions yet</div>
                       <div className="text-2xs text-blade-muted mt-1">
                         Warm sessions from Claude, Codex, or local runtimes will appear here so you can resume work instead of restarting it.
@@ -1326,7 +1326,7 @@ export function OperatorCenter({
                       const latestMessage = [...task.messages].reverse().find((message) => message.role === "assistant" || message.role === "tool");
                       const taskArtifacts = prominentArtifacts(task.artifacts, 3);
                       return (
-                        <div key={task.id} className="rounded-xl border border-blade-border/60 bg-[#0d0d10] p-3">
+                        <div key={task.id} className="rounded-xl border border-blade-border/60 bg-[#09090b] p-3">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                               <div className="text-xs text-blade-secondary truncate">{task.goal}</div>
@@ -1356,7 +1356,7 @@ export function OperatorCenter({
                               ) : null}
                               <button
                                 onClick={() => void prepareHandoff(task)}
-                                className="text-2xs px-2 py-1 rounded-md bg-[#16172a] text-[#c8cbff] hover:text-white transition-colors"
+                                className="text-2xs px-2 py-1 rounded-md bg-[#09090b] text-[#c8cbff] hover:text-white transition-colors"
                               >
                                 handoff
                               </button>
@@ -1398,7 +1398,7 @@ export function OperatorCenter({
                       );
                     })
                   ) : (
-                    <div className="rounded-lg border border-blade-border/60 bg-[#0d0d10] px-3 py-4">
+                    <div className="rounded-lg border border-blade-border/60 bg-[#09090b] px-3 py-4">
                       <div className="text-xs text-blade-text">No live tasks yet</div>
                       <div className="text-2xs text-blade-muted mt-1">
                         Start or resume an operator task above and Blade will stream checkpoints, summaries, and artifacts here.
@@ -1556,7 +1556,7 @@ function MissionPipeline({
                 <button
                   onClick={() => onRunStage(stage.id)}
                   disabled={!canRun || !!missionExecution[stage.id]}
-                  className="text-2xs px-2 py-1 rounded-md bg-[#16172a] text-[#c8cbff] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="text-2xs px-2 py-1 rounded-md bg-[#09090b] text-[#c8cbff] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   run
                 </button>
@@ -1631,7 +1631,7 @@ const TAG_COLORS: Record<string, string> = {
   productivity: "text-teal-300 border-teal-500/20 bg-teal-500/10",
   learning: "text-indigo-300 border-indigo-500/20 bg-indigo-500/10",
   monitoring: "text-yellow-300 border-yellow-500/20 bg-yellow-500/10",
-  system: "text-slate-300 border-slate-500/20 bg-slate-500/10",
+  system: "text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)]/20 bg-[rgba(255,255,255,0.04)]/10",
   news: "text-fuchsia-300 border-fuchsia-500/20 bg-fuchsia-500/10",
   marketing: "text-red-300 border-red-500/20 bg-red-500/10",
   thinking: "text-lime-300 border-lime-500/20 bg-lime-500/10",

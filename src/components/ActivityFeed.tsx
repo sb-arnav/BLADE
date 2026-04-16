@@ -37,10 +37,10 @@ const TYPE_COLORS: Record<ActivityItem["type"], string> = {
   screenshot: "bg-cyan-500",
   template: "bg-pink-500",
   workflow: "bg-orange-500",
-  setting: "bg-gray-500",
+  setting: "bg-[rgba(255,255,255,0.04)]",
   pulse: "bg-indigo-400",
   briefing: "bg-amber-400",
-  god_mode: "bg-slate-500",
+  god_mode: "bg-[rgba(255,255,255,0.04)]",
   window_switch: "bg-teal-500",
 };
 

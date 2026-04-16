@@ -19,10 +19,10 @@ const THEME_OPTIONS: { value: Presentation["theme"]; label: string }[] = [
 ];
 
 const THEME_BADGE_COLORS: Record<Presentation["theme"], string> = {
-  dark: "bg-zinc-700/50 text-zinc-300",
-  light: "bg-zinc-200/50 text-zinc-700",
+  dark: "bg-[rgba(255,255,255,0.07)]/50 text-[rgba(255,255,255,0.7)]",
+  light: "bg-[rgba(255,255,255,0.04)]/50 text-[rgba(255,255,255,0.2)]",
   blade: "bg-indigo-500/20 text-indigo-300",
-  minimal: "bg-zinc-400/20 text-zinc-400",
+  minimal: "bg-[rgba(255,255,255,0.04)]/20 text-[rgba(255,255,255,0.5)]",
 };
 
 const BG_PRESETS = [
@@ -362,18 +362,18 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
 
   if (!active) {
     return (
-      <div className="flex flex-col h-full bg-zinc-950 text-zinc-200">
+      <div className="flex flex-col h-full bg-[#09090b] text-[rgba(255,255,255,0.85)]">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-800/70">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[rgba(255,255,255,0.07)]/70">
           <div className="flex items-center gap-3">
             <button
               onClick={onBack}
-              className="text-zinc-400 hover:text-zinc-200 transition-colors text-sm"
+              className="text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] transition-colors text-sm"
             >
               &#8592; Back
             </button>
             <h1 className="text-base font-semibold">Presentations</h1>
-            <span className="text-xs text-zinc-500">
+            <span className="text-xs text-[rgba(255,255,255,0.4)]">
               {stats.totalPresentations} decks &middot; {stats.totalSlides} slides
             </span>
           </div>
@@ -388,7 +388,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
         {/* Presentation list */}
         <div className="flex-1 overflow-y-auto p-5">
           {sortedPresentations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-zinc-500">
+            <div className="flex flex-col items-center justify-center h-full text-[rgba(255,255,255,0.4)]">
               <div className="text-4xl mb-3 opacity-30">{"\u25A1"}</div>
               <p className="text-sm">No presentations yet</p>
               <button
@@ -403,7 +403,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
               {sortedPresentations.map((pres) => (
                 <div
                   key={pres.id}
-                  className="group bg-zinc-900/60 border border-zinc-800/60 rounded-xl p-4 cursor-pointer hover:border-indigo-500/40 hover:bg-zinc-900/80 transition-all"
+                  className="group bg-[#0a0a0f]/60 border border-[rgba(255,255,255,0.07)]/60 rounded-xl p-4 cursor-pointer hover:border-indigo-500/40 hover:bg-[#0a0a0f]/80 transition-all"
                   onClick={() => {
                     setActive(pres.id);
                     setActiveSlideIdx(0);
@@ -421,8 +421,8 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
                       {pres.title}
                     </span>
                   </div>
-                  <h3 className="text-sm font-medium text-zinc-200 truncate">{pres.title}</h3>
-                  <div className="flex items-center gap-2 mt-1.5 text-xs text-zinc-500">
+                  <h3 className="text-sm font-medium text-[rgba(255,255,255,0.85)] truncate">{pres.title}</h3>
+                  <div className="flex items-center gap-2 mt-1.5 text-xs text-[rgba(255,255,255,0.4)]">
                     <span className={`px-1.5 py-0.5 rounded ${THEME_BADGE_COLORS[pres.theme]}`}>
                       {pres.theme}
                     </span>
@@ -435,7 +435,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
                       e.stopPropagation();
                       deletePresentation(pres.id);
                     }}
-                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 text-xs transition-all"
+                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-[rgba(255,255,255,0.4)] hover:text-red-400 text-xs transition-all"
                   >
                     &#10005;
                   </button>
@@ -448,11 +448,11 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
         {/* New dialog */}
         {showNewDialog && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="bg-zinc-900 border border-zinc-700/60 rounded-xl p-6 w-full max-w-md shadow-2xl">
+            <div className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.1)]/60 rounded-xl p-6 w-full max-w-md shadow-2xl">
               <h2 className="text-base font-semibold mb-4">New Presentation</h2>
               <div className="space-y-3">
                 <input
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
                   placeholder="Presentation title"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
@@ -460,7 +460,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
                   onKeyDown={(e) => e.key === "Enter" && handleCreate()}
                 />
                 <input
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
                   placeholder="Author name"
                   value={newAuthor}
                   onChange={(e) => setNewAuthor(e.target.value)}
@@ -473,7 +473,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
                       className={`flex-1 py-1.5 text-xs rounded-lg border transition-colors ${
                         newTheme === t.value
                           ? "border-indigo-500 bg-indigo-500/10 text-indigo-300"
-                          : "border-zinc-700 text-zinc-400 hover:border-zinc-600"
+                          : "border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)] hover:border-[rgba(255,255,255,0.15)]"
                       }`}
                     >
                       {t.label}
@@ -484,7 +484,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
               <div className="flex justify-end gap-2 mt-5">
                 <button
                   onClick={() => setShowNewDialog(false)}
-                  className="px-3 py-1.5 text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
+                  className="px-3 py-1.5 text-sm text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] transition-colors"
                 >
                   Cancel
                 </button>
@@ -505,13 +505,13 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
   // ── Editor view ──────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950 text-zinc-200">
+    <div className="flex flex-col h-full bg-[#09090b] text-[rgba(255,255,255,0.85)]">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800/70 shrink-0">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-[rgba(255,255,255,0.07)]/70 shrink-0">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setActive(null)}
-            className="text-zinc-400 hover:text-zinc-200 transition-colors text-sm"
+            className="text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] transition-colors text-sm"
           >
             &#8592; Decks
           </button>
@@ -520,7 +520,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
           {editingTitle ? (
             <input
               ref={titleInputRef}
-              className="bg-zinc-800 border border-indigo-500 rounded px-2 py-0.5 text-sm font-semibold focus:outline-none"
+              className="bg-[rgba(255,255,255,0.04)] border border-indigo-500 rounded px-2 py-0.5 text-sm font-semibold focus:outline-none"
               value={active.title}
               onChange={(e) => updatePresentation(active.id, { title: e.target.value })}
               onBlur={() => setEditingTitle(false)}
@@ -540,7 +540,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
           <span className={`text-xs px-1.5 py-0.5 rounded ${THEME_BADGE_COLORS[active.theme]}`}>
             {active.theme}
           </span>
-          <span className="text-xs text-zinc-500">
+          <span className="text-xs text-[rgba(255,255,255,0.4)]">
             {active.slides.length} slides
           </span>
         </div>
@@ -570,27 +570,27 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
           <div className="relative">
             <button
               onClick={() => setShowExportMenu(!showExportMenu)}
-              className="px-2.5 py-1 text-xs border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 rounded-lg transition-colors"
+              className="px-2.5 py-1 text-xs border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] hover:border-[rgba(255,255,255,0.15)] rounded-lg transition-colors"
             >
               Export
             </button>
             {showExportMenu && (
-              <div className="absolute right-0 top-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-30 py-1 min-w-[140px]">
+              <div className="absolute right-0 top-full mt-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded-lg shadow-xl z-30 py-1 min-w-[140px]">
                 <button
                   onClick={() => { exportAsHtml(); setShowExportMenu(false); }}
-                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-700 transition-colors"
+                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-[rgba(255,255,255,0.07)] transition-colors"
                 >
                   HTML Slideshow
                 </button>
                 <button
                   onClick={() => { exportAsMarkdown(); setShowExportMenu(false); }}
-                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-700 transition-colors"
+                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-[rgba(255,255,255,0.07)] transition-colors"
                 >
                   Markdown
                 </button>
                 <button
                   onClick={handleExportPdf}
-                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-700 transition-colors"
+                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-[rgba(255,255,255,0.07)] transition-colors"
                 >
                   PDF (Print)
                 </button>
@@ -603,14 +603,14 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
       {/* Main editor area: navigator + slide + properties */}
       <div className="flex flex-1 overflow-hidden">
         {/* ── Slide Navigator (left) ──────────────────────────────────── */}
-        <div className="w-48 border-r border-zinc-800/70 overflow-y-auto shrink-0 p-2 space-y-1">
+        <div className="w-48 border-r border-[rgba(255,255,255,0.07)]/70 overflow-y-auto shrink-0 p-2 space-y-1">
           {active.slides.map((slide, idx) => (
             <div key={slide.id}>
               {/* Insert button between slides */}
               {idx === 0 && (
                 <button
                   onClick={() => handleAddSlide(0)}
-                  className="w-full py-0.5 text-[10px] text-zinc-600 hover:text-indigo-400 transition-colors text-center"
+                  className="w-full py-0.5 text-[10px] text-[rgba(255,255,255,0.3)] hover:text-indigo-400 transition-colors text-center"
                 >
                   + Add slide
                 </button>
@@ -626,7 +626,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
                 className={`group relative rounded-lg p-1.5 cursor-pointer transition-all ${
                   activeSlideIdx === idx
                     ? "bg-indigo-500/15 border border-indigo-500/40"
-                    : "border border-transparent hover:bg-zinc-800/50 hover:border-zinc-700/50"
+                    : "border border-transparent hover:bg-[rgba(255,255,255,0.04)]/50 hover:border-[rgba(255,255,255,0.1)]/50"
                 } ${dragOverIdx === idx ? "border-indigo-400 bg-indigo-500/10" : ""}`}
               >
                 {/* Thumbnail */}
@@ -644,7 +644,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
 
                 {/* Slide info */}
                 <div className="flex items-center justify-between px-0.5">
-                  <span className="text-[10px] text-zinc-500">
+                  <span className="text-[10px] text-[rgba(255,255,255,0.4)]">
                     {idx + 1}. {slideTypeIcon(slide.type)}
                   </span>
                   <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -653,7 +653,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
                         e.stopPropagation();
                         handleDuplicateSlide(idx);
                       }}
-                      className="text-[10px] text-zinc-500 hover:text-zinc-300 px-0.5"
+                      className="text-[10px] text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] px-0.5"
                       title="Duplicate"
                     >
                       {"\u2398"}
@@ -664,7 +664,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
                           e.stopPropagation();
                           handleDeleteSlide(idx);
                         }}
-                        className="text-[10px] text-zinc-500 hover:text-red-400 px-0.5"
+                        className="text-[10px] text-[rgba(255,255,255,0.4)] hover:text-red-400 px-0.5"
                         title="Delete"
                       >
                         &#10005;
@@ -677,7 +677,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
               {/* Insert after button */}
               <button
                 onClick={() => handleAddSlide(idx + 1)}
-                className="w-full py-0.5 text-[10px] text-zinc-600 hover:text-indigo-400 transition-colors text-center"
+                className="w-full py-0.5 text-[10px] text-[rgba(255,255,255,0.3)] hover:text-indigo-400 transition-colors text-center"
               >
                 +
               </button>
@@ -686,7 +686,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
         </div>
 
         {/* ── Slide Editor (center) ───────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto flex items-center justify-center p-6 bg-zinc-900/30">
+        <div className="flex-1 overflow-y-auto flex items-center justify-center p-6 bg-[#0a0a0f]/30">
           {currentSlide ? (
             <div
               className="w-full max-w-3xl aspect-video rounded-xl shadow-2xl flex flex-col items-center justify-center p-10 relative overflow-hidden"
@@ -698,17 +698,17 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
               {renderEditableSlide(currentSlide, themeColors, handleSlideFieldChange, active)}
             </div>
           ) : (
-            <div className="text-zinc-500 text-sm">No slide selected</div>
+            <div className="text-[rgba(255,255,255,0.4)] text-sm">No slide selected</div>
           )}
         </div>
 
         {/* ── Properties Panel (right) ────────────────────────────────── */}
-        <div className="w-56 border-l border-zinc-800/70 overflow-y-auto shrink-0 p-3 space-y-4">
+        <div className="w-56 border-l border-[rgba(255,255,255,0.07)]/70 overflow-y-auto shrink-0 p-3 space-y-4">
           {currentSlide && (
             <>
               {/* Slide type */}
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5 block">
+                <label className="text-[10px] uppercase tracking-wider text-[rgba(255,255,255,0.4)] mb-1.5 block">
                   Slide Type
                 </label>
                 <div className="grid grid-cols-3 gap-1">
@@ -719,7 +719,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
                       className={`text-[10px] py-1.5 rounded transition-colors ${
                         currentSlide.type === t
                           ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/40"
-                          : "bg-zinc-800/50 text-zinc-400 border border-transparent hover:bg-zinc-800"
+                          : "bg-[rgba(255,255,255,0.04)]/50 text-[rgba(255,255,255,0.5)] border border-transparent hover:bg-[rgba(255,255,255,0.04)]"
                       }`}
                     >
                       {slideTypeIcon(t)} {t}
@@ -730,7 +730,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
 
               {/* Background color */}
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5 block">
+                <label className="text-[10px] uppercase tracking-wider text-[rgba(255,255,255,0.4)] mb-1.5 block">
                   Background
                 </label>
                 <div className="flex flex-wrap gap-1.5">
@@ -741,7 +741,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
                       className={`w-6 h-6 rounded-md border transition-all ${
                         currentSlide.backgroundColor === c
                           ? "border-indigo-400 ring-1 ring-indigo-400/50"
-                          : "border-zinc-700 hover:border-zinc-500"
+                          : "border-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.2)]"
                       }`}
                       style={{
                         background: c || themeColors.bg,
@@ -751,7 +751,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
                   ))}
                 </div>
                 <input
-                  className="mt-1.5 w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-[11px] focus:outline-none focus:border-indigo-500"
+                  className="mt-1.5 w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded px-2 py-1 text-[11px] focus:outline-none focus:border-indigo-500"
                   placeholder="Custom color (#hex)"
                   value={currentSlide.backgroundColor}
                   onChange={(e) =>
@@ -762,7 +762,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
 
               {/* Theme */}
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5 block">
+                <label className="text-[10px] uppercase tracking-wider text-[rgba(255,255,255,0.4)] mb-1.5 block">
                   Deck Theme
                 </label>
                 <div className="grid grid-cols-2 gap-1">
@@ -775,7 +775,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
                       className={`text-[11px] py-1.5 rounded transition-colors ${
                         active.theme === t.value
                           ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/40"
-                          : "bg-zinc-800/50 text-zinc-400 border border-transparent hover:bg-zinc-800"
+                          : "bg-[rgba(255,255,255,0.04)]/50 text-[rgba(255,255,255,0.5)] border border-transparent hover:bg-[rgba(255,255,255,0.04)]"
                       }`}
                     >
                       {t.label}
@@ -786,11 +786,11 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
 
               {/* Notes */}
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5 block">
+                <label className="text-[10px] uppercase tracking-wider text-[rgba(255,255,255,0.4)] mb-1.5 block">
                   Speaker Notes
                 </label>
                 <textarea
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-2 text-xs resize-none focus:outline-none focus:border-indigo-500 min-h-[80px]"
+                  className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded-lg px-2.5 py-2 text-xs resize-none focus:outline-none focus:border-indigo-500 min-h-[80px]"
                   placeholder="Add speaker notes..."
                   value={currentSlide.notes}
                   onChange={(e) =>
@@ -802,13 +802,13 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
               {/* Type-specific fields */}
               {currentSlide.type === "bullets" && (
                 <div>
-                  <label className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5 block">
+                  <label className="text-[10px] uppercase tracking-wider text-[rgba(255,255,255,0.4)] mb-1.5 block">
                     Bullet Points
                   </label>
                   {(currentSlide.bullets || []).map((b, i) => (
                     <div key={i} className="flex gap-1 mb-1">
                       <input
-                        className="flex-1 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-[11px] focus:outline-none focus:border-indigo-500"
+                        className="flex-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded px-2 py-1 text-[11px] focus:outline-none focus:border-indigo-500"
                         value={b}
                         onChange={(e) => {
                           const next = [...(currentSlide.bullets || [])];
@@ -823,7 +823,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
                           );
                           handleSlideFieldChange("bullets", next);
                         }}
-                        className="text-zinc-500 hover:text-red-400 text-[10px] px-1"
+                        className="text-[rgba(255,255,255,0.4)] hover:text-red-400 text-[10px] px-1"
                       >
                         &#10005;
                       </button>
@@ -845,11 +845,11 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
 
               {currentSlide.type === "code" && (
                 <div>
-                  <label className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5 block">
+                  <label className="text-[10px] uppercase tracking-wider text-[rgba(255,255,255,0.4)] mb-1.5 block">
                     Code
                   </label>
                   <input
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-[11px] mb-1 focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded px-2 py-1 text-[11px] mb-1 focus:outline-none focus:border-indigo-500"
                     placeholder="Language"
                     value={currentSlide.code?.language || ""}
                     onChange={(e) =>
@@ -860,7 +860,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
                     }
                   />
                   <textarea
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-2 text-xs font-mono resize-none focus:outline-none focus:border-indigo-500 min-h-[100px]"
+                    className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded-lg px-2.5 py-2 text-xs font-mono resize-none focus:outline-none focus:border-indigo-500 min-h-[100px]"
                     placeholder="Code snippet..."
                     value={currentSlide.code?.code || ""}
                     onChange={(e) =>
@@ -875,13 +875,13 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
 
               {currentSlide.type === "stats" && (
                 <div>
-                  <label className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5 block">
+                  <label className="text-[10px] uppercase tracking-wider text-[rgba(255,255,255,0.4)] mb-1.5 block">
                     Statistics
                   </label>
                   {(currentSlide.stats || []).map((s, i) => (
-                    <div key={i} className="bg-zinc-800/50 rounded p-1.5 mb-1 space-y-1">
+                    <div key={i} className="bg-[rgba(255,255,255,0.04)]/50 rounded p-1.5 mb-1 space-y-1">
                       <input
-                        className="w-full bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-[10px] focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded px-1.5 py-0.5 text-[10px] focus:outline-none focus:border-indigo-500"
                         placeholder="Label"
                         value={s.label}
                         onChange={(e) => {
@@ -892,7 +892,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
                       />
                       <div className="flex gap-1">
                         <input
-                          className="flex-1 bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-[10px] focus:outline-none focus:border-indigo-500"
+                          className="flex-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded px-1.5 py-0.5 text-[10px] focus:outline-none focus:border-indigo-500"
                           placeholder="Value"
                           value={s.value}
                           onChange={(e) => {
@@ -902,7 +902,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
                           }}
                         />
                         <input
-                          className="w-16 bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-[10px] focus:outline-none focus:border-indigo-500"
+                          className="w-16 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded px-1.5 py-0.5 text-[10px] focus:outline-none focus:border-indigo-500"
                           placeholder="+/-"
                           value={s.change || ""}
                           onChange={(e) => {
@@ -917,7 +917,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
                           const next = (currentSlide.stats || []).filter((_, j) => j !== i);
                           handleSlideFieldChange("stats", next);
                         }}
-                        className="text-[9px] text-zinc-500 hover:text-red-400"
+                        className="text-[9px] text-[rgba(255,255,255,0.4)] hover:text-red-400"
                       >
                         Remove
                       </button>
@@ -939,15 +939,15 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
 
               {currentSlide.type === "comparison" && (
                 <div>
-                  <label className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5 block">
+                  <label className="text-[10px] uppercase tracking-wider text-[rgba(255,255,255,0.4)] mb-1.5 block">
                     Comparison
                   </label>
                   {(["left", "right"] as const).map((side) => {
                     const data = currentSlide.comparison?.[side] || { title: "", points: [] };
                     return (
-                      <div key={side} className="bg-zinc-800/50 rounded p-1.5 mb-1.5">
+                      <div key={side} className="bg-[rgba(255,255,255,0.04)]/50 rounded p-1.5 mb-1.5">
                         <input
-                          className="w-full bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-[10px] mb-1 focus:outline-none focus:border-indigo-500"
+                          className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded px-1.5 py-0.5 text-[10px] mb-1 focus:outline-none focus:border-indigo-500"
                           placeholder={`${side === "left" ? "Left" : "Right"} title`}
                           value={data.title}
                           onChange={(e) => {
@@ -964,7 +964,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
                         {data.points.map((p, pi) => (
                           <div key={pi} className="flex gap-1 mb-0.5">
                             <input
-                              className="flex-1 bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-[10px] focus:outline-none focus:border-indigo-500"
+                              className="flex-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded px-1.5 py-0.5 text-[10px] focus:outline-none focus:border-indigo-500"
                               value={p}
                               onChange={(e) => {
                                 const comp = currentSlide.comparison || {
@@ -991,7 +991,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
                                   [side]: { ...comp[side], points: pts },
                                 });
                               }}
-                              className="text-zinc-500 hover:text-red-400 text-[9px]"
+                              className="text-[rgba(255,255,255,0.4)] hover:text-red-400 text-[9px]"
                             >
                               &#10005;
                             </button>
@@ -1020,13 +1020,13 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
 
               {currentSlide.type === "timeline" && (
                 <div>
-                  <label className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5 block">
+                  <label className="text-[10px] uppercase tracking-wider text-[rgba(255,255,255,0.4)] mb-1.5 block">
                     Timeline Items
                   </label>
                   {(currentSlide.timeline || []).map((t, i) => (
-                    <div key={i} className="bg-zinc-800/50 rounded p-1.5 mb-1 space-y-1">
+                    <div key={i} className="bg-[rgba(255,255,255,0.04)]/50 rounded p-1.5 mb-1 space-y-1">
                       <input
-                        className="w-full bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-[10px] focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded px-1.5 py-0.5 text-[10px] focus:outline-none focus:border-indigo-500"
                         placeholder="Label (date, phase...)"
                         value={t.label}
                         onChange={(e) => {
@@ -1036,7 +1036,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
                         }}
                       />
                       <input
-                        className="w-full bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-[10px] focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded px-1.5 py-0.5 text-[10px] focus:outline-none focus:border-indigo-500"
                         placeholder="Description"
                         value={t.description}
                         onChange={(e) => {
@@ -1050,7 +1050,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
                           const next = (currentSlide.timeline || []).filter((_, j) => j !== i);
                           handleSlideFieldChange("timeline", next);
                         }}
-                        className="text-[9px] text-zinc-500 hover:text-red-400"
+                        className="text-[9px] text-[rgba(255,255,255,0.4)] hover:text-red-400"
                       >
                         Remove
                       </button>
@@ -1077,21 +1077,21 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
       {/* Generate dialog */}
       {showGenerateDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-700/60 rounded-xl p-6 w-full max-w-md shadow-2xl">
+          <div className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.1)]/60 rounded-xl p-6 w-full max-w-md shadow-2xl">
             <h2 className="text-base font-semibold mb-1">Generate Deck with AI</h2>
-            <p className="text-xs text-zinc-500 mb-4">
+            <p className="text-xs text-[rgba(255,255,255,0.4)] mb-4">
               Describe the topic and the AI will create a full slide deck.
             </p>
             <div className="space-y-3">
               <textarea
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-indigo-500 min-h-[80px]"
+                className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-indigo-500 min-h-[80px]"
                 placeholder="e.g. Introduction to Rust programming language for web developers"
                 value={genTopic}
                 onChange={(e) => setGenTopic(e.target.value)}
                 autoFocus
               />
               <div className="flex items-center gap-3">
-                <label className="text-xs text-zinc-400">Slide count:</label>
+                <label className="text-xs text-[rgba(255,255,255,0.5)]">Slide count:</label>
                 <input
                   type="range"
                   min={4}
@@ -1108,7 +1108,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
             <div className="flex justify-end gap-2 mt-5">
               <button
                 onClick={() => setShowGenerateDialog(false)}
-                className="px-3 py-1.5 text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
+                className="px-3 py-1.5 text-sm text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] transition-colors"
               >
                 Cancel
               </button>
@@ -1273,7 +1273,7 @@ function renderSlideContent(
             className="w-full h-48 rounded-xl flex items-center justify-center"
             style={{ background: tc.surface }}
           >
-            <span className="text-zinc-500 text-sm">Image placeholder</span>
+            <span className="text-[rgba(255,255,255,0.4)] text-sm">Image placeholder</span>
           </div>
           {slide.content && <p className="text-sm opacity-60 mt-3">{slide.content}</p>}
         </div>

@@ -64,10 +64,10 @@ function RelevanceBar({ score }: { score: number }) {
     pct >= 25 ? "bg-orange-500" : "bg-red-500";
   return (
     <div className="flex items-center gap-2">
-      <div className="flex-1 h-1.5 bg-gray-900 rounded overflow-hidden">
+      <div className="flex-1 h-1.5 bg-[#09090b] rounded overflow-hidden">
         <div className={`h-full ${color} transition-all`} style={{ width: `${pct}%` }} />
       </div>
-      <span className="text-gray-500 font-mono text-xs min-w-[32px] text-right">{pct}%</span>
+      <span className="text-[rgba(255,255,255,0.4)] font-mono text-xs min-w-[32px] text-right">{pct}%</span>
     </div>
   );
 }
@@ -79,15 +79,15 @@ function ChunkCard({ chunk }: { chunk: ContextChunk }) {
   const preview = chunk.content.length > 200 ? chunk.content.slice(0, 200) + "…" : chunk.content;
 
   return (
-    <div className="bg-gray-950 border border-gray-800 rounded overflow-hidden">
-      <div className="px-3 py-2 flex items-center gap-3 border-b border-gray-800/50">
+    <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded overflow-hidden">
+      <div className="px-3 py-2 flex items-center gap-3 border-b border-[rgba(255,255,255,0.07)]/50">
         <SourceBadge source={chunk.source} />
         <RelevanceBar score={chunk.relevance_score} />
-        <span className="text-gray-700 font-mono text-xs min-w-[60px] text-right">{chunk.token_count}t</span>
+        <span className="text-[rgba(255,255,255,0.2)] font-mono text-xs min-w-[60px] text-right">{chunk.token_count}t</span>
       </div>
       <div className="px-3 py-2">
-        <div className="text-gray-400 font-mono text-xs mb-1">{chunk.timestamp}</div>
-        <div className="text-gray-300 text-xs leading-relaxed font-mono whitespace-pre-wrap">
+        <div className="text-[rgba(255,255,255,0.5)] font-mono text-xs mb-1">{chunk.timestamp}</div>
+        <div className="text-[rgba(255,255,255,0.7)] text-xs leading-relaxed font-mono whitespace-pre-wrap">
           {expanded ? chunk.content : preview}
         </div>
         {chunk.content.length > 200 && (
@@ -100,10 +100,10 @@ function ChunkCard({ chunk }: { chunk: ContextChunk }) {
         )}
       </div>
       {chunk.metadata && Object.keys(chunk.metadata).length > 0 && (
-        <div className="px-3 py-1 border-t border-gray-800/50 flex flex-wrap gap-2">
+        <div className="px-3 py-1 border-t border-[rgba(255,255,255,0.07)]/50 flex flex-wrap gap-2">
           {Object.entries(chunk.metadata).map(([k, v]) => (
-            <span key={k} className="text-gray-700 font-mono text-xs">
-              <span className="text-gray-600">{k}:</span> {v}
+            <span key={k} className="text-[rgba(255,255,255,0.2)] font-mono text-xs">
+              <span className="text-[rgba(255,255,255,0.3)]">{k}:</span> {v}
             </span>
           ))}
         </div>
@@ -190,12 +190,12 @@ export function ContextEngineView({ onBack }: { onBack: () => void }) {
   const SOURCE_LIST: SourceType[] = ["memory", "screen", "goals", "files", "conversation"];
 
   return (
-    <div className="flex flex-col h-full bg-black text-gray-200">
+    <div className="flex flex-col h-full bg-black text-[rgba(255,255,255,0.85)]">
       {/* Header */}
-      <div className="flex items-center gap-4 px-4 py-3 border-b border-gray-800 shrink-0">
+      <div className="flex items-center gap-4 px-4 py-3 border-b border-[rgba(255,255,255,0.07)] shrink-0">
         <button
           onClick={onBack}
-          className="text-gray-600 hover:text-gray-300 font-mono text-xs transition-colors"
+          className="text-[rgba(255,255,255,0.3)] hover:text-[rgba(255,255,255,0.7)] font-mono text-xs transition-colors"
         >
           ← BACK
         </button>
@@ -208,7 +208,7 @@ export function ContextEngineView({ onBack }: { onBack: () => void }) {
           className={`ml-auto border font-mono text-xs px-3 py-1 transition-colors ${
             cacheCleared
               ? "border-green-700 text-green-400"
-              : "border-gray-700 text-gray-600 hover:text-gray-300 hover:border-gray-500"
+              : "border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.3)] hover:text-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.2)]"
           }`}
         >
           {cacheCleared ? "✓ CLEARED" : "CLEAR CACHE"}
@@ -224,10 +224,10 @@ export function ContextEngineView({ onBack }: { onBack: () => void }) {
           {/* Query input */}
           <div className="px-4 pt-4 pb-2 flex flex-col gap-3 shrink-0">
             <div className="flex flex-col gap-1">
-              <label className="text-gray-500 font-mono text-xs">QUERY — what context to retrieve</label>
+              <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">QUERY — what context to retrieve</label>
               <textarea
                 rows={2}
-                className="bg-gray-950 border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700 resize-none"
+                className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700 resize-none"
                 placeholder="e.g. What are my current project deadlines and financial goals?"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -252,19 +252,19 @@ export function ContextEngineView({ onBack }: { onBack: () => void }) {
           <div className="flex-1 overflow-y-auto px-4 pb-4 flex flex-col gap-3">
             {/* Footer summary (shown at top when results present) */}
             {result && (
-              <div className="bg-gray-950 border border-gray-800 rounded px-4 py-3 flex flex-wrap items-center gap-3">
+              <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded px-4 py-3 flex flex-wrap items-center gap-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-600 font-mono text-xs">TOKENS:</span>
+                  <span className="text-[rgba(255,255,255,0.3)] font-mono text-xs">TOKENS:</span>
                   <span className={`font-mono text-xs ${result.was_truncated ? "text-amber-400" : "text-green-400"}`}>
                     {result.total_tokens} / {result.token_budget}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-600 font-mono text-xs">TIME:</span>
-                  <span className="text-gray-400 font-mono text-xs">{result.assembly_time_ms}ms</span>
+                  <span className="text-[rgba(255,255,255,0.3)] font-mono text-xs">TIME:</span>
+                  <span className="text-[rgba(255,255,255,0.5)] font-mono text-xs">{result.assembly_time_ms}ms</span>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-gray-600 font-mono text-xs">SOURCES:</span>
+                  <span className="text-[rgba(255,255,255,0.3)] font-mono text-xs">SOURCES:</span>
                   {result.sources_used.map((src) => (
                     <SourceBadge key={src} source={src} />
                   ))}
@@ -280,7 +280,7 @@ export function ContextEngineView({ onBack }: { onBack: () => void }) {
 
             {/* Chunk cards */}
             {result && result.chunks.length === 0 && (
-              <div className="text-gray-700 font-mono text-xs text-center py-8 border border-dashed border-gray-800 rounded">
+              <div className="text-[rgba(255,255,255,0.2)] font-mono text-xs text-center py-8 border border-dashed border-[rgba(255,255,255,0.07)] rounded">
                 No context chunks returned for this query
               </div>
             )}
@@ -291,8 +291,8 @@ export function ContextEngineView({ onBack }: { onBack: () => void }) {
             {!result && !loading && (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
-                  <div className="text-gray-800 font-mono text-xs mb-2">NO CONTEXT ASSEMBLED</div>
-                  <div className="text-gray-700 font-mono text-xs">Enter a query and click Assemble</div>
+                  <div className="text-[rgba(255,255,255,0.4)] font-mono text-xs mb-2">NO CONTEXT ASSEMBLED</div>
+                  <div className="text-[rgba(255,255,255,0.2)] font-mono text-xs">Enter a query and click Assemble</div>
                 </div>
               </div>
             )}
@@ -300,7 +300,7 @@ export function ContextEngineView({ onBack }: { onBack: () => void }) {
         </div>
 
         {/* RIGHT SIDEBAR: source toggles + max tokens + score tool */}
-        <div className="w-full lg:w-64 border-t lg:border-t-0 lg:border-l border-gray-800 shrink-0 flex flex-col overflow-y-auto">
+        <div className="w-full lg:w-64 border-t lg:border-t-0 lg:border-l border-[rgba(255,255,255,0.07)] shrink-0 flex flex-col overflow-y-auto">
           <div className="p-4 flex flex-col gap-4">
 
             {/* Source toggles */}
@@ -317,10 +317,10 @@ export function ContextEngineView({ onBack }: { onBack: () => void }) {
                       className={`flex items-center gap-2 px-3 py-2 border rounded transition-colors text-left ${
                         enabled
                           ? `${c.bg} ${c.border} ${c.text}`
-                          : "bg-gray-950 border-gray-800 text-gray-600 hover:border-gray-700"
+                          : "bg-[#09090b] border-[rgba(255,255,255,0.07)] text-[rgba(255,255,255,0.3)] hover:border-[rgba(255,255,255,0.1)]"
                       }`}
                     >
-                      <div className={`w-3 h-3 border-2 rounded-sm flex items-center justify-center shrink-0 ${enabled ? c.border : "border-gray-700"}`}>
+                      <div className={`w-3 h-3 border-2 rounded-sm flex items-center justify-center shrink-0 ${enabled ? c.border : "border-[rgba(255,255,255,0.1)]"}`}>
                         {enabled && <div className={`w-1.5 h-1.5 rounded-sm ${c.text.replace("text-", "bg-")}`} />}
                       </div>
                       <span className="font-mono text-xs uppercase">{SOURCE_ICONS[src]} {src}</span>
@@ -334,9 +334,9 @@ export function ContextEngineView({ onBack }: { onBack: () => void }) {
             <div>
               <div className="text-green-400 font-mono text-xs uppercase tracking-widest mb-2">// Max Tokens</div>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-gray-600 font-mono text-xs">500</span>
+                <span className="text-[rgba(255,255,255,0.3)] font-mono text-xs">500</span>
                 <span className="text-green-400 font-mono text-xs">{maxTokens}</span>
-                <span className="text-gray-600 font-mono text-xs">4000</span>
+                <span className="text-[rgba(255,255,255,0.3)] font-mono text-xs">4000</span>
               </div>
               <input
                 type="range"
@@ -352,7 +352,7 @@ export function ContextEngineView({ onBack }: { onBack: () => void }) {
                   <button
                     key={v}
                     onClick={() => setMaxTokens(v)}
-                    className={`font-mono text-xs transition-colors ${maxTokens === v ? "text-green-400" : "text-gray-700 hover:text-gray-500"}`}
+                    className={`font-mono text-xs transition-colors ${maxTokens === v ? "text-green-400" : "text-[rgba(255,255,255,0.2)] hover:text-[rgba(255,255,255,0.4)]"}`}
                   >
                     {v >= 1000 ? `${v / 1000}k` : v}
                   </button>
@@ -361,25 +361,25 @@ export function ContextEngineView({ onBack }: { onBack: () => void }) {
             </div>
 
             {/* Score Chunk Tool */}
-            <div className="border border-gray-800 rounded">
+            <div className="border border-[rgba(255,255,255,0.07)] rounded">
               <button
-                className="w-full flex items-center justify-between px-3 py-2 font-mono text-xs text-gray-500 hover:text-gray-300"
+                className="w-full flex items-center justify-between px-3 py-2 font-mono text-xs text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)]"
                 onClick={() => setToolOpen((v) => !v)}
               >
                 <span>// SCORE CHUNK</span>
                 <span>{toolOpen ? "▲" : "▼"}</span>
               </button>
               {toolOpen && (
-                <div className="p-3 flex flex-col gap-2 border-t border-gray-800">
+                <div className="p-3 flex flex-col gap-2 border-t border-[rgba(255,255,255,0.07)]">
                   <input
-                    className="bg-black border border-gray-700 text-gray-200 font-mono text-xs px-2 py-1.5 rounded focus:outline-none focus:border-green-700"
+                    className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-xs px-2 py-1.5 rounded focus:outline-none focus:border-green-700"
                     placeholder="Query"
                     value={scoreQuery}
                     onChange={(e) => setScoreQuery(e.target.value)}
                   />
                   <textarea
                     rows={4}
-                    className="bg-black border border-gray-700 text-gray-200 font-mono text-xs px-2 py-1.5 rounded focus:outline-none focus:border-green-700 resize-none"
+                    className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-xs px-2 py-1.5 rounded focus:outline-none focus:border-green-700 resize-none"
                     placeholder="Paste any text to score..."
                     value={scoreChunk}
                     onChange={(e) => setScoreChunk(e.target.value)}
@@ -387,14 +387,14 @@ export function ContextEngineView({ onBack }: { onBack: () => void }) {
                   <button
                     onClick={scoreChunkFn}
                     disabled={scoreLoading || !scoreQuery.trim() || !scoreChunk.trim()}
-                    className="bg-gray-900 border border-gray-700 text-gray-400 font-mono text-xs py-1.5 hover:border-green-700 hover:text-green-400 disabled:opacity-40 transition-colors"
+                    className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)] font-mono text-xs py-1.5 hover:border-green-700 hover:text-green-400 disabled:opacity-40 transition-colors"
                   >
                     {scoreLoading ? "..." : "SCORE →"}
                   </button>
                   {scoreResult && (
-                    <div className="bg-black border border-gray-800 rounded p-2 flex flex-col gap-2">
+                    <div className="bg-black border border-[rgba(255,255,255,0.07)] rounded p-2 flex flex-col gap-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-gray-600 font-mono text-xs">SCORE</span>
+                        <span className="text-[rgba(255,255,255,0.3)] font-mono text-xs">SCORE</span>
                         <span className={`font-mono text-xs ${
                           scoreResult.score >= 0.75 ? "text-green-400" :
                           scoreResult.score >= 0.5 ? "text-amber-400" : "text-red-400"
@@ -404,7 +404,7 @@ export function ContextEngineView({ onBack }: { onBack: () => void }) {
                       </div>
                       <RelevanceBar score={scoreResult.score} />
                       {scoreResult.explanation && (
-                        <div className="text-gray-600 font-mono text-xs leading-relaxed">{scoreResult.explanation}</div>
+                        <div className="text-[rgba(255,255,255,0.3)] font-mono text-xs leading-relaxed">{scoreResult.explanation}</div>
                       )}
                     </div>
                   )}
