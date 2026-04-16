@@ -424,6 +424,15 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "blade_look_at_screen".to_string(),
+            description: "Look at what's currently visible on the user's screen. Returns a description of what's visible: app names, file names, code, errors, text, URLs. Use when the user says 'this', 'what I'm looking at', 'this error', 'my screen', or when you need visual context. No arguments needed — captures the primary monitor.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {},
+                "required": []
+            }),
+        },
+        ToolDefinition {
             name: "blade_index_project".to_string(),
             description: "Index a codebase directory — extract all functions, classes, types, imports into a persistent knowledge graph. Run this once when entering a new project. BLADE never forgets indexed code across restarts. Use blade_find_symbol after indexing.".to_string(),
             input_schema: json!({
@@ -675,6 +684,15 @@ pub fn suggest_tools_for_query(query: &str) -> Vec<String> {
             suppress: &["blade_bash", "blade_index_project", "blade_find_symbol",
                         "blade_pentest_authorize", "blade_set_api_key"],
         },
+        // Vision / screen reading / "what's this"
+        Affinity {
+            keywords: &["screen", "see", "look at", "looking at", "what is this",
+                        "this error", "what's on", "show me", "visible", "what do you see",
+                        "my screen", "can you see"],
+            boost: &["blade_look_at_screen"],
+            suppress: &["blade_index_project", "blade_find_symbol",
+                        "blade_pentest_authorize", "blade_iot_control"],
+        },
         // System / processes / desktop
         Affinity {
             keywords: &["process", "running", "app", "application", "cpu", "ram",
@@ -682,8 +700,9 @@ pub fn suggest_tools_for_query(query: &str) -> Vec<String> {
                         "screen", "click", "type", "window", "ui", "desktop",
                         "volume", "brightness", "lock", "shutdown"],
             boost: &["blade_get_processes", "blade_kill_process", "blade_system_info",
-                     "blade_screenshot", "blade_ui_read", "blade_ui_click",
-                     "blade_ui_type", "blade_ui_wait", "blade_mouse", "blade_keyboard"],
+                     "blade_screenshot", "blade_look_at_screen", "blade_ui_read",
+                     "blade_ui_click", "blade_ui_type", "blade_ui_wait",
+                     "blade_mouse", "blade_keyboard"],
             suppress: &["blade_index_project", "blade_find_symbol",
                         "blade_recall_execution", "blade_pentest_authorize",
                         "blade_set_api_key"],
@@ -1147,6 +1166,41 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
                     }
                 }).collect();
                 (format!("{} pending reminder(s):\n{}", reminders.len(), lines.join("\n")), false)
+            }
+        }
+        "blade_look_at_screen" => {
+            // Capture screen, describe it with vision model, return description
+            match crate::screen::capture_screen() {
+                Ok(base64_png) => {
+                    // If we have a recent screen_timeline description (<60s), use that
+                    // instead of making a new vision call (save API cost)
+                    let recent = crate::perception_fusion::get_latest()
+                        .map(|p| p.screen_ocr_text.clone())
+                        .unwrap_or_default();
+
+                    if !recent.is_empty() && recent.len() > 20 {
+                        (format!("Current screen:\n{}\n\n[Screenshot captured — base64 length: {} chars]", recent, base64_png.len()), false)
+                    } else {
+                        // No recent description — ask vision model directly
+                        let config = crate::config::load_config();
+                        if config.api_key.is_empty() {
+                            (format!("[Screenshot captured but no API key for vision analysis. Base64 length: {} chars]", base64_png.len()), false)
+                        } else {
+                            // Use the screen_timeline describe function
+                            let thumb_b64 = base64_png.clone();
+                            let description = tokio::task::spawn(async move {
+                                crate::screen_timeline::describe_screenshot_public(&thumb_b64).await
+                            }).await.unwrap_or_else(|_| String::new());
+
+                            if description.is_empty() {
+                                (format!("[Screenshot captured. Base64 length: {} chars. Vision model unavailable.]", base64_png.len()), false)
+                            } else {
+                                (format!("Current screen:\n{}", description), false)
+                            }
+                        }
+                    }
+                }
+                Err(e) => (format!("Screen capture failed: {}", e), true),
             }
         }
         "blade_notify" => {
