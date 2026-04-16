@@ -236,6 +236,15 @@ pub fn hypothalamus_tick() {
         0.0
     };
 
+    // ── Blood pressure feedback: high API usage → lower energy ─────────
+    let bp = crate::cardiovascular::get_blood_pressure();
+    if bp.api_calls_per_minute > 20 {
+        state.energy_mode = (state.energy_mode - 0.15).max(0.1);
+    }
+    if bp.errors_per_minute > 5 {
+        state.urgency = (state.urgency + 0.2).min(1.0);
+    }
+
     // ── Hunger: pending work not being executed ───────────────────────
     let pending_decisions = hive_status.pending_decisions;
     let pending_reports = hive_status.pending_reports;

@@ -55,6 +55,7 @@ mod crypto;
 mod db;
 mod db_commands;
 mod brain_planner;
+mod cardiovascular;
 mod discovery;
 mod dna;
 mod homeostasis;
@@ -1150,6 +1151,8 @@ pub fn run() {
             organ::organ_get_autonomy,
             joints::joints_list_providers,
             joints::joints_list_stores,
+            cardiovascular::cardio_get_blood_pressure,
+            cardiovascular::cardio_get_event_registry,
             homeostasis::homeostasis_get,
             homeostasis::homeostasis_get_directive,
             homeostasis::homeostasis_get_circadian,

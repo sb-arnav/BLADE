@@ -215,7 +215,7 @@ pub async fn complete_turn(
         }
         return result;
     }
-    match provider {
+    let result = match provider {
         "gemini"     => gemini::complete(api_key, model, messages, tools).await,
         "groq"       => groq::complete(api_key, model, messages, tools).await,
         "openai"     => openai::complete(api_key, model, messages, tools, base_url).await,
@@ -223,7 +223,12 @@ pub async fn complete_turn(
         "ollama"     => ollama::complete(model, messages).await,
         "openrouter" => openai::complete(api_key, model, messages, tools, Some(OPENROUTER_BASE_URL)).await,
         _            => Err(format!("Unknown provider: {}", provider)),
-    }
+    };
+
+    // Cardiovascular: track every API call for blood pressure monitoring
+    crate::cardiovascular::on_provider_call_complete(provider, model, result.is_ok());
+
+    result
 }
 
 /// Stream a text-only response (no tool calling). Used when no tools are
