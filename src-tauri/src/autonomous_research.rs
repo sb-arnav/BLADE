@@ -343,6 +343,12 @@ pub fn start_autonomous_research(app: tauri::AppHandle) {
                 continue;
             }
 
+            // Pituitary GH: skip research when growth hormone is low
+            let gh = crate::homeostasis::growth_hormone();
+            if gh < 0.3 {
+                continue; // body is conserving — not the time for research
+            }
+
             // Only research when idle (no activity in last 5 minutes)
             let last = LAST_ACTIVITY_TS.load(Ordering::Relaxed);
             let now = now_secs();
