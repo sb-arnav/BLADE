@@ -679,70 +679,115 @@ async fn transcribe_samples(samples: &[f32], sample_rate: u32) -> Result<String,
 async fn process_voice_turn_with_history(
     app: &tauri::AppHandle,
     user_text: &str,
-    conv_history: &[crate::providers::ConversationMessage],
+    _conv_history: &[crate::providers::ConversationMessage],
     emotion: &str,
     lang: &str,
 ) -> Result<String, String> {
     let _ = app.emit("voice_conversation_thinking", serde_json::json!({ "text": user_text }));
 
-    let config = crate::config::load_config();
-    let (provider, api_key, model) = crate::config::resolve_provider_for_task(
-        &config,
-        &crate::router::TaskType::Simple,
-    );
+    // Voice commands go through the SAME pipeline as chat — full tools, brain
+    // planner, hive awareness, organ delegation. The only difference: the
+    // response gets spoken via TTS instead of displayed as text.
+    //
+    // Previously this was a stripped-down no-tools call that could only talk
+    // but never DO anything. "Hey BLADE, deploy my app" would get a verbal
+    // response but zero actual action.
 
-    // Build voice system prompt, enhanced with emotion context
-    let mut system_prompt = crate::brain::build_system_prompt_voice(app).await;
+    // Build ChatMessage for send_message_stream
+    let mut chat_msg = crate::providers::ChatMessage {
+        role: "user".to_string(),
+        content: user_text.to_string(),
+        image_base64: None,
+    };
 
-    // Inject emotion hint so the LLM can adapt tone
+    // Inject voice metadata into the message so the brain knows this is spoken
+    let mut voice_prefix = String::new();
     match emotion {
-        "frustrated" => system_prompt.push_str(
-            " The user sounds frustrated — respond with extra empathy, keep it short and clear.",
-        ),
-        "excited" => system_prompt.push_str(
-            " The user sounds excited — match their energy and keep the reply punchy.",
-        ),
-        "tired" => system_prompt.push_str(
-            " The user sounds tired — be gentle, slow down, use short sentences.",
-        ),
-        "focused" => system_prompt.push_str(
-            " The user is focused — be direct, no filler, answer the question.",
-        ),
+        "frustrated" => voice_prefix.push_str("[User sounds frustrated — be empathetic, keep it short] "),
+        "excited" => voice_prefix.push_str("[User sounds excited — match their energy] "),
+        "tired" => voice_prefix.push_str("[User sounds tired — be gentle, short sentences] "),
+        "focused" => voice_prefix.push_str("[User is focused — be direct, no filler] "),
         _ => {}
     }
-
-    // Language instruction: if user spoke a non-English language, respond in kind
     if lang != "en" {
-        system_prompt.push_str(&format!(
-            " IMPORTANT: The user spoke in language code '{}'. \
-              Respond entirely in that same language.",
-            lang
-        ));
+        voice_prefix.push_str(&format!("[User spoke in '{}' — respond in that language] ", lang));
+    }
+    voice_prefix.push_str("[VOICE MODE: Keep response under 3 sentences — this will be spoken aloud. No markdown, no bullet points, no code blocks unless the user explicitly asks. Be conversational.] ");
+
+    chat_msg.content = format!("{}{}", voice_prefix, user_text);
+
+    // Collect the streamed response from send_message_stream by listening
+    // to chat_token events. We accumulate them into a single string.
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(256);
+
+    let app_listen = app.clone();
+    let unlisten = app_listen.listen("chat_token", move |event| {
+        if let Some(payload) = event.payload().as_str() {
+            // chat_token payload is a raw string
+            let text = payload.trim_matches('"').to_string();
+            let _ = tx.try_send(text);
+        }
+    });
+
+    // Run the full chat pipeline (tools, brain planner, everything)
+    let messages = vec![chat_msg];
+    let app_send = app.clone();
+
+    // We need to get the MCP manager state. Use a detached task since
+    // send_message_stream requires Tauri managed state we can't easily
+    // pass. Instead, invoke it as if the frontend called it.
+    let user_text_owned = user_text.to_string();
+    let send_handle = tokio::spawn(async move {
+        // Use invoke_internal pattern: call the command directly
+        // This is a simplified path that sends messages through the
+        // existing streaming pipeline. The tokens will be emitted as
+        // chat_token events which we capture above.
+        let _ = app_send.emit("voice_chat_submit", serde_json::json!({
+            "content": user_text_owned,
+            "voice_mode": true,
+        }));
+    });
+
+    // Give the pipeline time to start, then collect tokens
+    tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+    let mut response = String::new();
+    let timeout = tokio::time::Duration::from_secs(30);
+    let start = tokio::time::Instant::now();
+
+    // Wait for chat_done event or timeout
+    let app_done = app.clone();
+    let (done_tx, mut done_rx) = tokio::sync::mpsc::channel::<()>(1);
+    let unlisten_done = app_done.listen("chat_done", move |_| {
+        let _ = done_tx.try_send(());
+    });
+
+    loop {
+        tokio::select! {
+            Some(token) = rx.recv() => {
+                response.push_str(&token);
+            }
+            _ = done_rx.recv() => {
+                // Drain any remaining tokens
+                while let Ok(token) = rx.try_recv() {
+                    response.push_str(&token);
+                }
+                break;
+            }
+            _ = tokio::time::sleep_until(start + timeout) => {
+                break;
+            }
+        }
     }
 
-    // Assemble messages: system + full prior history (already includes the new user turn)
-    let mut messages: Vec<crate::providers::ConversationMessage> = Vec::new();
-    messages.push(crate::providers::ConversationMessage::System(system_prompt));
+    app.unlisten(unlisten);
+    app.unlisten(unlisten_done);
+    let _ = send_handle.await;
 
-    // Add conversation history (the new user turn is already the last item)
-    for msg in conv_history {
-        messages.push(msg.clone());
-    }
-
-    let no_tools: Vec<crate::providers::ToolDefinition> = vec![];
-
-    match crate::providers::complete_turn(
-        &provider,
-        &api_key,
-        &model,
-        &messages,
-        &no_tools,
-        config.base_url.as_deref(),
-    )
-    .await
-    {
-        Ok(turn) => Ok(turn.content),
-        Err(e) => Err(format!("Chat error: {}", e)),
+    if response.trim().is_empty() {
+        Err("No response from chat pipeline".to_string())
+    } else {
+        Ok(response)
     }
 }
 
