@@ -409,18 +409,19 @@ pub fn cleanup_old_screenshots(retention_days: u32) {
         // fingerprint dedup and were never described by the vision model.
         // Deleting their JPEG files saves ~80% of disk compared to keeping everything.
         let one_hour_ago = now - 3600;
-        let stale_frames: Vec<(i64, String, String)> = conn.prepare(
+        let stale_frames: Vec<(i64, String, String)> = if let Ok(mut stmt) = conn.prepare(
             "SELECT id, screenshot_path, thumbnail_path FROM screen_timeline
              WHERE timestamp < ?1 AND (description = '' OR description IS NULL)"
-        )
-        .ok()
-        .and_then(|mut stmt| {
+        ) {
             stmt.query_map(params![one_hour_ago], |row| {
                 Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))
-            }).ok()
-        })
-        .map(|rows| rows.filter_map(|r| r.ok()).collect())
-        .unwrap_or_default();
+            })
+            .ok()
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
 
         for (id, screenshot_path, thumb_path) in &stale_frames {
             let _ = std::fs::remove_file(screenshot_path);

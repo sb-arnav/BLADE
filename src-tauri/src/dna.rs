@@ -61,9 +61,6 @@ pub fn get_person(name: &str) -> Option<String> {
     let person = crate::people_graph::get_person(name)?;
     let mut lines = Vec::new();
     lines.push(format!("**{}**", person.name));
-    if !person.role.is_empty() {
-        lines.push(format!("Role: {}", person.role));
-    }
     if !person.relationship.is_empty() {
         lines.push(format!("Relationship: {}", person.relationship));
     }
@@ -91,10 +88,10 @@ pub fn get_known_people_summary() -> String {
         .iter()
         .take(20)
         .map(|p| {
-            if p.role.is_empty() {
+            if p.relationship.is_empty() {
                 p.name.clone()
             } else {
-                format!("{} ({})", p.name, p.role)
+                format!("{} ({})", p.name, p.relationship)
             }
         })
         .collect();
@@ -177,10 +174,12 @@ pub fn get_goals() -> String {
         .iter()
         .take(5)
         .map(|g| {
-            let progress = if g.progress > 0 {
-                format!(" ({}%)", g.progress)
+            let done = g.subtasks.iter().filter(|s| s.status == "done").count();
+            let total = g.subtasks.len();
+            let progress = if total > 0 {
+                format!(" ({}/{})", done, total)
             } else {
-                String::new()
+                format!(" [{}]", g.status)
             };
             format!("- {}{}", crate::safe_slice(&g.title, 80), progress)
         })

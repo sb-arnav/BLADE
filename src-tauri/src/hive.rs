@@ -2451,8 +2451,8 @@ pub async fn hive_tick(app: &AppHandle) {
                             let name_owned = name.to_string();
                             let platform_owned = platform.clone();
                             tokio::spawn(async move {
-                                crate::people_graph::learn_person_from_conversation(
-                                    &app_clone,
+                                let _ = &app_clone; // keep alive
+                                crate::people_graph::learn_from_conversation_text(
                                     &format!("{} mentioned on {}", name_owned, platform_owned),
                                     "",
                                 ).await;

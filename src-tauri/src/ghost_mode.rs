@@ -174,6 +174,8 @@ fn detect_meeting_platform() -> String {
 /// Capture CHUNK_SECONDS of audio from the default input device.
 /// Returns the PCM samples (f32, mono) and the sample rate.
 /// Falls back gracefully if no device is available.
+/// NOTE: Kept for reference / audio_timeline use. Ghost mode now uses vad::start_vad_capture().
+#[allow(dead_code)]
 fn capture_audio_chunk() -> Option<(Vec<f32>, u32)> {
     let host = cpal::default_host();
     let device = host.default_input_device()?;
@@ -223,6 +225,7 @@ fn capture_audio_chunk() -> Option<(Vec<f32>, u32)> {
 }
 
 /// Simple energy-based VAD: returns true if the chunk contains enough speech.
+#[allow(dead_code)]
 fn has_speech(samples: &[f32]) -> bool {
     let energy: f32 = samples.iter().map(|s| s * s).sum::<f32>() / samples.len() as f32;
     energy > SPEECH_ENERGY_THRESHOLD
@@ -232,6 +235,8 @@ fn has_speech(samples: &[f32]) -> bool {
 
 /// Transcribe audio samples using Groq Whisper API (or local if configured).
 /// Returns the transcript text or empty string on failure.
+/// NOTE: Replaced by deepgram::transcribe_with_fallback() in ghost_mode's main loop.
+#[allow(dead_code)]
 async fn transcribe_chunk(samples: &[f32], sample_rate: u32) -> String {
     // Encode as WAV in memory (mono, 1 channel)
     let wav_data = match crate::voice::encode_wav(samples, 1, sample_rate) {
@@ -386,17 +391,19 @@ pub async fn generate_ghost_response(context: &str, question_detected: &str) -> 
         "Be concise and natural. Match the conversation's energy level.".to_string()
     };
 
+    // Cluely response format: ≤6-word headline, 1-2 bullets ≤15 words, ≤60 chars/line.
+    // Silence is default — only fire when confident. Peripheral reading during calls.
     let system_prompt = format!(
-        "You are BLADE Ghost Mode — an invisible AI assistant helping the user during a live meeting or conversation.\n\
-         Your role: generate a short, natural response the user can say or type.\n\
-         Rules:\n\
-         - Keep response to 1-3 sentences maximum\n\
-         - Sound human, not like an AI assistant\n\
-         - Be direct and relevant to the question asked\n\
-         - Do NOT say 'As an AI' or any meta-commentary\n\
-         - Do NOT add disclaimers or caveats unless critical\n\
+        "You are BLADE Ghost — an invisible AI assistant during live meetings.\n\
+         SILENCE IS DEFAULT. Only respond when the trigger is a genuine question or objection.\n\
+         RESPONSE FORMAT (strict):\n\
+         - Line 1: ≤6-word headline (no period)\n\
+         - Line 2-3: 1-2 bullet points, ≤15 words each, ≤60 chars per line\n\
+         - No markdown headers, no paragraphs, no filler\n\
+         - Sound human — never say 'As an AI'\n\
+         - No disclaimers unless critical\n\
          {}\n\
-         Return ONLY the response text, nothing else.",
+         Return ONLY the formatted response. No preamble.",
         style_hint
     );
 
@@ -455,6 +462,8 @@ pub fn create_ghost_overlay(app: &tauri::AppHandle) -> Result<(), String> {
         _              => (-320.0_f64, -200.0_f64), // bottom-right default
     };
 
+    // content_protected(true) = NSWindowSharingNone on macOS, WDA_EXCLUDEFROMCAPTURE on Windows.
+    // Invisible to screen share in Google Meet, Teams, all browsers. (Zoom macOS bypasses this.)
     let builder = tauri::WebviewWindowBuilder::new(
         app,
         "ghost_overlay",
@@ -467,6 +476,7 @@ pub fn create_ghost_overlay(app: &tauri::AppHandle) -> Result<(), String> {
     .skip_taskbar(true)
     .transparent(true)
     .resizable(false)
+    .content_protected(true)
     .visible(false);
 
     let window = builder.build().map_err(|e| e.to_string())?;
@@ -489,27 +499,6 @@ pub fn create_ghost_overlay(app: &tauri::AppHandle) -> Result<(), String> {
         }
     }
 
-    // Enable content protection (invisible to screen share) on Windows.
-    // SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE = 0x11) makes the window
-    // invisible to screen capture / screen share tools.
-    #[cfg(target_os = "windows")]
-    {
-        if let Ok(hwnd) = window.hwnd() {
-            // Declare SetWindowDisplayAffinity via raw FFI.
-            // The Win32 HWND is a *mut c_void; we pass it as-is.
-            // WDA_EXCLUDEFROMCAPTURE = 0x00000011
-            extern "system" {
-                fn SetWindowDisplayAffinity(
-                    hwnd: *mut std::ffi::c_void,
-                    affinity: u32,
-                ) -> i32;
-            }
-            // windows::Win32::Foundation::HWND(pub *mut core::ffi::c_void)
-            unsafe { SetWindowDisplayAffinity(hwnd.0, 0x00000011); }
-        }
-    }
-
-    // Close on Escape via frontend JS injected at runtime
     let _ = window.show();
 
     log::info!("[ghost_mode] overlay window created at position '{}'", position);
@@ -593,93 +582,104 @@ pub fn stop_ghost_mode(app: &tauri::AppHandle) {
 async fn run_ghost_loop(app: tauri::AppHandle, state: Arc<Mutex<GhostState>>) {
     let config = crate::config::load_config();
     let user_name = config.user_name.clone();
-    let mut previous_speaker: usize = 0;
     let mut context_buffer: VecDeque<ConversationSegment> = VecDeque::new();
+
+    // Start VAD capture — replaces 5s fixed chunks with real speech detection.
+    // Pre-speech buffer (0.27s), noise gate, silence detection, min duration filter.
+    let vad_config = crate::vad::VadConfig::default();
+    let (speech_rx, stop_tx) = match crate::vad::start_vad_capture(vad_config) {
+        Ok(pair) => pair,
+        Err(e) => {
+            log::warn!("[ghost_mode] VAD start failed: {e}");
+            return;
+        }
+    };
+    // stop_tx kept alive here — dropped when function returns, signals VAD thread to stop.
+
+    // Platform polling: check every 10s whether we're in a meeting
+    let mut last_platform_check = std::time::Instant::now();
+    let mut current_platform = "none".to_string();
 
     loop {
         if !GHOST_ACTIVE.load(Ordering::SeqCst) {
+            let _ = stop_tx.try_send(());
             break;
         }
 
-        // 1. Detect active meeting platform
-        let platform = detect_meeting_platform();
-        // Note: s.platform is updated in the meeting-state block below (not here)
-        // so the is_new_meeting check can compare previous vs current platform.
+        // Poll meeting platform every 10 seconds
+        if last_platform_check.elapsed() > std::time::Duration::from_secs(10) {
+            current_platform = detect_meeting_platform();
+            last_platform_check = std::time::Instant::now();
 
-        // Only process audio when a meeting/chat is active
-        if platform == "none" {
-            // If we had a meeting before, clear the meeting state in the HUD
-            {
-                if let Ok(mut s) = state.lock() {
+            let now_secs = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+
+            if let Ok(mut s) = state.lock() {
+                if current_platform == "none" {
                     if s.meeting_start_secs.is_some() {
                         s.meeting_start_secs = None;
                         s.current_speaker = None;
-                        // Notify HUD that meeting ended
                         let _ = app.emit("ghost_meeting_ended", serde_json::json!({}));
                     }
+                } else {
+                    let is_new_meeting = s.platform != current_platform || s.meeting_start_secs.is_none();
+                    if is_new_meeting {
+                        s.meeting_start_secs = Some(now_secs);
+                    }
+                    s.platform = current_platform.clone();
+                    let duration_secs = s.meeting_start_secs
+                        .map(|start| now_secs.saturating_sub(start))
+                        .unwrap_or(0);
+                    let speaker_name = s.current_speaker.clone();
+                    let _ = app.emit("ghost_meeting_state", &GhostMeetingState {
+                        platform: current_platform.clone(),
+                        meeting_name: platform_display_name(&current_platform),
+                        speaker_name,
+                        duration_secs,
+                        listening: true,
+                    });
                 }
-            }
-            tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-            continue;
-        }
-
-        // Track meeting start time and emit HUD meeting state
-        let now_secs = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-        {
-            if let Ok(mut s) = state.lock() {
-                let is_new_meeting = s.platform != platform || s.meeting_start_secs.is_none();
-                if is_new_meeting {
-                    s.meeting_start_secs = Some(now_secs);
-                }
-                s.platform = platform.clone();
-
-                let duration_secs = s.meeting_start_secs
-                    .map(|start| now_secs.saturating_sub(start))
-                    .unwrap_or(0);
-                let speaker_name = s.current_speaker.clone();
-                let meeting_state = GhostMeetingState {
-                    platform: platform.clone(),
-                    meeting_name: platform_display_name(&platform),
-                    speaker_name,
-                    duration_secs,
-                    listening: true,
-                };
-                let _ = app.emit("ghost_meeting_state", &meeting_state);
             }
         }
 
-        // 2. Capture audio chunk
-        let audio_data = tokio::task::spawn_blocking(capture_audio_chunk).await;
-        let (samples, sample_rate) = match audio_data {
-            Ok(Some(d)) => d,
-            _ => {
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                continue;
+        // Wait for a VAD-detected speech segment (non-blocking poll with timeout)
+        let segment = match speech_rx.recv_timeout(std::time::Duration::from_millis(500)) {
+            Ok(seg) => seg,
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                log::warn!("[ghost_mode] VAD channel disconnected");
+                break;
             }
         };
 
-        // 3. VAD gate — skip silent chunks
-        if !has_speech(&samples) {
-            continue;
-        }
+        // Transcribe: try Deepgram streaming first, fall back to Groq Whisper
+        let transcript = match crate::deepgram::transcribe_with_fallback(
+            &segment.wav,
+            &segment.samples,
+            segment.sample_rate,
+        ).await {
+            Some(t) => t,
+            None => continue,
+        };
 
-        // 4. Detect speaker change
-        let speaker_idx = estimate_speaker(&samples, sample_rate, previous_speaker);
-        if speaker_idx != previous_speaker {
-            log::debug!("[ghost_mode] speaker change: {} → {}", previous_speaker, speaker_idx);
-        }
-        previous_speaker = speaker_idx;
-
-        // 5. Transcribe the chunk
-        let text = transcribe_chunk(&samples, sample_rate).await;
+        let text = transcript.text.trim().to_string();
         if text.is_empty() {
             continue;
         }
 
-        log::debug!("[ghost_mode] transcribed [speaker {}]: {}", speaker_idx, text);
+        // Speaker index: Deepgram diarization gives speaker tags (0-based).
+        // Treat speaker 0 as "first speaker heard" — in a 1:1 meeting typically the other person.
+        // Without diarization (Groq fallback), alternate 0/1 based on energy delta (existing heuristic).
+        let speaker_idx = if let Some(spk) = transcript.speaker {
+            spk as usize
+        } else {
+            // Fallback: use existing heuristic
+            estimate_speaker(&segment.samples, segment.sample_rate, 0)
+        };
+
+        log::debug!("[ghost_mode] VAD+STT [speaker {}]: {}", speaker_idx, crate::safe_slice(&text, 60));
 
         // 6. Add to rolling context window
         let now_secs = std::time::SystemTime::now()
@@ -738,9 +738,12 @@ async fn run_ghost_loop(app: tauri::AppHandle, state: Arc<Mutex<GhostState>>) {
             }
         }
 
-        // 7. Check if this segment is a question/prompt directed at the user
-        // (Only react to other speakers, not the user themselves. Speaker 0 = user.)
-        if speaker_idx == 0 {
+        // 7. Check if this segment is a question/prompt directed at the user.
+        // With Deepgram diarization: speaker 0 = first voice detected (usually "them"),
+        // speaker 1 = second voice (usually "you"). Without diarization: heuristic only.
+        // We respond to ANY speaker asking a question (can't always tell who's "user").
+        // TODO: let user calibrate which speaker index is "me" during setup.
+        if speaker_idx == 1 && !user_name.is_empty() {
             continue;
         }
 

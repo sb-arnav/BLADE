@@ -26,7 +26,7 @@
 ///   - Session memory: summarised and stored in chat history when session ends
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use tauri::{Emitter, Manager};
+use tauri::{Emitter, Listener, Manager};
 
 static IS_RECORDING: AtomicBool = AtomicBool::new(false);
 

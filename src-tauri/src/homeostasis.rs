@@ -207,7 +207,7 @@ pub fn hypothalamus_tick() {
         .iter()
         .rev()
         .take(20)
-        .filter(|d| d.feedback_correct == Some(true))
+        .filter(|d| d.feedback == Some(true))
         .count();
 
     if decision_log_size > 5 {
@@ -226,13 +226,13 @@ pub fn hypothalamus_tick() {
         .iter()
         .rev()
         .take(30)
-        .filter(|d| d.feedback_correct == Some(true))
+        .filter(|d| d.feedback == Some(true))
         .count();
     let recent_denied = crate::decision_gate::get_decision_log()
         .iter()
         .rev()
         .take(30)
-        .filter(|d| d.feedback_correct == Some(false))
+        .filter(|d| d.feedback == Some(false))
         .count();
 
     if recent_approved + recent_denied > 3 {
