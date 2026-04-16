@@ -70,6 +70,7 @@ mod organ;
 mod prefrontal;
 mod proactive_vision;
 mod reproductive;
+mod show_engine;
 mod skeleton;
 mod social_cognition;
 mod symbolic;
@@ -1176,6 +1177,9 @@ pub fn run() {
             consequence::consequence_predict,
             metacognition::metacognition_assess,
             social_cognition::social_get_advice,
+            show_engine::show_record_request,
+            show_engine::show_dismiss,
+            show_engine::show_get_patterns,
             symbolic::symbolic_check_policy,
             symbolic::symbolic_list_policies,
             symbolic::symbolic_add_policy,

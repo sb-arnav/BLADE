@@ -2520,6 +2520,12 @@ pub async fn hive_tick(app: &AppHandle) {
             }),
         );
 
+        // Show engine: auto-show CI failure details if user has trained BLADE to do so
+        let app_show = app.clone();
+        tokio::spawn(async move {
+            crate::show_engine::trigger_auto_show(&app_show, "ci_failure").await;
+        });
+
         // Wire AutoFixCard: emit the event it listens for so the card activates in the UI.
         // AutoFixCard.tsx listens on "hive_auto_fix_started" and drives the pipeline UI.
         let run_id_val = failure.details.get("run_id").and_then(|v| v.as_u64()).unwrap_or(0);
@@ -2591,6 +2597,16 @@ async fn execute_decision(app: &AppHandle, decision: &Decision) {
         Decision::Inform { summary } => {
             log::debug!("[Hive] Inform: {}", summary);
             let _ = app.emit("hive_inform", serde_json::json!({ "summary": summary }));
+            // Show engine: surface info if user trained BLADE to show it
+            let app_show = app.clone();
+            let summary_clone = summary.clone();
+            tokio::spawn(async move {
+                // Detect trigger type from summary content
+                let trigger = if summary_clone.to_lowercase().contains("slack") { "slack_mention" }
+                    else if summary_clone.to_lowercase().contains("meeting") { "meeting_start" }
+                    else { return; };
+                crate::show_engine::trigger_auto_show(&app_show, trigger).await;
+            });
         }
         Decision::Reply {
             platform,

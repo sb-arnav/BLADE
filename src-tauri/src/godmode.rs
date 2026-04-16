@@ -52,6 +52,12 @@ fn check_smart_interrupt(app: &tauri::AppHandle, error_preview: &str) {
                         elapsed_min, preview
                     ),
                 }));
+                // Show engine: auto-show error details if learned
+                let app_show = app.clone();
+                tokio::spawn(async move {
+                    crate::show_engine::trigger_auto_show(&app_show, "error_detected").await;
+                });
+
                 // Speak it — BLADE notices you're stuck and says something
                 let app_speak = app.clone();
                 let speak_msg = format!(
