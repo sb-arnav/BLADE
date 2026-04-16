@@ -60,6 +60,7 @@ mod dna;
 mod homeostasis;
 mod immune_system;
 mod organ;
+mod prefrontal;
 mod embeddings;
 mod files;
 mod history;
@@ -1140,6 +1141,8 @@ pub fn run() {
             organ::organ_set_autonomy,
             organ::organ_get_autonomy,
             homeostasis::homeostasis_get,
+            prefrontal::prefrontal_get,
+            prefrontal::prefrontal_clear,
             hive::hive_get_reports,
             hive::hive_approve_decision,
             hive::hive_set_autonomy,

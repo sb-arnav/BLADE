@@ -1148,6 +1148,11 @@ pub async fn send_message_stream(
             }
             let _ = app.emit("chat_done", ());
             let _ = app.emit("blade_status", "idle");
+
+            // Complete prefrontal working memory so follow-up messages
+            // know what was just accomplished
+            crate::prefrontal::complete_task(crate::safe_slice(&clean_content, 200));
+
             // Background: entity extraction + auto-embed + THREAD update + SKILL ENGINE + gap detection
             let app2 = app.clone();
             let app3 = app.clone();
@@ -1597,6 +1602,11 @@ pub async fn send_message_stream(
                 if enriched.len() > raw_error.len() || enriched.contains("Similar files") || enriched.contains("not installed") {
                     content = enriched;
                 }
+            }
+
+            // Prefrontal working memory: record this tool step
+            if !is_error {
+                crate::prefrontal::record_step(&tool_call.name, crate::safe_slice(&content, 150));
             }
 
             // Emit a short preview of the result (first 300 chars) so the UI can show it
