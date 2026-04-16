@@ -134,6 +134,26 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
             let active_title = &perception.active_title;
 
             if !active_app.is_empty() || !active_title.is_empty() {
+                // Detect return from away — generate catch-up summary
+                if idle_nudged {
+                    let away_mins = last_activity.elapsed().as_secs() / 60;
+                    if away_mins >= 5 {
+                        let app_catchup = app.clone();
+                        tokio::spawn(async move {
+                            let summary = generate_catchup_summary(away_mins).await;
+                            if !summary.is_empty() {
+                                let _ = app_catchup.emit("blade_catchup", serde_json::json!({
+                                    "away_minutes": away_mins,
+                                    "summary": &summary,
+                                }));
+                                // Speak it
+                                let _ = crate::tts::speak_and_wait(&app_catchup, &summary).await;
+                                // Also show it via show_engine
+                                crate::show_engine::trigger_auto_show(&app_catchup, "morning").await;
+                            }
+                        });
+                    }
+                }
                 last_activity = std::time::Instant::now();
                 idle_nudged = false;
 
@@ -244,6 +264,49 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
             }
         }
     });
+}
+
+/// Generate a catch-up summary of what happened while the user was away.
+async fn generate_catchup_summary(away_mins: u64) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    parts.push(format!("Welcome back — you were away for {} minutes.", away_mins));
+
+    // Hive: what happened across platforms
+    let digest = crate::hive::get_hive_digest();
+    if !digest.is_empty() && digest.contains("URGENT") {
+        parts.push("Something needs your attention.".to_string());
+    }
+
+    // Integration state: unread counts
+    let istate = crate::integration_bridge::get_integration_state();
+    let mut counts: Vec<String> = Vec::new();
+    if istate.unread_emails > 0 { counts.push(format!("{} unread emails", istate.unread_emails)); }
+    if istate.slack_mentions > 0 { counts.push(format!("{} Slack mentions", istate.slack_mentions)); }
+    if istate.github_notifications > 0 { counts.push(format!("{} GitHub notifications", istate.github_notifications)); }
+    if !counts.is_empty() {
+        parts.push(format!("While you were away: {}.", counts.join(", ")));
+    }
+
+    // Upcoming meetings
+    if !istate.upcoming_events.is_empty() {
+        let next = &istate.upcoming_events[0];
+        if next.minutes_until <= 30 && next.minutes_until >= 0 {
+            parts.push(format!("You have '{}' in {} minutes.", crate::safe_slice(&next.title, 40), next.minutes_until));
+        }
+    }
+
+    // Proactive cards generated while away
+    let cards = crate::proactive_vision::proactive_get_cards(Some(5));
+    if !cards.is_empty() {
+        parts.push(format!("{} observations while you were away.", cards.len()));
+    }
+
+    if parts.len() <= 1 {
+        // Nothing happened
+        return String::new();
+    }
+
+    parts.join(" ")
 }
 
 fn friendly_app(process: &str) -> &str {

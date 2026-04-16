@@ -2592,6 +2592,47 @@ fn decision_to_head(decision: &Decision, hive: &Hive) -> String {
 }
 
 /// Execute an auto-approved decision.
+/// Try to actually send a reply via MCP. Returns true if sent.
+async fn try_send_reply(app: &AppHandle, platform: &str, to: &str, draft: &str) -> bool {
+    use tauri::Manager;
+    let manager = match app.try_state::<crate::mcp::SharedMcpManager>() {
+        Some(m) => m,
+        None => return false,
+    };
+
+    let tool_name = match platform {
+        "slack" => "mcp__claude_ai_Slack__slack_send_message",
+        "email" | "gmail" => "mcp__claude_ai_Gmail__gmail_create_draft",
+        _ => return false, // no MCP tool for this platform
+    };
+
+    let args = match platform {
+        "slack" => serde_json::json!({
+            "channel": to,
+            "text": draft,
+        }),
+        "email" | "gmail" => serde_json::json!({
+            "to": to,
+            "subject": "Re:",
+            "body": draft,
+        }),
+        _ => return false,
+    };
+
+    let result = {
+        let mut mgr = manager.lock().await;
+        mgr.call_tool(tool_name, args).await
+    };
+
+    match result {
+        Ok(r) => !r.is_error,
+        Err(e) => {
+            log::warn!("[Hive] Failed to send reply via {}: {}", platform, e);
+            false
+        }
+    }
+}
+
 async fn execute_decision(app: &AppHandle, decision: &Decision) {
     match decision {
         Decision::Inform { summary } => {
@@ -2625,15 +2666,30 @@ async fn execute_decision(app: &AppHandle, decision: &Decision) {
                 platform,
                 &format!("auto-reply to {}: {}", to, crate::safe_slice(draft, 80)),
             );
-            let _ = app.emit(
-                "hive_action",
-                serde_json::json!({
-                    "type": "reply",
-                    "platform": platform,
-                    "to": to,
-                    "draft": draft
-                }),
-            );
+
+            // Actually send via MCP if platform has a connected server
+            let platform_clone = platform.clone();
+            let to_clone = to.clone();
+            let draft_clone = draft.clone();
+            let app_clone = app.clone();
+            tokio::spawn(async move {
+                let sent = try_send_reply(&app_clone, &platform_clone, &to_clone, &draft_clone).await;
+                let _ = app_clone.emit(
+                    "hive_action",
+                    serde_json::json!({
+                        "type": "reply",
+                        "platform": platform_clone,
+                        "to": to_clone,
+                        "draft": draft_clone,
+                        "sent": sent,
+                    }),
+                );
+                if sent {
+                    // Speak confirmation
+                    let msg = format!("Sent a reply to {} on {}.", to_clone, platform_clone);
+                    let _ = crate::tts::speak_and_wait(&app_clone, &msg).await;
+                }
+            });
         }
         Decision::Act {
             action,

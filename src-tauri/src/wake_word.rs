@@ -281,6 +281,16 @@ async fn run_wake_loop(app: tauri::AppHandle, phrases: Vec<String>, energy_thres
                                 let ack = random_ack();
                                 log::info!("[wake_word] ack: {}", ack);
                                 crate::tts::speak(ack);
+
+                                // Auto-start voice conversation if not already active
+                                if !crate::voice_global::voice_conversation_active() {
+                                    let app_voice = app_clone.clone();
+                                    tokio::spawn(async move {
+                                        // Small delay so the ack finishes speaking
+                                        tokio::time::sleep(tokio::time::Duration::from_millis(800)).await;
+                                        let _ = crate::voice_global::start_voice_conversation(app_voice).await;
+                                    });
+                                }
                             }
                         }
                         Err(e) => log::debug!("[wake_word] transcription error: {}", e),

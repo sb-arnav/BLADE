@@ -10,6 +10,7 @@ import { NotificationCenter, useNotifications } from "./components/NotificationC
 import { TitleBar } from "./components/TitleBar";
 import { GlowOverlay } from "./components/GlowOverlay";
 import { AutoShowOverlay } from "./components/AutoShowOverlay";
+import { CatchupOverlay } from "./components/CatchupOverlay";
 import { OnboardingFlow } from "./components/OnboardingFlow";
 import { useChat } from "./hooks/useChat";
 import { useTTS } from "./hooks/useTTS";
@@ -1225,6 +1226,8 @@ export default function App() {
 
       {/* Onboarding — shown on first launch */}
       {showOnboarding && <OnboardingFlow onComplete={() => setShowOnboarding(false)} />}
+      {/* Catch-up overlay — "welcome back" summary after being away */}
+      <CatchupOverlay />
       {/* Auto-show overlay — BLADE proactively shows learned content */}
       <AutoShowOverlay />
       {/* Glow overlay — BLADE's visual heartbeat */}
