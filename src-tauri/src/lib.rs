@@ -1148,6 +1148,7 @@ pub fn run() {
             prefrontal::prefrontal_get,
             prefrontal::prefrontal_clear,
             proactive_vision::proactive_get_cards,
+            proactive_vision::proactive_get_focus_score,
             proactive_vision::proactive_dismiss_card,
             hive::hive_get_reports,
             hive::hive_approve_decision,

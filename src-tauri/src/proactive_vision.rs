@@ -84,6 +84,24 @@ pub async fn on_context_switch(
         }
     });
 
+    // Memory extraction — extract facts/knowledge from what's visible on screen
+    let app4 = app.clone();
+    let ctx4 = context.clone();
+    let to_app4 = to_app.to_string();
+    tokio::spawn(async move {
+        if let Some(card) = extract_memory(&ctx4, &to_app4).await {
+            let _ = app4.emit("proactive_card", &card);
+            store_card(&card);
+            // Also feed into typed_memory so it persists
+            let _ = crate::typed_memory::store_typed_memory(
+                crate::typed_memory::MemoryCategory::Fact,
+                &card.body,
+                "proactive_vision",
+                Some(card.confidence as f64),
+            );
+        }
+    });
+
     // Insight surfacing — connect what's on screen to what BLADE knows
     tokio::spawn(async move {
         if let Some(card) = surface_insight(&ctx1, &to_app_owned).await {
@@ -122,6 +140,11 @@ async fn extract_tasks(context: &str, source_app: &str) -> Option<ProactiveCard>
 
     let text = result.content.trim().to_string();
     if text.is_empty() || text.to_uppercase().starts_with("NONE") {
+        return None;
+    }
+
+    // Dedup: skip if we already extracted a similar task recently
+    if is_duplicate_card("task", &text) {
         return None;
     }
 
@@ -231,6 +254,77 @@ async fn surface_insight(context: &str, source_app: &str) -> Option<ProactiveCar
     })
 }
 
+/// Extract facts/knowledge visible on screen (Omi's MemoryAssistant).
+/// Looks for: names, dates, project details, technical facts, decisions.
+async fn extract_memory(context: &str, source_app: &str) -> Option<ProactiveCard> {
+    let config = crate::config::load_config();
+    if config.api_key.is_empty() && config.provider != "ollama" {
+        return None;
+    }
+
+    let model = crate::config::cheap_model_for_provider(&config.provider, &config.model);
+
+    let prompt = format!(
+        "Look at this screen context and extract any important FACTS worth remembering: \
+         names of people, project details, technical decisions, dates, commitments made. \
+         NOT tasks/todos (those are handled separately). Only durable facts.\n\
+         If nothing worth remembering, respond with: NONE\n\
+         If yes, respond with ONE fact sentence (max 100 chars).\n\n\
+         Context:\n{}",
+        crate::safe_slice(context, 600)
+    );
+
+    let messages = vec![crate::providers::ConversationMessage::User(prompt)];
+
+    let result = crate::providers::complete_turn(
+        &config.provider, &config.api_key, &model,
+        &messages, &crate::providers::no_tools(),
+        config.base_url.as_deref(),
+    ).await.ok()?;
+
+    let text = result.content.trim().to_string();
+    if text.is_empty() || text.to_uppercase().starts_with("NONE") {
+        return None;
+    }
+
+    // Dedup: check if we recently extracted a similar memory
+    if is_duplicate_card("memory", &text) {
+        return None;
+    }
+
+    Some(ProactiveCard {
+        card_type: "memory".to_string(),
+        title: "Fact observed".to_string(),
+        body: crate::safe_slice(&text, 150).to_string(),
+        source_app: source_app.to_string(),
+        confidence: 0.65,
+        timestamp: chrono::Utc::now().timestamp(),
+        dismissed: false,
+    })
+}
+
+/// Simple deduplication: check if a similar card was extracted in the last 10 minutes.
+/// Uses first-50-chars matching (cheap, good enough for short extractions).
+fn is_duplicate_card(card_type: &str, body: &str) -> bool {
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    let conn = match rusqlite::Connection::open(&db_path) {
+        Ok(c) => c,
+        Err(_) => return false,
+    };
+
+    let cutoff = chrono::Utc::now().timestamp() - 600; // 10 minutes
+    let search = format!("{}%", crate::safe_slice(body, 50));
+
+    let count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM proactive_cards
+         WHERE card_type = ?1 AND body LIKE ?2 AND timestamp > ?3",
+        rusqlite::params![card_type, search, cutoff],
+        |row| row.get(0),
+    ).unwrap_or(0);
+
+    count > 0
+}
+
 fn store_card(card: &ProactiveCard) {
     let db_path = crate::config::blade_config_dir().join("blade.db");
     if let Ok(conn) = rusqlite::Connection::open(&db_path) {
@@ -252,6 +346,100 @@ fn store_card(card: &ProactiveCard) {
             rusqlite::params![card.card_type, card.title, card.body, card.source_app, card.confidence, card.timestamp],
         );
     }
+}
+
+// ── Daily Focus Score (from Omi's DailyScoreWidget) ──────────────────────────
+//
+// Computes a 0-100 productivity score from today's activity_monitor data.
+// Productive apps (code editors, terminals) = +points
+// Distraction apps (social media, entertainment) = -points
+// Neutral apps (browser, slack) = context-dependent
+
+/// Compute today's focus score from activity_monitor data.
+pub fn compute_daily_focus_score() -> DailyFocusScore {
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    let conn = match rusqlite::Connection::open(&db_path) {
+        Ok(c) => c,
+        Err(_) => return DailyFocusScore::default(),
+    };
+
+    let today_start = {
+        let now = chrono::Local::now();
+        now.date_naive().and_hms_opt(0, 0, 0)
+            .map(|t| t.and_local_timezone(chrono::Local).unwrap().timestamp())
+            .unwrap_or(0)
+    };
+
+    let mut stmt = match conn.prepare(
+        "SELECT app_name, SUM(duration_secs) FROM activity_monitor
+         WHERE timestamp > ?1 GROUP BY app_name"
+    ) {
+        Ok(s) => s,
+        Err(_) => return DailyFocusScore::default(),
+    };
+
+    let rows: Vec<(String, i64)> = stmt
+        .query_map(rusqlite::params![today_start], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+        })
+        .ok()
+        .map(|r| r.filter_map(|x| x.ok()).collect())
+        .unwrap_or_default();
+
+    let mut productive_secs: i64 = 0;
+    let mut distraction_secs: i64 = 0;
+    let mut total_secs: i64 = 0;
+
+    for (app, secs) in &rows {
+        total_secs += secs;
+        let lower = app.to_lowercase();
+
+        let is_productive = lower.contains("code") || lower.contains("cursor")
+            || lower.contains("vim") || lower.contains("terminal")
+            || lower.contains("powershell") || lower.contains("wt")
+            || lower.contains("idea") || lower.contains("webstorm")
+            || lower.contains("pycharm") || lower.contains("rider")
+            || lower.contains("figma") || lower.contains("notion")
+            || lower.contains("linear") || lower.contains("obsidian");
+
+        let is_distraction = lower.contains("twitter") || lower.contains("reddit")
+            || lower.contains("instagram") || lower.contains("tiktok")
+            || lower.contains("youtube") || lower.contains("netflix")
+            || lower.contains("twitch") || lower.contains("facebook");
+
+        if is_productive {
+            productive_secs += secs;
+        } else if is_distraction {
+            distraction_secs += secs;
+        }
+    }
+
+    if total_secs == 0 {
+        return DailyFocusScore::default();
+    }
+
+    let productive_ratio = productive_secs as f32 / total_secs as f32;
+    let distraction_ratio = distraction_secs as f32 / total_secs as f32;
+
+    // Score: 100 * productive_ratio - 50 * distraction_ratio, clamped 0-100
+    let raw_score = (productive_ratio * 100.0 - distraction_ratio * 50.0).clamp(0.0, 100.0);
+
+    DailyFocusScore {
+        score: raw_score as u32,
+        productive_minutes: (productive_secs / 60) as u32,
+        distraction_minutes: (distraction_secs / 60) as u32,
+        total_minutes: (total_secs / 60) as u32,
+        top_app: rows.iter().max_by_key(|(_, s)| s).map(|(a, _)| a.clone()).unwrap_or_default(),
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DailyFocusScore {
+    pub score: u32,              // 0-100
+    pub productive_minutes: u32,
+    pub distraction_minutes: u32,
+    pub total_minutes: u32,
+    pub top_app: String,
 }
 
 // ── Tauri Commands ───────────────────────────────────────────────────────────
@@ -286,6 +474,11 @@ pub fn proactive_get_cards(limit: Option<usize>) -> Vec<ProactiveCard> {
     .ok()
     .map(|rows| rows.filter_map(|r| r.ok()).collect())
     .unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn proactive_get_focus_score() -> DailyFocusScore {
+    compute_daily_focus_score()
 }
 
 #[tauri::command]
