@@ -65,6 +65,7 @@ mod joints;
 mod organ;
 mod prefrontal;
 mod proactive_vision;
+mod reproductive;
 mod skeleton;
 mod supervisor;
 mod urinary;
@@ -1160,6 +1161,8 @@ pub fn run() {
             supervisor::supervisor_get_service,
             urinary::urinary_flush,
             urinary::immune_get_status,
+            reproductive::reproductive_get_dna,
+            reproductive::reproductive_spawn,
             homeostasis::homeostasis_get,
             homeostasis::homeostasis_get_directive,
             homeostasis::homeostasis_get_circadian,
