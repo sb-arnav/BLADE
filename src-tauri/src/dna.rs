@@ -314,6 +314,15 @@ pub fn query_for_brain(user_query: &str) -> String {
         }
     }
 
+    // File awareness — if query mentions files, documents, downloads
+    let file_keywords = ["file", "document", "download", "pdf", "photo", "image", "video", "where", "find"];
+    if file_keywords.iter().any(|k| query_lower.contains(k)) {
+        let file_ctx = crate::file_indexer::get_file_context();
+        if !file_ctx.is_empty() {
+            sections.push(file_ctx);
+        }
+    }
+
     // Thalamus: selective perception routing (only relevant screen/system data)
     let perception_ctx = get_relevant_perception(user_query);
     if !perception_ctx.is_empty() {
