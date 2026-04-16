@@ -9,6 +9,7 @@ import { CommandPalette } from "./components/CommandPalette";
 import { NotificationCenter, useNotifications } from "./components/NotificationCenter";
 import { TitleBar } from "./components/TitleBar";
 import { GlowOverlay } from "./components/GlowOverlay";
+import { OnboardingFlow } from "./components/OnboardingFlow";
 import { useChat } from "./hooks/useChat";
 import { useTTS } from "./hooks/useTTS";
 import { useKeyboard } from "./hooks/useKeyboard";
@@ -63,7 +64,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, EBState> {
   }
 }
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar" | "workflow-builder" | "code-sandbox" | "persona" | "negotiation" | "financial" | "context-engine" | "reasoning" | "social-graph" | "health" | "documents" | "habits" | "knowledge-graph" | "meetings" | "predictions" | "emotional-intel" | "decision-log" | "security" | "health-panel" | "temporal" | "integrations" | "smart-home" | "finance" | "hive" | "agent-factory" | "rewind" | "live-notes" | "focus-page" | "insight-page" | "persona-page";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar" | "workflow-builder" | "code-sandbox" | "persona" | "negotiation" | "financial" | "context-engine" | "reasoning" | "social-graph" | "health" | "documents" | "habits" | "knowledge-graph" | "meetings" | "predictions" | "emotional-intel" | "decision-log" | "security" | "health-panel" | "temporal" | "integrations" | "smart-home" | "finance" | "hive" | "agent-factory" | "rewind" | "live-notes" | "focus-page" | "insight-page" | "persona-page" | "task-agents";
 
 const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
 const Canvas = lazy(() => import("./components/Canvas"));
@@ -133,6 +134,7 @@ const LiveNotes = lazy(() => import("./components/LiveNotes").then(m => ({ defau
 const FocusPage = lazy(() => import("./components/FocusPage").then(m => ({ default: m.FocusPage })));
 const InsightPage = lazy(() => import("./components/InsightPage").then(m => ({ default: m.InsightPage })));
 const PersonaPage2 = lazy(() => import("./components/PersonaPage").then(m => ({ default: m.PersonaPage })));
+const TaskAgentView = lazy(() => import("./components/TaskAgentView").then(m => ({ default: m.TaskAgentView })));
 const AgentFactoryView = lazy(() => import("./components/AgentFactory").then(m => ({ default: m.AgentFactory })));
 
 function ShellFallback({ label = "Loading workspace..." }: { label?: string }) {
@@ -214,6 +216,7 @@ export default function App() {
   const [branchOpen, setBranchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(() => !localStorage.getItem("blade_onboarded"));
   const [workspaceIntent, setWorkspaceIntent] = useState<{ route: Route; title: string; note: string } | null>(null);
   const chat = useChat();
   const tts = useTTS(chat.messages, chat.loading, config);
@@ -979,6 +982,7 @@ export default function App() {
     { id: "focus-page", label: "Focus", description: "Productivity score, app usage, circadian rhythm", section: "Features", action: () => openRoute("focus-page") },
     { id: "insight-page", label: "Insights", description: "Browse all proactive observations and discoveries", section: "Features", action: () => openRoute("insight-page") },
     { id: "persona-page", label: "Persona", description: "View and edit BLADE's understanding of you", section: "Features", action: () => openRoute("persona-page") },
+    { id: "task-agents", label: "Task Agents", description: "Spawn and monitor autonomous coding agents", section: "Work", action: () => openRoute("task-agents") },
     { id: "agent-factory", label: "Agent Factory", description: "Describe an agent in plain English and deploy it as a live Hive tentacle", section: "Work", action: () => openRoute("agent-factory") },
     { id: "agents", label: "Operator Center", description: "Launch the multi-runtime control plane", section: "Work", action: () => openRoute("agents") },
     { id: "agent-teams", label: "Agent teams", description: "Coordinate multi-role execution plans", section: "Work", action: () => openRoute("agent-teams") },
@@ -1152,6 +1156,7 @@ export default function App() {
     "focus-page": <FocusPage onBack={() => openRoute("dashboard")} />,
     "insight-page": <InsightPage onBack={() => openRoute("dashboard")} />,
     "persona-page": <PersonaPage2 onBack={() => openRoute("dashboard")} />,
+    "task-agents": <TaskAgentView onBack={() => openRoute("dashboard")} />,
     "agent-factory": <AgentFactoryView onBack={() => openRoute("dashboard")} />,
   };
 
@@ -1217,6 +1222,8 @@ export default function App() {
         </div>
       )}
 
+      {/* Onboarding — shown on first launch */}
+      {showOnboarding && <OnboardingFlow onComplete={() => setShowOnboarding(false)} />}
       {/* Glow overlay — BLADE's visual heartbeat */}
       <GlowOverlay />
       {/* TitleBar is now embedded in Sidebar's logo row via drag region — keep for window controls */}
