@@ -344,6 +344,7 @@ pub fn start_timeline_capture_loop(app: tauri::AppHandle) {
         const CLEANUP_EVERY: u64 = 720; // run cleanup every ~1 hour (720 * 5s)
 
         loop {
+            crate::supervisor::heartbeat("screen_timeline");
             capture_timeline_tick(&app).await;
 
             // Context-switch detection: check if app or window changed

@@ -74,6 +74,7 @@ pub fn start_perception_loop(_app: tauri::AppHandle) {
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
             // spawn_blocking so the sync I/O (arboard, win32, ps) doesn't stall the runtime
+            crate::supervisor::heartbeat("perception");
             let _ = tokio::task::spawn_blocking(update_perception).await;
         }
     });

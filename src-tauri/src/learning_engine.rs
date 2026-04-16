@@ -1009,6 +1009,7 @@ pub fn start_learning_engine(app: tauri::AppHandle) {
                 continue;
             }
 
+            crate::supervisor::heartbeat("learning_engine");
             let count = analyze_and_store_patterns().await;
             log::info!("learning_engine: analyzed {} patterns", count);
 

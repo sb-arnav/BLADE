@@ -236,6 +236,12 @@ pub fn hypothalamus_tick() {
         0.0
     };
 
+    // ── Supervisor health check: detect stuck/dead services ────────────
+    let dead_services = crate::supervisor::check_service_health();
+    if !dead_services.is_empty() {
+        state.urgency = (state.urgency + 0.1 * dead_services.len() as f32).min(1.0);
+    }
+
     // ── Blood pressure feedback: high API usage → lower energy ─────────
     let bp = crate::cardiovascular::get_blood_pressure();
     if bp.api_calls_per_minute > 20 {
@@ -288,6 +294,7 @@ pub fn start_hypothalamus(app: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+            crate::supervisor::heartbeat("homeostasis");
             hypothalamus_tick();
 
             // Emit hormone state for HUD/dashboard
