@@ -2,7 +2,8 @@ import React from "react";
 
 export type NavRailRoute =
   | "dashboard" | "chat" | "terminal" | "git"
-  | "hive" | "agent-factory" | "security" | "settings";
+  | "hive" | "agent-factory" | "security" | "settings"
+  | "rewind" | "live-notes";
 
 interface NavRailProps {
   activeRoute: string;
@@ -89,6 +90,14 @@ export function NavRail({ activeRoute, onNavigate, onOpenHistory }: NavRailProps
 
       <NavBtn tip="Hive" active={activeRoute === "hive"} onClick={() => onNavigate("hive")}>
         <Ico d={<><polygon points="12,2 18,6 18,14 12,18 6,14 6,6"/><circle cx="12" cy="10" r="2"/></>} />
+      </NavBtn>
+
+      <NavBtn tip="Rewind" active={activeRoute === "rewind"} onClick={() => onNavigate("rewind")}>
+        <Ico d={<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/><path d="M7 4L4 7l3 3"/></>} />
+      </NavBtn>
+
+      <NavBtn tip="Live Notes" active={activeRoute === "live-notes"} onClick={() => onNavigate("live-notes")}>
+        <Ico d={<><path d="M4 4h16v16H4z" fill="none"/><path d="M8 8h8M8 12h6M8 16h4"/></>} />
       </NavBtn>
 
       <div className="flex-1" />
