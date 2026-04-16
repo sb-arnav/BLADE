@@ -377,6 +377,26 @@ pub fn hypothalamus_tick() {
 
     state.last_updated = now;
 
+    // Audit: log significant hormone changes
+    let old = get_hormones();
+    if (state.energy_mode - old.energy_mode).abs() > 0.15
+        || (state.adrenaline - old.adrenaline).abs() > 0.3
+        || (state.insulin - old.insulin).abs() > 0.2
+    {
+        crate::audit::record(
+            "homeostasis",
+            &format!("energy {:.1}→{:.1}, adrenaline {:.1}→{:.1}, insulin {:.1}→{:.1}",
+                old.energy_mode, state.energy_mode,
+                old.adrenaline, state.adrenaline,
+                old.insulin, state.insulin),
+            &format!("user_state={}, battery={}, api_rate={}/min, circadian={:.1}",
+                user_state, on_battery, bp.api_calls_per_minute,
+                profile[hour as usize]),
+            "",
+            "adjusted",
+        );
+    }
+
     // Write back
     if let Ok(mut guard) = hormone_store().lock() {
         *guard = state.clone();

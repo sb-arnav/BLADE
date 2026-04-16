@@ -771,6 +771,14 @@ fn build_system_prompt_inner(
         }
     }
 
+    // ── AUDIT CONTEXT (priority 8.2) — explain decisions when asked ─────────────
+    if !user_query.is_empty() {
+        let audit_ctx = crate::audit::get_audit_context(user_query);
+        if !audit_ctx.is_empty() {
+            parts.push(audit_ctx);
+        }
+    }
+
     // ── SOCIAL COGNITION (priority 8.3) ─────────────────────────────────────────
     // When the query involves people/communication, inject social dynamics advice.
     if !user_query.is_empty() {

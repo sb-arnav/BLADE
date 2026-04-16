@@ -54,6 +54,7 @@ mod context;
 mod crypto;
 mod db;
 mod db_commands;
+mod audit;
 mod brain_planner;
 mod cardiovascular;
 mod consequence;
@@ -1167,6 +1168,7 @@ pub fn run() {
             urinary::immune_get_status,
             reproductive::reproductive_get_dna,
             reproductive::reproductive_spawn,
+            audit::audit_get_log,
             consequence::consequence_predict,
             metacognition::metacognition_assess,
             social_cognition::social_get_advice,

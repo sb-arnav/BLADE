@@ -157,6 +157,15 @@ Respond with ONLY the numbered plan. No preamble, no explanation, no markdown he
                     .join("\n"))
             };
 
+            // Audit: log the plan decision
+            crate::audit::record(
+                "brain_planner",
+                &format!("Plan for: {}", crate::safe_slice(user_query, 60)),
+                &crate::safe_slice(&plan, 150),
+                &format!("energy={:.1}, from_cache={}", energy, false),
+                "planned",
+            );
+
             // Store in prefrontal working memory
             crate::prefrontal::begin_task(user_query, &plan);
             // Store in plan memory (pending — will be confirmed or rejected later)
