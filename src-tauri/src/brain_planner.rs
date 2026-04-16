@@ -143,8 +143,11 @@ Respond with ONLY the numbered plan. No preamble, no explanation, no markdown he
                 return String::new();
             }
             // SYMBOLIC: verify plan constraints before executing
-            // Check if referenced organs are available, policies aren't violated
             let warnings = crate::symbolic::verify_plan_constraints(&plan);
+
+            // WORLD MODEL: predict consequences of this plan
+            let consequences = crate::consequence::predict_consequences(&plan);
+            let consequence_text = crate::consequence::format_warnings(&consequences);
             let warning_text = if warnings.is_empty() {
                 String::new()
             } else {
@@ -162,6 +165,10 @@ Respond with ONLY the numbered plan. No preamble, no explanation, no markdown he
             let mut formatted = format_plan(&plan, false);
             if !warning_text.is_empty() {
                 formatted.push_str(&warning_text);
+            }
+            if !consequence_text.is_empty() {
+                formatted.push_str("\n\n");
+                formatted.push_str(&consequence_text);
             }
             formatted
         }
