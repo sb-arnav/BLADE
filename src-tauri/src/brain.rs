@@ -771,6 +771,15 @@ fn build_system_prompt_inner(
         }
     }
 
+    // ── SOCIAL COGNITION (priority 8.3) ─────────────────────────────────────────
+    // When the query involves people/communication, inject social dynamics advice.
+    if !user_query.is_empty() {
+        let social = crate::social_cognition::get_social_injection(user_query);
+        if !social.is_empty() {
+            parts.push(social);
+        }
+    }
+
     // ── METACOGNITION (priority 8.5) ───────────────────────────────────────────
     // Self-awareness: does BLADE know enough to handle this? Should it ask?
     // Only injected when confidence is low or query is complex.

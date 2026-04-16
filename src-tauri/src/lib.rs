@@ -69,6 +69,7 @@ mod prefrontal;
 mod proactive_vision;
 mod reproductive;
 mod skeleton;
+mod social_cognition;
 mod symbolic;
 mod supervisor;
 mod urinary;
@@ -1168,6 +1169,7 @@ pub fn run() {
             reproductive::reproductive_spawn,
             consequence::consequence_predict,
             metacognition::metacognition_assess,
+            social_cognition::social_get_advice,
             symbolic::symbolic_check_policy,
             symbolic::symbolic_list_policies,
             symbolic::symbolic_add_policy,

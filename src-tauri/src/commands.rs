@@ -323,6 +323,42 @@ async fn try_free_model_fallback(
 }
 
 /// Count implied task steps in a user query.
+/// Detect if a query needs deep multi-step REASONING (not action).
+/// "Why is our conversion rate dropping?" = reasoning
+/// "Deploy my app" = action (NOT reasoning)
+fn is_reasoning_query(query: &str) -> bool {
+    let q = query.to_lowercase();
+
+    // Reasoning indicators: questions that need analysis, not execution
+    let reasoning_signals = [
+        "why ", "why?", "how does", "how would", "what causes",
+        "explain", "analyze", "compare", "evaluate", "what if",
+        "trade-off", "tradeoff", "pros and cons", "should i",
+        "what's the best", "which is better", "difference between",
+        "implications", "consequences of", "root cause",
+        "strategy for", "approach to", "reasoning behind",
+        "think through", "break down", "deep dive",
+    ];
+
+    // Action indicators: things that need tools, not thinking
+    let action_signals = [
+        "run ", "execute", "install", "deploy", "build", "create",
+        "delete", "open", "send", "post", "write file", "read file",
+        "git ", "npm ", "cargo ", "fix this", "do this",
+    ];
+
+    let reasoning_score: usize = reasoning_signals.iter()
+        .filter(|s| q.contains(*s))
+        .count();
+
+    let action_score: usize = action_signals.iter()
+        .filter(|s| q.contains(*s))
+        .count();
+
+    // Need at least 1 reasoning signal and more reasoning than action signals
+    reasoning_score >= 1 && reasoning_score > action_score
+}
+
 /// NOSE: sanitize user input before it reaches the brain.
 /// Strips null bytes, excessive whitespace, caps length, removes control chars.
 fn sanitize_input(input: &str) -> String {
@@ -658,6 +694,53 @@ pub async fn send_message_stream(
         if !smart_ctx.is_empty() {
             system_prompt.push_str("\n\n---\n\n");
             system_prompt.push_str(&smart_ctx);
+        }
+    }
+
+    // ── REASONING ENGINE: deep thinking for analytical queries ─────────────
+    // If the query needs multi-step REASONING (not action), route through
+    // reasoning_engine instead of the tool loop. The reasoning engine does:
+    // decompose → analyze → self-critique → revise → synthesize.
+    {
+        let needs_reasoning = is_reasoning_query(&last_user_text);
+        if needs_reasoning && last_user_text.split_whitespace().count() > 5 {
+            let _ = app.emit("blade_status", "thinking");
+            let _ = app.emit("blade_planning", serde_json::json!({
+                "query": crate::safe_slice(&last_user_text, 120),
+                "mode": "deep_reasoning",
+            }));
+
+            let dna_context = crate::dna::query_for_brain(&last_user_text);
+            match crate::reasoning_engine::reason_through(
+                &last_user_text,
+                &dna_context,
+                5, // max 5 reasoning steps
+                app.clone(),
+            ).await {
+                Ok(trace) => {
+                    // Stream the final answer as chat tokens
+                    let answer = &trace.final_answer;
+                    for word in answer.split_whitespace() {
+                        let _ = app.emit("chat_token", format!("{} ", word));
+                        tokio::task::yield_now().await;
+                    }
+                    let _ = app.emit("chat_done", ());
+                    let _ = app.emit("blade_status", "idle");
+
+                    // Record the reasoning for solution memory
+                    crate::metacognition::remember_solution(
+                        &last_user_text,
+                        crate::safe_slice(&trace.final_answer, 300),
+                        &["reasoning_engine".to_string()],
+                    );
+
+                    return Ok(());
+                }
+                Err(e) => {
+                    // Reasoning failed — fall through to normal chat
+                    log::warn!("[reasoning] Deep reasoning failed: {} — falling back to normal chat", e);
+                }
+            }
         }
     }
 
