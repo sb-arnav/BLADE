@@ -25,11 +25,17 @@ pub async fn plan_task(
         return String::new();
     }
 
-    // Use the fast task routing if configured (e.g. Groq for speed),
-    // otherwise fall back to cheap model on the active provider
-    let (provider, api_key, model) = {
+    // Model selection adapts to homeostasis energy_mode:
+    // High energy (>0.7): use the quality model for better plans
+    // Low energy (<0.3): use the cheapest available for speed/cost
+    // Normal: use fast task routing
+    let energy = crate::homeostasis::energy_mode();
+    let (provider, api_key, model) = if energy > 0.7 {
+        // High energy — use the configured model for quality planning
+        (config.provider.clone(), config.api_key.clone(), config.model.clone())
+    } else {
+        // Normal/low energy — use fast routing or cheap model
         let (p, k, m) = crate::config::resolve_provider_for_task(&config, &crate::router::TaskType::Simple);
-        // If routing gave us a fast provider, use it; otherwise use cheap model
         if p != config.provider && !k.is_empty() {
             (p, k, m)
         } else {
