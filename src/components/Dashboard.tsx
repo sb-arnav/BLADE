@@ -427,12 +427,22 @@ function ProactiveCardsPanel() {
       </div>
       <div className="flex flex-col gap-[4px] overflow-hidden">
         {cards.slice(0, 3).map((card, i) => (
-          <div key={i} className="flex items-start gap-[6px] px-[8px] py-[6px] rounded-[8px] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)]">
+          <div key={i} className="flex items-start gap-[6px] px-[8px] py-[6px] rounded-[8px] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] group">
             <span className="text-[12px] flex-shrink-0 mt-[1px]">{iconForType(card.card_type)}</span>
-            <div className="min-w-0">
+            <div className="flex-1 min-w-0">
               <div className="text-[11px] font-semibold truncate">{card.title}</div>
               <div className="text-[10px] text-[rgba(255,255,255,0.5)] truncate">{card.body}</div>
             </div>
+            <button
+              onClick={() => {
+                invoke("send_message_stream", {
+                  messages: [{ role: "user", content: `Handle this: ${card.body}`, image_base64: null }],
+                }).catch(() => null);
+              }}
+              className="text-[9px] px-[6px] py-[2px] rounded bg-[rgba(129,140,248,0.15)] text-[#818cf8] border border-[rgba(129,140,248,0.2)] opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 hover:bg-[rgba(129,140,248,0.25)]"
+            >
+              act
+            </button>
           </div>
         ))}
       </div>
