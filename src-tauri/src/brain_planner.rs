@@ -142,12 +142,28 @@ Respond with ONLY the numbered plan. No preamble, no explanation, no markdown he
             if plan.is_empty() || plan.len() < 20 {
                 return String::new();
             }
+            // SYMBOLIC: verify plan constraints before executing
+            // Check if referenced organs are available, policies aren't violated
+            let warnings = crate::symbolic::verify_plan_constraints(&plan);
+            let warning_text = if warnings.is_empty() {
+                String::new()
+            } else {
+                format!("\n\n**Warnings:**\n{}", warnings.iter()
+                    .map(|w| format!("- {}", w))
+                    .collect::<Vec<_>>()
+                    .join("\n"))
+            };
+
             // Store in prefrontal working memory
             crate::prefrontal::begin_task(user_query, &plan);
             // Store in plan memory (pending — will be confirmed or rejected later)
             store_pending_plan(&request_hash, user_query, &plan);
 
-            format_plan(&plan, false)
+            let mut formatted = format_plan(&plan, false);
+            if !warning_text.is_empty() {
+                formatted.push_str(&warning_text);
+            }
+            formatted
         }
         Err(e) => {
             log::warn!("[BrainPlanner] Planning failed: {}", e);
