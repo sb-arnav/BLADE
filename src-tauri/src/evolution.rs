@@ -565,10 +565,21 @@ pub async fn run_evolution_cycle(app: &tauri::AppHandle) {
     }
 
     // Pituitary GH: only grow capabilities when growth hormone is adequate.
-    // Low GH (night, conservation mode) → skip discovery to save API calls.
     let gh = crate::homeostasis::growth_hormone();
     if gh < 0.3 {
         return; // body is conserving — not the time for growth
+    }
+
+    // Leptin: skip evolution when knowledge-satiated
+    let leptin = crate::homeostasis::get_hormones().leptin;
+    if leptin > 0.8 {
+        return; // satiated — have enough capabilities, stop acquiring
+    }
+
+    // Insulin: skip if API budget is stressed
+    let insulin = crate::homeostasis::get_hormones().insulin;
+    if insulin > 0.7 {
+        return; // budget stressed — don't spend on discovery
     }
 
     // Guard against double-running if a previous cycle is still executing
