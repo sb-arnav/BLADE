@@ -39,7 +39,7 @@ fn recent_store() -> &'static Mutex<Vec<OsNotification>> {
 const MAX_STORED: usize = 50;
 
 fn store_notification(n: OsNotification) {
-    let mut guard = recent_store().lock().unwrap();
+    let mut guard = recent_store().lock().unwrap_or_else(|e| e.into_inner());
     // Dedup by (app_name, title, body) within last 60s
     let already = guard.iter().any(|existing| {
         existing.app_name == n.app_name
@@ -60,7 +60,7 @@ fn store_notification(n: OsNotification) {
 /// Return the count of unread notifications seen in the current session.
 /// Used by the HUD bar to show an unread badge.
 pub fn get_unread_count() -> u32 {
-    let guard = recent_store().lock().unwrap();
+    let guard = recent_store().lock().unwrap_or_else(|e| e.into_inner());
     // Count notifications from the last 30 minutes as "unread"
     let cutoff = chrono::Utc::now().timestamp() - 1800;
     guard.iter().filter(|n| n.timestamp >= cutoff).count() as u32
@@ -69,7 +69,7 @@ pub fn get_unread_count() -> u32 {
 /// Return up to 20 most recent OS notifications.
 #[tauri::command]
 pub fn notification_get_recent() -> Vec<OsNotification> {
-    let guard = recent_store().lock().unwrap();
+    let guard = recent_store().lock().unwrap_or_else(|e| e.into_inner());
     guard.iter().rev().take(20).cloned().collect::<Vec<_>>().into_iter().rev().collect()
 }
 
@@ -108,7 +108,7 @@ pub async fn start_notification_listener(app: tauri::AppHandle) {
 
 /// Return the in-memory list (non-async, for internal use by brain/pulse)
 pub fn get_recent_notifications() -> Vec<OsNotification> {
-    let guard = recent_store().lock().unwrap();
+    let guard = recent_store().lock().unwrap_or_else(|e| e.into_inner());
     guard.iter().rev().take(20).cloned().collect::<Vec<_>>().into_iter().rev().collect()
 }
 

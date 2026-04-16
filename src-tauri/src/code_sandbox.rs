@@ -117,7 +117,7 @@ fn run_cmd(
             use std::io::Read;
             let mut buf = Vec::new();
             let _ = pipe.read_to_end(&mut buf);
-            *out_clone.lock().unwrap() = buf;
+            *out_clone.lock().unwrap_or_else(|e| e.into_inner()) = buf;
         }
     });
     let stderr_thread = std::thread::spawn(move || {
@@ -125,7 +125,7 @@ fn run_cmd(
             use std::io::Read;
             let mut buf = Vec::new();
             let _ = pipe.read_to_end(&mut buf);
-            *err_clone.lock().unwrap() = buf;
+            *err_clone.lock().unwrap_or_else(|e| e.into_inner()) = buf;
         }
     });
 
@@ -160,8 +160,8 @@ fn run_cmd(
     }
 
     let elapsed = start.elapsed().as_millis() as u64;
-    let stdout = String::from_utf8_lossy(&stdout_buf.lock().unwrap()).into_owned();
-    let stderr = String::from_utf8_lossy(&stderr_buf.lock().unwrap()).into_owned();
+    let stdout = String::from_utf8_lossy(&stdout_buf.lock().unwrap_or_else(|e| e.into_inner())).into_owned();
+    let stderr = String::from_utf8_lossy(&stderr_buf.lock().unwrap_or_else(|e| e.into_inner())).into_owned();
 
     Ok((
         sanitize_output(&stdout),

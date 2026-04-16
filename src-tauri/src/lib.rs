@@ -63,6 +63,7 @@ mod immune_system;
 mod organ;
 mod prefrontal;
 mod proactive_vision;
+mod skeleton;
 mod embeddings;
 mod files;
 mod history;
@@ -1298,6 +1299,11 @@ pub fn run() {
                     }
                 }
             });
+
+            // SKELETON: initialize ALL database tables before any background thread starts.
+            // Without this, modules that query tables before their first ensure_tables()
+            // call would fail silently. This is the skull — structural integrity.
+            skeleton::init_all_tables();
 
             // Start HUD update loop (pushes data every 10s when HUD is visible)
             overlay_manager::start_hud_update_loop(app.handle().clone());

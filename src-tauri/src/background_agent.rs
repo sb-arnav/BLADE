@@ -184,13 +184,13 @@ pub async fn agent_spawn(
     };
 
     {
-        let mut registry = registry().lock().unwrap();
+        let mut registry = registry().lock().unwrap_or_else(|e| e.into_inner());
         registry.insert(id.clone(), agent);
     }
 
     let cancel_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
     {
-        let mut flags = cancel_flags().lock().unwrap();
+        let mut flags = cancel_flags().lock().unwrap_or_else(|e| e.into_inner());
         flags.insert(id.clone(), cancel_flag.clone());
     }
 
@@ -310,7 +310,7 @@ async fn run_agent(
 
     // Build completion summary and store in execution_memory
     let summary = {
-        let reg = registry().lock().unwrap();
+        let reg = registry().lock().unwrap_or_else(|e| e.into_inner());
         reg.get(&id)
             .map(|a| extract_completion_summary(a))
             .unwrap_or_default()
@@ -318,7 +318,7 @@ async fn run_agent(
 
     // Store agent run in execution memory so BLADE can recall it later
     {
-        let reg = registry().lock().unwrap();
+        let reg = registry().lock().unwrap_or_else(|e| e.into_inner());
         if let Some(agent) = reg.get(&id) {
             let full_output = agent.output.join("\n");
             let started = agent.started_at;
@@ -358,7 +358,7 @@ async fn run_agent(
 }
 
 fn update_agent_status(id: &str, status: AgentStatus, code: Option<i32>, _error: Option<String>) {
-    let mut registry = registry().lock().unwrap();
+    let mut registry = registry().lock().unwrap_or_else(|e| e.into_inner());
     if let Some(agent) = registry.get_mut(id) {
         agent.status = status;
         agent.exit_code = code;
@@ -367,7 +367,7 @@ fn update_agent_status(id: &str, status: AgentStatus, code: Option<i32>, _error:
 }
 
 fn append_agent_output(id: &str, line: &str) {
-    let mut registry = registry().lock().unwrap();
+    let mut registry = registry().lock().unwrap_or_else(|e| e.into_inner());
     if let Some(agent) = registry.get_mut(id) {
         agent.output.push(line.to_string());
         // Cap output at 500 lines to prevent memory blow-up
@@ -380,7 +380,7 @@ fn append_agent_output(id: &str, line: &str) {
 /// List all background agents (running + recent)
 #[tauri::command]
 pub fn agent_list_background() -> Vec<BackgroundAgent> {
-    let registry = registry().lock().unwrap();
+    let registry = registry().lock().unwrap_or_else(|e| e.into_inner());
     let mut agents: Vec<BackgroundAgent> = registry.values().cloned().collect();
     agents.sort_by(|a, b| b.started_at.cmp(&a.started_at));
     agents
@@ -389,14 +389,14 @@ pub fn agent_list_background() -> Vec<BackgroundAgent> {
 /// Get a specific agent's state including output
 #[tauri::command]
 pub fn agent_get_background(id: String) -> Option<BackgroundAgent> {
-    let registry = registry().lock().unwrap();
+    let registry = registry().lock().unwrap_or_else(|e| e.into_inner());
     registry.get(&id).cloned()
 }
 
 /// Cancel a running background agent
 #[tauri::command]
 pub async fn agent_cancel_background(id: String) -> Result<(), String> {
-    let flags = cancel_flags().lock().unwrap();
+    let flags = cancel_flags().lock().unwrap_or_else(|e| e.into_inner());
     if let Some(flag) = flags.get(&id) {
         flag.store(true, std::sync::atomic::Ordering::Relaxed);
         Ok(())
@@ -414,7 +414,7 @@ pub fn agent_detect_available() -> Vec<String> {
 /// Get the combined output of a completed agent as a single string
 #[tauri::command]
 pub fn agent_get_output(id: String) -> String {
-    let registry = registry().lock().unwrap();
+    let registry = registry().lock().unwrap_or_else(|e| e.into_inner());
     registry
         .get(&id)
         .map(|a| a.output.join("\n"))
@@ -540,7 +540,7 @@ pub async fn auto_spawn_agent(
 /// Build a task string enriched with output snippets from related running agents.
 /// Keeps the injection small — just the last 10 lines from each sibling.
 fn inject_sibling_context(task: &str) -> String {
-    let registry = registry().lock().unwrap();
+    let registry = registry().lock().unwrap_or_else(|e| e.into_inner());
     let running: Vec<&BackgroundAgent> = registry
         .values()
         .filter(|a| a.status == AgentStatus::Running)
@@ -649,7 +649,7 @@ fn build_codex_command(task: &str) -> (String, Vec<String>) {
 /// The Dashboard can display these to give the user situational awareness.
 #[tauri::command]
 pub fn get_active_agents() -> Vec<BackgroundAgent> {
-    let registry = registry().lock().unwrap();
+    let registry = registry().lock().unwrap_or_else(|e| e.into_inner());
     let now = chrono::Utc::now().timestamp();
     let mut agents: Vec<BackgroundAgent> = registry
         .values()

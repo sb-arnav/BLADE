@@ -296,13 +296,13 @@ fn last_poll_map() -> &'static Mutex<HashMap<String, i64>> {
 
 /// Returns true if enough time has passed since the last poll on this platform.
 fn should_poll(platform: &str, min_interval_secs: i64) -> bool {
-    let map = last_poll_map().lock().unwrap();
+    let map = last_poll_map().lock().unwrap_or_else(|e| e.into_inner());
     let last = map.get(platform).copied().unwrap_or(0);
     now_secs() - last >= min_interval_secs
 }
 
 fn mark_polled(platform: &str) {
-    let mut map = last_poll_map().lock().unwrap();
+    let mut map = last_poll_map().lock().unwrap_or_else(|e| e.into_inner());
     map.insert(platform.to_string(), now_secs());
 }
 
@@ -988,7 +988,7 @@ async fn poll_tentacle(platform: &str) -> Vec<TentacleReport> {
             };
 
             // Snapshot previous port states before we overwrite them
-            let prev_states = { port_states_map().lock().unwrap().clone() };
+            let prev_states = { port_states_map().lock().unwrap_or_else(|e| e.into_inner()).clone() };
             let mut new_states = prev_states.clone();
 
             for &port in PORTS {
@@ -1042,7 +1042,7 @@ async fn poll_tentacle(platform: &str) -> Vec<TentacleReport> {
                 new_states.insert(port, is_up);
             }
 
-            *port_states_map().lock().unwrap() = new_states;
+            *port_states_map().lock().unwrap_or_else(|e| e.into_inner()) = new_states;
         }
 
         // ── Discord ────────────────────────────────────────────────────────────
@@ -2230,7 +2230,7 @@ pub fn initialize_hive() -> Hive {
 /// 7. Store all decisions + High/Critical reports in typed_memory + execution_memory.
 pub async fn hive_tick(app: &AppHandle) {
     let active_tentacles: Vec<String> = {
-        let hive = hive_lock().lock().unwrap();
+        let hive = hive_lock().lock().unwrap_or_else(|e| e.into_inner());
         hive.tentacles
             .values()
             .filter(|t| t.status == TentacleStatus::Active)
@@ -2265,7 +2265,7 @@ pub async fn hive_tick(app: &AppHandle) {
         match poll_result {
             Ok(reports) => {
                 all_reports.extend(reports.clone());
-                let mut hive = hive_lock().lock().unwrap();
+                let mut hive = hive_lock().lock().unwrap_or_else(|e| e.into_inner());
                 if let Some(t) = hive.tentacles.get_mut(&tid) {
                     t.last_heartbeat = now_secs();
                     t.messages_processed += reports.len() as u64;
@@ -2276,7 +2276,7 @@ pub async fn hive_tick(app: &AppHandle) {
             }
             Err(reason) => {
                 let (new_failures, new_status) = {
-                    let hive = hive_lock().lock().unwrap();
+                    let hive = hive_lock().lock().unwrap_or_else(|e| e.into_inner());
                     let failures = hive
                         .tentacles
                         .get(&tid)
@@ -2293,7 +2293,7 @@ pub async fn hive_tick(app: &AppHandle) {
                 };
 
                 {
-                    let mut hive = hive_lock().lock().unwrap();
+                    let mut hive = hive_lock().lock().unwrap_or_else(|e| e.into_inner());
                     if let Some(t) = hive.tentacles.get_mut(&tid) {
                         t.consecutive_failures = new_failures;
                         t.status = new_status.clone();
@@ -2322,7 +2322,7 @@ pub async fn hive_tick(app: &AppHandle) {
     }
 
     if all_reports.is_empty() {
-        let mut hive = hive_lock().lock().unwrap();
+        let mut hive = hive_lock().lock().unwrap_or_else(|e| e.into_inner());
         hive.last_tick = now_secs();
         return;
     }
@@ -2330,7 +2330,7 @@ pub async fn hive_tick(app: &AppHandle) {
     // Route reports to domain heads (each head sees only its tentacles' reports)
     let mut head_reports: HashMap<String, Vec<TentacleReport>> = HashMap::new();
     {
-        let hive = hive_lock().lock().unwrap();
+        let hive = hive_lock().lock().unwrap_or_else(|e| e.into_inner());
         for report in &all_reports {
             if let Some(t) = hive.tentacles.get(&report.tentacle_id) {
                 head_reports
@@ -2352,7 +2352,7 @@ pub async fn hive_tick(app: &AppHandle) {
     let mut all_decisions: Vec<Decision> = Vec::new();
     {
         let head_data: Vec<(HeadModel, Vec<TentacleReport>)> = {
-            let hive = hive_lock().lock().unwrap();
+            let hive = hive_lock().lock().unwrap_or_else(|e| e.into_inner());
             head_reports
                 .iter()
                 .filter_map(|(head_id, reports)| {
@@ -2374,7 +2374,7 @@ pub async fn hive_tick(app: &AppHandle) {
     all_decisions.extend(big_decisions);
 
     let autonomy_level = {
-        let hive = hive_lock().lock().unwrap();
+        let hive = hive_lock().lock().unwrap_or_else(|e| e.into_inner());
         hive.autonomy
     };
 
@@ -2400,7 +2400,7 @@ pub async fn hive_tick(app: &AppHandle) {
     }
 
     {
-        let mut hive = hive_lock().lock().unwrap();
+        let mut hive = hive_lock().lock().unwrap_or_else(|e| e.into_inner());
         for decision in &to_queue {
             let target_head = decision_to_head(decision, &hive);
             if let Some(head) = hive.heads.get_mut(&target_head) {
@@ -2780,12 +2780,12 @@ pub fn start_hive(app: AppHandle, autonomy: f32) {
     hive.running = true;
     hive.autonomy = autonomy;
 
-    *hive_lock().lock().unwrap() = hive;
+    *hive_lock().lock().unwrap_or_else(|e| e.into_inner()) = hive;
 
     tauri::async_runtime::spawn(async move {
         let mut tick_count: u64 = 0;
         loop {
-            let running = hive_lock().lock().unwrap().running;
+            let running = hive_lock().lock().unwrap_or_else(|e| e.into_inner()).running;
             if !running {
                 break;
             }
@@ -2819,7 +2819,7 @@ pub fn start_hive(app: AppHandle, autonomy: f32) {
 
 /// Stop the Hive tick loop.
 pub fn stop_hive() {
-    let mut hive = hive_lock().lock().unwrap();
+    let mut hive = hive_lock().lock().unwrap_or_else(|e| e.into_inner());
     hive.running = false;
     log::info!("[Hive] Stop requested.");
 }
@@ -2838,7 +2838,7 @@ pub async fn spawn_tentacle(
         other => return Err(format!("Unknown platform: {}", other)),
     };
 
-    let mut hive = hive_lock().lock().unwrap();
+    let mut hive = hive_lock().lock().unwrap_or_else(|e| e.into_inner());
 
     if let Some(existing) = hive.tentacles.get_mut(&tentacle_id) {
         existing.status = TentacleStatus::Active;
@@ -2874,7 +2874,7 @@ pub fn register_factory_tentacle(agent_id: &str, agent_name: &str) {
     let platform = format!("factory:{}", agent_name);
     let head_id = "head-intelligence";
 
-    let mut hive = hive_lock().lock().unwrap();
+    let mut hive = hive_lock().lock().unwrap_or_else(|e| e.into_inner());
 
     if hive.tentacles.contains_key(&tentacle_id) {
         // Already registered — reactivate
@@ -2903,7 +2903,7 @@ pub fn register_factory_tentacle(agent_id: &str, agent_name: &str) {
 /// Deactivate a factory tentacle when an agent is paused or deleted.
 pub fn deregister_factory_tentacle(agent_id: &str) {
     let tentacle_id = format!("tentacle-factory-{}", agent_id);
-    let mut hive = hive_lock().lock().unwrap();
+    let mut hive = hive_lock().lock().unwrap_or_else(|e| e.into_inner());
     if let Some(t) = hive.tentacles.get_mut(&tentacle_id) {
         t.status = TentacleStatus::Dormant;
         log::info!("[Hive] Deregistered factory tentacle: {}", tentacle_id);
@@ -2912,7 +2912,7 @@ pub fn deregister_factory_tentacle(agent_id: &str) {
 
 /// Return a serialisable snapshot of the Hive.
 pub fn get_hive_status() -> HiveStatus {
-    let hive = hive_lock().lock().unwrap();
+    let hive = hive_lock().lock().unwrap_or_else(|e| e.into_inner());
 
     let tentacle_summaries: Vec<TentacleSummary> = hive
         .tentacles
@@ -3110,7 +3110,7 @@ pub fn hive_get_digest() -> String {
 
 /// Return all unprocessed reports across all tentacles.
 pub fn get_all_reports() -> Vec<TentacleReport> {
-    let hive = hive_lock().lock().unwrap();
+    let hive = hive_lock().lock().unwrap_or_else(|e| e.into_inner());
     hive.tentacles
         .values()
         .flat_map(|t| t.pending_reports.iter().filter(|r| !r.processed).cloned())
@@ -3119,7 +3119,7 @@ pub fn get_all_reports() -> Vec<TentacleReport> {
 
 /// Approve a pending decision (by head_id + decision index) and queue for execution.
 pub fn approve_decision(head_id: &str, decision_index: usize) -> Result<Decision, String> {
-    let mut hive = hive_lock().lock().unwrap();
+    let mut hive = hive_lock().lock().unwrap_or_else(|e| e.into_inner());
     let head = hive
         .heads
         .get_mut(head_id)
@@ -3138,7 +3138,7 @@ pub fn approve_decision(head_id: &str, decision_index: usize) -> Result<Decision
 /// Set the global autonomy level for the Hive and all Heads.
 pub fn set_autonomy(level: f32) {
     let clamped = level.clamp(0.0, 1.0);
-    let mut hive = hive_lock().lock().unwrap();
+    let mut hive = hive_lock().lock().unwrap_or_else(|e| e.into_inner());
     hive.autonomy = clamped;
     for head in hive.heads.values_mut() {
         head.autonomy_level = clamped;

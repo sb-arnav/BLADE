@@ -541,7 +541,7 @@ pub async fn get_support_response(emotion: &EmotionalState) -> SupportResponse {
 ///    Adaptation: be empathetic, avoid adding tasks, offer to simplify."
 pub fn get_emotional_context() -> String {
     let state = {
-        let guard = CURRENT_EMOTION.lock().unwrap();
+        let guard = CURRENT_EMOTION.lock().unwrap_or_else(|e| e.into_inner());
         match guard.as_ref() {
             Some(s) => s.clone(),
             None => {
@@ -726,7 +726,7 @@ pub async fn process_message_emotion(message: &str, app: tauri::AppHandle) -> Em
 
     // Get previous state before we do anything async
     let previous_valence = {
-        let guard = CURRENT_EMOTION.lock().unwrap();
+        let guard = CURRENT_EMOTION.lock().unwrap_or_else(|e| e.into_inner());
         guard.as_ref().map(|s| s.valence)
     };
 
@@ -734,7 +734,7 @@ pub async fn process_message_emotion(message: &str, app: tauri::AppHandle) -> Em
 
     // Update static current state
     {
-        let mut guard = CURRENT_EMOTION.lock().unwrap();
+        let mut guard = CURRENT_EMOTION.lock().unwrap_or_else(|e| e.into_inner());
         *guard = Some(new_state.clone());
     }
 
@@ -769,7 +769,7 @@ pub async fn process_message_emotion(message: &str, app: tauri::AppHandle) -> Em
 
 #[tauri::command]
 pub fn emotion_get_current() -> Option<EmotionalState> {
-    let guard = CURRENT_EMOTION.lock().unwrap();
+    let guard = CURRENT_EMOTION.lock().unwrap_or_else(|e| e.into_inner());
     guard.clone()
 }
 
