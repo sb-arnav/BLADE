@@ -303,11 +303,165 @@ fn persist_to_db(state: &HormoneState) {
     }
 }
 
+// ── Pituitary Gland: translate hormones → per-module directives ──────────────
+//
+// The hypothalamus produces abstract state (arousal, energy, trust...).
+// Individual modules don't know what "energy 0.3" means for THEM.
+// The pituitary translates into concrete settings per module.
+
+/// Directive for a specific module — what it should do right now.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModuleDirective {
+    /// Which LLM tier to use: "quality" | "balanced" | "cheap" | "skip"
+    pub model_tier: String,
+    /// How frequently to poll/tick (multiplier: 1.0 = normal, 0.5 = half, 2.0 = double)
+    pub poll_rate: f32,
+    /// Whether to run expensive operations (LLM calls, web fetches, etc.)
+    pub allow_expensive_ops: bool,
+    /// Whether to act autonomously or ask first
+    pub autonomous: bool,
+    /// One-line reason for these settings (for debugging/display)
+    pub reason: String,
+}
+
+/// GH (Growth Hormone) — should BLADE actively seek new capabilities?
+pub fn growth_hormone() -> f32 {
+    let h = get_hormones();
+    // Grow when: energy is high, user is idle (exploration opportunity), trust is decent
+    let base = h.exploration * 0.5 + h.energy_mode * 0.3 + h.trust * 0.2;
+    base.clamp(0.0, 1.0)
+}
+
+/// TSH (Thyroid-Stimulating) — how aggressively should background modules run?
+pub fn thyroid_stimulating() -> f32 {
+    let h = get_hormones();
+    // High metabolism when: energy is high, arousal is moderate (not sleeping, not panicking)
+    let base = h.energy_mode * 0.6 + (1.0 - h.urgency.abs()) * 0.2 + h.arousal * 0.2;
+    base.clamp(0.0, 1.0)
+}
+
+/// ACTH — how cautious should decision-making be?
+/// High ACTH = high cortisol = more cautious
+pub fn acth() -> f32 {
+    let h = get_hormones();
+    // Cautious when: urgency is high (something's wrong), trust is low
+    let base = h.urgency * 0.5 + (1.0 - h.trust) * 0.3 + (1.0 - h.exploration) * 0.2;
+    base.clamp(0.0, 1.0)
+}
+
+/// Oxytocin — how personal/warm should BLADE be?
+pub fn oxytocin() -> f32 {
+    let h = get_hormones();
+    // Warm when: trust is high, urgency is low (not in crisis mode)
+    let base = h.trust * 0.6 + (1.0 - h.urgency) * 0.3 + h.arousal * 0.1;
+    base.clamp(0.0, 1.0)
+}
+
+/// ADH (vasopressin) — how aggressively should BLADE conserve resources?
+pub fn adh() -> f32 {
+    let h = get_hormones();
+    // Conserve when: energy is low, hunger is low (no urgent work needing resources)
+    let base = (1.0 - h.energy_mode) * 0.5 + (1.0 - h.hunger) * 0.3 + h.thirst * 0.2;
+    base.clamp(0.0, 1.0)
+}
+
+/// Get a concrete directive for a specific module based on current pituitary output.
+/// Modules call this instead of reading raw hormones.
+pub fn get_directive(module: &str) -> ModuleDirective {
+    let tsh = thyroid_stimulating();
+    let gh = growth_hormone();
+    let cortisol = acth();
+    let conserve = adh();
+    let warmth = oxytocin();
+    let h = get_hormones();
+
+    match module {
+        // Evolution: controlled by GH (growth) + energy
+        "evolution" => ModuleDirective {
+            model_tier: if gh > 0.6 { "balanced" } else { "skip" }.to_string(),
+            poll_rate: gh,
+            allow_expensive_ops: gh > 0.4 && h.energy_mode > 0.3,
+            autonomous: h.trust > 0.5 && gh > 0.5,
+            reason: format!("GH={:.1}, energy={:.1}", gh, h.energy_mode),
+        },
+
+        // Hive tentacles: controlled by TSH (metabolism) + arousal
+        "hive" | "tentacle" => ModuleDirective {
+            model_tier: if tsh > 0.6 { "balanced" } else { "cheap" }.to_string(),
+            poll_rate: (tsh * 1.5).clamp(0.3, 2.0), // 0.3x to 2x normal rate
+            allow_expensive_ops: tsh > 0.5,
+            autonomous: h.trust > 0.6,
+            reason: format!("TSH={:.1}, arousal={:.1}", tsh, h.arousal),
+        },
+
+        // Brain planner: energy determines model quality
+        "brain_planner" => ModuleDirective {
+            model_tier: if h.energy_mode > 0.7 { "quality" }
+                else if h.energy_mode > 0.4 { "balanced" }
+                else { "cheap" }.to_string(),
+            poll_rate: 1.0, // always runs on demand
+            allow_expensive_ops: h.energy_mode > 0.3,
+            autonomous: false, // brain planner never acts autonomously
+            reason: format!("energy={:.1}", h.energy_mode),
+        },
+
+        // Decision gate: ACTH controls caution level
+        "decision_gate" => ModuleDirective {
+            model_tier: "cheap".to_string(), // decisions are always cheap
+            poll_rate: 1.0,
+            allow_expensive_ops: false,
+            autonomous: cortisol < 0.4, // low cortisol = more autonomous
+            reason: format!("ACTH={:.1}, trust={:.1}", cortisol, h.trust),
+        },
+
+        // Dream mode: runs during conservation (ADH high, arousal low)
+        "dream_mode" => ModuleDirective {
+            model_tier: "cheap".to_string(),
+            poll_rate: if h.arousal < 0.3 { 1.5 } else { 0.5 }, // more active when idle
+            allow_expensive_ops: conserve > 0.5 && h.arousal < 0.3,
+            autonomous: true, // dream mode is always autonomous
+            reason: format!("ADH={:.1}, arousal={:.1}", conserve, h.arousal),
+        },
+
+        // Persona/communication: oxytocin controls warmth
+        "persona" | "communication" => ModuleDirective {
+            model_tier: "balanced".to_string(),
+            poll_rate: 1.0,
+            allow_expensive_ops: true,
+            autonomous: false,
+            reason: format!("oxytocin={:.1}, trust={:.1}", warmth, h.trust),
+        },
+
+        // Background research: GH + low arousal (idle time)
+        "research" => ModuleDirective {
+            model_tier: if gh > 0.5 { "cheap" } else { "skip" }.to_string(),
+            poll_rate: gh * 0.8,
+            allow_expensive_ops: gh > 0.5 && h.arousal < 0.4,
+            autonomous: true,
+            reason: format!("GH={:.1}, arousal={:.1}", gh, h.arousal),
+        },
+
+        // Default: balanced, follow energy level
+        _ => ModuleDirective {
+            model_tier: if h.energy_mode > 0.5 { "balanced" } else { "cheap" }.to_string(),
+            poll_rate: tsh,
+            allow_expensive_ops: h.energy_mode > 0.4,
+            autonomous: h.trust > 0.5,
+            reason: format!("energy={:.1}, trust={:.1}", h.energy_mode, h.trust),
+        },
+    }
+}
+
 // ── Tauri Commands ───────────────────────────────────────────────────────────
 
 #[tauri::command]
 pub fn homeostasis_get() -> HormoneState {
     get_hormones()
+}
+
+#[tauri::command]
+pub fn homeostasis_get_directive(module: String) -> ModuleDirective {
+    get_directive(&module)
 }
 
 use tauri::Emitter;

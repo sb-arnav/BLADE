@@ -2783,14 +2783,30 @@ pub fn start_hive(app: AppHandle, autonomy: f32) {
     *hive_lock().lock().unwrap() = hive;
 
     tauri::async_runtime::spawn(async move {
+        let mut tick_count: u64 = 0;
         loop {
             let running = hive_lock().lock().unwrap().running;
             if !running {
                 break;
             }
 
-            hive_tick(&app).await;
+            // Pituitary TSH: modulate tick frequency based on metabolic state.
+            // High TSH (>0.6): always tick. Low TSH (<0.3): skip every other tick.
+            // This conserves API calls during low-energy periods (night, idle).
+            let tsh = crate::homeostasis::thyroid_stimulating();
+            let should_tick = if tsh > 0.6 {
+                true // high metabolism — always tick
+            } else if tsh < 0.3 {
+                tick_count % 3 == 0 // low metabolism — tick every 3rd cycle (90s)
+            } else {
+                tick_count % 2 == 0 // normal — tick every 2nd cycle (60s)
+            };
 
+            if should_tick {
+                hive_tick(&app).await;
+            }
+
+            tick_count += 1;
             tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
         }
 

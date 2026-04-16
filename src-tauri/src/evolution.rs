@@ -564,6 +564,13 @@ pub async fn run_evolution_cycle(app: &tauri::AppHandle) {
         return;
     }
 
+    // Pituitary GH: only grow capabilities when growth hormone is adequate.
+    // Low GH (night, conservation mode) → skip discovery to save API calls.
+    let gh = crate::homeostasis::growth_hormone();
+    if gh < 0.3 {
+        return; // body is conserving — not the time for growth
+    }
+
     // Guard against double-running if a previous cycle is still executing
     if EVOLUTION_RUNNING.compare_exchange(false, true, std::sync::atomic::Ordering::SeqCst, std::sync::atomic::Ordering::Relaxed).is_err() {
         return;
