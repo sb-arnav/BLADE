@@ -10,7 +10,7 @@
 ///   Speaker 0 = first detected voice (assumed "other person" in ghost mode context).
 ///   BLADE maps speaker 0 → "them", speaker 1+ → additional participants.
 
-use futures_util::{SinkExt, StreamExt};
+use futures::{SinkExt, StreamExt};
 use serde::Deserialize;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;

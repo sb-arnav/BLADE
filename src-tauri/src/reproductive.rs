@@ -20,6 +20,7 @@
 /// decisions instead of user-specific ones.
 
 use serde::{Deserialize, Serialize};
+use tauri::Emitter;
 
 /// DNA package that gets injected into every spawned child.
 /// Compact (~500-1000 chars) so it doesn't bloat the child's context.

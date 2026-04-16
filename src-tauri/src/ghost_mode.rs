@@ -768,6 +768,7 @@ async fn run_ghost_loop(app: tauri::AppHandle, state: Arc<Mutex<GhostState>>) {
         // 9. Generate a response suggestion
         let question = text.clone();
         let ctx = context_str.clone();
+        let platform = detect_active_platform();
         let platform_clone = platform.clone();
         let app_clone = app.clone();
 
