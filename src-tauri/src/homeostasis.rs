@@ -121,6 +121,16 @@ pub fn hypothalamus_tick() {
         state.arousal = (state.arousal + 0.1).min(1.0);
     }
 
+    // ── Power monitor: battery awareness (from Omi's PowerMonitor) ──────
+    // On laptops, detect battery vs AC power and adjust energy accordingly.
+    // Battery → lower energy (skip expensive vision calls, reduce poll rate)
+    // AC → full power
+    let on_battery = detect_battery_power();
+    if on_battery {
+        state.energy_mode = (state.energy_mode * 0.5).max(0.1);
+        state.arousal = (state.arousal - 0.1).max(0.0);
+    }
+
     // ── Pineal gland: LEARNED circadian rhythm ──────────────────────────
     // Instead of hardcoding "9-17 is work hours," BLADE learns the user's
     // actual schedule from activity_monitor data. A user who works 12pm-3am
@@ -284,6 +294,63 @@ pub fn start_hypothalamus(app: tauri::AppHandle) {
             }));
         }
     });
+}
+
+// ── Battery / Power Detection ─────────────────────────────────────────────────
+
+/// Detect if the machine is running on battery power.
+/// Returns true on battery, false on AC or if detection fails (desktops).
+fn detect_battery_power() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        // Windows: GetSystemPowerStatus
+        #[repr(C)]
+        #[allow(non_snake_case)]
+        struct SystemPowerStatus {
+            ACLineStatus: u8,
+            BatteryFlag: u8,
+            BatteryLifePercent: u8,
+            SystemStatusFlag: u8,
+            BatteryLifeTime: u32,
+            BatteryFullLifeTime: u32,
+        }
+        extern "system" {
+            fn GetSystemPowerStatus(status: *mut SystemPowerStatus) -> i32;
+        }
+        unsafe {
+            let mut status = std::mem::zeroed::<SystemPowerStatus>();
+            if GetSystemPowerStatus(&mut status) != 0 {
+                // ACLineStatus: 0 = offline (battery), 1 = online (AC)
+                return status.ACLineStatus == 0;
+            }
+        }
+        false
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // Linux: check /sys/class/power_supply/BAT0/status
+        if let Ok(status) = std::fs::read_to_string("/sys/class/power_supply/BAT0/status") {
+            return status.trim() == "Discharging";
+        }
+        // WSL or desktop without battery
+        false
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // macOS: pmset -g batt
+        if let Ok(output) = std::process::Command::new("pmset").args(["-g", "batt"]).output() {
+            let text = String::from_utf8_lossy(&output.stdout);
+            return text.contains("Battery Power");
+        }
+        false
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+    {
+        false
+    }
 }
 
 // ── Learned Circadian Profile ─────────────────────────────────────────────────
