@@ -2541,6 +2541,56 @@ pub async fn hive_tick(app: &AppHandle) {
 
         // Store CI failure in execution_memory for pattern tracking
         log_hive_action("ci", &format!("CI failure in {}: {}", repo, failing_jobs));
+
+        // Auto-fix trivial failures (lint/format) autonomously
+        if is_trivial {
+            if let Some(cmd) = &fix_cmd {
+                let app_fix = app.clone();
+                let cmd_clone = cmd.clone();
+                let repo_clone = repo.to_string();
+                tokio::spawn(async move {
+                    let _ = crate::tts::speak_and_wait(
+                        &app_fix,
+                        &format!("CI failed on a trivial issue. Running auto-fix."),
+                    ).await;
+                    // Run the fix command
+                    let result = crate::native_tools::run_shell(cmd_clone.clone(), Some(repo_clone)).await;
+                    match result {
+                        Ok(output) => {
+                            if !output.contains("error") {
+                                // Commit and push the fix
+                                let _ = crate::native_tools::run_shell(
+                                    "git add -A && git commit -m 'fix: auto-fix lint/format (BLADE)' && git push".to_string(),
+                                    None,
+                                ).await;
+                                let _ = crate::tts::speak_and_wait(
+                                    &app_fix,
+                                    "Auto-fix applied and pushed.",
+                                ).await;
+                            }
+                        }
+                        Err(_) => {}
+                    }
+                });
+            }
+        } else {
+            // Complex failure — spawn Claude Code to investigate
+            let app_spawn = app.clone();
+            let summary = failure.summary.clone();
+            tokio::spawn(async move {
+                let task = format!(
+                    "CI failed: {}. Investigate the error, find the root cause, and fix it.",
+                    crate::safe_slice(&summary, 200)
+                );
+                let _ = crate::reproductive::spawn_with_dna(
+                    &app_spawn, "claude_code", &task, None,
+                ).await;
+                let _ = crate::tts::speak_and_wait(
+                    &app_spawn,
+                    "CI has a complex failure. I've spawned an agent to investigate.",
+                ).await;
+            });
+        }
     }
 
     // ── Store all decisions in typed_memory ───────────────────────────────────
@@ -2742,6 +2792,28 @@ async fn execute_decision(app: &AppHandle, decision: &Decision) {
                     "reversible": reversible
                 }),
             );
+
+            // Actually execute: spawn an agent for complex actions,
+            // or run a tool for simple ones
+            let action_lower = action.to_lowercase();
+            let is_code_task = action_lower.contains("fix") || action_lower.contains("pr")
+                || action_lower.contains("code") || action_lower.contains("build")
+                || action_lower.contains("deploy") || action_lower.contains("merge");
+
+            if is_code_task {
+                // Spawn Claude Code with DNA inheritance for coding tasks
+                let app_spawn = app.clone();
+                let task = action.clone();
+                tokio::spawn(async move {
+                    let _ = crate::reproductive::spawn_with_dna(
+                        &app_spawn, "claude_code", &task, None,
+                    ).await;
+                    let _ = crate::tts::speak_and_wait(
+                        &app_spawn,
+                        &format!("I've spawned an agent to handle: {}", crate::safe_slice(&task, 40)),
+                    ).await;
+                });
+            }
         }
         Decision::Escalate { reason, context } => {
             log::warn!("[Hive] Escalate: {}", reason);
