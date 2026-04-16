@@ -61,6 +61,7 @@ mod homeostasis;
 mod immune_system;
 mod organ;
 mod prefrontal;
+mod proactive_vision;
 mod embeddings;
 mod files;
 mod history;
@@ -1146,6 +1147,8 @@ pub fn run() {
             homeostasis::homeostasis_relearn_circadian,
             prefrontal::prefrontal_get,
             prefrontal::prefrontal_clear,
+            proactive_vision::proactive_get_cards,
+            proactive_vision::proactive_dismiss_card,
             hive::hive_get_reports,
             hive::hive_approve_decision,
             hive::hive_set_autonomy,
@@ -1366,6 +1369,24 @@ pub fn run() {
             godmode::start_god_mode(app.handle().clone(), &god_tier);
             // Screen timeline always runs — BLADE always sees your screen
             screen_timeline::start_timeline_capture_loop(app.handle().clone());
+
+            // Proactive vision — listen for context switches from screen_timeline
+            // and run lightweight assistants (task extraction, focus detection, insights)
+            {
+                let pv_app = app.handle().clone();
+                app.listen("screen_context_switch", move |event| {
+                    let payload = event.payload().to_string();
+                    let app_clone = pv_app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&payload) {
+                            let from = v["from_app"].as_str().unwrap_or("");
+                            let to = v["to_app"].as_str().unwrap_or("");
+                            let title = v["to_title"].as_str().unwrap_or("");
+                            proactive_vision::on_context_switch(&app_clone, from, to, title).await;
+                        }
+                    });
+                });
+            }
 
             // Audio: always listening — "Hey BLADE" wake word + ambient capture
             audio_timeline::start_audio_timeline_capture(app.handle().clone());

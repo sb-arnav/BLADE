@@ -12,7 +12,13 @@ use base64::Engine as _;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{Emitter, Manager};
+
+/// Flag set by the capture loop when a context switch is detected.
+/// capture_timeline_tick checks this to decide whether to run the expensive
+/// vision model call or just save the JPEG cheaply.
+static DESCRIBE_NEXT_FRAME: AtomicBool = AtomicBool::new(true); // true on first frame
 
 // ---------------------------------------------------------------------------
 // Types
@@ -280,21 +286,35 @@ pub async fn capture_timeline_tick(app: &tauri::AppHandle) {
     // Notify HUD: screenshot taken (camera blink + blue screen flash)
     let _ = app.emit("screenshot_taken", ());
 
-    // 7. Async: describe + embed (doesn't block the capture loop)
-    let thumb_b64 = B64.encode(&thumb);
+    // 7. Async: describe + embed
+    // Omi approach: the CAPTURE is cheap (local JPEG, every 5s).
+    // The DESCRIBE is expensive (vision API call). Only describe when:
+    //   a) Context switched (app/window changed — detected in the capture loop)
+    //   b) Every Nth unique frame as fallback
+    // This drops vision API calls from ~12/min to ~2-3/min in practice.
+    let should_describe = DESCRIBE_NEXT_FRAME.swap(false, std::sync::atomic::Ordering::SeqCst);
+
     let store = app.state::<crate::embeddings::SharedVectorStore>().inner().clone();
     let wt = window_title.clone();
     let an = app_name.clone();
 
-    tauri::async_runtime::spawn(async move {
-        let description = describe_screenshot(&thumb_b64).await;
-        if !description.is_empty() {
-            if let Some(conn) = open_db() {
-                update_description(&conn, entry_id, &description);
+    if should_describe {
+        let thumb_b64 = B64.encode(&thumb);
+        tauri::async_runtime::spawn(async move {
+            let description = describe_screenshot(&thumb_b64).await;
+            if !description.is_empty() {
+                if let Some(conn) = open_db() {
+                    update_description(&conn, entry_id, &description);
+                }
+                embed_timeline_entry(&store, entry_id, &wt, &an, &description);
             }
-            embed_timeline_entry(&store, entry_id, &wt, &an, &description);
-        }
-    });
+        });
+    } else {
+        // No vision call — still embed the window title + app name for search
+        tauri::async_runtime::spawn(async move {
+            embed_timeline_entry(&store, entry_id, &wt, &an, "");
+        });
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -302,19 +322,58 @@ pub async fn capture_timeline_tick(app: &tauri::AppHandle) {
 // ---------------------------------------------------------------------------
 
 pub fn start_timeline_capture_loop(app: tauri::AppHandle) {
+    // Omi approach: capture every 5s, but only run the EXPENSIVE vision model
+    // call when the context changes (app/window switch). Identical/near-identical
+    // frames are skipped via fingerprint dedup. This means:
+    //   - 5s capture interval (fast, low-cost: just JPEG + fingerprint)
+    //   - Vision model call only on context switch (~every few minutes in practice)
+    //   - Near-zero cost during focused work in one app
     tauri::async_runtime::spawn(async move {
+        let mut last_app = String::new();
+        let mut last_title = String::new();
+        let mut frames_since_describe: u32 = 0;
+        const CAPTURE_INTERVAL_SECS: u64 = 5;
+        const FORCE_DESCRIBE_EVERY: u32 = 24; // force a description every ~2 min even without context switch
+
         loop {
-            let config = crate::config::load_config();
-
-            // Stop if timeline was disabled
-            if !config.screen_timeline_enabled {
-                break;
-            }
-
             capture_timeline_tick(&app).await;
 
-            let interval = config.timeline_capture_interval.max(10) as u64;
-            tokio::time::sleep(tokio::time::Duration::from_secs(interval)).await;
+            // Context-switch detection: check if app or window changed
+            let (current_app, current_title) = match crate::context::get_active_window() {
+                Ok(w) => (w.app_name, w.window_title),
+                Err(_) => (String::new(), String::new()),
+            };
+
+            let context_changed = current_app != last_app
+                || (current_title != last_title && !current_title.is_empty());
+            frames_since_describe += 1;
+
+            if context_changed || frames_since_describe >= FORCE_DESCRIBE_EVERY {
+                // Context switch or 2-min fallback — trigger vision description
+                // on the NEXT captured frame (not this one — let the user settle)
+                DESCRIBE_NEXT_FRAME.store(true, Ordering::SeqCst);
+
+                // Emit context switch event for proactive assistants
+                if !current_app.is_empty() {
+                    let app_clone = app.clone();
+                    let departing_app = last_app.clone();
+                    let new_app = current_app.clone();
+                    let new_title = current_title.clone();
+                    tokio::spawn(async move {
+                        // Emit context switch event for proactive assistants
+                        let _ = app_clone.emit("screen_context_switch", serde_json::json!({
+                            "from_app": departing_app,
+                            "to_app": new_app,
+                            "to_title": crate::safe_slice(&new_title, 100),
+                        }));
+                    });
+                }
+                last_app = current_app;
+                last_title = current_title;
+                frames_since_describe = 0;
+            }
+
+            tokio::time::sleep(tokio::time::Duration::from_secs(CAPTURE_INTERVAL_SECS)).await;
         }
     });
 }
