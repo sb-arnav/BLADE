@@ -122,5 +122,8 @@ pub fn init_all_tables() {
     // Register trait-based joint contracts (context providers, memory stores)
     crate::joints::register_builtins();
 
+    // Seed show engine patterns (auto-show learning defaults)
+    crate::show_engine::seed_defaults();
+
     log::info!("[skeleton] All tables initialized, joints registered");
 }

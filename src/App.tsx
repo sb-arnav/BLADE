@@ -9,6 +9,7 @@ import { CommandPalette } from "./components/CommandPalette";
 import { NotificationCenter, useNotifications } from "./components/NotificationCenter";
 import { TitleBar } from "./components/TitleBar";
 import { GlowOverlay } from "./components/GlowOverlay";
+import { AutoShowOverlay } from "./components/AutoShowOverlay";
 import { OnboardingFlow } from "./components/OnboardingFlow";
 import { useChat } from "./hooks/useChat";
 import { useTTS } from "./hooks/useTTS";
@@ -1224,6 +1225,8 @@ export default function App() {
 
       {/* Onboarding — shown on first launch */}
       {showOnboarding && <OnboardingFlow onComplete={() => setShowOnboarding(false)} />}
+      {/* Auto-show overlay — BLADE proactively shows learned content */}
+      <AutoShowOverlay />
       {/* Glow overlay — BLADE's visual heartbeat */}
       <GlowOverlay />
       {/* TitleBar is now embedded in Sidebar's logo row via drag region — keep for window controls */}
