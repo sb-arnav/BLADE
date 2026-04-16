@@ -17,6 +17,9 @@ interface HudData {
   meeting_active: boolean;
   meeting_name: string | null;
   speaker_name: string | null;
+  hive_organs_active: number;
+  hive_pending_decisions: number;
+  hive_status_line: string;
 }
 
 interface GhostSuggestion {
@@ -112,6 +115,9 @@ export function HudBar() {
     meeting_active: false,
     meeting_name: null,
     speaker_name: null,
+    hive_organs_active: 0,
+    hive_pending_decisions: 0,
+    hive_status_line: "",
   });
 
   const [ghost, setGhost] = useState<GhostSuggestion | null>(null);
@@ -560,6 +566,29 @@ export function HudBar() {
           <span style={{ color: gmColor, fontSize: "10px", fontWeight: 600, letterSpacing: "0.06em", transition: "color 0.25s ease" }}>
             {godModeLabel(data.god_mode_status)}
           </span>
+
+          {/* Hive organ count — shows when organs are active */}
+          {data.hive_organs_active > 0 && (
+            <>
+              <span style={{ color: "rgba(255,255,255,0.15)", fontSize: "10px" }}>·</span>
+              <span
+                style={{
+                  width: "6px", height: "6px", borderRadius: "50%",
+                  background: data.hive_pending_decisions > 0 ? "#f59e0b" : "#818cf8",
+                  flexShrink: 0,
+                }}
+                title={data.hive_status_line || `${data.hive_organs_active} organs active`}
+              />
+              <span style={{
+                color: data.hive_pending_decisions > 0 ? "#f59e0b" : "rgba(129,140,248,0.7)",
+                fontSize: "10px", fontWeight: 600, letterSpacing: "0.06em",
+              }}>
+                {data.hive_pending_decisions > 0
+                  ? `${data.hive_pending_decisions} pending`
+                  : `${data.hive_organs_active} organs`}
+              </span>
+            </>
+          )}
 
           {/* Ghost card toggle — only in meeting */}
           {isMeeting && ghost && (

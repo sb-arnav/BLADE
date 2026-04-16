@@ -124,6 +124,7 @@ export function QuickAsk() {
   const [history, setHistory] = useState<string[]>(loadHistory);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [selectedIdx, setSelectedIdx] = useState(-1);
+  const [ambientLine, setAmbientLine] = useState("");
 
   const inputRef = useRef<HTMLInputElement>(null);
   const streamBuffer = useRef("");
@@ -151,6 +152,20 @@ export function QuickAsk() {
         invoke<string>("get_clipboard").then((text) => {
           clipboardRef.current = text ?? "";
           buildContextSuggestions(contextApp ?? "");
+        }).catch(() => {});
+
+        // Fetch ambient hive status for the context line
+        invoke<string>("hive_get_digest").then((digest) => {
+          if (!digest) { setAmbientLine(""); return; }
+          // Extract the most useful line: first organ report or status
+          const lines = digest.split("\n").filter(l => l.startsWith("- **") || l.includes("Active organs:"));
+          const active = lines.find(l => l.includes("Active organs:"));
+          const urgent = lines.find(l => l.includes("URGENT"));
+          setAmbientLine(
+            urgent ? urgent.replace(/\*\*/g, "").replace(/^- /, "")
+            : active ? active.replace(/\*\*/g, "")
+            : ""
+          );
         }).catch(() => {});
       }
     });
@@ -508,6 +523,20 @@ export function QuickAsk() {
                 animation: "spin 0.7s linear infinite",
               }}
             />
+          )}
+
+          {/* Ambient context — what BLADE sees right now */}
+          {!loading && !query.trim() && ambientLine && (
+            <span
+              className="flex-shrink-0 truncate"
+              style={{
+                fontSize: "10px",
+                color: "rgba(129,140,248,0.5)",
+                maxWidth: "200px",
+              }}
+            >
+              {ambientLine}
+            </span>
           )}
 
           {/* Enter hint */}
