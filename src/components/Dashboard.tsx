@@ -321,60 +321,118 @@ function CalendarCard({ integrations }: { integrations: IntegrationState }) {
   );
 }
 
-function QueueCard() {
-  const items = [
-    { title: "Reply to Rohan — API timeline", sub: "Draft ready · Slack · 2h ago", cta: "Review", accent: "#fbbf24" },
-    { title: "Approve PR merge — blade#47", sub: "Review complete · CI passing", cta: "Approve", accent: "#818cf8" },
-    { title: "Accept calendar invite", sub: "Tomorrow 10 AM · Zoom · investor", cta: "Accept", accent: "#4ade80" },
-  ];
+function VitalSignsCard() {
+  const [vitals, setVitals] = useState<{
+    overall: string;
+    hormones: { arousal: number; energy_mode: number; trust: number; insulin: number; adrenaline: number; leptin: number };
+    blood_pressure: { events_per_minute: number; api_calls_per_minute: number; status: string };
+    services_alive: number;
+    services_dead: string[];
+    hive_organs_active: number;
+    focus_score: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const load = () => invoke<typeof vitals>("blade_vital_signs").then(setVitals).catch(() => null);
+    load();
+    const interval = setInterval(load, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const overall = vitals?.overall || "unknown";
+
+  const hormones = vitals?.hormones;
+  const bars = hormones ? [
+    { label: "Energy", value: hormones.energy_mode, color: "#818cf8" },
+    { label: "Arousal", value: hormones.arousal, color: "#60a5fa" },
+    { label: "Trust", value: hormones.trust, color: "#4ade80" },
+    { label: "Insulin", value: hormones.insulin, color: hormones.insulin > 0.6 ? "#f87171" : "#4ade80" },
+  ] : [];
+
   return (
     <div className="blade-glass flex flex-col p-4 gap-3 flex-1 min-h-0 animate-[blade-card-in_0.5s_cubic-bezier(0.22,1,0.36,1)_0.22s_both]">
       <div className="flex items-center justify-between">
-        <CardLabel icon={<svg viewBox="0 0 12 12" className="w-[10px] h-[10px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="6" cy="6" r="5"/><path d="M6 4v2l1.5 1.5"/></svg>}>
-          Action Queue
+        <CardLabel icon={<svg viewBox="0 0 12 12" className="w-[10px] h-[10px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 2v3l2 2"/><circle cx="6" cy="6" r="5"/></svg>}>
+          Body Status
         </CardLabel>
-        <Chip color="amber">3 waiting</Chip>
+        <Chip color={overall === "healthy" ? "green" : overall === "critical" ? "accent" : "amber"}>
+          {overall}
+        </Chip>
       </div>
-      <div className="flex flex-col gap-[5px] flex-1 overflow-hidden">
-        {items.map((item) => (
-          <div key={item.title}
-            className="flex items-center gap-[10px] px-[10px] py-[9px] rounded-[11px]
-              bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)]
-              cursor-pointer hover:bg-[rgba(255,255,255,0.07)] hover:border-[rgba(255,255,255,0.12)]
-              hover:-translate-y-[1px] hover:shadow-[0_6px_20px_rgba(0,0,0,0.25)]
-              transition-all group">
-            <div className="w-[3px] self-stretch rounded-full flex-shrink-0" style={{ background: item.accent }} />
-            <div className="flex-1 min-w-0">
-              <div className="text-[12px] font-semibold truncate">{item.title}</div>
-              <div className="text-[10.5px] text-[rgba(255,255,255,0.55)] mt-[1px]">{item.sub}</div>
+      <div className="flex flex-col gap-[6px] flex-1 overflow-hidden">
+        {bars.map((bar) => (
+          <div key={bar.label} className="flex items-center gap-[8px]">
+            <span className="text-[10px] text-[rgba(255,255,255,0.45)] w-[50px] text-right">{bar.label}</span>
+            <div className="flex-1 h-[4px] bg-[rgba(255,255,255,0.07)] rounded-full overflow-hidden">
+              <div className="h-full rounded-full transition-all duration-700" style={{ width: `${(bar.value * 100).toFixed(0)}%`, background: bar.color }} />
             </div>
-            <div className="text-[9.5px] font-bold tracking-[0.05em] px-[9px] py-[3px] rounded-[6px]
-              border border-[rgba(129,140,248,0.28)] bg-[rgba(129,140,248,0.12)] text-[#818cf8]
-              flex-shrink-0 whitespace-nowrap group-hover:bg-[rgba(129,140,248,0.22)] transition-colors">
-              {item.cta}
-            </div>
+            <span className="text-[10px] text-[rgba(255,255,255,0.35)] w-[28px]">{(bar.value * 100).toFixed(0)}%</span>
           </div>
         ))}
+        {vitals && (
+          <div className="mt-auto pt-2 border-t border-[rgba(255,255,255,0.06)] flex items-center justify-between text-[10px] text-[rgba(255,255,255,0.35)]">
+            <span>{vitals.services_alive} services</span>
+            <span>{vitals.blood_pressure?.api_calls_per_minute || 0} API/min</span>
+            <span>Focus: {vitals.focus_score}%</span>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function StatsStrip() {
-  const stats = [
-    { label: "Chats", value: "12", delta: "↑ 3", up: true },
-    { label: "Spend", value: "$0.84", delta: "under budget", up: true },
-    { label: "Memories", value: "1.2k", delta: "+14", up: true },
-    { label: "Screen", value: "4h 21m", delta: "↑ above avg", up: false },
-  ];
+function ProactiveCardsPanel() {
+  const [cards, setCards] = useState<Array<{
+    card_type: string; title: string; body: string; source_app: string; confidence: number; timestamp: number;
+  }>>([]);
+
+  useEffect(() => {
+    const load = () => invoke<typeof cards>("proactive_get_cards", { limit: 4 }).then(setCards).catch(() => null);
+    load();
+    const interval = setInterval(load, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const iconForType = (t: string) => {
+    switch (t) {
+      case "task": return "📋";
+      case "focus": return "🎯";
+      case "insight": return "💡";
+      case "memory": return "🧠";
+      default: return "•";
+    }
+  };
+
+  if (cards.length === 0) {
+    return (
+      <div className="blade-glass p-4 flex-shrink-0 animate-[blade-card-in_0.5s_cubic-bezier(0.22,1,0.36,1)_0.26s_both]">
+        <div className="flex items-center justify-between mb-2">
+          <CardLabel icon={<svg viewBox="0 0 12 12" className="w-[10px] h-[10px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 1v4M4 3l2 2 2-2M1 7h10M3 9h6"/></svg>}>
+            Proactive
+          </CardLabel>
+          <Chip color="dim">quiet</Chip>
+        </div>
+        <div className="text-[11px] text-[rgba(255,255,255,0.3)] italic">No proactive cards right now</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="blade-glass p-[14px_16px] flex-shrink-0 animate-[blade-card-in_0.5s_cubic-bezier(0.22,1,0.36,1)_0.26s_both]">
-      <div className="grid grid-cols-4 gap-[6px]">
-        {stats.map((s) => (
-          <div key={s.label} className="p-[10px_12px] rounded-[11px] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.07)] flex flex-col gap-[2px] hover:bg-[rgba(255,255,255,0.07)] transition-colors cursor-default">
-            <div className="text-[9.5px] font-semibold tracking-[0.1em] uppercase text-[rgba(255,255,255,0.28)]">{s.label}</div>
-            <div className="text-[22px] font-bold tracking-[-0.04em] leading-[1.1]">{s.value}</div>
-            <div className={`text-[9.5px] font-medium mt-[1px] ${s.up ? "text-[#4ade80]" : "text-[#f87171]"}`}>{s.delta}</div>
+    <div className="blade-glass flex flex-col p-4 gap-2 flex-shrink-0 animate-[blade-card-in_0.5s_cubic-bezier(0.22,1,0.36,1)_0.26s_both]">
+      <div className="flex items-center justify-between">
+        <CardLabel icon={<svg viewBox="0 0 12 12" className="w-[10px] h-[10px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 1v4M4 3l2 2 2-2M1 7h10M3 9h6"/></svg>}>
+          Proactive
+        </CardLabel>
+        <Chip color="amber">{cards.length} cards</Chip>
+      </div>
+      <div className="flex flex-col gap-[4px] overflow-hidden">
+        {cards.slice(0, 3).map((card, i) => (
+          <div key={i} className="flex items-start gap-[6px] px-[8px] py-[6px] rounded-[8px] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)]">
+            <span className="text-[12px] flex-shrink-0 mt-[1px]">{iconForType(card.card_type)}</span>
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold truncate">{card.title}</div>
+              <div className="text-[10px] text-[rgba(255,255,255,0.5)] truncate">{card.body}</div>
+            </div>
           </div>
         ))}
       </div>
@@ -448,8 +506,8 @@ export function Dashboard({ onNavigate, chatPanelProps, activeRoute }: Dashboard
         <div className="grid gap-[10px] flex-1 min-h-0" style={{ gridTemplateColumns: "1.05fr 1.3fr" }}>
           <CalendarCard integrations={integrations} />
           <div className="flex flex-col gap-[10px] min-h-0">
-            <QueueCard />
-            <StatsStrip />
+            <VitalSignsCard />
+            <ProactiveCardsPanel />
           </div>
         </div>
       </div>
