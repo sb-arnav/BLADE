@@ -153,9 +153,13 @@ pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
             first_run = false;
 
             // BLADE's ambient awareness is always on — no "god mode off" state.
-            // The config.god_mode flag now only controls the TIER (normal/intermediate/extreme),
-            // not whether perception runs at all.
             let config = crate::config::load_config();
+
+            // Vagus nerve: skip expensive operations in conservation mode.
+            // Perception fusion still runs (it's cheap), but the LLM-heavy
+            // intelligence brief and proactive actions are gated.
+            let energy = crate::homeostasis::energy_mode();
+            let skip_expensive = energy < 0.2;
 
             // ── Run perception fusion first — all downstream uses share this snapshot ──
             let perception = tokio::task::spawn_blocking(
@@ -163,6 +167,12 @@ pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
             )
             .await
             .unwrap_or_default();
+
+            // Vagus: skip the expensive intelligence brief in deep conservation
+            if skip_expensive {
+                last_brief = String::new();
+                continue;
+            }
 
             // Build the intelligence brief using the fresh perception state
             let brief = build_intelligence_brief(&tier, &last_brief, &perception);

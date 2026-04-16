@@ -550,6 +550,11 @@ async fn proactive_loop(app: tauri::AppHandle) {
             continue;
         }
 
+        // Vagus nerve: skip LLM-heavy stuck detection in conservation mode
+        if crate::homeostasis::energy_mode() < 0.25 {
+            continue;
+        }
+
         let conn = match open_conn() {
             Some(c) => c,
             None => continue,

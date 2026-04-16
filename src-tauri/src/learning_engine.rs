@@ -1003,6 +1003,12 @@ pub fn start_learning_engine(app: tauri::AppHandle) {
                 continue;
             }
 
+            // Vagus nerve: skip LLM pattern analysis in conservation mode
+            if crate::homeostasis::energy_mode() < 0.25 {
+                tokio::time::sleep(Duration::from_secs(30 * 60)).await;
+                continue;
+            }
+
             let count = analyze_and_store_patterns().await;
             log::info!("learning_engine: analyzed {} patterns", count);
 

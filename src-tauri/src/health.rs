@@ -303,7 +303,10 @@ pub fn start_health_scanner(app: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
         loop {
-            run_health_scan(&app).await;
+            // Vagus nerve: skip code health scans in conservation mode
+            if crate::homeostasis::energy_mode() > 0.3 {
+                run_health_scan(&app).await;
+            }
             tokio::time::sleep(tokio::time::Duration::from_secs(1800)).await;
         }
     });
