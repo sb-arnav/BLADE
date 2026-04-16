@@ -63,7 +63,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, EBState> {
   }
 }
 
-type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar" | "workflow-builder" | "code-sandbox" | "persona" | "negotiation" | "financial" | "context-engine" | "reasoning" | "social-graph" | "health" | "documents" | "habits" | "knowledge-graph" | "meetings" | "predictions" | "emotional-intel" | "decision-log" | "security" | "health-panel" | "temporal" | "integrations" | "smart-home" | "finance" | "hive" | "agent-factory" | "rewind" | "live-notes";
+type Route = "chat" | "settings" | "discovery" | "diagnostics" | "analytics" | "knowledge" | "comparison" | "agents" | "terminal" | "files" | "canvas" | "workflows" | "activity" | "sync" | "managed-agents" | "email" | "docs" | "web-auto" | "agent-teams" | "git" | "character" | "reports" | "init" | "deeplearn" | "computer-use" | "bg-agents" | "screen-timeline" | "swarm" | "soul" | "dashboard" | "skill-packs" | "goals" | "kali" | "agents-authority" | "accountability" | "sidecar" | "workflow-builder" | "code-sandbox" | "persona" | "negotiation" | "financial" | "context-engine" | "reasoning" | "social-graph" | "health" | "documents" | "habits" | "knowledge-graph" | "meetings" | "predictions" | "emotional-intel" | "decision-log" | "security" | "health-panel" | "temporal" | "integrations" | "smart-home" | "finance" | "hive" | "agent-factory" | "rewind" | "live-notes" | "focus-page" | "insight-page" | "persona-page";
 
 const Analytics = lazy(() => import("./components/Analytics").then((m) => ({ default: m.Analytics })));
 const Canvas = lazy(() => import("./components/Canvas"));
@@ -130,6 +130,9 @@ const FinanceView = lazy(() => import("./components/FinanceView").then(m => ({ d
 const HiveView = lazy(() => import("./components/HiveView").then(m => ({ default: m.HiveView })));
 const RewindTimeline = lazy(() => import("./components/RewindTimeline").then(m => ({ default: m.RewindTimeline })));
 const LiveNotes = lazy(() => import("./components/LiveNotes").then(m => ({ default: m.LiveNotes })));
+const FocusPage = lazy(() => import("./components/FocusPage").then(m => ({ default: m.FocusPage })));
+const InsightPage = lazy(() => import("./components/InsightPage").then(m => ({ default: m.InsightPage })));
+const PersonaPage2 = lazy(() => import("./components/PersonaPage").then(m => ({ default: m.PersonaPage })));
 const AgentFactoryView = lazy(() => import("./components/AgentFactory").then(m => ({ default: m.AgentFactory })));
 
 function ShellFallback({ label = "Loading workspace..." }: { label?: string }) {
@@ -973,6 +976,9 @@ export default function App() {
     { id: "hive", label: "Hive Control Center", description: "Mission control for BLADE's distributed agent mesh", section: "Work", action: () => openRoute("hive") },
     { id: "rewind", label: "Rewind", description: "Scrub through your day — visual screenshot timeline", section: "Features", action: () => openRoute("rewind") },
     { id: "live-notes", label: "Live Notes", description: "Real-time meeting transcript and action items", section: "Features", action: () => openRoute("live-notes") },
+    { id: "focus-page", label: "Focus", description: "Productivity score, app usage, circadian rhythm", section: "Features", action: () => openRoute("focus-page") },
+    { id: "insight-page", label: "Insights", description: "Browse all proactive observations and discoveries", section: "Features", action: () => openRoute("insight-page") },
+    { id: "persona-page", label: "Persona", description: "View and edit BLADE's understanding of you", section: "Features", action: () => openRoute("persona-page") },
     { id: "agent-factory", label: "Agent Factory", description: "Describe an agent in plain English and deploy it as a live Hive tentacle", section: "Work", action: () => openRoute("agent-factory") },
     { id: "agents", label: "Operator Center", description: "Launch the multi-runtime control plane", section: "Work", action: () => openRoute("agents") },
     { id: "agent-teams", label: "Agent teams", description: "Coordinate multi-role execution plans", section: "Work", action: () => openRoute("agent-teams") },
@@ -1143,6 +1149,9 @@ export default function App() {
     "hive": <HiveView onBack={() => openRoute("dashboard")} />,
     "rewind": <RewindTimeline onBack={() => openRoute("dashboard")} />,
     "live-notes": <LiveNotes onBack={() => openRoute("dashboard")} />,
+    "focus-page": <FocusPage onBack={() => openRoute("dashboard")} />,
+    "insight-page": <InsightPage onBack={() => openRoute("dashboard")} />,
+    "persona-page": <PersonaPage2 onBack={() => openRoute("dashboard")} />,
     "agent-factory": <AgentFactoryView onBack={() => openRoute("dashboard")} />,
   };
 
