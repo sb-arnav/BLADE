@@ -60,6 +60,7 @@ mod dna;
 mod homeostasis;
 mod file_indexer;
 mod immune_system;
+mod joints;
 mod organ;
 mod prefrontal;
 mod proactive_vision;
@@ -1147,6 +1148,8 @@ pub fn run() {
             organ::organ_get_roster,
             organ::organ_set_autonomy,
             organ::organ_get_autonomy,
+            joints::joints_list_providers,
+            joints::joints_list_stores,
             homeostasis::homeostasis_get,
             homeostasis::homeostasis_get_directive,
             homeostasis::homeostasis_get_circadian,

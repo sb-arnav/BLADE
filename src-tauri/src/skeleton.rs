@@ -119,5 +119,8 @@ pub fn init_all_tables() {
         );
     }
 
-    log::info!("[skeleton] All tables initialized");
+    // Register trait-based joint contracts (context providers, memory stores)
+    crate::joints::register_builtins();
+
+    log::info!("[skeleton] All tables initialized, joints registered");
 }
