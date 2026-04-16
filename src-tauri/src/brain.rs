@@ -597,28 +597,34 @@ fn build_system_prompt_inner(
     }
 
     // ── LIVE PERCEPTION (priority 7) ─────────────────────────────────────────
-    // ONE line. Only when God Mode is running (perception has ticked).
-    if let Some(p) = crate::perception_fusion::get_latest() {
-        if !p.active_app.is_empty() {
-            let title_part = if !p.active_title.is_empty() && p.active_title != p.active_app {
-                format!(" — {}", crate::safe_slice(&p.active_title, 50))
-            } else {
-                String::new()
-            };
-            let streak_mins = crate::health_guardian::get_health_stats()["current_streak_minutes"]
-                .as_i64().unwrap_or(0);
-            let streak_part = if streak_mins >= 5 { format!(", {}min", streak_mins) } else { String::new() };
-            parts.push(format!(
-                "Now: {}{} ({}{}).",
-                p.active_app, title_part, p.user_state, streak_part
-            ));
+    // When hive + DNA are active, they provide perception data via selective
+    // routing (thalamus). Only fall back to raw perception dump when hive is off.
+    let hive_is_active = !crate::hive::get_hive_digest().is_empty();
+    if !hive_is_active {
+        // Hive not running — fall back to raw perception line
+        if let Some(p) = crate::perception_fusion::get_latest() {
+            if !p.active_app.is_empty() {
+                let title_part = if !p.active_title.is_empty() && p.active_title != p.active_app {
+                    format!(" — {}", crate::safe_slice(&p.active_title, 50))
+                } else {
+                    String::new()
+                };
+                let streak_mins = crate::health_guardian::get_health_stats()["current_streak_minutes"]
+                    .as_i64().unwrap_or(0);
+                let streak_part = if streak_mins >= 5 { format!(", {}min", streak_mins) } else { String::new() };
+                parts.push(format!(
+                    "Now: {}{} ({}{}).",
+                    p.active_app, title_part, p.user_state, streak_part
+                ));
+            }
         }
     }
 
     // ── MEMORY RECALL (priority 8, query-gated) ───────────────────────────────
-    // Only inject when the query has enough signal words (4+ chars) and
-    // the underlying stores return non-empty results.
-    if !user_query.is_empty() {
+    // When hive + DNA are active, DNA::query_for_brain already pulls typed_memory,
+    // knowledge_graph, people_graph with selective relevance. Skip the individual
+    // pulls to avoid prompt duplication. Fall back to full recall when hive is off.
+    if !user_query.is_empty() && !hive_is_active {
         // Typed memory
         let context_tags: Vec<String> = user_query
             .split_whitespace()
@@ -755,8 +761,10 @@ fn build_system_prompt_inner(
     }
 
     // ── INTEGRATIONS (priority 10) ────────────────────────────────────────────
-    // Only inject when query is schedule/people-related OR meeting is imminent (<= 30 min)
-    {
+    // When hive is active, tentacles already monitor integrations and the digest
+    // surfaces urgent items. Only inject raw integration data when hive is off
+    // OR when there's an imminent meeting (always surface that).
+    if !hive_is_active {
         let integration_score = if user_query.is_empty() {
             0.0f32 // don't auto-inject on cold start
         } else {
@@ -895,10 +903,12 @@ fn build_system_prompt_inner(
         parts.push(meeting_action_ctx);
     }
 
-    // Prediction engine
-    let pred_ctx = crate::prediction_engine::get_prediction_context();
-    if !pred_ctx.is_empty() {
-        parts.push(pred_ctx);
+    // Prediction engine — skip when hive is active (heads already surface predictions)
+    if !hive_is_active {
+        let pred_ctx = crate::prediction_engine::get_prediction_context();
+        if !pred_ctx.is_empty() {
+            parts.push(pred_ctx);
+        }
     }
 
     // Document library
@@ -925,10 +935,12 @@ fn build_system_prompt_inner(
         parts.push(format!("## MCP Tools\n\n{}", tool_list.join("\n")));
     }
 
-    // Activity monitor
-    let activity_ctx = crate::activity_monitor::get_activity_context();
-    if !activity_ctx.trim().is_empty() {
-        parts.push(activity_ctx);
+    // Activity monitor — skip when hive is active (DNA provides this via get_today_activity)
+    if !hive_is_active {
+        let activity_ctx = crate::activity_monitor::get_activity_context();
+        if !activity_ctx.trim().is_empty() {
+            parts.push(activity_ctx);
+        }
     }
 
     // Activity timeline — only for context-heavy queries (not for "hi")
