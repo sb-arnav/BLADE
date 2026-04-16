@@ -623,6 +623,9 @@ pub async fn send_message_stream(
         }
     }
 
+    // Track whether brain planner was used (for pons relay → learning_engine)
+    let mut brain_plan_used = false;
+
     // ── Brain planner for complex tasks ─────────────────────────────────────────
     // For complex multi-step requests (3+ implied actions), the Brain planner
     // makes a separate cheap LLM call to produce a structured execution plan.
@@ -648,6 +651,7 @@ pub async fn send_message_stream(
             .await;
 
             if !brain_plan.is_empty() {
+                brain_plan_used = true;
                 system_prompt.push_str("\n\n---\n\n");
                 system_prompt.push_str(&brain_plan);
             } else {
@@ -1168,12 +1172,33 @@ pub async fn send_message_stream(
                 }
                 // Embed the full exchange for persistent semantic memory
                 crate::embeddings::auto_embed_exchange(&store_clone, &user_text, &assistant_text, "tool_loop");
-                // SKILL ENGINE: record successful tool pattern
+                // SKILL ENGINE (cerebellum): record successful tool pattern
                 if !tools_used.is_empty() {
                     let result_summary = crate::safe_slice(&assistant_text, 200);
                     crate::skill_engine::record_tool_pattern(&user_text_skill, &tools_used, result_summary);
                     // Check if any candidates are ready to graduate to skills
                     crate::skill_engine::maybe_synthesize_skills(app3).await;
+                }
+                // PONS RELAY: record brain-planned tasks as behavior patterns
+                // When brain_planner produces a plan and it executes successfully,
+                // learning_engine should detect this as a repeatable workflow.
+                if brain_plan_used && !tools_used.is_empty() {
+                    let workflow_desc = format!(
+                        "Brain-planned task: {} → tools: {}",
+                        crate::safe_slice(&user_text_skill, 80),
+                        tools_used.join(" → ")
+                    );
+                    let db_path = crate::config::blade_config_dir().join("blade.db");
+                    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                        let _ = crate::db::timeline_record(
+                            &conn,
+                            "brain_plan_executed",
+                            &workflow_desc,
+                            "",
+                            "brain_planner",
+                            "{}",
+                        );
+                    }
                 }
                 // Capability gap detection — runs silently, fires webhook if gap found
                 if reports::detect_and_log(&user_text, &assistant_text) {
