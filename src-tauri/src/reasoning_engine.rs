@@ -145,14 +145,7 @@ async fn llm(
 
 /// Strip markdown fences from LLM JSON output.
 fn strip_fences(s: &str) -> &str {
-    let s = s.trim();
-    if let Some(inner) = s.strip_prefix("```json").or_else(|| s.strip_prefix("```")) {
-        if let Some(end) = inner.rfind("```") {
-            return inner[..end].trim();
-        }
-        return inner.trim();
-    }
-    s
+    crate::strip_json_fences(s)
 }
 
 /// Parse f32 from a JSON Value that might be float or int.

@@ -54,7 +54,11 @@ mod context;
 mod crypto;
 mod db;
 mod db_commands;
+mod brain_planner;
 mod discovery;
+mod dna;
+mod immune_system;
+mod organ;
 mod embeddings;
 mod files;
 mod history;
@@ -71,6 +75,8 @@ mod reports;
 mod router;
 mod runtimes;
 mod audio_timeline;
+mod vad;
+mod deepgram;
 mod screen;
 mod screen_timeline;
 mod screen_timeline_commands;
@@ -140,6 +146,21 @@ pub(crate) fn safe_slice(s: &str, n: usize) -> &str {
     if s.len() <= n { return s; }
     let end = s.char_indices().nth(n).map(|(i, _)| i).unwrap_or(s.len());
     &s[..end]
+}
+
+/// Strip markdown fences from an LLM JSON response.
+/// Handles ` ```json ... ``` ` and ` ``` ... ``` ` wrappers.
+#[allow(dead_code)]
+pub(crate) fn strip_json_fences(s: &str) -> &str {
+    let s = s.trim();
+    if let Some(inner) = s.strip_prefix("```json").or_else(|| s.strip_prefix("```")) {
+        let inner = inner.trim_start_matches('\n');
+        if let Some(end) = inner.rfind("```") {
+            return inner[..end].trim();
+        }
+        return inner.trim();
+    }
+    s
 }
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
@@ -1106,7 +1127,17 @@ pub fn run() {
             hive::hive_start,
             hive::hive_stop,
             hive::hive_get_status,
+            hive::hive_get_digest,
             hive::hive_spawn_tentacle,
+            dna::dna_get_identity,
+            dna::dna_get_goals,
+            dna::dna_get_patterns,
+            dna::dna_query,
+            immune_system::immune_resolve_gap,
+            organ::organ_get_registry,
+            organ::organ_get_roster,
+            organ::organ_set_autonomy,
+            organ::organ_get_autonomy,
             hive::hive_get_reports,
             hive::hive_approve_decision,
             hive::hive_set_autonomy,
@@ -1257,6 +1288,9 @@ pub fn run() {
             // Start clipboard watcher
             clipboard::start_clipboard_watcher(app.handle().clone());
 
+            // Start perception fusion loop — keeps get_latest() fresh for all consumers
+            perception_fusion::start_perception_loop(app.handle().clone());
+
             // Start ambient intelligence monitor
             ambient::start_ambient_monitor(app.handle().clone());
 
@@ -1383,8 +1417,7 @@ pub fn run() {
             // Proactive engine — monitors signals and acts before being asked
             proactive_engine::start_proactive_engine(app.handle().clone());
 
-            // Prediction engine — learns patterns and anticipates what you'll need
-            prediction_engine::start_prediction_loop(app.handle().clone());
+            // Prediction engine — runs inside learning_engine's 30-min tick (no separate loop)
 
             // Workflow Builder scheduler — checks every 60s for due scheduled workflows
             workflow_builder::start_workflow_scheduler(app.handle().clone());

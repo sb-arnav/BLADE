@@ -2905,6 +2905,139 @@ pub fn get_hive_status() -> HiveStatus {
     }
 }
 
+/// Compact intelligence digest for the chat system prompt.
+/// Returns a short markdown block (~300-600 chars) summarizing what the Hive
+/// currently knows. Designed for injection into brain.rs so the chat model
+/// gets ambient awareness without prompt bloat.
+/// Returns empty string if Hive is not running or has no data.
+pub fn get_hive_digest() -> String {
+    let hive = match hive_lock().lock() {
+        Ok(h) => h,
+        Err(_) => return String::new(),
+    };
+
+    if !hive.running {
+        return String::new();
+    }
+
+    let mut lines: Vec<String> = Vec::new();
+    lines.push("## Live Intelligence (Hive)".to_string());
+
+    // Active organ roster — Brain needs to know what capabilities are available
+    let active_organs: Vec<String> = hive
+        .tentacles
+        .values()
+        .filter(|t| t.status == TentacleStatus::Active)
+        .map(|t| t.platform.clone())
+        .collect();
+
+    if !active_organs.is_empty() {
+        lines.push(format!("**Active organs:** {}", active_organs.join(", ")));
+    }
+
+    // Dormant/error organs — Brain should know what's NOT available
+    let inactive: Vec<String> = hive
+        .tentacles
+        .values()
+        .filter(|t| t.status != TentacleStatus::Active)
+        .map(|t| {
+            let status_label = match t.status {
+                TentacleStatus::Dormant => "dormant",
+                TentacleStatus::Error => "error",
+                TentacleStatus::Disconnected => "disconnected",
+                TentacleStatus::Active => "active", // won't reach here
+            };
+            format!("{} ({})", t.platform, status_label)
+        })
+        .collect();
+
+    if !inactive.is_empty() {
+        lines.push(format!("**Unavailable:** {}", inactive.join(", ")));
+    }
+
+    // Head-level intelligence — one line per domain with pending work
+    for head in hive.heads.values() {
+        let report_count = hive
+            .tentacles
+            .values()
+            .filter(|t| t.head == head.id)
+            .flat_map(|t| t.pending_reports.iter())
+            .filter(|r| !r.processed)
+            .count();
+
+        let decision_count = head.pending_decisions.len();
+
+        if report_count > 0 || decision_count > 0 {
+            let mut summary_parts = Vec::new();
+            if report_count > 0 {
+                summary_parts.push(format!("{} reports", report_count));
+            }
+            if decision_count > 0 {
+                summary_parts.push(format!("{} decisions pending", decision_count));
+            }
+            lines.push(format!("- **{} Head:** {}", head.domain, summary_parts.join(", ")));
+        }
+    }
+
+    // Urgent reports from active tentacles — only High/Critical to keep digest small
+    for tentacle in hive.tentacles.values() {
+        if tentacle.status != TentacleStatus::Active {
+            continue;
+        }
+        if let Some(report) = tentacle.pending_reports.iter().rev().find(|r| !r.processed) {
+            let urgency = match report.priority {
+                Priority::Critical => "URGENT: ",
+                Priority::High => "",
+                _ => continue,
+            };
+            lines.push(format!(
+                "- **{}** {}{}",
+                tentacle.platform,
+                urgency,
+                crate::safe_slice(&report.summary, 100),
+            ));
+        }
+    }
+
+    // Pending decisions that need user attention (escalations)
+    let pending_escalations: Vec<String> = hive
+        .heads
+        .values()
+        .flat_map(|h| h.pending_decisions.iter())
+        .filter_map(|d| match d {
+            Decision::Escalate { reason, .. } => Some(crate::safe_slice(reason, 80).to_string()),
+            _ => None,
+        })
+        .take(3)
+        .collect();
+
+    if !pending_escalations.is_empty() {
+        lines.push("**Needs your attention:**".to_string());
+        for e in pending_escalations {
+            lines.push(format!("- {}", e));
+        }
+    }
+
+    // If nothing notable beyond the header + roster, keep it minimal
+    if lines.len() <= 2 {
+        let active = active_organs.len();
+        if active > 0 && lines.len() == 2 {
+            // Just the header + organ list, nothing urgent — that's fine, keep it
+        } else if active == 0 {
+            return String::new();
+        }
+    }
+
+    lines.join("\n")
+}
+
+/// Returns the current Hive intelligence digest — the compact summary
+/// injected into the chat system prompt. Useful for debugging/display.
+#[tauri::command]
+pub fn hive_get_digest() -> String {
+    get_hive_digest()
+}
+
 /// Return all unprocessed reports across all tentacles.
 pub fn get_all_reports() -> Vec<TentacleReport> {
     let hive = hive_lock().lock().unwrap();

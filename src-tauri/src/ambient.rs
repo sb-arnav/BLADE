@@ -24,18 +24,6 @@ fn error_headline(text: &str) -> String {
         .collect()
 }
 
-fn looks_like_error(text: &str) -> bool {
-    if text.len() < 10 || text.len() > 20_000 { return false; }
-    let lower = text.to_lowercase();
-    lower.contains("traceback") || lower.contains("error:") ||
-        lower.contains("exception:") || lower.contains("panicked at") ||
-        lower.contains("typeerror:") || lower.contains("syntaxerror:") ||
-        lower.contains("nameerror:") || lower.contains("valueerror:") ||
-        lower.contains("attributeerror:") || lower.contains("nullpointerexception") ||
-        lower.contains("uncaught error") || lower.contains("undefined is not a function") ||
-        (lower.contains("fatal:") && lower.contains("error"))
-}
-
 pub fn start_ambient_monitor(app: tauri::AppHandle) {
     // Detect multiple monitors immediately at startup and on hot-plug changes
     let mut last_monitor_count: usize = 0;
@@ -97,142 +85,110 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
                 }
             }
 
-            // Proactively detect errors in clipboard — nudge if BLADE sees something new
-            if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                if let Ok(text) = clipboard.get_text() {
-                    if looks_like_error(&text) {
-                        use std::hash::{Hash, Hasher};
-                        let mut h = std::collections::hash_map::DefaultHasher::new();
-                        crate::safe_slice(&text, 500).hash(&mut h);
-                        let hash = h.finish();
-                        if hash != last_error_hash {
-                            last_error_hash = hash;
-                            last_clipboard_action_hash = hash;
-                            let headline = error_headline(&text);
-                            let _ = app.emit("proactive_nudge", serde_json::json!({
-                                "message": format!("I see an error in your clipboard: {}. Want me to diagnose it?", headline),
-                                "type": "error_detected",
-                                "raw": crate::safe_slice(&text, 800),
-                            }));
+            // Use the shared perception state — kept fresh by perception_fusion's 30s loop.
+            // This eliminates duplicate clipboard reads and window polls on every tick.
+            let perception = crate::perception_fusion::get_latest().unwrap_or_default();
 
-                            // Route through decision gate — detached so the ambient loop continues
-                            let text_clone = text.clone();
-                            let app_clone = app.clone();
-                            tauri::async_runtime::spawn(async move {
-                                crate::clipboard::clipboard_auto_action(
-                                    &app_clone,
-                                    &text_clone,
-                                    "error",
-                                ).await;
-                            });
-                        }
-                    } else {
-                        // Classify and route non-error clipboard content through the decision gate
-                        use std::hash::{Hash, Hasher};
-                        let mut h = std::collections::hash_map::DefaultHasher::new();
-                        crate::safe_slice(&text, 500).hash(&mut h);
-                        let hash = h.finish();
-                        if hash != last_clipboard_action_hash {
-                            let lower = text.to_lowercase();
-                            let content_type = if lower.starts_with("http://") || lower.starts_with("https://") {
-                                Some("url")
-                            } else {
-                                // Mirror classify_content code-detection logic
-                                let code_signals = ["fn ", "def ", "class ", "const ", "let ", "var ", "import ", "function ", "=>", "->", "{", "};"];
-                                let code_score: usize = code_signals.iter().filter(|s| text.contains(*s)).count();
-                                if code_score >= 2 { Some("code") } else { None }
-                            };
-                            if let Some(ct) = content_type {
-                                last_clipboard_action_hash = hash;
-                                let text_clone = text.clone();
-                                let app_clone = app.clone();
-                                let ct_str = ct.to_string();
-                                tauri::async_runtime::spawn(async move {
-                                    crate::clipboard::clipboard_auto_action(
-                                        &app_clone,
-                                        &text_clone,
-                                        &ct_str,
-                                    ).await;
-                                });
-                            }
-                        }
-                    }
+            // ── Clipboard routing via perception state ────────────────────────
+            // perception_fusion already classified the clipboard; we only act on change.
+            if perception.clipboard_type == "error" && !perception.clipboard_preview.is_empty() {
+                use std::hash::{Hash, Hasher};
+                let mut h = std::collections::hash_map::DefaultHasher::new();
+                perception.clipboard_preview.hash(&mut h);
+                let hash = h.finish();
+                if hash != last_error_hash {
+                    last_error_hash = hash;
+                    last_clipboard_action_hash = hash;
+                    let headline = error_headline(&perception.clipboard_preview);
+                    let _ = app.emit("proactive_nudge", serde_json::json!({
+                        "message": format!("I see an error in your clipboard: {}. Want me to diagnose it?", headline),
+                        "type": "error_detected",
+                        "raw": &perception.clipboard_preview,
+                    }));
+                    let text_clone = perception.clipboard_preview.clone();
+                    let app_clone = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        crate::clipboard::clipboard_auto_action(&app_clone, &text_clone, "error").await;
+                    });
+                }
+            } else if matches!(perception.clipboard_type.as_str(), "url" | "code")
+                && !perception.clipboard_preview.is_empty()
+            {
+                use std::hash::{Hash, Hasher};
+                let mut h = std::collections::hash_map::DefaultHasher::new();
+                perception.clipboard_preview.hash(&mut h);
+                let hash = h.finish();
+                if hash != last_clipboard_action_hash {
+                    last_clipboard_action_hash = hash;
+                    let ct = perception.clipboard_type.clone();
+                    let text_clone = perception.clipboard_preview.clone();
+                    let app_clone = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        crate::clipboard::clipboard_auto_action(&app_clone, &text_clone, &ct).await;
+                    });
                 }
             }
 
-            let win = crate::context::get_active_window().ok();
+            // ── Window / session tracking via perception state ─────────────────
+            let active_app = &perception.active_app;
+            let active_title = &perception.active_title;
 
-            match &win {
-                Some(w) if !w.app_name.is_empty() || !w.window_title.is_empty() => {
-                    last_activity = std::time::Instant::now();
-                    idle_nudged = false;
+            if !active_app.is_empty() || !active_title.is_empty() {
+                last_activity = std::time::Instant::now();
+                idle_nudged = false;
 
-                    let key = format!("{}|{}", w.app_name, w.window_title);
-                    let prev_key = current.as_ref().map(|s| format!("{}|{}", s.process, s.name));
+                let key = format!("{}|{}", active_app, active_title);
+                let prev_key = current.as_ref().map(|s| format!("{}|{}", s.process, s.name));
 
-                    if prev_key.as_deref() != Some(&key) {
-                        // App or window switched — record to timeline
-                        let db_path = crate::config::blade_config_dir().join("blade.db");
-                        if let Ok(conn) = rusqlite::Connection::open(&db_path) {
-                            let title = if w.window_title.is_empty() {
-                                w.app_name.clone()
-                            } else {
-                                format!("{} — {}", w.app_name, crate::safe_slice(&w.window_title, 60))
-                            };
-                            let _ = crate::db::timeline_record(
-                                &conn,
-                                "window_switch",
-                                &title,
-                                "",
-                                &w.app_name,
-                                "{}",
-                            );
-                        }
-                        current = Some(WindowSession {
-                            name: w.window_title.clone(),
-                            process: w.app_name.clone(),
-                            started: std::time::Instant::now(),
-                            nudge_fired: false,
-                        });
-                    } else if let Some(ref mut sess) = current {
-                        let mins = sess.started.elapsed().as_secs() / 60;
-
-                        // Nudge after 45 min on same app
-                        if mins >= 45 && !sess.nudge_fired {
-                            sess.nudge_fired = true;
-                            let app_label = friendly_app(&sess.process);
-                            let _ = app.emit("proactive_nudge", serde_json::json!({
-                                "message": format!(
-                                    "You've been in {} for {} minutes straight. Need a break, a summary, or want me to take something off your plate?",
-                                    app_label, mins
-                                ),
-                                "type": "duration",
-                                "context": sess.process
-                            }));
-                        }
+                if prev_key.as_deref() != Some(&key) {
+                    // App or window switched — record to timeline
+                    let db_path = crate::config::blade_config_dir().join("blade.db");
+                    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                        let title = if active_title.is_empty() {
+                            active_app.clone()
+                        } else {
+                            format!("{} — {}", active_app, crate::safe_slice(active_title, 60))
+                        };
+                        let _ = crate::db::timeline_record(&conn, "window_switch", &title, "", active_app, "{}");
                     }
-
-                    // Every ~10 min (20 ticks): ambient context update to frontend
-                    if tick % 20 == 0 {
-                        let activity = crate::context::get_user_activity().ok().unwrap_or_default();
-                        if !activity.is_empty() {
-                            let _ = app.emit("ambient_update", serde_json::json!({
-                                "activity": activity
-                            }));
-                        }
-                    }
-                }
-                _ => {
-                    // Can't detect window
-                    let idle_mins = last_activity.elapsed().as_secs() / 60;
-
-                    if idle_mins >= 20 && !idle_nudged {
-                        idle_nudged = true;
+                    current = Some(WindowSession {
+                        name: active_title.clone(),
+                        process: active_app.clone(),
+                        started: std::time::Instant::now(),
+                        nudge_fired: false,
+                    });
+                } else if let Some(ref mut sess) = current {
+                    let mins = sess.started.elapsed().as_secs() / 60;
+                    if mins >= 45 && !sess.nudge_fired {
+                        sess.nudge_fired = true;
+                        let app_label = friendly_app(&sess.process);
                         let _ = app.emit("proactive_nudge", serde_json::json!({
-                            "message": "You've been away a while. Back? Want a quick summary of where we left off, or something to jump back into?",
-                            "type": "idle"
+                            "message": format!(
+                                "You've been in {} for {} minutes straight. Need a break, a summary, or want me to take something off your plate?",
+                                app_label, mins
+                            ),
+                            "type": "duration",
+                            "context": sess.process
                         }));
                     }
+                }
+
+                // Every ~10 min (20 ticks): ambient context update to frontend
+                if tick % 20 == 0 {
+                    let activity = crate::context::get_user_activity().ok().unwrap_or_default();
+                    if !activity.is_empty() {
+                        let _ = app.emit("ambient_update", serde_json::json!({ "activity": activity }));
+                    }
+                }
+            } else {
+                // No active window in perception — user may be away
+                let idle_mins = last_activity.elapsed().as_secs() / 60;
+                if idle_mins >= 20 && !idle_nudged {
+                    idle_nudged = true;
+                    let _ = app.emit("proactive_nudge", serde_json::json!({
+                        "message": "You've been away a while. Back? Want a quick summary of where we left off, or something to jump back into?",
+                        "type": "idle"
+                    }));
                 }
             }
 

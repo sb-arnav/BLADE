@@ -310,6 +310,10 @@ pub async fn roast_and_rebuild(
 /// Called async in the background after every message. Only critiques responses
 /// over 100 chars (skip trivial replies). Returns the rebuilt response if the
 /// original scored below 7, otherwise returns None to keep the original.
+///
+/// Uses critique_response() directly rather than duplicating the prompt — this
+/// avoids the double API call that the previous inline approach caused (once here,
+/// then again inside roast_and_rebuild).
 pub async fn maybe_critique(
     user_request: &str,
     blade_response: &str,
@@ -319,75 +323,44 @@ pub async fn maybe_critique(
         return None;
     }
 
-    let cfg = crate::config::load_config();
-    let provider = &cfg.provider;
-    let api_key = &cfg.api_key;
-    let model = cheap_model_for_provider(provider);
-    let base_url = cfg.base_url.as_deref();
+    let _ = ensure_tables();
 
-    let system = "You are a brutal, honest critic evaluating an AI assistant's response. \
-                  Your job is to find every flaw without mercy.";
+    // Single critique call — reuse critique_response() instead of duplicating the prompt.
+    let critique = critique_response(user_request, blade_response).await.ok()?;
 
-    let user_msg = format!(
-        r#"You are a brutal, honest critic evaluating an AI assistant's response.
-
-User asked: {user_request}
-
-AI responded: {blade_response}
-
-Score this response on these axes (be harsh):
-1. Directness: did it actually answer what was asked, or hedge/deflect?
-2. Completeness: did it cover the full request or leave things out?
-3. Accuracy: is anything wrong or oversimplified?
-4. Conciseness: is it bloated with filler, preamble, or unnecessary caveats?
-5. Actionability: can the user immediately act on this, or is it vague?
-
-Overall score: X/10 (7+ = acceptable, <7 = rebuild needed)
-
-Respond ONLY as JSON:
-{{"score": N, "problems": ["problem1", "problem2"], "verdict": "one sentence", "should_rebuild": true/false}}"#
-    );
-
-    use crate::providers::{complete_turn, ConversationMessage};
-
-    let messages = vec![
-        ConversationMessage::System(system.to_string()),
-        ConversationMessage::User(user_msg.clone()),
-    ];
-
-    let raw = match complete_turn(provider, api_key, &model, &messages, &crate::providers::no_tools(), base_url).await {
-        Ok(t) => t.content,
-        Err(_) => return None,
-    };
-
-    let json_str = extract_json(&raw);
-    let score = serde_json::from_str::<serde_json::Value>(json_str)
-        .ok()
-        .and_then(|v| v["score"].as_i64())
-        .unwrap_or(8) as i32;
-
-    if score < 7 {
-        // Full roast in background to persist, but also return the rebuilt response
-        match roast_and_rebuild(user_request, blade_response).await {
-            Ok(session) => session.rebuilt,
-            Err(_) => None,
-        }
-    } else {
-        // Score is fine — persist a lightweight record and return None
-        let _ = ensure_tables();
-        let critique = CritiqueResult {
-            score,
-            problems: vec![],
-            verdict: format!("Score {}/10 — acceptable.", score),
-            should_rebuild: false,
+    if critique.should_rebuild {
+        // Rebuild using the already-computed critique (no second critique call needed).
+        let rebuilt = rebuild_response(user_request, blade_response, &critique).await.ok()?;
+        let improvement = format!(
+            "Rebuilt from score {}/10. Fixed: {}",
+            critique.score,
+            if critique.problems.is_empty() {
+                "general quality issues".to_string()
+            } else {
+                critique.problems.join(", ")
+            },
+        );
+        let session = RoastSession {
+            id: uuid::Uuid::new_v4().to_string(),
+            user_request: user_request.to_string(),
+            original: blade_response.to_string(),
+            critique,
+            rebuilt: Some(rebuilt.clone()),
+            improvement_summary: improvement,
+            created_at: chrono::Utc::now().timestamp_millis(),
         };
+        let _ = save_session(&session);
+        Some(rebuilt)
+    } else {
+        // Score is acceptable — persist a lightweight record and return None.
+        let improvement = format!("Score {}/10 — no rebuild needed.", critique.score);
         let session = RoastSession {
             id: uuid::Uuid::new_v4().to_string(),
             user_request: user_request.to_string(),
             original: blade_response.to_string(),
             critique,
             rebuilt: None,
-            improvement_summary: format!("Score {}/10 — no rebuild needed.", score),
+            improvement_summary: improvement,
             created_at: chrono::Utc::now().timestamp_millis(),
         };
         let _ = save_session(&session);
@@ -581,24 +554,8 @@ pub async fn deep_roast(
     Ok(final_response)
 }
 
-// ---------------------------------------------------------------------------
-// Utility: strip markdown fences from LLM JSON output
-// ---------------------------------------------------------------------------
-
 fn extract_json(raw: &str) -> &str {
-    let trimmed = raw.trim();
-
-    // Handle ```json ... ``` and ``` ... ```
-    if let Some(inner) = trimmed
-        .strip_prefix("```json")
-        .or_else(|| trimmed.strip_prefix("```"))
-    {
-        if let Some(end) = inner.rfind("```") {
-            return inner[..end].trim();
-        }
-    }
-
-    trimmed
+    crate::strip_json_fences(raw)
 }
 
 // ---------------------------------------------------------------------------
