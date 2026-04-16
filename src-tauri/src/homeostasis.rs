@@ -275,6 +275,36 @@ pub fn hypothalamus_tick() {
         0.1 // fresh
     };
 
+    // ── Kidneys: continuous waste management ───────────────────────────
+    // Don't wait for dream mode — prune the most common waste every tick.
+    // Lightweight: only runs SQL DELETEs, no LLM calls.
+    // Only prune when energy is decent (don't add DB load during conservation).
+    if state.energy_mode > 0.3 {
+        let db_path = crate::config::blade_config_dir().join("blade.db");
+        if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+            // Prune processed hive reports older than 2 hours (they've been synthesized)
+            let two_hours_ago = now - 7200;
+            let _ = conn.execute(
+                "DELETE FROM proactive_cards WHERE dismissed = 1 AND timestamp < ?1",
+                rusqlite::params![two_hours_ago],
+            );
+
+            // Prune old activity_timeline entries (>48h, keep DB lean during active use)
+            let two_days_ago = now - 172800;
+            let _ = conn.execute(
+                "DELETE FROM activity_timeline WHERE timestamp < ?1 AND event_type NOT IN ('god_mode', 'brain_plan_executed')",
+                rusqlite::params![two_days_ago],
+            );
+
+            // Prune old analytics events (>7 days)
+            let week_ago = now - 604800;
+            let _ = conn.execute(
+                "DELETE FROM analytics_events WHERE timestamp < ?1",
+                rusqlite::params![week_ago],
+            );
+        }
+    }
+
     state.last_updated = now;
 
     // Write back
