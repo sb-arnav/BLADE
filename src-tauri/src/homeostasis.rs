@@ -52,6 +52,20 @@ pub struct HormoneState {
     /// Affected by: time since last perception tick, time since last user interaction.
     pub thirst: f32,
 
+    /// INSULIN: 0.0 = budget plenty → 1.0 = budget critical (stop spending).
+    /// Tracks API token budget health. High insulin = suppress all non-essential API calls.
+    pub insulin: f32,
+
+    /// ADRENALINE: 0.0 = calm → 1.0 = emergency burst mode.
+    /// Temporary spike when critical events detected. Overrides conservation —
+    /// ALL services go to max power. Decays after 5 minutes.
+    pub adrenaline: f32,
+
+    /// LEPTIN: 0.0 = knowledge-hungry → 1.0 = satiated (have enough, stop learning).
+    /// Based on how much typed_memory + knowledge_graph has grown recently.
+    /// High leptin = skip research, evolution, memory extraction.
+    pub leptin: f32,
+
     /// When the hypothalamus last updated these values.
     pub last_updated: i64,
 }
@@ -66,6 +80,9 @@ impl Default for HormoneState {
             urgency: 0.0,      // no urgency
             hunger: 0.0,       // no pending work
             thirst: 0.0,       // fresh data
+            insulin: 0.0,      // budget healthy
+            adrenaline: 0.0,   // calm
+            leptin: 0.3,       // slightly hungry for knowledge
             last_updated: 0,
         }
     }
@@ -305,6 +322,82 @@ pub fn hypothalamus_tick() {
         }
     }
 
+    // ── Insulin: API token budget health ────────────────────────────────
+    // Track how fast we're burning API credits. High insulin = suppress spending.
+    // Uses cardiovascular blood pressure as the real-time spend indicator.
+    let api_rate = bp.api_calls_per_minute;
+    state.insulin = if api_rate > 40 {
+        0.9  // critical — burning credits very fast
+    } else if api_rate > 20 {
+        0.6  // elevated — should slow down
+    } else if api_rate > 10 {
+        0.3  // moderate — normal usage
+    } else {
+        0.1  // healthy — budget is fine
+    };
+
+    // High insulin suppresses energy (like real insulin suppresses blood sugar)
+    if state.insulin > 0.6 {
+        state.energy_mode = (state.energy_mode * 0.7).max(0.1);
+    }
+
+    // ── Adrenaline: acute emergency burst ─────────────────────────────
+    // Check for critical signals that warrant temporary full-power mode.
+    // Adrenaline spikes then decays over 5 minutes.
+    static ADRENALINE_SPIKE_AT: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+
+    // Spike triggers: critical hive reports, service crashes, high error rate
+    let should_spike = hive_status.pending_decisions > 3
+        || bp.errors_per_minute > 5
+        || !dead_services.is_empty();
+
+    if should_spike {
+        ADRENALINE_SPIKE_AT.store(now, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    let spike_at = ADRENALINE_SPIKE_AT.load(std::sync::atomic::Ordering::SeqCst);
+    let since_spike = now - spike_at;
+    state.adrenaline = if spike_at == 0 || since_spike > 300 {
+        0.0  // no spike or expired (>5 min)
+    } else if since_spike < 60 {
+        1.0  // peak adrenaline (first minute)
+    } else {
+        // Decay: 1.0 → 0.0 over 5 minutes
+        (1.0 - (since_spike as f32 / 300.0)).max(0.0)
+    };
+
+    // Adrenaline OVERRIDES conservation — emergency = full power
+    if state.adrenaline > 0.5 {
+        state.energy_mode = (state.energy_mode + 0.3).min(1.0);
+        state.arousal = (state.arousal + 0.3).min(1.0);
+    }
+
+    // ── Leptin: knowledge satiety ─────────────────────────────────────
+    // How much has BLADE learned recently? If a lot → stop researching.
+    // If little → keep exploring.
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    let recent_memories = rusqlite::Connection::open(&db_path)
+        .ok()
+        .and_then(|conn| {
+            let cutoff = now - 3600; // last hour
+            conn.query_row(
+                "SELECT COUNT(*) FROM typed_memories WHERE created_at > ?1",
+                rusqlite::params![cutoff],
+                |row| row.get::<_, i64>(0),
+            ).ok()
+        })
+        .unwrap_or(0);
+
+    state.leptin = if recent_memories > 20 {
+        0.9  // very satiated — learned a lot this hour, stop researching
+    } else if recent_memories > 10 {
+        0.6  // moderately full
+    } else if recent_memories > 3 {
+        0.3  // slightly hungry for knowledge
+    } else {
+        0.1  // starving — should research more
+    };
+
     state.last_updated = now;
 
     // Write back
@@ -337,6 +430,9 @@ pub fn start_hypothalamus(app: tauri::AppHandle) {
                 "urgency": hormones.urgency,
                 "hunger": hormones.hunger,
                 "thirst": hormones.thirst,
+                "insulin": hormones.insulin,
+                "adrenaline": hormones.adrenaline,
+                "leptin": hormones.leptin,
             }));
         }
     });

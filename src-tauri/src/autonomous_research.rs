@@ -349,6 +349,12 @@ pub fn start_autonomous_research(app: tauri::AppHandle) {
                 continue; // body is conserving — not the time for research
             }
 
+            // Leptin: skip research when knowledge-satiated (learned a lot recently)
+            let leptin = crate::homeostasis::get_hormones().leptin;
+            if leptin > 0.7 {
+                continue; // satiated — don't overfeed on knowledge
+            }
+
             // Only research when idle (no activity in last 5 minutes)
             let last = LAST_ACTIVITY_TS.load(Ordering::Relaxed);
             let now = now_secs();
