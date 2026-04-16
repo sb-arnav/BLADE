@@ -40,11 +40,13 @@ pub fn filter_waste() -> u64 {
     // Nephron 4: emotional_readings — keep 7 days
     total_pruned += del(&conn, "DELETE FROM emotional_readings WHERE timestamp < ?1", cutoff_7d);
 
-    // Nephron 5: self_critiques — keep 30 days
-    total_pruned += del(&conn, "DELETE FROM self_critiques WHERE created_at < ?1", cutoff_30d);
+    // Nephron 5: self_critiques — keep 90 days (feeds weekly_meta_critique learning)
+    let cutoff_90d = now - 90 * 86400;
+    total_pruned += del(&conn, "DELETE FROM self_critiques WHERE created_at < ?1", cutoff_90d);
 
-    // Nephron 6: reasoning_traces — keep 14 days
-    total_pruned += del(&conn, "DELETE FROM reasoning_traces WHERE created_at < ?1", cutoff_14d);
+    // Nephron 6: reasoning_traces — keep 60 days (user may ask "show me that analysis")
+    let cutoff_60d = now - 60 * 86400;
+    total_pruned += del(&conn, "DELETE FROM reasoning_traces WHERE created_at < ?1", cutoff_60d);
 
     // Nephron 7: voice_sessions + voice_segments — keep 7 days
     total_pruned += del(&conn, "DELETE FROM voice_segments WHERE timestamp < ?1", cutoff_7d);
@@ -54,13 +56,14 @@ pub fn filter_waste() -> u64 {
     total_pruned += del(&conn,
         "DELETE FROM plan_memory WHERE status != 'confirmed' AND last_used < ?1", cutoff_7d);
 
-    // Nephron 9: behavior_patterns — prune low-confidence after 30 days
+    // Nephron 9: behavior_patterns — only prune VERY low confidence AND old AND rarely seen
+    // Be conservative: patterns are learning data. A pattern seen once might become important.
     total_pruned += del(&conn,
-        "DELETE FROM behavior_patterns WHERE confidence < 0.3 AND last_seen < ?1", cutoff_30d);
+        "DELETE FROM behavior_patterns WHERE confidence < 0.15 AND frequency <= 1 AND last_seen < ?1", cutoff_30d);
 
-    // Nephron 10: predictions — prune unfulfilled after 14 days
+    // Nephron 10: predictions — prune unfulfilled after 30 days (keep fulfilled forever — they're validated patterns)
     total_pruned += del(&conn,
-        "DELETE FROM user_predictions WHERE fulfilled = 0 AND created_at < ?1", cutoff_14d);
+        "DELETE FROM user_predictions WHERE fulfilled = 0 AND created_at < ?1", cutoff_30d);
 
     // Nephron 11: authority_audit_log — keep 30 days
     total_pruned += del(&conn, "DELETE FROM authority_audit_log WHERE timestamp < ?1", cutoff_30d);
@@ -68,9 +71,9 @@ pub fn filter_waste() -> u64 {
     // Nephron 12: agent_delegations — keep 14 days
     total_pruned += del(&conn, "DELETE FROM agent_delegations WHERE created_at < ?1", cutoff_14d);
 
-    // Nephron 13: debate_sessions + negotiation_scenarios — keep 30 days
-    total_pruned += del(&conn, "DELETE FROM debate_sessions WHERE created_at < ?1", cutoff_30d);
-    total_pruned += del(&conn, "DELETE FROM negotiation_scenarios WHERE created_at < ?1", cutoff_30d);
+    // Nephron 13: debate_sessions + negotiation_scenarios — keep 90 days (user work product)
+    total_pruned += del(&conn, "DELETE FROM debate_sessions WHERE created_at < ?1", cutoff_90d);
+    total_pruned += del(&conn, "DELETE FROM negotiation_scenarios WHERE created_at < ?1", cutoff_90d);
 
     // Nephron 14: proactive_actions — keep 7 days
     total_pruned += del(&conn, "DELETE FROM proactive_actions WHERE created_at < ?1", cutoff_7d);
@@ -101,8 +104,13 @@ pub fn filter_waste() -> u64 {
     total_pruned += del(&conn,
         "DELETE FROM swarms WHERE status = 'completed' AND created_at < ?1", cutoff_14d);
 
-    // Nephron 22: vector_entries (stale embeddings) — keep 30 days
-    total_pruned += del(&conn, "DELETE FROM vector_entries WHERE created_at < ?1", cutoff_30d);
+    // Nephron 22: vector_entries — DON'T time-prune. These are the search index.
+    // Deleting embeddings makes "what was I doing last month?" return nothing.
+    // Only prune orphaned entries whose source was already deleted.
+    total_pruned += conn.execute(
+        "DELETE FROM vector_entries WHERE source = 'screen_timeline' AND source_id NOT IN (SELECT CAST(id AS TEXT) FROM screen_timeline)",
+        [],
+    ).unwrap_or(0) as u64;
 
     // Nephron 23: indexed_files — prune files deleted from disk (hourly check)
     static PRUNE_COUNTER: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
