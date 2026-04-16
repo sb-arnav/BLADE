@@ -770,20 +770,73 @@ pub async fn proactive_suggestion(app: &tauri::AppHandle) {
 
     for pred in &predictions {
         if pred.confidence > 0.75 {
-            let _ = app.emit(
-                "blade_suggestion",
-                serde_json::json!({
-                    "prediction": pred.prediction,
-                    "confidence": pred.confidence,
-                    "context": pred.context,
-                    "id": pred.id,
-                }),
-            );
+            // Cerebellum reflex: if this prediction has been fulfilled 3+ times before,
+            // it's a learned routine — route through decision_gate for autonomous execution
+            // instead of just suggesting.
+            let fulfilled_count = count_fulfilled_similar(&pred.prediction);
+            if fulfilled_count >= 3 && pred.confidence > 0.85 {
+                // This is a reflex — route through decision_gate
+                let signal = crate::decision_gate::Signal {
+                    source: "cerebellum".to_string(),
+                    description: format!("Learned reflex (confirmed {}x): {}", fulfilled_count, pred.prediction),
+                    confidence: pred.confidence as f64,
+                    reversible: true,
+                    time_sensitive: false,
+                };
+                let perception = crate::perception_fusion::get_latest()
+                    .unwrap_or_default();
+                let outcome = crate::decision_gate::evaluate(&signal, &perception).await;
+
+                match outcome {
+                    crate::decision_gate::DecisionOutcome::ActAutonomously { action, .. } => {
+                        let _ = app.emit("blade_reflex", serde_json::json!({
+                            "prediction": pred.prediction,
+                            "action": action,
+                            "confidence": pred.confidence,
+                            "fulfilled_count": fulfilled_count,
+                        }));
+                    }
+                    _ => {
+                        // Decision gate said don't act autonomously — fall back to suggestion
+                        let _ = app.emit("blade_suggestion", serde_json::json!({
+                            "prediction": pred.prediction,
+                            "confidence": pred.confidence,
+                            "context": pred.context,
+                            "id": pred.id,
+                            "learned_reflex": true,
+                        }));
+                    }
+                }
+            } else {
+                let _ = app.emit(
+                    "blade_suggestion",
+                    serde_json::json!({
+                        "prediction": pred.prediction,
+                        "confidence": pred.confidence,
+                        "context": pred.context,
+                        "id": pred.id,
+                    }),
+                );
+            }
             LAST_SUGGESTION_TS.store(now, Ordering::SeqCst);
-            // Only surface the best one
             break;
         }
     }
+}
+
+/// Count how many times a similar prediction was previously fulfilled.
+/// Used by the cerebellum to decide if a pattern is a learned reflex.
+fn count_fulfilled_similar(prediction_text: &str) -> i64 {
+    let conn = match open_db() {
+        Some(c) => c,
+        None => return 0,
+    };
+    let search = format!("%{}%", crate::safe_slice(prediction_text, 50));
+    conn.query_row(
+        "SELECT COUNT(*) FROM user_predictions WHERE fulfilled = 1 AND prediction LIKE ?1",
+        params![search],
+        |row| row.get::<_, i64>(0),
+    ).unwrap_or(0)
 }
 
 /// Mark a prediction as fulfilled when the user actually asks for it.
