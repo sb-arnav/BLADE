@@ -658,6 +658,35 @@ fn build_system_prompt_inner(
         }
     }
 
+    // ── ALWAYS-ON HEARING (priority 7.1) ─────────────────────────────────
+    // BLADE always hears. If there's a meeting in progress, include the
+    // latest transcript so the model knows what's being discussed.
+    if crate::audio_timeline::detect_meeting_in_progress() {
+        let db_path = crate::config::blade_config_dir().join("blade.db");
+        if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+            let cutoff = chrono::Utc::now().timestamp() - 300; // last 5 min
+            if let Ok(mut stmt) = conn.prepare(
+                "SELECT transcript FROM audio_timeline
+                 WHERE timestamp > ?1 AND meeting_id != ''
+                 ORDER BY timestamp DESC LIMIT 2"
+            ) {
+                let transcripts: Vec<String> = stmt
+                    .query_map(rusqlite::params![cutoff], |row| row.get::<_, String>(0))
+                    .ok()
+                    .map(|rows| rows.filter_map(|r| r.ok()).collect())
+                    .unwrap_or_default();
+
+                if !transcripts.is_empty() {
+                    let combined: String = transcripts.iter().rev()
+                        .map(|t| crate::safe_slice(t, 200).to_string())
+                        .collect::<Vec<_>>()
+                        .join(" ... ");
+                    parts.push(format!("Hearing (meeting in progress): {}", combined));
+                }
+            }
+        }
+    }
+
     // ── MEMORY RECALL (priority 8, query-gated) ───────────────────────────────
     // When hive + DNA are active, DNA::query_for_brain already pulls typed_memory,
     // knowledge_graph, people_graph with selective relevance. Skip the individual

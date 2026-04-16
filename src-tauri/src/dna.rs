@@ -314,6 +314,16 @@ pub fn query_for_brain(user_query: &str) -> String {
         }
     }
 
+    // Audio/hearing awareness — recent transcripts, meetings, what was said
+    let audio_keywords = ["said", "heard", "meeting", "discussed", "talked", "conversation",
+        "call", "mentioned", "told me", "audio", "transcript", "action item"];
+    if audio_keywords.iter().any(|k| query_lower.contains(k)) {
+        let audio_ctx = get_recent_audio_context();
+        if !audio_ctx.is_empty() {
+            sections.push(audio_ctx);
+        }
+    }
+
     // File awareness — if query mentions files, documents, downloads
     let file_keywords = ["file", "document", "download", "pdf", "photo", "image", "video", "where", "find"];
     if file_keywords.iter().any(|k| query_lower.contains(k)) {
@@ -335,6 +345,71 @@ pub fn query_for_brain(user_query: &str) -> String {
         result = crate::safe_slice(&result, 2000).to_string();
     }
     result
+}
+
+// ── Audio / Hearing Context ───────────────────────────────────────────────────
+
+/// What has BLADE heard recently? Pulls from audio_timeline transcripts.
+pub fn get_recent_audio_context() -> String {
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    let conn = match rusqlite::Connection::open(&db_path) {
+        Ok(c) => c,
+        Err(_) => return String::new(),
+    };
+
+    let cutoff = chrono::Utc::now().timestamp() - 3600; // last hour
+
+    // Recent transcripts
+    let mut stmt = match conn.prepare(
+        "SELECT timestamp, transcript, source, action_items, meeting_id
+         FROM audio_timeline WHERE timestamp > ?1
+         ORDER BY timestamp DESC LIMIT 10"
+    ) {
+        Ok(s) => s,
+        Err(_) => return String::new(),
+    };
+
+    let entries: Vec<(i64, String, String, String, String)> = stmt
+        .query_map(rusqlite::params![cutoff], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?))
+        })
+        .ok()
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default();
+
+    if entries.is_empty() {
+        return String::new();
+    }
+
+    let mut lines: Vec<String> = Vec::new();
+    lines.push("**Recent audio (what BLADE heard):**".to_string());
+
+    let mut in_meeting = false;
+    for (ts, transcript, source, action_items, meeting_id) in &entries {
+        if !meeting_id.is_empty() && !in_meeting {
+            in_meeting = true;
+            lines.push("*In meeting:*".to_string());
+        }
+
+        let time = chrono::DateTime::from_timestamp(*ts, 0)
+            .map(|d| d.with_timezone(&chrono::Local).format("%H:%M").to_string())
+            .unwrap_or_default();
+
+        lines.push(format!("[{}] {}", time, crate::safe_slice(transcript, 120)));
+
+        // Surface action items if any
+        if !action_items.is_empty() && action_items != "[]" {
+            if let Ok(items) = serde_json::from_str::<Vec<String>>(action_items) {
+                for item in items.iter().take(3) {
+                    lines.push(format!("  ACTION: {}", crate::safe_slice(item, 80)));
+                }
+            }
+        }
+    }
+
+    // Cap total
+    let result = lines.join("\n");
+    crate::safe_slice(&result, 800).to_string()
 }
 
 // ── Thalamus: selective perception routing ───────────────────────────────────

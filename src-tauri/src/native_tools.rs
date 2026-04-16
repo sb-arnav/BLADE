@@ -447,6 +447,18 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "blade_recall_audio".to_string(),
+            description: "Search what BLADE has heard — audio transcripts from meetings, conversations, and ambient audio. Use when the user asks 'what did they say about...?', 'what was discussed in the meeting?', 'did anyone mention...?'. Returns timestamped transcript matches.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "What to search for in audio history (e.g. 'deadline', 'budget', 'John said')"},
+                    "limit": {"type": "integer", "description": "Max results (default 10)"}
+                },
+                "required": ["query"]
+            }),
+        },
+        ToolDefinition {
             name: "blade_find_file".to_string(),
             description: "Search for files on the user's machine by name, extension, or type. BLADE indexes Downloads, Documents, Desktop, Projects, and other standard folders. Use when the user asks 'where's that PDF?', 'find my resume', 'what did I download yesterday?'. Returns file paths, types, sizes, and modification dates.".to_string(),
             input_schema: json!({
@@ -1241,6 +1253,62 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
                     }
                 }
                 Err(e) => (format!("Screen capture failed: {}", e), true),
+            }
+        }
+        "blade_recall_audio" => {
+            let query = match args["query"].as_str() {
+                Some(q) => q,
+                None => return ("Missing required argument: query".to_string(), true),
+            };
+            let limit = args["limit"].as_u64().unwrap_or(10) as usize;
+
+            let db_path = crate::config::blade_config_dir().join("blade.db");
+            match rusqlite::Connection::open(&db_path) {
+                Ok(conn) => {
+                    let search = format!("%{}%", crate::safe_slice(query, 100));
+                    let mut stmt = match conn.prepare(
+                        "SELECT timestamp, transcript, source, action_items, meeting_id
+                         FROM audio_timeline
+                         WHERE transcript LIKE ?1
+                         ORDER BY timestamp DESC LIMIT ?2"
+                    ) {
+                        Ok(s) => s,
+                        Err(e) => return (format!("DB error: {}", e), true),
+                    };
+
+                    let results: Vec<String> = stmt.query_map(
+                        rusqlite::params![search, limit as i64],
+                        |row| {
+                            let ts: i64 = row.get(0)?;
+                            let transcript: String = row.get(1)?;
+                            let source: String = row.get(2)?;
+                            let action_items: String = row.get(3)?;
+                            let meeting_id: String = row.get(4)?;
+                            let time = chrono::DateTime::from_timestamp(ts, 0)
+                                .map(|d| d.with_timezone(&chrono::Local).format("%H:%M %b %d").to_string())
+                                .unwrap_or_default();
+                            let meeting_tag = if !meeting_id.is_empty() { " [MEETING]" } else { "" };
+                            let mut entry = format!("[{}{}] ({})\n  {}", time, meeting_tag, source, crate::safe_slice(&transcript, 200));
+                            if !action_items.is_empty() && action_items != "[]" {
+                                if let Ok(items) = serde_json::from_str::<Vec<String>>(&action_items) {
+                                    for item in items.iter().take(2) {
+                                        entry.push_str(&format!("\n  ACTION: {}", crate::safe_slice(item, 80)));
+                                    }
+                                }
+                            }
+                            Ok(entry)
+                        }
+                    ).ok()
+                    .map(|rows| rows.filter_map(|r| r.ok()).collect())
+                    .unwrap_or_default();
+
+                    if results.is_empty() {
+                        (format!("No audio transcripts matching '{}'. Audio timeline may not have enough data yet.", query), false)
+                    } else {
+                        (format!("Audio matches for '{}':\n\n{}", query, results.join("\n\n")), false)
+                    }
+                }
+                Err(e) => (format!("DB error: {}", e), true),
             }
         }
         "blade_find_file" => {
