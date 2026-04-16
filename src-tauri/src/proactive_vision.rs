@@ -84,6 +84,31 @@ pub async fn on_context_switch(
         }
     });
 
+    // Speak important observations aloud — BLADE is ALIVE, not a silent logger.
+    // Only speak focus warnings and urgent tasks (not every insight/memory).
+    {
+        let app_speak = app.clone();
+        let from_owned = from_app.to_string();
+        let to_owned = to_app.to_string();
+        tokio::spawn(async move {
+            // Focus: speak if user switched from productive to distraction
+            let to_lower = to_owned.to_lowercase();
+            let from_lower = from_owned.to_lowercase();
+            let distractors = ["twitter", "reddit", "youtube", "tiktok", "instagram"];
+            let productive = ["code", "cursor", "vim", "terminal", "figma"];
+            let went_to_distraction = distractors.iter().any(|d| to_lower.contains(d));
+            let was_productive = productive.iter().any(|p| from_lower.contains(p));
+
+            if went_to_distraction && was_productive {
+                // Gentle spoken nudge — not a nag, just awareness
+                let _ = crate::tts::speak_and_wait(
+                    &app_speak,
+                    &format!("Heads up — you just switched from {} to {}.", from_owned, to_owned),
+                ).await;
+            }
+        });
+    }
+
     // Memory extraction — extract facts/knowledge from what's visible on screen
     let app4 = app.clone();
     let ctx4 = context.clone();
