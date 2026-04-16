@@ -566,6 +566,15 @@ fn build_system_prompt_inner(
         }
     }
 
+    // Prefrontal working memory — active task state (what Brain is currently doing)
+    // This gives continuity between messages: "we're on step 3 of 5, deploying..."
+    {
+        let wm_injection = crate::prefrontal::get_injection();
+        if !wm_injection.is_empty() {
+            parts.push(wm_injection);
+        }
+    }
+
     // Top learned preferences — apply to every response
     {
         let learned = crate::character::get_top_learned_preferences(3);

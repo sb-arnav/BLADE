@@ -80,7 +80,31 @@ RULES:
 Respond with ONLY the numbered plan. No preamble, no explanation, no markdown headers."#
     );
 
-    let user_msg = format!("User request: {}", user_query);
+    // Check prefrontal working memory — if a task is already in progress,
+    // tell the Brain so it can produce a continuation plan, not a fresh one.
+    let wm = crate::prefrontal::get();
+    let wm_context = if wm.active {
+        format!(
+            "\n\nIMPORTANT: A task is already in progress.\nOriginal request: {}\nSteps completed: {}\nTools used: {}\nLast result: {}\n\nThe user's new message may be a follow-up to this task. Adapt the plan accordingly.",
+            wm.task_request, wm.steps_completed,
+            wm.tools_used.join(", "),
+            crate::safe_slice(&wm.last_result_preview, 100)
+        )
+    } else if !wm.progress_summary.is_empty() {
+        let age = chrono::Utc::now().timestamp() - wm.started_at;
+        if age < 300 {
+            format!(
+                "\n\nContext: User just completed a task: {} → {}",
+                wm.task_request, crate::safe_slice(&wm.progress_summary, 100)
+            )
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
+    let user_msg = format!("User request: {}{}", user_query, wm_context);
 
     let messages = vec![
         crate::providers::ConversationMessage::System(system),
@@ -103,6 +127,10 @@ Respond with ONLY the numbered plan. No preamble, no explanation, no markdown he
             if plan.is_empty() || plan.len() < 20 {
                 return String::new();
             }
+            // Store in prefrontal working memory so follow-up messages know
+            // what task is in progress and what the plan was
+            crate::prefrontal::begin_task(user_query, &plan);
+
             format!(
                 "## BLADE Brain Plan\n\n\
                  The Brain analyzed this request and produced this execution plan. \
