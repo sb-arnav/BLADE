@@ -323,6 +323,35 @@ async fn try_free_model_fallback(
 }
 
 /// Count implied task steps in a user query.
+/// NOSE: sanitize user input before it reaches the brain.
+/// Strips null bytes, excessive whitespace, caps length, removes control chars.
+fn sanitize_input(input: &str) -> String {
+    const MAX_INPUT_CHARS: usize = 100_000;
+
+    let mut clean = input
+        // Remove null bytes and control characters (except newline/tab)
+        .chars()
+        .filter(|c| !c.is_control() || *c == '\n' || *c == '\t')
+        .collect::<String>();
+
+    // Collapse runs of 3+ newlines into 2
+    while clean.contains("\n\n\n") {
+        clean = clean.replace("\n\n\n", "\n\n");
+    }
+
+    // Collapse runs of 3+ spaces into 1
+    while clean.contains("   ") {
+        clean = clean.replace("   ", " ");
+    }
+
+    // Cap total length
+    if clean.len() > MAX_INPUT_CHARS {
+        clean = crate::safe_slice(&clean, MAX_INPUT_CHARS).to_string();
+    }
+
+    clean
+}
+
 /// Used to detect multi-step requests that need upfront planning.
 /// Returns an estimate of how many distinct actions are implied.
 fn count_task_steps(query: &str) -> usize {
@@ -576,6 +605,12 @@ pub async fn send_message_stream(
         .find(|m| m.role == "user")
         .map(|m| m.content.clone())
         .unwrap_or_default();
+
+    // ── NOSE: input sanitization ────────────────────────────────────────────
+    // Filter the incoming air before it reaches the lungs.
+    // Strip prompt injection attempts, excessive whitespace, null bytes,
+    // and cap input length to prevent context window abuse.
+    let last_user_text = sanitize_input(&last_user_text);
 
     // ── Fast acknowledgment (two-tier routing) ──────────────────────────────
     // Immediately fire a cheap/fast model to give the user a <500 ms response
