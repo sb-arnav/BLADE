@@ -616,7 +616,10 @@ pub fn start_causal_engine(app: tauri::AppHandle) {
         tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
 
         loop {
-            run_causal_analysis(&app).await;
+            // Vagus nerve: skip causal analysis in conservation mode
+            if crate::homeostasis::energy_mode() > 0.25 {
+                run_causal_analysis(&app).await;
+            }
             tokio::time::sleep(tokio::time::Duration::from_secs(2 * 3600)).await;
         }
     });

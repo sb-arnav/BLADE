@@ -678,6 +678,14 @@ pub fn start_audio_timeline_capture(app: tauri::AppHandle) {
                 break;
             }
 
+            // Vagus nerve: skip transcription in deep conservation mode
+            // BUT always capture during meetings (meetings override conservation)
+            let in_meeting = detect_meeting_in_progress();
+            if !in_meeting && crate::homeostasis::energy_mode() < 0.2 {
+                tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
+                continue;
+            }
+
             audio_capture_tick(&app, &mut meeting_id).await;
 
             // Respect audio_capture_enabled between chunks too

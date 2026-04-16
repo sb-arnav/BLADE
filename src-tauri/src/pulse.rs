@@ -70,6 +70,11 @@ pub fn start_pulse(app: tauri::AppHandle) {
                 continue;
             }
 
+            // Vagus nerve: skip pulse thoughts in conservation mode
+            if crate::homeostasis::energy_mode() < 0.25 {
+                continue;
+            }
+
             // Only pulse if provider + key are configured
             if !config.api_key.is_empty() || config.provider == "ollama" {
                 match generate_pulse_thought(&config).await {
