@@ -67,6 +67,7 @@ mod prefrontal;
 mod proactive_vision;
 mod reproductive;
 mod skeleton;
+mod symbolic;
 mod supervisor;
 mod urinary;
 mod embeddings;
@@ -1163,6 +1164,10 @@ pub fn run() {
             urinary::immune_get_status,
             reproductive::reproductive_get_dna,
             reproductive::reproductive_spawn,
+            symbolic::symbolic_check_policy,
+            symbolic::symbolic_list_policies,
+            symbolic::symbolic_add_policy,
+            symbolic::symbolic_verify_plan,
             homeostasis::homeostasis_get,
             homeostasis::homeostasis_get_directive,
             homeostasis::homeostasis_get_circadian,

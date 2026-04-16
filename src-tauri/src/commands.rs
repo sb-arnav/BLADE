@@ -1558,6 +1558,27 @@ pub async fn send_message_stream(
                 }
             }
 
+            // SYMBOLIC LAYER: check policies before executing
+            // Deterministic rules that LLMs can't be trusted with (no deploy on Friday, etc.)
+            {
+                let action_desc = format!("{} {}", tool_call.name,
+                    serde_json::to_string(&tool_call.arguments).unwrap_or_default());
+                let ctx = crate::symbolic::ActionContext::current();
+                let policy_result = crate::symbolic::check_policies(&action_desc, &ctx);
+                if policy_result.action == "block" {
+                    conversation.push(ConversationMessage::Tool {
+                        tool_call_id: tool_call.id.clone(),
+                        tool_name: tool_call.name.clone(),
+                        content: format!("BLOCKED by policy: {}", policy_result.reason),
+                        is_error: true,
+                    });
+                    continue;
+                }
+                if policy_result.action == "warn" && !policy_result.triggered_policies.is_empty() {
+                    log::warn!("[symbolic] Policy warning for {}: {}", tool_call.name, policy_result.reason);
+                }
+            }
+
             let _ = app.emit(
                 "tool_executing",
                 serde_json::json!({
