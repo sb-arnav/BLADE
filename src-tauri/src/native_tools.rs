@@ -433,6 +433,32 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "blade_look_at_region".to_string(),
+            description: "Focus on a specific region of the screen. Use when you need to zoom into a specific area — the terminal panel, a dialog box, a particular section of code. Provide x, y (top-left corner) and width, height in pixels. Returns a detailed vision description of just that region.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "x": {"type": "integer", "description": "Left edge X coordinate in pixels"},
+                    "y": {"type": "integer", "description": "Top edge Y coordinate in pixels"},
+                    "width": {"type": "integer", "description": "Width of the region in pixels"},
+                    "height": {"type": "integer", "description": "Height of the region in pixels"}
+                },
+                "required": ["x", "y", "width", "height"]
+            }),
+        },
+        ToolDefinition {
+            name: "blade_recall_screen".to_string(),
+            description: "Search visual memory — find past screenshots matching a query. Use when the user asks 'what was I debugging earlier?', 'what did that error look like?', 'show me what I was working on this morning'. Returns descriptions of matching past screenshots with timestamps.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "What to search for in visual memory (e.g. 'error in auth.rs', 'meeting notes', 'code I was editing this morning')"},
+                    "limit": {"type": "integer", "description": "Max results (default 5)"}
+                },
+                "required": ["query"]
+            }),
+        },
+        ToolDefinition {
             name: "blade_index_project".to_string(),
             description: "Index a codebase directory — extract all functions, classes, types, imports into a persistent knowledge graph. Run this once when entering a new project. BLADE never forgets indexed code across restarts. Use blade_find_symbol after indexing.".to_string(),
             input_schema: json!({
@@ -688,8 +714,9 @@ pub fn suggest_tools_for_query(query: &str) -> Vec<String> {
         Affinity {
             keywords: &["screen", "see", "look at", "looking at", "what is this",
                         "this error", "what's on", "show me", "visible", "what do you see",
-                        "my screen", "can you see"],
-            boost: &["blade_look_at_screen"],
+                        "my screen", "can you see", "earlier", "before", "was I",
+                        "was debugging", "20 minutes ago", "this morning"],
+            boost: &["blade_look_at_screen", "blade_look_at_region", "blade_recall_screen"],
             suppress: &["blade_index_project", "blade_find_symbol",
                         "blade_pentest_authorize", "blade_iot_control"],
         },
@@ -1201,6 +1228,78 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
                     }
                 }
                 Err(e) => (format!("Screen capture failed: {}", e), true),
+            }
+        }
+        "blade_look_at_region" => {
+            let x = args["x"].as_u64().unwrap_or(0) as u32;
+            let y = args["y"].as_u64().unwrap_or(0) as u32;
+            let w = args["width"].as_u64().unwrap_or(400) as u32;
+            let h = args["height"].as_u64().unwrap_or(300) as u32;
+
+            match crate::screen::capture_screen_region(x, y, w, h) {
+                Ok(base64_png) => {
+                    // Describe the region with the vision model
+                    let description = tokio::task::spawn(async move {
+                        crate::screen_timeline::describe_screenshot_public(&base64_png).await
+                    }).await.unwrap_or_else(|_| String::new());
+
+                    if description.is_empty() {
+                        (format!("[Region captured ({}x{} at {},{}) but vision model unavailable]", w, h, x, y), false)
+                    } else {
+                        (format!("Region ({}x{} at {},{}):\n{}", w, h, x, y, description), false)
+                    }
+                }
+                Err(e) => (format!("Region capture failed: {}", e), true),
+            }
+        }
+        "blade_recall_screen" => {
+            let query = match args["query"].as_str() {
+                Some(q) => q,
+                None => return ("Missing required argument: query".to_string(), true),
+            };
+            let limit = args["limit"].as_u64().unwrap_or(5) as usize;
+
+            // Search screen_timeline via the timeline_browse function with text matching
+            // (vector search requires the SharedVectorStore which we don't have here,
+            // so fall back to DB text search on descriptions)
+            let db_path = crate::config::blade_config_dir().join("blade.db");
+            match rusqlite::Connection::open(&db_path) {
+                Ok(conn) => {
+                    let search_term = format!("%{}%", crate::safe_slice(query, 100));
+                    let mut stmt = match conn.prepare(
+                        "SELECT timestamp, window_title, app_name, description
+                         FROM screen_timeline
+                         WHERE description LIKE ?1 OR window_title LIKE ?1 OR app_name LIKE ?1
+                         ORDER BY timestamp DESC
+                         LIMIT ?2"
+                    ) {
+                        Ok(s) => s,
+                        Err(e) => return (format!("DB error: {}", e), true),
+                    };
+
+                    let results: Vec<String> = stmt.query_map(
+                        rusqlite::params![search_term, limit as i64],
+                        |row| {
+                            let ts: i64 = row.get(0)?;
+                            let title: String = row.get(1)?;
+                            let app: String = row.get(2)?;
+                            let desc: String = row.get(3)?;
+                            let time = chrono::DateTime::from_timestamp(ts, 0)
+                                .map(|d| d.with_timezone(&chrono::Local).format("%H:%M").to_string())
+                                .unwrap_or_else(|| "?".to_string());
+                            Ok(format!("[{}] {} — {}\n  {}", time, app, crate::safe_slice(&title, 50), crate::safe_slice(&desc, 200)))
+                        }
+                    ).ok()
+                    .map(|rows| rows.filter_map(|r| r.ok()).collect())
+                    .unwrap_or_default();
+
+                    if results.is_empty() {
+                        (format!("No visual memories matching '{}'. Screen timeline may not have enough data yet.", query), false)
+                    } else {
+                        (format!("Visual memory matches for '{}':\n\n{}", query, results.join("\n\n")), false)
+                    }
+                }
+                Err(e) => (format!("DB error: {}", e), true),
             }
         }
         "blade_notify" => {
