@@ -153,7 +153,7 @@ mod agent_factory;
 
 use chrono::Timelike;
 use std::sync::Arc;
-use tauri::{Emitter, Manager, WindowEvent};
+use tauri::{Emitter, Listener, Manager, WindowEvent};
 
 /// Safely truncate a string at a char boundary.
 /// Unlike `&s[..n]`, this never panics on non-ASCII (emoji, CJK, etc.).

@@ -116,18 +116,19 @@ pub fn filter_waste() -> u64 {
     static PRUNE_COUNTER: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
     let count = PRUNE_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     if count % 60 == 0 {
-        let stale: Vec<(i64, String)> = conn.prepare(
+        let cutoff_reindex = now - 7 * 86400;
+        let stale: Vec<(i64, String)> = if let Ok(mut stmt) = conn.prepare(
             "SELECT id, path FROM indexed_files WHERE indexed_at < ?1 LIMIT 100"
-        )
-        .ok()
-        .and_then(|mut stmt| {
-            let cutoff_reindex = now - 7 * 86400;
+        ) {
             stmt.query_map(params![cutoff_reindex], |row| {
                 Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
-            }).ok()
-        })
-        .map(|rows| rows.filter_map(|r| r.ok()).collect())
-        .unwrap_or_default();
+            })
+            .ok()
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
 
         for (id, path) in &stale {
             let home = dirs::home_dir().unwrap_or_default().to_string_lossy().to_string();
