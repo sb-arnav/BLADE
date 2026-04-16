@@ -726,6 +726,16 @@ fn build_system_prompt_inner(
         }
     }
 
+    // ── PERSONA (priority 7.3) ──────────────────────────────────────────────
+    // Personality traits + relationship state — shapes HOW BLADE communicates.
+    // This was disconnected (dead code). Now wired into every response.
+    {
+        let persona_ctx = crate::persona_engine::get_persona_context();
+        if !persona_ctx.is_empty() {
+            parts.push(persona_ctx);
+        }
+    }
+
     // ── Hive intelligence digest (priority 7.5) ────────────────────────────
     // The Hive's tentacles monitor platforms (Slack, GitHub, Email, etc.) and
     // heads synthesize cross-domain intelligence. This compact digest gives
