@@ -149,6 +149,11 @@ async fn describe_screenshot(image_base64: &str) -> String {
     }
 }
 
+/// Public wrapper for native_tools to describe a screenshot on demand.
+pub async fn describe_screenshot_public(image_base64: &str) -> String {
+    describe_screenshot(image_base64).await
+}
+
 fn best_vision_model(provider: &str, current: &str) -> String {
     crate::config::cheap_model_for_provider(provider, current)
 }
