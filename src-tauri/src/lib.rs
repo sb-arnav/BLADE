@@ -56,6 +56,7 @@ mod db;
 mod db_commands;
 mod brain_planner;
 mod cardiovascular;
+mod consequence;
 mod discovery;
 mod dna;
 mod homeostasis;
@@ -1164,6 +1165,7 @@ pub fn run() {
             urinary::immune_get_status,
             reproductive::reproductive_get_dna,
             reproductive::reproductive_spawn,
+            consequence::consequence_predict,
             symbolic::symbolic_check_policy,
             symbolic::symbolic_list_policies,
             symbolic::symbolic_add_policy,
