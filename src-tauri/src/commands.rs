@@ -1249,6 +1249,20 @@ pub async fn send_message_stream(
                         );
                     }
                 }
+                // SOLUTION MEMORY: if this was a problem-solving exchange, remember the solution
+                {
+                    let q = user_text_skill.to_lowercase();
+                    let was_problem = q.contains("error") || q.contains("fix") || q.contains("bug")
+                        || q.contains("broken") || q.contains("failing") || q.contains("not working");
+                    if was_problem && !tools_used.is_empty() {
+                        crate::metacognition::remember_solution(
+                            &user_text_skill,
+                            crate::safe_slice(&assistant_text, 300),
+                            &tools_used,
+                        );
+                    }
+                }
+
                 // Capability gap detection — runs silently, fires webhook if gap found
                 if reports::detect_and_log(&user_text, &assistant_text) {
                     let _ = app2.emit("capability_gap_detected", serde_json::json!({

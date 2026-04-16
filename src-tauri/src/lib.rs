@@ -63,6 +63,7 @@ mod homeostasis;
 mod file_indexer;
 mod immune_system;
 mod joints;
+mod metacognition;
 mod organ;
 mod prefrontal;
 mod proactive_vision;
@@ -1166,6 +1167,7 @@ pub fn run() {
             reproductive::reproductive_get_dna,
             reproductive::reproductive_spawn,
             consequence::consequence_predict,
+            metacognition::metacognition_assess,
             symbolic::symbolic_check_policy,
             symbolic::symbolic_list_policies,
             symbolic::symbolic_add_policy,

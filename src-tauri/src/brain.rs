@@ -771,6 +771,21 @@ fn build_system_prompt_inner(
         }
     }
 
+    // ── METACOGNITION (priority 8.5) ───────────────────────────────────────────
+    // Self-awareness: does BLADE know enough to handle this? Should it ask?
+    // Only injected when confidence is low or query is complex.
+    if !user_query.is_empty() {
+        let meta_injection = crate::metacognition::get_metacognition_injection(user_query);
+        if !meta_injection.is_empty() {
+            parts.push(meta_injection);
+        }
+        // Solution memory: if this looks like a problem, recall past solutions
+        let solution = crate::metacognition::get_solution_injection(user_query);
+        if !solution.is_empty() {
+            parts.push(solution);
+        }
+    }
+
     // ── CONTEXT NOW (priority 9) ──────────────────────────────────────────────
     // Clipboard — only if fresh (< 5 min) and there's actual content
     if let Some(pf) = crate::clipboard::get_latest_prefetch() {
