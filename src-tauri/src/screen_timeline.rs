@@ -211,8 +211,14 @@ pub async fn capture_timeline_tick(app: &tauri::AppHandle) {
     let now = chrono::Utc::now().timestamp();
 
     // 1. Capture screen as JPEG
+    // Omi uses H.264 video chunks for storage efficiency. We can't easily add
+    // ffmpeg as a dependency (breaks CI on 3 platforms). Instead: use low quality
+    // JPEG (30) for non-described frames (just for dedup, never shown to user),
+    // and full quality (60) only on frames that get vision-described.
+    let will_describe = DESCRIBE_NEXT_FRAME.load(std::sync::atomic::Ordering::Relaxed);
+    let jpeg_quality = if will_describe { 60 } else { 25 };
     let (jpeg, thumb, _w, _h, fingerprint) =
-        match crate::screen::capture_screen_as_jpeg(60) {
+        match crate::screen::capture_screen_as_jpeg(jpeg_quality) {
             Ok(v) => v,
             Err(e) => {
                 eprintln!("[screen_timeline] capture failed: {}", e);
@@ -332,8 +338,10 @@ pub fn start_timeline_capture_loop(app: tauri::AppHandle) {
         let mut last_app = String::new();
         let mut last_title = String::new();
         let mut frames_since_describe: u32 = 0;
+        let mut tick_count: u64 = 0;
         const CAPTURE_INTERVAL_SECS: u64 = 5;
         const FORCE_DESCRIBE_EVERY: u32 = 24; // force a description every ~2 min even without context switch
+        const CLEANUP_EVERY: u64 = 720; // run cleanup every ~1 hour (720 * 5s)
 
         loop {
             capture_timeline_tick(&app).await;
@@ -373,6 +381,14 @@ pub fn start_timeline_capture_loop(app: tauri::AppHandle) {
                 frames_since_describe = 0;
             }
 
+            tick_count += 1;
+
+            // Auto-cleanup every ~1 hour: delete undescribed frames >1h old
+            if tick_count % CLEANUP_EVERY == 0 {
+                let retention = crate::config::load_config().timeline_retention_days;
+                tokio::task::spawn_blocking(move || cleanup_old_screenshots(retention));
+            }
+
             tokio::time::sleep(tokio::time::Duration::from_secs(CAPTURE_INTERVAL_SECS)).await;
         }
     });
@@ -383,10 +399,39 @@ pub fn start_timeline_capture_loop(app: tauri::AppHandle) {
 // ---------------------------------------------------------------------------
 
 pub fn cleanup_old_screenshots(retention_days: u32) {
-    let cutoff = chrono::Utc::now().timestamp() - retention_days as i64 * 86400;
+    let now = chrono::Utc::now().timestamp();
+    let cutoff = now - retention_days as i64 * 86400;
 
-    // Remove DB rows
     if let Some(conn) = open_db() {
+        // Phase 1: Delete non-described frames older than 1 hour.
+        // At 5s intervals, these accumulate fast (720/hour). They exist only for
+        // fingerprint dedup and were never described by the vision model.
+        // Deleting their JPEG files saves ~80% of disk compared to keeping everything.
+        let one_hour_ago = now - 3600;
+        let stale_frames: Vec<(i64, String, String)> = conn.prepare(
+            "SELECT id, screenshot_path, thumbnail_path FROM screen_timeline
+             WHERE timestamp < ?1 AND (description = '' OR description IS NULL)"
+        )
+        .ok()
+        .and_then(|mut stmt| {
+            stmt.query_map(params![one_hour_ago], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))
+            }).ok()
+        })
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default();
+
+        for (id, screenshot_path, thumb_path) in &stale_frames {
+            let _ = std::fs::remove_file(screenshot_path);
+            let _ = std::fs::remove_file(thumb_path);
+            let _ = conn.execute("DELETE FROM screen_timeline WHERE id = ?1", params![id]);
+        }
+
+        if !stale_frames.is_empty() {
+            log::info!("[screen_timeline] Cleaned {} undescribed frames (>1h old)", stale_frames.len());
+        }
+
+        // Phase 2: Delete ALL frames (including described) older than retention_days
         let _ = conn.execute(
             "DELETE FROM screen_timeline WHERE timestamp < ?1",
             params![cutoff],
