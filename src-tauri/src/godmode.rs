@@ -52,6 +52,15 @@ fn check_smart_interrupt(app: &tauri::AppHandle, error_preview: &str) {
                         elapsed_min, preview
                     ),
                 }));
+                // Speak it — BLADE notices you're stuck and says something
+                let app_speak = app.clone();
+                let speak_msg = format!(
+                    "Hey, I see you've been stuck on an error for {} minutes. Want me to take a look?",
+                    elapsed_min
+                );
+                tokio::spawn(async move {
+                    let _ = crate::tts::speak_and_wait(&app_speak, &speak_msg).await;
+                });
             }
         }
         _ => {

@@ -424,6 +424,18 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "blade_computer_use".to_string(),
+            description: "Autonomously control the computer to achieve a goal. BLADE will screenshot the screen, understand what's visible, decide what to do (click, type, scroll, open URL), execute, screenshot again, and repeat until the goal is achieved. Use for ANY task that requires navigating websites, filling forms, clicking through UIs, setting up accounts, posting on social media, configuring apps. Up to 20 steps. The user's browser, apps, and desktop are all accessible. Example: 'Go to x.com and post a thread about AI' or 'Open Telegram BotFather and create a new bot' or 'Go to github.com/settings/tokens and create a new token'.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "goal": {"type": "string", "description": "What to accomplish (e.g. 'post a thread on X about what I'm building')"},
+                    "max_steps": {"type": "integer", "description": "Maximum steps (default 20)"}
+                },
+                "required": ["goal"]
+            }),
+        },
+        ToolDefinition {
             name: "blade_look_at_screen".to_string(),
             description: "Look at what's currently visible on the user's screen. Returns a description of what's visible: app names, file names, code, errors, text, URLs. Use when the user says 'this', 'what I'm looking at', 'this error', 'my screen', or when you need visual context. No arguments needed — captures the primary monitor.".to_string(),
             input_schema: json!({
@@ -1352,6 +1364,38 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
                     format!("- {} ({}, {}) — modified {}\n  {}", f.filename, f.file_type, size, modified, f.path)
                 }).collect();
                 (format!("Found {} files:\n\n{}", results.len(), lines.join("\n")), false)
+            }
+        }
+        "blade_computer_use" => {
+            let goal = match args["goal"].as_str() {
+                Some(g) => g.to_string(),
+                None => return ("Missing required argument: goal".to_string(), true),
+            };
+            let max_steps = args["max_steps"].as_u64().map(|s| s as usize);
+
+            // Enrich the goal with DNA context so the vision loop knows who the user is
+            let dna_ctx = crate::reproductive::get_forge_context();
+            let enriched_goal = if dna_ctx.is_empty() {
+                goal
+            } else {
+                format!("{}\n\nContext about the user:\n{}", goal, crate::safe_slice(&dna_ctx, 300))
+            };
+
+            match app {
+                Some(app_handle) => {
+                    match crate::computer_use::computer_use_task(
+                        app_handle.clone(),
+                        enriched_goal,
+                        max_steps,
+                    ).await {
+                        Ok(result) => {
+                            let status = if result.success { "completed" } else { "stopped" };
+                            (format!("Computer use {}: {} ({} steps)", status, result.result, result.steps_taken), !result.success)
+                        }
+                        Err(e) => (format!("Computer use failed: {}", e), true),
+                    }
+                }
+                None => ("Computer use requires app handle".to_string(), true),
             }
         }
         "blade_look_at_region" => {

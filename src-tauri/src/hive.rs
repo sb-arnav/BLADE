@@ -2680,6 +2680,15 @@ async fn execute_decision(app: &AppHandle, decision: &Decision) {
                     "context": context
                 }),
             );
+            // BLADE speaks urgent escalations aloud — it's alive, not a silent notification
+            let speak_reason = crate::safe_slice(reason, 100).to_string();
+            let app_speak = app.clone();
+            tokio::spawn(async move {
+                let _ = crate::tts::speak_and_wait(
+                    &app_speak,
+                    &speak_reason,
+                ).await;
+            });
         }
     }
 }
