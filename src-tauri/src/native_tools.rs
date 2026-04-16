@@ -447,6 +447,19 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "blade_find_file".to_string(),
+            description: "Search for files on the user's machine by name, extension, or type. BLADE indexes Downloads, Documents, Desktop, Projects, and other standard folders. Use when the user asks 'where's that PDF?', 'find my resume', 'what did I download yesterday?'. Returns file paths, types, sizes, and modification dates.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Search term (filename, extension, or keyword)"},
+                    "file_type": {"type": "string", "description": "Filter by type: document, image, video, audio, code, config, archive, other (optional)"},
+                    "recent_hours": {"type": "integer", "description": "Only show files modified in the last N hours (optional, default: all time)"}
+                },
+                "required": ["query"]
+            }),
+        },
+        ToolDefinition {
             name: "blade_recall_screen".to_string(),
             description: "Search visual memory — find past screenshots matching a query. Use when the user asks 'what was I debugging earlier?', 'what did that error look like?', 'show me what I was working on this morning'. Returns descriptions of matching past screenshots with timestamps.".to_string(),
             input_schema: json!({
@@ -1228,6 +1241,49 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
                     }
                 }
                 Err(e) => (format!("Screen capture failed: {}", e), true),
+            }
+        }
+        "blade_find_file" => {
+            let query = match args["query"].as_str() {
+                Some(q) => q,
+                None => return ("Missing required argument: query".to_string(), true),
+            };
+            let file_type = args["file_type"].as_str();
+            let recent_hours = args["recent_hours"].as_u64();
+
+            let results = if let Some(hours) = recent_hours {
+                crate::file_indexer::get_recent_files(hours as u32, 20)
+                    .into_iter()
+                    .filter(|f| f.filename.to_lowercase().contains(&query.to_lowercase())
+                        || f.path.to_lowercase().contains(&query.to_lowercase()))
+                    .collect::<Vec<_>>()
+            } else {
+                crate::file_indexer::search_files(query, file_type, 20)
+            };
+
+            if results.is_empty() {
+                let stats = crate::file_indexer::get_file_stats();
+                let total: i64 = stats.iter().map(|(_, c)| c).sum();
+                if total == 0 {
+                    ("No files indexed yet. BLADE is still scanning your machine — try again in a minute.".to_string(), false)
+                } else {
+                    (format!("No files matching '{}' found in {} indexed files.", query, total), false)
+                }
+            } else {
+                let lines: Vec<String> = results.iter().map(|f| {
+                    let size = if f.size_bytes > 1_048_576 {
+                        format!("{:.1}MB", f.size_bytes as f64 / 1_048_576.0)
+                    } else if f.size_bytes > 1024 {
+                        format!("{}KB", f.size_bytes / 1024)
+                    } else {
+                        format!("{}B", f.size_bytes)
+                    };
+                    let modified = chrono::DateTime::from_timestamp(f.modified_at, 0)
+                        .map(|d| d.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M").to_string())
+                        .unwrap_or_default();
+                    format!("- {} ({}, {}) — modified {}\n  {}", f.filename, f.file_type, size, modified, f.path)
+                }).collect();
+                (format!("Found {} files:\n\n{}", results.len(), lines.join("\n")), false)
             }
         }
         "blade_look_at_region" => {

@@ -58,6 +58,7 @@ mod brain_planner;
 mod discovery;
 mod dna;
 mod homeostasis;
+mod file_indexer;
 mod immune_system;
 mod organ;
 mod prefrontal;
@@ -1136,6 +1137,10 @@ pub fn run() {
             dna::dna_get_goals,
             dna::dna_get_patterns,
             dna::dna_query,
+            file_indexer::file_index_scan_now,
+            file_indexer::file_index_search,
+            file_indexer::file_index_recent,
+            file_indexer::file_index_stats,
             immune_system::immune_resolve_gap,
             organ::organ_get_registry,
             organ::organ_get_roster,
@@ -1388,6 +1393,9 @@ pub fn run() {
                     });
                 });
             }
+
+            // File indexer — indexes ALL files on the machine (not just code)
+            file_indexer::start_file_indexer(app.handle().clone());
 
             // Audio: always listening — "Hey BLADE" wake word + ambient capture
             audio_timeline::start_audio_timeline_capture(app.handle().clone());
