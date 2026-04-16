@@ -314,12 +314,94 @@ pub fn query_for_brain(user_query: &str) -> String {
         }
     }
 
+    // Thalamus: selective perception routing (only relevant screen/system data)
+    let perception_ctx = get_relevant_perception(user_query);
+    if !perception_ctx.is_empty() {
+        sections.push(perception_ctx);
+    }
+
     // Cap total output
     let mut result = sections.join("\n\n");
     if result.len() > 2000 {
         result = crate::safe_slice(&result, 2000).to_string();
     }
     result
+}
+
+// ── Thalamus: selective perception routing ───────────────────────────────────
+
+/// Route perception data to the right context based on what the user is asking.
+/// Instead of dumping all perception into the prompt, this returns only the
+/// perception fields relevant to the query.
+///
+/// "fix this error" → visible_errors + active_app + clipboard
+/// "check my email" → nothing from screen (email organ handles this)
+/// "what am I working on" → active_app + active_title + context_tags
+pub fn get_relevant_perception(query: &str) -> String {
+    let perception = match crate::perception_fusion::get_latest() {
+        Some(p) => p,
+        None => return String::new(),
+    };
+
+    let q = query.to_lowercase();
+    let mut lines: Vec<String> = Vec::new();
+
+    // Error-related queries get visible errors + clipboard
+    if q.contains("error") || q.contains("fix") || q.contains("debug") || q.contains("broken") || q.contains("failing") {
+        if !perception.visible_errors.is_empty() {
+            for err in &perception.visible_errors {
+                lines.push(format!("Visible error: {}", crate::safe_slice(err, 150)));
+            }
+        }
+        if perception.clipboard_type == "error" && !perception.clipboard_preview.is_empty() {
+            lines.push(format!("Clipboard error: {}", &perception.clipboard_preview));
+        }
+    }
+
+    // Screen/context queries get full app context
+    if q.contains("screen") || q.contains("looking at") || q.contains("working on") || q.contains("doing") || q.contains("current") {
+        if !perception.active_app.is_empty() {
+            let title = if !perception.active_title.is_empty() {
+                format!("{} — {}", perception.active_app, crate::safe_slice(&perception.active_title, 60))
+            } else {
+                perception.active_app.clone()
+            };
+            lines.push(format!("Active: {}", title));
+        }
+        if !perception.context_tags.is_empty() {
+            lines.push(format!("Context: {}", perception.context_tags.join(", ")));
+        }
+    }
+
+    // Clipboard queries get clipboard data
+    if q.contains("clipboard") || q.contains("copied") || q.contains("paste") {
+        if !perception.clipboard_preview.is_empty() {
+            lines.push(format!("Clipboard ({}): {}", perception.clipboard_type, &perception.clipboard_preview));
+        }
+    }
+
+    // System queries get vitals
+    if q.contains("system") || q.contains("memory") || q.contains("disk") || q.contains("cpu") || q.contains("slow") || q.contains("performance") {
+        if perception.ram_used_gb > 0.0 {
+            lines.push(format!("RAM: {:.1}GB used", perception.ram_used_gb));
+        }
+        if perception.disk_free_gb > 0.0 {
+            lines.push(format!("Disk: {:.1}GB free", perception.disk_free_gb));
+        }
+        if !perception.top_cpu_process.is_empty() {
+            lines.push(format!("Top CPU: {}", &perception.top_cpu_process));
+        }
+    }
+
+    // If nothing specific matched but the query is long enough to be a real request,
+    // provide a minimal context line
+    if lines.is_empty() && query.len() > 10 {
+        if !perception.active_app.is_empty() {
+            lines.push(format!("Currently in: {}", perception.active_app));
+        }
+    }
+
+    lines.join("\n")
 }
 
 // ── Tauri Commands ───────────────────────────────────────────────────────────
