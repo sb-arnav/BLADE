@@ -57,6 +57,7 @@ mod db_commands;
 mod brain_planner;
 mod discovery;
 mod dna;
+mod homeostasis;
 mod immune_system;
 mod organ;
 mod embeddings;
@@ -1138,6 +1139,7 @@ pub fn run() {
             organ::organ_get_roster,
             organ::organ_set_autonomy,
             organ::organ_get_autonomy,
+            homeostasis::homeostasis_get,
             hive::hive_get_reports,
             hive::hive_approve_decision,
             hive::hive_set_autonomy,
@@ -1287,6 +1289,9 @@ pub fn run() {
 
             // Start clipboard watcher
             clipboard::start_clipboard_watcher(app.handle().clone());
+
+            // Start homeostasis — the hypothalamus that regulates the whole body
+            homeostasis::start_hypothalamus(app.handle().clone());
 
             // Start perception fusion loop — keeps get_latest() fresh for all consumers
             perception_fusion::start_perception_loop(app.handle().clone());

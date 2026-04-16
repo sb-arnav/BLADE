@@ -3063,6 +3063,15 @@ pub fn get_hive_digest() -> String {
         }
     }
 
+    // Organism state from homeostasis (hormone bus)
+    let hormones = crate::homeostasis::get_hormones();
+    if hormones.urgency > 0.5 {
+        lines.push(format!("**Body state:** URGENT (arousal {:.0}%, trust {:.0}%)",
+            hormones.arousal * 100.0, hormones.trust * 100.0));
+    } else if hormones.energy_mode < 0.3 {
+        lines.push("**Body state:** conserving energy".to_string());
+    }
+
     // If nothing notable beyond the header + roster, keep it minimal
     if lines.len() <= 2 {
         let active = active_organs.len();
