@@ -502,6 +502,13 @@ async fn run_conversation_loop(app: tauri::AppHandle) -> Result<(), String> {
                             // Append user turn to conversation history
                             conv_history.push(crate::providers::ConversationMessage::User(trimmed.clone()));
 
+                            // Persist user turn to chat history so typing and voice
+                            // share the same conversation. When the user opens BLADE
+                            // and types, they see the voice conversation too.
+                            let _ = app.emit("voice_user_message", serde_json::json!({
+                                "content": &trimmed,
+                            }));
+
                             // Process through chat pipeline with full history
                             let response = process_voice_turn_with_history(
                                 &app, &trimmed, &conv_history, &emotion, &lang

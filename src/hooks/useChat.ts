@@ -276,6 +276,41 @@ export function useChat() {
       }
     });
 
+    // Voice → Chat unification: when the user speaks a command via voice,
+    // add it to the chat messages so voice and typing share the same history.
+    // The response arrives via chat_token (same as typed messages) because
+    // voice now routes through send_message_stream.
+    const unlistenVoiceUser = listen<{ content: string }>("voice_user_message", (event) => {
+      if (!active) return;
+      const voiceMsg: Message = {
+        id: crypto.randomUUID(),
+        role: "user",
+        content: event.payload.content,
+        timestamp: Date.now(),
+        isVoice: true,
+      };
+      setMessages((prev) => {
+        const next = [...prev, voiceMsg];
+        messagesRef.current = next;
+        return next;
+      });
+      // Also add an empty assistant message placeholder for the streaming response
+      const assistantMsg: Message = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: "",
+        timestamp: Date.now(),
+      };
+      setMessages((prev) => {
+        const next = [...prev, assistantMsg];
+        messagesRef.current = next;
+        return next;
+      });
+      setLoading(true);
+      streamBuffer.current = "";
+      streamRequestId.current = crypto.randomUUID();
+    });
+
     const unlistenToolExecuting = listen<{ name: string; arguments?: unknown; risk: string }>("tool_executing", (event) => {
       if (!active) return;
       // arguments arrives as a JSON Value (object) from Rust, not a string — normalize it
@@ -396,6 +431,7 @@ export function useChat() {
       unlistenThinkingDone.then((fn) => fn());
       unlistenToolExecuting.then((fn) => fn());
       unlistenToolCompleted.then((fn) => fn());
+      unlistenVoiceUser.then((fn) => fn());
       unlistenApproval.then((fn) => fn());
       unlistenClipboard.then((fn) => fn());
       unlistenImproved.then((fn) => fn());
