@@ -316,6 +316,27 @@ pub fn score_context_relevance(query: &str, context_type: &str) -> f32 {
     score.min(1.0)
 }
 
+/// Thalamus attention gate — dynamic threshold that gets stricter as the
+/// prompt grows. When there's plenty of budget left, let more context through
+/// (threshold 0.2). When the prompt is getting large, only let high-relevance
+/// context through (threshold 0.6). This prevents prompt bloat without
+/// losing important context.
+fn thalamus_threshold(current_prompt_chars: usize) -> f32 {
+    const SMALL: usize = 8_000;    // plenty of room
+    const MEDIUM: usize = 40_000;  // getting full
+    const LARGE: usize = 100_000;  // very full
+
+    if current_prompt_chars < SMALL {
+        0.2  // generous — let everything relevant through
+    } else if current_prompt_chars < MEDIUM {
+        0.3  // standard gate
+    } else if current_prompt_chars < LARGE {
+        0.5  // stricter — only clearly relevant
+    } else {
+        0.7  // very strict — only high-signal matches
+    }
+}
+
 // ── Situational humor injection ───────────────────────────────────────────────
 //
 // Returns an optional one-liner to append to the personality section.
@@ -807,7 +828,11 @@ fn build_system_prompt_inner(
     }
 
     // ── CODEBASE INDEX (priority 11, code-gated) ──────────────────────────────
-    if !user_query.is_empty() && score_context_relevance(user_query, "code") > 0.3 {
+    // Thalamus: dynamic threshold tightens as prompt grows
+    let current_chars: usize = parts.iter().map(|p| p.len()).sum();
+    let gate = thalamus_threshold(current_chars);
+
+    if !user_query.is_empty() && score_context_relevance(user_query, "code") > gate {
         const MAX_PROJECT_CHARS: usize = 3_000;
         const MAX_INDEX_TOTAL_CHARS: usize = 12_000;
         let known_projects = crate::indexer::list_indexed_projects();
@@ -840,7 +865,7 @@ fn build_system_prompt_inner(
     }
 
     // ── GIT CONTEXT (priority 12, code-gated) ────────────────────────────────
-    if user_query.is_empty() || score_context_relevance(user_query, "code") > 0.3 {
+    if user_query.is_empty() || score_context_relevance(user_query, "code") > gate {
         if let Some(git_ctx) = git_context_for_active_project() {
             parts.push(git_ctx);
         }
@@ -883,7 +908,7 @@ fn build_system_prompt_inner(
 
     // ── WORLD MODEL (priority 15, system-gated) ───────────────────────────────
     // Only inject for system/process queries — not for every message
-    if !user_query.is_empty() && score_context_relevance(user_query, "system") > 0.3 {
+    if !user_query.is_empty() && score_context_relevance(user_query, "system") > gate {
         let world_summary = crate::world_model::get_world_summary();
         if !world_summary.is_empty() {
             parts.push(world_summary);
@@ -898,7 +923,7 @@ fn build_system_prompt_inner(
     }
 
     // Financial — only for money queries
-    if !user_query.is_empty() && score_context_relevance(user_query, "financial") > 0.3 {
+    if !user_query.is_empty() && score_context_relevance(user_query, "financial") > gate {
         let fin = crate::financial_brain::get_financial_context();
         if !fin.is_empty() {
             parts.push(fin);
@@ -977,7 +1002,7 @@ fn build_system_prompt_inner(
     }
 
     // Hot files — only for code/file queries
-    if !user_query.is_empty() && (score_context_relevance(user_query, "code") > 0.3 || user_query.to_lowercase().contains("file")) {
+    if !user_query.is_empty() && (score_context_relevance(user_query, "code") > gate || user_query.to_lowercase().contains("file")) {
         let hot = crate::tentacles::filesystem_watch::get_hot_files(4);
         if !hot.is_empty() {
             let lines: Vec<String> = hot
@@ -1001,7 +1026,7 @@ fn build_system_prompt_inner(
     }
 
     // Code health
-    if !user_query.is_empty() && score_context_relevance(user_query, "code") > 0.3 {
+    if !user_query.is_empty() && score_context_relevance(user_query, "code") > gate {
         let health_summaries = crate::health::health_summary_all();
         if !health_summaries.is_empty() {
             parts.push(format!("## Code Health\n\n{}", health_summaries.join("\n")));

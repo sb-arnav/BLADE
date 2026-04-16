@@ -44,6 +44,14 @@ pub struct HormoneState {
     /// Affected by: hive critical reports, user stress signals, deadline proximity.
     pub urgency: f32,
 
+    /// 0.0 = satiated → 1.0 = starving (pending work not being executed).
+    /// Affected by: pending hive decisions, queued tasks, unanswered messages.
+    pub hunger: f32,
+
+    /// 0.0 = fresh data → 1.0 = stale (perception/context hasn't been updated).
+    /// Affected by: time since last perception tick, time since last user interaction.
+    pub thirst: f32,
+
     /// When the hypothalamus last updated these values.
     pub last_updated: i64,
 }
@@ -56,6 +64,8 @@ impl Default for HormoneState {
             exploration: 0.3,  // slightly conservative
             trust: 0.3,        // cautious with new users
             urgency: 0.0,      // no urgency
+            hunger: 0.0,       // no pending work
+            thirst: 0.0,       // fresh data
             last_updated: 0,
         }
     }
@@ -111,22 +121,46 @@ pub fn hypothalamus_tick() {
         state.arousal = (state.arousal + 0.1).min(1.0);
     }
 
-    // ── Energy mode: based on API budget health + time of day ───────────
+    // ── Pineal gland: circadian rhythm ─────────────────────────────────
+    // Time-of-day awareness affects energy, arousal, and exploration.
+    // Deep night (0-5): minimal activity, dream mode territory
+    // Morning (6-9): gradual ramp-up, morning briefing time
+    // Work hours (9-18): full power
+    // Evening (18-22): gradual wind-down
+    // Late night (22-0): low energy, conservation mode
     let config = crate::config::load_config();
     let hour = chrono::Local::now().format("%H").to_string().parse::<u32>().unwrap_or(12);
 
-    // Lower energy during user's likely sleep hours
-    if hour < 6 || hour > 23 {
-        state.energy_mode = 0.2; // conserve at night
-    } else if config.token_efficient {
-        state.energy_mode = 0.3; // user explicitly asked to conserve
-    } else {
-        state.energy_mode = 0.6; // normal
+    let circadian_energy = match hour {
+        0..=5  => 0.15,  // deep night — minimal, dream mode
+        6..=8  => 0.4,   // morning ramp-up
+        9..=17 => 0.7,   // work hours — full power
+        18..=21 => 0.5,  // evening wind-down
+        22..=23 => 0.25, // late night — conservation
+        _ => 0.5,
+    };
+
+    let circadian_arousal_mod = match hour {
+        0..=5  => -0.2,  // suppress arousal at night
+        6..=8  => 0.0,   // neutral
+        9..=17 => 0.1,   // slightly elevated during work
+        18..=21 => -0.05, // slight suppression
+        22..=23 => -0.15, // suppress at night
+        _ => 0.0,
+    };
+
+    // Apply circadian rhythm as baseline, then modify from other signals
+    state.energy_mode = circadian_energy;
+    state.arousal = (state.arousal + circadian_arousal_mod).clamp(0.0, 1.0);
+
+    if config.token_efficient {
+        state.energy_mode *= 0.6; // user asked to conserve — scale down
     }
 
-    // If user is actively working, raise energy
+    // If user is actively working, override circadian suppression
     if user_state == "focused" {
         state.energy_mode = (state.energy_mode + 0.2).min(1.0);
+        state.arousal = (state.arousal + 0.1).min(1.0);
     }
 
     // ── Exploration: based on success rate + time since last evolution ──
@@ -183,6 +217,30 @@ pub fn hypothalamus_tick() {
         0.0
     };
 
+    // ── Hunger: pending work not being executed ───────────────────────
+    let pending_decisions = hive_status.pending_decisions;
+    let pending_reports = hive_status.pending_reports;
+    state.hunger = if pending_decisions > 5 || pending_reports > 10 {
+        0.8 // lots of pending work
+    } else if pending_decisions > 0 || pending_reports > 3 {
+        0.4 // some pending work
+    } else {
+        0.1 // satiated
+    };
+
+    // ── Thirst: staleness of perception data ────────────────────────
+    let perception_age = perception
+        .as_ref()
+        .map(|p| now - p.timestamp)
+        .unwrap_or(300); // 5 min if no perception at all
+    state.thirst = if perception_age > 120 {
+        0.8 // very stale (>2 min, perception loop should run every 30s)
+    } else if perception_age > 60 {
+        0.4 // somewhat stale
+    } else {
+        0.1 // fresh
+    };
+
     state.last_updated = now;
 
     // Write back
@@ -212,6 +270,8 @@ pub fn start_hypothalamus(app: tauri::AppHandle) {
                 "exploration": hormones.exploration,
                 "trust": hormones.trust,
                 "urgency": hormones.urgency,
+                "hunger": hormones.hunger,
+                "thirst": hormones.thirst,
             }));
         }
     });
