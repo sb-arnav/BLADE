@@ -67,6 +67,7 @@ mod prefrontal;
 mod proactive_vision;
 mod skeleton;
 mod supervisor;
+mod urinary;
 mod embeddings;
 mod files;
 mod history;
@@ -1156,6 +1157,8 @@ pub fn run() {
             cardiovascular::cardio_get_event_registry,
             supervisor::supervisor_get_health,
             supervisor::supervisor_get_service,
+            urinary::urinary_flush,
+            urinary::immune_get_status,
             homeostasis::homeostasis_get,
             homeostasis::homeostasis_get_directive,
             homeostasis::homeostasis_get_circadian,
