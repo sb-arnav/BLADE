@@ -187,12 +187,25 @@ pub fn check_policies(action_description: &str, context: &ActionContext) -> Poli
         }
     }
 
-    PolicyCheckResult {
+    let result = PolicyCheckResult {
         allowed: worst_action == "allow" || worst_action == "warn",
-        triggered_policies: triggered,
-        action: worst_action,
+        triggered_policies: triggered.clone(),
+        action: worst_action.clone(),
         reason: reasons.join("; "),
+    };
+
+    // Audit: log policy decisions
+    if !triggered.is_empty() {
+        crate::audit::record(
+            "symbolic",
+            &format!("Policy check: {}", triggered.join(", ")),
+            &result.reason,
+            crate::safe_slice(action_description, 100),
+            &worst_action,
+        );
     }
+
+    result
 }
 
 /// Context for policy evaluation — deterministic facts, not LLM guesses.
