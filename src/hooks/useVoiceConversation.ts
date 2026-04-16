@@ -262,6 +262,18 @@ export function useVoiceConversation(): UseVoiceConversationResult {
       setDetectedLanguage(event.payload.language);
     }).then((unlisten) => cleanups.push(unlisten));
 
+    // Voice → Chat pipeline bridge: when the voice backend needs to execute
+    // a command through the full chat pipeline (tools, brain planner, etc.),
+    // it emits voice_chat_submit. We catch it here and call send_message_stream.
+    listen<{ content: string; voice_mode: boolean }>("voice_chat_submit", (event) => {
+      const { content } = event.payload;
+      invoke("send_message_stream", {
+        messages: [{ role: "user", content, image_base64: null }],
+      }).catch((err: unknown) => {
+        console.warn("[voice] send_message_stream failed:", err);
+      });
+    }).then((unlisten) => cleanups.push(unlisten));
+
     listen<{ reason: string }>("voice_conversation_ended", () => {
       clearThinkingTimer();
       setConversationState("idle");
