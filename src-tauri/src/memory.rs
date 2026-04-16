@@ -406,6 +406,18 @@ CONVERSATION:
             );
         }
 
+        // Cross-system consolidation: decisions and personal facts become episodic memories
+        // so memory_palace captures "that time user decided X" alongside the raw fact.
+        if category == "decision" || category == "personal" {
+            let episode_text = format!("{}: {}", category, text);
+            tokio::spawn(async move {
+                crate::memory_palace::auto_consolidate_from_conversation(
+                    &episode_text,
+                    "",
+                ).await;
+            });
+        }
+
         facts.push(Fact { text, category, source: source.clone() });
     }
 

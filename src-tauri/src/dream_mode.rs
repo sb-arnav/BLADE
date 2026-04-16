@@ -148,6 +148,40 @@ async fn task_memory_consolidation() -> String {
         }
     }
 
+    // 5. Prune stale episodic memories (memory_palace) — low importance, old, rarely recalled
+    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+        let cutoff = chrono::Utc::now().timestamp() - (180 * 86400); // 180 days
+        let pruned_episodes = conn.execute(
+            "DELETE FROM memory_episodes WHERE created_at < ?1 AND recall_count < 2 AND importance <= 3",
+            rusqlite::params![cutoff],
+        ).unwrap_or(0);
+        if pruned_episodes > 0 {
+            results.push(format!("pruned {} stale episodes", pruned_episodes));
+        }
+    }
+
+    // 6. Prune stale knowledge graph nodes (>120 days, low importance, no edges)
+    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+        let cutoff = chrono::Utc::now().timestamp() - (120 * 86400);
+        let pruned_nodes = conn.execute(
+            "DELETE FROM knowledge_nodes WHERE last_updated < ?1 AND importance < 0.4 \
+             AND id NOT IN (SELECT source_id FROM knowledge_edges UNION SELECT target_id FROM knowledge_edges)",
+            rusqlite::params![cutoff],
+        ).unwrap_or(0);
+        if pruned_nodes > 0 {
+            results.push(format!("pruned {} orphan knowledge nodes", pruned_nodes));
+        }
+    }
+
+    // 7. Compress memory.rs working memory blocks if they're getting large
+    let blocks = crate::memory::load_memory_blocks();
+    if blocks.human_block.len() > 3000 || blocks.conversation_block.len() > 4000 {
+        // Working memory over 3-4k chars should be compressed
+        // The compression happens via LLM in memory.rs — just trigger it
+        let _ = crate::memory::update_human_block("").await; // triggers compression check
+        results.push("triggered working memory compression".to_string());
+    }
+
     if results.is_empty() {
         "No consolidation needed".to_string()
     } else {
