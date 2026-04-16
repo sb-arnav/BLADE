@@ -265,6 +265,8 @@ export function useVoiceConversation(): UseVoiceConversationResult {
     // Voice → Chat pipeline bridge: when the voice backend needs to execute
     // a command through the full chat pipeline (tools, brain planner, etc.),
     // it emits voice_chat_submit. We catch it here and call send_message_stream.
+    // The response tokens flow back via chat_token events which the voice
+    // backend collects and speaks via TTS.
     listen<{ content: string; voice_mode: boolean }>("voice_chat_submit", (event) => {
       const { content } = event.payload;
       invoke("send_message_stream", {
@@ -272,6 +274,18 @@ export function useVoiceConversation(): UseVoiceConversationResult {
       }).catch((err: unknown) => {
         console.warn("[voice] send_message_stream failed:", err);
       });
+    }).then((unlisten) => cleanups.push(unlisten));
+
+    // Voice user message: persist to chat history so voice and typing
+    // share the same conversation. When the user opens BLADE's chat window,
+    // they see voice turns alongside typed messages.
+    listen<{ content: string }>("voice_user_message", (event) => {
+      const turn: ConversationTurn = {
+        role: "user",
+        text: event.payload.content,
+        timestamp: Date.now(),
+      };
+      setTranscript((prev) => [...prev, turn]);
     }).then((unlisten) => cleanups.push(unlisten));
 
     listen<{ reason: string }>("voice_conversation_ended", () => {

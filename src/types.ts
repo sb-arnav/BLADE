@@ -7,6 +7,8 @@ export interface Message {
   refined?: boolean;
   /** True while this is a fast-ack placeholder before the real stream begins */
   isAck?: boolean;
+  /** True when this message came from voice input (not typed) */
+  isVoice?: boolean;
 }
 
 export interface McpServerConfig {
