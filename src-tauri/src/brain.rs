@@ -626,27 +626,35 @@ fn build_system_prompt_inner(
         }
     }
 
-    // ── LIVE PERCEPTION (priority 7) ─────────────────────────────────────────
-    // When hive + DNA are active, they provide perception data via selective
-    // routing (thalamus). Only fall back to raw perception dump when hive is off.
+    // ── ALWAYS-ON VISION (priority 7) ───────────────────────────────────────
+    // BLADE always sees the screen. This is not optional. No "God Mode off."
+    // The ambient awareness IS the product.
     let hive_is_active = !crate::hive::get_hive_digest().is_empty();
-    if !hive_is_active {
-        // Hive not running — fall back to raw perception line
-        if let Some(p) = crate::perception_fusion::get_latest() {
-            if !p.active_app.is_empty() {
-                let title_part = if !p.active_title.is_empty() && p.active_title != p.active_app {
-                    format!(" — {}", crate::safe_slice(&p.active_title, 50))
-                } else {
-                    String::new()
-                };
-                let streak_mins = crate::health_guardian::get_health_stats()["current_streak_minutes"]
-                    .as_i64().unwrap_or(0);
-                let streak_part = if streak_mins >= 5 { format!(", {}min", streak_mins) } else { String::new() };
-                parts.push(format!(
-                    "Now: {}{} ({}{}).",
-                    p.active_app, title_part, p.user_state, streak_part
-                ));
-            }
+    if let Some(p) = crate::perception_fusion::get_latest() {
+        let mut vision_lines: Vec<String> = Vec::new();
+
+        // What app the user is in
+        if !p.active_app.is_empty() {
+            let title_part = if !p.active_title.is_empty() && p.active_title != p.active_app {
+                format!(" — {}", crate::safe_slice(&p.active_title, 50))
+            } else {
+                String::new()
+            };
+            vision_lines.push(format!("Seeing: {}{} ({})", p.active_app, title_part, p.user_state));
+        }
+
+        // What's actually visible on screen (vision model description)
+        if !p.screen_ocr_text.is_empty() {
+            vision_lines.push(crate::safe_slice(&p.screen_ocr_text, 300).to_string());
+        }
+
+        // Visible errors (extracted from screen + clipboard)
+        if !p.visible_errors.is_empty() {
+            vision_lines.push(format!("Visible error: {}", crate::safe_slice(&p.visible_errors[0], 150)));
+        }
+
+        if !vision_lines.is_empty() {
+            parts.push(vision_lines.join("\n"));
         }
     }
 
