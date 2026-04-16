@@ -77,7 +77,7 @@ const NODE_PALETTE: { type: NodeType; label: string; icon: React.ReactNode; colo
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function nodeColor(type: NodeType): string {
-  return NODE_PALETTE.find((p) => p.type === type)?.color ?? "text-gray-400 border-gray-700 bg-gray-900/20";
+  return NODE_PALETTE.find((p) => p.type === type)?.color ?? "text-[rgba(255,255,255,0.5)] border-[rgba(255,255,255,0.1)] bg-[#09090b]/20";
 }
 
 function nodeIcon(type: NodeType): React.ReactNode {
@@ -117,10 +117,10 @@ function NodeConfigPanel({
 
   const field = (key: string, label: string, placeholder = "", type = "text") => (
     <div key={key} className="flex flex-col gap-1">
-      <label className="text-2xs text-gray-500 uppercase tracking-wider">{label}</label>
+      <label className="text-2xs text-[rgba(255,255,255,0.4)] uppercase tracking-wider">{label}</label>
       {type === "textarea" ? (
         <textarea
-          className="bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-xs text-green-300 font-mono resize-none focus:outline-none focus:border-green-600"
+          className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-green-300 font-mono resize-none focus:outline-none focus:border-green-600"
           rows={3}
           value={node.config[key] ?? ""}
           placeholder={placeholder}
@@ -129,7 +129,7 @@ function NodeConfigPanel({
       ) : (
         <input
           type="text"
-          className="bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-xs text-green-300 font-mono focus:outline-none focus:border-green-600"
+          className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-green-300 font-mono focus:outline-none focus:border-green-600"
           value={node.config[key] ?? ""}
           placeholder={placeholder}
           onChange={(e) => set(key, e.target.value)}
@@ -140,9 +140,9 @@ function NodeConfigPanel({
 
   const select = (key: string, label: string, options: string[]) => (
     <div key={key} className="flex flex-col gap-1">
-      <label className="text-2xs text-gray-500 uppercase tracking-wider">{label}</label>
+      <label className="text-2xs text-[rgba(255,255,255,0.4)] uppercase tracking-wider">{label}</label>
       <select
-        className="bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-xs text-green-300 focus:outline-none focus:border-green-600"
+        className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-green-300 focus:outline-none focus:border-green-600"
         value={node.config[key] ?? options[0]}
         onChange={(e) => set(key, e.target.value)}
       >
@@ -154,10 +154,10 @@ function NodeConfigPanel({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
-        <label className="text-2xs text-gray-500 uppercase tracking-wider">Label</label>
+        <label className="text-2xs text-[rgba(255,255,255,0.4)] uppercase tracking-wider">Label</label>
         <input
           type="text"
-          className="bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-xs text-green-300 font-mono focus:outline-none focus:border-green-600"
+          className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-green-300 font-mono focus:outline-none focus:border-green-600"
           value={node.label}
           onChange={(e) => onChange({ ...node, label: e.target.value })}
         />
@@ -389,10 +389,10 @@ export function WorkflowBuilderView({ onBack }: { onBack: () => void }) {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="flex-1 min-h-0 flex flex-col bg-black text-gray-300 font-mono text-xs overflow-hidden">
+    <div className="flex-1 min-h-0 flex flex-col bg-black text-[rgba(255,255,255,0.7)] font-mono text-xs overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-800 shrink-0">
-        <button onClick={onBack} className="text-gray-500 hover:text-green-400 transition-colors">
+      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[rgba(255,255,255,0.07)] shrink-0">
+        <button onClick={onBack} className="text-[rgba(255,255,255,0.4)] hover:text-green-400 transition-colors">
           <ArrowLeft size={15} />
         </button>
         <span className="text-green-400 font-bold tracking-widest uppercase text-xs">Workflow Builder</span>
@@ -411,7 +411,7 @@ export function WorkflowBuilderView({ onBack }: { onBack: () => void }) {
         <button
           onClick={save}
           disabled={saving}
-          className="flex items-center gap-1.5 px-3 py-1 border border-gray-700 bg-gray-900 text-gray-300 rounded hover:text-green-400 hover:border-green-700 transition-colors text-2xs"
+          className="flex items-center gap-1.5 px-3 py-1 border border-[rgba(255,255,255,0.1)] bg-[#09090b] text-[rgba(255,255,255,0.7)] rounded hover:text-green-400 hover:border-green-700 transition-colors text-2xs"
         >
           <Save size={12} /> {saving ? "Saving…" : "Save"}
           {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />}
@@ -428,17 +428,17 @@ export function WorkflowBuilderView({ onBack }: { onBack: () => void }) {
       {/* Generate dialog */}
       {showGenerate && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-gray-950 border border-gray-700 rounded-lg p-5 w-[480px] flex flex-col gap-3">
+          <div className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded-lg p-5 w-[480px] flex flex-col gap-3">
             <div className="text-green-400 font-bold text-sm">Generate from description</div>
             <textarea
-              className="bg-gray-900 border border-gray-700 rounded px-3 py-2 text-xs text-green-300 font-mono resize-none focus:outline-none focus:border-green-600"
+              className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-xs text-green-300 font-mono resize-none focus:outline-none focus:border-green-600"
               rows={4}
               placeholder="e.g. Every morning at 9am, fetch my GitHub notifications and send me a summary via desktop notification"
               value={genDesc}
               onChange={(e) => setGenDesc(e.target.value)}
             />
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setShowGenerate(false)} className="px-3 py-1 text-2xs text-gray-500 hover:text-gray-300 border border-gray-700 rounded">Cancel</button>
+              <button onClick={() => setShowGenerate(false)} className="px-3 py-1 text-2xs text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] border border-[rgba(255,255,255,0.1)] rounded">Cancel</button>
               <button
                 onClick={generate}
                 disabled={generating || !genDesc.trim()}
@@ -454,21 +454,21 @@ export function WorkflowBuilderView({ onBack }: { onBack: () => void }) {
       {/* Body */}
       <div className="flex-1 min-h-0 flex overflow-hidden">
         {/* Left sidebar */}
-        <div className="w-56 border-r border-gray-800 flex flex-col shrink-0 overflow-hidden">
+        <div className="w-56 border-r border-[rgba(255,255,255,0.07)] flex flex-col shrink-0 overflow-hidden">
           {/* Workflow list */}
-          <div className="border-b border-gray-800 p-2 flex flex-col gap-1 overflow-y-auto max-h-64 shrink-0">
+          <div className="border-b border-[rgba(255,255,255,0.07)] p-2 flex flex-col gap-1 overflow-y-auto max-h-64 shrink-0">
             <div className="flex items-center justify-between px-1 mb-1">
-              <span className="text-2xs text-gray-500 uppercase tracking-widest">Workflows</span>
+              <span className="text-2xs text-[rgba(255,255,255,0.4)] uppercase tracking-widest">Workflows</span>
               <button
                 onClick={() => { setCurrent(emptyWorkflow()); setSelectedId(null); setSelectedNodeId(null); setIsDirty(false); }}
-                className="text-gray-600 hover:text-green-400 transition-colors"
+                className="text-[rgba(255,255,255,0.3)] hover:text-green-400 transition-colors"
                 title="New workflow"
               >
                 <Plus size={12} />
               </button>
             </div>
             {workflows.length === 0 && (
-              <div className="text-2xs text-gray-600 px-1">No workflows yet</div>
+              <div className="text-2xs text-[rgba(255,255,255,0.3)] px-1">No workflows yet</div>
             )}
             {workflows.map((wf) => (
               <div
@@ -476,7 +476,7 @@ export function WorkflowBuilderView({ onBack }: { onBack: () => void }) {
                 className={`group flex items-center gap-1.5 px-2 py-1.5 rounded cursor-pointer border transition-colors ${
                   selectedId === wf.id
                     ? "border-green-800 bg-green-900/10 text-green-300"
-                    : "border-transparent hover:border-gray-700 hover:bg-gray-900 text-gray-400"
+                    : "border-transparent hover:border-[rgba(255,255,255,0.1)] hover:bg-[#09090b] text-[rgba(255,255,255,0.5)]"
                 }`}
                 onClick={() => selectWorkflow(wf.id!)}
               >
@@ -487,7 +487,7 @@ export function WorkflowBuilderView({ onBack }: { onBack: () => void }) {
                 >
                   {wf.enabled
                     ? <ToggleRight size={13} className="text-green-500" />
-                    : <ToggleLeft size={13} className="text-gray-600" />}
+                    : <ToggleLeft size={13} className="text-[rgba(255,255,255,0.3)]" />}
                 </button>
                 <span className="flex-1 truncate text-2xs">{wf.name}</span>
                 <button
@@ -502,13 +502,13 @@ export function WorkflowBuilderView({ onBack }: { onBack: () => void }) {
 
           {/* Selected workflow meta */}
           {selectedId && (
-            <div className="p-2 border-b border-gray-800 shrink-0">
-              <div className="text-2xs text-gray-600 flex items-center gap-1">
+            <div className="p-2 border-b border-[rgba(255,255,255,0.07)] shrink-0">
+              <div className="text-2xs text-[rgba(255,255,255,0.3)] flex items-center gap-1">
                 <Clock size={10} /> Last run: {formatTs(current.last_run)}
               </div>
               <button
                 onClick={() => setShowRuns((p) => !p)}
-                className="mt-1 text-2xs text-gray-500 hover:text-green-400 flex items-center gap-1 transition-colors"
+                className="mt-1 text-2xs text-[rgba(255,255,255,0.4)] hover:text-green-400 flex items-center gap-1 transition-colors"
               >
                 <RefreshCw size={10} /> Run history {showRuns ? "▲" : "▼"}
               </button>
@@ -517,7 +517,7 @@ export function WorkflowBuilderView({ onBack }: { onBack: () => void }) {
 
           {/* Node palette */}
           <div className="flex-1 p-2 overflow-y-auto">
-            <div className="text-2xs text-gray-500 uppercase tracking-widest px-1 mb-2">Node Palette</div>
+            <div className="text-2xs text-[rgba(255,255,255,0.4)] uppercase tracking-widest px-1 mb-2">Node Palette</div>
             <div className="flex flex-col gap-1">
               {NODE_PALETTE.map((p) => (
                 <div
@@ -539,15 +539,15 @@ export function WorkflowBuilderView({ onBack }: { onBack: () => void }) {
         {/* Canvas + config panel */}
         <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
           {/* Workflow name/desc bar */}
-          <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-800 shrink-0">
+          <div className="flex items-center gap-3 px-4 py-2 border-b border-[rgba(255,255,255,0.07)] shrink-0">
             <input
-              className="bg-transparent text-green-300 font-bold text-sm border-b border-transparent focus:border-green-700 focus:outline-none w-56 placeholder:text-gray-600"
+              className="bg-transparent text-green-300 font-bold text-sm border-b border-transparent focus:border-green-700 focus:outline-none w-56 placeholder:text-[rgba(255,255,255,0.3)]"
               value={current.name}
               placeholder="Workflow name"
               onChange={(e) => { setCurrent((c) => ({ ...c, name: e.target.value })); setIsDirty(true); }}
             />
             <input
-              className="bg-transparent text-gray-500 text-2xs border-b border-transparent focus:border-gray-700 focus:outline-none flex-1 placeholder:text-gray-700"
+              className="bg-transparent text-[rgba(255,255,255,0.4)] text-2xs border-b border-transparent focus:border-[rgba(255,255,255,0.1)] focus:outline-none flex-1 placeholder:text-[rgba(255,255,255,0.2)]"
               value={current.description}
               placeholder="Description…"
               onChange={(e) => { setCurrent((c) => ({ ...c, description: e.target.value })); setIsDirty(true); }}
@@ -556,9 +556,9 @@ export function WorkflowBuilderView({ onBack }: { onBack: () => void }) {
 
           {/* Run history panel */}
           {showRuns && (
-            <div className="border-b border-gray-800 bg-gray-950 px-4 py-2 max-h-48 overflow-y-auto shrink-0">
-              <div className="text-2xs text-gray-500 uppercase tracking-widest mb-2">Run History</div>
-              {runs.length === 0 && <div className="text-2xs text-gray-600">No runs yet</div>}
+            <div className="border-b border-[rgba(255,255,255,0.07)] bg-[#09090b] px-4 py-2 max-h-48 overflow-y-auto shrink-0">
+              <div className="text-2xs text-[rgba(255,255,255,0.4)] uppercase tracking-widest mb-2">Run History</div>
+              {runs.length === 0 && <div className="text-2xs text-[rgba(255,255,255,0.3)]">No runs yet</div>}
               {runs.map((run) => (
                 <div key={run.id} className="mb-1">
                   <button
@@ -570,16 +570,16 @@ export function WorkflowBuilderView({ onBack }: { onBack: () => void }) {
                       : run.status === "failure"
                         ? <XCircle size={11} className="text-red-400 shrink-0" />
                         : <RefreshCw size={11} className="text-yellow-400 shrink-0 animate-spin" />}
-                    <span className="text-2xs text-gray-400">{formatTs(run.started_at)}</span>
-                    <span className="text-2xs text-gray-600">({formatDuration(run.duration_ms)})</span>
-                    <ChevronRight size={10} className={`ml-auto text-gray-600 transition-transform ${expandedRun === run.id ? "rotate-90" : ""}`} />
+                    <span className="text-2xs text-[rgba(255,255,255,0.5)]">{formatTs(run.started_at)}</span>
+                    <span className="text-2xs text-[rgba(255,255,255,0.3)]">({formatDuration(run.duration_ms)})</span>
+                    <ChevronRight size={10} className={`ml-auto text-[rgba(255,255,255,0.3)] transition-transform ${expandedRun === run.id ? "rotate-90" : ""}`} />
                   </button>
                   {expandedRun === run.id && (
-                    <div className="ml-4 mt-1 bg-gray-900 border border-gray-800 rounded p-2 text-2xs text-gray-400 font-mono whitespace-pre-wrap max-h-32 overflow-y-auto">
+                    <div className="ml-4 mt-1 bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-2 text-2xs text-[rgba(255,255,255,0.5)] font-mono whitespace-pre-wrap max-h-32 overflow-y-auto">
                       {Object.entries(run.node_outputs).map(([k, v]) => (
                         <div key={k}><span className="text-green-600">[{k}]</span> {v}</div>
                       ))}
-                      {Object.keys(run.node_outputs).length === 0 && <span className="text-gray-600">No output</span>}
+                      {Object.keys(run.node_outputs).length === 0 && <span className="text-[rgba(255,255,255,0.3)]">No output</span>}
                     </div>
                   )}
                 </div>
@@ -596,7 +596,7 @@ export function WorkflowBuilderView({ onBack }: { onBack: () => void }) {
               onDrop={onCanvasDrop}
             >
               {current.nodes.length === 0 && (
-                <div className="flex-1 flex flex-col items-center justify-center text-gray-700 select-none">
+                <div className="flex-1 flex flex-col items-center justify-center text-[rgba(255,255,255,0.2)] select-none">
                   <Zap size={32} className="mb-3 opacity-30" />
                   <div className="text-sm">Drag nodes here or click palette items</div>
                   <div className="text-2xs mt-1 opacity-60">Or use "Generate" to build from a description</div>
@@ -637,8 +637,8 @@ export function WorkflowBuilderView({ onBack }: { onBack: () => void }) {
                   </div>
                   {idx < current.nodes.length - 1 && (
                     <div className="flex flex-col items-center">
-                      <div className="w-px h-4 bg-gray-700" />
-                      <div className="text-gray-700 text-2xs">▼</div>
+                      <div className="w-px h-4 bg-[rgba(255,255,255,0.07)]" />
+                      <div className="text-[rgba(255,255,255,0.2)] text-2xs">▼</div>
                     </div>
                   )}
                 </React.Fragment>
@@ -647,10 +647,10 @@ export function WorkflowBuilderView({ onBack }: { onBack: () => void }) {
 
             {/* Config panel */}
             {selectedNode && (
-              <div className="w-64 border-l border-gray-800 p-3 overflow-y-auto shrink-0 bg-gray-950">
+              <div className="w-64 border-l border-[rgba(255,255,255,0.07)] p-3 overflow-y-auto shrink-0 bg-[#09090b]">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-2xs text-green-400 font-bold uppercase tracking-wider">Node Config</span>
-                  <button onClick={() => setSelectedNodeId(null)} className="text-gray-600 hover:text-gray-400">
+                  <button onClick={() => setSelectedNodeId(null)} className="text-[rgba(255,255,255,0.3)] hover:text-[rgba(255,255,255,0.5)]">
                     <XCircle size={12} />
                   </button>
                 </div>

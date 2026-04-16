@@ -38,6 +38,8 @@ interface Props {
   onOpenChat?: () => void;
 
   lastResponse?: string | null;
+  /** Normalised mic energy 0–1 from useVoiceConversation. Drives OpenClaw-style ring animation. */
+  micVolume?: number;
 }
 
 const LONG_PRESS_MS = 400;
@@ -83,7 +85,39 @@ export function VoiceOrb({
   onPttUp,
   onOpenChat,
   lastResponse,
+  micVolume = 0,
 }: Props) {
+  // Smooth mic level (OpenClaw: 0.45 * prev + 0.55 * new, throttled 12fps)
+  const smoothedLevel = useRef(0);
+  const [level, setLevel] = useState(0);
+  const levelFrameRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (levelFrameRef.current) clearInterval(levelFrameRef.current);
+    levelFrameRef.current = setInterval(() => {
+      smoothedLevel.current = smoothedLevel.current * 0.45 + micVolume * 0.55;
+      setLevel(smoothedLevel.current);
+    }, 83); // 12fps
+    return () => { if (levelFrameRef.current) clearInterval(levelFrameRef.current); };
+  }, [micVolume]);
+
+  // 3 staggered expanding rings (OpenClaw TalkOverlayView.swift)
+  // Each ring advances at state-dependent speed; staggered by 0.28 cycle offset.
+  const ringTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [ringProgress, setRingProgress] = useState([0, 0.28, 0.56]); // staggered start
+  // orbStateRef is updated each render (after orbState is derived below) so the timer reads the correct state
+  const orbStateRef = useRef<"idle"|"listening"|"thinking"|"speaking"|"recording"|"processing"|"error">("idle");
+
+  useEffect(() => {
+    if (ringTimerRef.current) clearInterval(ringTimerRef.current);
+    ringTimerRef.current = setInterval(() => {
+      const speed = orbStateRef.current === "speaking" ? 1.4
+        : (orbStateRef.current === "listening" || orbStateRef.current === "recording") ? 0.9
+        : 0.6;
+      setRingProgress(prev => prev.map((p) => (p + 0.016 * speed) % 1));
+    }, 16);
+    return () => { if (ringTimerRef.current) clearInterval(ringTimerRef.current); };
+  }, []);
   const [corner, setCorner] = useState<Corner>(loadCorner);
   const [showTooltip, setShowTooltip] = useState(false);
   const [tooltipText, setTooltipText] = useState<string | null>(null);
@@ -204,6 +238,35 @@ export function VoiceOrb({
   }
 
   const isActive = orbState !== "idle" && orbState !== "error";
+  // Keep ref current for use in ring timer callback
+  orbStateRef.current = orbState;
+
+  // OpenClaw orb scale formula: listening = 1 + level * 0.12, speaking = 1 + 0.06*sin(t*6)
+  const timeRef = useRef(0);
+  const [orbLevelScale, setOrbLevelScale] = useState(1);
+  useEffect(() => {
+    const id = setInterval(() => {
+      timeRef.current += 0.016;
+      if (orbState === "listening" || orbState === "recording") {
+        setOrbLevelScale(1 + level * 0.12);
+      } else if (orbState === "speaking") {
+        setOrbLevelScale(1 + 0.06 * Math.sin(timeRef.current * 6));
+      } else {
+        setOrbLevelScale(1);
+      }
+    }, 16);
+    return () => clearInterval(id);
+  }, [orbState, level]);
+
+  // OpenClaw 3-ring params — p is already normalized 0..1 progress (speed applied in timer)
+  const isListening = orbState === "listening" || orbState === "recording";
+  const ringParams = ringProgress.map((p) => {
+    const amplitude = orbState === "speaking" ? 0.95 : isListening ? 0.5 + level * 0.7 : 0.35;
+    const alphaBase = orbState === "speaking" ? 0.72 : isListening ? 0.58 + level * 0.28 : 0.4;
+    const ringScale = 0.75 + p * amplitude + (isListening ? level * 0.15 : 0);
+    const ringOpacity = Math.max(0, alphaBase - p * 0.6);
+    return { scale: ringScale, opacity: ringOpacity };
+  });
 
   // State config — Apple color palette, no glow
   const stateConfig = {
@@ -321,11 +384,28 @@ export function VoiceOrb({
           </div>
         )}
 
+        {/* OpenClaw 3 expanding rings — only when active */}
+        {isActive && (
+          <div className="absolute pointer-events-none" style={{ width: 96, height: 96, left: "50%", top: "50%", transform: "translate(-50%, -50%)" }}>
+            {ringParams.map((ring, idx) => (
+              <div key={idx} className="absolute rounded-full" style={{
+                width: 96,
+                height: 96,
+                border: `1.6px solid ${stateConfig.ring}`,
+                left: 0,
+                top: 0,
+                transform: `scale(${ring.scale})`,
+                opacity: ring.opacity,
+              }} />
+            ))}
+          </div>
+        )}
+
         {/* Main orb */}
         <div className="relative flex items-center justify-center"
           style={{
             transition: "transform 250ms cubic-bezier(0.25, 0.1, 0.25, 1)",
-            transform: `scale(${scale})`,
+            transform: `scale(${scale * orbLevelScale})`,
           }}
         >
           {/* Outer ring — very subtle */}

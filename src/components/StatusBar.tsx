@@ -48,12 +48,12 @@ export function StatusBar({ provider, model, streakDays = 0 }: Props) {
       .catch(() => {});
 
     // Load hive tentacle count
-    invoke<{ active: number }>("hive_stats")
-      .then((s) => setTentacleCount(s.active))
+    invoke<{ active_tentacles: number }>("hive_get_status")
+      .then((s) => setTentacleCount(s.active_tentacles))
       .catch(() => {});
 
     // Listen for god mode updates
-    const unlistenGod = listen<GodModeUpdate>("god_mode_update", (e) => {
+    const unlistenGod = listen<GodModeUpdate>("godmode_update", (e) => {
       setGodModeTier(e.payload.tier ?? "off");
     });
 
@@ -62,9 +62,9 @@ export function StatusBar({ provider, model, streakDays = 0 }: Props) {
       setVoiceActive(e.payload.active);
     });
 
-    // Listen for hive updates
-    const unlistenHive = listen<{ active: number }>("hive_updated", (e) => {
-      setTentacleCount(e.payload.active);
+    // Listen for hive tick — update active tentacle count
+    const unlistenHive = listen<{ active_tentacles: number }>("hive_tick", (e) => {
+      setTentacleCount(e.payload.active_tentacles);
     });
 
     return () => {

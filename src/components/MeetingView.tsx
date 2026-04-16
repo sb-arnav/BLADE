@@ -37,7 +37,7 @@ const SENTIMENT_STYLES: Record<Meeting["sentiment"], { border: string; text: str
   productive:  { border: "border-green-600",  text: "text-green-400",  bg: "bg-green-950/30" },
   tense:       { border: "border-red-700",    text: "text-red-400",    bg: "bg-red-950/30" },
   energetic:   { border: "border-blue-600",   text: "text-blue-400",   bg: "bg-blue-950/30" },
-  inconclusive:{ border: "border-gray-600",   text: "text-gray-400",   bg: "bg-gray-900" },
+  inconclusive:{ border: "border-[rgba(255,255,255,0.15)]",   text: "text-[rgba(255,255,255,0.5)]",   bg: "bg-[#09090b]" },
 };
 
 function SentimentBadge({ sentiment }: { sentiment: Meeting["sentiment"] }) {
@@ -53,7 +53,7 @@ function SentimentBadge({ sentiment }: { sentiment: Meeting["sentiment"] }) {
 
 function TypeBadge({ type }: { type: string }) {
   return (
-    <span className="text-2xs font-mono px-2 py-0.5 rounded border border-gray-700 text-gray-400 bg-gray-800">
+    <span className="text-2xs font-mono px-2 py-0.5 rounded border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)] bg-[rgba(255,255,255,0.04)]">
       {type}
     </span>
   );
@@ -103,46 +103,46 @@ function NewMeetingForm({ onProcessed }: { onProcessed: (meeting: Meeting) => vo
 
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
-          <label className="text-gray-500 text-2xs font-mono">Title *</label>
+          <label className="text-[rgba(255,255,255,0.4)] text-2xs font-mono">Title *</label>
           <input
-            className="w-full mt-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-green-500"
+            className="w-full mt-1 bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-green-500"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Q4 planning meeting"
           />
         </div>
         <div>
-          <label className="text-gray-500 text-2xs font-mono">Date</label>
+          <label className="text-[rgba(255,255,255,0.4)] text-2xs font-mono">Date</label>
           <input
             type="date"
-            className="w-full mt-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-green-500"
+            className="w-full mt-1 bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-green-500"
             value={date}
             onChange={(e) => setDate(e.target.value)}
           />
         </div>
         <div>
-          <label className="text-gray-500 text-2xs font-mono">Duration (minutes)</label>
+          <label className="text-[rgba(255,255,255,0.4)] text-2xs font-mono">Duration (minutes)</label>
           <input
             type="number"
-            className="w-full mt-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-green-500"
+            className="w-full mt-1 bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-green-500"
             value={duration}
             onChange={(e) => setDuration(e.target.value)}
             placeholder="60"
           />
         </div>
         <div className="col-span-2">
-          <label className="text-gray-500 text-2xs font-mono">Participants (comma-separated)</label>
+          <label className="text-[rgba(255,255,255,0.4)] text-2xs font-mono">Participants (comma-separated)</label>
           <input
-            className="w-full mt-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-green-500"
+            className="w-full mt-1 bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-green-500"
             value={participants}
             onChange={(e) => setParticipants(e.target.value)}
             placeholder="Alice, Bob, Carol"
           />
         </div>
         <div className="col-span-2">
-          <label className="text-gray-500 text-2xs font-mono">Transcript / Notes *</label>
+          <label className="text-[rgba(255,255,255,0.4)] text-2xs font-mono">Transcript / Notes *</label>
           <textarea
-            className="w-full mt-1 bg-gray-900 border border-gray-700 rounded p-3 text-xs font-mono resize-none h-48 focus:outline-none focus:border-green-500"
+            className="w-full mt-1 bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded p-3 text-xs font-mono resize-none h-48 focus:outline-none focus:border-green-500"
             value={transcript}
             onChange={(e) => setTranscript(e.target.value)}
             placeholder="Paste or type meeting notes / transcript here..."
@@ -206,19 +206,19 @@ function MeetingDetail({ meeting, onActionComplete }: { meeting: Meeting; onActi
     <div className="space-y-5">
       {/* Header */}
       <div className="space-y-2">
-        <h2 className="text-gray-100 font-mono text-base font-semibold">{meeting.title}</h2>
+        <h2 className="text-white font-mono text-base font-semibold">{meeting.title}</h2>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-gray-500 text-xs font-mono">{meeting.date}</span>
+          <span className="text-[rgba(255,255,255,0.4)] text-xs font-mono">{meeting.date}</span>
           <TypeBadge type={meeting.meeting_type} />
           <SentimentBadge sentiment={meeting.sentiment} />
           {meeting.duration_minutes && (
-            <span className="text-gray-500 text-2xs font-mono">⏱ {meeting.duration_minutes}m</span>
+            <span className="text-[rgba(255,255,255,0.4)] text-2xs font-mono">⏱ {meeting.duration_minutes}m</span>
           )}
         </div>
         {meeting.participants.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {meeting.participants.map((p) => (
-              <span key={p} className="text-2xs font-mono bg-gray-800 border border-gray-700 rounded px-2 py-0.5 text-gray-300">
+              <span key={p} className="text-2xs font-mono bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded px-2 py-0.5 text-[rgba(255,255,255,0.7)]">
                 {p}
               </span>
             ))}
@@ -230,18 +230,18 @@ function MeetingDetail({ meeting, onActionComplete }: { meeting: Meeting; onActi
       {meeting.summary && (
         <div className="bg-amber-950/30 border border-amber-800 rounded-lg p-4">
           <p className="text-amber-400 text-2xs font-mono uppercase tracking-wider mb-2">Summary</p>
-          <p className="text-gray-200 text-xs font-mono leading-relaxed">{meeting.summary}</p>
+          <p className="text-[rgba(255,255,255,0.85)] text-xs font-mono leading-relaxed">{meeting.summary}</p>
         </div>
       )}
 
       {/* Decisions */}
       {meeting.decisions.length > 0 && (
         <div>
-          <p className="text-gray-500 text-2xs font-mono uppercase tracking-wider mb-2">⚖️ Decisions</p>
+          <p className="text-[rgba(255,255,255,0.4)] text-2xs font-mono uppercase tracking-wider mb-2">⚖️ Decisions</p>
           <ol className="space-y-1.5">
             {meeting.decisions.map((d, i) => (
-              <li key={i} className="flex gap-3 text-xs font-mono text-gray-200">
-                <span className="text-gray-600 flex-shrink-0">{i + 1}.</span>
+              <li key={i} className="flex gap-3 text-xs font-mono text-[rgba(255,255,255,0.85)]">
+                <span className="text-[rgba(255,255,255,0.3)] flex-shrink-0">{i + 1}.</span>
                 <span>{d}</span>
               </li>
             ))}
@@ -252,7 +252,7 @@ function MeetingDetail({ meeting, onActionComplete }: { meeting: Meeting; onActi
       {/* Action Items */}
       {meeting.action_items.length > 0 && (
         <div>
-          <p className="text-gray-500 text-2xs font-mono uppercase tracking-wider mb-2">
+          <p className="text-[rgba(255,255,255,0.4)] text-2xs font-mono uppercase tracking-wider mb-2">
             ✅ Action Items ({openActions.length} open)
           </p>
           <div className="space-y-2">
@@ -261,8 +261,8 @@ function MeetingDetail({ meeting, onActionComplete }: { meeting: Meeting; onActi
                 key={i}
                 className={`flex items-start gap-3 border rounded p-2.5 ${
                   item.completed
-                    ? "border-gray-800 opacity-50"
-                    : "border-gray-700 bg-gray-900"
+                    ? "border-[rgba(255,255,255,0.07)] opacity-50"
+                    : "border-[rgba(255,255,255,0.1)] bg-[#09090b]"
                 }`}
               >
                 <button
@@ -271,13 +271,13 @@ function MeetingDetail({ meeting, onActionComplete }: { meeting: Meeting; onActi
                   className={`mt-0.5 w-4 h-4 flex-shrink-0 rounded border text-center text-2xs leading-none ${
                     item.completed
                       ? "border-green-700 bg-green-900 text-green-400"
-                      : "border-gray-600 hover:border-green-600"
+                      : "border-[rgba(255,255,255,0.15)] hover:border-green-600"
                   }`}
                 >
                   {item.completed ? "✓" : ""}
                 </button>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-xs font-mono ${item.completed ? "line-through text-gray-600" : "text-gray-200"}`}>
+                  <p className={`text-xs font-mono ${item.completed ? "line-through text-[rgba(255,255,255,0.3)]" : "text-[rgba(255,255,255,0.85)]"}`}>
                     {item.description}
                   </p>
                   <div className="flex gap-2 mt-0.5">
@@ -287,7 +287,7 @@ function MeetingDetail({ meeting, onActionComplete }: { meeting: Meeting; onActi
                       </span>
                     )}
                     {item.due_date && (
-                      <span className="text-2xs font-mono text-gray-500">{item.due_date}</span>
+                      <span className="text-2xs font-mono text-[rgba(255,255,255,0.4)]">{item.due_date}</span>
                     )}
                   </div>
                 </div>
@@ -300,11 +300,11 @@ function MeetingDetail({ meeting, onActionComplete }: { meeting: Meeting; onActi
       {/* Open Questions */}
       {meeting.open_questions.length > 0 && (
         <div>
-          <p className="text-gray-500 text-2xs font-mono uppercase tracking-wider mb-2">? Open Questions</p>
+          <p className="text-[rgba(255,255,255,0.4)] text-2xs font-mono uppercase tracking-wider mb-2">? Open Questions</p>
           <div className="space-y-1.5">
             {meeting.open_questions.map((q, i) => (
-              <div key={i} className="flex gap-3 text-xs font-mono text-gray-300 border border-gray-800 rounded p-2">
-                <span className="text-gray-600">?</span>
+              <div key={i} className="flex gap-3 text-xs font-mono text-[rgba(255,255,255,0.7)] border border-[rgba(255,255,255,0.07)] rounded p-2">
+                <span className="text-[rgba(255,255,255,0.3)]">?</span>
                 <span>{q}</span>
               </div>
             ))}
@@ -313,11 +313,11 @@ function MeetingDetail({ meeting, onActionComplete }: { meeting: Meeting; onActi
       )}
 
       {/* Follow-up email */}
-      <div className="border border-gray-700 rounded-lg p-4 bg-gray-900">
-        <p className="text-gray-400 text-2xs font-mono uppercase tracking-wider mb-3">Generate Follow-up Email</p>
+      <div className="border border-[rgba(255,255,255,0.1)] rounded-lg p-4 bg-[#09090b]">
+        <p className="text-[rgba(255,255,255,0.5)] text-2xs font-mono uppercase tracking-wider mb-3">Generate Follow-up Email</p>
         <div className="flex gap-2 mb-3">
           <input
-            className="flex-1 bg-black border border-gray-700 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-green-500"
+            className="flex-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-green-500"
             value={recipient}
             onChange={(e) => setRecipient(e.target.value)}
             placeholder="recipient@example.com"
@@ -334,12 +334,12 @@ function MeetingDetail({ meeting, onActionComplete }: { meeting: Meeting; onActi
           <div className="relative">
             <textarea
               readOnly
-              className="w-full bg-black border border-gray-700 rounded p-3 text-xs font-mono resize-none h-40 text-gray-300"
+              className="w-full bg-black border border-[rgba(255,255,255,0.1)] rounded p-3 text-xs font-mono resize-none h-40 text-[rgba(255,255,255,0.7)]"
               value={followUpEmail}
             />
             <button
               onClick={copyEmail}
-              className="absolute top-2 right-2 text-2xs font-mono px-2 py-1 border border-gray-700 rounded bg-gray-900 text-gray-400 hover:text-green-400 hover:border-green-700"
+              className="absolute top-2 right-2 text-2xs font-mono px-2 py-1 border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b] text-[rgba(255,255,255,0.5)] hover:text-green-400 hover:border-green-700"
             >
               {copied ? "Copied!" : "Copy"}
             </button>
@@ -374,12 +374,12 @@ function Sidebar({
   const openGlobal = globalActions.filter((a) => !a.completed);
 
   return (
-    <div className="w-64 border-r border-gray-800 flex flex-col bg-gray-950 flex-shrink-0">
+    <div className="w-64 border-r border-[rgba(255,255,255,0.07)] flex flex-col bg-[#09090b] flex-shrink-0">
       {/* Search */}
-      <div className="p-3 border-b border-gray-800">
+      <div className="p-3 border-b border-[rgba(255,255,255,0.07)]">
         <div className="flex gap-1.5">
           <input
-            className="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-green-500"
+            className="flex-1 bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-green-500"
             placeholder="Search meetings..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -387,7 +387,7 @@ function Sidebar({
           />
           <button
             onClick={onSearch}
-            className="text-xs border border-gray-700 rounded px-2 py-1.5 hover:border-gray-500 text-gray-400"
+            className="text-xs border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 hover:border-[rgba(255,255,255,0.2)] text-[rgba(255,255,255,0.5)]"
           >
             ↵
           </button>
@@ -395,7 +395,7 @@ function Sidebar({
       </div>
 
       {/* New meeting button */}
-      <div className="p-3 border-b border-gray-800">
+      <div className="p-3 border-b border-[rgba(255,255,255,0.07)]">
         <button
           onClick={onNewMeeting}
           className="w-full text-xs text-green-400 border border-green-700 rounded py-1.5 hover:bg-green-900/30 font-mono"
@@ -406,16 +406,16 @@ function Sidebar({
 
       {/* Global open action items */}
       {openGlobal.length > 0 && (
-        <div className="p-3 border-b border-gray-800">
+        <div className="p-3 border-b border-[rgba(255,255,255,0.07)]">
           <p className="text-amber-500 text-2xs font-mono uppercase tracking-wider mb-2">
             Open Actions ({openGlobal.length})
           </p>
           <div className="space-y-1.5 max-h-36 overflow-y-auto">
             {openGlobal.slice(0, 8).map((a, i) => (
-              <div key={i} className="text-2xs font-mono text-gray-400 border border-gray-800 rounded px-2 py-1">
+              <div key={i} className="text-2xs font-mono text-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.07)] rounded px-2 py-1">
                 <div className="truncate">{a.description}</div>
                 {a.meeting_title && (
-                  <div className="text-gray-600 truncate mt-0.5">{a.meeting_title}</div>
+                  <div className="text-[rgba(255,255,255,0.3)] truncate mt-0.5">{a.meeting_title}</div>
                 )}
               </div>
             ))}
@@ -426,7 +426,7 @@ function Sidebar({
       {/* Meeting list */}
       <div className="flex-1 overflow-y-auto">
         {meetings.length === 0 && (
-          <p className="text-gray-700 text-2xs font-mono p-3 text-center">No meetings yet.</p>
+          <p className="text-[rgba(255,255,255,0.2)] text-2xs font-mono p-3 text-center">No meetings yet.</p>
         )}
         {meetings.map((m) => {
           const openCount = m.action_items.filter((a) => !a.completed).length;
@@ -434,13 +434,13 @@ function Sidebar({
             <button
               key={m.id}
               onClick={() => onSelect(m)}
-              className={`w-full text-left p-3 border-b border-gray-800 hover:bg-gray-900 transition-colors ${
-                selectedId === m.id ? "bg-gray-900 border-l-2 border-l-green-500" : ""
+              className={`w-full text-left p-3 border-b border-[rgba(255,255,255,0.07)] hover:bg-[#09090b] transition-colors ${
+                selectedId === m.id ? "bg-[#09090b] border-l-2 border-l-green-500" : ""
               }`}
             >
-              <div className="text-xs font-mono text-gray-200 truncate">{m.title}</div>
+              <div className="text-xs font-mono text-[rgba(255,255,255,0.85)] truncate">{m.title}</div>
               <div className="flex items-center gap-2 mt-1">
-                <span className="text-2xs text-gray-600 font-mono">{m.date}</span>
+                <span className="text-2xs text-[rgba(255,255,255,0.3)] font-mono">{m.date}</span>
                 <TypeBadge type={m.meeting_type} />
                 {openCount > 0 && (
                   <span className="text-2xs font-mono bg-amber-900/50 border border-amber-700 text-amber-400 rounded px-1.5 py-0.5 ml-auto">
@@ -501,9 +501,9 @@ function MoreTools({ meetings }: { meetings: Meeting[] }) {
   return (
     <div className="space-y-6">
       {/* Compare meetings */}
-      <div className="border border-gray-700 rounded-lg p-4 bg-gray-900">
+      <div className="border border-[rgba(255,255,255,0.1)] rounded-lg p-4 bg-[#09090b]">
         <h3 className="text-green-400 font-mono text-xs mb-3">Compare Meetings</h3>
-        <p className="text-gray-500 text-2xs font-mono mb-3">Select 2+ meetings to compare:</p>
+        <p className="text-[rgba(255,255,255,0.4)] text-2xs font-mono mb-3">Select 2+ meetings to compare:</p>
         <div className="space-y-1 max-h-48 overflow-y-auto mb-3">
           {meetings.map((m) => (
             <label
@@ -511,7 +511,7 @@ function MoreTools({ meetings }: { meetings: Meeting[] }) {
               className={`flex items-center gap-2 p-2 rounded cursor-pointer border ${
                 selectedIds.includes(m.id)
                   ? "border-green-700 bg-green-950/20"
-                  : "border-gray-800 hover:border-gray-700"
+                  : "border-[rgba(255,255,255,0.07)] hover:border-[rgba(255,255,255,0.1)]"
               }`}
             >
               <input
@@ -520,8 +520,8 @@ function MoreTools({ meetings }: { meetings: Meeting[] }) {
                 checked={selectedIds.includes(m.id)}
                 onChange={() => toggleSelect(m.id)}
               />
-              <span className="text-xs font-mono text-gray-200">{m.title}</span>
-              <span className="text-2xs text-gray-600 font-mono ml-auto">{m.date}</span>
+              <span className="text-xs font-mono text-[rgba(255,255,255,0.85)]">{m.title}</span>
+              <span className="text-2xs text-[rgba(255,255,255,0.3)] font-mono ml-auto">{m.date}</span>
             </label>
           ))}
         </div>
@@ -533,14 +533,14 @@ function MoreTools({ meetings }: { meetings: Meeting[] }) {
           {comparing ? "Comparing..." : `Compare (${selectedIds.length} selected)`}
         </button>
         {compareResult && (
-          <div className="mt-3 border border-gray-700 rounded p-3 text-xs font-mono text-gray-200 whitespace-pre-wrap">
+          <div className="mt-3 border border-[rgba(255,255,255,0.1)] rounded p-3 text-xs font-mono text-[rgba(255,255,255,0.85)] whitespace-pre-wrap">
             {compareResult}
           </div>
         )}
       </div>
 
       {/* Recurring themes */}
-      <div className="border border-gray-700 rounded-lg p-4 bg-gray-900">
+      <div className="border border-[rgba(255,255,255,0.1)] rounded-lg p-4 bg-[#09090b]">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-green-400 font-mono text-xs">Find Recurring Themes (30 days)</h3>
           <button
@@ -554,14 +554,14 @@ function MoreTools({ meetings }: { meetings: Meeting[] }) {
         {themes.length > 0 && (
           <div className="space-y-1.5">
             {themes.map((theme, i) => (
-              <div key={i} className="border border-gray-800 rounded px-3 py-2 text-xs font-mono text-gray-200">
+              <div key={i} className="border border-[rgba(255,255,255,0.07)] rounded px-3 py-2 text-xs font-mono text-[rgba(255,255,255,0.85)]">
                 {i + 1}. {theme}
               </div>
             ))}
           </div>
         )}
         {themes.length === 0 && !loadingThemes && (
-          <p className="text-gray-600 text-xs font-mono">Click Analyze to find recurring themes across your recent meetings.</p>
+          <p className="text-[rgba(255,255,255,0.3)] text-xs font-mono">Click Analyze to find recurring themes across your recent meetings.</p>
         )}
       </div>
     </div>
@@ -636,13 +636,13 @@ export function MeetingView({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-black text-gray-200 font-mono">
+    <div className="flex flex-col h-screen bg-black text-[rgba(255,255,255,0.85)] font-mono">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.07)]">
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
-            className="text-gray-500 hover:text-gray-300 text-xs border border-gray-800 rounded px-2 py-1"
+            className="text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] text-xs border border-[rgba(255,255,255,0.07)] rounded px-2 py-1"
           >
             ← Back
           </button>
@@ -653,7 +653,7 @@ export function MeetingView({ onBack }: { onBack: () => void }) {
           className={`text-xs border rounded px-2 py-1 font-mono ${
             view === "more"
               ? "border-purple-600 text-purple-400"
-              : "border-gray-700 text-gray-500 hover:border-gray-600"
+              : "border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.4)] hover:border-[rgba(255,255,255,0.15)]"
           }`}
         >
           More Tools
@@ -693,7 +693,7 @@ export function MeetingView({ onBack }: { onBack: () => void }) {
           )}
           {view === "detail" && !selectedMeeting && (
             <div className="flex items-center justify-center h-full">
-              <p className="text-gray-700 text-xs font-mono">Select a meeting from the sidebar.</p>
+              <p className="text-[rgba(255,255,255,0.2)] text-xs font-mono">Select a meeting from the sidebar.</p>
             </div>
           )}
         </div>

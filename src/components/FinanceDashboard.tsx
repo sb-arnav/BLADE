@@ -36,14 +36,14 @@ const TRANSACTION_TYPES: Array<{ value: Transaction["type"]; label: string }> = 
 ];
 
 const INVOICE_STATUSES: Array<{ value: Invoice["status"]; label: string; color: string }> = [
-  { value: "draft", label: "Draft", color: "text-zinc-400" },
+  { value: "draft", label: "Draft", color: "text-[rgba(255,255,255,0.5)]" },
   { value: "sent", label: "Sent", color: "text-blue-400" },
   { value: "paid", label: "Paid", color: "text-emerald-400" },
   { value: "overdue", label: "Overdue", color: "text-red-400" },
 ];
 
 const STATUS_BG: Record<Invoice["status"], string> = {
-  draft: "bg-zinc-500/10 border-zinc-500/20",
+  draft: "bg-[rgba(255,255,255,0.04)]/10 border-[rgba(255,255,255,0.2)]/20",
   sent: "bg-blue-500/10 border-blue-500/20",
   paid: "bg-emerald-500/10 border-emerald-500/20",
   overdue: "bg-red-500/10 border-red-500/20",
@@ -286,38 +286,38 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
   // ── Render ─────────────────────────────────────────────────────────────
 
   const inputCls =
-    "w-full bg-zinc-800/60 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/25";
+    "w-full bg-[rgba(255,255,255,0.04)]/60 border border-[rgba(255,255,255,0.1)]/50 rounded-lg px-3 py-2 text-sm text-white placeholder:text-[rgba(255,255,255,0.4)] focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/25";
   const btnPrimary =
     "px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors";
   const btnSecondary =
-    "px-4 py-2 bg-zinc-700/60 hover:bg-zinc-600/60 text-zinc-300 text-sm font-medium rounded-lg transition-colors border border-zinc-600/40";
+    "px-4 py-2 bg-[rgba(255,255,255,0.07)]/60 hover:bg-[rgba(255,255,255,0.04)]/60 text-[rgba(255,255,255,0.7)] text-sm font-medium rounded-lg transition-colors border border-[rgba(255,255,255,0.15)]/40";
 
   return (
-    <div className="flex flex-col h-full bg-zinc-900 text-zinc-100">
+    <div className="flex flex-col h-full bg-[#0a0a0f] text-white">
       {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-800/60">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-[rgba(255,255,255,0.07)]/60">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="text-zinc-400 hover:text-zinc-200 transition-colors">
+          <button onClick={onBack} className="text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] transition-colors">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           <h1 className="text-lg font-semibold">Finance Dashboard</h1>
-          <span className="text-xs text-zinc-500">{transactions.length} transactions</span>
+          <span className="text-xs text-[rgba(255,255,255,0.4)]">{transactions.length} transactions</span>
         </div>
         <div className="flex items-center gap-2">
           <input
             type="date"
             value={dateRange.start}
             onChange={(e) => setDateRange((r) => ({ ...r, start: e.target.value }))}
-            className="bg-zinc-800/60 border border-zinc-700/50 rounded-lg px-2 py-1.5 text-xs text-zinc-300"
+            className="bg-[rgba(255,255,255,0.04)]/60 border border-[rgba(255,255,255,0.1)]/50 rounded-lg px-2 py-1.5 text-xs text-[rgba(255,255,255,0.7)]"
           />
-          <span className="text-zinc-500 text-xs">to</span>
+          <span className="text-[rgba(255,255,255,0.4)] text-xs">to</span>
           <input
             type="date"
             value={dateRange.end}
             onChange={(e) => setDateRange((r) => ({ ...r, end: e.target.value }))}
-            className="bg-zinc-800/60 border border-zinc-700/50 rounded-lg px-2 py-1.5 text-xs text-zinc-300"
+            className="bg-[rgba(255,255,255,0.04)]/60 border border-[rgba(255,255,255,0.1)]/50 rounded-lg px-2 py-1.5 text-xs text-[rgba(255,255,255,0.7)]"
           />
           <button onClick={handleExport} className={btnSecondary} title="Export CSV">
             Export
@@ -326,15 +326,15 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
       </div>
 
       {/* ── Tabs ────────────────────────────────────────────────────────── */}
-      <div className="flex gap-1 px-5 pt-3 border-b border-zinc-800/40">
+      <div className="flex gap-1 px-5 pt-3 border-b border-[rgba(255,255,255,0.07)]/40">
         {TAB_ITEMS.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
             className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
               tab === t.key
-                ? "bg-zinc-800/80 text-zinc-100 border-b-2 border-blue-500"
-                : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/40"
+                ? "bg-[rgba(255,255,255,0.04)]/80 text-white border-b-2 border-blue-500"
+                : "text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] hover:bg-[rgba(255,255,255,0.04)]/40"
             }`}
           >
             {t.icon} {t.label}
@@ -355,10 +355,10 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
                 { label: "Net Income", value: stats.netIncome, color: stats.netIncome >= 0 ? "text-emerald-400" : "text-red-400", bg: stats.netIncome >= 0 ? "bg-emerald-500/10" : "bg-red-500/10" },
                 { label: "AI Costs", value: stats.aiCostTotal, color: "text-cyan-400", bg: "bg-cyan-500/10" },
               ].map((card) => (
-                <div key={card.label} className={`${card.bg} rounded-xl p-4 border border-zinc-700/30`}>
-                  <p className="text-xs text-zinc-500 mb-1">{card.label}</p>
+                <div key={card.label} className={`${card.bg} rounded-xl p-4 border border-[rgba(255,255,255,0.1)]/30`}>
+                  <p className="text-xs text-[rgba(255,255,255,0.4)] mb-1">{card.label}</p>
                   <p className={`text-2xl font-bold ${card.color}`}>{formatCurrency(card.value)}</p>
-                  <p className="text-xs text-zinc-600 mt-1">
+                  <p className="text-xs text-[rgba(255,255,255,0.3)] mt-1">
                     {card.label === "Expenses" ? `~${formatCurrency(stats.monthlyBurn)}/mo burn` : ""}
                   </p>
                 </div>
@@ -366,10 +366,10 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
             </div>
 
             {/* Monthly Trend Bar Chart */}
-            <div className="bg-zinc-800/40 rounded-xl p-5 border border-zinc-700/30">
-              <h3 className="text-sm font-semibold text-zinc-300 mb-4">Monthly Trend</h3>
+            <div className="bg-[rgba(255,255,255,0.04)]/40 rounded-xl p-5 border border-[rgba(255,255,255,0.1)]/30">
+              <h3 className="text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-4">Monthly Trend</h3>
               {stats.monthlyTrend.length === 0 ? (
-                <p className="text-zinc-600 text-sm text-center py-8">No data yet. Add transactions to see trends.</p>
+                <p className="text-[rgba(255,255,255,0.3)] text-sm text-center py-8">No data yet. Add transactions to see trends.</p>
               ) : (
                 <div className="flex items-end gap-2 h-48">
                   {stats.monthlyTrend.map((m) => (
@@ -386,16 +386,16 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
                           title={`Expenses: ${formatCurrency(m.expenses)}`}
                         />
                       </div>
-                      <span className="text-[10px] text-zinc-600 truncate w-full text-center">{m.month}</span>
+                      <span className="text-[10px] text-[rgba(255,255,255,0.3)] truncate w-full text-center">{m.month}</span>
                     </div>
                   ))}
                 </div>
               )}
               <div className="flex gap-4 mt-3 justify-center">
-                <span className="flex items-center gap-1 text-xs text-zinc-500">
+                <span className="flex items-center gap-1 text-xs text-[rgba(255,255,255,0.4)]">
                   <span className="w-3 h-2 bg-emerald-500/60 rounded-sm" /> Income
                 </span>
-                <span className="flex items-center gap-1 text-xs text-zinc-500">
+                <span className="flex items-center gap-1 text-xs text-[rgba(255,255,255,0.4)]">
                   <span className="w-3 h-2 bg-red-500/60 rounded-sm" /> Expenses
                 </span>
               </div>
@@ -403,21 +403,21 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
 
             {/* Category Breakdown */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-zinc-800/40 rounded-xl p-5 border border-zinc-700/30">
-                <h3 className="text-sm font-semibold text-zinc-300 mb-4">Category Breakdown</h3>
+              <div className="bg-[rgba(255,255,255,0.04)]/40 rounded-xl p-5 border border-[rgba(255,255,255,0.1)]/30">
+                <h3 className="text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-4">Category Breakdown</h3>
                 {stats.topCategories.length === 0 ? (
-                  <p className="text-zinc-600 text-sm text-center py-4">No expense data.</p>
+                  <p className="text-[rgba(255,255,255,0.3)] text-sm text-center py-4">No expense data.</p>
                 ) : (
                   <div className="space-y-3">
                     {stats.topCategories.map((cat) => (
                       <div key={cat.category}>
                         <div className="flex justify-between text-xs mb-1">
-                          <span className="text-zinc-400">
+                          <span className="text-[rgba(255,255,255,0.5)]">
                             {CATEGORY_ICONS[cat.category] || "📎"} {cat.category}
                           </span>
-                          <span className="text-zinc-500">{formatCurrency(cat.amount)}</span>
+                          <span className="text-[rgba(255,255,255,0.4)]">{formatCurrency(cat.amount)}</span>
                         </div>
-                        <div className="h-2 bg-zinc-700/40 rounded-full overflow-hidden">
+                        <div className="h-2 bg-[rgba(255,255,255,0.07)]/40 rounded-full overflow-hidden">
                           <div
                             className="h-full rounded-full transition-all"
                             style={{
@@ -433,10 +433,10 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
               </div>
 
               {/* Donut-style Category Pie */}
-              <div className="bg-zinc-800/40 rounded-xl p-5 border border-zinc-700/30">
-                <h3 className="text-sm font-semibold text-zinc-300 mb-4">Spending Share</h3>
+              <div className="bg-[rgba(255,255,255,0.04)]/40 rounded-xl p-5 border border-[rgba(255,255,255,0.1)]/30">
+                <h3 className="text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-4">Spending Share</h3>
                 {stats.topCategories.length === 0 ? (
-                  <p className="text-zinc-600 text-sm text-center py-4">No expense data.</p>
+                  <p className="text-[rgba(255,255,255,0.3)] text-sm text-center py-4">No expense data.</p>
                 ) : (
                   <div className="flex items-center justify-center">
                     <svg viewBox="0 0 100 100" className="w-40 h-40">
@@ -469,7 +469,7 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
                 )}
                 <div className="flex flex-wrap gap-2 mt-3 justify-center">
                   {stats.topCategories.slice(0, 6).map((cat) => (
-                    <span key={cat.category} className="flex items-center gap-1 text-[10px] text-zinc-500">
+                    <span key={cat.category} className="flex items-center gap-1 text-[10px] text-[rgba(255,255,255,0.4)]">
                       <span
                         className="w-2 h-2 rounded-full inline-block"
                         style={{ backgroundColor: CATEGORY_COLORS[cat.category] || "#64748b" }}
@@ -482,22 +482,22 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
             </div>
 
             {/* Recent Transactions */}
-            <div className="bg-zinc-800/40 rounded-xl p-5 border border-zinc-700/30">
-              <h3 className="text-sm font-semibold text-zinc-300 mb-3">Recent Transactions</h3>
+            <div className="bg-[rgba(255,255,255,0.04)]/40 rounded-xl p-5 border border-[rgba(255,255,255,0.1)]/30">
+              <h3 className="text-sm font-semibold text-[rgba(255,255,255,0.7)] mb-3">Recent Transactions</h3>
               {transactions.length === 0 ? (
-                <p className="text-zinc-600 text-sm text-center py-4">No transactions yet.</p>
+                <p className="text-[rgba(255,255,255,0.3)] text-sm text-center py-4">No transactions yet.</p>
               ) : (
                 <div className="space-y-1">
                   {transactions
                     .sort((a, b) => b.createdAt - a.createdAt)
                     .slice(0, 8)
                     .map((t) => (
-                      <div key={t.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-zinc-700/20">
+                      <div key={t.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-[rgba(255,255,255,0.07)]/20">
                         <div className="flex items-center gap-3">
                           <span className="text-base">{CATEGORY_ICONS[t.category] || "📎"}</span>
                           <div>
-                            <p className="text-sm text-zinc-200">{t.description}</p>
-                            <p className="text-xs text-zinc-600">{t.category} &middot; {formatDate(t.date)}</p>
+                            <p className="text-sm text-[rgba(255,255,255,0.85)]">{t.description}</p>
+                            <p className="text-xs text-[rgba(255,255,255,0.3)]">{t.category} &middot; {formatDate(t.date)}</p>
                           </div>
                         </div>
                         <span className={`text-sm font-semibold ${t.type === "income" ? "text-emerald-400" : "text-red-400"}`}>
@@ -554,11 +554,11 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
 
             {/* Add Transaction Form */}
             {showTxnForm && (
-              <div className="bg-zinc-800/60 rounded-xl p-5 border border-zinc-700/30 space-y-4">
-                <h3 className="text-sm font-semibold text-zinc-300">New Transaction</h3>
+              <div className="bg-[rgba(255,255,255,0.04)]/60 rounded-xl p-5 border border-[rgba(255,255,255,0.1)]/30 space-y-4">
+                <h3 className="text-sm font-semibold text-[rgba(255,255,255,0.7)]">New Transaction</h3>
                 <div className="grid grid-cols-4 gap-3">
                   <div>
-                    <label className="text-xs text-zinc-500 mb-1 block">Type</label>
+                    <label className="text-xs text-[rgba(255,255,255,0.4)] mb-1 block">Type</label>
                     <select value={txnType} onChange={(e) => setTxnType(e.target.value as Transaction["type"])} className={inputCls}>
                       {TRANSACTION_TYPES.map((t) => (
                         <option key={t.value} value={t.value}>{t.label}</option>
@@ -566,7 +566,7 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-zinc-500 mb-1 block">Amount ($)</label>
+                    <label className="text-xs text-[rgba(255,255,255,0.4)] mb-1 block">Amount ($)</label>
                     <input
                       type="number"
                       step="0.01"
@@ -578,7 +578,7 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-zinc-500 mb-1 block">Category</label>
+                    <label className="text-xs text-[rgba(255,255,255,0.4)] mb-1 block">Category</label>
                     <select value={txnCategory} onChange={(e) => setTxnCategory(e.target.value)} className={inputCls}>
                       {EXPENSE_CATEGORIES.map((c) => (
                         <option key={c} value={c}>{CATEGORY_ICONS[c]} {c}</option>
@@ -586,13 +586,13 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-zinc-500 mb-1 block">Date</label>
+                    <label className="text-xs text-[rgba(255,255,255,0.4)] mb-1 block">Date</label>
                     <input type="date" value={txnDate} onChange={(e) => setTxnDate(e.target.value)} className={inputCls} />
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-2">
-                    <label className="text-xs text-zinc-500 mb-1 block">Description</label>
+                    <label className="text-xs text-[rgba(255,255,255,0.4)] mb-1 block">Description</label>
                     <input
                       type="text"
                       placeholder="What was this for?"
@@ -602,12 +602,12 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
                     />
                   </div>
                   <div className="flex items-end gap-3">
-                    <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer">
+                    <label className="flex items-center gap-2 text-xs text-[rgba(255,255,255,0.5)] cursor-pointer">
                       <input
                         type="checkbox"
                         checked={txnRecurring}
                         onChange={(e) => setTxnRecurring(e.target.checked)}
-                        className="rounded border-zinc-600"
+                        className="rounded border-[rgba(255,255,255,0.15)]"
                       />
                       Recurring
                     </label>
@@ -629,10 +629,10 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
             )}
 
             {/* Transaction List */}
-            <div className="bg-zinc-800/40 rounded-xl border border-zinc-700/30 overflow-hidden">
+            <div className="bg-[rgba(255,255,255,0.04)]/40 rounded-xl border border-[rgba(255,255,255,0.1)]/30 overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-zinc-500 text-xs border-b border-zinc-700/30">
+                  <tr className="text-left text-[rgba(255,255,255,0.4)] text-xs border-b border-[rgba(255,255,255,0.1)]/30">
                     <th className="px-4 py-3">Date</th>
                     <th className="px-4 py-3">Type</th>
                     <th className="px-4 py-3">Category</th>
@@ -644,14 +644,14 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
                 <tbody>
                   {filteredTransactions.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-12 text-zinc-600">
+                      <td colSpan={6} className="text-center py-12 text-[rgba(255,255,255,0.3)]">
                         No transactions found. {!showTxnForm && "Click '+ Add Transaction' to get started."}
                       </td>
                     </tr>
                   ) : (
                     filteredTransactions.slice(0, 100).map((t) => (
-                      <tr key={t.id} className="border-b border-zinc-800/40 hover:bg-zinc-800/30">
-                        <td className="px-4 py-2.5 text-zinc-400">{formatDate(t.date)}</td>
+                      <tr key={t.id} className="border-b border-[rgba(255,255,255,0.07)]/40 hover:bg-[rgba(255,255,255,0.04)]/30">
+                        <td className="px-4 py-2.5 text-[rgba(255,255,255,0.5)]">{formatDate(t.date)}</td>
                         <td className="px-4 py-2.5">
                           <span className={`text-xs px-2 py-0.5 rounded-full ${
                             t.type === "income"
@@ -665,15 +665,15 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
                             {t.type}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5 text-zinc-300">
+                        <td className="px-4 py-2.5 text-[rgba(255,255,255,0.7)]">
                           {CATEGORY_ICONS[t.category] || "📎"} {t.category}
                         </td>
-                        <td className="px-4 py-2.5 text-zinc-300 max-w-[200px] truncate">{t.description}</td>
+                        <td className="px-4 py-2.5 text-[rgba(255,255,255,0.7)] max-w-[200px] truncate">{t.description}</td>
                         <td className={`px-4 py-2.5 text-right font-medium ${t.type === "income" ? "text-emerald-400" : "text-red-400"}`}>
                           {t.type === "income" ? "+" : "-"}{formatCurrency(t.amount)}
                         </td>
                         <td className="px-4 py-2.5 text-center">
-                          <button onClick={() => deleteTransaction(t.id)} className="text-zinc-600 hover:text-red-400 transition-colors text-xs">
+                          <button onClick={() => deleteTransaction(t.id)} className="text-[rgba(255,255,255,0.3)] hover:text-red-400 transition-colors text-xs">
                             Delete
                           </button>
                         </td>
@@ -683,7 +683,7 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
                 </tbody>
               </table>
               {filteredTransactions.length > 100 && (
-                <p className="text-xs text-zinc-600 text-center py-2">Showing 100 of {filteredTransactions.length} transactions</p>
+                <p className="text-xs text-[rgba(255,255,255,0.3)] text-center py-2">Showing 100 of {filteredTransactions.length} transactions</p>
               )}
             </div>
           </>
@@ -693,25 +693,25 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
         {tab === "budgets" && (
           <>
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-zinc-300">Budget Tracker</h2>
+              <h2 className="text-sm font-semibold text-[rgba(255,255,255,0.7)]">Budget Tracker</h2>
               <button onClick={() => setShowBudgetForm(true)} className={btnPrimary}>+ New Budget</button>
             </div>
 
             {/* Add Budget Form */}
             {showBudgetForm && (
-              <div className="bg-zinc-800/60 rounded-xl p-5 border border-zinc-700/30 space-y-4">
-                <h3 className="text-sm font-semibold text-zinc-300">Create Budget</h3>
+              <div className="bg-[rgba(255,255,255,0.04)]/60 rounded-xl p-5 border border-[rgba(255,255,255,0.1)]/30 space-y-4">
+                <h3 className="text-sm font-semibold text-[rgba(255,255,255,0.7)]">Create Budget</h3>
                 <div className="grid grid-cols-4 gap-3">
                   <div>
-                    <label className="text-xs text-zinc-500 mb-1 block">Name</label>
+                    <label className="text-xs text-[rgba(255,255,255,0.4)] mb-1 block">Name</label>
                     <input type="text" placeholder="e.g. AI Spending" value={budgetName} onChange={(e) => setBudgetName(e.target.value)} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-xs text-zinc-500 mb-1 block">Amount ($)</label>
+                    <label className="text-xs text-[rgba(255,255,255,0.4)] mb-1 block">Amount ($)</label>
                     <input type="number" step="1" min="0" placeholder="500" value={budgetAmount} onChange={(e) => setBudgetAmount(e.target.value)} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-xs text-zinc-500 mb-1 block">Period</label>
+                    <label className="text-xs text-[rgba(255,255,255,0.4)] mb-1 block">Period</label>
                     <select value={budgetPeriod} onChange={(e) => setBudgetPeriod(e.target.value as Budget["period"])} className={inputCls}>
                       <option value="monthly">Monthly</option>
                       <option value="quarterly">Quarterly</option>
@@ -719,7 +719,7 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-zinc-500 mb-1 block">Category</label>
+                    <label className="text-xs text-[rgba(255,255,255,0.4)] mb-1 block">Category</label>
                     <select value={budgetCategory} onChange={(e) => setBudgetCategory(e.target.value)} className={inputCls}>
                       {EXPENSE_CATEGORIES.map((c) => (
                         <option key={c} value={c}>{c}</option>
@@ -736,7 +736,7 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
 
             {/* Budget Cards */}
             {budgets.length === 0 && !showBudgetForm ? (
-              <div className="text-center py-16 text-zinc-600">
+              <div className="text-center py-16 text-[rgba(255,255,255,0.3)]">
                 <p className="text-4xl mb-3">🎯</p>
                 <p className="text-sm">No budgets set. Create one to start tracking spending limits.</p>
               </div>
@@ -747,26 +747,26 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
                   const barColor = utilization >= 100 ? "bg-red-500" : utilization >= 80 ? "bg-amber-500" : "bg-emerald-500";
                   const textColor = utilization >= 100 ? "text-red-400" : utilization >= 80 ? "text-amber-400" : "text-emerald-400";
                   return (
-                    <div key={b.id} className="bg-zinc-800/40 rounded-xl p-5 border border-zinc-700/30">
+                    <div key={b.id} className="bg-[rgba(255,255,255,0.04)]/40 rounded-xl p-5 border border-[rgba(255,255,255,0.1)]/30">
                       <div className="flex items-start justify-between mb-3">
                         <div>
-                          <h4 className="text-sm font-semibold text-zinc-200">{b.name}</h4>
-                          <p className="text-xs text-zinc-500">{CATEGORY_ICONS[b.category]} {b.category} &middot; {b.period}</p>
+                          <h4 className="text-sm font-semibold text-[rgba(255,255,255,0.85)]">{b.name}</h4>
+                          <p className="text-xs text-[rgba(255,255,255,0.4)]">{CATEGORY_ICONS[b.category]} {b.category} &middot; {b.period}</p>
                         </div>
-                        <button onClick={() => deleteBudget(b.id)} className="text-zinc-700 hover:text-red-400 transition-colors text-xs">
+                        <button onClick={() => deleteBudget(b.id)} className="text-[rgba(255,255,255,0.2)] hover:text-red-400 transition-colors text-xs">
                           Remove
                         </button>
                       </div>
                       <div className="flex items-end justify-between mb-2">
-                        <span className="text-lg font-bold text-zinc-200">{formatCurrency(b.spent)}</span>
-                        <span className="text-xs text-zinc-500">of {formatCurrency(b.amount)}</span>
+                        <span className="text-lg font-bold text-[rgba(255,255,255,0.85)]">{formatCurrency(b.spent)}</span>
+                        <span className="text-xs text-[rgba(255,255,255,0.4)]">of {formatCurrency(b.amount)}</span>
                       </div>
-                      <div className="h-2.5 bg-zinc-700/40 rounded-full overflow-hidden mb-2">
+                      <div className="h-2.5 bg-[rgba(255,255,255,0.07)]/40 rounded-full overflow-hidden mb-2">
                         <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${clamp(utilization, 0, 100)}%` }} />
                       </div>
                       <div className="flex justify-between text-xs">
                         <span className={textColor}>{utilization.toFixed(0)}% used</span>
-                        <span className="text-zinc-500">{formatCurrency(b.remaining)} remaining</span>
+                        <span className="text-[rgba(255,255,255,0.4)]">{formatCurrency(b.remaining)} remaining</span>
                       </div>
                     </div>
                   );
@@ -780,32 +780,32 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
         {tab === "invoices" && (
           <>
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-zinc-300">Invoices</h2>
+              <h2 className="text-sm font-semibold text-[rgba(255,255,255,0.7)]">Invoices</h2>
               <button onClick={() => setShowInvForm(true)} className={btnPrimary}>+ Create Invoice</button>
             </div>
 
             {/* Create Invoice Form */}
             {showInvForm && (
-              <div className="bg-zinc-800/60 rounded-xl p-5 border border-zinc-700/30 space-y-4">
-                <h3 className="text-sm font-semibold text-zinc-300">New Invoice</h3>
+              <div className="bg-[rgba(255,255,255,0.04)]/60 rounded-xl p-5 border border-[rgba(255,255,255,0.1)]/30 space-y-4">
+                <h3 className="text-sm font-semibold text-[rgba(255,255,255,0.7)]">New Invoice</h3>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="text-xs text-zinc-500 mb-1 block">Client Name</label>
+                    <label className="text-xs text-[rgba(255,255,255,0.4)] mb-1 block">Client Name</label>
                     <input type="text" placeholder="Acme Corp" value={invClient} onChange={(e) => setInvClient(e.target.value)} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-xs text-zinc-500 mb-1 block">Tax Rate (%)</label>
+                    <label className="text-xs text-[rgba(255,255,255,0.4)] mb-1 block">Tax Rate (%)</label>
                     <input type="number" step="0.5" min="0" value={invTax} onChange={(e) => setInvTax(e.target.value)} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-xs text-zinc-500 mb-1 block">Due In (days)</label>
+                    <label className="text-xs text-[rgba(255,255,255,0.4)] mb-1 block">Due In (days)</label>
                     <input type="number" step="1" min="1" value={invDueDays} onChange={(e) => setInvDueDays(e.target.value)} className={inputCls} />
                   </div>
                 </div>
 
                 {/* Line Items */}
                 <div>
-                  <label className="text-xs text-zinc-500 mb-2 block">Line Items</label>
+                  <label className="text-xs text-[rgba(255,255,255,0.4)] mb-2 block">Line Items</label>
                   <div className="space-y-2">
                     {invItems.map((item, i) => (
                       <div key={i} className="grid grid-cols-12 gap-2 items-center">
@@ -831,11 +831,11 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
                           onChange={(e) => handleUpdateInvoiceItem(i, "rate", e.target.value)}
                           className={inputCls + " col-span-2"}
                         />
-                        <span className="col-span-2 text-sm text-zinc-400 text-right">{formatCurrency(item.amount)}</span>
+                        <span className="col-span-2 text-sm text-[rgba(255,255,255,0.5)] text-right">{formatCurrency(item.amount)}</span>
                         {invItems.length > 1 && (
                           <button
                             onClick={() => setInvItems((prev) => prev.filter((_, j) => j !== i))}
-                            className="col-span-1 text-zinc-600 hover:text-red-400 text-xs"
+                            className="col-span-1 text-[rgba(255,255,255,0.3)] hover:text-red-400 text-xs"
                           >
                             X
                           </button>
@@ -851,7 +851,7 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-500 mb-1 block">Notes</label>
+                  <label className="text-xs text-[rgba(255,255,255,0.4)] mb-1 block">Notes</label>
                   <textarea
                     placeholder="Payment terms, thank you note, etc."
                     value={invNotes}
@@ -861,7 +861,7 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
                   />
                 </div>
                 <div className="flex items-center justify-between">
-                  <div className="text-sm text-zinc-400">
+                  <div className="text-sm text-[rgba(255,255,255,0.5)]">
                     Subtotal: {formatCurrency(invItems.reduce((s, it) => s + it.amount, 0))}
                     {parseFloat(invTax) > 0 && (
                       <span className="ml-3">
@@ -880,17 +880,17 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
             {/* Invoice Preview Modal */}
             {previewInvoice && (
               <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-8">
-                <div className="bg-zinc-900 rounded-2xl border border-zinc-700/50 max-w-2xl w-full max-h-[80vh] overflow-y-auto p-8">
+                <div className="bg-[#0a0a0f] rounded-2xl border border-[rgba(255,255,255,0.1)]/50 max-w-2xl w-full max-h-[80vh] overflow-y-auto p-8">
                   <div className="flex justify-between items-start mb-6">
                     <div>
-                      <h2 className="text-xl font-bold text-zinc-100">Invoice {previewInvoice.number}</h2>
-                      <p className="text-sm text-zinc-500">Client: {previewInvoice.client}</p>
+                      <h2 className="text-xl font-bold text-white">Invoice {previewInvoice.number}</h2>
+                      <p className="text-sm text-[rgba(255,255,255,0.4)]">Client: {previewInvoice.client}</p>
                     </div>
-                    <button onClick={() => setPreviewInvoice(null)} className="text-zinc-500 hover:text-zinc-300 text-lg">&times;</button>
+                    <button onClick={() => setPreviewInvoice(null)} className="text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] text-lg">&times;</button>
                   </div>
                   <table className="w-full text-sm mb-4">
                     <thead>
-                      <tr className="border-b border-zinc-700/40 text-zinc-500 text-xs">
+                      <tr className="border-b border-[rgba(255,255,255,0.1)]/40 text-[rgba(255,255,255,0.4)] text-xs">
                         <th className="py-2 text-left">Description</th>
                         <th className="py-2 text-right">Qty</th>
                         <th className="py-2 text-right">Rate</th>
@@ -899,24 +899,24 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
                     </thead>
                     <tbody>
                       {previewInvoice.items.map((it, i) => (
-                        <tr key={i} className="border-b border-zinc-800/40">
-                          <td className="py-2 text-zinc-300">{it.description}</td>
-                          <td className="py-2 text-right text-zinc-400">{it.quantity}</td>
-                          <td className="py-2 text-right text-zinc-400">{formatCurrency(it.rate)}</td>
-                          <td className="py-2 text-right text-zinc-200">{formatCurrency(it.amount)}</td>
+                        <tr key={i} className="border-b border-[rgba(255,255,255,0.07)]/40">
+                          <td className="py-2 text-[rgba(255,255,255,0.7)]">{it.description}</td>
+                          <td className="py-2 text-right text-[rgba(255,255,255,0.5)]">{it.quantity}</td>
+                          <td className="py-2 text-right text-[rgba(255,255,255,0.5)]">{formatCurrency(it.rate)}</td>
+                          <td className="py-2 text-right text-[rgba(255,255,255,0.85)]">{formatCurrency(it.amount)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                   <div className="text-right space-y-1 mb-4">
-                    <p className="text-sm text-zinc-500">Subtotal: {formatCurrency(previewInvoice.subtotal)}</p>
-                    <p className="text-sm text-zinc-500">Tax: {formatCurrency(previewInvoice.tax)}</p>
-                    <p className="text-lg font-bold text-zinc-100 border-t border-zinc-700/40 pt-2">
+                    <p className="text-sm text-[rgba(255,255,255,0.4)]">Subtotal: {formatCurrency(previewInvoice.subtotal)}</p>
+                    <p className="text-sm text-[rgba(255,255,255,0.4)]">Tax: {formatCurrency(previewInvoice.tax)}</p>
+                    <p className="text-lg font-bold text-white border-t border-[rgba(255,255,255,0.1)]/40 pt-2">
                       Total: {formatCurrency(previewInvoice.total)}
                     </p>
                   </div>
                   {previewInvoice.notes && (
-                    <div className="bg-zinc-800/40 rounded-lg p-3 text-sm text-zinc-400 mb-4">{previewInvoice.notes}</div>
+                    <div className="bg-[rgba(255,255,255,0.04)]/40 rounded-lg p-3 text-sm text-[rgba(255,255,255,0.5)] mb-4">{previewInvoice.notes}</div>
                   )}
                   <div className="flex gap-2 justify-end">
                     <button onClick={() => setPreviewInvoice(null)} className={btnSecondary}>Close</button>
@@ -928,7 +928,7 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
 
             {/* Invoice List */}
             {invoices.length === 0 && !showInvForm ? (
-              <div className="text-center py-16 text-zinc-600">
+              <div className="text-center py-16 text-[rgba(255,255,255,0.3)]">
                 <p className="text-4xl mb-3">📄</p>
                 <p className="text-sm">No invoices yet. Create one to bill your clients professionally.</p>
               </div>
@@ -937,23 +937,23 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
                 {invoices
                   .sort((a, b) => b.createdAt - a.createdAt)
                   .map((inv) => (
-                    <div key={inv.id} className="bg-zinc-800/40 rounded-xl p-4 border border-zinc-700/30 flex items-center justify-between">
+                    <div key={inv.id} className="bg-[rgba(255,255,255,0.04)]/40 rounded-xl p-4 border border-[rgba(255,255,255,0.1)]/30 flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         <div className={`px-2.5 py-1 rounded-lg border text-xs font-semibold ${STATUS_BG[inv.status]}`}>
                           <span className={INVOICE_STATUSES.find((s) => s.value === inv.status)?.color}>{inv.status.toUpperCase()}</span>
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-zinc-200">{inv.number}</p>
-                          <p className="text-xs text-zinc-500">{inv.client} &middot; Due {formatDate(inv.dueDate)}</p>
+                          <p className="text-sm font-semibold text-[rgba(255,255,255,0.85)]">{inv.number}</p>
+                          <p className="text-xs text-[rgba(255,255,255,0.4)]">{inv.client} &middot; Due {formatDate(inv.dueDate)}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
-                        <span className="text-lg font-bold text-zinc-200">{formatCurrency(inv.total)}</span>
+                        <span className="text-lg font-bold text-[rgba(255,255,255,0.85)]">{formatCurrency(inv.total)}</span>
                         <div className="flex gap-1">
                           <button onClick={() => setPreviewInvoice(inv)} className="text-xs text-blue-400 hover:text-blue-300 px-2 py-1">
                             Preview
                           </button>
-                          <button onClick={() => handlePrintInvoice(inv)} className="text-xs text-zinc-500 hover:text-zinc-300 px-2 py-1">
+                          <button onClick={() => handlePrintInvoice(inv)} className="text-xs text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] px-2 py-1">
                             Print
                           </button>
                           {inv.status === "draft" && (
@@ -972,7 +972,7 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
                               Mark Paid
                             </button>
                           )}
-                          <button onClick={() => deleteInvoice(inv.id)} className="text-xs text-zinc-700 hover:text-red-400 px-2 py-1">
+                          <button onClick={() => deleteInvoice(inv.id)} className="text-xs text-[rgba(255,255,255,0.2)] hover:text-red-400 px-2 py-1">
                             Delete
                           </button>
                         </div>

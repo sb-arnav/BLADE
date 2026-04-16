@@ -57,7 +57,7 @@ function MetricDot({ val, max, label }: { val: number; max: number; label: strin
   return (
     <div className="flex flex-col items-center gap-1">
       <div className={`w-3 h-3 rounded-full ${dotColor(val, max)}`} title={`${label}: ${val}`} />
-      <span className="text-xs text-gray-600">{label[0]}</span>
+      <span className="text-xs text-[rgba(255,255,255,0.3)]">{label[0]}</span>
     </div>
   );
 }
@@ -69,7 +69,7 @@ function Slider({ label, min, max, step = 1, value, onChange, emoji }: {
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
-        <label className="text-xs text-gray-500">{label}</label>
+        <label className="text-xs text-[rgba(255,255,255,0.4)]">{label}</label>
         <span className="text-xs text-green-400 font-bold">
           {emoji || ""} {value}
         </span>
@@ -81,9 +81,9 @@ function Slider({ label, min, max, step = 1, value, onChange, emoji }: {
         step={step}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="w-full h-1.5 bg-gray-800 rounded-full appearance-none cursor-pointer accent-green-500"
+        className="w-full h-1.5 bg-[rgba(255,255,255,0.04)] rounded-full appearance-none cursor-pointer accent-green-500"
       />
-      <div className="flex justify-between text-xs text-gray-700">
+      <div className="flex justify-between text-xs text-[rgba(255,255,255,0.2)]">
         <span>{min}</span>
         <span>{max}</span>
       </div>
@@ -96,7 +96,7 @@ function InsightCard({ insight }: { insight: HealthInsight }) {
     sleep_debt: "border-red-700 bg-red-900/20 text-red-300",
     exercise_streak: "border-green-700 bg-green-900/20 text-green-300",
     correlation: "border-blue-700 bg-blue-900/20 text-blue-300",
-    general: "border-gray-600 bg-gray-800/40 text-gray-300",
+    general: "border-[rgba(255,255,255,0.15)] bg-[rgba(255,255,255,0.04)]/40 text-[rgba(255,255,255,0.7)]",
   };
   const cls = colors[insight.type] || colors.general;
   return (
@@ -104,7 +104,7 @@ function InsightCard({ insight }: { insight: HealthInsight }) {
       <div className="flex items-center gap-2">
         <span className="text-xs font-bold uppercase tracking-wider">{insight.type.replace("_", " ")}</span>
       </div>
-      <p className="text-xs font-semibold text-gray-100">{insight.title}</p>
+      <p className="text-xs font-semibold text-white">{insight.title}</p>
       <p className="text-xs opacity-80">{insight.content}</p>
       {insight.recommendation && (
         <p className="text-xs italic opacity-60 mt-1">{insight.recommendation}</p>
@@ -224,10 +224,10 @@ export function HealthView({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-black text-gray-200 font-mono overflow-y-auto">
+    <div className="flex flex-col h-full bg-black text-[rgba(255,255,255,0.85)] font-mono overflow-y-auto">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-700 bg-black sticky top-0 z-10">
-        <button onClick={onBack} className="text-gray-500 hover:text-green-400 transition-colors">
+      <div className="flex items-center gap-3 px-4 py-2 border-b border-[rgba(255,255,255,0.1)] bg-black sticky top-0 z-10">
+        <button onClick={onBack} className="text-[rgba(255,255,255,0.4)] hover:text-green-400 transition-colors">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -242,7 +242,7 @@ export function HealthView({ onBack }: { onBack: () => void }) {
 
       <div className="p-4 space-y-4 max-w-3xl mx-auto w-full">
         {/* Today's Log */}
-        <div className="border border-gray-700 rounded bg-gray-900/40 p-4 space-y-4">
+        <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/40 p-4 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-bold text-green-400 uppercase tracking-widest">Today — {today}</h2>
             <div className="flex items-center gap-2">
@@ -288,20 +288,20 @@ export function HealthView({ onBack }: { onBack: () => void }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-xs text-gray-500">Exercise Minutes</label>
+              <label className="text-xs text-[rgba(255,255,255,0.4)]">Exercise Minutes</label>
               <input
                 type="number"
                 min={0}
-                className="w-full bg-black border border-gray-700 rounded px-2 py-1.5 text-sm text-gray-100 focus:outline-none focus:border-green-700"
+                className="w-full bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-green-700"
                 value={log.exercise_minutes}
                 onChange={(e) => setLog({ ...log, exercise_minutes: parseInt(e.target.value) || 0 })}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-gray-500">Exercise Type</label>
+              <label className="text-xs text-[rgba(255,255,255,0.4)]">Exercise Type</label>
               <input
                 type="text"
-                className="w-full bg-black border border-gray-700 rounded px-2 py-1.5 text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-green-700"
+                className="w-full bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-green-700"
                 placeholder="run, gym, walk..."
                 value={log.exercise_type}
                 onChange={(e) => setLog({ ...log, exercise_type: e.target.value })}
@@ -312,16 +312,16 @@ export function HealthView({ onBack }: { onBack: () => void }) {
           {/* Water glasses */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-xs text-gray-500">Water Glasses</label>
+              <label className="text-xs text-[rgba(255,255,255,0.4)]">Water Glasses</label>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setLog({ ...log, water_glasses: Math.max(0, log.water_glasses - 1) })}
-                  className="w-6 h-6 text-xs border border-gray-700 rounded text-gray-400 hover:text-gray-200 transition-colors"
+                  className="w-6 h-6 text-xs border border-[rgba(255,255,255,0.1)] rounded text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] transition-colors"
                 >-</button>
                 <span className="text-sm font-bold text-blue-300 w-6 text-center">{log.water_glasses}</span>
                 <button
                   onClick={() => setLog({ ...log, water_glasses: Math.min(15, log.water_glasses + 1) })}
-                  className="w-6 h-6 text-xs border border-gray-700 rounded text-gray-400 hover:text-gray-200 transition-colors"
+                  className="w-6 h-6 text-xs border border-[rgba(255,255,255,0.1)] rounded text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] transition-colors"
                 >+</button>
               </div>
             </div>
@@ -330,16 +330,16 @@ export function HealthView({ onBack }: { onBack: () => void }) {
                 <div
                   key={i}
                   onClick={() => setLog({ ...log, water_glasses: i + 1 })}
-                  className={`flex-1 h-3 rounded-sm cursor-pointer transition-colors ${i < log.water_glasses ? "bg-blue-600" : "bg-gray-800 hover:bg-gray-700"}`}
+                  className={`flex-1 h-3 rounded-sm cursor-pointer transition-colors ${i < log.water_glasses ? "bg-blue-600" : "bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.07)]"}`}
                 />
               ))}
             </div>
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs text-gray-500">Notes</label>
+            <label className="text-xs text-[rgba(255,255,255,0.4)]">Notes</label>
             <textarea
-              className="w-full bg-black border border-gray-700 rounded px-2 py-2 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-green-700 resize-none"
+              className="w-full bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-2 text-xs text-[rgba(255,255,255,0.7)] placeholder-gray-600 focus:outline-none focus:border-green-700 resize-none"
               rows={2}
               placeholder="Anything noteworthy today..."
               value={log.notes}
@@ -349,7 +349,7 @@ export function HealthView({ onBack }: { onBack: () => void }) {
         </div>
 
         {/* Week View */}
-        <div className="border border-gray-700 rounded bg-gray-900/40 p-4">
+        <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/40 p-4">
           <h2 className="text-xs font-bold text-green-400 uppercase tracking-widest mb-3">7-Day Overview</h2>
           <div className="grid grid-cols-7 gap-2">
             {last7Days.map((date) => {
@@ -357,7 +357,7 @@ export function HealthView({ onBack }: { onBack: () => void }) {
               const label = new Date(date).toLocaleDateString("en", { weekday: "short" }).slice(0, 2);
               return (
                 <div key={date} className="flex flex-col items-center gap-1.5">
-                  <span className="text-xs text-gray-600">{label}</span>
+                  <span className="text-xs text-[rgba(255,255,255,0.3)]">{label}</span>
                   {dayLog ? (
                     <>
                       <MetricDot val={dayLog.sleep_hours} max={9} label="Sleep" />
@@ -369,17 +369,17 @@ export function HealthView({ onBack }: { onBack: () => void }) {
                     </>
                   ) : (
                     <>
-                      <div className="w-3 h-3 rounded-full bg-gray-800" />
-                      <div className="w-3 h-3 rounded-full bg-gray-800" />
-                      <div className="w-3 h-3 rounded-full bg-gray-800" />
+                      <div className="w-3 h-3 rounded-full bg-[rgba(255,255,255,0.04)]" />
+                      <div className="w-3 h-3 rounded-full bg-[rgba(255,255,255,0.04)]" />
+                      <div className="w-3 h-3 rounded-full bg-[rgba(255,255,255,0.04)]" />
                     </>
                   )}
-                  <span className="text-xs text-gray-700">{date.slice(5)}</span>
+                  <span className="text-xs text-[rgba(255,255,255,0.2)]">{date.slice(5)}</span>
                 </div>
               );
             })}
           </div>
-          <div className="flex gap-3 mt-3 text-xs text-gray-600">
+          <div className="flex gap-3 mt-3 text-xs text-[rgba(255,255,255,0.3)]">
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" />Good</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />OK</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" />Low</span>
@@ -389,7 +389,7 @@ export function HealthView({ onBack }: { onBack: () => void }) {
 
         {/* Stats */}
         {stats && (
-          <div className="border border-gray-700 rounded bg-gray-900/40 p-4">
+          <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/40 p-4">
             <h2 className="text-xs font-bold text-green-400 uppercase tracking-widest mb-3">This Week Stats</h2>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
@@ -398,8 +398,8 @@ export function HealthView({ onBack }: { onBack: () => void }) {
                 { label: "Avg Mood", value: `${stats.avg_mood.toFixed(1)}/10`, color: "text-pink-300" },
                 { label: "Exercise Days", value: `${stats.exercise_days}/7`, color: "text-green-300" },
               ].map((s) => (
-                <div key={s.label} className="bg-black border border-gray-800 rounded p-2 text-center">
-                  <p className="text-xs text-gray-500">{s.label}</p>
+                <div key={s.label} className="bg-black border border-[rgba(255,255,255,0.07)] rounded p-2 text-center">
+                  <p className="text-xs text-[rgba(255,255,255,0.4)]">{s.label}</p>
                   <p className={`text-base font-bold ${s.color}`}>{s.value}</p>
                 </div>
               ))}
@@ -414,24 +414,24 @@ export function HealthView({ onBack }: { onBack: () => void }) {
 
         {/* Streak info */}
         {streakInfo && (
-          <div className="border border-gray-700 rounded bg-gray-900/40 p-3 flex items-center gap-4 flex-wrap">
+          <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/40 p-3 flex items-center gap-4 flex-wrap">
             <div className="flex items-center gap-2">
               <span className="text-lg">🔥</span>
               <div>
-                <p className="text-xs text-gray-500">Exercise Streak</p>
+                <p className="text-xs text-[rgba(255,255,255,0.4)]">Exercise Streak</p>
                 <p className="text-base font-bold text-green-400">{streakInfo.exercise_streak} days</p>
               </div>
             </div>
-            <div className="w-px h-8 bg-gray-700" />
+            <div className="w-px h-8 bg-[rgba(255,255,255,0.07)]" />
             <div>
-              <p className="text-xs text-gray-500">Longest Streak</p>
+              <p className="text-xs text-[rgba(255,255,255,0.4)]">Longest Streak</p>
               <p className="text-base font-bold text-amber-400">{streakInfo.longest_streak} days</p>
             </div>
           </div>
         )}
 
         {/* Insights */}
-        <div className="border border-gray-700 rounded bg-gray-900/40 p-4 space-y-3">
+        <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/40 p-4 space-y-3">
           <div className="flex items-center gap-2">
             <h2 className="text-xs font-bold text-green-400 uppercase tracking-widest">AI Insights</h2>
             <div className="flex-1" />
@@ -448,12 +448,12 @@ export function HealthView({ onBack }: { onBack: () => void }) {
               {insights.map((ins, i) => <InsightCard key={i} insight={ins} />)}
             </div>
           ) : (
-            <p className="text-xs text-gray-600 italic">Click Generate to analyze 30 days of health data.</p>
+            <p className="text-xs text-[rgba(255,255,255,0.3)] italic">Click Generate to analyze 30 days of health data.</p>
           )}
         </div>
 
         {/* Productivity Correlation */}
-        <div className="border border-gray-700 rounded bg-gray-900/40 p-4 space-y-3">
+        <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/40 p-4 space-y-3">
           <div className="flex items-center gap-2">
             <h2 className="text-xs font-bold text-blue-400 uppercase tracking-widest">Productivity Correlation</h2>
             <div className="flex-1" />
@@ -466,9 +466,9 @@ export function HealthView({ onBack }: { onBack: () => void }) {
             </button>
           </div>
           {correlationText ? (
-            <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{correlationText}</p>
+            <p className="text-sm text-[rgba(255,255,255,0.7)] leading-relaxed whitespace-pre-wrap">{correlationText}</p>
           ) : (
-            <p className="text-xs text-gray-600 italic">Correlate your health metrics with productivity patterns over the last 30 days.</p>
+            <p className="text-xs text-[rgba(255,255,255,0.3)] italic">Correlate your health metrics with productivity patterns over the last 30 days.</p>
           )}
         </div>
       </div>

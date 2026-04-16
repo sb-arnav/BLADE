@@ -51,7 +51,7 @@ const SERVICES: ServiceConfig[] = [
     name: "GitHub",
     icon: "🐙",
     dataLabel: (s) => s.github_notifications === 0 ? "No notifications" : `${s.github_notifications} notification${s.github_notifications !== 1 ? "s" : ""}`,
-    color: "text-gray-300",
+    color: "text-[rgba(255,255,255,0.7)]",
   },
 ];
 

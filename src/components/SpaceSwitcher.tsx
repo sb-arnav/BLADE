@@ -330,7 +330,7 @@ export function SpaceSwitcher({
                 if (e.key === "Enter") commitRename();
                 if (e.key === "Escape") { setRenaming(null); setRenameValue(""); }
               }}
-              className="w-8 bg-transparent text-[10px] text-zinc-100 text-center outline-none"
+              className="w-8 bg-transparent text-[10px] text-white text-center outline-none"
             />
           ) : (
             <span className="pointer-events-none">{space.icon}</span>
@@ -340,7 +340,7 @@ export function SpaceSwitcher({
         {/* Unread indicator */}
         {unread[space.id] && !isActive && (
           <div
-            className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-zinc-900"
+            className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[rgba(255,255,255,0.1)]"
             style={{ backgroundColor: space.color }}
           />
         )}
@@ -353,17 +353,17 @@ export function SpaceSwitcher({
   return (
     <>
       {/* Vertical sidebar bar */}
-      <div className="w-12 h-full bg-zinc-950 border-r border-zinc-800/60 flex flex-col items-center py-2 gap-1.5 relative shrink-0">
+      <div className="w-12 h-full bg-[#09090b] border-r border-[rgba(255,255,255,0.07)]/60 flex flex-col items-center py-2 gap-1.5 relative shrink-0">
         {/* Active spaces */}
         {activeSpaces.map((space) => renderSpaceIcon(space, space.id === activeSpaceId))}
 
         {/* Separator before archived */}
         {archivedSpaces.length > 0 && (
           <>
-            <div className="w-6 h-px bg-zinc-700/50 my-1" />
+            <div className="w-6 h-px bg-[rgba(255,255,255,0.07)]/50 my-1" />
             <button
               onClick={() => setShowArchived((v) => !v)}
-              className="w-10 h-5 flex items-center justify-center text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors"
+              className="w-10 h-5 flex items-center justify-center text-[10px] text-[rgba(255,255,255,0.3)] hover:text-[rgba(255,255,255,0.5)] transition-colors"
               title={showArchived ? "Hide archived" : `Archived (${archivedSpaces.length})`}
             >
               {showArchived ? "\u{25B4}" : `\u{25BE}${archivedSpaces.length}`}
@@ -383,7 +383,7 @@ export function SpaceSwitcher({
         {/* Create button */}
         <button
           onClick={() => setShowModal(true)}
-          className="w-10 h-10 rounded-2xl flex items-center justify-center text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 hover:rounded-xl transition-all duration-200 mb-1 border border-dashed border-zinc-700/50 hover:border-zinc-600 cursor-pointer"
+          className="w-10 h-10 rounded-2xl flex items-center justify-center text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.85)] hover:bg-[rgba(255,255,255,0.04)] hover:rounded-xl transition-all duration-200 mb-1 border border-dashed border-[rgba(255,255,255,0.1)]/50 hover:border-[rgba(255,255,255,0.15)] cursor-pointer"
           title="Create new space"
         >
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -395,7 +395,7 @@ export function SpaceSwitcher({
       {/* Tooltip */}
       {tooltip && (
         <div
-          className="fixed z-[100] px-2.5 py-1 rounded-md bg-zinc-800 border border-zinc-700/60 text-xs text-zinc-200 whitespace-nowrap shadow-lg pointer-events-none"
+          className="fixed z-[100] px-2.5 py-1 rounded-md bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)]/60 text-xs text-[rgba(255,255,255,0.85)] whitespace-nowrap shadow-lg pointer-events-none"
           style={{ left: 56, top: tooltip.y - 12 }}
         >
           {tooltip.text}
@@ -406,7 +406,7 @@ export function SpaceSwitcher({
       {contextMenu && (
         <div
           ref={contextMenuRef}
-          className="fixed z-[110] bg-zinc-900 border border-zinc-700/60 rounded-lg shadow-2xl py-1 min-w-[160px]"
+          className="fixed z-[110] bg-[#0a0a0f] border border-[rgba(255,255,255,0.1)]/60 rounded-lg shadow-2xl py-1 min-w-[160px]"
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
           {[
@@ -424,7 +424,7 @@ export function SpaceSwitcher({
                 "w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 transition-colors",
                 item.key === "delete"
                   ? "text-red-400 hover:bg-red-500/10"
-                  : "text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100",
+                  : "text-[rgba(255,255,255,0.7)] hover:bg-[rgba(255,255,255,0.04)] hover:text-white",
               ].join(" ")}
             >
               <span className="w-4 text-center">{item.icon}</span>
@@ -444,14 +444,14 @@ export function SpaceSwitcher({
         >
           <div
             ref={modalRef}
-            className="bg-zinc-900 border border-zinc-700/60 rounded-2xl shadow-2xl w-[480px] max-h-[85vh] flex flex-col overflow-hidden"
+            className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.1)]/60 rounded-2xl shadow-2xl w-[480px] max-h-[85vh] flex flex-col overflow-hidden"
           >
             {/* Modal header */}
             <div className="flex items-center justify-between px-5 pt-5 pb-3">
-              <h2 className="text-lg font-semibold text-zinc-100">Create Space</h2>
+              <h2 className="text-lg font-semibold text-white">Create Space</h2>
               <button
                 onClick={() => setShowModal(false)}
-                className="text-zinc-500 hover:text-zinc-300 transition-colors text-lg leading-none"
+                className="text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] transition-colors text-lg leading-none"
               >
                 &times;
               </button>
@@ -464,13 +464,13 @@ export function SpaceSwitcher({
                 <div className="relative">
                   <button
                     onClick={() => setShowEmojiPicker((v) => !v)}
-                    className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl border border-zinc-700/60 hover:border-zinc-600 transition-colors cursor-pointer"
+                    className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl border border-[rgba(255,255,255,0.1)]/60 hover:border-[rgba(255,255,255,0.15)] transition-colors cursor-pointer"
                     style={{ backgroundColor: `${form.color ?? "#71717a"}22` }}
                   >
                     {form.icon}
                   </button>
                   {showEmojiPicker && (
-                    <div className="absolute top-14 left-0 z-20 bg-zinc-800 border border-zinc-700/60 rounded-lg shadow-xl p-2 grid grid-cols-6 gap-1 w-[200px]">
+                    <div className="absolute top-14 left-0 z-20 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)]/60 rounded-lg shadow-xl p-2 grid grid-cols-6 gap-1 w-[200px]">
                       {EMOJI_GRID.map((emoji) => (
                         <button
                           key={emoji}
@@ -478,7 +478,7 @@ export function SpaceSwitcher({
                             setForm((f) => ({ ...f, icon: emoji }));
                             setShowEmojiPicker(false);
                           }}
-                          className="w-7 h-7 flex items-center justify-center rounded hover:bg-zinc-700 transition-colors text-base cursor-pointer"
+                          className="w-7 h-7 flex items-center justify-center rounded hover:bg-[rgba(255,255,255,0.07)] transition-colors text-base cursor-pointer"
                         >
                           {emoji}
                         </button>
@@ -490,7 +490,7 @@ export function SpaceSwitcher({
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   placeholder="Space name"
-                  className="flex-1 bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-zinc-500 transition-colors"
+                  className="flex-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)]/60 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none focus:border-[rgba(255,255,255,0.2)] transition-colors"
                   autoFocus
                   onKeyDown={(e) => { if (e.key === "Enter" && form.name.trim()) handleCreateSubmit(); }}
                 />
@@ -501,16 +501,16 @@ export function SpaceSwitcher({
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 placeholder="Description (optional)"
-                className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-zinc-500 transition-colors"
+                className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)]/60 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none focus:border-[rgba(255,255,255,0.2)] transition-colors"
               />
 
               {/* Type dropdown */}
               <div>
-                <label className="block text-xs text-zinc-500 mb-1.5">Type</label>
+                <label className="block text-xs text-[rgba(255,255,255,0.4)] mb-1.5">Type</label>
                 <select
                   value={form.type}
                   onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as ChatSpace["type"] }))}
-                  className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500 transition-colors"
+                  className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)]/60 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[rgba(255,255,255,0.2)] transition-colors"
                 >
                   {SPACE_TYPE_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -522,7 +522,7 @@ export function SpaceSwitcher({
 
               {/* Color picker */}
               <div>
-                <label className="block text-xs text-zinc-500 mb-1.5">Color</label>
+                <label className="block text-xs text-[rgba(255,255,255,0.4)] mb-1.5">Color</label>
                 <div className="flex items-center gap-2">
                   {COLOR_OPTIONS.map((color) => (
                     <button
@@ -540,34 +540,34 @@ export function SpaceSwitcher({
 
               {/* System prompt */}
               <div>
-                <label className="block text-xs text-zinc-500 mb-1.5">System Prompt (optional)</label>
+                <label className="block text-xs text-[rgba(255,255,255,0.4)] mb-1.5">System Prompt (optional)</label>
                 <textarea
                   value={form.systemPrompt ?? ""}
                   onChange={(e) => setForm((f) => ({ ...f, systemPrompt: e.target.value }))}
                   placeholder="Custom instructions for AI in this space..."
                   rows={3}
-                  className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-zinc-500 transition-colors resize-none"
+                  className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)]/60 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none focus:border-[rgba(255,255,255,0.2)] transition-colors resize-none"
                 />
               </div>
 
               {/* Model / Provider overrides */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-zinc-500 mb-1.5">Model (optional)</label>
+                  <label className="block text-xs text-[rgba(255,255,255,0.4)] mb-1.5">Model (optional)</label>
                   <input
                     value={form.model ?? ""}
                     onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
                     placeholder="e.g. gpt-4o"
-                    className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-zinc-500 transition-colors"
+                    className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)]/60 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none focus:border-[rgba(255,255,255,0.2)] transition-colors"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-zinc-500 mb-1.5">Provider (optional)</label>
+                  <label className="block text-xs text-[rgba(255,255,255,0.4)] mb-1.5">Provider (optional)</label>
                   <input
                     value={form.provider ?? ""}
                     onChange={(e) => setForm((f) => ({ ...f, provider: e.target.value }))}
                     placeholder="e.g. openai"
-                    className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-zinc-500 transition-colors"
+                    className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)]/60 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none focus:border-[rgba(255,255,255,0.2)] transition-colors"
                   />
                 </div>
               </div>
@@ -576,14 +576,14 @@ export function SpaceSwitcher({
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                  className="px-4 py-2 rounded-lg text-sm text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] hover:bg-[rgba(255,255,255,0.04)] transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleCreateSubmit}
                   disabled={!form.name.trim()}
-                  className="px-4 py-2 rounded-lg text-sm font-medium text-zinc-100 bg-accent hover:bg-accent/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-accent hover:bg-accent/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   style={{ backgroundColor: form.color ?? "#71717a" }}
                 >
                   Create Space

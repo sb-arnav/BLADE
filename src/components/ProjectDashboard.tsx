@@ -42,7 +42,7 @@ const FRAMEWORK_BADGES: Record<string, { color: string; icon: string }> = {
   "Svelte":   { color: "bg-orange-500/15 text-orange-400 border-orange-500/30", icon: "S" },
   "Vite":     { color: "bg-violet-500/15 text-violet-400 border-violet-500/30", icon: "\u26A1" },
   "Tauri":    { color: "bg-yellow-500/15 text-yellow-400 border-yellow-500/30", icon: "\uD83E\uDD80" },
-  "Express":  { color: "bg-gray-500/15 text-gray-400 border-gray-500/30",     icon: "E" },
+  "Express":  { color: "bg-[rgba(255,255,255,0.04)]/15 text-[rgba(255,255,255,0.5)] border-[rgba(255,255,255,0.1)]/30",     icon: "E" },
   "Electron": { color: "bg-blue-500/15 text-blue-400 border-blue-500/30",     icon: "e" },
 };
 

@@ -475,15 +475,15 @@ export default function MindMapView({ onBack, onSendToChat }: MindMapViewProps) 
   // ── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-full bg-[#0e0e10] text-zinc-100 select-none overflow-hidden">
+    <div className="flex h-full bg-[#09090b] text-white select-none overflow-hidden">
       {/* ── Sidebar ─────────────────────────────────────────────────────────── */}
       {showSidebar && (
-        <div className="w-56 flex-shrink-0 border-r border-zinc-800 bg-[#111114] flex flex-col">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800">
-            <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Mind Maps</span>
+        <div className="w-56 flex-shrink-0 border-r border-[rgba(255,255,255,0.07)] bg-[#09090b] flex flex-col">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-[rgba(255,255,255,0.07)]">
+            <span className="text-xs font-semibold text-[rgba(255,255,255,0.5)] uppercase tracking-wider">Mind Maps</span>
             <button
               onClick={handleNewMap}
-              className="w-6 h-6 flex items-center justify-center rounded hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors text-lg leading-none"
+              className="w-6 h-6 flex items-center justify-center rounded hover:bg-[rgba(255,255,255,0.07)] text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] transition-colors text-lg leading-none"
               title="New map"
             >
               +
@@ -494,7 +494,7 @@ export default function MindMapView({ onBack, onSendToChat }: MindMapViewProps) 
               <div
                 key={m.id}
                 className={`group flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${
-                  m.id === activeMap?.id ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+                  m.id === activeMap?.id ? "bg-[rgba(255,255,255,0.04)] text-white" : "text-[rgba(255,255,255,0.5)] hover:bg-[rgba(255,255,255,0.04)]/50 hover:text-[rgba(255,255,255,0.85)]"
                 }`}
                 onClick={() => setActiveMap(m.id)}
               >
@@ -505,7 +505,7 @@ export default function MindMapView({ onBack, onSendToChat }: MindMapViewProps) 
                 <span className="text-xs truncate flex-1">{m.title}</span>
                 <button
                   onClick={(e) => { e.stopPropagation(); deleteMap(m.id); }}
-                  className="opacity-0 group-hover:opacity-100 w-4 h-4 flex items-center justify-center text-zinc-500 hover:text-red-400 transition-all text-[10px]"
+                  className="opacity-0 group-hover:opacity-100 w-4 h-4 flex items-center justify-center text-[rgba(255,255,255,0.4)] hover:text-red-400 transition-all text-[10px]"
                   title="Delete map"
                 >
                   x
@@ -513,7 +513,7 @@ export default function MindMapView({ onBack, onSendToChat }: MindMapViewProps) 
               </div>
             ))}
             {maps.length === 0 && (
-              <div className="text-xs text-zinc-600 px-2 py-4 text-center">No maps yet. Create one or generate with AI.</div>
+              <div className="text-xs text-[rgba(255,255,255,0.3)] px-2 py-4 text-center">No maps yet. Create one or generate with AI.</div>
             )}
           </div>
         </div>
@@ -522,21 +522,21 @@ export default function MindMapView({ onBack, onSendToChat }: MindMapViewProps) 
       {/* ── Main area ──────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* ── Header ─────────────────────────────────────────────────────── */}
-        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-zinc-800 bg-[#111114]">
-          <button onClick={onBack} className="text-zinc-400 hover:text-zinc-200 transition-colors text-xs px-2 py-1 rounded hover:bg-zinc-800" title="Back">
+        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[rgba(255,255,255,0.07)] bg-[#09090b]">
+          <button onClick={onBack} className="text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] transition-colors text-xs px-2 py-1 rounded hover:bg-[rgba(255,255,255,0.04)]" title="Back">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
           </button>
-          <button onClick={() => setShowSidebar((s) => !s)} className="text-zinc-500 hover:text-zinc-300 transition-colors px-1" title="Toggle sidebar">
+          <button onClick={() => setShowSidebar((s) => !s)} className="text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] transition-colors px-1" title="Toggle sidebar">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2" d="M4 6h16M4 12h10M4 18h16" /></svg>
           </button>
 
-          <div className="mx-2 h-4 w-px bg-zinc-700" />
+          <div className="mx-2 h-4 w-px bg-[rgba(255,255,255,0.07)]" />
 
           {/* Title */}
           {editingTitle ? (
             <input
               autoFocus
-              className="bg-transparent text-sm font-medium text-zinc-100 border-b border-indigo-500 outline-none px-1 w-48"
+              className="bg-transparent text-sm font-medium text-white border-b border-indigo-500 outline-none px-1 w-48"
               value={titleText}
               onChange={(e) => setTitleText(e.target.value)}
               onBlur={handleTitleCommit}
@@ -544,7 +544,7 @@ export default function MindMapView({ onBack, onSendToChat }: MindMapViewProps) 
             />
           ) : (
             <span
-              className="text-sm font-medium text-zinc-200 cursor-pointer hover:text-white truncate max-w-[200px]"
+              className="text-sm font-medium text-[rgba(255,255,255,0.85)] cursor-pointer hover:text-white truncate max-w-[200px]"
               onDoubleClick={() => { if (activeMap) setEditingTitle(true); }}
               title="Double-click to rename"
             >
@@ -556,38 +556,38 @@ export default function MindMapView({ onBack, onSendToChat }: MindMapViewProps) 
 
           {/* Zoom controls */}
           <div className="flex items-center gap-0.5">
-            <button onClick={handleZoomOut} className="text-zinc-400 hover:text-zinc-200 px-1.5 py-0.5 text-xs rounded hover:bg-zinc-800 transition-colors">-</button>
-            <button onClick={handleZoomReset} className="text-zinc-400 hover:text-zinc-200 px-1.5 py-0.5 text-xs rounded hover:bg-zinc-800 transition-colors min-w-[40px] text-center">
+            <button onClick={handleZoomOut} className="text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] px-1.5 py-0.5 text-xs rounded hover:bg-[rgba(255,255,255,0.04)] transition-colors">-</button>
+            <button onClick={handleZoomReset} className="text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] px-1.5 py-0.5 text-xs rounded hover:bg-[rgba(255,255,255,0.04)] transition-colors min-w-[40px] text-center">
               {Math.round(zoom * 100)}%
             </button>
-            <button onClick={handleZoomIn} className="text-zinc-400 hover:text-zinc-200 px-1.5 py-0.5 text-xs rounded hover:bg-zinc-800 transition-colors">+</button>
+            <button onClick={handleZoomIn} className="text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] px-1.5 py-0.5 text-xs rounded hover:bg-[rgba(255,255,255,0.04)] transition-colors">+</button>
           </div>
 
-          <div className="mx-1 h-4 w-px bg-zinc-700" />
+          <div className="mx-1 h-4 w-px bg-[rgba(255,255,255,0.07)]" />
 
           {/* Layout toggle */}
-          <button onClick={handleToggleLayout} className="text-zinc-400 hover:text-zinc-200 text-xs px-2 py-1 rounded hover:bg-zinc-800 transition-colors" title={`Layout: ${layoutMode}`}>
+          <button onClick={handleToggleLayout} className="text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] text-xs px-2 py-1 rounded hover:bg-[rgba(255,255,255,0.04)] transition-colors" title={`Layout: ${layoutMode}`}>
             {layoutMode === "radial" ? (
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2" strokeWidth="2" /><circle cx="12" cy="12" r="8" strokeWidth="1.5" strokeDasharray="3 3" /></svg>
             ) : (
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2" d="M12 3v6m0 6v6M6 9h12M3 15h6m6 0h6" /></svg>
             )}
           </button>
-          <button onClick={handleAutoLayout} className="text-zinc-400 hover:text-zinc-200 text-xs px-2 py-1 rounded hover:bg-zinc-800 transition-colors" title="Auto-layout">
+          <button onClick={handleAutoLayout} className="text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] text-xs px-2 py-1 rounded hover:bg-[rgba(255,255,255,0.04)] transition-colors" title="Auto-layout">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2" d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" /></svg>
           </button>
 
-          <div className="mx-1 h-4 w-px bg-zinc-700" />
+          <div className="mx-1 h-4 w-px bg-[rgba(255,255,255,0.07)]" />
 
           {/* Export */}
-          <button onClick={handleExportMd} className="text-zinc-400 hover:text-zinc-200 text-xs px-2 py-1 rounded hover:bg-zinc-800 transition-colors" title="Send to chat as markdown">
+          <button onClick={handleExportMd} className="text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] text-xs px-2 py-1 rounded hover:bg-[rgba(255,255,255,0.04)] transition-colors" title="Send to chat as markdown">
             MD
           </button>
-          <button onClick={handleExportJson} className="text-zinc-400 hover:text-zinc-200 text-xs px-2 py-1 rounded hover:bg-zinc-800 transition-colors" title="Copy JSON to clipboard">
+          <button onClick={handleExportJson} className="text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] text-xs px-2 py-1 rounded hover:bg-[rgba(255,255,255,0.04)] transition-colors" title="Copy JSON to clipboard">
             JSON
           </button>
 
-          <div className="mx-1 h-4 w-px bg-zinc-700" />
+          <div className="mx-1 h-4 w-px bg-[rgba(255,255,255,0.07)]" />
 
           {/* Generate */}
           <button
@@ -672,7 +672,7 @@ export default function MindMapView({ onBack, onSendToChat }: MindMapViewProps) 
                           <foreignObject x={-w / 2 + 4} y={-fontSize} width={w - 8} height={fontSize * 2.5}>
                             <input
                               autoFocus
-                              className="w-full bg-transparent text-zinc-100 text-center outline-none border-b border-indigo-500"
+                              className="w-full bg-transparent text-white text-center outline-none border-b border-indigo-500"
                               style={{ fontSize }}
                               value={editText}
                               onChange={(e) => setEditText(e.target.value)}
@@ -706,7 +706,7 @@ export default function MindMapView({ onBack, onSendToChat }: MindMapViewProps) 
 
               {/* ── Minimap ──────────────────────────────────────────────── */}
               <div
-                className="absolute bottom-3 right-3 rounded border border-zinc-700 bg-[#111114cc] backdrop-blur-sm overflow-hidden"
+                className="absolute bottom-3 right-3 rounded border border-[rgba(255,255,255,0.1)] bg-[#111114cc] backdrop-blur-sm overflow-hidden"
                 style={{ width: MINIMAP_W, height: MINIMAP_H }}
               >
                 <svg width={MINIMAP_W} height={MINIMAP_H}>
@@ -749,7 +749,7 @@ export default function MindMapView({ onBack, onSendToChat }: MindMapViewProps) 
               {/* ── Node toolbar (on selection) ──────────────────────────── */}
               {selectedNode && !editingId && (
                 <div
-                  className="absolute flex items-center gap-1 px-2 py-1 rounded-lg border border-zinc-700 bg-[#18181bee] backdrop-blur-sm shadow-xl transition-all duration-200"
+                  className="absolute flex items-center gap-1 px-2 py-1 rounded-lg border border-[rgba(255,255,255,0.1)] bg-[#18181bee] backdrop-blur-sm shadow-xl transition-all duration-200"
                   style={{
                     left: (selectedNode.x * zoom) + panX + (containerRef.current?.clientWidth ?? 0) / 2,
                     top: (selectedNode.y * zoom) + panY + (containerRef.current?.clientHeight ?? 0) / 2 - nodeRadius(selectedNode.size) * zoom - 48,
@@ -767,7 +767,7 @@ export default function MindMapView({ onBack, onSendToChat }: MindMapViewProps) 
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                   </ToolbarBtn>
                   <ToolbarBtn title="Color" onClick={() => setShowColorPicker((s) => !s)}>
-                    <div className="w-3 h-3 rounded-full border border-zinc-500" style={{ backgroundColor: selectedNode.color }} />
+                    <div className="w-3 h-3 rounded-full border border-[rgba(255,255,255,0.2)]" style={{ backgroundColor: selectedNode.color }} />
                   </ToolbarBtn>
                   <ToolbarBtn title="Notes" onClick={handleOpenNotes}>
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
@@ -792,7 +792,7 @@ export default function MindMapView({ onBack, onSendToChat }: MindMapViewProps) 
               {/* ── Color picker popup ───────────────────────────────────── */}
               {showColorPicker && selectedId && (
                 <div
-                  className="absolute z-50 flex gap-1.5 p-2 rounded-lg border border-zinc-700 bg-[#18181b] shadow-xl"
+                  className="absolute z-50 flex gap-1.5 p-2 rounded-lg border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.04)] shadow-xl"
                   style={{
                     left: (selectedNode!.x * zoom) + panX + (containerRef.current?.clientWidth ?? 0) / 2,
                     top: (selectedNode!.y * zoom) + panY + (containerRef.current?.clientHeight ?? 0) / 2 - nodeRadius(selectedNode!.size) * zoom - 88,
@@ -814,14 +814,14 @@ export default function MindMapView({ onBack, onSendToChat }: MindMapViewProps) 
             /* ── Empty state ──────────────────────────────────────────── */
             <div className="flex-1 flex items-center justify-center h-full">
               <div className="text-center space-y-4">
-                <svg className="w-16 h-16 mx-auto text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-16 h-16 mx-auto text-[rgba(255,255,255,0.2)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <circle cx="12" cy="12" r="3" strokeWidth="1.5" />
                   <path strokeWidth="1.5" d="M12 2v4m0 12v4M2 12h4m12 0h4" />
                   <circle cx="12" cy="12" r="9" strokeWidth="1" strokeDasharray="4 4" />
                 </svg>
-                <p className="text-zinc-500 text-sm">No mind map selected</p>
+                <p className="text-[rgba(255,255,255,0.4)] text-sm">No mind map selected</p>
                 <div className="flex gap-2 justify-center">
-                  <button onClick={handleNewMap} className="text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors">
+                  <button onClick={handleNewMap} className="text-xs px-3 py-1.5 rounded bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.07)] text-[rgba(255,255,255,0.7)] transition-colors">
                     New Map
                   </button>
                   <button onClick={() => setShowGenerateModal(true)} className="text-xs px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white transition-colors">
@@ -837,19 +837,19 @@ export default function MindMapView({ onBack, onSendToChat }: MindMapViewProps) 
       {/* ── Generate Map Modal ────────────────────────────────────────────── */}
       {showGenerateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowGenerateModal(false)}>
-          <div className="w-[420px] bg-[#18181b] border border-zinc-700 rounded-xl shadow-2xl p-5" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-sm font-semibold text-zinc-200 mb-3">Generate Mind Map with AI</h3>
-            <p className="text-xs text-zinc-500 mb-3">Describe a topic or idea and AI will create a structured mind map for you.</p>
+          <div className="w-[420px] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded-xl shadow-2xl p-5" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-[rgba(255,255,255,0.85)] mb-3">Generate Mind Map with AI</h3>
+            <p className="text-xs text-[rgba(255,255,255,0.4)] mb-3">Describe a topic or idea and AI will create a structured mind map for you.</p>
             <textarea
               autoFocus
-              className="w-full h-24 rounded-lg bg-[#0e0e10] border border-zinc-700 text-sm text-zinc-200 p-3 outline-none focus:border-indigo-500 resize-none placeholder-zinc-600"
+              className="w-full h-24 rounded-lg bg-[#09090b] border border-[rgba(255,255,255,0.1)] text-sm text-[rgba(255,255,255,0.85)] p-3 outline-none focus:border-indigo-500 resize-none placeholder-zinc-600"
               placeholder="e.g. Machine learning fundamentals and applications..."
               value={generatePrompt}
               onChange={(e) => setGeneratePrompt(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleGenerate(); }}
             />
             <div className="flex justify-end gap-2 mt-3">
-              <button onClick={() => setShowGenerateModal(false)} className="text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 transition-colors">
+              <button onClick={() => setShowGenerateModal(false)} className="text-xs px-3 py-1.5 rounded bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.07)] text-[rgba(255,255,255,0.5)] transition-colors">
                 Cancel
               </button>
               <button onClick={handleGenerate} disabled={!generatePrompt.trim()} className="text-xs px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors">
@@ -863,17 +863,17 @@ export default function MindMapView({ onBack, onSendToChat }: MindMapViewProps) 
       {/* ── Note Editor Modal ─────────────────────────────────────────────── */}
       {showNoteEditor && selectedNode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowNoteEditor(false)}>
-          <div className="w-[400px] bg-[#18181b] border border-zinc-700 rounded-xl shadow-2xl p-5" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-sm font-semibold text-zinc-200 mb-1">Notes: {selectedNode.text}</h3>
+          <div className="w-[400px] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded-xl shadow-2xl p-5" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-[rgba(255,255,255,0.85)] mb-1">Notes: {selectedNode.text}</h3>
             <textarea
               autoFocus
-              className="w-full h-32 mt-2 rounded-lg bg-[#0e0e10] border border-zinc-700 text-sm text-zinc-200 p-3 outline-none focus:border-indigo-500 resize-none placeholder-zinc-600"
+              className="w-full h-32 mt-2 rounded-lg bg-[#09090b] border border-[rgba(255,255,255,0.1)] text-sm text-[rgba(255,255,255,0.85)] p-3 outline-none focus:border-indigo-500 resize-none placeholder-zinc-600"
               placeholder="Add notes about this topic..."
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
             />
             <div className="flex justify-end gap-2 mt-3">
-              <button onClick={() => setShowNoteEditor(false)} className="text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 transition-colors">
+              <button onClick={() => setShowNoteEditor(false)} className="text-xs px-3 py-1.5 rounded bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.07)] text-[rgba(255,255,255,0.5)] transition-colors">
                 Cancel
               </button>
               <button onClick={handleSaveNote} className="text-xs px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white transition-colors">
@@ -894,7 +894,7 @@ function ToolbarBtn({ children, title, onClick }: { children: React.ReactNode; t
     <button
       onClick={onClick}
       title={title}
-      className="w-7 h-7 flex items-center justify-center rounded hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
+      className="w-7 h-7 flex items-center justify-center rounded hover:bg-[rgba(255,255,255,0.07)] text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] transition-colors"
     >
       {children}
     </button>

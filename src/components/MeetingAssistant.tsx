@@ -52,7 +52,7 @@ function statusColor(status: Meeting["status"]): string {
     case "in-progress":
       return "text-emerald-400 bg-emerald-500/15";
     case "completed":
-      return "text-zinc-400 bg-zinc-500/15";
+      return "text-[rgba(255,255,255,0.5)] bg-[rgba(255,255,255,0.04)]/15";
   }
 }
 
@@ -257,25 +257,25 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
       <div className="flex items-center gap-2 mb-4">
         <button
           onClick={() => setView("list")}
-          className="p-1.5 rounded-lg hover:bg-white/5 text-zinc-400"
+          className="p-1.5 rounded-lg hover:bg-white/5 text-[rgba(255,255,255,0.5)]"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <h2 className="text-sm font-semibold text-zinc-200">New Meeting</h2>
+        <h2 className="text-sm font-semibold text-[rgba(255,255,255,0.85)]">New Meeting</h2>
       </div>
 
       {/* Template selector */}
       <div>
-        <label className="block text-xs text-zinc-500 mb-2">Template</label>
+        <label className="block text-xs text-[rgba(255,255,255,0.4)] mb-2">Template</label>
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => { setFormTemplate(""); setFormAgenda(""); }}
             className={`p-2.5 rounded-lg border text-left text-xs transition ${
               !formTemplate
-                ? "border-accent/50 bg-accent/10 text-zinc-200"
-                : "border-white/5 bg-white/[0.02] text-zinc-400 hover:bg-white/5"
+                ? "border-accent/50 bg-accent/10 text-[rgba(255,255,255,0.85)]"
+                : "border-white/5 bg-white/[0.02] text-[rgba(255,255,255,0.5)] hover:bg-white/5"
             }`}
           >
             <span className="mr-1.5">{"\uD83D\uDCC4"}</span> Blank
@@ -286,12 +286,12 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
               onClick={() => handleTemplateSelect(tpl)}
               className={`p-2.5 rounded-lg border text-left text-xs transition ${
                 formTemplate === tpl.id
-                  ? "border-accent/50 bg-accent/10 text-zinc-200"
-                  : "border-white/5 bg-white/[0.02] text-zinc-400 hover:bg-white/5"
+                  ? "border-accent/50 bg-accent/10 text-[rgba(255,255,255,0.85)]"
+                  : "border-white/5 bg-white/[0.02] text-[rgba(255,255,255,0.5)] hover:bg-white/5"
               }`}
             >
               <span className="mr-1.5">{tpl.icon}</span> {tpl.name}
-              <p className="text-[10px] text-zinc-500 mt-0.5 line-clamp-1">{tpl.description}</p>
+              <p className="text-[10px] text-[rgba(255,255,255,0.4)] mt-0.5 line-clamp-1">{tpl.description}</p>
             </button>
           ))}
         </div>
@@ -299,68 +299,68 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
 
       {/* Title */}
       <div>
-        <label className="block text-xs text-zinc-500 mb-1">Title</label>
+        <label className="block text-xs text-[rgba(255,255,255,0.4)] mb-1">Title</label>
         <input
           type="text"
           value={formTitle}
           onChange={(e) => setFormTitle(e.target.value)}
           placeholder="Meeting title..."
-          className="w-full bg-white/[0.03] border border-white/5 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-accent/40"
+          className="w-full bg-white/[0.03] border border-white/5 rounded-lg px-3 py-2 text-sm text-[rgba(255,255,255,0.85)] placeholder:text-[rgba(255,255,255,0.3)] outline-none focus:border-accent/40"
         />
       </div>
 
       {/* Date / Time */}
       <div className="grid grid-cols-3 gap-2">
         <div>
-          <label className="block text-xs text-zinc-500 mb-1">Date</label>
+          <label className="block text-xs text-[rgba(255,255,255,0.4)] mb-1">Date</label>
           <input
             type="date"
             value={formDate}
             onChange={(e) => setFormDate(e.target.value)}
-            className="w-full bg-white/[0.03] border border-white/5 rounded-lg px-3 py-2 text-sm text-zinc-200 outline-none focus:border-accent/40"
+            className="w-full bg-white/[0.03] border border-white/5 rounded-lg px-3 py-2 text-sm text-[rgba(255,255,255,0.85)] outline-none focus:border-accent/40"
           />
         </div>
         <div>
-          <label className="block text-xs text-zinc-500 mb-1">Start</label>
+          <label className="block text-xs text-[rgba(255,255,255,0.4)] mb-1">Start</label>
           <input
             type="time"
             value={formStartTime}
             onChange={(e) => setFormStartTime(e.target.value)}
-            className="w-full bg-white/[0.03] border border-white/5 rounded-lg px-3 py-2 text-sm text-zinc-200 outline-none focus:border-accent/40"
+            className="w-full bg-white/[0.03] border border-white/5 rounded-lg px-3 py-2 text-sm text-[rgba(255,255,255,0.85)] outline-none focus:border-accent/40"
           />
         </div>
         <div>
-          <label className="block text-xs text-zinc-500 mb-1">End</label>
+          <label className="block text-xs text-[rgba(255,255,255,0.4)] mb-1">End</label>
           <input
             type="time"
             value={formEndTime}
             onChange={(e) => setFormEndTime(e.target.value)}
-            className="w-full bg-white/[0.03] border border-white/5 rounded-lg px-3 py-2 text-sm text-zinc-200 outline-none focus:border-accent/40"
+            className="w-full bg-white/[0.03] border border-white/5 rounded-lg px-3 py-2 text-sm text-[rgba(255,255,255,0.85)] outline-none focus:border-accent/40"
           />
         </div>
       </div>
 
       {/* Attendees */}
       <div>
-        <label className="block text-xs text-zinc-500 mb-1">Attendees (comma separated)</label>
+        <label className="block text-xs text-[rgba(255,255,255,0.4)] mb-1">Attendees (comma separated)</label>
         <input
           type="text"
           value={formAttendees}
           onChange={(e) => setFormAttendees(e.target.value)}
           placeholder="Alice, Bob, Charlie..."
-          className="w-full bg-white/[0.03] border border-white/5 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-accent/40"
+          className="w-full bg-white/[0.03] border border-white/5 rounded-lg px-3 py-2 text-sm text-[rgba(255,255,255,0.85)] placeholder:text-[rgba(255,255,255,0.3)] outline-none focus:border-accent/40"
         />
       </div>
 
       {/* Agenda */}
       <div>
-        <label className="block text-xs text-zinc-500 mb-1">Agenda (one item per line)</label>
+        <label className="block text-xs text-[rgba(255,255,255,0.4)] mb-1">Agenda (one item per line)</label>
         <textarea
           value={formAgenda}
           onChange={(e) => setFormAgenda(e.target.value)}
           rows={4}
           placeholder="Enter agenda items..."
-          className="w-full bg-white/[0.03] border border-white/5 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-accent/40 resize-none"
+          className="w-full bg-white/[0.03] border border-white/5 rounded-lg px-3 py-2 text-sm text-[rgba(255,255,255,0.85)] placeholder:text-[rgba(255,255,255,0.3)] outline-none focus:border-accent/40 resize-none"
         />
       </div>
 
@@ -388,15 +388,15 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
         <div className="flex items-start gap-2 mb-3">
           <button
             onClick={() => { setView("list"); setActiveMeetingId(null); }}
-            className="p-1.5 rounded-lg hover:bg-white/5 text-zinc-400 mt-0.5"
+            className="p-1.5 rounded-lg hover:bg-white/5 text-[rgba(255,255,255,0.5)] mt-0.5"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-semibold text-zinc-200 truncate">{m.title}</h2>
-            <div className="flex items-center gap-2 mt-0.5 text-xs text-zinc-500">
+            <h2 className="text-sm font-semibold text-[rgba(255,255,255,0.85)] truncate">{m.title}</h2>
+            <div className="flex items-center gap-2 mt-0.5 text-xs text-[rgba(255,255,255,0.4)]">
               <span>{formatDate(m.date)}</span>
               {m.startTime && <span>{formatTime(m.startTime)}</span>}
               <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${statusColor(m.status)}`}>
@@ -406,7 +406,7 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
             {m.attendees.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-1.5">
                 {m.attendees.map((a, i) => (
-                  <span key={i} className="px-1.5 py-0.5 text-[10px] rounded bg-white/5 text-zinc-400">
+                  <span key={i} className="px-1.5 py-0.5 text-[10px] rounded bg-white/5 text-[rgba(255,255,255,0.5)]">
                     {a}
                   </span>
                 ))}
@@ -442,11 +442,11 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
         {/* Agenda bar */}
         {m.agenda.length > 0 && (
           <div className="mb-3 p-2.5 rounded-lg bg-white/[0.02] border border-white/5">
-            <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5">Agenda</p>
+            <p className="text-[10px] uppercase tracking-wider text-[rgba(255,255,255,0.4)] mb-1.5">Agenda</p>
             <div className="space-y-0.5">
               {m.agenda.map((item, i) => (
-                <p key={i} className="text-xs text-zinc-400">
-                  <span className="text-zinc-600 mr-1.5">{i + 1}.</span>{item}
+                <p key={i} className="text-xs text-[rgba(255,255,255,0.5)]">
+                  <span className="text-[rgba(255,255,255,0.3)] mr-1.5">{i + 1}.</span>{item}
                 </p>
               ))}
             </div>
@@ -461,8 +461,8 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
               onClick={() => setTab(t)}
               className={`flex-1 py-1.5 rounded-md text-xs font-medium transition ${
                 tab === t
-                  ? "bg-white/10 text-zinc-200"
-                  : "text-zinc-500 hover:text-zinc-400"
+                  ? "bg-white/10 text-[rgba(255,255,255,0.85)]"
+                  : "text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.5)]"
               }`}
             >
               {t === "notes" && "Notes"}
@@ -480,7 +480,7 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
             <div className="space-y-3">
               {m.notes && (
                 <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
-                  <pre className="text-xs text-zinc-300 whitespace-pre-wrap font-sans leading-relaxed">
+                  <pre className="text-xs text-[rgba(255,255,255,0.7)] whitespace-pre-wrap font-sans leading-relaxed">
                     {m.notes}
                   </pre>
                 </div>
@@ -494,7 +494,7 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleAddNote();
                   }}
-                  className="flex-1 bg-white/[0.03] border border-white/5 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-accent/40 resize-none"
+                  className="flex-1 bg-white/[0.03] border border-white/5 rounded-lg px-3 py-2 text-xs text-[rgba(255,255,255,0.85)] placeholder:text-[rgba(255,255,255,0.3)] outline-none focus:border-accent/40 resize-none"
                 />
                 <button
                   onClick={handleAddNote}
@@ -506,13 +506,13 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
               </div>
               {/* Full notes editor */}
               <div>
-                <label className="block text-[10px] uppercase tracking-wider text-zinc-500 mb-1">Full Notes</label>
+                <label className="block text-[10px] uppercase tracking-wider text-[rgba(255,255,255,0.4)] mb-1">Full Notes</label>
                 <textarea
                   value={m.notes}
                   onChange={(e) => updateMeeting(m.id, { notes: e.target.value })}
                   rows={8}
                   placeholder="Type meeting notes here..."
-                  className="w-full bg-white/[0.03] border border-white/5 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-accent/40 resize-none leading-relaxed"
+                  className="w-full bg-white/[0.03] border border-white/5 rounded-lg px-3 py-2 text-xs text-[rgba(255,255,255,0.85)] placeholder:text-[rgba(255,255,255,0.3)] outline-none focus:border-accent/40 resize-none leading-relaxed"
                 />
               </div>
             </div>
@@ -528,7 +528,7 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
                   value={newActionTask}
                   onChange={(e) => setNewActionTask(e.target.value)}
                   placeholder="Action item..."
-                  className="w-full bg-white/[0.03] border border-white/5 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-accent/40"
+                  className="w-full bg-white/[0.03] border border-white/5 rounded-lg px-3 py-1.5 text-xs text-[rgba(255,255,255,0.85)] placeholder:text-[rgba(255,255,255,0.3)] outline-none focus:border-accent/40"
                 />
                 <div className="flex gap-2">
                   <input
@@ -536,13 +536,13 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
                     value={newActionAssignee}
                     onChange={(e) => setNewActionAssignee(e.target.value)}
                     placeholder="Assignee"
-                    className="flex-1 bg-white/[0.03] border border-white/5 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-accent/40"
+                    className="flex-1 bg-white/[0.03] border border-white/5 rounded-lg px-3 py-1.5 text-xs text-[rgba(255,255,255,0.85)] placeholder:text-[rgba(255,255,255,0.3)] outline-none focus:border-accent/40"
                   />
                   <input
                     type="date"
                     value={newActionDeadline}
                     onChange={(e) => setNewActionDeadline(e.target.value)}
-                    className="bg-white/[0.03] border border-white/5 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-accent/40"
+                    className="bg-white/[0.03] border border-white/5 rounded-lg px-3 py-1.5 text-xs text-[rgba(255,255,255,0.85)] outline-none focus:border-accent/40"
                   />
                   <button
                     onClick={handleAddAction}
@@ -556,7 +556,7 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
 
               {/* Action list */}
               {m.actionItems.length === 0 ? (
-                <p className="text-xs text-zinc-600 text-center py-6">No action items yet</p>
+                <p className="text-xs text-[rgba(255,255,255,0.3)] text-center py-6">No action items yet</p>
               ) : (
                 <div className="space-y-1">
                   {m.actionItems.map((item, idx) => (
@@ -583,15 +583,15 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
                         )}
                       </button>
                       <div className="flex-1 min-w-0">
-                        <p className={`text-xs ${item.completed ? "line-through text-zinc-500" : "text-zinc-200"}`}>
+                        <p className={`text-xs ${item.completed ? "line-through text-[rgba(255,255,255,0.4)]" : "text-[rgba(255,255,255,0.85)]"}`}>
                           {item.task}
                         </p>
                         <div className="flex items-center gap-2 mt-0.5">
                           {item.assignee && (
-                            <span className="text-[10px] text-zinc-500">{item.assignee}</span>
+                            <span className="text-[10px] text-[rgba(255,255,255,0.4)]">{item.assignee}</span>
                           )}
                           {item.deadline && (
-                            <span className="text-[10px] text-zinc-600">Due {item.deadline}</span>
+                            <span className="text-[10px] text-[rgba(255,255,255,0.3)]">Due {item.deadline}</span>
                           )}
                         </div>
                       </div>
@@ -614,7 +614,7 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleAddDecision();
                   }}
-                  className="flex-1 bg-white/[0.03] border border-white/5 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-accent/40"
+                  className="flex-1 bg-white/[0.03] border border-white/5 rounded-lg px-3 py-2 text-xs text-[rgba(255,255,255,0.85)] placeholder:text-[rgba(255,255,255,0.3)] outline-none focus:border-accent/40"
                 />
                 <button
                   onClick={handleAddDecision}
@@ -626,7 +626,7 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
               </div>
 
               {m.decisions.length === 0 ? (
-                <p className="text-xs text-zinc-600 text-center py-6">No decisions recorded yet</p>
+                <p className="text-xs text-[rgba(255,255,255,0.3)] text-center py-6">No decisions recorded yet</p>
               ) : (
                 <div className="space-y-1.5">
                   {m.decisions.map((d, i) => (
@@ -634,7 +634,7 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
                       <span className="w-5 h-5 rounded-full bg-amber-500/15 text-amber-400 text-[10px] flex items-center justify-center flex-shrink-0 font-semibold mt-0.5">
                         {i + 1}
                       </span>
-                      <p className="text-xs text-zinc-300 leading-relaxed">{d}</p>
+                      <p className="text-xs text-[rgba(255,255,255,0.7)] leading-relaxed">{d}</p>
                     </div>
                   ))}
                 </div>
@@ -647,7 +647,7 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
             <div className="space-y-3">
               {!m.summary ? (
                 <div className="text-center py-8">
-                  <p className="text-xs text-zinc-500 mb-3">
+                  <p className="text-xs text-[rgba(255,255,255,0.4)] mb-3">
                     Generate an AI-powered summary of this meeting
                   </p>
                   <button
@@ -660,20 +660,20 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
               ) : (
                 <>
                   <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
-                    <pre className="text-xs text-zinc-300 whitespace-pre-wrap font-sans leading-relaxed">
+                    <pre className="text-xs text-[rgba(255,255,255,0.7)] whitespace-pre-wrap font-sans leading-relaxed">
                       {m.summary}
                     </pre>
                   </div>
                   <div className="flex gap-2">
                     <button
                       onClick={handleGenerateSummary}
-                      className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-400 text-xs transition"
+                      className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[rgba(255,255,255,0.5)] text-xs transition"
                     >
                       Regenerate
                     </button>
                     <button
                       onClick={() => onSendToChat(m.summary)}
-                      className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-400 text-xs transition"
+                      className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[rgba(255,255,255,0.5)] text-xs transition"
                     >
                       Send to Chat
                     </button>
@@ -721,8 +721,8 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
           { label: "Open Tasks", value: stats.totalActionItems - stats.completedActionItems },
         ].map((s) => (
           <div key={s.label} className="p-2 rounded-lg bg-white/[0.02] border border-white/5 text-center">
-            <p className="text-sm font-semibold text-zinc-200">{s.value}</p>
-            <p className="text-[10px] text-zinc-500">{s.label}</p>
+            <p className="text-sm font-semibold text-[rgba(255,255,255,0.85)]">{s.value}</p>
+            <p className="text-[10px] text-[rgba(255,255,255,0.4)]">{s.label}</p>
           </div>
         ))}
       </div>
@@ -731,7 +731,7 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
       <div className="flex gap-2">
         <div className="flex-1 relative">
           <svg
-            className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500"
+            className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[rgba(255,255,255,0.4)]"
             fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -741,13 +741,13 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search meetings..."
-            className="w-full bg-white/[0.03] border border-white/5 rounded-lg pl-8 pr-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-accent/40"
+            className="w-full bg-white/[0.03] border border-white/5 rounded-lg pl-8 pr-3 py-1.5 text-xs text-[rgba(255,255,255,0.85)] placeholder:text-[rgba(255,255,255,0.3)] outline-none focus:border-accent/40"
           />
         </div>
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value as FilterStatus)}
-          className="bg-white/[0.03] border border-white/5 rounded-lg px-2 py-1.5 text-xs text-zinc-400 outline-none focus:border-accent/40"
+          className="bg-white/[0.03] border border-white/5 rounded-lg px-2 py-1.5 text-xs text-[rgba(255,255,255,0.5)] outline-none focus:border-accent/40"
         >
           <option value="all">All</option>
           <option value="upcoming">Upcoming</option>
@@ -759,7 +759,7 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
       {/* Create button */}
       <button
         onClick={() => setView("create")}
-        className="w-full py-2.5 rounded-lg border border-dashed border-white/10 hover:border-accent/30 hover:bg-accent/5 text-zinc-400 hover:text-accent text-xs font-medium transition"
+        className="w-full py-2.5 rounded-lg border border-dashed border-white/10 hover:border-accent/30 hover:bg-accent/5 text-[rgba(255,255,255,0.5)] hover:text-accent text-xs font-medium transition"
       >
         + New Meeting
       </button>
@@ -775,15 +775,15 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
               <div key={i} className="flex items-start gap-2 text-xs">
                 <span className="text-amber-500/50 mt-0.5">{"\u25CB"}</span>
                 <div className="min-w-0">
-                  <p className="text-zinc-300 truncate">{a.task}</p>
-                  <p className="text-[10px] text-zinc-600">
+                  <p className="text-[rgba(255,255,255,0.7)] truncate">{a.task}</p>
+                  <p className="text-[10px] text-[rgba(255,255,255,0.3)]">
                     {a.meetingTitle}{a.assignee ? ` \u2022 ${a.assignee}` : ""}{a.deadline ? ` \u2022 Due ${a.deadline}` : ""}
                   </p>
                 </div>
               </div>
             ))}
             {allOpenActions.length > 5 && (
-              <p className="text-[10px] text-zinc-600 ml-4">+{allOpenActions.length - 5} more...</p>
+              <p className="text-[10px] text-[rgba(255,255,255,0.3)] ml-4">+{allOpenActions.length - 5} more...</p>
             )}
           </div>
         </div>
@@ -792,7 +792,7 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
       {/* Upcoming meetings */}
       {upcomingMeetings.length > 0 && filterStatus === "all" && !search && (
         <div>
-          <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-2">Upcoming</p>
+          <p className="text-[10px] uppercase tracking-wider text-[rgba(255,255,255,0.4)] mb-2">Upcoming</p>
           <div className="space-y-1.5">
             {upcomingMeetings.slice(0, 3).map((m) => (
               <button
@@ -801,12 +801,12 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
                 className="w-full p-3 rounded-lg bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] text-left transition"
               >
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium text-zinc-200 truncate">{m.title}</p>
+                  <p className="text-xs font-medium text-[rgba(255,255,255,0.85)] truncate">{m.title}</p>
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${statusColor(m.status)}`}>
                     {statusLabel(m.status)}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 mt-1 text-[10px] text-zinc-500">
+                <div className="flex items-center gap-2 mt-1 text-[10px] text-[rgba(255,255,255,0.4)]">
                   <span>{formatDate(m.date)}</span>
                   {m.startTime && <span>{formatTime(m.startTime)}</span>}
                   {m.attendees.length > 0 && (
@@ -821,12 +821,12 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
 
       {/* All meetings */}
       <div>
-        <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-2">
+        <p className="text-[10px] uppercase tracking-wider text-[rgba(255,255,255,0.4)] mb-2">
           {search ? `Results (${filteredMeetings.length})` : "All Meetings"}
         </p>
         {filteredMeetings.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-xs text-zinc-600">
+            <p className="text-xs text-[rgba(255,255,255,0.3)]">
               {search ? "No meetings found" : "No meetings yet. Create one to get started!"}
             </p>
           </div>
@@ -839,12 +839,12 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
                 className="w-full p-3 rounded-lg bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] text-left transition"
               >
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium text-zinc-200 truncate">{m.title}</p>
+                  <p className="text-xs font-medium text-[rgba(255,255,255,0.85)] truncate">{m.title}</p>
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${statusColor(m.status)}`}>
                     {statusLabel(m.status)}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 mt-1 text-[10px] text-zinc-500">
+                <div className="flex items-center gap-2 mt-1 text-[10px] text-[rgba(255,255,255,0.4)]">
                   <span>{formatDate(m.date)}</span>
                   {m.startTime && <span>{formatTime(m.startTime)}</span>}
                   {m.attendees.length > 0 && (
@@ -857,7 +857,7 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
                 {m.tags.length > 0 && (
                   <div className="flex gap-1 mt-1.5">
                     {m.tags.map((t, i) => (
-                      <span key={i} className="px-1.5 py-0.5 rounded text-[10px] bg-white/5 text-zinc-500">
+                      <span key={i} className="px-1.5 py-0.5 rounded text-[10px] bg-white/5 text-[rgba(255,255,255,0.4)]">
                         {t}
                       </span>
                     ))}
@@ -881,15 +881,15 @@ export default function MeetingAssistant({ onBack, onSendToChat }: Props) {
           <div className="flex items-center gap-2">
             <button
               onClick={onBack}
-              className="p-1.5 rounded-lg hover:bg-white/5 text-zinc-400"
+              className="p-1.5 rounded-lg hover:bg-white/5 text-[rgba(255,255,255,0.5)]"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <h1 className="text-sm font-semibold text-zinc-200">Meeting Assistant</h1>
+            <h1 className="text-sm font-semibold text-[rgba(255,255,255,0.85)]">Meeting Assistant</h1>
           </div>
-          <span className="text-[10px] text-zinc-600">{meetings.length} meetings</span>
+          <span className="text-[10px] text-[rgba(255,255,255,0.3)]">{meetings.length} meetings</span>
         </div>
       )}
 

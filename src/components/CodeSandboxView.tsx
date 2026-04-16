@@ -240,20 +240,20 @@ export function CodeSandboxView({ onBack }: { onBack: () => void }) {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col bg-black text-gray-300 font-mono text-xs overflow-hidden">
+    <div className="flex-1 min-h-0 flex flex-col bg-black text-[rgba(255,255,255,0.7)] font-mono text-xs overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-800 shrink-0">
-        <button onClick={onBack} className="text-gray-500 hover:text-green-400 transition-colors">
+      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[rgba(255,255,255,0.07)] shrink-0">
+        <button onClick={onBack} className="text-[rgba(255,255,255,0.4)] hover:text-green-400 transition-colors">
           <ArrowLeft size={15} />
         </button>
         <span className="text-green-400 font-bold tracking-widest uppercase text-xs">Code Sandbox</span>
         <div className="flex-1" />
 
         {/* Timeout selector */}
-        <div className="flex items-center gap-1 border border-gray-700 rounded px-1">
-          <Clock size={11} className="text-gray-600" />
+        <div className="flex items-center gap-1 border border-[rgba(255,255,255,0.1)] rounded px-1">
+          <Clock size={11} className="text-[rgba(255,255,255,0.3)]" />
           <select
-            className="bg-transparent text-gray-400 text-2xs focus:outline-none py-0.5"
+            className="bg-transparent text-[rgba(255,255,255,0.5)] text-2xs focus:outline-none py-0.5"
             value={timeout}
             onChange={(e) => setTimeout(Number(e.target.value))}
           >
@@ -265,7 +265,7 @@ export function CodeSandboxView({ onBack }: { onBack: () => void }) {
         <button
           onClick={explain}
           disabled={explaining || !code.trim()}
-          className="flex items-center gap-1.5 px-3 py-1 border border-gray-700 text-gray-400 rounded hover:text-purple-300 hover:border-purple-700 transition-colors text-2xs disabled:opacity-40"
+          className="flex items-center gap-1.5 px-3 py-1 border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)] rounded hover:text-purple-300 hover:border-purple-700 transition-colors text-2xs disabled:opacity-40"
         >
           <BookOpen size={12} /> {explaining ? "Explaining…" : "Explain"}
         </button>
@@ -292,7 +292,7 @@ export function CodeSandboxView({ onBack }: { onBack: () => void }) {
       </div>
 
       {/* Language tabs */}
-      <div className="flex items-center gap-0 border-b border-gray-800 shrink-0">
+      <div className="flex items-center gap-0 border-b border-[rgba(255,255,255,0.07)] shrink-0">
         {LANGUAGES.map((l) => (
           <button
             key={l.id}
@@ -300,7 +300,7 @@ export function CodeSandboxView({ onBack }: { onBack: () => void }) {
             className={`px-4 py-2 text-2xs border-b-2 transition-colors ${
               language === l.id
                 ? "border-green-500 text-green-300 bg-green-900/10"
-                : "border-transparent text-gray-600 hover:text-gray-400 hover:bg-gray-900/40"
+                : "border-transparent text-[rgba(255,255,255,0.3)] hover:text-[rgba(255,255,255,0.5)] hover:bg-[#09090b]/40"
             }`}
           >
             {l.label}
@@ -327,7 +327,7 @@ export function CodeSandboxView({ onBack }: { onBack: () => void }) {
               onChange={(e) => setCode(e.target.value)}
               onKeyDown={onKeyDown}
               spellCheck={false}
-              className="absolute inset-0 w-full h-full bg-gray-900 text-green-300 font-mono text-xs p-4 resize-none focus:outline-none leading-relaxed caret-green-400 border-0"
+              className="absolute inset-0 w-full h-full bg-[#09090b] text-green-300 font-mono text-xs p-4 resize-none focus:outline-none leading-relaxed caret-green-400 border-0"
               style={{ tabSize: 4 }}
               placeholder={currentLang.placeholder}
             />
@@ -335,10 +335,10 @@ export function CodeSandboxView({ onBack }: { onBack: () => void }) {
 
           {/* Output panel */}
           {(output || running) && (
-            <div className="border-t border-gray-800 shrink-0 max-h-64 overflow-y-auto bg-gray-950">
+            <div className="border-t border-[rgba(255,255,255,0.07)] shrink-0 max-h-64 overflow-y-auto bg-[#09090b]">
               {/* Output header */}
-              <div className="flex items-center gap-3 px-4 py-1.5 border-b border-gray-800 sticky top-0 bg-gray-950">
-                <span className="text-2xs text-gray-500 uppercase tracking-widest">Output</span>
+              <div className="flex items-center gap-3 px-4 py-1.5 border-b border-[rgba(255,255,255,0.07)] sticky top-0 bg-[#09090b]">
+                <span className="text-2xs text-[rgba(255,255,255,0.4)] uppercase tracking-widest">Output</span>
                 {output && (
                   <>
                     <span className={`text-2xs px-1.5 py-0.5 rounded border ${
@@ -348,7 +348,7 @@ export function CodeSandboxView({ onBack }: { onBack: () => void }) {
                     }`}>
                       exit {output.exit_code}
                     </span>
-                    <span className="text-2xs text-gray-600 border border-gray-700 px-1.5 py-0.5 rounded">
+                    <span className="text-2xs text-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.1)] px-1.5 py-0.5 rounded">
                       {formatDuration(output.duration_ms)}
                     </span>
                     {output.exit_code === 0
@@ -363,18 +363,18 @@ export function CodeSandboxView({ onBack }: { onBack: () => void }) {
                 <div className="p-4 space-y-3">
                   {output.stdout && (
                     <div>
-                      <div className="text-2xs text-gray-600 mb-1 uppercase tracking-wider">stdout</div>
+                      <div className="text-2xs text-[rgba(255,255,255,0.3)] mb-1 uppercase tracking-wider">stdout</div>
                       <pre className="text-green-300 text-2xs font-mono whitespace-pre-wrap leading-relaxed">{output.stdout}</pre>
                     </div>
                   )}
                   {output.stderr && (
                     <div>
-                      <div className="text-2xs text-gray-600 mb-1 uppercase tracking-wider">stderr</div>
+                      <div className="text-2xs text-[rgba(255,255,255,0.3)] mb-1 uppercase tracking-wider">stderr</div>
                       <pre className="text-red-400 text-2xs font-mono whitespace-pre-wrap leading-relaxed">{output.stderr}</pre>
                     </div>
                   )}
                   {!output.stdout && !output.stderr && (
-                    <div className="text-2xs text-gray-600">(no output)</div>
+                    <div className="text-2xs text-[rgba(255,255,255,0.3)]">(no output)</div>
                   )}
                 </div>
               )}
@@ -383,32 +383,32 @@ export function CodeSandboxView({ onBack }: { onBack: () => void }) {
 
           {/* Explanation panel */}
           {(explanation || explaining) && (
-            <div className="border-t border-gray-800 shrink-0 max-h-48 overflow-y-auto bg-gray-950">
-              <div className="flex items-center gap-2 px-4 py-1.5 border-b border-gray-800 sticky top-0 bg-gray-950">
+            <div className="border-t border-[rgba(255,255,255,0.07)] shrink-0 max-h-48 overflow-y-auto bg-[#09090b]">
+              <div className="flex items-center gap-2 px-4 py-1.5 border-b border-[rgba(255,255,255,0.07)] sticky top-0 bg-[#09090b]">
                 <BookOpen size={11} className="text-purple-400" />
                 <span className="text-2xs text-purple-400 uppercase tracking-widest">Explanation</span>
                 {explaining && <span className="text-2xs text-yellow-400 animate-pulse">Thinking…</span>}
               </div>
               {explanation && (
-                <div className="p-4 text-2xs text-gray-300 leading-relaxed whitespace-pre-wrap font-sans">{explanation}</div>
+                <div className="p-4 text-2xs text-[rgba(255,255,255,0.7)] leading-relaxed whitespace-pre-wrap font-sans">{explanation}</div>
               )}
             </div>
           )}
         </div>
 
         {/* Recent runs sidebar */}
-        <div className="w-56 border-l border-gray-800 flex flex-col shrink-0 overflow-hidden">
-          <div className="px-3 py-2 border-b border-gray-800 text-2xs text-gray-500 uppercase tracking-widest flex items-center gap-1">
+        <div className="w-56 border-l border-[rgba(255,255,255,0.07)] flex flex-col shrink-0 overflow-hidden">
+          <div className="px-3 py-2 border-b border-[rgba(255,255,255,0.07)] text-2xs text-[rgba(255,255,255,0.4)] uppercase tracking-widest flex items-center gap-1">
             <Clock size={10} /> Recent
           </div>
           <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-1.5">
             {recentRuns.length === 0 && (
-              <div className="text-2xs text-gray-700 p-1">No runs yet</div>
+              <div className="text-2xs text-[rgba(255,255,255,0.2)] p-1">No runs yet</div>
             )}
             {recentRuns.map((r) => (
               <div
                 key={r.id}
-                className="border border-gray-800 rounded p-2 bg-gray-900/40 hover:bg-gray-900 transition-colors cursor-default"
+                className="border border-[rgba(255,255,255,0.07)] rounded p-2 bg-[#09090b]/40 hover:bg-[#09090b] transition-colors cursor-default"
               >
                 <div className="flex items-center gap-1.5 mb-1">
                   {r.success
@@ -417,17 +417,17 @@ export function CodeSandboxView({ onBack }: { onBack: () => void }) {
                   <span className={`text-2xs px-1 py-px rounded ${LANG_COLOR[r.language]}`}>
                     {r.language}
                   </span>
-                  <span className="text-2xs text-gray-600 ml-auto">{r.timestamp}</span>
+                  <span className="text-2xs text-[rgba(255,255,255,0.3)] ml-auto">{r.timestamp}</span>
                 </div>
-                <div className="text-2xs text-gray-500 font-mono truncate">{r.first_line}</div>
+                <div className="text-2xs text-[rgba(255,255,255,0.4)] font-mono truncate">{r.first_line}</div>
               </div>
             ))}
           </div>
 
           {/* Keyboard hint */}
-          <div className="border-t border-gray-800 px-3 py-2">
-            <div className="text-2xs text-gray-700">Ctrl+Enter to run</div>
-            <div className="text-2xs text-gray-700">Tab for indent</div>
+          <div className="border-t border-[rgba(255,255,255,0.07)] px-3 py-2">
+            <div className="text-2xs text-[rgba(255,255,255,0.2)]">Ctrl+Enter to run</div>
+            <div className="text-2xs text-[rgba(255,255,255,0.2)]">Tab for indent</div>
           </div>
         </div>
       </div>

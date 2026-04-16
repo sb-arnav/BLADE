@@ -43,12 +43,12 @@ interface CritiqueResponse {
 function VerdictModal({ verdict, onClose }: { verdict: string; onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-black border border-gray-700 rounded max-w-lg w-full p-6">
+      <div className="bg-black border border-[rgba(255,255,255,0.1)] rounded max-w-lg w-full p-6">
         <div className="flex items-center justify-between mb-4">
           <span className="text-green-400 font-mono text-sm uppercase tracking-widest">// Debate Verdict</span>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none">✕</button>
+          <button onClick={onClose} className="text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] text-lg leading-none">✕</button>
         </div>
-        <div className="text-gray-200 text-sm leading-relaxed whitespace-pre-wrap font-mono">{verdict}</div>
+        <div className="text-[rgba(255,255,255,0.85)] text-sm leading-relaxed whitespace-pre-wrap font-mono">{verdict}</div>
         <button
           onClick={onClose}
           className="mt-6 w-full bg-green-900/40 border border-green-700 text-green-400 font-mono text-xs py-2 hover:bg-green-900/60 transition-colors"
@@ -175,22 +175,22 @@ function DebatePanel() {
 
       {/* Setup */}
       {!session && (
-        <div className="bg-gray-950 border border-gray-800 rounded p-4 flex flex-col gap-3">
+        <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
           <div className="text-green-400 font-mono text-xs uppercase tracking-widest mb-1">// New Debate</div>
           <div className="flex flex-col gap-1">
-            <label className="text-gray-500 font-mono text-xs">TOPIC</label>
+            <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">TOPIC</label>
             <input
-              className="bg-black border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
+              className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
               placeholder="e.g. Universal Basic Income should be implemented"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-gray-500 font-mono text-xs">YOUR POSITION</label>
+            <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">YOUR POSITION</label>
             <textarea
               rows={2}
-              className="bg-black border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700 resize-none"
+              className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700 resize-none"
               placeholder="State your stance and key reasoning..."
               value={userPosition}
               onChange={(e) => setUserPosition(e.target.value)}
@@ -224,7 +224,7 @@ function DebatePanel() {
               </button>
               <button
                 onClick={() => { setSession(null); setVerdict(null); }}
-                className="border border-gray-700 text-gray-500 font-mono text-xs px-3 py-1 hover:text-gray-300 transition-colors"
+                className="border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.4)] font-mono text-xs px-3 py-1 hover:text-[rgba(255,255,255,0.7)] transition-colors"
               >
                 RESET
               </button>
@@ -233,22 +233,22 @@ function DebatePanel() {
 
           {/* Round cards */}
           {session.rounds.map((round) => (
-            <div key={round.round} className="bg-gray-950 border border-gray-800 rounded overflow-hidden">
-              <div className="px-3 py-1 bg-gray-900 border-b border-gray-800 font-mono text-xs text-gray-500">
+            <div key={round.round} className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded overflow-hidden">
+              <div className="px-3 py-1 bg-[#09090b] border-b border-[rgba(255,255,255,0.07)] font-mono text-xs text-[rgba(255,255,255,0.4)]">
                 ROUND {round.round}
               </div>
               <div className="grid grid-cols-2 gap-0">
-                <div className="p-3 border-r border-gray-800">
+                <div className="p-3 border-r border-[rgba(255,255,255,0.07)]">
                   <div className="text-green-500 font-mono text-xs mb-1">YOUR SIDE</div>
-                  <div className="text-gray-300 text-sm leading-relaxed">{round.user_argument}</div>
+                  <div className="text-[rgba(255,255,255,0.7)] text-sm leading-relaxed">{round.user_argument}</div>
                 </div>
                 <div className="p-3">
                   <div className="text-red-400 font-mono text-xs mb-1">OPPONENT</div>
-                  <div className="text-gray-300 text-sm leading-relaxed">{round.opponent_argument}</div>
+                  <div className="text-[rgba(255,255,255,0.7)] text-sm leading-relaxed">{round.opponent_argument}</div>
                 </div>
               </div>
               {round.coaching && (
-                <div className="px-3 py-2 border-t border-gray-800 bg-amber-950/20">
+                <div className="px-3 py-2 border-t border-[rgba(255,255,255,0.07)] bg-amber-950/20">
                   <span className="text-amber-500/70 font-mono text-xs italic">[BLADE] {round.coaching}</span>
                 </div>
               )}
@@ -256,11 +256,11 @@ function DebatePanel() {
           ))}
 
           {/* Next Round Input */}
-          <div className="bg-gray-950 border border-gray-800 rounded p-3 flex flex-col gap-2">
-            <label className="text-gray-500 font-mono text-xs">YOUR NEXT ARGUMENT</label>
+          <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-3 flex flex-col gap-2">
+            <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">YOUR NEXT ARGUMENT</label>
             <textarea
               rows={3}
-              className="bg-black border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700 resize-none"
+              className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700 resize-none"
               placeholder="Make your case for the next round..."
               value={nextArg}
               onChange={(e) => setNextArg(e.target.value)}
@@ -281,27 +281,27 @@ function DebatePanel() {
       )}
 
       {/* Argument Tools */}
-      <div className="bg-gray-950 border border-gray-800 rounded">
+      <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded">
         <button
-          className="w-full flex items-center justify-between px-4 py-2 font-mono text-xs text-gray-500 hover:text-gray-300"
+          className="w-full flex items-center justify-between px-4 py-2 font-mono text-xs text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)]"
           onClick={() => setToolsOpen((v) => !v)}
         >
           <span>// ARGUMENT TOOLS</span>
           <span>{toolsOpen ? "▲" : "▼"}</span>
         </button>
         {toolsOpen && (
-          <div className="p-4 flex flex-col gap-4 border-t border-gray-800">
+          <div className="p-4 flex flex-col gap-4 border-t border-[rgba(255,255,255,0.07)]">
             {/* Steelman */}
             <div className="flex flex-col gap-2">
-              <div className="text-gray-400 font-mono text-xs">STEELMAN OPPONENT</div>
+              <div className="text-[rgba(255,255,255,0.5)] font-mono text-xs">STEELMAN OPPONENT</div>
               <input
-                className="bg-black border border-gray-700 text-gray-200 font-mono text-xs px-3 py-1.5 rounded focus:outline-none focus:border-green-700"
+                className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-xs px-3 py-1.5 rounded focus:outline-none focus:border-green-700"
                 placeholder="Topic"
                 value={steelmanTopic}
                 onChange={(e) => setSteelmanTopic(e.target.value)}
               />
               <input
-                className="bg-black border border-gray-700 text-gray-200 font-mono text-xs px-3 py-1.5 rounded focus:outline-none focus:border-green-700"
+                className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-xs px-3 py-1.5 rounded focus:outline-none focus:border-green-700"
                 placeholder="Their position"
                 value={steelmanPos}
                 onChange={(e) => setSteelmanPos(e.target.value)}
@@ -309,12 +309,12 @@ function DebatePanel() {
               <button
                 onClick={steelman}
                 disabled={loading}
-                className="bg-gray-900 border border-gray-700 text-gray-400 font-mono text-xs py-1.5 hover:border-green-700 hover:text-green-400 disabled:opacity-40 transition-colors"
+                className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)] font-mono text-xs py-1.5 hover:border-green-700 hover:text-green-400 disabled:opacity-40 transition-colors"
               >
                 STEELMAN →
               </button>
               {steelmanResult && (
-                <div className="bg-black border border-gray-800 p-3 text-gray-300 text-xs font-mono leading-relaxed">
+                <div className="bg-black border border-[rgba(255,255,255,0.07)] p-3 text-[rgba(255,255,255,0.7)] text-xs font-mono leading-relaxed">
                   {steelmanResult}
                 </div>
               )}
@@ -322,21 +322,21 @@ function DebatePanel() {
 
             {/* Build Argument */}
             <div className="flex flex-col gap-2">
-              <div className="text-gray-400 font-mono text-xs">BUILD ARGUMENT</div>
+              <div className="text-[rgba(255,255,255,0.5)] font-mono text-xs">BUILD ARGUMENT</div>
               <input
-                className="bg-black border border-gray-700 text-gray-200 font-mono text-xs px-3 py-1.5 rounded focus:outline-none focus:border-green-700"
+                className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-xs px-3 py-1.5 rounded focus:outline-none focus:border-green-700"
                 placeholder="Topic"
                 value={buildTopic}
                 onChange={(e) => setBuildTopic(e.target.value)}
               />
               <input
-                className="bg-black border border-gray-700 text-gray-200 font-mono text-xs px-3 py-1.5 rounded focus:outline-none focus:border-green-700"
+                className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-xs px-3 py-1.5 rounded focus:outline-none focus:border-green-700"
                 placeholder="Position"
                 value={buildPos}
                 onChange={(e) => setBuildPos(e.target.value)}
               />
               <input
-                className="bg-black border border-gray-700 text-gray-200 font-mono text-xs px-3 py-1.5 rounded focus:outline-none focus:border-green-700"
+                className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-xs px-3 py-1.5 rounded focus:outline-none focus:border-green-700"
                 placeholder="Context (optional)"
                 value={buildContext}
                 onChange={(e) => setBuildContext(e.target.value)}
@@ -344,12 +344,12 @@ function DebatePanel() {
               <button
                 onClick={buildArgument}
                 disabled={loading}
-                className="bg-gray-900 border border-gray-700 text-gray-400 font-mono text-xs py-1.5 hover:border-green-700 hover:text-green-400 disabled:opacity-40 transition-colors"
+                className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)] font-mono text-xs py-1.5 hover:border-green-700 hover:text-green-400 disabled:opacity-40 transition-colors"
               >
                 BUILD →
               </button>
               {buildResult && (
-                <div className="bg-black border border-gray-800 p-3 text-gray-300 text-xs font-mono leading-relaxed">
+                <div className="bg-black border border-[rgba(255,255,255,0.07)] p-3 text-[rgba(255,255,255,0.7)] text-xs font-mono leading-relaxed">
                   {buildResult}
                 </div>
               )}
@@ -432,13 +432,13 @@ function NegotiationPanel() {
   return (
     <div className="flex flex-col gap-4 h-full overflow-y-auto">
       {/* Input */}
-      <div className="bg-gray-950 border border-gray-800 rounded p-4 flex flex-col gap-3">
+      <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
         <div className="text-green-400 font-mono text-xs uppercase tracking-widest mb-1">// Scenario Setup</div>
         <div className="flex flex-col gap-1">
-          <label className="text-gray-500 font-mono text-xs">CONTEXT</label>
+          <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">CONTEXT</label>
           <textarea
             rows={2}
-            className="bg-black border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700 resize-none"
+            className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700 resize-none"
             placeholder="e.g. Salary negotiation with new employer, annual review, contract renewal..."
             value={context}
             onChange={(e) => setContext(e.target.value)}
@@ -446,18 +446,18 @@ function NegotiationPanel() {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-gray-500 font-mono text-xs">YOUR GOAL</label>
+            <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">YOUR GOAL</label>
             <input
-              className="bg-black border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
+              className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
               placeholder="What you want to achieve"
               value={userGoal}
               onChange={(e) => setUserGoal(e.target.value)}
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-gray-500 font-mono text-xs">THEIR LIKELY GOAL</label>
+            <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">THEIR LIKELY GOAL</label>
             <input
-              className="bg-black border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
+              className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
               placeholder="What they probably want"
               value={theirInfo}
               onChange={(e) => setTheirInfo(e.target.value)}
@@ -478,24 +478,24 @@ function NegotiationPanel() {
       {analysis && (
         <>
           {/* Tactics */}
-          <div className="bg-gray-950 border border-gray-800 rounded p-4">
+          <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4">
             <div className="text-green-400 font-mono text-xs uppercase tracking-widest mb-3">// Tactics</div>
             <ol className="flex flex-col gap-2">
               {analysis.tactics.map((tactic, i) => (
                 <li key={i} className="flex gap-3">
                   <span className="text-green-600 font-mono text-xs mt-0.5 min-w-[20px]">{i + 1}.</span>
-                  <span className="text-gray-300 text-sm">{tactic}</span>
+                  <span className="text-[rgba(255,255,255,0.7)] text-sm">{tactic}</span>
                 </li>
               ))}
             </ol>
           </div>
 
           {/* Scripts */}
-          <div className="bg-gray-950 border border-gray-800 rounded p-4">
+          <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4">
             <div className="text-green-400 font-mono text-xs uppercase tracking-widest mb-3">// Word-for-Word Scripts</div>
             <div className="flex flex-col gap-3">
               {analysis.scripts.map((script, i) => (
-                <blockquote key={i} className="border-l-2 border-green-700 pl-3 text-gray-300 text-sm italic">
+                <blockquote key={i} className="border-l-2 border-green-700 pl-3 text-[rgba(255,255,255,0.7)] text-sm italic">
                   &ldquo;{script}&rdquo;
                 </blockquote>
               ))}
@@ -503,18 +503,18 @@ function NegotiationPanel() {
           </div>
 
           {/* BATNA */}
-          <div className="bg-gray-950 border border-amber-900/50 rounded p-4">
+          <div className="bg-[#09090b] border border-amber-900/50 rounded p-4">
             <div className="text-amber-400 font-mono text-xs uppercase tracking-widest mb-2">// BATNA</div>
-            <p className="text-gray-300 text-sm">{analysis.batna}</p>
+            <p className="text-[rgba(255,255,255,0.7)] text-sm">{analysis.batna}</p>
           </div>
 
           {/* Their Interests */}
           {analysis.their_interests && analysis.their_interests.length > 0 && (
-            <div className="bg-gray-950 border border-gray-800 rounded p-4">
+            <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4">
               <div className="text-red-400 font-mono text-xs uppercase tracking-widest mb-2">// Their Interests</div>
               <ul className="flex flex-col gap-1">
                 {analysis.their_interests.map((interest, i) => (
-                  <li key={i} className="text-gray-400 text-sm flex gap-2">
+                  <li key={i} className="text-[rgba(255,255,255,0.5)] text-sm flex gap-2">
                     <span className="text-red-600">▸</span>
                     {interest}
                   </li>
@@ -524,13 +524,13 @@ function NegotiationPanel() {
           )}
 
           {/* Practice Roleplay */}
-          <div className="bg-gray-950 border border-gray-800 rounded p-4 flex flex-col gap-3">
+          <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
             <div className="text-green-400 font-mono text-xs uppercase tracking-widest">// Practice: Roleplay</div>
             <div className="flex flex-col gap-1">
-              <label className="text-gray-500 font-mono text-xs">THEIR MESSAGE (as opponent)</label>
+              <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">THEIR MESSAGE (as opponent)</label>
               <textarea
                 rows={2}
-                className="bg-black border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700 resize-none"
+                className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700 resize-none"
                 placeholder="Type what they might say..."
                 value={theirMessage}
                 onChange={(e) => setTheirMessage(e.target.value)}
@@ -539,7 +539,7 @@ function NegotiationPanel() {
             <button
               onClick={roleplay}
               disabled={loading || !theirMessage.trim()}
-              className="bg-gray-900 border border-gray-700 text-gray-400 font-mono text-xs py-2 hover:border-green-700 hover:text-green-400 disabled:opacity-40 transition-colors"
+              className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)] font-mono text-xs py-2 hover:border-green-700 hover:text-green-400 disabled:opacity-40 transition-colors"
             >
               {loading ? "..." : "BLADE RESPONDS AS OPPONENT →"}
             </button>
@@ -547,7 +547,7 @@ function NegotiationPanel() {
               <div className="flex flex-col gap-2">
                 <div className="bg-black border border-red-900/40 rounded p-3">
                   <div className="text-red-400 font-mono text-xs mb-1">OPPONENT SAYS:</div>
-                  <div className="text-gray-300 text-sm">{roleplayResponse.opponent_message}</div>
+                  <div className="text-[rgba(255,255,255,0.7)] text-sm">{roleplayResponse.opponent_message}</div>
                 </div>
                 {roleplayResponse.subtext && (
                   <div className="bg-black border border-amber-900/30 rounded p-2">
@@ -559,13 +559,13 @@ function NegotiationPanel() {
           </div>
 
           {/* Critique */}
-          <div className="bg-gray-950 border border-gray-800 rounded p-4 flex flex-col gap-3">
+          <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
             <div className="text-green-400 font-mono text-xs uppercase tracking-widest">// Critique My Move</div>
             <div className="flex flex-col gap-1">
-              <label className="text-gray-500 font-mono text-xs">WHAT YOU PLAN TO SAY OR DO</label>
+              <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">WHAT YOU PLAN TO SAY OR DO</label>
               <textarea
                 rows={2}
-                className="bg-black border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700 resize-none"
+                className="bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700 resize-none"
                 placeholder={`e.g. "I need at least $120k or I'll have to consider other offers"`}
                 value={userMove}
                 onChange={(e) => setUserMove(e.target.value)}
@@ -574,19 +574,19 @@ function NegotiationPanel() {
             <button
               onClick={critiqueMove}
               disabled={loading || !userMove.trim()}
-              className="bg-gray-900 border border-gray-700 text-gray-400 font-mono text-xs py-2 hover:border-green-700 hover:text-green-400 disabled:opacity-40 transition-colors"
+              className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)] font-mono text-xs py-2 hover:border-green-700 hover:text-green-400 disabled:opacity-40 transition-colors"
             >
               {loading ? "..." : "CRITIQUE THIS MOVE →"}
             </button>
             {critique && (
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-gray-500 font-mono text-xs">SCORE:</span>
+                  <span className="text-[rgba(255,255,255,0.4)] font-mono text-xs">SCORE:</span>
                   <div className="flex gap-0.5">
                     {Array.from({ length: 10 }).map((_, i) => (
                       <div
                         key={i}
-                        className={`w-3 h-3 border ${i < critique.score ? "bg-green-600 border-green-500" : "bg-gray-900 border-gray-700"}`}
+                        className={`w-3 h-3 border ${i < critique.score ? "bg-green-600 border-green-500" : "bg-[#09090b] border-[rgba(255,255,255,0.1)]"}`}
                       />
                     ))}
                   </div>
@@ -597,7 +597,7 @@ function NegotiationPanel() {
                     <div className="text-green-500 font-mono text-xs mb-1">STRENGTHS</div>
                     <ul className="flex flex-col gap-1">
                       {critique.strengths.map((s, i) => (
-                        <li key={i} className="text-gray-400 text-xs">{s}</li>
+                        <li key={i} className="text-[rgba(255,255,255,0.5)] text-xs">{s}</li>
                       ))}
                     </ul>
                   </div>
@@ -605,14 +605,14 @@ function NegotiationPanel() {
                     <div className="text-red-400 font-mono text-xs mb-1">WEAKNESSES</div>
                     <ul className="flex flex-col gap-1">
                       {critique.weaknesses.map((w, i) => (
-                        <li key={i} className="text-gray-400 text-xs">{w}</li>
+                        <li key={i} className="text-[rgba(255,255,255,0.5)] text-xs">{w}</li>
                       ))}
                     </ul>
                   </div>
                 </div>
                 <div className="bg-black border border-amber-900/30 rounded p-3">
                   <div className="text-amber-400 font-mono text-xs mb-1">BETTER MOVE</div>
-                  <div className="text-gray-300 text-sm">{critique.better_move}</div>
+                  <div className="text-[rgba(255,255,255,0.7)] text-sm">{critique.better_move}</div>
                 </div>
               </div>
             )}
@@ -629,12 +629,12 @@ export function NegotiationView({ onBack }: { onBack: () => void }) {
   const [tab, setTab] = useState<"debate" | "negotiation">("debate");
 
   return (
-    <div className="flex flex-col h-full bg-black text-gray-200">
+    <div className="flex flex-col h-full bg-black text-[rgba(255,255,255,0.85)]">
       {/* Header */}
-      <div className="flex items-center gap-4 px-4 py-3 border-b border-gray-800 shrink-0">
+      <div className="flex items-center gap-4 px-4 py-3 border-b border-[rgba(255,255,255,0.07)] shrink-0">
         <button
           onClick={onBack}
-          className="text-gray-600 hover:text-gray-300 font-mono text-xs transition-colors"
+          className="text-[rgba(255,255,255,0.3)] hover:text-[rgba(255,255,255,0.7)] font-mono text-xs transition-colors"
         >
           ← BACK
         </button>
@@ -648,7 +648,7 @@ export function NegotiationView({ onBack }: { onBack: () => void }) {
             className={`font-mono text-xs px-4 py-1.5 border transition-colors ${
               tab === "debate"
                 ? "border-green-700 text-green-400 bg-green-900/20"
-                : "border-gray-700 text-gray-500 hover:text-gray-300"
+                : "border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)]"
             }`}
           >
             ⚔ DEBATE
@@ -658,7 +658,7 @@ export function NegotiationView({ onBack }: { onBack: () => void }) {
             className={`font-mono text-xs px-4 py-1.5 border transition-colors ${
               tab === "negotiation"
                 ? "border-green-700 text-green-400 bg-green-900/20"
-                : "border-gray-700 text-gray-500 hover:text-gray-300"
+                : "border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)]"
             }`}
           >
             🤝 NEGOTIATION PREP

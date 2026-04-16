@@ -217,7 +217,7 @@ export function DashboardGlance({ onNavigate, onOpenChat }: Props) {
     load();
 
     // Refresh perception live
-    const unlistenPerc = listen<PerceptionState>("god_mode_update", (e) => {
+    const unlistenPerc = listen<PerceptionState>("godmode_update", (e) => {
       setPerception(e.payload as unknown as PerceptionState);
     });
 

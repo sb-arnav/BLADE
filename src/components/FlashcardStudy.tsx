@@ -252,9 +252,9 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
   // ── Render ────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950 text-zinc-100">
+    <div className="flex flex-col h-full bg-[#09090b] text-white">
       {/* ── Header ──────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/60">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.07)]/60">
         <div className="flex items-center gap-3">
           <button
             onClick={() => {
@@ -265,7 +265,7 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
                 onBack();
               }
             }}
-            className="p-1.5 rounded-md hover:bg-zinc-800 transition-colors text-zinc-400 hover:text-zinc-200"
+            className="p-1.5 rounded-md hover:bg-[rgba(255,255,255,0.04)] transition-colors text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)]"
           >
             <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M19 12H5M12 19l-7-7 7-7" />
@@ -283,13 +283,13 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
             <>
               <button
                 onClick={handleImportFromChat}
-                className="px-2.5 py-1.5 text-xs rounded-md bg-zinc-800 hover:bg-zinc-700 transition-colors text-zinc-300"
+                className="px-2.5 py-1.5 text-xs rounded-md bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.07)] transition-colors text-[rgba(255,255,255,0.7)]"
               >
                 Import from Chat
               </button>
               <button
                 onClick={() => handleOpenEditor()}
-                className="px-2.5 py-1.5 text-xs rounded-md bg-zinc-800 hover:bg-zinc-700 transition-colors text-zinc-300"
+                className="px-2.5 py-1.5 text-xs rounded-md bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.07)] transition-colors text-[rgba(255,255,255,0.7)]"
               >
                 + Card
               </button>
@@ -308,9 +308,9 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
       <div className="flex-1 overflow-y-auto">
         {/* ── Stats bar ──────────────────────────────────────────────── */}
         {view === "decks" && (
-          <div className="px-4 py-3 border-b border-zinc-800/40 flex items-center gap-6 text-xs text-zinc-500">
+          <div className="px-4 py-3 border-b border-[rgba(255,255,255,0.07)]/40 flex items-center gap-6 text-xs text-[rgba(255,255,255,0.4)]">
             <span>
-              <span className="text-zinc-300 font-medium">{stats.totalCards}</span> cards
+              <span className="text-[rgba(255,255,255,0.7)] font-medium">{stats.totalCards}</span> cards
             </span>
             <span>
               <span className="text-amber-400 font-medium">{stats.dueToday}</span> due
@@ -319,7 +319,7 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
               <span className="text-emerald-400 font-medium">{stats.masteredCards}</span> mastered
             </span>
             <span>
-              <span className="text-zinc-300 font-medium">{stats.averageAccuracy}%</span> accuracy
+              <span className="text-[rgba(255,255,255,0.7)] font-medium">{stats.averageAccuracy}%</span> accuracy
             </span>
             {stats.streakDays > 0 && (
               <span>
@@ -333,36 +333,36 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
         {view === "decks" && (
           <div className="p-4">
             {fc.decks.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-zinc-500">
-                <svg viewBox="0 0 24 24" className="w-12 h-12 mb-3 text-zinc-700" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <div className="flex flex-col items-center justify-center py-20 text-[rgba(255,255,255,0.4)]">
+                <svg viewBox="0 0 24 24" className="w-12 h-12 mb-3 text-[rgba(255,255,255,0.2)]" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <rect x="3" y="3" width="18" height="18" rx="2" />
                   <path d="M3 9h18M9 3v18" />
                 </svg>
                 <p className="text-sm mb-1">No flashcard decks yet</p>
-                <p className="text-xs text-zinc-600">Create a deck to start studying</p>
+                <p className="text-xs text-[rgba(255,255,255,0.3)]">Create a deck to start studying</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {fc.decks.map((deck) => (
                   <div
                     key={deck.id}
-                    className="bg-zinc-900 border border-zinc-800/60 rounded-lg p-4 hover:border-zinc-700 transition-colors group"
+                    className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)]/60 rounded-lg p-4 hover:border-[rgba(255,255,255,0.1)] transition-colors group"
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-md bg-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-blue-400 transition-colors">
+                        <div className="w-8 h-8 rounded-md bg-[rgba(255,255,255,0.04)] flex items-center justify-center text-[rgba(255,255,255,0.5)] group-hover:text-blue-400 transition-colors">
                           <DeckIcon icon={deck.icon} className="w-4 h-4" />
                         </div>
                         <div>
-                          <h3 className="text-sm font-medium text-zinc-200">{deck.name}</h3>
+                          <h3 className="text-sm font-medium text-[rgba(255,255,255,0.85)]">{deck.name}</h3>
                           {deck.description && (
-                            <p className="text-xs text-zinc-500 mt-0.5 line-clamp-1">{deck.description}</p>
+                            <p className="text-xs text-[rgba(255,255,255,0.4)] mt-0.5 line-clamp-1">{deck.description}</p>
                           )}
                         </div>
                       </div>
                       <button
                         onClick={() => fc.deleteDeck(deck.id)}
-                        className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-zinc-800 text-zinc-600 hover:text-red-400 transition-all"
+                        className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.3)] hover:text-red-400 transition-all"
                       >
                         <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
@@ -370,14 +370,14 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
                       </button>
                     </div>
 
-                    <div className="flex items-center gap-4 mb-3 text-xs text-zinc-500">
+                    <div className="flex items-center gap-4 mb-3 text-xs text-[rgba(255,255,255,0.4)]">
                       <span>{deck.cardCount} cards</span>
                       <span className="text-amber-400/80">{deck.dueCount} due</span>
                       <span className="text-emerald-400/80">{deck.masteredCount} mastered</span>
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-zinc-600">
+                      <span className="text-[10px] text-[rgba(255,255,255,0.3)]">
                         Studied {formatRelative(deck.lastStudied)}
                       </span>
                       <div className="flex items-center gap-1.5">
@@ -386,14 +386,14 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
                             setGenDeckId(deck.id);
                             setShowGenerate(true);
                           }}
-                          className="px-2 py-1 text-[10px] rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
+                          className="px-2 py-1 text-[10px] rounded bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.07)] text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] transition-colors"
                         >
                           AI Generate
                         </button>
                         <button
                           onClick={() => handleStartStudy(deck.id)}
                           disabled={deck.dueCount === 0}
-                          className="px-2.5 py-1 text-[10px] rounded bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white font-medium transition-colors"
+                          className="px-2.5 py-1 text-[10px] rounded bg-blue-600 hover:bg-blue-500 disabled:bg-[rgba(255,255,255,0.04)] disabled:text-[rgba(255,255,255,0.3)] text-white font-medium transition-colors"
                         >
                           Study Now{deck.dueCount > 0 ? ` (${deck.dueCount})` : ""}
                         </button>
@@ -411,17 +411,17 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
           <div className="flex flex-col items-center px-4 py-6 h-full">
             {/* Progress bar */}
             <div className="w-full max-w-xl mb-6">
-              <div className="flex items-center justify-between mb-2 text-xs text-zinc-500">
+              <div className="flex items-center justify-between mb-2 text-xs text-[rgba(255,255,255,0.4)]">
                 <span>
                   Card {fc.session.currentIndex + 1} of {fc.session.cards.length}
                 </span>
                 <div className="flex items-center gap-3">
                   <span className="text-emerald-400">{fc.session.correct} correct</span>
                   <span className="text-red-400">{fc.session.incorrect} incorrect</span>
-                  <span className="text-zinc-500">{fc.session.skipped} skipped</span>
+                  <span className="text-[rgba(255,255,255,0.4)]">{fc.session.skipped} skipped</span>
                 </div>
               </div>
-              <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+              <div className="w-full h-1.5 bg-[rgba(255,255,255,0.04)] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-blue-500 rounded-full transition-all duration-300"
                   style={{
@@ -443,20 +443,20 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
                 }`}
               >
                 {/* Front */}
-                <div className="absolute inset-0 backface-hidden bg-zinc-900 border border-zinc-800/60 rounded-xl p-8 flex flex-col items-center justify-center">
-                  <span className="text-[10px] uppercase tracking-widest text-zinc-600 mb-4">Question</span>
-                  <p className="text-xl text-center font-medium text-zinc-100 leading-relaxed">
+                <div className="absolute inset-0 backface-hidden bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)]/60 rounded-xl p-8 flex flex-col items-center justify-center">
+                  <span className="text-[10px] uppercase tracking-widest text-[rgba(255,255,255,0.3)] mb-4">Question</span>
+                  <p className="text-xl text-center font-medium text-white leading-relaxed">
                     {currentCard.front}
                   </p>
-                  <span className="mt-6 text-[10px] text-zinc-600">
+                  <span className="mt-6 text-[10px] text-[rgba(255,255,255,0.3)]">
                     Click or press Space to flip
                   </span>
                 </div>
 
                 {/* Back */}
-                <div className="absolute inset-0 backface-hidden [transform:rotateY(180deg)] bg-zinc-900 border border-blue-800/40 rounded-xl p-8 flex flex-col items-center justify-center">
+                <div className="absolute inset-0 backface-hidden [transform:rotateY(180deg)] bg-[#0a0a0f] border border-blue-800/40 rounded-xl p-8 flex flex-col items-center justify-center">
                   <span className="text-[10px] uppercase tracking-widest text-blue-400/60 mb-4">Answer</span>
-                  <p className="text-lg text-center text-zinc-200 leading-relaxed whitespace-pre-wrap">
+                  <p className="text-lg text-center text-[rgba(255,255,255,0.85)] leading-relaxed whitespace-pre-wrap">
                     {currentCard.back}
                   </p>
                 </div>
@@ -502,7 +502,7 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
                 {currentCard.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="px-2 py-0.5 rounded-full bg-zinc-800 text-[10px] text-zinc-500"
+                    className="px-2 py-0.5 rounded-full bg-[rgba(255,255,255,0.04)] text-[10px] text-[rgba(255,255,255,0.4)]"
                   >
                     {tag}
                   </span>
@@ -513,7 +513,7 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
             {/* Edit card link */}
             <button
               onClick={() => handleOpenEditor(currentCard)}
-              className="mt-3 text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors"
+              className="mt-3 text-[10px] text-[rgba(255,255,255,0.3)] hover:text-[rgba(255,255,255,0.5)] transition-colors"
             >
               Edit this card
             </button>
@@ -528,32 +528,32 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
                 <path d="M20 6L9 17l-5-5" />
               </svg>
             </div>
-            <h2 className="text-lg font-semibold text-zinc-100 mb-1">Session Complete!</h2>
-            <p className="text-sm text-zinc-500 mb-6">
+            <h2 className="text-lg font-semibold text-white mb-1">Session Complete!</h2>
+            <p className="text-sm text-[rgba(255,255,255,0.4)] mb-6">
               Great work studying{" "}
               {fc.decks.find((d) => d.id === activeDeckId)?.name ?? "this deck"}.
             </p>
 
             <div className="grid grid-cols-3 gap-4 mb-8 w-full max-w-sm">
-              <div className="bg-zinc-900 border border-zinc-800/60 rounded-lg p-3 text-center">
+              <div className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)]/60 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold text-emerald-400">{fc.session.correct}</div>
-                <div className="text-[10px] text-zinc-500 mt-1">Correct</div>
+                <div className="text-[10px] text-[rgba(255,255,255,0.4)] mt-1">Correct</div>
               </div>
-              <div className="bg-zinc-900 border border-zinc-800/60 rounded-lg p-3 text-center">
+              <div className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)]/60 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold text-red-400">{fc.session.incorrect}</div>
-                <div className="text-[10px] text-zinc-500 mt-1">Incorrect</div>
+                <div className="text-[10px] text-[rgba(255,255,255,0.4)] mt-1">Incorrect</div>
               </div>
-              <div className="bg-zinc-900 border border-zinc-800/60 rounded-lg p-3 text-center">
-                <div className="text-2xl font-bold text-zinc-300">
+              <div className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)]/60 rounded-lg p-3 text-center">
+                <div className="text-2xl font-bold text-[rgba(255,255,255,0.7)]">
                   {formatDuration(Date.now() - fc.session.startedAt)}
                 </div>
-                <div className="text-[10px] text-zinc-500 mt-1">Time</div>
+                <div className="text-[10px] text-[rgba(255,255,255,0.4)] mt-1">Time</div>
               </div>
             </div>
 
             {fc.session.correct + fc.session.incorrect > 0 && (
               <div className="mb-6 w-full max-w-sm">
-                <div className="flex items-center justify-between text-xs text-zinc-500 mb-1">
+                <div className="flex items-center justify-between text-xs text-[rgba(255,255,255,0.4)] mb-1">
                   <span>Score</span>
                   <span>
                     {Math.round(
@@ -562,7 +562,7 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
                     %
                   </span>
                 </div>
-                <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+                <div className="w-full h-2 bg-[rgba(255,255,255,0.04)] rounded-full overflow-hidden">
                   <div
                     className="h-full bg-emerald-500 rounded-full"
                     style={{
@@ -579,7 +579,7 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
                   fc.endSession();
                   setView("decks");
                 }}
-                className="px-4 py-2 text-sm rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+                className="px-4 py-2 text-sm rounded-md bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.07)] text-[rgba(255,255,255,0.7)] transition-colors"
               >
                 Back to Decks
               </button>
@@ -602,11 +602,11 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
             <div className="space-y-4">
               {/* Deck selector */}
               <div>
-                <label className="block text-xs text-zinc-500 mb-1.5">Deck</label>
+                <label className="block text-xs text-[rgba(255,255,255,0.4)] mb-1.5">Deck</label>
                 <select
                   value={editDeckId}
                   onChange={(e) => setEditDeckId(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-zinc-900 border border-zinc-800 rounded-md text-zinc-200 focus:outline-none focus:border-zinc-600"
+                  className="w-full px-3 py-2 text-sm bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] rounded-md text-[rgba(255,255,255,0.85)] focus:outline-none focus:border-[rgba(255,255,255,0.15)]"
                 >
                   <option value="">Select deck...</option>
                   {fc.decks.map((d) => (
@@ -619,36 +619,36 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
 
               {/* Front */}
               <div>
-                <label className="block text-xs text-zinc-500 mb-1.5">Front (Question / Term)</label>
+                <label className="block text-xs text-[rgba(255,255,255,0.4)] mb-1.5">Front (Question / Term)</label>
                 <textarea
                   value={editFront}
                   onChange={(e) => setEditFront(e.target.value)}
                   rows={3}
                   placeholder="Enter the question or term..."
-                  className="w-full px-3 py-2 text-sm bg-zinc-900 border border-zinc-800 rounded-md text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-600 resize-none"
+                  className="w-full px-3 py-2 text-sm bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] rounded-md text-[rgba(255,255,255,0.85)] placeholder-zinc-600 focus:outline-none focus:border-[rgba(255,255,255,0.15)] resize-none"
                 />
               </div>
 
               {/* Back */}
               <div>
-                <label className="block text-xs text-zinc-500 mb-1.5">Back (Answer / Definition)</label>
+                <label className="block text-xs text-[rgba(255,255,255,0.4)] mb-1.5">Back (Answer / Definition)</label>
                 <textarea
                   value={editBack}
                   onChange={(e) => setEditBack(e.target.value)}
                   rows={4}
                   placeholder="Enter the answer or definition..."
-                  className="w-full px-3 py-2 text-sm bg-zinc-900 border border-zinc-800 rounded-md text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-600 resize-none"
+                  className="w-full px-3 py-2 text-sm bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] rounded-md text-[rgba(255,255,255,0.85)] placeholder-zinc-600 focus:outline-none focus:border-[rgba(255,255,255,0.15)] resize-none"
                 />
               </div>
 
               {/* Tags */}
               <div>
-                <label className="block text-xs text-zinc-500 mb-1.5">Tags (comma separated)</label>
+                <label className="block text-xs text-[rgba(255,255,255,0.4)] mb-1.5">Tags (comma separated)</label>
                 <input
                   value={editTags}
                   onChange={(e) => setEditTags(e.target.value)}
                   placeholder="e.g. react, hooks, basics"
-                  className="w-full px-3 py-2 text-sm bg-zinc-900 border border-zinc-800 rounded-md text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
+                  className="w-full px-3 py-2 text-sm bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] rounded-md text-[rgba(255,255,255,0.85)] placeholder-zinc-600 focus:outline-none focus:border-[rgba(255,255,255,0.15)]"
                 />
               </div>
 
@@ -670,14 +670,14 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setView("decks")}
-                    className="px-3 py-1.5 text-xs rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+                    className="px-3 py-1.5 text-xs rounded-md bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.07)] text-[rgba(255,255,255,0.7)] transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleSaveCard}
                     disabled={!editFront.trim() || !editBack.trim() || !editDeckId}
-                    className="px-3 py-1.5 text-xs rounded-md bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white transition-colors"
+                    className="px-3 py-1.5 text-xs rounded-md bg-blue-600 hover:bg-blue-500 disabled:bg-[rgba(255,255,255,0.04)] disabled:text-[rgba(255,255,255,0.3)] text-white transition-colors"
                   >
                     {editingCard ? "Save Changes" : "Add Card"}
                   </button>
@@ -687,14 +687,14 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
 
             {/* Preview */}
             {(editFront.trim() || editBack.trim()) && (
-              <div className="mt-6 border-t border-zinc-800/40 pt-4">
-                <p className="text-[10px] uppercase tracking-widest text-zinc-600 mb-3">Preview</p>
-                <div className="bg-zinc-900 border border-zinc-800/60 rounded-xl p-6 text-center">
-                  <p className="text-lg font-medium text-zinc-100 mb-4">
+              <div className="mt-6 border-t border-[rgba(255,255,255,0.07)]/40 pt-4">
+                <p className="text-[10px] uppercase tracking-widest text-[rgba(255,255,255,0.3)] mb-3">Preview</p>
+                <div className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)]/60 rounded-xl p-6 text-center">
+                  <p className="text-lg font-medium text-white mb-4">
                     {editFront || "Front side"}
                   </p>
-                  <div className="w-12 h-px bg-zinc-800 mx-auto mb-4" />
-                  <p className="text-sm text-zinc-400">{editBack || "Back side"}</p>
+                  <div className="w-12 h-px bg-[rgba(255,255,255,0.04)] mx-auto mb-4" />
+                  <p className="text-sm text-[rgba(255,255,255,0.5)]">{editBack || "Back side"}</p>
                 </div>
               </div>
             )}
@@ -705,41 +705,41 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
       {/* ── New Deck Modal ───────────────────────────────────────────── */}
       {showNewDeck && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 w-full max-w-sm mx-4 shadow-2xl">
-            <h3 className="text-sm font-semibold text-zinc-200 mb-4">Create New Deck</h3>
+          <div className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] rounded-xl p-5 w-full max-w-sm mx-4 shadow-2xl">
+            <h3 className="text-sm font-semibold text-[rgba(255,255,255,0.85)] mb-4">Create New Deck</h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-zinc-500 mb-1">Name</label>
+                <label className="block text-xs text-[rgba(255,255,255,0.4)] mb-1">Name</label>
                 <input
                   value={newDeckName}
                   onChange={(e) => setNewDeckName(e.target.value)}
                   placeholder="e.g. JavaScript Fundamentals"
                   autoFocus
                   onKeyDown={(e) => e.key === "Enter" && handleCreateDeck()}
-                  className="w-full px-3 py-2 text-sm bg-zinc-800 border border-zinc-700 rounded-md text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+                  className="w-full px-3 py-2 text-sm bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded-md text-[rgba(255,255,255,0.85)] placeholder-zinc-600 focus:outline-none focus:border-[rgba(255,255,255,0.2)]"
                 />
               </div>
               <div>
-                <label className="block text-xs text-zinc-500 mb-1">Description (optional)</label>
+                <label className="block text-xs text-[rgba(255,255,255,0.4)] mb-1">Description (optional)</label>
                 <input
                   value={newDeckDesc}
                   onChange={(e) => setNewDeckDesc(e.target.value)}
                   placeholder="What is this deck about?"
-                  className="w-full px-3 py-2 text-sm bg-zinc-800 border border-zinc-700 rounded-md text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+                  className="w-full px-3 py-2 text-sm bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded-md text-[rgba(255,255,255,0.85)] placeholder-zinc-600 focus:outline-none focus:border-[rgba(255,255,255,0.2)]"
                 />
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 mt-4">
               <button
                 onClick={() => setShowNewDeck(false)}
-                className="px-3 py-1.5 text-xs rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+                className="px-3 py-1.5 text-xs rounded-md bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.07)] text-[rgba(255,255,255,0.7)] transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateDeck}
                 disabled={!newDeckName.trim()}
-                className="px-3 py-1.5 text-xs rounded-md bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white transition-colors"
+                className="px-3 py-1.5 text-xs rounded-md bg-blue-600 hover:bg-blue-500 disabled:bg-[rgba(255,255,255,0.04)] disabled:text-[rgba(255,255,255,0.3)] text-white transition-colors"
               >
                 Create Deck
               </button>
@@ -751,26 +751,26 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
       {/* ── Generate Modal ───────────────────────────────────────────── */}
       {showGenerate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 w-full max-w-md mx-4 shadow-2xl">
-            <h3 className="text-sm font-semibold text-zinc-200 mb-1">AI Generate Flashcards</h3>
-            <p className="text-xs text-zinc-500 mb-4">
+          <div className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] rounded-xl p-5 w-full max-w-md mx-4 shadow-2xl">
+            <h3 className="text-sm font-semibold text-[rgba(255,255,255,0.85)] mb-1">AI Generate Flashcards</h3>
+            <p className="text-xs text-[rgba(255,255,255,0.4)] mb-4">
               Enter a topic and the AI will create flashcards for you.
             </p>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-zinc-500 mb-1">Topic</label>
+                <label className="block text-xs text-[rgba(255,255,255,0.4)] mb-1">Topic</label>
                 <input
                   value={genTopic}
                   onChange={(e) => setGenTopic(e.target.value)}
                   placeholder="e.g. React hooks, Photosynthesis, WW2 battles"
                   autoFocus
                   onKeyDown={(e) => e.key === "Enter" && handleGenerate()}
-                  className="w-full px-3 py-2 text-sm bg-zinc-800 border border-zinc-700 rounded-md text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+                  className="w-full px-3 py-2 text-sm bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded-md text-[rgba(255,255,255,0.85)] placeholder-zinc-600 focus:outline-none focus:border-[rgba(255,255,255,0.2)]"
                 />
               </div>
               <div>
-                <label className="block text-xs text-zinc-500 mb-1">
-                  Number of cards: <span className="text-zinc-300 font-medium">{genCount}</span>
+                <label className="block text-xs text-[rgba(255,255,255,0.4)] mb-1">
+                  Number of cards: <span className="text-[rgba(255,255,255,0.7)] font-medium">{genCount}</span>
                 </label>
                 <input
                   type="range"
@@ -781,17 +781,17 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
                   onChange={(e) => setGenCount(Number(e.target.value))}
                   className="w-full accent-blue-500"
                 />
-                <div className="flex justify-between text-[10px] text-zinc-600 mt-0.5">
+                <div className="flex justify-between text-[10px] text-[rgba(255,255,255,0.3)] mt-0.5">
                   <span>5</span>
                   <span>50</span>
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-zinc-500 mb-1">Deck</label>
+                <label className="block text-xs text-[rgba(255,255,255,0.4)] mb-1">Deck</label>
                 <select
                   value={genDeckId ?? ""}
                   onChange={(e) => setGenDeckId(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-zinc-800 border border-zinc-700 rounded-md text-zinc-200 focus:outline-none focus:border-zinc-500"
+                  className="w-full px-3 py-2 text-sm bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] rounded-md text-[rgba(255,255,255,0.85)] focus:outline-none focus:border-[rgba(255,255,255,0.2)]"
                 >
                   {fc.decks.map((d) => (
                     <option key={d.id} value={d.id}>
@@ -807,14 +807,14 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
                   setShowGenerate(false);
                   setGenTopic("");
                 }}
-                className="px-3 py-1.5 text-xs rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+                className="px-3 py-1.5 text-xs rounded-md bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.07)] text-[rgba(255,255,255,0.7)] transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleGenerate}
                 disabled={!genTopic.trim() || genLoading}
-                className="px-3 py-1.5 text-xs rounded-md bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white transition-colors flex items-center gap-1.5"
+                className="px-3 py-1.5 text-xs rounded-md bg-blue-600 hover:bg-blue-500 disabled:bg-[rgba(255,255,255,0.04)] disabled:text-[rgba(255,255,255,0.3)] text-white transition-colors flex items-center gap-1.5"
               >
                 {genLoading ? (
                   <>

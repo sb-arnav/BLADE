@@ -131,37 +131,37 @@ export function SkillModeSelector({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={(e) => e.target === overlayRef.current && onClose()}
     >
-      <div className="bg-zinc-900 border border-zinc-700/60 rounded-2xl shadow-2xl w-[720px] max-h-[85vh] flex flex-col overflow-hidden">
+      <div className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.1)]/60 rounded-2xl shadow-2xl w-[720px] max-h-[85vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
           <div>
-            <h2 className="text-lg font-semibold text-zinc-100">Skill Modes</h2>
+            <h2 className="text-lg font-semibold text-white">Skill Modes</h2>
             {activeMode && activeMode.id !== "default" ? (
               <div className="flex items-center gap-2 mt-1">
-                <span className="text-xs text-zinc-400">
+                <span className="text-xs text-[rgba(255,255,255,0.5)]">
                   Currently: <span className="text-accent font-medium">{activeMode.icon} {activeMode.name}</span>
                 </span>
                 <button
                   onClick={handleDeactivate}
-                  className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 hover:text-red-400 hover:bg-zinc-700 transition-colors"
+                  className="text-[10px] px-2 py-0.5 rounded-full bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.5)] hover:text-red-400 hover:bg-[rgba(255,255,255,0.07)] transition-colors"
                 >
                   Deactivate
                 </button>
               </div>
             ) : (
-              <p className="text-xs text-zinc-500 mt-0.5">Switch AI personality and capabilities</p>
+              <p className="text-xs text-[rgba(255,255,255,0.4)] mt-0.5">Switch AI personality and capabilities</p>
             )}
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCreating(true)}
-              className="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 transition-colors border border-zinc-700/50"
+              className="text-xs px-3 py-1.5 rounded-lg bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.7)] hover:bg-[rgba(255,255,255,0.07)] hover:text-white transition-colors border border-[rgba(255,255,255,0.1)]/50"
             >
               + Custom Mode
             </button>
             <button
               onClick={onClose}
-              className="text-zinc-500 hover:text-zinc-300 transition-colors p-1"
+              className="text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] transition-colors p-1"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -178,7 +178,7 @@ export function SkillModeSelector({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search modes... (or type /mode-name in chat)"
-            className="w-full bg-zinc-800/80 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-zinc-600 transition-colors"
+            className="w-full bg-[rgba(255,255,255,0.04)]/80 border border-[rgba(255,255,255,0.1)]/50 rounded-lg px-3 py-2 text-sm text-[rgba(255,255,255,0.85)] placeholder-zinc-500 outline-none focus:border-[rgba(255,255,255,0.15)] transition-colors"
           />
           <div className="flex gap-1 overflow-x-auto scrollbar-none">
             {ALL_TABS.map((t) => (
@@ -187,8 +187,8 @@ export function SkillModeSelector({
                 onClick={() => setTab(t.key)}
                 className={`text-xs px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
                   tab === t.key
-                    ? "bg-zinc-700 text-zinc-100 font-medium"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
+                    ? "bg-[rgba(255,255,255,0.07)] text-white font-medium"
+                    : "text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] hover:bg-[rgba(255,255,255,0.04)]"
                 }`}
               >
                 {t.label}
@@ -202,20 +202,20 @@ export function SkillModeSelector({
           {creating ? (
             /* Create Custom Mode Form */
             <div className="space-y-4">
-              <h3 className="text-sm font-medium text-zinc-200">Create Custom Mode</h3>
+              <h3 className="text-sm font-medium text-[rgba(255,255,255,0.85)]">Create Custom Mode</h3>
 
               <div className="flex gap-3">
                 <div>
-                  <label className="text-xs text-zinc-400 block mb-1">Icon</label>
-                  <div className="grid grid-cols-8 gap-1 bg-zinc-800 rounded-lg p-2 border border-zinc-700/50">
+                  <label className="text-xs text-[rgba(255,255,255,0.5)] block mb-1">Icon</label>
+                  <div className="grid grid-cols-8 gap-1 bg-[rgba(255,255,255,0.04)] rounded-lg p-2 border border-[rgba(255,255,255,0.1)]/50">
                     {EMOJI_OPTIONS.map((e) => (
                       <button
                         key={e}
                         onClick={() => setForm((f) => ({ ...f, icon: e }))}
                         className={`w-8 h-8 rounded-md text-base flex items-center justify-center transition-colors ${
                           form.icon === e
-                            ? "bg-zinc-600 ring-1 ring-accent"
-                            : "hover:bg-zinc-700"
+                            ? "bg-[rgba(255,255,255,0.04)] ring-1 ring-accent"
+                            : "hover:bg-[rgba(255,255,255,0.07)]"
                         }`}
                       >
                         {e}
@@ -226,21 +226,21 @@ export function SkillModeSelector({
 
                 <div className="flex-1 space-y-3">
                   <div>
-                    <label className="text-xs text-zinc-400 block mb-1">Name</label>
+                    <label className="text-xs text-[rgba(255,255,255,0.5)] block mb-1">Name</label>
                     <input
                       value={form.name}
                       onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                       placeholder="e.g., Marketing Copywriter"
-                      className="w-full bg-zinc-800/80 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-zinc-600"
+                      className="w-full bg-[rgba(255,255,255,0.04)]/80 border border-[rgba(255,255,255,0.1)]/50 rounded-lg px-3 py-2 text-sm text-[rgba(255,255,255,0.85)] placeholder-zinc-500 outline-none focus:border-[rgba(255,255,255,0.15)]"
                     />
                   </div>
 
                   <div>
-                    <label className="text-xs text-zinc-400 block mb-1">Category</label>
+                    <label className="text-xs text-[rgba(255,255,255,0.5)] block mb-1">Category</label>
                     <select
                       value={form.category}
                       onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as SkillCategory }))}
-                      className="w-full bg-zinc-800/80 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-zinc-200 outline-none focus:border-zinc-600"
+                      className="w-full bg-[rgba(255,255,255,0.04)]/80 border border-[rgba(255,255,255,0.1)]/50 rounded-lg px-3 py-2 text-sm text-[rgba(255,255,255,0.85)] outline-none focus:border-[rgba(255,255,255,0.15)]"
                     >
                       {SKILL_CATEGORIES.map((c) => (
                         <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
@@ -251,30 +251,30 @@ export function SkillModeSelector({
               </div>
 
               <div>
-                <label className="text-xs text-zinc-400 block mb-1">Description</label>
+                <label className="text-xs text-[rgba(255,255,255,0.5)] block mb-1">Description</label>
                 <input
                   value={form.description}
                   onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                   placeholder="Short description of what this mode does"
-                  className="w-full bg-zinc-800/80 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-zinc-600"
+                  className="w-full bg-[rgba(255,255,255,0.04)]/80 border border-[rgba(255,255,255,0.1)]/50 rounded-lg px-3 py-2 text-sm text-[rgba(255,255,255,0.85)] placeholder-zinc-500 outline-none focus:border-[rgba(255,255,255,0.15)]"
                 />
               </div>
 
               <div>
-                <label className="text-xs text-zinc-400 block mb-1">System Prompt</label>
+                <label className="text-xs text-[rgba(255,255,255,0.5)] block mb-1">System Prompt</label>
                 <textarea
                   value={form.systemPrompt}
                   onChange={(e) => setForm((f) => ({ ...f, systemPrompt: e.target.value }))}
                   placeholder="You are a... Describe the AI persona and behavior in 2-4 sentences."
                   rows={4}
-                  className="w-full bg-zinc-800/80 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-zinc-600 resize-none"
+                  className="w-full bg-[rgba(255,255,255,0.04)]/80 border border-[rgba(255,255,255,0.1)]/50 rounded-lg px-3 py-2 text-sm text-[rgba(255,255,255,0.85)] placeholder-zinc-500 outline-none focus:border-[rgba(255,255,255,0.15)] resize-none"
                 />
               </div>
 
               <div className="flex gap-2 justify-end">
                 <button
                   onClick={() => setCreating(false)}
-                  className="text-xs px-4 py-2 rounded-lg text-zinc-400 hover:text-zinc-200 transition-colors"
+                  className="text-xs px-4 py-2 rounded-lg text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] transition-colors"
                 >
                   Cancel
                 </button>
@@ -292,7 +292,7 @@ export function SkillModeSelector({
             <div className="space-y-4">
               <button
                 onClick={() => setPreview(null)}
-                className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1"
+                className="text-xs text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] transition-colors flex items-center gap-1"
               >
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                   <path d="M8 2L4 6l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -303,9 +303,9 @@ export function SkillModeSelector({
               <div className="flex items-start gap-3">
                 <span className="text-3xl">{preview.icon}</span>
                 <div className="flex-1">
-                  <h3 className="text-base font-semibold text-zinc-100">{preview.name}</h3>
-                  <p className="text-sm text-zinc-400 mt-0.5">{preview.description}</p>
-                  <span className="inline-block mt-2 text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 capitalize">
+                  <h3 className="text-base font-semibold text-white">{preview.name}</h3>
+                  <p className="text-sm text-[rgba(255,255,255,0.5)] mt-0.5">{preview.description}</p>
+                  <span className="inline-block mt-2 text-[10px] px-2 py-0.5 rounded-full bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.5)] capitalize">
                     {preview.category}
                   </span>
                 </div>
@@ -325,7 +325,7 @@ export function SkillModeSelector({
                     onClick={() => handleActivate(preview)}
                     className={`text-xs px-4 py-1.5 rounded-lg font-medium transition ${
                       activeMode?.id === preview.id
-                        ? "bg-zinc-700 text-zinc-300"
+                        ? "bg-[rgba(255,255,255,0.07)] text-[rgba(255,255,255,0.7)]"
                         : "bg-accent text-white hover:brightness-110"
                     }`}
                   >
@@ -336,8 +336,8 @@ export function SkillModeSelector({
 
               {preview.systemPrompt && (
                 <div>
-                  <h4 className="text-xs font-medium text-zinc-400 mb-1.5">System Prompt</h4>
-                  <div className="bg-zinc-800/60 border border-zinc-700/40 rounded-lg p-3 text-sm text-zinc-300 leading-relaxed">
+                  <h4 className="text-xs font-medium text-[rgba(255,255,255,0.5)] mb-1.5">System Prompt</h4>
+                  <div className="bg-[rgba(255,255,255,0.04)]/60 border border-[rgba(255,255,255,0.1)]/40 rounded-lg p-3 text-sm text-[rgba(255,255,255,0.7)] leading-relaxed">
                     {preview.systemPrompt}
                   </div>
                 </div>
@@ -345,17 +345,17 @@ export function SkillModeSelector({
 
               {preview.examples.length > 0 && (
                 <div>
-                  <h4 className="text-xs font-medium text-zinc-400 mb-1.5">Example Prompts</h4>
+                  <h4 className="text-xs font-medium text-[rgba(255,255,255,0.5)] mb-1.5">Example Prompts</h4>
                   <div className="space-y-1.5">
                     {preview.examples.map((ex, i) => (
                       <div
                         key={i}
-                        className="bg-zinc-800/40 border border-zinc-700/30 rounded-lg px-3 py-2 text-sm text-zinc-300 cursor-pointer hover:bg-zinc-800/70 transition-colors"
+                        className="bg-[rgba(255,255,255,0.04)]/40 border border-[rgba(255,255,255,0.1)]/30 rounded-lg px-3 py-2 text-sm text-[rgba(255,255,255,0.7)] cursor-pointer hover:bg-[rgba(255,255,255,0.04)]/70 transition-colors"
                         onClick={() => {
                           handleActivate(preview);
                         }}
                       >
-                        <span className="text-zinc-500 mr-1.5">→</span>
+                        <span className="text-[rgba(255,255,255,0.4)] mr-1.5">→</span>
                         {ex}
                       </div>
                     ))}
@@ -365,12 +365,12 @@ export function SkillModeSelector({
 
               {preview.suggestedTools.length > 0 && (
                 <div>
-                  <h4 className="text-xs font-medium text-zinc-400 mb-1.5">Suggested Tools</h4>
+                  <h4 className="text-xs font-medium text-[rgba(255,255,255,0.5)] mb-1.5">Suggested Tools</h4>
                   <div className="flex gap-1.5 flex-wrap">
                     {preview.suggestedTools.map((t) => (
                       <span
                         key={t}
-                        className="text-[11px] px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-400 border border-zinc-700/40"
+                        className="text-[11px] px-2 py-0.5 rounded-md bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.1)]/40"
                       >
                         {t}
                       </span>
@@ -380,8 +380,8 @@ export function SkillModeSelector({
               )}
 
               {preview.shortcut && (
-                <p className="text-xs text-zinc-500">
-                  Shortcut: <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono text-[11px]">{preview.shortcut}</kbd>
+                <p className="text-xs text-[rgba(255,255,255,0.4)]">
+                  Shortcut: <kbd className="px-1.5 py-0.5 rounded bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.7)] font-mono text-[11px]">{preview.shortcut}</kbd>
                 </p>
               )}
             </div>
@@ -389,7 +389,7 @@ export function SkillModeSelector({
             /* Mode Grid */
             <div>
               {filtered.length === 0 ? (
-                <p className="text-center text-sm text-zinc-500 py-12">
+                <p className="text-center text-sm text-[rgba(255,255,255,0.4)] py-12">
                   No modes match your search.
                 </p>
               ) : (
@@ -404,7 +404,7 @@ export function SkillModeSelector({
                         className={`text-left p-3 rounded-xl border transition-all group ${
                           isActive
                             ? "border-accent/60 bg-accent/5 ring-1 ring-accent/30"
-                            : "border-zinc-700/40 bg-zinc-800/40 hover:bg-zinc-800/70 hover:border-zinc-600/50"
+                            : "border-[rgba(255,255,255,0.1)]/40 bg-[rgba(255,255,255,0.04)]/40 hover:bg-[rgba(255,255,255,0.04)]/70 hover:border-[rgba(255,255,255,0.15)]/50"
                         }`}
                       >
                         <div className="flex items-start justify-between">
@@ -413,19 +413,19 @@ export function SkillModeSelector({
                             <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
                           )}
                           {!mode.isBuiltin && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-700/60 text-zinc-500">
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-[rgba(255,255,255,0.07)]/60 text-[rgba(255,255,255,0.4)]">
                               custom
                             </span>
                           )}
                         </div>
-                        <h3 className="text-sm font-medium text-zinc-200 mt-1.5 leading-tight">
+                        <h3 className="text-sm font-medium text-[rgba(255,255,255,0.85)] mt-1.5 leading-tight">
                           {mode.name}
                         </h3>
-                        <p className="text-[11px] text-zinc-500 mt-1 line-clamp-2 leading-snug">
+                        <p className="text-[11px] text-[rgba(255,255,255,0.4)] mt-1 line-clamp-2 leading-snug">
                           {mode.description}
                         </p>
                         {mode.shortcut && (
-                          <span className="inline-block mt-1.5 text-[10px] text-zinc-600 font-mono">
+                          <span className="inline-block mt-1.5 text-[10px] text-[rgba(255,255,255,0.3)] font-mono">
                             {mode.shortcut}
                           </span>
                         )}
@@ -440,11 +440,11 @@ export function SkillModeSelector({
 
         {/* Footer hint */}
         {!creating && !preview && (
-          <div className="px-5 py-2.5 border-t border-zinc-800 flex items-center justify-between">
-            <span className="text-[11px] text-zinc-600">
-              Click to preview, double-click to activate. Type <kbd className="px-1 py-0.5 rounded bg-zinc-800 text-zinc-500 font-mono">/mode-name</kbd> in chat to quick-switch.
+          <div className="px-5 py-2.5 border-t border-[rgba(255,255,255,0.07)] flex items-center justify-between">
+            <span className="text-[11px] text-[rgba(255,255,255,0.3)]">
+              Click to preview, double-click to activate. Type <kbd className="px-1 py-0.5 rounded bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.4)] font-mono">/mode-name</kbd> in chat to quick-switch.
             </span>
-            <span className="text-[11px] text-zinc-600">
+            <span className="text-[11px] text-[rgba(255,255,255,0.3)]">
               {filtered.length} mode{filtered.length !== 1 ? "s" : ""}
             </span>
           </div>

@@ -139,13 +139,13 @@ export function TentacleDetail({ tentacle, onClose, onUpdate, onReconnect }: Ten
                 {meta.label}
               </span>
               {tentacle.status === "online" && (
-                <span className="text-[10px] text-gray-500">— up {fmtUptime(tentacle.uptime)}</span>
+                <span className="text-[10px] text-[rgba(255,255,255,0.4)]">— up {fmtUptime(tentacle.uptime)}</span>
               )}
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-colors text-lg leading-none"
+            className="w-7 h-7 flex items-center justify-center rounded-lg text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] hover:bg-white/5 transition-colors text-lg leading-none"
           >
             ×
           </button>
@@ -166,8 +166,8 @@ export function TentacleDetail({ tentacle, onClose, onUpdate, onReconnect }: Ten
               className="px-3 py-2.5"
               style={{ background: "#0e0e12" }}
             >
-              <div className="text-[9px] uppercase tracking-widest text-gray-600 mb-0.5">{s.label}</div>
-              <div className="text-xs font-semibold text-gray-200 truncate">{s.value}</div>
+              <div className="text-[9px] uppercase tracking-widest text-[rgba(255,255,255,0.3)] mb-0.5">{s.label}</div>
+              <div className="text-xs font-semibold text-[rgba(255,255,255,0.85)] truncate">{s.value}</div>
             </div>
           ))}
         </div>
@@ -194,7 +194,7 @@ export function TentacleDetail({ tentacle, onClose, onUpdate, onReconnect }: Ten
               className="px-3 py-2"
               style={{ background: "#0e0e12" }}
             >
-              <div className="text-[9px] uppercase tracking-widest text-gray-600 mb-0.5">{s.label}</div>
+              <div className="text-[9px] uppercase tracking-widest text-[rgba(255,255,255,0.3)] mb-0.5">{s.label}</div>
               <div
                 className="text-xs font-semibold truncate"
                 style={{ color: (s as { color?: string }).color ?? "#d1d5db" }}
@@ -210,8 +210,8 @@ export function TentacleDetail({ tentacle, onClose, onUpdate, onReconnect }: Ten
           className="flex items-center justify-between px-4 py-2 shrink-0"
           style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
         >
-          <span className="text-[10px] text-gray-600">Last message</span>
-          <span className="text-[10px] text-gray-400">{relTime(tentacle.lastSeen)}</span>
+          <span className="text-[10px] text-[rgba(255,255,255,0.3)]">Last message</span>
+          <span className="text-[10px] text-[rgba(255,255,255,0.5)]">{relTime(tentacle.lastSeen)}</span>
         </div>
 
         {/* Tabs */}
@@ -241,7 +241,7 @@ export function TentacleDetail({ tentacle, onClose, onUpdate, onReconnect }: Ten
           {activeTab === "messages" && (
             <div className="space-y-2">
               {tentacle.recentMessages.length === 0 ? (
-                <p className="text-[11px] text-gray-600 text-center py-6">No recent messages</p>
+                <p className="text-[11px] text-[rgba(255,255,255,0.3)] text-center py-6">No recent messages</p>
               ) : (
                 tentacle.recentMessages.map((msg) => {
                   const pc = PRIORITY_COLORS[msg.priority];
@@ -258,9 +258,9 @@ export function TentacleDetail({ tentacle, onClose, onUpdate, onReconnect }: Ten
                         >
                           {msg.priority}
                         </span>
-                        <span className="text-[9px] text-gray-600">{relTime(msg.timestamp)}</span>
+                        <span className="text-[9px] text-[rgba(255,255,255,0.3)]">{relTime(msg.timestamp)}</span>
                       </div>
-                      <p className="text-[11px] text-gray-300 leading-relaxed">{msg.summary}</p>
+                      <p className="text-[11px] text-[rgba(255,255,255,0.7)] leading-relaxed">{msg.summary}</p>
                     </div>
                   );
                 })
@@ -271,7 +271,7 @@ export function TentacleDetail({ tentacle, onClose, onUpdate, onReconnect }: Ten
           {activeTab === "actions" && (
             <div className="space-y-2">
               {tentacle.recentActions.length === 0 ? (
-                <p className="text-[11px] text-gray-600 text-center py-6">No recent actions</p>
+                <p className="text-[11px] text-[rgba(255,255,255,0.3)] text-center py-6">No recent actions</p>
               ) : (
                 tentacle.recentActions.map((act) => (
                   <div
@@ -294,7 +294,7 @@ export function TentacleDetail({ tentacle, onClose, onUpdate, onReconnect }: Ten
                       }}
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[11px] text-gray-300 leading-snug">{act.action}</p>
+                      <p className="text-[11px] text-[rgba(255,255,255,0.7)] leading-snug">{act.action}</p>
                       <div className="flex items-center justify-between mt-1">
                         <span
                           className="text-[9px] uppercase font-medium"
@@ -307,7 +307,7 @@ export function TentacleDetail({ tentacle, onClose, onUpdate, onReconnect }: Ten
                         >
                           {act.status}
                         </span>
-                        <span className="text-[9px] text-gray-600">{relTime(act.timestamp)}</span>
+                        <span className="text-[9px] text-[rgba(255,255,255,0.3)]">{relTime(act.timestamp)}</span>
                       </div>
                     </div>
                   </div>
@@ -321,7 +321,7 @@ export function TentacleDetail({ tentacle, onClose, onUpdate, onReconnect }: Ten
               {/* Autonomy override */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-medium text-gray-300">Autonomy override</span>
+                  <span className="text-[11px] font-medium text-[rgba(255,255,255,0.7)]">Autonomy override</span>
                   <span className="text-[11px] font-mono text-indigo-400">{autonomyVal}%</span>
                 </div>
                 <input
@@ -336,7 +336,7 @@ export function TentacleDetail({ tentacle, onClose, onUpdate, onReconnect }: Ten
                   }}
                   className="w-full accent-indigo-500"
                 />
-                <div className="flex justify-between text-[9px] text-gray-700 mt-0.5">
+                <div className="flex justify-between text-[9px] text-[rgba(255,255,255,0.2)] mt-0.5">
                   <span>Ask always</span>
                   <span>Full auto</span>
                 </div>
@@ -345,8 +345,8 @@ export function TentacleDetail({ tentacle, onClose, onUpdate, onReconnect }: Ten
               {/* Notifications */}
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-[11px] font-medium text-gray-300">Notifications</div>
-                  <div className="text-[10px] text-gray-600 mt-0.5">Surface reports to hive feed</div>
+                  <div className="text-[11px] font-medium text-[rgba(255,255,255,0.7)]">Notifications</div>
+                  <div className="text-[10px] text-[rgba(255,255,255,0.3)] mt-0.5">Surface reports to hive feed</div>
                 </div>
                 <button
                   onClick={() => {
@@ -371,8 +371,8 @@ export function TentacleDetail({ tentacle, onClose, onUpdate, onReconnect }: Ten
               {/* Enable / Disable */}
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-[11px] font-medium text-gray-300">Tentacle enabled</div>
-                  <div className="text-[10px] text-gray-600 mt-0.5">Allow this tentacle to process messages</div>
+                  <div className="text-[11px] font-medium text-[rgba(255,255,255,0.7)]">Tentacle enabled</div>
+                  <div className="text-[10px] text-[rgba(255,255,255,0.3)] mt-0.5">Allow this tentacle to process messages</div>
                 </div>
                 <button
                   onClick={() => {
