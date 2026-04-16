@@ -3261,7 +3261,7 @@ async fn spawn_runtime_process(
             }
             // Capture into buffer (cap at 500 lines to bound memory)
             {
-                let mut buf = output_buf_stdout.lock().unwrap();
+                let mut buf = output_buf_stdout.lock().unwrap_or_else(|e| e.into_inner());
                 buf.push(line.clone());
                 if buf.len() > 500 {
                     buf.drain(0..100);
@@ -3292,7 +3292,7 @@ async fn spawn_runtime_process(
                 continue;
             }
             {
-                let mut buf = output_buf_stderr.lock().unwrap();
+                let mut buf = output_buf_stderr.lock().unwrap_or_else(|e| e.into_inner());
                 buf.push(format!("[err] {}", line));
                 if buf.len() > 500 {
                     buf.drain(0..100);
@@ -3327,7 +3327,7 @@ async fn spawn_runtime_process(
         // Drain captured output and build a completion summary.
         // This is stored in execution_memory so BLADE can recall what each runtime did.
         let captured_output: Vec<String> = {
-            output_buf.lock().unwrap().clone()
+            output_buf.lock().unwrap_or_else(|e| e.into_inner()).clone()
         };
         let exit_code = match &status {
             Ok(code) => code.code().unwrap_or(0),

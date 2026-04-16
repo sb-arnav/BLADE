@@ -77,7 +77,7 @@ pub fn voice_start_recording() -> Result<(), String> {
             // Keep stream alive while recording
             loop {
                 std::thread::sleep(std::time::Duration::from_millis(100));
-                let state = recording.lock().unwrap();
+                let state = recording.lock().unwrap_or_else(|e| e.into_inner());
                 if !state.is_recording {
                     break;
                 }

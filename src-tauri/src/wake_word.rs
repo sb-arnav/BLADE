@@ -240,7 +240,7 @@ async fn run_wake_loop(app: tauri::AppHandle, phrases: Vec<String>, energy_thres
 
                 // Debounce: skip if triggered within last 3s
                 {
-                    let last = debounce.lock().unwrap();
+                    let last = debounce.lock().unwrap_or_else(|e| e.into_inner());
                     if last.elapsed().as_secs() < 3 {
                         continue;
                     }
@@ -267,7 +267,7 @@ async fn run_wake_loop(app: tauri::AppHandle, phrases: Vec<String>, energy_thres
                             if phrases_match(&lower, &phrase_clone) {
                                 log::info!("[wake_word] TRIGGERED: {:?}", lower);
                                 {
-                                    let mut last = debounce_clone.lock().unwrap();
+                                    let mut last = debounce_clone.lock().unwrap_or_else(|e| e.into_inner());
                                     *last = std::time::Instant::now();
                                 }
                                 // Emit the wake event — frontend plays chime + shows animation

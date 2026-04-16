@@ -188,7 +188,7 @@ pub fn start_clipboard_watcher(app: AppHandle) {
                     continue;
                 }
 
-                let mut last = last_content.lock().unwrap();
+                let mut last = last_content.lock().unwrap_or_else(|e| e.into_inner());
                 if *last != trimmed {
                     *last = trimmed.clone();
                     let _ = app.emit("clipboard_changed", &trimmed);

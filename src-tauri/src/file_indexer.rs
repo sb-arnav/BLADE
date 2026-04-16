@@ -80,7 +80,7 @@ fn db_path() -> PathBuf {
     crate::config::blade_config_dir().join("blade.db")
 }
 
-fn ensure_table() {
+pub fn ensure_table() {
     if let Ok(conn) = rusqlite::Connection::open(db_path()) {
         let _ = conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS indexed_files (

@@ -96,11 +96,11 @@ fn default_configs() -> Vec<IntegrationConfig> {
 }
 
 fn get_configs() -> Vec<IntegrationConfig> {
-    integration_configs_lock().lock().unwrap().clone()
+    integration_configs_lock().lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
 fn set_configs(configs: Vec<IntegrationConfig>) {
-    *integration_configs_lock().lock().unwrap() = configs;
+    *integration_configs_lock().lock().unwrap_or_else(|e| e.into_inner()) = configs;
 }
 
 // ── MCP-aware poll helpers ────────────────────────────────────────────────────
@@ -307,14 +307,14 @@ async fn call_mcp_tool(
 static APP_HANDLE: Mutex<Option<AppHandle>> = Mutex::new(None);
 
 fn stash_app_handle(app: AppHandle) {
-    let mut guard = APP_HANDLE.lock().unwrap();
+    let mut guard = APP_HANDLE.lock().unwrap_or_else(|e| e.into_inner());
     *guard = Some(app);
 }
 
 /// Return a clone of the stashed AppHandle if one has been set.
 /// Used by hive.rs to call MCP tools without a direct AppHandle parameter.
 pub fn get_app_handle() -> Option<AppHandle> {
-    APP_HANDLE.lock().unwrap().clone()
+    APP_HANDLE.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -369,25 +369,25 @@ async fn poll_service(service: &str) {
     match service {
         "gmail" => {
             let count = poll_gmail().await;
-            let mut state = integration_state().lock().unwrap();
+            let mut state = integration_state().lock().unwrap_or_else(|e| e.into_inner());
             state.unread_emails = count;
             state.last_updated = now_secs();
         }
         "calendar" => {
             let events = poll_calendar().await;
-            let mut state = integration_state().lock().unwrap();
+            let mut state = integration_state().lock().unwrap_or_else(|e| e.into_inner());
             state.upcoming_events = events;
             state.last_updated = now_secs();
         }
         "slack" => {
             let count = poll_slack().await;
-            let mut state = integration_state().lock().unwrap();
+            let mut state = integration_state().lock().unwrap_or_else(|e| e.into_inner());
             state.slack_mentions = count;
             state.last_updated = now_secs();
         }
         "github" => {
             let count = poll_github().await;
-            let mut state = integration_state().lock().unwrap();
+            let mut state = integration_state().lock().unwrap_or_else(|e| e.into_inner());
             state.github_notifications = count;
             state.last_updated = now_secs();
         }
@@ -399,7 +399,7 @@ async fn poll_service(service: &str) {
 
 /// Returns a snapshot of the latest integration state.
 pub fn get_integration_state() -> IntegrationState {
-    integration_state().lock().unwrap().clone()
+    integration_state().lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
 /// Returns a concise 2–3 line plain-text summary for injection into the
