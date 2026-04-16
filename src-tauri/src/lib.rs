@@ -1155,6 +1155,7 @@ pub fn run() {
             joints::joints_list_stores,
             cardiovascular::cardio_get_blood_pressure,
             cardiovascular::cardio_get_event_registry,
+            cardiovascular::blade_vital_signs,
             supervisor::supervisor_get_health,
             supervisor::supervisor_get_service,
             urinary::urinary_flush,

@@ -233,6 +233,69 @@ pub fn on_provider_call_complete(provider: &str, model: &str, success: bool) {
     // high "metabolic rate" → pituitary adjusts TSH → modules slow down
 }
 
+// ── Vital Signs: full body health check ───────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VitalSigns {
+    /// Hormones
+    pub hormones: crate::homeostasis::HormoneState,
+    /// Blood pressure (data flow health)
+    pub blood_pressure: BloodPressure,
+    /// Immune status (threats)
+    pub immune: crate::urinary::ImmuneStatus,
+    /// Service health (how many alive, crashed, dead)
+    pub services_alive: usize,
+    pub services_dead: Vec<String>,
+    /// Brain state
+    pub brain_working_memory_active: bool,
+    /// Hive organ count
+    pub hive_organs_active: usize,
+    /// Focus score
+    pub focus_score: u32,
+    /// Overall status
+    pub overall: String, // "healthy" | "stressed" | "critical" | "conserving"
+}
+
+/// Full body health check — like a doctor checking vitals.
+pub fn check_vital_signs() -> VitalSigns {
+    let hormones = crate::homeostasis::get_hormones();
+    let bp = get_blood_pressure();
+    let immune = crate::urinary::get_immune_status();
+    let hive = crate::hive::get_hive_status();
+    let wm = crate::prefrontal::get();
+    let focus = crate::proactive_vision::compute_daily_focus_score();
+
+    let service_health = crate::supervisor::supervisor_get_health();
+    let alive = service_health.iter().filter(|s| s.status == "running").count();
+    let dead: Vec<String> = service_health.iter()
+        .filter(|s| s.status == "dead")
+        .map(|s| s.name.clone())
+        .collect();
+
+    // Overall status assessment
+    let overall = if !dead.is_empty() || immune.status == "under_attack" || bp.status == "critical" {
+        "critical"
+    } else if hormones.adrenaline > 0.5 || hormones.insulin > 0.7 || bp.status == "elevated" {
+        "stressed"
+    } else if hormones.energy_mode < 0.25 {
+        "conserving"
+    } else {
+        "healthy"
+    };
+
+    VitalSigns {
+        hormones,
+        blood_pressure: bp,
+        immune,
+        services_alive: alive,
+        services_dead: dead,
+        brain_working_memory_active: wm.active,
+        hive_organs_active: hive.active_tentacles,
+        focus_score: focus.score,
+        overall: overall.to_string(),
+    }
+}
+
 // ── Tauri Commands ───────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -243,4 +306,10 @@ pub fn cardio_get_blood_pressure() -> BloodPressure {
 #[tauri::command]
 pub fn cardio_get_event_registry() -> Vec<EventInfo> {
     get_event_registry()
+}
+
+/// Full body health check — all vital signs in one call.
+#[tauri::command]
+pub fn blade_vital_signs() -> VitalSigns {
+    check_vital_signs()
 }
