@@ -1533,13 +1533,26 @@ pub async fn send_message_stream(
                                 }
                             }
                             _ => {
-                                let msg = explain_tool_failure(
+                                // Autoskills couldn't help — try the immune system
+                                // (deeper: CLI tools, browser automation, tool forging)
+                                let immune_msg = crate::immune_system::resolve_capability_gap(
+                                    &app,
                                     &tool_call.name,
-                                    &tool_call.arguments,
-                                    &e,
-                                    Some(&app),
-                                );
-                                (msg, true)
+                                    &last_user_text,
+                                ).await;
+
+                                if immune_msg.contains("Found") || immune_msg.contains("Created") {
+                                    // Immune system found something — report to the model
+                                    (immune_msg, true)
+                                } else {
+                                    let msg = explain_tool_failure(
+                                        &tool_call.name,
+                                        &tool_call.arguments,
+                                        &e,
+                                        Some(&app),
+                                    );
+                                    (msg, true)
+                                }
                             }
                         }
                     }

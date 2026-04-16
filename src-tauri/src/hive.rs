@@ -2419,6 +2419,51 @@ pub async fn hive_tick(app: &AppHandle) {
         }
     }
 
+    // ── DNA enrichment: feed high-priority observations into typed_memory ─────
+    // This ensures the DNA query layer (dna.rs) has fresh data from organ activity.
+    // Only persist Critical/High reports — Normal/Low are noise for memory.
+    for report in &all_reports {
+        if report.priority == Priority::Critical || report.priority == Priority::High {
+            let content = format!(
+                "[{}] {}",
+                report.tentacle_id.replace("tentacle-", ""),
+                crate::safe_slice(&report.summary, 200),
+            );
+            let _ = crate::typed_memory::store_typed_memory(
+                crate::typed_memory::MemoryCategory::Fact,
+                &content,
+                "hive",
+                Some(0.8),
+            );
+        }
+    }
+
+    // ── People enrichment: extract person mentions from reports ───────────────
+    for report in &all_reports {
+        if let Some(people) = report.details.get("people") {
+            if let Some(arr) = people.as_array() {
+                for person_val in arr {
+                    if let Some(name) = person_val.as_str() {
+                        let platform = report.tentacle_id.replace("tentacle-", "");
+                        // Feed into people_graph if the name is substantial
+                        if name.len() > 2 && name.len() < 50 {
+                            let app_clone = app.clone();
+                            let name_owned = name.to_string();
+                            let platform_owned = platform.clone();
+                            tokio::spawn(async move {
+                                crate::people_graph::learn_person_from_conversation(
+                                    &app_clone,
+                                    &format!("{} mentioned on {}", name_owned, platform_owned),
+                                    "",
+                                ).await;
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // ── Auto-fix pipeline: trigger on CI failures ─────────────────────────────
     // For trivial CI failures (lint/format/clippy), emit an event that the
     // proactive engine can pick up and suggest a fix command to the user.
