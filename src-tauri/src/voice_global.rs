@@ -729,9 +729,9 @@ async fn process_voice_turn_with_history(
 
     let app_listen = app.clone();
     let unlisten = app_listen.listen("chat_token", move |event| {
-        if let Some(payload) = event.payload().as_str() {
-            // chat_token payload is a raw string
-            let text = payload.trim_matches('"').to_string();
+        let payload = event.payload();
+        let text = payload.trim_matches('"').to_string();
+        if !text.is_empty() {
             let _ = tx.try_send(text);
         }
     });
