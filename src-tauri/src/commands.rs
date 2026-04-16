@@ -613,31 +613,8 @@ pub async fn send_message_stream(
         messages.len(),
     );
 
-    // ── Eye reflex: auto-attach screen context for deictic references ──────────
-    // When the user says "this", "this error", "what I'm looking at", etc.,
-    // auto-inject the latest screen description so the model doesn't have to
-    // call blade_look_at_screen first. This is a reflex arc: eyes → brain.
-    {
-        let q = last_user_text.to_lowercase();
-        let needs_screen = q.contains("this error") || q.contains("this bug")
-            || q.contains("what's this") || q.contains("what is this")
-            || q.contains("on my screen") || q.contains("looking at")
-            || q.contains("can you see") || q.contains("what do you see")
-            || (q.contains("fix this") && !q.contains("fix this file"))
-            || (q.contains("help with this") && q.len() < 60);
-
-        if needs_screen {
-            let screen_desc = crate::perception_fusion::get_latest()
-                .map(|p| p.screen_ocr_text.clone())
-                .unwrap_or_default();
-            if !screen_desc.is_empty() {
-                system_prompt.push_str(&format!(
-                    "\n\n---\n\n## What's on the user's screen right now\n\n{}",
-                    crate::safe_slice(&screen_desc, 800)
-                ));
-            }
-        }
-    }
+    // Vision is always in the prompt via brain.rs priority 7 (always-on vision).
+    // No reflex needed — BLADE always sees the screen.
 
     // Context Engine — smart RAG injection.
     // Appended after the main prompt so it always fits without displacing identity.

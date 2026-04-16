@@ -1354,24 +1354,22 @@ pub fn run() {
                 }
             });
 
-            // Start god mode if enabled
+            // BLADE always sees, always hears, always aware.
+            // There is no "God Mode off" — that's just another ChatGPT wrapper.
+            // The ambient awareness IS the product.
             let startup_god_config = config::load_config();
-            if startup_god_config.god_mode {
-                godmode::start_god_mode(app.handle().clone(), &startup_god_config.god_mode_tier);
-            } else if startup_god_config.screen_timeline_enabled {
-                // Timeline can run independently of god mode
-                screen_timeline::start_timeline_capture_loop(app.handle().clone());
-            }
+            let god_tier = if startup_god_config.god_mode_tier.is_empty() {
+                "intermediate".to_string()
+            } else {
+                startup_god_config.god_mode_tier.clone()
+            };
+            godmode::start_god_mode(app.handle().clone(), &god_tier);
+            // Screen timeline always runs — BLADE always sees your screen
+            screen_timeline::start_timeline_capture_loop(app.handle().clone());
 
-            // Start always-on audio capture if enabled
-            if startup_god_config.audio_capture_enabled {
-                audio_timeline::start_audio_timeline_capture(app.handle().clone());
-            }
-
-            // Start wake word listener if enabled
-            if startup_god_config.wake_word_enabled {
-                wake_word::start_wake_word_listener(app.handle().clone());
-            }
+            // Audio: always listening — "Hey BLADE" wake word + ambient capture
+            audio_timeline::start_audio_timeline_capture(app.handle().clone());
+            wake_word::start_wake_word_listener(app.handle().clone());
 
             // EVOLUTION ENGINE — BLADE's self-improvement loop.
             // Watches what you use and progressively wires BLADE into your stack.

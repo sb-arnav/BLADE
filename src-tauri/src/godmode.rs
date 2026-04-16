@@ -102,6 +102,8 @@ fn queue_proactive_task(app: &tauri::AppHandle, suggestion: &str, category: &str
     }
 
     let _ = app.emit("proactive_suggestion", &task);
+    // Also feed the dashboard alerts panel
+    let _ = app.emit("proactive_task_added", &task);
 }
 
 #[tauri::command]
@@ -150,11 +152,10 @@ pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
             }
             first_run = false;
 
+            // BLADE's ambient awareness is always on — no "god mode off" state.
+            // The config.god_mode flag now only controls the TIER (normal/intermediate/extreme),
+            // not whether perception runs at all.
             let config = crate::config::load_config();
-            if !config.god_mode {
-                let _ = app.emit("godmode_stopped", ());
-                break;
-            }
 
             // ── Run perception fusion first — all downstream uses share this snapshot ──
             let perception = tokio::task::spawn_blocking(
