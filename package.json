@@ -1,4 +1,11 @@
 {
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "release:prepare-updater": "node .github/scripts/prepare-tauri-release-config.mjs"
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.1",
     "autoprefixer": "^10.4.27",
