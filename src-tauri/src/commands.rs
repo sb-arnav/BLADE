@@ -1590,6 +1590,18 @@ pub async fn send_message_stream(
                 }),
             );
 
+            // Feed non-error tool results into knowledge graph (fire-and-forget).
+            // Tool outputs contain real-world data (file contents, API responses, search
+            // results) that the knowledge graph should learn from.
+            if !is_error && content.len() > 50 && content.len() < 5000 {
+                let tool_content = content.clone();
+                let tool_name = tool_call.name.clone();
+                tokio::spawn(async move {
+                    let snippet = format!("[Tool: {}] {}", tool_name, crate::safe_slice(&tool_content, 1000));
+                    crate::knowledge_graph::grow_graph_from_conversation(&snippet).await;
+                });
+            }
+
             conversation.push(ConversationMessage::Tool {
                 tool_call_id: tool_call.id,
                 tool_name: tool_call.name,

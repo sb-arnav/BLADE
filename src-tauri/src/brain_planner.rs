@@ -47,6 +47,14 @@ pub async fn plan_task(
     // Get the organ roster so Brain knows exactly what each organ can do
     let organ_roster = crate::organ::get_organ_roster_for_brain();
 
+    // Persona context — so the plan respects user's personality and preferences
+    let persona_ctx = crate::persona_engine::get_persona_context();
+    let persona_section = if persona_ctx.is_empty() {
+        String::new()
+    } else {
+        format!("\nUser personality:\n{}\n", crate::safe_slice(&persona_ctx, 300))
+    };
+
     let system = format!(
         r#"You are BLADE's Brain — the planning layer of a distributed AI agent system.
 
@@ -59,7 +67,7 @@ You know the following about BLADE's body:
 {hive_digest}
 
 {dna_context}
-
+{persona_section}
 RULES:
 - Produce 3-8 numbered steps, each one clear action
 - Reference specific organs/tools when possible (e.g. "use GitHub organ to check PRs")
