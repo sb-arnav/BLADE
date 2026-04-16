@@ -212,6 +212,28 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
                 }
             }
 
+            // ── Meeting prep (every 5 min = 10 ticks) ─────────────────────────
+            if tick % 10 == 0 {
+                let istate = crate::integration_bridge::get_integration_state();
+                if let Some(next) = istate.upcoming_events.first() {
+                    if next.minutes_until >= 10 && next.minutes_until <= 15 {
+                        // Meeting in 10-15 min — generate prep and speak it
+                        let title = next.title.clone();
+                        let mins = next.minutes_until;
+                        let app_prep = app.clone();
+                        tokio::spawn(async move {
+                            let prep = format!(
+                                "You have {} in {} minutes.",
+                                crate::safe_slice(&title, 40), mins
+                            );
+                            let _ = crate::tts::speak_and_wait(&app_prep, &prep).await;
+                            // Trigger auto-show for meeting prep
+                            crate::show_engine::trigger_auto_show(&app_prep, "meeting_start").await;
+                        });
+                    }
+                }
+            }
+
             // ── Temporal awareness checks (every ~30 min = 60 ticks) ──────────
             if tick % 60 == 0 && tick > 0 {
 
