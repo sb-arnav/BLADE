@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { PageShell } from "./PageShell";
 
 interface ProactiveCard {
   card_type: string;
@@ -53,14 +54,7 @@ export function InsightPage({ onBack }: InsightPageProps) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#0a0a0f] text-white">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-5 py-3 border-b border-[rgba(255,255,255,0.08)]">
-        <button onClick={onBack} className="text-[rgba(255,255,255,0.5)] hover:text-white transition-colors text-sm">← Back</button>
-        <h1 className="text-[15px] font-semibold">Insights</h1>
-        <span className="text-[11px] text-[rgba(255,255,255,0.3)] ml-auto">{filtered.length} observations</span>
-      </div>
-
+    <PageShell title="Insights" subtitle={`${filtered.length} observations`} onBack={onBack} noPadding>
       {/* Filters + search */}
       <div className="px-5 py-2 flex items-center gap-3 border-b border-[rgba(255,255,255,0.06)]">
         <div className="flex gap-1">
@@ -133,6 +127,6 @@ export function InsightPage({ onBack }: InsightPageProps) {
           })
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }

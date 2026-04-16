@@ -1178,59 +1178,88 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
           )}
         </div>
 
-        {/* ── Provider picker ── */}
+        {/* ── Provider picker — clean, not overwhelming ── */}
         <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
 
-          {/* Native / cloud APIs */}
+          {/* Quick start: just paste your key */}
+          <div className="space-y-2">
+            <p className="text-[11px] font-semibold text-blade-text">Quick start — paste any API key</p>
+            <p className="text-[10px] text-blade-muted/60">BLADE auto-detects the provider from the key format</p>
+            <input
+              type="text"
+              value={apiKey}
+              onChange={(e) => {
+                const val = e.target.value;
+                setApiKey(val);
+                setTestState("idle");
+                setTestMessage(null);
+                const detected = detectProvider(val.trim());
+                if (detected) {
+                  const entry = PROVIDER_MATRIX.find(p => p.id === detected.provider && !p.baseUrl);
+                  if (entry) { setSelectedEntry(entry); setProvider(detected.provider); setBaseUrl(""); }
+                  setModel(detected.model);
+                  const providerNames: Record<string, string> = {
+                    openrouter: "OpenRouter — free models available",
+                    anthropic: "Anthropic — Claude Sonnet 4",
+                    openai: "OpenAI — GPT-4o-mini",
+                    groq: "Groq — Llama 3.3 70B",
+                    gemini: "Gemini — Flash 2.0",
+                  };
+                  setDetectedToast(`Detected: ${providerNames[detected.provider] ?? detected.provider}`);
+                  setTimeout(() => setDetectedToast(null), 4000);
+                }
+              }}
+              className="w-full bg-blade-bg border border-blade-border rounded-xl px-4 py-3 text-[13px] outline-none font-mono focus:border-blade-accent/50 transition-colors placeholder-blade-muted/40"
+              placeholder="sk-ant-... or sk-or-v1-... or AIza... or gsk_..."
+            />
+            {detectedToast && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px]">
+                <span>✓</span> {detectedToast}
+              </div>
+            )}
+          </div>
+
+          <div className="h-px bg-blade-border/50" />
+
+          {/* Or pick a provider */}
           <div>
-            <p className="text-[9px] uppercase tracking-widest text-blade-muted/60 mb-2">Native APIs</p>
-            <div className="grid grid-cols-2 gap-1.5">
-              {PROVIDER_MATRIX.filter(e => !e.baseUrl && e.id !== "ollama").map((entry, i) => {
+            <p className="text-[10px] text-blade-muted/50 mb-2">Or choose a provider</p>
+            <div className="space-y-[6px]">
+              {PROVIDER_MATRIX.map((entry, i) => {
                 const isSelected = selectedEntry?.name === entry.name && selectedEntry?.baseUrl === entry.baseUrl;
                 const freeTier = PROVIDER_FREE_TIER[entry.id];
                 const isFree = freeTier && !freeTier.includes("Paid");
                 return (
                   <button key={i} type="button"
                     onClick={() => { setSelectedEntry(entry); setProvider(entry.id); if (entry.model) setModel(entry.model); setBaseUrl(entry.baseUrl ?? ""); setTestState("idle"); setTestMessage(null); }}
-                    className={`flex items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors ${isSelected ? "border-blade-accent bg-blade-accent/10" : "border-blade-border hover:border-blade-accent/40"}`}
+                    className={`w-full flex items-center gap-3 rounded-xl border px-4 py-[10px] text-left transition-all ${
+                      isSelected
+                        ? "border-blade-accent bg-blade-accent/8 shadow-[0_0_12px_rgba(129,140,248,0.1)]"
+                        : "border-blade-border/60 hover:border-blade-accent/30 hover:bg-[rgba(255,255,255,0.02)]"
+                    }`}
                   >
+                    {/* Selection dot */}
+                    <div className={`w-[14px] h-[14px] rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                      isSelected ? "border-blade-accent" : "border-blade-border"
+                    }`}>
+                      {isSelected && <div className="w-[6px] h-[6px] rounded-full bg-blade-accent" />}
+                    </div>
+
                     <div className="flex-1 min-w-0">
-                      <p className={`text-xs font-semibold leading-tight ${isSelected ? "text-blade-accent" : "text-blade-text"}`}>{entry.name}</p>
-                      <p className="text-[9px] text-blade-muted/60 font-mono mt-0.5 truncate max-w-[120px]">{entry.model}</p>
-                      {freeTier && (
-                        <p className={`text-[8px] mt-0.5 ${isFree ? "text-emerald-400/80" : "text-blade-muted/50"}`}>{freeTier}</p>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-1 ml-1">
-                      {entry.badges.slice(0, 2).map(b => (
-                        <span key={b} className={`text-[8px] px-1 py-0.5 rounded whitespace-nowrap ${isSelected ? "bg-blade-accent/20 text-blade-accent" : "bg-blade-bg text-blade-muted/70"}`}>{b}</span>
-                      ))}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* OpenAI-compatible providers */}
-          <div>
-            <p className="text-[9px] uppercase tracking-widest text-blade-muted/60 mb-2">OpenAI-Compatible</p>
-            <div className="grid grid-cols-2 gap-1.5">
-              {PROVIDER_MATRIX.filter(e => !!e.baseUrl).map((entry, i) => {
-                const isSelected = selectedEntry?.name === entry.name && selectedEntry?.baseUrl === entry.baseUrl;
-                return (
-                  <button key={i} type="button"
-                    onClick={() => { setSelectedEntry(entry); setProvider(entry.id); if (entry.model) setModel(entry.model); setBaseUrl(entry.baseUrl ?? ""); setTestState("idle"); setTestMessage(null); }}
-                    className={`flex items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors ${isSelected ? "border-blade-accent bg-blade-accent/10" : "border-blade-border hover:border-blade-accent/40"}`}
-                  >
-                    <div>
-                      <p className={`text-xs font-semibold leading-tight ${isSelected ? "text-blade-accent" : "text-blade-text"}`}>{entry.name}</p>
-                      <p className="text-[9px] text-blade-muted/60 font-mono mt-0.5 truncate max-w-[120px]">{entry.model}</p>
-                    </div>
-                    <div className="flex flex-col items-end gap-1 ml-1">
-                      {entry.badges.slice(0, 2).map(b => (
-                        <span key={b} className={`text-[8px] px-1 py-0.5 rounded whitespace-nowrap ${isSelected ? "bg-blade-accent/20 text-blade-accent" : "bg-blade-bg text-blade-muted/70"}`}>{b}</span>
-                      ))}
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[13px] font-semibold ${isSelected ? "text-blade-accent" : "text-blade-text"}`}>
+                          {entry.name}
+                        </span>
+                        {isFree && <span className="text-[9px] px-[6px] py-[1px] rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">free tier</span>}
+                        {entry.baseUrl && <span className="text-[9px] text-blade-muted/40">OpenAI-compat</span>}
+                      </div>
+                      <div className="flex items-center gap-2 mt-[2px]">
+                        <span className="text-[10px] text-blade-muted/50 font-mono">{entry.model}</span>
+                        <span className="text-[9px] text-blade-muted/30">·</span>
+                        {entry.badges.slice(0, 3).map(b => (
+                          <span key={b} className="text-[9px] text-blade-muted/40">{b}</span>
+                        ))}
+                      </div>
                     </div>
                   </button>
                 );
@@ -1238,90 +1267,42 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             </div>
           </div>
 
-          {/* Local */}
-          <div>
-            <p className="text-[9px] uppercase tracking-widest text-blade-muted/60 mb-2">Local</p>
-            <div className="grid grid-cols-2 gap-1.5">
-              {PROVIDER_MATRIX.filter(e => e.id === "ollama").map((entry, i) => {
-                const isSelected = selectedEntry?.name === entry.name;
-                return (
-                  <button key={i} type="button"
-                    onClick={() => { setSelectedEntry(entry); setProvider(entry.id); if (entry.model) setModel(entry.model); setBaseUrl(""); setTestState("idle"); setTestMessage(null); }}
-                    className={`flex items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors ${isSelected ? "border-blade-accent bg-blade-accent/10" : "border-blade-border hover:border-blade-accent/40"}`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-xs font-semibold leading-tight ${isSelected ? "text-blade-accent" : "text-blade-text"}`}>{entry.name}</p>
-                      <p className="text-[9px] text-blade-muted/60 font-mono mt-0.5">{entry.model}</p>
-                      <p className="text-[8px] text-emerald-400/80 mt-0.5">Completely free (local)</p>
-                    </div>
-                    <div className="flex flex-col items-end gap-1 ml-1">
-                      {entry.badges.slice(0, 2).map(b => (
-                        <span key={b} className={`text-[8px] px-1 py-0.5 rounded whitespace-nowrap ${isSelected ? "bg-blade-accent/20 text-blade-accent" : "bg-blade-bg text-blade-muted/70"}`}>{b}</span>
-                      ))}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Model + key */}
-          <div className="grid gap-3 grid-cols-2 pt-1 border-t border-blade-border/50">
-            <label className="space-y-1.5">
-              <span className="text-[9px] uppercase tracking-widest text-blade-muted">Model</span>
-              <input
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 text-sm outline-none font-mono focus:border-blade-accent/50 transition-colors"
-                placeholder="model-name"
-              />
-            </label>
-
-            {provider !== "ollama" && (
+          {/* Model override + API key (for advanced users) */}
+          <div className="pt-1 border-t border-blade-border/50 space-y-3">
+            <div className="grid gap-3 grid-cols-2">
               <label className="space-y-1.5">
-                <span className="text-[9px] uppercase tracking-widest text-blade-muted">API Key</span>
-                <div className="relative">
-                  <input
-                    type={showKey ? "text" : "password"}
-                    value={apiKey}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setApiKey(val);
-                      setTestState("idle");
-                      setTestMessage(null);
-                      const detected = detectProvider(val.trim());
-                      if (detected) {
-                        const entry = PROVIDER_MATRIX.find(p => p.id === detected.provider && !p.baseUrl);
-                        if (entry) { setSelectedEntry(entry); setProvider(detected.provider); setBaseUrl(""); }
-                        setModel(detected.model);
-                        const providerNames: Record<string, string> = {
-                          openrouter: "OpenRouter — set model to llama-3.3-70b (free)",
-                          anthropic: "Anthropic — set model to Claude Sonnet 4",
-                          openai: "OpenAI — set model to gpt-4o-mini",
-                          groq: "Groq — set model to llama-3.3-70b",
-                          gemini: "Gemini — set model to gemini-2.0-flash",
-                        };
-                        setDetectedToast(`Detected ${providerNames[detected.provider] ?? detected.provider}`);
-                        setTimeout(() => setDetectedToast(null), 4000);
-                      }
-                    }}
-                    className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2 pr-9 text-sm outline-none font-mono focus:border-blade-accent/50 transition-colors"
-                    placeholder={selectedEntry?.keyPlaceholder ?? "your-api-key"}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowKey(v => !v)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-blade-muted/50 hover:text-blade-muted transition-colors"
-                  >
-                    {showKey ? (
-                      <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24M1 1l22 22"/></svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                    )}
-                  </button>
-                </div>
+                <span className="text-[10px] text-blade-muted/60">Model override</span>
+                <input
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2.5 text-[12px] outline-none font-mono focus:border-blade-accent/50 transition-colors"
+                  placeholder="auto-selected"
+                />
               </label>
-            )}
+
+              {provider !== "ollama" && (
+                <label className="space-y-1.5">
+                  <span className="text-[10px] text-blade-muted/60">API Key</span>
+                  <div className="relative">
+                    <input
+                      type={showKey ? "text" : "password"}
+                      value={apiKey}
+                      onChange={(e) => { setApiKey(e.target.value); setTestState("idle"); }}
+                      className="w-full bg-blade-bg border border-blade-border rounded-xl px-3 py-2.5 pr-9 text-[12px] outline-none font-mono focus:border-blade-accent/50 transition-colors"
+                      placeholder={selectedEntry?.keyPlaceholder ?? "your-api-key"}
+                    />
+                    <button type="button" onClick={() => setShowKey(v => !v)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-blade-muted/50 hover:text-blade-muted transition-colors">
+                      {showKey ? (
+                        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24M1 1l22 22"/></svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      )}
+                    </button>
+                  </div>
+                </label>
+              )}
+            </div>
           </div>
 
           {/* Base URL — shown for OpenAI-compat */}
@@ -1340,11 +1321,10 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             </label>
           )}
 
-          {/* Smart paste toast */}
-          {detectedToast && (
+          {/* Smart paste toast — only show here if not already shown in quick start */}
+          {detectedToast && !apiKey && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blade-accent/10 border border-blade-accent/30 text-blade-accent text-xs">
-              <svg viewBox="0 0 16 16" className="w-3.5 h-3.5 shrink-0" fill="currentColor"><path d="M13.354 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
-              {detectedToast}
+              <span>✓</span> {detectedToast}
             </div>
           )}
 
