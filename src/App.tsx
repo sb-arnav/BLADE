@@ -441,7 +441,14 @@ export default function App() {
 
     // MORNING BRIEFING — richer once-per-day context summary
     const unlistenBriefing = listen<{ briefing: string; date: string }>("blade_briefing", (event) => {
-      void event.payload;
+      const { briefing } = event.payload;
+      notifications.add({
+        type: "info",
+        title: "Morning Briefing",
+        message: briefing.slice(0, 200),
+        action: { label: "Full briefing", callback: () => sendWithStats("Give me my full morning briefing") },
+      });
+      if (tts.enabled) tts.speak(briefing.slice(0, 300));
     });
 
     // REMINDERS — fire notification + toast when a scheduled reminder fires
@@ -694,6 +701,22 @@ export default function App() {
       }
     );
 
+    // BLADE learned suggestion — proactive recommendation from pattern learning
+    const unlistenSuggestion = listen<{ prediction: string; confidence: number; context: string }>(
+      "blade_suggestion",
+      (event) => {
+        const { prediction, confidence } = event.payload;
+        if (confidence > 0.7) {
+          notifications.add({
+            type: "info",
+            title: "BLADE noticed a pattern",
+            message: prediction,
+            action: { label: "Act on it", callback: () => sendWithStats(prediction) },
+          });
+        }
+      }
+    );
+
     // Auto-title conversations after first exchange
     const unlistenTitled = listen<{ conversation_id: string; title: string }>(
       "conversation_titled",
@@ -713,6 +736,7 @@ export default function App() {
       unlistenAutoUpgraded.then((fn) => fn());
       unlistenEvolutionSuggestion.then((fn) => fn());
       unlistenWakeWord.then((fn) => fn());
+      unlistenSuggestion.then((fn) => fn());
       unlistenAutoskillInstalled.then((fn) => fn());
       unlistenAutoskillSuggestion.then((fn) => fn());
       unlistenBgAiDisabled.then((fn) => fn());
