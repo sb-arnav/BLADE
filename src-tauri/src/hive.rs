@@ -2645,7 +2645,7 @@ fn decision_to_head(decision: &Decision, hive: &Hive) -> String {
 /// Try to actually send a reply via MCP. Returns true if sent.
 async fn try_send_reply(app: &AppHandle, platform: &str, to: &str, draft: &str) -> bool {
     use tauri::Manager;
-    let manager = match app.try_state::<crate::mcp::SharedMcpManager>() {
+    let manager = match app.try_state::<crate::commands::SharedMcpManager>() {
         Some(m) => m,
         None => return false,
     };
