@@ -516,7 +516,7 @@ export function Dashboard({ onNavigate, chatPanelProps, activeRoute }: Dashboard
 
       {/* Main grid */}
       <div
-        className="relative z-[10] flex flex-col ml-[62px] mt-[34px] h-[calc(100vh-34px)] p-[12px] gap-[10px] overflow-hidden transition-[margin-right] duration-[460ms]"
+        className="relative z-[10] flex flex-col ml-[62px] mt-[34px] h-[calc(100vh-34px-26px)] p-[12px] gap-[10px] overflow-hidden transition-[margin-right] duration-[460ms]"
         style={{
           transitionTimingFunction: "cubic-bezier(0.32,0.72,0,1)",
           marginRight: chatOpen ? "400px" : "0px",
