@@ -69,8 +69,11 @@ fn backoff_secs(base: u64, kind: &str) -> u64 {
 
 #[tauri::command]
 pub fn cancel_chat(app: tauri::AppHandle) {
+    // Only set CHAT_CANCEL — the InflightGuard in send_message_stream will
+    // clear CHAT_INFLIGHT on drop when the stream loop exits. Clearing it
+    // here creates a race where a second message could slip through before
+    // the first stream actually stops.
     CHAT_CANCEL.store(true, Ordering::SeqCst);
-    CHAT_INFLIGHT.store(false, Ordering::SeqCst);
     let _ = app.emit("chat_cancelled", ());
     let _ = app.emit("blade_status", "idle");
 }

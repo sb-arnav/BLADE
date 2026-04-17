@@ -5,13 +5,15 @@ export default {
     extend: {
       colors: {
         blade: {
-          // Glass-first palette — transparent backgrounds, glass material
-          bg:               "rgba(9,9,11,0.75)",     // semi-transparent dark (was opaque #09090b)
-          "bg-solid":       "#09090b",               // opaque fallback for inputs/modals
-          surface:          "rgba(28,28,30,0.65)",   // translucent surface
-          "surface-2":      "rgba(44,44,46,0.55)",   // translucent elevated
-          "surface-hover":  "rgba(44,44,46,0.7)",
-          "surface-active": "rgba(58,58,60,0.7)",
+          // Glass-first palette — top-level containers manage transparency explicitly.
+          // blade-bg stays opaque for input fields and modals (readability).
+          bg:               "#09090b",               // opaque dark for inputs, modals, content
+          "bg-solid":       "#09090b",               // alias for explicit opacity intent
+          "bg-glass":       "rgba(9,9,11,0.75)",     // use for glass surfaces only
+          surface:          "rgba(28,28,30,0.85)",   // lightly translucent surface
+          "surface-2":      "rgba(44,44,46,0.8)",    // elevated surface
+          "surface-hover":  "rgba(44,44,46,0.9)",
+          "surface-active": "rgba(58,58,60,0.9)",
 
           // Separators — slightly more visible for glass
           border:           "rgba(255,255,255,0.13)", // glass border
