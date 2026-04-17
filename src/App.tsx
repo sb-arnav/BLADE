@@ -11,6 +11,7 @@ import { TitleBar } from "./components/TitleBar";
 import { GlowOverlay } from "./components/GlowOverlay";
 import { AutoShowOverlay } from "./components/AutoShowOverlay";
 import { CatchupOverlay } from "./components/CatchupOverlay";
+import { AmbientStrip } from "./components/AmbientStrip";
 import { OnboardingFlow } from "./components/OnboardingFlow";
 import { useChat } from "./hooks/useChat";
 import { useTTS } from "./hooks/useTTS";
@@ -1232,6 +1233,8 @@ export default function App() {
       <AutoShowOverlay />
       {/* Glow overlay — BLADE's visual heartbeat */}
       <GlowOverlay />
+      {/* Ambient strip — persistent bottom bar showing BLADE's live state */}
+      <AmbientStrip />
       {/* TitleBar is now embedded in Sidebar's logo row via drag region — keep for window controls */}
       <TitleBar />
       <CommandPalette commands={commands} open={paletteOpen} onClose={closePalette} />
