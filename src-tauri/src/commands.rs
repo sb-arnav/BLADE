@@ -1203,7 +1203,9 @@ pub async fn send_message_stream(
                     }
                     ErrorRecovery::Fatal(msg) => {
                         // Before giving up: try the configured fallback provider
-                        let fallback_provider = load_config().task_routing.fallback.clone();
+                        // Use the already-loaded config — never re-read from disk mid-loop
+                        // (user could have changed it, causing provider switch mid-run)
+                        let fallback_provider = config.task_routing.fallback.clone();
                         if let Some(fb_prov) = fallback_provider {
                             if fb_prov != config.provider {
                                 let fb_key = crate::config::get_provider_key(&fb_prov);

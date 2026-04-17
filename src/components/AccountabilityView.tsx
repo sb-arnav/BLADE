@@ -207,12 +207,11 @@ export function AccountabilityView({ onBack }: { onBack: () => void }) {
   }, [load]);
 
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    listen<string>("accountability_nudge", (e) => {
+    const unlisten = listen<string>("accountability_nudge", (e) => {
       setNudgeBanner(e.payload);
       setTimeout(() => setNudgeBanner(null), 8000);
-    }).then((fn) => { unlisten = fn; });
-    return () => unlisten?.();
+    });
+    return () => { unlisten.then((fn) => fn()); };
   }, []);
 
   async function generatePlan() {
