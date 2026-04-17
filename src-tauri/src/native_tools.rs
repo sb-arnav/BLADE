@@ -4,10 +4,39 @@
 
 use crate::providers::ToolDefinition;
 use serde_json::{json, Value};
+use std::collections::HashMap;
+use std::sync::Mutex;
 use std::time::Duration;
 
 const MAX_OUTPUT: usize = 50_000;
 const BASH_TIMEOUT_MS: u64 = 30_000;
+
+// ── File staleness guard (OpenCode pattern) ──────────────────────────────────
+// Track when BLADE last read a file. If the file was modified externally between
+// read and edit/write, warn the LLM to re-read first. Prevents stale overwrites.
+
+static FILE_READ_TIMES: std::sync::LazyLock<Mutex<HashMap<String, std::time::SystemTime>>> =
+    std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+
+fn record_read_time(path: &str) {
+    if let Ok(meta) = std::fs::metadata(path) {
+        if let Ok(modified) = meta.modified() {
+            if let Ok(mut map) = FILE_READ_TIMES.lock() {
+                map.insert(path.to_string(), modified);
+            }
+        }
+    }
+}
+
+/// Returns true if the file was modified since BLADE last read it.
+fn is_file_stale(path: &str) -> bool {
+    let last_read = FILE_READ_TIMES.lock().ok()
+        .and_then(|map| map.get(path).copied());
+    let Some(read_time) = last_read else { return false };
+    let Ok(meta) = std::fs::metadata(path) else { return false };
+    let Ok(modified) = meta.modified() else { return false };
+    modified > read_time
+}
 
 // ── Tool catalogue ─────────────────────────────────────────────────────────────
 
@@ -2230,6 +2259,9 @@ fn read_file(path: &str, offset: usize, limit: Option<usize>) -> (String, bool) 
 
     match std::fs::read(&expanded) {
         Ok(bytes) => {
+            // Record read time for staleness tracking
+            record_read_time(&expanded);
+
             // Detect binary: check for null bytes in first 8KB
             let is_binary = bytes.iter().take(8192).any(|&b| b == 0);
             if is_binary {
@@ -2266,19 +2298,48 @@ fn read_file(path: &str, offset: usize, limit: Option<usize>) -> (String, bool) 
 fn write_file(path: &str, content: &str) -> (String, bool) {
     let expanded = expand_home(path);
     let p = std::path::Path::new(&expanded);
+
+    // Staleness guard: if the file exists and was modified since we last read it, warn
+    if p.exists() && is_file_stale(&expanded) {
+        return (
+            format!(
+                "WARNING: '{}' was modified externally since you last read it. \
+                 Use blade_read_file first to see the current content, then retry.",
+                path
+            ),
+            true,
+        );
+    }
+
     if let Some(parent) = p.parent() {
         if let Err(e) = std::fs::create_dir_all(parent) {
             return (format!("Cannot create directories: {}", e), true);
         }
     }
     match std::fs::write(&expanded, content) {
-        Ok(_) => (format!("Wrote {} ({} bytes)", path, content.len()), false),
+        Ok(_) => {
+            record_read_time(&expanded); // Update after successful write
+            (format!("Wrote {} ({} bytes)", path, content.len()), false)
+        }
         Err(e) => (format!("Cannot write '{}': {}", path, e), true),
     }
 }
 
 fn edit_file(path: &str, old_string: &str, new_string: &str) -> (String, bool) {
     let expanded = expand_home(path);
+
+    // Staleness guard: warn if file changed since last read
+    if is_file_stale(&expanded) {
+        return (
+            format!(
+                "WARNING: '{}' was modified externally since you last read it. \
+                 Use blade_read_file first to see the current content, then retry.",
+                path
+            ),
+            true,
+        );
+    }
+
     let content = match std::fs::read_to_string(&expanded) {
         Ok(c) => c,
         Err(e) => return (format!("Cannot read '{}': {}", path, e), true),
@@ -2306,7 +2367,10 @@ fn edit_file(path: &str, old_string: &str, new_string: &str) -> (String, bool) {
 
     let new_content = content.replacen(old_string, new_string, 1);
     match std::fs::write(&expanded, new_content) {
-        Ok(_) => (format!("Edited '{}' successfully", path), false),
+        Ok(_) => {
+            record_read_time(&expanded); // Update after successful edit
+            (format!("Edited '{}' successfully", path), false)
+        }
         Err(e) => (format!("Cannot write '{}': {}", path, e), true),
     }
 }
