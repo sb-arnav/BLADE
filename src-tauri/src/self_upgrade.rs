@@ -36,22 +36,48 @@ pub struct InstallResult {
     pub output: String,
 }
 
-/// Catalog mapping what BLADE can't do → what to install
+/// Detect the system package manager for cross-platform install commands.
+fn pkg_install_cmd(packages_apt: &str, packages_brew: &str, packages_dnf: &str) -> String {
+    if cfg!(target_os = "macos") {
+        return format!("brew install {}", packages_brew);
+    }
+    // Linux: detect which package manager is available
+    let has = |cmd: &str| std::process::Command::new("which").arg(cmd).output()
+        .map(|o| o.status.success()).unwrap_or(false);
+
+    if has("apt-get") {
+        format!("sudo apt-get install -y {}", packages_apt)
+    } else if has("dnf") {
+        format!("sudo dnf install -y {}", packages_dnf)
+    } else if has("pacman") {
+        format!("sudo pacman -S --noconfirm {}", packages_apt) // pacman names often match apt
+    } else if has("zypper") {
+        format!("sudo zypper install -y {}", packages_apt)
+    } else {
+        format!("# Could not detect package manager. Install manually: {}", packages_apt)
+    }
+}
+
+/// Catalog mapping what BLADE can't do → what to install (cross-platform)
 pub fn capability_catalog() -> HashMap<&'static str, CapabilityGap> {
     let mut map = HashMap::new();
 
-    // Development tools
+    // Development tools — cross-platform installers
     map.insert("node", CapabilityGap {
         description: "Node.js not found".to_string(),
         category: "missing_runtime".to_string(),
         suggestion: "Install Node.js via nvm".to_string(),
-        install_cmd: "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash && source ~/.bashrc && nvm install node".to_string(),
+        install_cmd: if cfg!(target_os = "macos") {
+            "brew install node".to_string()
+        } else {
+            "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash && source ~/.bashrc && nvm install node".to_string()
+        },
     });
     map.insert("python3", CapabilityGap {
         description: "Python3 not found".to_string(),
         category: "missing_runtime".to_string(),
         suggestion: "Install Python3".to_string(),
-        install_cmd: "sudo apt-get install -y python3 python3-pip".to_string(),
+        install_cmd: pkg_install_cmd("python3 python3-pip", "python3", "python3 python3-pip"),
     });
     map.insert("rust", CapabilityGap {
         description: "Rust not found".to_string(),
@@ -63,19 +89,23 @@ pub fn capability_catalog() -> HashMap<&'static str, CapabilityGap> {
         description: "Docker not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install Docker".to_string(),
-        install_cmd: "curl -fsSL https://get.docker.com | sh".to_string(),
+        install_cmd: if cfg!(target_os = "macos") {
+            "brew install --cask docker".to_string()
+        } else {
+            "curl -fsSL https://get.docker.com | sh".to_string()
+        },
     });
     map.insert("git", CapabilityGap {
         description: "Git not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install git".to_string(),
-        install_cmd: "sudo apt-get install -y git".to_string(),
+        install_cmd: pkg_install_cmd("git", "git", "git"),
     });
     map.insert("ffmpeg", CapabilityGap {
         description: "FFmpeg not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install FFmpeg for media processing".to_string(),
-        install_cmd: "sudo apt-get install -y ffmpeg".to_string(),
+        install_cmd: pkg_install_cmd("ffmpeg", "ffmpeg", "ffmpeg"),
     });
     map.insert("claude", CapabilityGap {
         description: "Claude Code CLI not installed".to_string(),
@@ -93,25 +123,43 @@ pub fn capability_catalog() -> HashMap<&'static str, CapabilityGap> {
         description: "jq (JSON processor) not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install jq for JSON processing".to_string(),
-        install_cmd: "sudo apt-get install -y jq".to_string(),
+        install_cmd: pkg_install_cmd("jq", "jq", "jq"),
     });
     map.insert("ripgrep", CapabilityGap {
         description: "ripgrep not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install ripgrep for fast file search".to_string(),
-        install_cmd: "sudo apt-get install -y ripgrep".to_string(),
+        install_cmd: pkg_install_cmd("ripgrep", "ripgrep", "ripgrep"),
     });
     map.insert("fd", CapabilityGap {
         description: "fd (find) not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install fd for fast file finding".to_string(),
-        install_cmd: "sudo apt-get install -y fd-find".to_string(),
+        install_cmd: pkg_install_cmd("fd-find", "fd", "fd-find"),
     });
     map.insert("bat", CapabilityGap {
         description: "bat (better cat) not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install bat for syntax-highlighted file viewing".to_string(),
-        install_cmd: "sudo apt-get install -y bat".to_string(),
+        install_cmd: pkg_install_cmd("bat", "bat", "bat"),
+    });
+    map.insert("go", CapabilityGap {
+        description: "Go not installed".to_string(),
+        category: "missing_runtime".to_string(),
+        suggestion: "Install Go programming language".to_string(),
+        install_cmd: pkg_install_cmd("golang-go", "go", "golang"),
+    });
+    map.insert("htop", CapabilityGap {
+        description: "htop not installed".to_string(),
+        category: "missing_tool".to_string(),
+        suggestion: "Install htop for process monitoring".to_string(),
+        install_cmd: pkg_install_cmd("htop", "htop", "htop"),
+    });
+    map.insert("tmux", CapabilityGap {
+        description: "tmux not installed".to_string(),
+        category: "missing_tool".to_string(),
+        suggestion: "Install tmux for terminal multiplexing".to_string(),
+        install_cmd: pkg_install_cmd("tmux", "tmux", "tmux"),
     });
 
     map
