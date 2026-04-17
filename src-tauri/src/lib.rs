@@ -72,6 +72,7 @@ mod proactive_vision;
 mod reproductive;
 mod show_engine;
 mod skeleton;
+mod sysadmin;
 mod social_cognition;
 mod symbolic;
 mod supervisor;
@@ -1073,6 +1074,15 @@ pub fn run() {
             system_control::minimize_all,
             system_control::get_battery_status,
             system_control::get_network_status,
+            // Sysadmin — hardware detection, dry-run, checkpoints, sudo
+            sysadmin::sysadmin_detect_hardware,
+            sysadmin::sysadmin_dry_run_edit,
+            sysadmin::sysadmin_dry_run_command,
+            sysadmin::sysadmin_list_checkpoints,
+            sysadmin::sysadmin_save_checkpoint,
+            sysadmin::sysadmin_load_checkpoint,
+            sysadmin::sysadmin_rollback,
+            sysadmin::sysadmin_sudo_exec,
             // Notification Listener — Phase 5 partial
             notification_listener::notification_get_recent,
             notification_listener::notification_listener_start,

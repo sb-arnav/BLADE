@@ -234,6 +234,46 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "blade_hardware_detect".to_string(),
+            description: "Deep hardware detection — CPU (model, cores, virtualization features like VT-x/AMD-V/IOMMU), all GPUs (with PCI IDs, drivers, integrated vs discrete, IOMMU groups), RAM, disk space, OS/package manager, and virtualization readiness (KVM, QEMU, libvirt, VFIO). Use for: VM setup, GPU passthrough, hardware diagnostics, driver troubleshooting, system administration.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        ToolDefinition {
+            name: "blade_dry_run".to_string(),
+            description: "Preview a system change BEFORE applying it. Use this before editing critical system files (/etc/grub, /etc/fstab, modprobe configs) or running dangerous commands. Returns: risk level, diff preview, warnings about potential consequences. ALWAYS use this before modifying boot or kernel configs.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "type": {"type": "string", "enum": ["file_edit", "command"], "description": "What kind of change to preview"},
+                    "path": {"type": "string", "description": "File path (for file_edit)"},
+                    "old_content": {"type": "string", "description": "Current content (for file_edit)"},
+                    "new_content": {"type": "string", "description": "New content (for file_edit)"},
+                    "command": {"type": "string", "description": "Command to preview (for command type)"}
+                },
+                "required": ["type"]
+            }),
+        },
+        ToolDefinition {
+            name: "blade_checkpoint".to_string(),
+            description: "Create/update/list/rollback task checkpoints for multi-step system administration. Use for complex tasks that span multiple steps or require a reboot mid-way (e.g., GPU passthrough setup). Checkpoints persist across app restarts and include file rollback capability.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": ["create", "update", "list", "rollback", "backup_file"], "description": "Checkpoint action"},
+                    "id": {"type": "string", "description": "Checkpoint ID (for update/rollback)"},
+                    "title": {"type": "string", "description": "Task title (for create)"},
+                    "steps": {"type": "array", "items": {"type": "object"}, "description": "Task steps (for create)"},
+                    "step_index": {"type": "integer", "description": "Step to update"},
+                    "step_status": {"type": "string", "description": "New step status"},
+                    "file_path": {"type": "string", "description": "File to backup (for backup_file)"}
+                },
+                "required": ["action"]
+            }),
+        },
+        ToolDefinition {
             name: "blade_time_now".to_string(),
             description: "Get the current date and time with timezone. Use whenever you need to know what time it is — for scheduling, reminders, timestamps, or any time-aware task. Returns local time, UTC time, Unix timestamp, and timezone name.".to_string(),
             input_schema: json!({
@@ -786,6 +826,19 @@ pub fn suggest_tools_for_query(query: &str) -> Vec<String> {
             suppress: &["blade_index_project", "blade_find_symbol",
                         "blade_pentest_authorize", "blade_iot_control"],
         },
+        // System admin / virtualization / hardware
+        Affinity {
+            keywords: &["gpu", "passthrough", "vfio", "iommu", "virtual machine", "vm",
+                        "qemu", "kvm", "libvirt", "grub", "kernel", "driver", "pci",
+                        "nvidia", "cuda", "modprobe", "systemctl", "service",
+                        "partition", "mount", "fstab", "network config", "firewall",
+                        "docker", "container", "hardware"],
+            boost: &["blade_hardware_detect", "blade_dry_run", "blade_checkpoint",
+                     "blade_bash", "blade_read_file", "blade_edit_file",
+                     "blade_system_info"],
+            suppress: &["blade_browser_open", "blade_iot_control",
+                        "blade_set_reminder", "blade_pentest_authorize"],
+        },
         // System / processes / desktop
         Affinity {
             keywords: &["process", "running", "app", "application", "cpu", "ram",
@@ -793,6 +846,7 @@ pub fn suggest_tools_for_query(query: &str) -> Vec<String> {
                         "screen", "click", "type", "window", "ui", "desktop",
                         "volume", "brightness", "lock", "shutdown"],
             boost: &["blade_get_processes", "blade_kill_process", "blade_system_info",
+                     "blade_hardware_detect", "blade_dry_run", "blade_checkpoint",
                      "blade_screenshot", "blade_look_at_screen", "blade_ui_read",
                      "blade_ui_click", "blade_ui_type", "blade_ui_wait",
                      "blade_mouse", "blade_keyboard"],
@@ -1069,6 +1123,77 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
         }
         "blade_system_info" => {
             system_info().await
+        }
+        "blade_hardware_detect" => {
+            let hw = crate::sysadmin::detect_hardware();
+            (serde_json::to_string_pretty(&hw).unwrap_or_else(|_| "Failed to serialize hardware info".to_string()), false)
+        }
+        "blade_dry_run" => {
+            let run_type = args["type"].as_str().unwrap_or("command");
+            match run_type {
+                "file_edit" => {
+                    let path = args["path"].as_str().unwrap_or("");
+                    let old = args["old_content"].as_str().unwrap_or("");
+                    let new = args["new_content"].as_str().unwrap_or("");
+                    let result = crate::sysadmin::dry_run_file_edit(path, old, new);
+                    (serde_json::to_string_pretty(&result).unwrap_or_default(), false)
+                }
+                "command" => {
+                    let cmd = args["command"].as_str().unwrap_or("");
+                    let result = crate::sysadmin::dry_run_command(cmd);
+                    (serde_json::to_string_pretty(&result).unwrap_or_default(), false)
+                }
+                _ => ("Invalid dry_run type. Use 'file_edit' or 'command'.".to_string(), true)
+            }
+        }
+        "blade_checkpoint" => {
+            let action = args["action"].as_str().unwrap_or("list");
+            match action {
+                "create" => {
+                    let title = args["title"].as_str().unwrap_or("Untitled task");
+                    let steps: Vec<crate::sysadmin::TaskStep> = serde_json::from_value(args["steps"].clone()).unwrap_or_default();
+                    let now = chrono::Utc::now().timestamp();
+                    let cp = crate::sysadmin::TaskCheckpoint {
+                        id: format!("cp-{}", now),
+                        title: title.to_string(),
+                        steps,
+                        current_step: 0,
+                        created_at: now,
+                        updated_at: now,
+                        status: "in_progress".to_string(),
+                        rollback_info: Vec::new(),
+                    };
+                    match crate::sysadmin::save_checkpoint(&cp) {
+                        Ok(_) => (format!("Checkpoint created: {} ({})", cp.title, cp.id), false),
+                        Err(e) => (format!("Failed to create checkpoint: {}", e), true),
+                    }
+                }
+                "list" => {
+                    let cps = crate::sysadmin::list_active_checkpoints();
+                    if cps.is_empty() {
+                        ("No active task checkpoints.".to_string(), false)
+                    } else {
+                        (serde_json::to_string_pretty(&cps).unwrap_or_default(), false)
+                    }
+                }
+                "rollback" => {
+                    let id = args["id"].as_str().unwrap_or("");
+                    match crate::sysadmin::rollback_checkpoint(id) {
+                        Ok(n) => (format!("Rolled back {} file(s) for checkpoint {}", n, id), false),
+                        Err(e) => (format!("Rollback failed: {}", e), true),
+                    }
+                }
+                "backup_file" => {
+                    let id = args["id"].as_str().unwrap_or("");
+                    let step = args["step_index"].as_u64().unwrap_or(0) as usize;
+                    let path = args["file_path"].as_str().unwrap_or("");
+                    match crate::sysadmin::backup_file_for_rollback(id, step, path) {
+                        Ok(_) => (format!("Backed up {} for rollback", path), false),
+                        Err(e) => (format!("Backup failed: {}", e), true),
+                    }
+                }
+                _ => ("Invalid checkpoint action. Use: create, list, rollback, backup_file".to_string(), true)
+            }
         }
         "blade_time_now" => {
             time_now()
