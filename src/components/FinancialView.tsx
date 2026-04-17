@@ -516,13 +516,11 @@ function GoalsTab() {
     if (!goalName.trim() || !goalTarget || !goalDeadline) return;
     setLoading(true);
     try {
-      await invoke("finance_add_goal", {
-        goal: {
-          name: goalName.trim(),
-          target_amount: parseFloat(goalTarget),
-          deadline: goalDeadline,
-          starting_amount: parseFloat(goalStarting || "0"),
-        },
+      await invoke("finance_create_goal", {
+        name: goalName.trim(),
+        targetAmount: parseFloat(goalTarget),
+        deadline: goalDeadline,
+        currentAmount: parseFloat(goalStarting || "0"),
       });
       setGoalName("");
       setGoalTarget("");
