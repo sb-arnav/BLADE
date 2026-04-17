@@ -175,7 +175,7 @@ function DebatePanel() {
 
       {/* Setup */}
       {!session && (
-        <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
+        <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
           <div className="text-green-400 font-mono text-xs uppercase tracking-widest mb-1">// New Debate</div>
           <div className="flex flex-col gap-1">
             <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">TOPIC</label>
@@ -233,8 +233,8 @@ function DebatePanel() {
 
           {/* Round cards */}
           {session.rounds.map((round) => (
-            <div key={round.round} className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded overflow-hidden">
-              <div className="px-3 py-1 bg-[#09090b] border-b border-[rgba(255,255,255,0.07)] font-mono text-xs text-[rgba(255,255,255,0.4)]">
+            <div key={round.round} className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded overflow-hidden">
+              <div className="px-3 py-1 bg-blade-bg border-b border-[rgba(255,255,255,0.07)] font-mono text-xs text-[rgba(255,255,255,0.4)]">
                 ROUND {round.round}
               </div>
               <div className="grid grid-cols-2 gap-0">
@@ -256,7 +256,7 @@ function DebatePanel() {
           ))}
 
           {/* Next Round Input */}
-          <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-3 flex flex-col gap-2">
+          <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded p-3 flex flex-col gap-2">
             <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">YOUR NEXT ARGUMENT</label>
             <textarea
               rows={3}
@@ -281,7 +281,7 @@ function DebatePanel() {
       )}
 
       {/* Argument Tools */}
-      <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded">
+      <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded">
         <button
           className="w-full flex items-center justify-between px-4 py-2 font-mono text-xs text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)]"
           onClick={() => setToolsOpen((v) => !v)}
@@ -309,7 +309,7 @@ function DebatePanel() {
               <button
                 onClick={steelman}
                 disabled={loading}
-                className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)] font-mono text-xs py-1.5 hover:border-green-700 hover:text-green-400 disabled:opacity-40 transition-colors"
+                className="bg-blade-bg border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)] font-mono text-xs py-1.5 hover:border-green-700 hover:text-green-400 disabled:opacity-40 transition-colors"
               >
                 STEELMAN →
               </button>
@@ -344,7 +344,7 @@ function DebatePanel() {
               <button
                 onClick={buildArgument}
                 disabled={loading}
-                className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)] font-mono text-xs py-1.5 hover:border-green-700 hover:text-green-400 disabled:opacity-40 transition-colors"
+                className="bg-blade-bg border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)] font-mono text-xs py-1.5 hover:border-green-700 hover:text-green-400 disabled:opacity-40 transition-colors"
               >
                 BUILD →
               </button>
@@ -432,7 +432,7 @@ function NegotiationPanel() {
   return (
     <div className="flex flex-col gap-4 h-full overflow-y-auto">
       {/* Input */}
-      <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
+      <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
         <div className="text-green-400 font-mono text-xs uppercase tracking-widest mb-1">// Scenario Setup</div>
         <div className="flex flex-col gap-1">
           <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">CONTEXT</label>
@@ -478,7 +478,7 @@ function NegotiationPanel() {
       {analysis && (
         <>
           {/* Tactics */}
-          <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4">
+          <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded p-4">
             <div className="text-green-400 font-mono text-xs uppercase tracking-widest mb-3">// Tactics</div>
             <ol className="flex flex-col gap-2">
               {analysis.tactics.map((tactic, i) => (
@@ -491,7 +491,7 @@ function NegotiationPanel() {
           </div>
 
           {/* Scripts */}
-          <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4">
+          <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded p-4">
             <div className="text-green-400 font-mono text-xs uppercase tracking-widest mb-3">// Word-for-Word Scripts</div>
             <div className="flex flex-col gap-3">
               {analysis.scripts.map((script, i) => (
@@ -503,14 +503,14 @@ function NegotiationPanel() {
           </div>
 
           {/* BATNA */}
-          <div className="bg-[#09090b] border border-amber-900/50 rounded p-4">
+          <div className="bg-blade-bg border border-amber-900/50 rounded p-4">
             <div className="text-amber-400 font-mono text-xs uppercase tracking-widest mb-2">// BATNA</div>
             <p className="text-[rgba(255,255,255,0.7)] text-sm">{analysis.batna}</p>
           </div>
 
           {/* Their Interests */}
           {analysis.their_interests && analysis.their_interests.length > 0 && (
-            <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4">
+            <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded p-4">
               <div className="text-red-400 font-mono text-xs uppercase tracking-widest mb-2">// Their Interests</div>
               <ul className="flex flex-col gap-1">
                 {analysis.their_interests.map((interest, i) => (
@@ -524,7 +524,7 @@ function NegotiationPanel() {
           )}
 
           {/* Practice Roleplay */}
-          <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
+          <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
             <div className="text-green-400 font-mono text-xs uppercase tracking-widest">// Practice: Roleplay</div>
             <div className="flex flex-col gap-1">
               <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">THEIR MESSAGE (as opponent)</label>
@@ -539,7 +539,7 @@ function NegotiationPanel() {
             <button
               onClick={roleplay}
               disabled={loading || !theirMessage.trim()}
-              className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)] font-mono text-xs py-2 hover:border-green-700 hover:text-green-400 disabled:opacity-40 transition-colors"
+              className="bg-blade-bg border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)] font-mono text-xs py-2 hover:border-green-700 hover:text-green-400 disabled:opacity-40 transition-colors"
             >
               {loading ? "..." : "BLADE RESPONDS AS OPPONENT →"}
             </button>
@@ -559,7 +559,7 @@ function NegotiationPanel() {
           </div>
 
           {/* Critique */}
-          <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
+          <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
             <div className="text-green-400 font-mono text-xs uppercase tracking-widest">// Critique My Move</div>
             <div className="flex flex-col gap-1">
               <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">WHAT YOU PLAN TO SAY OR DO</label>
@@ -574,7 +574,7 @@ function NegotiationPanel() {
             <button
               onClick={critiqueMove}
               disabled={loading || !userMove.trim()}
-              className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)] font-mono text-xs py-2 hover:border-green-700 hover:text-green-400 disabled:opacity-40 transition-colors"
+              className="bg-blade-bg border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)] font-mono text-xs py-2 hover:border-green-700 hover:text-green-400 disabled:opacity-40 transition-colors"
             >
               {loading ? "..." : "CRITIQUE THIS MOVE →"}
             </button>
@@ -586,7 +586,7 @@ function NegotiationPanel() {
                     {Array.from({ length: 10 }).map((_, i) => (
                       <div
                         key={i}
-                        className={`w-3 h-3 border ${i < critique.score ? "bg-green-600 border-green-500" : "bg-[#09090b] border-[rgba(255,255,255,0.1)]"}`}
+                        className={`w-3 h-3 border ${i < critique.score ? "bg-green-600 border-green-500" : "bg-blade-bg border-[rgba(255,255,255,0.1)]"}`}
                       />
                     ))}
                   </div>
@@ -629,7 +629,7 @@ export function NegotiationView({ onBack }: { onBack: () => void }) {
   const [tab, setTab] = useState<"debate" | "negotiation">("debate");
 
   return (
-    <div className="flex flex-col h-full bg-black text-[rgba(255,255,255,0.85)]">
+    <div className="flex flex-col h-full bg-blade-bg text-[rgba(255,255,255,0.85)]">
       {/* Header */}
       <div className="flex items-center gap-4 px-4 py-3 border-b border-[rgba(255,255,255,0.07)] shrink-0">
         <button

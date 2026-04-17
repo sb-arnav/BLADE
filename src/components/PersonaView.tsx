@@ -108,7 +108,7 @@ function TraitBar({
   }, [localScore, trait.trait_name, onOverride]);
 
   return (
-    <div className="border border-[rgba(255,255,255,0.07)] rounded-lg p-3 bg-[#09090b] flex flex-col gap-2">
+    <div className="border border-[rgba(255,255,255,0.07)] rounded-lg p-3 bg-blade-bg flex flex-col gap-2">
       {/* Header row */}
       <div className="flex items-center gap-3">
         <span className={`font-bold text-xs w-40 ${meta.color}`}>{meta.label}</span>
@@ -254,7 +254,7 @@ export function PersonaView({ onBack }: { onBack: () => void }) {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col bg-black text-[rgba(255,255,255,0.7)] font-mono text-xs overflow-hidden">
+    <div className="flex-1 min-h-0 flex flex-col bg-blade-bg text-[rgba(255,255,255,0.7)] font-mono text-xs overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[rgba(255,255,255,0.07)] shrink-0">
         <button onClick={onBack} className="text-[rgba(255,255,255,0.4)] hover:text-green-400 transition-colors">
@@ -295,7 +295,7 @@ export function PersonaView({ onBack }: { onBack: () => void }) {
             </div>
 
             {relationship ? (
-              <div className="border border-[rgba(255,255,255,0.07)] rounded-lg p-4 bg-[#09090b]">
+              <div className="border border-[rgba(255,255,255,0.07)] rounded-lg p-4 bg-blade-bg">
                 <div className="flex items-start gap-6">
                   {/* Circle gauge */}
                   <div className="relative shrink-0">
@@ -336,7 +336,7 @@ export function PersonaView({ onBack }: { onBack: () => void }) {
                         <div className="text-2xs text-[rgba(255,255,255,0.4)] uppercase tracking-wider mb-1">Shared Context</div>
                         <div className="flex flex-wrap gap-1">
                           {relationship.shared_context.slice(0, 8).map((ctx, i) => (
-                            <span key={i} className="text-2xs px-2 py-0.5 border border-[rgba(255,255,255,0.1)] bg-[#09090b] rounded-full text-[rgba(255,255,255,0.5)]">
+                            <span key={i} className="text-2xs px-2 py-0.5 border border-[rgba(255,255,255,0.1)] bg-blade-bg rounded-full text-[rgba(255,255,255,0.5)]">
                               {ctx}
                             </span>
                           ))}
@@ -411,7 +411,7 @@ export function PersonaView({ onBack }: { onBack: () => void }) {
             ) : (
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {patterns.map((p, i) => (
-                  <div key={i} className="border border-[rgba(255,255,255,0.07)] rounded-lg p-3 bg-[#09090b]">
+                  <div key={i} className="border border-[rgba(255,255,255,0.07)] rounded-lg p-3 bg-blade-bg">
                     <div className="text-2xs text-teal-400 font-bold uppercase tracking-wider mb-1">{p.pattern_type}</div>
                     <div className="text-2xs text-[rgba(255,255,255,0.5)] font-sans leading-relaxed">{p.description}</div>
                   </div>

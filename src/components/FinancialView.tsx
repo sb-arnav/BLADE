@@ -139,7 +139,7 @@ function InvestmentModal({ suggestions, onClose }: { suggestions: InvestmentSugg
         </div>
         <div className="flex flex-col gap-3">
           {suggestions.map((s, i) => (
-            <div key={i} className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-3">
+            <div key={i} className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded p-3">
               <div className="flex items-start justify-between mb-1">
                 <span className="text-green-400 font-mono text-sm">{s.name}</span>
                 <span className={`font-mono text-xs px-2 py-0.5 rounded ${
@@ -155,7 +155,7 @@ function InvestmentModal({ suggestions, onClose }: { suggestions: InvestmentSugg
         </div>
         <button
           onClick={onClose}
-          className="mt-4 w-full bg-[#09090b] border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)] font-mono text-xs py-2 hover:text-[rgba(255,255,255,0.85)] transition-colors"
+          className="mt-4 w-full bg-blade-bg border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)] font-mono text-xs py-2 hover:text-[rgba(255,255,255,0.85)] transition-colors"
         >
           CLOSE
         </button>
@@ -239,7 +239,7 @@ function TransactionsTab({ month }: { month: string }) {
   return (
     <div className="flex flex-col gap-4">
       {/* Add form */}
-      <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
+      <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
         <div className="text-green-400 font-mono text-xs uppercase tracking-widest">// Add Transaction</div>
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1">
@@ -255,7 +255,7 @@ function TransactionsTab({ month }: { month: string }) {
               </button>
               <input
                 type="number"
-                className="flex-1 bg-black border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
+                className="flex-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700"
                 placeholder="0.00"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
@@ -317,13 +317,13 @@ function TransactionsTab({ month }: { month: string }) {
             {grouped[dateKey].map((tx) => (
               <div
                 key={tx.id}
-                className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded px-3 py-2 flex items-center gap-3"
+                className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded px-3 py-2 flex items-center gap-3"
               >
                 <span className={`font-mono text-sm font-bold min-w-[90px] text-right ${tx.is_income ? "text-green-400" : "text-red-400"}`}>
                   {tx.is_income ? "+" : "−"}${Math.abs(tx.amount).toFixed(2)}
                 </span>
                 <span className="text-[rgba(255,255,255,0.7)] text-sm flex-1 truncate">{tx.description}</span>
-                <span className={`font-mono text-xs px-2 py-0.5 rounded ${CATEGORY_TEXT[tx.category]} bg-[#09090b]`}>
+                <span className={`font-mono text-xs px-2 py-0.5 rounded ${CATEGORY_TEXT[tx.category]} bg-blade-bg`}>
                   {tx.category}
                 </span>
                 <button
@@ -395,7 +395,7 @@ function AnalyticsTab() {
       )}
 
       {/* Spending breakdown */}
-      <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4">
+      <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded p-4">
         <div className="text-green-400 font-mono text-xs uppercase tracking-widest mb-3">// Spending by Category</div>
         {breakdown.length === 0 && (
           <div className="text-[rgba(255,255,255,0.2)] font-mono text-xs text-center py-4">No spending data available</div>
@@ -418,7 +418,7 @@ function AnalyticsTab() {
                     </span>
                   </div>
                 </div>
-                <div className="h-2 bg-[#09090b] rounded overflow-hidden">
+                <div className="h-2 bg-blade-bg rounded overflow-hidden">
                   <div
                     className={`h-full ${barColor} transition-all duration-500`}
                     style={{ width: `${barWidth}%` }}
@@ -454,7 +454,7 @@ function AnalyticsTab() {
         <div className="flex flex-col gap-3">
           <div className="text-green-400 font-mono text-xs uppercase tracking-widest">// Insights</div>
           {insights.map((insight, i) => (
-            <div key={i} className={`bg-[#09090b] border ${INSIGHT_BORDER[insight.type]} rounded p-4`}>
+            <div key={i} className={`bg-blade-bg border ${INSIGHT_BORDER[insight.type]} rounded p-4`}>
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-base">{INSIGHT_ICONS[insight.type]}</span>
                 <span className="text-[rgba(255,255,255,0.85)] font-mono text-sm">{insight.title}</span>
@@ -575,7 +575,7 @@ function GoalsTab() {
       </div>
 
       {showAddGoal && (
-        <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
+        <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">GOAL NAME</label>
@@ -642,7 +642,7 @@ function GoalsTab() {
         const progress = Math.min((goal.current_amount / goal.target_amount) * 100, 100);
         const statusClass = STATUS_COLOR[goal.status] ?? "text-[rgba(255,255,255,0.5)] border-[rgba(255,255,255,0.1)]";
         return (
-          <div key={goal.id} className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
+          <div key={goal.id} className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
             <div className="flex items-start justify-between gap-2">
               <span className="text-[rgba(255,255,255,0.85)] font-mono text-sm">{goal.name}</span>
               <span className={`font-mono text-xs px-2 py-0.5 border rounded ${statusClass}`}>
@@ -655,7 +655,7 @@ function GoalsTab() {
               </span>
               <span className="text-green-400">{progress.toFixed(1)}%</span>
             </div>
-            <div className="h-3 bg-[#09090b] rounded overflow-hidden border border-[rgba(255,255,255,0.07)]">
+            <div className="h-3 bg-blade-bg rounded overflow-hidden border border-[rgba(255,255,255,0.07)]">
               <div
                 className={`h-full transition-all duration-700 ${
                   goal.status === "achieved" ? "bg-teal-600" :
@@ -673,7 +673,7 @@ function GoalsTab() {
       })}
 
       {/* Investment Ideas */}
-      <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
+      <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded p-4 flex flex-col gap-3">
         <div className="text-green-400 font-mono text-xs uppercase tracking-widest">// Investment Ideas</div>
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1">
@@ -733,7 +733,7 @@ export function FinancialView({ onBack }: { onBack: () => void }) {
   ];
 
   return (
-    <div className="flex flex-col h-full bg-black text-[rgba(255,255,255,0.85)]">
+    <div className="flex flex-col h-full bg-blade-bg text-[rgba(255,255,255,0.85)]">
       {/* Header */}
       <div className="shrink-0 border-b border-[rgba(255,255,255,0.07)] px-4 py-3">
         <div className="flex items-center gap-4 mb-3">
@@ -761,15 +761,15 @@ export function FinancialView({ onBack }: { onBack: () => void }) {
         {/* Quick stats */}
         {stats && (
           <div className="grid grid-cols-3 gap-3 mb-3">
-            <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded px-3 py-2">
+            <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded px-3 py-2">
               <div className="text-[rgba(255,255,255,0.3)] font-mono text-xs mb-1">INCOME</div>
               <div className="text-green-400 font-mono text-sm">${stats.income.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
             </div>
-            <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded px-3 py-2">
+            <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded px-3 py-2">
               <div className="text-[rgba(255,255,255,0.3)] font-mono text-xs mb-1">EXPENSES</div>
               <div className="text-red-400 font-mono text-sm">${stats.expenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
             </div>
-            <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded px-3 py-2">
+            <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded px-3 py-2">
               <div className="text-[rgba(255,255,255,0.3)] font-mono text-xs mb-1">SAVINGS RATE</div>
               <div className={`font-mono text-sm ${stats.savings_rate >= 20 ? "text-green-400" : stats.savings_rate >= 10 ? "text-amber-400" : "text-red-400"}`}>
                 {stats.savings_rate.toFixed(1)}%

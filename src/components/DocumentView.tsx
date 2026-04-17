@@ -52,7 +52,7 @@ function Accordion({ question, answer }: { question: string; answer: string }) {
     <div className="border border-[rgba(255,255,255,0.1)] rounded overflow-hidden">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full text-left px-3 py-2 flex items-center gap-2 bg-[#09090b]/60 hover:bg-[rgba(255,255,255,0.04)]/60 transition-colors"
+        className="w-full text-left px-3 py-2 flex items-center gap-2 bg-blade-bg/60 hover:bg-[rgba(255,255,255,0.04)]/60 transition-colors"
       >
         <svg
           width="10" height="10" viewBox="0 0 10 10" fill="currentColor"
@@ -63,7 +63,7 @@ function Accordion({ question, answer }: { question: string; answer: string }) {
         <span className="text-xs text-[rgba(255,255,255,0.85)] font-medium">{question}</span>
       </button>
       {open && (
-        <div className="px-4 py-3 bg-black border-t border-[rgba(255,255,255,0.07)]">
+        <div className="px-4 py-3 bg-blade-bg border-t border-[rgba(255,255,255,0.07)]">
           <p className="text-xs text-[rgba(255,255,255,0.7)] leading-relaxed">{answer}</p>
         </div>
       )}
@@ -199,9 +199,9 @@ export function DocumentView({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-black text-[rgba(255,255,255,0.85)] font-mono">
+    <div className="flex flex-col h-full bg-blade-bg text-[rgba(255,255,255,0.85)] font-mono">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-2 border-b border-[rgba(255,255,255,0.1)] bg-black">
+      <div className="flex items-center gap-3 px-4 py-2 border-b border-[rgba(255,255,255,0.1)] bg-blade-bg">
         <button onClick={onBack} className="text-[rgba(255,255,255,0.4)] hover:text-green-400 transition-colors">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -214,12 +214,12 @@ export function DocumentView({ onBack }: { onBack: () => void }) {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <div className="w-64 border-r border-[rgba(255,255,255,0.1)] flex flex-col overflow-hidden bg-[#09090b]/30">
+        <div className="w-64 border-r border-[rgba(255,255,255,0.1)] flex flex-col overflow-hidden bg-blade-bg/30">
           {/* Ingest */}
           <div className="p-2 border-b border-[rgba(255,255,255,0.1)] space-y-2">
             <div className="flex gap-1">
               <input
-                className="flex-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] placeholder-gray-600 focus:outline-none focus:border-green-700"
+                className="flex-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] placeholder-gray-600 focus:outline-none focus:border-green-700"
                 placeholder="File path or drag hint..."
                 value={filePath}
                 onChange={(e) => setFilePath(e.target.value)}
@@ -240,7 +240,7 @@ export function DocumentView({ onBack }: { onBack: () => void }) {
           {/* Search */}
           <div className="p-2 border-b border-[rgba(255,255,255,0.1)]">
             <input
-              className="w-full bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] placeholder-gray-600 focus:outline-none focus:border-green-700"
+              className="w-full bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] placeholder-gray-600 focus:outline-none focus:border-green-700"
               placeholder="Search docs..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -276,7 +276,7 @@ export function DocumentView({ onBack }: { onBack: () => void }) {
         {/* Main area */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Tabs */}
-          <div className="flex border-b border-[rgba(255,255,255,0.1)] bg-black px-4">
+          <div className="flex border-b border-[rgba(255,255,255,0.1)] bg-blade-bg px-4">
             {(["detail", "qa", "synthesis"] as const).map((t) => (
               <button
                 key={t}
@@ -298,7 +298,7 @@ export function DocumentView({ onBack }: { onBack: () => void }) {
               ) : (
                 <>
                   {/* Doc header */}
-                  <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/40 p-4">
+                  <div className="border border-[rgba(255,255,255,0.1)] rounded bg-blade-bg/40 p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1">
                         <h2 className="text-sm font-bold text-white leading-tight">{selectedDoc.title}</h2>
@@ -349,7 +349,7 @@ export function DocumentView({ onBack }: { onBack: () => void }) {
 
                   {/* Summary */}
                   {selectedDoc.summary && (
-                    <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/30">
+                    <div className="border border-[rgba(255,255,255,0.1)] rounded bg-blade-bg/30">
                       <button
                         onClick={() => setSummaryOpen((o) => !o)}
                         className="w-full text-left px-4 py-2 flex items-center gap-2 hover:bg-[rgba(255,255,255,0.04)]/40 transition-colors"
@@ -372,7 +372,7 @@ export function DocumentView({ onBack }: { onBack: () => void }) {
 
                   {/* Key Points */}
                   {selectedDoc.key_points.length > 0 && (
-                    <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/30 p-4">
+                    <div className="border border-[rgba(255,255,255,0.1)] rounded bg-blade-bg/30 p-4">
                       <p className="text-xs text-green-400 font-bold uppercase tracking-wider mb-2">Key Points</p>
                       <ul className="space-y-1.5">
                         {selectedDoc.key_points.map((pt, i) => (
@@ -386,7 +386,7 @@ export function DocumentView({ onBack }: { onBack: () => void }) {
                   )}
 
                   {/* Study Notes */}
-                  <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/30 p-4 space-y-3">
+                  <div className="border border-[rgba(255,255,255,0.1)] rounded bg-blade-bg/30 p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <p className="text-xs text-amber-400 font-bold uppercase tracking-wider">Study Notes</p>
                       <button
@@ -417,11 +417,11 @@ export function DocumentView({ onBack }: { onBack: () => void }) {
           {/* Q&A tab */}
           {activeTab === "qa" && (
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              <div className="space-y-3 border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/30 p-4">
+              <div className="space-y-3 border border-[rgba(255,255,255,0.1)] rounded bg-blade-bg/30 p-4">
                 <div>
                   <label className="text-xs text-[rgba(255,255,255,0.4)] uppercase tracking-wider">Question</label>
                   <textarea
-                    className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-green-700 resize-none"
+                    className="w-full mt-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-green-700 resize-none"
                     rows={3}
                     placeholder="Ask anything about your documents..."
                     value={question}
@@ -498,7 +498,7 @@ export function DocumentView({ onBack }: { onBack: () => void }) {
                     <div className="space-y-2">
                       <p className="text-xs text-[rgba(255,255,255,0.4)] uppercase tracking-wider">Relevant Quotes</p>
                       {qaResult.relevant_quotes.map((q, i) => (
-                        <blockquote key={i} className="border-l-4 border-[rgba(255,255,255,0.15)] pl-3 py-1 bg-[#09090b]/30">
+                        <blockquote key={i} className="border-l-4 border-[rgba(255,255,255,0.15)] pl-3 py-1 bg-blade-bg/30">
                           <p className="text-xs text-[rgba(255,255,255,0.7)] italic leading-relaxed">{q}</p>
                         </blockquote>
                       ))}
@@ -518,14 +518,14 @@ export function DocumentView({ onBack }: { onBack: () => void }) {
           {/* Cross-Doc Synthesis tab */}
           {activeTab === "synthesis" && (
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/30 p-4 space-y-3">
+              <div className="border border-[rgba(255,255,255,0.1)] rounded bg-blade-bg/30 p-4 space-y-3">
                 <p className="text-xs text-[rgba(255,255,255,0.5)]">
                   Synthesize insights across all documents for a complex question.
                 </p>
                 <div>
                   <label className="text-xs text-[rgba(255,255,255,0.4)] uppercase tracking-wider">Question</label>
                   <textarea
-                    className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-green-700 resize-none"
+                    className="w-full mt-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-green-700 resize-none"
                     rows={3}
                     placeholder="What patterns or themes connect these documents?"
                     value={synthQuestion}

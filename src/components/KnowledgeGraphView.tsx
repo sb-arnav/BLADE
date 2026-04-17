@@ -192,7 +192,7 @@ export function KnowledgeGraphView({ onBack }: KnowledgeGraphViewProps) {
   const handleMouseUp = useCallback(() => { isPanningRef.current = false; }, []);
 
   return (
-    <div className="flex flex-col h-full bg-[#0a0a0f] text-white">
+    <div className="flex flex-col h-full bg-blade-bg text-white">
       <div className="flex items-center gap-3 px-5 py-3 border-b border-[rgba(255,255,255,0.08)]">
         <button onClick={onBack} className="text-[rgba(255,255,255,0.5)] hover:text-white text-sm">← Back</button>
         <h1 className="text-[15px] font-semibold">Knowledge Graph</h1>

@@ -67,7 +67,7 @@ function emotionColor(emotion: EmotionName): {
     case "focused":
       return { text: "text-green-400", bg: "bg-green-950", border: "border-green-700", dot: "bg-green-500" };
     case "tired":
-      return { text: "text-[rgba(255,255,255,0.5)]", bg: "bg-[#09090b]", border: "border-[rgba(255,255,255,0.1)]", dot: "bg-[rgba(255,255,255,0.04)]" };
+      return { text: "text-[rgba(255,255,255,0.5)]", bg: "bg-blade-bg", border: "border-[rgba(255,255,255,0.1)]", dot: "bg-[rgba(255,255,255,0.04)]" };
     case "frustrated":
       return { text: "text-orange-400", bg: "bg-orange-950", border: "border-orange-700", dot: "bg-orange-500" };
     case "happy":
@@ -76,7 +76,7 @@ function emotionColor(emotion: EmotionName): {
       return { text: "text-purple-400", bg: "bg-purple-950", border: "border-purple-700", dot: "bg-purple-500" };
     case "neutral":
     default:
-      return { text: "text-[rgba(255,255,255,0.5)]", bg: "bg-[#09090b]", border: "border-[rgba(255,255,255,0.1)]", dot: "bg-[rgba(255,255,255,0.04)]" };
+      return { text: "text-[rgba(255,255,255,0.5)]", bg: "bg-blade-bg", border: "border-[rgba(255,255,255,0.1)]", dot: "bg-[rgba(255,255,255,0.04)]" };
   }
 }
 
@@ -111,7 +111,7 @@ function ValenceArousalGrid({ valence, arousal, emotion }: { valence: number; ar
         <span className="text-[rgba(255,255,255,0.4)]">valence</span>
         <span>positive</span>
       </div>
-      <div className="relative border border-[rgba(255,255,255,0.1)] bg-[#09090b]/80 rounded" style={{ height: 120 }}>
+      <div className="relative border border-[rgba(255,255,255,0.1)] bg-blade-bg/80 rounded" style={{ height: 120 }}>
         {/* Quadrant dividers */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-0 bottom-0 left-1/2 border-l border-[rgba(255,255,255,0.07)]" />
@@ -163,7 +163,7 @@ function EmotionTimeline({ readings }: { readings: EmotionReading[] }) {
               <div
                 className={`w-2.5 h-2.5 rounded-full ${col.dot} border border-black`}
               />
-              <div className="w-2.5 h-8 bg-[#09090b] rounded-sm overflow-hidden flex flex-col-reverse">
+              <div className="w-2.5 h-8 bg-blade-bg rounded-sm overflow-hidden flex flex-col-reverse">
                 <div
                   className={`w-full ${valenceColor(r.valence)} rounded-sm`}
                   style={{ height: `${Math.abs(r.valence) * 100}%` }}
@@ -261,7 +261,7 @@ export function EmotionalIntelligenceView({ onBack }: { onBack: () => void }) {
   const emotionStyle = emotionColor(emotion);
 
   return (
-    <div className="flex flex-col h-full bg-black text-[rgba(255,255,255,0.85)] overflow-hidden">
+    <div className="flex flex-col h-full bg-blade-bg text-[rgba(255,255,255,0.85)] overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.1)] shrink-0">
         <div className="flex items-center gap-3">
@@ -303,7 +303,7 @@ export function EmotionalIntelligenceView({ onBack }: { onBack: () => void }) {
               )}
             </div>
 
-            <div className="border border-[rgba(255,255,255,0.1)] bg-[#09090b]/50 rounded p-4 flex flex-col gap-4">
+            <div className="border border-[rgba(255,255,255,0.1)] bg-blade-bg/50 rounded p-4 flex flex-col gap-4">
               {currentState ? (
                 <>
                   {/* Primary emotion display */}
@@ -427,7 +427,7 @@ export function EmotionalIntelligenceView({ onBack }: { onBack: () => void }) {
                     className={`text-2xs font-mono px-2 py-0.5 rounded border transition-colors ${
                       trendPeriod === p
                         ? "bg-green-900/40 text-green-400 border-green-700"
-                        : "bg-[#09090b] text-[rgba(255,255,255,0.4)] border-[rgba(255,255,255,0.1)] hover:text-[rgba(255,255,255,0.7)]"
+                        : "bg-blade-bg text-[rgba(255,255,255,0.4)] border-[rgba(255,255,255,0.1)] hover:text-[rgba(255,255,255,0.7)]"
                     }`}
                   >
                     {p.replace("_", " ")}
@@ -436,7 +436,7 @@ export function EmotionalIntelligenceView({ onBack }: { onBack: () => void }) {
               </div>
             </div>
 
-            <div className="border border-[rgba(255,255,255,0.1)] bg-[#09090b]/50 rounded p-4 flex flex-col gap-4">
+            <div className="border border-[rgba(255,255,255,0.1)] bg-blade-bg/50 rounded p-4 flex flex-col gap-4">
               {trendLoading ? (
                 <div className="flex items-center gap-2 text-2xs text-[rgba(255,255,255,0.4)] font-mono">
                   <span className="w-3 h-3 border border-green-500 border-t-transparent rounded-full animate-spin" />
@@ -519,7 +519,7 @@ export function EmotionalIntelligenceView({ onBack }: { onBack: () => void }) {
               <div className="flex-1 h-px bg-[rgba(255,255,255,0.04)]" />
             </div>
 
-            <div className="border border-[rgba(255,255,255,0.1)] bg-[#09090b]/40 rounded p-4 flex flex-col gap-4">
+            <div className="border border-[rgba(255,255,255,0.1)] bg-blade-bg/40 rounded p-4 flex flex-col gap-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-xs text-[rgba(255,255,255,0.85)]">Analyze 30-Day Patterns</p>
@@ -571,7 +571,7 @@ export function EmotionalIntelligenceView({ onBack }: { onBack: () => void }) {
               <div className="border border-[rgba(255,255,255,0.1)] rounded overflow-hidden">
                 <table className="w-full text-2xs font-mono">
                   <thead>
-                    <tr className="border-b border-[rgba(255,255,255,0.1)] bg-[#09090b]">
+                    <tr className="border-b border-[rgba(255,255,255,0.1)] bg-blade-bg">
                       <th className="text-left px-3 py-2 text-[rgba(255,255,255,0.4)] font-normal">time</th>
                       <th className="text-left px-3 py-2 text-[rgba(255,255,255,0.4)] font-normal">emotion</th>
                       <th className="text-left px-3 py-2 text-[rgba(255,255,255,0.4)] font-normal w-20">valence</th>
@@ -586,7 +586,7 @@ export function EmotionalIntelligenceView({ onBack }: { onBack: () => void }) {
                       return (
                         <tr
                           key={r.id}
-                          className="border-b border-[rgba(255,255,255,0.07)] hover:bg-[#09090b]/50 transition-colors"
+                          className="border-b border-[rgba(255,255,255,0.07)] hover:bg-blade-bg/50 transition-colors"
                         >
                           <td className="px-3 py-1.5 text-[rgba(255,255,255,0.4)]">{formatTimestamp(r.timestamp)}</td>
                           <td className={`px-3 py-1.5 font-semibold ${ec.text}`}>{r.emotion}</td>

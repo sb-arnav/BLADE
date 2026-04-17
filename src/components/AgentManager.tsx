@@ -215,7 +215,7 @@ export function AgentManager({ onBack }: { onBack?: () => void }) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#09090b]">
+    <div className="flex flex-col h-full bg-blade-bg">
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#1f1f1f] flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -279,7 +279,7 @@ export function AgentManager({ onBack }: { onBack?: () => void }) {
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2 mt-2">
-          <div className="flex items-center gap-1 p-0.5 rounded-md border border-[#1f1f1f] bg-[#09090b]">
+          <div className="flex items-center gap-1 p-0.5 rounded-md border border-[#1f1f1f] bg-blade-bg">
             <button
               onClick={() => setDesktopExecutionMode("supervised")}
               className={`text-2xs px-2 py-1 rounded ${

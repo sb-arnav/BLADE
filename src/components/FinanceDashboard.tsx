@@ -293,7 +293,7 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
     "px-4 py-2 bg-[rgba(255,255,255,0.07)]/60 hover:bg-[rgba(255,255,255,0.04)]/60 text-[rgba(255,255,255,0.7)] text-sm font-medium rounded-lg transition-colors border border-[rgba(255,255,255,0.15)]/40";
 
   return (
-    <div className="flex flex-col h-full bg-[#0a0a0f] text-white">
+    <div className="flex flex-col h-full bg-blade-bg text-white">
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-[rgba(255,255,255,0.07)]/60">
         <div className="flex items-center gap-3">
@@ -880,7 +880,7 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong><br/>${inv.notes}</div>
             {/* Invoice Preview Modal */}
             {previewInvoice && (
               <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-8">
-                <div className="bg-[#0a0a0f] rounded-2xl border border-[rgba(255,255,255,0.1)]/50 max-w-2xl w-full max-h-[80vh] overflow-y-auto p-8">
+                <div className="bg-blade-bg rounded-2xl border border-[rgba(255,255,255,0.1)]/50 max-w-2xl w-full max-h-[80vh] overflow-y-auto p-8">
                   <div className="flex justify-between items-start mb-6">
                     <div>
                       <h2 className="text-xl font-bold text-white">Invoice {previewInvoice.number}</h2>

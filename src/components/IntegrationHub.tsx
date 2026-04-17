@@ -228,8 +228,8 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
   const renderConfigForm = () => {
     if (!configuring) return null;
     return (
-      <div className="absolute inset-0 z-50 bg-[#09090b]/80 backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] rounded-2xl w-full max-w-md p-6 shadow-2xl">
+      <div className="absolute inset-0 z-50 bg-blade-bg/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded-2xl w-full max-w-md p-6 shadow-2xl">
           {/* Header */}
           <div className="flex items-center gap-3 mb-5">
             {renderIcon(configuring.icon, configuring.color)}
@@ -307,7 +307,7 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
           <button
             key={tpl.id}
             onClick={() => handleStartConfig(tpl)}
-            className="text-left bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] rounded-xl p-4 hover:border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.04)]/60 transition group"
+            className="text-left bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded-xl p-4 hover:border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.04)]/60 transition group"
           >
             <div className="flex items-start gap-3">
               {renderIcon(tpl.icon, tpl.color)}
@@ -351,7 +351,7 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
         filteredIntegrations.map(int => (
           <div
             key={int.id}
-            className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] rounded-xl p-4 hover:border-[rgba(255,255,255,0.1)] transition"
+            className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded-xl p-4 hover:border-[rgba(255,255,255,0.1)] transition"
           >
             <div className="flex items-center gap-3">
               {renderIcon(int.icon, int.color)}
@@ -472,7 +472,7 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
             return (
               <div
                 key={evt.id}
-                className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] rounded-xl overflow-hidden"
+                className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded-xl overflow-hidden"
               >
                 <button
                   onClick={() => setExpandedEvent(isExpanded ? null : evt.id)}
@@ -514,7 +514,7 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
 
                 {isExpanded && (
                   <div className="border-t border-[rgba(255,255,255,0.07)] p-3">
-                    <pre className="text-[11px] text-[rgba(255,255,255,0.5)] bg-[#09090b] rounded-lg p-3 overflow-auto max-h-48 whitespace-pre-wrap break-words">
+                    <pre className="text-[11px] text-[rgba(255,255,255,0.5)] bg-blade-bg rounded-lg p-3 overflow-auto max-h-48 whitespace-pre-wrap break-words">
                       {payloadPreview}
                     </pre>
                     <div className="flex gap-2 mt-3">
@@ -544,7 +544,7 @@ export default function IntegrationHub({ onBack, onSendToChat }: Props) {
   // ── Main render ──────────────────────────────────────────────────────────
 
   return (
-    <div className="relative flex flex-col h-full bg-[#09090b] text-white overflow-hidden">
+    <div className="relative flex flex-col h-full bg-blade-bg text-white overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-[rgba(255,255,255,0.07)] shrink-0">
         <button

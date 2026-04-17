@@ -253,9 +253,9 @@ export function SocialGraphView({ onBack }: { onBack: () => void }) {
     RELATIONSHIP_COLORS[rel] || "bg-[rgba(255,255,255,0.07)]/60 text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.15)]";
 
   return (
-    <div className="flex flex-col h-full bg-black text-[rgba(255,255,255,0.85)] font-mono">
+    <div className="flex flex-col h-full bg-blade-bg text-[rgba(255,255,255,0.85)] font-mono">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-2 border-b border-[rgba(255,255,255,0.1)] bg-black">
+      <div className="flex items-center gap-3 px-4 py-2 border-b border-[rgba(255,255,255,0.1)] bg-blade-bg">
         <button onClick={onBack} className="text-[rgba(255,255,255,0.4)] hover:text-green-400 transition-colors">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -273,10 +273,10 @@ export function SocialGraphView({ onBack }: { onBack: () => void }) {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Contact list sidebar */}
-        <div className="w-64 border-r border-[rgba(255,255,255,0.1)] flex flex-col overflow-hidden bg-[#09090b]/30">
+        <div className="w-64 border-r border-[rgba(255,255,255,0.1)] flex flex-col overflow-hidden bg-blade-bg/30">
           <div className="p-2 border-b border-[rgba(255,255,255,0.1)]">
             <input
-              className="w-full bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] placeholder-gray-600 focus:outline-none focus:border-green-700"
+              className="w-full bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] placeholder-gray-600 focus:outline-none focus:border-green-700"
               placeholder="Search contacts..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -317,7 +317,7 @@ export function SocialGraphView({ onBack }: { onBack: () => void }) {
           {selectedContact ? (
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* Contact header */}
-              <div className="flex items-start gap-4 border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/40 p-4">
+              <div className="flex items-start gap-4 border border-[rgba(255,255,255,0.1)] rounded bg-blade-bg/40 p-4">
                 <StrengthCircle value={selectedContact.strength} />
                 <div className="flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -345,7 +345,7 @@ export function SocialGraphView({ onBack }: { onBack: () => void }) {
 
               {/* Traits + Interests */}
               {(selectedContact.traits.length > 0 || selectedContact.interests.length > 0) && (
-                <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/30 p-3 space-y-2">
+                <div className="border border-[rgba(255,255,255,0.1)] rounded bg-blade-bg/30 p-3 space-y-2">
                   {selectedContact.traits.length > 0 && (
                     <div>
                       <p className="text-xs text-[rgba(255,255,255,0.4)] uppercase tracking-wider mb-1">Traits</p>
@@ -374,7 +374,7 @@ export function SocialGraphView({ onBack }: { onBack: () => void }) {
               )}
 
               {/* Notes */}
-              <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/30 p-3">
+              <div className="border border-[rgba(255,255,255,0.1)] rounded bg-blade-bg/30 p-3">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs text-[rgba(255,255,255,0.4)] uppercase tracking-wider">Notes</p>
                   {!editingNotes ? (
@@ -390,7 +390,7 @@ export function SocialGraphView({ onBack }: { onBack: () => void }) {
                 </div>
                 {editingNotes ? (
                   <textarea
-                    className="w-full bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-2 text-xs text-[rgba(255,255,255,0.85)] focus:outline-none focus:border-green-700 resize-none"
+                    className="w-full bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-2 py-2 text-xs text-[rgba(255,255,255,0.85)] focus:outline-none focus:border-green-700 resize-none"
                     rows={4}
                     value={notesValue}
                     onChange={(e) => setNotesValue(e.target.value)}
@@ -402,11 +402,11 @@ export function SocialGraphView({ onBack }: { onBack: () => void }) {
               </div>
 
               {/* How to Approach */}
-              <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/30 p-3 space-y-2">
+              <div className="border border-[rgba(255,255,255,0.1)] rounded bg-blade-bg/30 p-3 space-y-2">
                 <p className="text-xs text-[rgba(255,255,255,0.4)] uppercase tracking-wider">How to Approach</p>
                 <div className="flex gap-2">
                   <input
-                    className="flex-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] placeholder-gray-600 focus:outline-none focus:border-green-700"
+                    className="flex-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] placeholder-gray-600 focus:outline-none focus:border-green-700"
                     placeholder="What's your goal with this person?"
                     value={approachGoal}
                     onChange={(e) => setApproachGoal(e.target.value)}
@@ -447,7 +447,7 @@ export function SocialGraphView({ onBack }: { onBack: () => void }) {
               </div>
 
               {/* Interaction history */}
-              <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/30 p-3">
+              <div className="border border-[rgba(255,255,255,0.1)] rounded bg-blade-bg/30 p-3">
                 <p className="text-xs text-[rgba(255,255,255,0.4)] uppercase tracking-wider mb-3">Interaction History</p>
                 {interactions.length === 0 && (
                   <p className="text-xs text-[rgba(255,255,255,0.3)] italic">No interactions logged yet.</p>
@@ -493,7 +493,7 @@ export function SocialGraphView({ onBack }: { onBack: () => void }) {
           )}
 
           {/* Insights panel */}
-          <div className="border-t border-[rgba(255,255,255,0.1)] bg-[#09090b]/20 p-3">
+          <div className="border-t border-[rgba(255,255,255,0.1)] bg-blade-bg/20 p-3">
             <div className="flex items-center gap-2 mb-2">
               <p className="text-xs text-[rgba(255,255,255,0.4)] uppercase tracking-wider">Relationship Insights</p>
               <button
@@ -529,13 +529,13 @@ export function SocialGraphView({ onBack }: { onBack: () => void }) {
       {/* Add Contact Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded-lg p-6 w-96 space-y-4">
+          <div className="bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded-lg p-6 w-96 space-y-4">
             <h3 className="text-sm font-bold text-green-400 uppercase tracking-widest">Add Contact</h3>
             <div className="space-y-3">
               <div>
                 <label className="text-xs text-[rgba(255,255,255,0.4)]">Name</label>
                 <input
-                  className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-green-700"
+                  className="w-full mt-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-green-700"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   autoFocus
@@ -544,7 +544,7 @@ export function SocialGraphView({ onBack }: { onBack: () => void }) {
               <div>
                 <label className="text-xs text-[rgba(255,255,255,0.4)]">Relationship Type</label>
                 <select
-                  className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-green-700"
+                  className="w-full mt-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-green-700"
                   value={newRelType}
                   onChange={(e) => setNewRelType(e.target.value)}
                 >
@@ -556,7 +556,7 @@ export function SocialGraphView({ onBack }: { onBack: () => void }) {
               <div>
                 <label className="text-xs text-[rgba(255,255,255,0.4)]">Notes</label>
                 <textarea
-                  className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-xs text-[rgba(255,255,255,0.7)] focus:outline-none focus:border-green-700 resize-none"
+                  className="w-full mt-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-xs text-[rgba(255,255,255,0.7)] focus:outline-none focus:border-green-700 resize-none"
                   rows={3}
                   value={newNotes}
                   onChange={(e) => setNewNotes(e.target.value)}
@@ -582,7 +582,7 @@ export function SocialGraphView({ onBack }: { onBack: () => void }) {
       {/* Log Interaction Modal */}
       {showLogModal && selectedContact && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded-lg p-6 w-96 space-y-4">
+          <div className="bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded-lg p-6 w-96 space-y-4">
             <h3 className="text-sm font-bold text-blue-400 uppercase tracking-widest">
               Log Interaction — {selectedContact.name}
             </h3>
@@ -590,7 +590,7 @@ export function SocialGraphView({ onBack }: { onBack: () => void }) {
               <div>
                 <label className="text-xs text-[rgba(255,255,255,0.4)]">Summary</label>
                 <textarea
-                  className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-xs text-[rgba(255,255,255,0.85)] focus:outline-none focus:border-blue-700 resize-none"
+                  className="w-full mt-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-xs text-[rgba(255,255,255,0.85)] focus:outline-none focus:border-blue-700 resize-none"
                   rows={3}
                   value={logSummary}
                   onChange={(e) => setLogSummary(e.target.value)}
@@ -617,7 +617,7 @@ export function SocialGraphView({ onBack }: { onBack: () => void }) {
               <div>
                 <label className="text-xs text-[rgba(255,255,255,0.4)]">Topics (comma-separated)</label>
                 <input
-                  className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-3 py-1.5 text-xs text-[rgba(255,255,255,0.85)] focus:outline-none focus:border-blue-700"
+                  className="w-full mt-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-3 py-1.5 text-xs text-[rgba(255,255,255,0.85)] focus:outline-none focus:border-blue-700"
                   value={logTopics}
                   onChange={(e) => setLogTopics(e.target.value)}
                   placeholder="work, plans, project..."
@@ -626,7 +626,7 @@ export function SocialGraphView({ onBack }: { onBack: () => void }) {
               <div>
                 <label className="text-xs text-[rgba(255,255,255,0.4)]">Action Items (comma-separated)</label>
                 <input
-                  className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-3 py-1.5 text-xs text-[rgba(255,255,255,0.85)] focus:outline-none focus:border-blue-700"
+                  className="w-full mt-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-3 py-1.5 text-xs text-[rgba(255,255,255,0.85)] focus:outline-none focus:border-blue-700"
                   value={logActions}
                   onChange={(e) => setLogActions(e.target.value)}
                   placeholder="follow up Friday, send link..."

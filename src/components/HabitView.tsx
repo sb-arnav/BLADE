@@ -95,11 +95,11 @@ function SkipModal({
   const [reason, setReason] = useState("");
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded-lg p-6 w-96">
+      <div className="bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded-lg p-6 w-96">
         <h3 className="text-green-400 font-mono text-sm mb-1">Skip habit</h3>
         <p className="text-[rgba(255,255,255,0.5)] text-xs mb-4">{habitName}</p>
         <textarea
-          className="w-full bg-black border border-[rgba(255,255,255,0.1)] rounded p-2 text-xs text-[rgba(255,255,255,0.85)] font-mono resize-none h-20 focus:outline-none focus:border-green-500"
+          className="w-full bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded p-2 text-xs text-[rgba(255,255,255,0.85)] font-mono resize-none h-20 focus:outline-none focus:border-green-500"
           placeholder="Why are you skipping? (optional)"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
@@ -142,13 +142,13 @@ function AddHabitModal({
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded-lg p-6 w-[480px] max-h-[90vh] overflow-y-auto">
+      <div className="bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded-lg p-6 w-[480px] max-h-[90vh] overflow-y-auto">
         <h3 className="text-green-400 font-mono text-sm mb-4">+ New Habit</h3>
         <div className="space-y-3">
           <div>
             <label className="text-[rgba(255,255,255,0.4)] text-xs font-mono">Name *</label>
             <input
-              className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] font-mono focus:outline-none focus:border-green-500"
+              className="w-full mt-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] font-mono focus:outline-none focus:border-green-500"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Morning meditation"
@@ -157,7 +157,7 @@ function AddHabitModal({
           <div>
             <label className="text-[rgba(255,255,255,0.4)] text-xs font-mono">Description</label>
             <input
-              className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] font-mono focus:outline-none focus:border-green-500"
+              className="w-full mt-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] font-mono focus:outline-none focus:border-green-500"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="10 minutes of focused breathing"
@@ -167,7 +167,7 @@ function AddHabitModal({
             <div>
               <label className="text-[rgba(255,255,255,0.4)] text-xs font-mono">Frequency</label>
               <select
-                className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] font-mono focus:outline-none focus:border-green-500"
+                className="w-full mt-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] font-mono focus:outline-none focus:border-green-500"
                 value={frequency}
                 onChange={(e) => setFrequency(e.target.value as Habit["frequency"])}
               >
@@ -181,7 +181,7 @@ function AddHabitModal({
               <label className="text-[rgba(255,255,255,0.4)] text-xs font-mono">Target time</label>
               <input
                 type="time"
-                className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] font-mono focus:outline-none focus:border-green-500"
+                className="w-full mt-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] font-mono focus:outline-none focus:border-green-500"
                 value={targetTime}
                 onChange={(e) => setTargetTime(e.target.value)}
               />
@@ -190,7 +190,7 @@ function AddHabitModal({
           <div>
             <label className="text-[rgba(255,255,255,0.4)] text-xs font-mono">Category</label>
             <select
-              className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] font-mono focus:outline-none focus:border-green-500"
+              className="w-full mt-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] font-mono focus:outline-none focus:border-green-500"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
@@ -202,7 +202,7 @@ function AddHabitModal({
           <div>
             <label className="text-[rgba(255,255,255,0.4)] text-xs font-mono">Cue (trigger)</label>
             <input
-              className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] font-mono focus:outline-none focus:border-green-500"
+              className="w-full mt-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] font-mono focus:outline-none focus:border-green-500"
               value={cue}
               onChange={(e) => setCue(e.target.value)}
               placeholder="After I brew my morning coffee"
@@ -211,7 +211,7 @@ function AddHabitModal({
           <div>
             <label className="text-[rgba(255,255,255,0.4)] text-xs font-mono">Reward</label>
             <input
-              className="w-full mt-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] font-mono focus:outline-none focus:border-green-500"
+              className="w-full mt-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-[rgba(255,255,255,0.85)] font-mono focus:outline-none focus:border-green-500"
               value={reward}
               onChange={(e) => setReward(e.target.value)}
               placeholder="I can then scroll news for 5 min"
@@ -288,7 +288,7 @@ function HistoryModal({
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded-lg p-6 w-[480px]">
+      <div className="bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded-lg p-6 w-[480px]">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-green-400 font-mono text-sm">{habit.name} — Last 30 days</h3>
           <button onClick={onClose} className="text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] text-lg leading-none">✕</button>
@@ -369,8 +369,8 @@ function TodaySection() {
               th.completed
                 ? "border-green-900 bg-green-950/20"
                 : th.skipped
-                ? "border-[rgba(255,255,255,0.07)] bg-[#09090b]/50 opacity-60"
-                : "border-[rgba(255,255,255,0.1)] bg-[#09090b]"
+                ? "border-[rgba(255,255,255,0.07)] bg-blade-bg/50 opacity-60"
+                : "border-[rgba(255,255,255,0.1)] bg-blade-bg"
             }`}
           >
             {/* Category dot */}
@@ -485,7 +485,7 @@ function AllHabitsSection() {
           return (
             <div
               key={habit.id}
-              className={`border rounded-lg p-4 bg-[#09090b] ${
+              className={`border rounded-lg p-4 bg-blade-bg ${
                 atRisk ? "border-amber-700" : "border-[rgba(255,255,255,0.1)]"
               }`}
             >
@@ -611,11 +611,11 @@ function AIAdvisorSection() {
   return (
     <section className="space-y-6">
       {/* Design a Habit */}
-      <div className="border border-[rgba(255,255,255,0.1)] rounded-lg p-4 bg-[#09090b]">
+      <div className="border border-[rgba(255,255,255,0.1)] rounded-lg p-4 bg-blade-bg">
         <h3 className="text-green-400 font-mono text-xs mb-3">🧠 Design a Habit</h3>
         <p className="text-[rgba(255,255,255,0.4)] text-xs font-mono mb-2">Describe your goal and BLADE will design a cue/routine/reward structure.</p>
         <textarea
-          className="w-full bg-black border border-[rgba(255,255,255,0.1)] rounded p-2 text-xs text-[rgba(255,255,255,0.85)] font-mono resize-none h-20 focus:outline-none focus:border-green-500"
+          className="w-full bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded p-2 text-xs text-[rgba(255,255,255,0.85)] font-mono resize-none h-20 focus:outline-none focus:border-green-500"
           placeholder="e.g. I want to exercise consistently in the morning..."
           value={goalText}
           onChange={(e) => setGoalText(e.target.value)}
@@ -647,7 +647,7 @@ function AIAdvisorSection() {
       </div>
 
       {/* Get Insights */}
-      <div className="border border-[rgba(255,255,255,0.1)] rounded-lg p-4 bg-[#09090b]">
+      <div className="border border-[rgba(255,255,255,0.1)] rounded-lg p-4 bg-blade-bg">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-green-400 font-mono text-xs">💡 Habit Insights</h3>
           <button
@@ -694,7 +694,7 @@ export function HabitView({ onBack }: { onBack: () => void }) {
   ];
 
   return (
-    <div className="flex flex-col h-screen bg-black text-[rgba(255,255,255,0.85)] font-mono">
+    <div className="flex flex-col h-screen bg-blade-bg text-[rgba(255,255,255,0.85)] font-mono">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.07)]">
         <div className="flex items-center gap-3">

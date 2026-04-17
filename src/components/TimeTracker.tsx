@@ -204,7 +204,7 @@ export default function TimeTracker({ onBack }: Props) {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-full bg-[#09090b] text-white">
+    <div className="flex flex-col h-full bg-blade-bg text-white">
       {/* Header */}
       <div className="flex-shrink-0 border-b border-[rgba(255,255,255,0.07)] px-4 py-3">
         <div className="flex items-center justify-between mb-3">
@@ -225,7 +225,7 @@ export default function TimeTracker({ onBack }: Props) {
         </div>
 
         {/* Active Timer Display */}
-        <div className="rounded-lg bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] p-3 mb-3">
+        <div className="rounded-lg bg-blade-bg border border-[rgba(255,255,255,0.07)] p-3 mb-3">
           {activeTimer ? (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -343,7 +343,7 @@ export default function TimeTracker({ onBack }: Props) {
             {todayEntries.map((entry) => (
               <div
                 key={entry.id}
-                className="rounded-lg bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] p-3 hover:border-[rgba(255,255,255,0.1)] transition-colors cursor-pointer"
+                className="rounded-lg bg-blade-bg border border-[rgba(255,255,255,0.07)] p-3 hover:border-[rgba(255,255,255,0.1)] transition-colors cursor-pointer"
                 onClick={() => {
                   if (editingEntry === entry.id) {
                     setEditingEntry(null);
@@ -427,7 +427,7 @@ export default function TimeTracker({ onBack }: Props) {
         {/* ── Week Tab ─────────────────────────────────────────────────── */}
         {tab === "week" && (
           <>
-            <div className="rounded-lg bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] p-4">
+            <div className="rounded-lg bg-blade-bg border border-[rgba(255,255,255,0.07)] p-4">
               <h3 className="text-sm font-medium mb-3">
                 Week of {weekReport.weekStart}
                 <span className="text-[rgba(255,255,255,0.4)] ml-2">({formatHours(weekReport.totalTime)} total)</span>
@@ -470,7 +470,7 @@ export default function TimeTracker({ onBack }: Props) {
             </div>
 
             {/* Week project totals */}
-            <div className="rounded-lg bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] p-4">
+            <div className="rounded-lg bg-blade-bg border border-[rgba(255,255,255,0.07)] p-4">
               <h3 className="text-sm font-medium mb-3">Project Breakdown</h3>
               {weekReport.projectTotals.length === 0 && (
                 <p className="text-xs text-[rgba(255,255,255,0.4)]">No tracked time this week.</p>
@@ -489,15 +489,15 @@ export default function TimeTracker({ onBack }: Props) {
 
             {/* Week summary */}
             <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-lg bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] p-3 text-center">
+              <div className="rounded-lg bg-blade-bg border border-[rgba(255,255,255,0.07)] p-3 text-center">
                 <div className="text-lg font-bold tabular-nums">{formatHours(weekReport.totalTime)}</div>
                 <div className="text-xs text-[rgba(255,255,255,0.4)]">Total</div>
               </div>
-              <div className="rounded-lg bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] p-3 text-center">
+              <div className="rounded-lg bg-blade-bg border border-[rgba(255,255,255,0.07)] p-3 text-center">
                 <div className="text-lg font-bold tabular-nums text-emerald-400">{formatHours(weekReport.totalBillable)}</div>
                 <div className="text-xs text-[rgba(255,255,255,0.4)]">Billable</div>
               </div>
-              <div className="rounded-lg bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] p-3 text-center">
+              <div className="rounded-lg bg-blade-bg border border-[rgba(255,255,255,0.07)] p-3 text-center">
                 <div className="text-lg font-bold tabular-nums text-amber-400">{formatCurrency(weekReport.totalAiCost)}</div>
                 <div className="text-xs text-[rgba(255,255,255,0.4)]">AI Cost</div>
               </div>
@@ -521,7 +521,7 @@ export default function TimeTracker({ onBack }: Props) {
             </div>
 
             {showAddProject && (
-              <div className="rounded-lg bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] p-4 space-y-3">
+              <div className="rounded-lg bg-blade-bg border border-[rgba(255,255,255,0.07)] p-4 space-y-3">
                 <input
                   type="text"
                   value={newProjectName}
@@ -583,7 +583,7 @@ export default function TimeTracker({ onBack }: Props) {
               return (
                 <div
                   key={project.id}
-                  className="rounded-lg bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] p-3 hover:border-[rgba(255,255,255,0.1)] transition-colors"
+                  className="rounded-lg bg-blade-bg border border-[rgba(255,255,255,0.07)] p-3 hover:border-[rgba(255,255,255,0.1)] transition-colors"
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -653,7 +653,7 @@ export default function TimeTracker({ onBack }: Props) {
         {tab === "reports" && (
           <>
             {/* Date range picker */}
-            <div className="rounded-lg bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] p-3 flex items-center gap-3">
+            <div className="rounded-lg bg-blade-bg border border-[rgba(255,255,255,0.07)] p-3 flex items-center gap-3">
               <label className="text-xs text-[rgba(255,255,255,0.5)]">From:</label>
               <input
                 type="date"
@@ -679,22 +679,22 @@ export default function TimeTracker({ onBack }: Props) {
 
             {/* Summary cards */}
             <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-lg bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] p-3 text-center">
+              <div className="rounded-lg bg-blade-bg border border-[rgba(255,255,255,0.07)] p-3 text-center">
                 <div className="text-lg font-bold tabular-nums">{formatHours(reportStats.total)}</div>
                 <div className="text-xs text-[rgba(255,255,255,0.4)]">Total Hours</div>
               </div>
-              <div className="rounded-lg bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] p-3 text-center">
+              <div className="rounded-lg bg-blade-bg border border-[rgba(255,255,255,0.07)] p-3 text-center">
                 <div className="text-lg font-bold tabular-nums text-emerald-400">{formatHours(reportStats.billable)}</div>
                 <div className="text-xs text-[rgba(255,255,255,0.4)]">Billable Hours</div>
               </div>
-              <div className="rounded-lg bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] p-3 text-center">
+              <div className="rounded-lg bg-blade-bg border border-[rgba(255,255,255,0.07)] p-3 text-center">
                 <div className="text-lg font-bold tabular-nums text-amber-400">{formatCurrency(reportStats.aiCost)}</div>
                 <div className="text-xs text-[rgba(255,255,255,0.4)]">AI Cost</div>
               </div>
             </div>
 
             {/* Time by project chart */}
-            <div className="rounded-lg bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] p-4">
+            <div className="rounded-lg bg-blade-bg border border-[rgba(255,255,255,0.07)] p-4">
               <h3 className="text-sm font-medium mb-3">Time by Project</h3>
               {reportStats.projectBreakdown.length === 0 && (
                 <p className="text-xs text-[rgba(255,255,255,0.4)]">No data in selected range.</p>
@@ -719,7 +719,7 @@ export default function TimeTracker({ onBack }: Props) {
             </div>
 
             {/* Entries table */}
-            <div className="rounded-lg bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] p-4">
+            <div className="rounded-lg bg-blade-bg border border-[rgba(255,255,255,0.07)] p-4">
               <h3 className="text-sm font-medium mb-3">
                 Entries ({reportEntries.length})
               </h3>
@@ -752,7 +752,7 @@ export default function TimeTracker({ onBack }: Props) {
       {/* ── Manual Entry Modal ──────────────────────────────────────────── */}
       {showManual && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.1)] rounded-xl p-5 w-[420px] shadow-xl space-y-3">
+          <div className="bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded-xl p-5 w-[420px] shadow-xl space-y-3">
             <h2 className="text-sm font-semibold">Add Manual Entry</h2>
             <input
               type="date"

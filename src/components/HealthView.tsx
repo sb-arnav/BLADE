@@ -224,9 +224,9 @@ export function HealthView({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-black text-[rgba(255,255,255,0.85)] font-mono overflow-y-auto">
+    <div className="flex flex-col h-full bg-blade-bg text-[rgba(255,255,255,0.85)] font-mono overflow-y-auto">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-2 border-b border-[rgba(255,255,255,0.1)] bg-black sticky top-0 z-10">
+      <div className="flex items-center gap-3 px-4 py-2 border-b border-[rgba(255,255,255,0.1)] bg-blade-bg sticky top-0 z-10">
         <button onClick={onBack} className="text-[rgba(255,255,255,0.4)] hover:text-green-400 transition-colors">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -242,7 +242,7 @@ export function HealthView({ onBack }: { onBack: () => void }) {
 
       <div className="p-4 space-y-4 max-w-3xl mx-auto w-full">
         {/* Today's Log */}
-        <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/40 p-4 space-y-4">
+        <div className="border border-[rgba(255,255,255,0.1)] rounded bg-blade-bg/40 p-4 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-bold text-green-400 uppercase tracking-widest">Today — {today}</h2>
             <div className="flex items-center gap-2">
@@ -292,7 +292,7 @@ export function HealthView({ onBack }: { onBack: () => void }) {
               <input
                 type="number"
                 min={0}
-                className="w-full bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-green-700"
+                className="w-full bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-green-700"
                 value={log.exercise_minutes}
                 onChange={(e) => setLog({ ...log, exercise_minutes: parseInt(e.target.value) || 0 })}
               />
@@ -301,7 +301,7 @@ export function HealthView({ onBack }: { onBack: () => void }) {
               <label className="text-xs text-[rgba(255,255,255,0.4)]">Exercise Type</label>
               <input
                 type="text"
-                className="w-full bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-green-700"
+                className="w-full bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-green-700"
                 placeholder="run, gym, walk..."
                 value={log.exercise_type}
                 onChange={(e) => setLog({ ...log, exercise_type: e.target.value })}
@@ -339,7 +339,7 @@ export function HealthView({ onBack }: { onBack: () => void }) {
           <div className="space-y-1">
             <label className="text-xs text-[rgba(255,255,255,0.4)]">Notes</label>
             <textarea
-              className="w-full bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-2 text-xs text-[rgba(255,255,255,0.7)] placeholder-gray-600 focus:outline-none focus:border-green-700 resize-none"
+              className="w-full bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-2 py-2 text-xs text-[rgba(255,255,255,0.7)] placeholder-gray-600 focus:outline-none focus:border-green-700 resize-none"
               rows={2}
               placeholder="Anything noteworthy today..."
               value={log.notes}
@@ -349,7 +349,7 @@ export function HealthView({ onBack }: { onBack: () => void }) {
         </div>
 
         {/* Week View */}
-        <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/40 p-4">
+        <div className="border border-[rgba(255,255,255,0.1)] rounded bg-blade-bg/40 p-4">
           <h2 className="text-xs font-bold text-green-400 uppercase tracking-widest mb-3">7-Day Overview</h2>
           <div className="grid grid-cols-7 gap-2">
             {last7Days.map((date) => {
@@ -389,7 +389,7 @@ export function HealthView({ onBack }: { onBack: () => void }) {
 
         {/* Stats */}
         {stats && (
-          <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/40 p-4">
+          <div className="border border-[rgba(255,255,255,0.1)] rounded bg-blade-bg/40 p-4">
             <h2 className="text-xs font-bold text-green-400 uppercase tracking-widest mb-3">This Week Stats</h2>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
@@ -414,7 +414,7 @@ export function HealthView({ onBack }: { onBack: () => void }) {
 
         {/* Streak info */}
         {streakInfo && (
-          <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/40 p-3 flex items-center gap-4 flex-wrap">
+          <div className="border border-[rgba(255,255,255,0.1)] rounded bg-blade-bg/40 p-3 flex items-center gap-4 flex-wrap">
             <div className="flex items-center gap-2">
               <span className="text-lg">🔥</span>
               <div>
@@ -431,7 +431,7 @@ export function HealthView({ onBack }: { onBack: () => void }) {
         )}
 
         {/* Insights */}
-        <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/40 p-4 space-y-3">
+        <div className="border border-[rgba(255,255,255,0.1)] rounded bg-blade-bg/40 p-4 space-y-3">
           <div className="flex items-center gap-2">
             <h2 className="text-xs font-bold text-green-400 uppercase tracking-widest">AI Insights</h2>
             <div className="flex-1" />
@@ -453,7 +453,7 @@ export function HealthView({ onBack }: { onBack: () => void }) {
         </div>
 
         {/* Productivity Correlation */}
-        <div className="border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b]/40 p-4 space-y-3">
+        <div className="border border-[rgba(255,255,255,0.1)] rounded bg-blade-bg/40 p-4 space-y-3">
           <div className="flex items-center gap-2">
             <h2 className="text-xs font-bold text-blue-400 uppercase tracking-widest">Productivity Correlation</h2>
             <div className="flex-1" />

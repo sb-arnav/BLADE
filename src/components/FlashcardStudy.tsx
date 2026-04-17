@@ -252,7 +252,7 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
   // ── Render ────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-full bg-[#09090b] text-white">
+    <div className="flex flex-col h-full bg-blade-bg text-white">
       {/* ── Header ──────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.07)]/60">
         <div className="flex items-center gap-3">
@@ -346,7 +346,7 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
                 {fc.decks.map((deck) => (
                   <div
                     key={deck.id}
-                    className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)]/60 rounded-lg p-4 hover:border-[rgba(255,255,255,0.1)] transition-colors group"
+                    className="bg-blade-bg border border-[rgba(255,255,255,0.07)]/60 rounded-lg p-4 hover:border-[rgba(255,255,255,0.1)] transition-colors group"
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2.5">
@@ -443,7 +443,7 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
                 }`}
               >
                 {/* Front */}
-                <div className="absolute inset-0 backface-hidden bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)]/60 rounded-xl p-8 flex flex-col items-center justify-center">
+                <div className="absolute inset-0 backface-hidden bg-blade-bg border border-[rgba(255,255,255,0.07)]/60 rounded-xl p-8 flex flex-col items-center justify-center">
                   <span className="text-[10px] uppercase tracking-widest text-[rgba(255,255,255,0.3)] mb-4">Question</span>
                   <p className="text-xl text-center font-medium text-white leading-relaxed">
                     {currentCard.front}
@@ -454,7 +454,7 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
                 </div>
 
                 {/* Back */}
-                <div className="absolute inset-0 backface-hidden [transform:rotateY(180deg)] bg-[#0a0a0f] border border-blue-800/40 rounded-xl p-8 flex flex-col items-center justify-center">
+                <div className="absolute inset-0 backface-hidden [transform:rotateY(180deg)] bg-blade-bg border border-blue-800/40 rounded-xl p-8 flex flex-col items-center justify-center">
                   <span className="text-[10px] uppercase tracking-widest text-blue-400/60 mb-4">Answer</span>
                   <p className="text-lg text-center text-[rgba(255,255,255,0.85)] leading-relaxed whitespace-pre-wrap">
                     {currentCard.back}
@@ -535,15 +535,15 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
             </p>
 
             <div className="grid grid-cols-3 gap-4 mb-8 w-full max-w-sm">
-              <div className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)]/60 rounded-lg p-3 text-center">
+              <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)]/60 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold text-emerald-400">{fc.session.correct}</div>
                 <div className="text-[10px] text-[rgba(255,255,255,0.4)] mt-1">Correct</div>
               </div>
-              <div className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)]/60 rounded-lg p-3 text-center">
+              <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)]/60 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold text-red-400">{fc.session.incorrect}</div>
                 <div className="text-[10px] text-[rgba(255,255,255,0.4)] mt-1">Incorrect</div>
               </div>
-              <div className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)]/60 rounded-lg p-3 text-center">
+              <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)]/60 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold text-[rgba(255,255,255,0.7)]">
                   {formatDuration(Date.now() - fc.session.startedAt)}
                 </div>
@@ -606,7 +606,7 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
                 <select
                   value={editDeckId}
                   onChange={(e) => setEditDeckId(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] rounded-md text-[rgba(255,255,255,0.85)] focus:outline-none focus:border-[rgba(255,255,255,0.15)]"
+                  className="w-full px-3 py-2 text-sm bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded-md text-[rgba(255,255,255,0.85)] focus:outline-none focus:border-[rgba(255,255,255,0.15)]"
                 >
                   <option value="">Select deck...</option>
                   {fc.decks.map((d) => (
@@ -625,7 +625,7 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
                   onChange={(e) => setEditFront(e.target.value)}
                   rows={3}
                   placeholder="Enter the question or term..."
-                  className="w-full px-3 py-2 text-sm bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] rounded-md text-[rgba(255,255,255,0.85)] placeholder-zinc-600 focus:outline-none focus:border-[rgba(255,255,255,0.15)] resize-none"
+                  className="w-full px-3 py-2 text-sm bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded-md text-[rgba(255,255,255,0.85)] placeholder-zinc-600 focus:outline-none focus:border-[rgba(255,255,255,0.15)] resize-none"
                 />
               </div>
 
@@ -637,7 +637,7 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
                   onChange={(e) => setEditBack(e.target.value)}
                   rows={4}
                   placeholder="Enter the answer or definition..."
-                  className="w-full px-3 py-2 text-sm bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] rounded-md text-[rgba(255,255,255,0.85)] placeholder-zinc-600 focus:outline-none focus:border-[rgba(255,255,255,0.15)] resize-none"
+                  className="w-full px-3 py-2 text-sm bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded-md text-[rgba(255,255,255,0.85)] placeholder-zinc-600 focus:outline-none focus:border-[rgba(255,255,255,0.15)] resize-none"
                 />
               </div>
 
@@ -648,7 +648,7 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
                   value={editTags}
                   onChange={(e) => setEditTags(e.target.value)}
                   placeholder="e.g. react, hooks, basics"
-                  className="w-full px-3 py-2 text-sm bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] rounded-md text-[rgba(255,255,255,0.85)] placeholder-zinc-600 focus:outline-none focus:border-[rgba(255,255,255,0.15)]"
+                  className="w-full px-3 py-2 text-sm bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded-md text-[rgba(255,255,255,0.85)] placeholder-zinc-600 focus:outline-none focus:border-[rgba(255,255,255,0.15)]"
                 />
               </div>
 
@@ -689,7 +689,7 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
             {(editFront.trim() || editBack.trim()) && (
               <div className="mt-6 border-t border-[rgba(255,255,255,0.07)]/40 pt-4">
                 <p className="text-[10px] uppercase tracking-widest text-[rgba(255,255,255,0.3)] mb-3">Preview</p>
-                <div className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)]/60 rounded-xl p-6 text-center">
+                <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)]/60 rounded-xl p-6 text-center">
                   <p className="text-lg font-medium text-white mb-4">
                     {editFront || "Front side"}
                   </p>
@@ -705,7 +705,7 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
       {/* ── New Deck Modal ───────────────────────────────────────────── */}
       {showNewDeck && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] rounded-xl p-5 w-full max-w-sm mx-4 shadow-2xl">
+          <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded-xl p-5 w-full max-w-sm mx-4 shadow-2xl">
             <h3 className="text-sm font-semibold text-[rgba(255,255,255,0.85)] mb-4">Create New Deck</h3>
             <div className="space-y-3">
               <div>
@@ -751,7 +751,7 @@ export default function FlashcardStudy({ onBack, onSendToChat }: Props) {
       {/* ── Generate Modal ───────────────────────────────────────────── */}
       {showGenerate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.07)] rounded-xl p-5 w-full max-w-md mx-4 shadow-2xl">
+          <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded-xl p-5 w-full max-w-md mx-4 shadow-2xl">
             <h3 className="text-sm font-semibold text-[rgba(255,255,255,0.85)] mb-1">AI Generate Flashcards</h3>
             <p className="text-xs text-[rgba(255,255,255,0.4)] mb-4">
               Enter a topic and the AI will create flashcards for you.

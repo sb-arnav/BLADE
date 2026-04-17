@@ -77,7 +77,7 @@ const NODE_PALETTE: { type: NodeType; label: string; icon: React.ReactNode; colo
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function nodeColor(type: NodeType): string {
-  return NODE_PALETTE.find((p) => p.type === type)?.color ?? "text-[rgba(255,255,255,0.5)] border-[rgba(255,255,255,0.1)] bg-[#09090b]/20";
+  return NODE_PALETTE.find((p) => p.type === type)?.color ?? "text-[rgba(255,255,255,0.5)] border-[rgba(255,255,255,0.1)] bg-blade-bg/20";
 }
 
 function nodeIcon(type: NodeType): React.ReactNode {
@@ -120,7 +120,7 @@ function NodeConfigPanel({
       <label className="text-2xs text-[rgba(255,255,255,0.4)] uppercase tracking-wider">{label}</label>
       {type === "textarea" ? (
         <textarea
-          className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-green-300 font-mono resize-none focus:outline-none focus:border-green-600"
+          className="bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-green-300 font-mono resize-none focus:outline-none focus:border-green-600"
           rows={3}
           value={node.config[key] ?? ""}
           placeholder={placeholder}
@@ -129,7 +129,7 @@ function NodeConfigPanel({
       ) : (
         <input
           type="text"
-          className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-green-300 font-mono focus:outline-none focus:border-green-600"
+          className="bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-green-300 font-mono focus:outline-none focus:border-green-600"
           value={node.config[key] ?? ""}
           placeholder={placeholder}
           onChange={(e) => set(key, e.target.value)}
@@ -142,7 +142,7 @@ function NodeConfigPanel({
     <div key={key} className="flex flex-col gap-1">
       <label className="text-2xs text-[rgba(255,255,255,0.4)] uppercase tracking-wider">{label}</label>
       <select
-        className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-green-300 focus:outline-none focus:border-green-600"
+        className="bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-green-300 focus:outline-none focus:border-green-600"
         value={node.config[key] ?? options[0]}
         onChange={(e) => set(key, e.target.value)}
       >
@@ -157,7 +157,7 @@ function NodeConfigPanel({
         <label className="text-2xs text-[rgba(255,255,255,0.4)] uppercase tracking-wider">Label</label>
         <input
           type="text"
-          className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-green-300 font-mono focus:outline-none focus:border-green-600"
+          className="bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs text-green-300 font-mono focus:outline-none focus:border-green-600"
           value={node.label}
           onChange={(e) => onChange({ ...node, label: e.target.value })}
         />
@@ -389,7 +389,7 @@ export function WorkflowBuilderView({ onBack }: { onBack: () => void }) {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="flex-1 min-h-0 flex flex-col bg-black text-[rgba(255,255,255,0.7)] font-mono text-xs overflow-hidden">
+    <div className="flex-1 min-h-0 flex flex-col bg-blade-bg text-[rgba(255,255,255,0.7)] font-mono text-xs overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[rgba(255,255,255,0.07)] shrink-0">
         <button onClick={onBack} className="text-[rgba(255,255,255,0.4)] hover:text-green-400 transition-colors">
@@ -411,7 +411,7 @@ export function WorkflowBuilderView({ onBack }: { onBack: () => void }) {
         <button
           onClick={save}
           disabled={saving}
-          className="flex items-center gap-1.5 px-3 py-1 border border-[rgba(255,255,255,0.1)] bg-[#09090b] text-[rgba(255,255,255,0.7)] rounded hover:text-green-400 hover:border-green-700 transition-colors text-2xs"
+          className="flex items-center gap-1.5 px-3 py-1 border border-[rgba(255,255,255,0.1)] bg-blade-bg text-[rgba(255,255,255,0.7)] rounded hover:text-green-400 hover:border-green-700 transition-colors text-2xs"
         >
           <Save size={12} /> {saving ? "Saving…" : "Save"}
           {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />}
@@ -428,10 +428,10 @@ export function WorkflowBuilderView({ onBack }: { onBack: () => void }) {
       {/* Generate dialog */}
       {showGenerate && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded-lg p-5 w-[480px] flex flex-col gap-3">
+          <div className="bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded-lg p-5 w-[480px] flex flex-col gap-3">
             <div className="text-green-400 font-bold text-sm">Generate from description</div>
             <textarea
-              className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-xs text-green-300 font-mono resize-none focus:outline-none focus:border-green-600"
+              className="bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-xs text-green-300 font-mono resize-none focus:outline-none focus:border-green-600"
               rows={4}
               placeholder="e.g. Every morning at 9am, fetch my GitHub notifications and send me a summary via desktop notification"
               value={genDesc}
@@ -476,7 +476,7 @@ export function WorkflowBuilderView({ onBack }: { onBack: () => void }) {
                 className={`group flex items-center gap-1.5 px-2 py-1.5 rounded cursor-pointer border transition-colors ${
                   selectedId === wf.id
                     ? "border-green-800 bg-green-900/10 text-green-300"
-                    : "border-transparent hover:border-[rgba(255,255,255,0.1)] hover:bg-[#09090b] text-[rgba(255,255,255,0.5)]"
+                    : "border-transparent hover:border-[rgba(255,255,255,0.1)] hover:bg-blade-bg text-[rgba(255,255,255,0.5)]"
                 }`}
                 onClick={() => selectWorkflow(wf.id!)}
               >
@@ -556,7 +556,7 @@ export function WorkflowBuilderView({ onBack }: { onBack: () => void }) {
 
           {/* Run history panel */}
           {showRuns && (
-            <div className="border-b border-[rgba(255,255,255,0.07)] bg-[#09090b] px-4 py-2 max-h-48 overflow-y-auto shrink-0">
+            <div className="border-b border-[rgba(255,255,255,0.07)] bg-blade-bg px-4 py-2 max-h-48 overflow-y-auto shrink-0">
               <div className="text-2xs text-[rgba(255,255,255,0.4)] uppercase tracking-widest mb-2">Run History</div>
               {runs.length === 0 && <div className="text-2xs text-[rgba(255,255,255,0.3)]">No runs yet</div>}
               {runs.map((run) => (
@@ -575,7 +575,7 @@ export function WorkflowBuilderView({ onBack }: { onBack: () => void }) {
                     <ChevronRight size={10} className={`ml-auto text-[rgba(255,255,255,0.3)] transition-transform ${expandedRun === run.id ? "rotate-90" : ""}`} />
                   </button>
                   {expandedRun === run.id && (
-                    <div className="ml-4 mt-1 bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded p-2 text-2xs text-[rgba(255,255,255,0.5)] font-mono whitespace-pre-wrap max-h-32 overflow-y-auto">
+                    <div className="ml-4 mt-1 bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded p-2 text-2xs text-[rgba(255,255,255,0.5)] font-mono whitespace-pre-wrap max-h-32 overflow-y-auto">
                       {Object.entries(run.node_outputs).map(([k, v]) => (
                         <div key={k}><span className="text-green-600">[{k}]</span> {v}</div>
                       ))}
@@ -647,7 +647,7 @@ export function WorkflowBuilderView({ onBack }: { onBack: () => void }) {
 
             {/* Config panel */}
             {selectedNode && (
-              <div className="w-64 border-l border-[rgba(255,255,255,0.07)] p-3 overflow-y-auto shrink-0 bg-[#09090b]">
+              <div className="w-64 border-l border-[rgba(255,255,255,0.07)] p-3 overflow-y-auto shrink-0 bg-blade-bg">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-2xs text-green-400 font-bold uppercase tracking-wider">Node Config</span>
                   <button onClick={() => setSelectedNodeId(null)} className="text-[rgba(255,255,255,0.3)] hover:text-[rgba(255,255,255,0.5)]">

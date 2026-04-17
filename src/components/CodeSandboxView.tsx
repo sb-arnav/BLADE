@@ -240,7 +240,7 @@ export function CodeSandboxView({ onBack }: { onBack: () => void }) {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col bg-black text-[rgba(255,255,255,0.7)] font-mono text-xs overflow-hidden">
+    <div className="flex-1 min-h-0 flex flex-col bg-blade-bg text-[rgba(255,255,255,0.7)] font-mono text-xs overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[rgba(255,255,255,0.07)] shrink-0">
         <button onClick={onBack} className="text-[rgba(255,255,255,0.4)] hover:text-green-400 transition-colors">
@@ -300,7 +300,7 @@ export function CodeSandboxView({ onBack }: { onBack: () => void }) {
             className={`px-4 py-2 text-2xs border-b-2 transition-colors ${
               language === l.id
                 ? "border-green-500 text-green-300 bg-green-900/10"
-                : "border-transparent text-[rgba(255,255,255,0.3)] hover:text-[rgba(255,255,255,0.5)] hover:bg-[#09090b]/40"
+                : "border-transparent text-[rgba(255,255,255,0.3)] hover:text-[rgba(255,255,255,0.5)] hover:bg-blade-bg/40"
             }`}
           >
             {l.label}
@@ -327,7 +327,7 @@ export function CodeSandboxView({ onBack }: { onBack: () => void }) {
               onChange={(e) => setCode(e.target.value)}
               onKeyDown={onKeyDown}
               spellCheck={false}
-              className="absolute inset-0 w-full h-full bg-[#09090b] text-green-300 font-mono text-xs p-4 resize-none focus:outline-none leading-relaxed caret-green-400 border-0"
+              className="absolute inset-0 w-full h-full bg-blade-bg text-green-300 font-mono text-xs p-4 resize-none focus:outline-none leading-relaxed caret-green-400 border-0"
               style={{ tabSize: 4 }}
               placeholder={currentLang.placeholder}
             />
@@ -335,9 +335,9 @@ export function CodeSandboxView({ onBack }: { onBack: () => void }) {
 
           {/* Output panel */}
           {(output || running) && (
-            <div className="border-t border-[rgba(255,255,255,0.07)] shrink-0 max-h-64 overflow-y-auto bg-[#09090b]">
+            <div className="border-t border-[rgba(255,255,255,0.07)] shrink-0 max-h-64 overflow-y-auto bg-blade-bg">
               {/* Output header */}
-              <div className="flex items-center gap-3 px-4 py-1.5 border-b border-[rgba(255,255,255,0.07)] sticky top-0 bg-[#09090b]">
+              <div className="flex items-center gap-3 px-4 py-1.5 border-b border-[rgba(255,255,255,0.07)] sticky top-0 bg-blade-bg">
                 <span className="text-2xs text-[rgba(255,255,255,0.4)] uppercase tracking-widest">Output</span>
                 {output && (
                   <>
@@ -383,8 +383,8 @@ export function CodeSandboxView({ onBack }: { onBack: () => void }) {
 
           {/* Explanation panel */}
           {(explanation || explaining) && (
-            <div className="border-t border-[rgba(255,255,255,0.07)] shrink-0 max-h-48 overflow-y-auto bg-[#09090b]">
-              <div className="flex items-center gap-2 px-4 py-1.5 border-b border-[rgba(255,255,255,0.07)] sticky top-0 bg-[#09090b]">
+            <div className="border-t border-[rgba(255,255,255,0.07)] shrink-0 max-h-48 overflow-y-auto bg-blade-bg">
+              <div className="flex items-center gap-2 px-4 py-1.5 border-b border-[rgba(255,255,255,0.07)] sticky top-0 bg-blade-bg">
                 <BookOpen size={11} className="text-purple-400" />
                 <span className="text-2xs text-purple-400 uppercase tracking-widest">Explanation</span>
                 {explaining && <span className="text-2xs text-yellow-400 animate-pulse">Thinking…</span>}
@@ -408,7 +408,7 @@ export function CodeSandboxView({ onBack }: { onBack: () => void }) {
             {recentRuns.map((r) => (
               <div
                 key={r.id}
-                className="border border-[rgba(255,255,255,0.07)] rounded p-2 bg-[#09090b]/40 hover:bg-[#09090b] transition-colors cursor-default"
+                className="border border-[rgba(255,255,255,0.07)] rounded p-2 bg-blade-bg/40 hover:bg-blade-bg transition-colors cursor-default"
               >
                 <div className="flex items-center gap-1.5 mb-1">
                   {r.success

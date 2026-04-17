@@ -37,7 +37,7 @@ const SENTIMENT_STYLES: Record<Meeting["sentiment"], { border: string; text: str
   productive:  { border: "border-green-600",  text: "text-green-400",  bg: "bg-green-950/30" },
   tense:       { border: "border-red-700",    text: "text-red-400",    bg: "bg-red-950/30" },
   energetic:   { border: "border-blue-600",   text: "text-blue-400",   bg: "bg-blue-950/30" },
-  inconclusive:{ border: "border-[rgba(255,255,255,0.15)]",   text: "text-[rgba(255,255,255,0.5)]",   bg: "bg-[#09090b]" },
+  inconclusive:{ border: "border-[rgba(255,255,255,0.15)]",   text: "text-[rgba(255,255,255,0.5)]",   bg: "bg-blade-bg" },
 };
 
 function SentimentBadge({ sentiment }: { sentiment: Meeting["sentiment"] }) {
@@ -105,7 +105,7 @@ function NewMeetingForm({ onProcessed }: { onProcessed: (meeting: Meeting) => vo
         <div className="col-span-2">
           <label className="text-[rgba(255,255,255,0.4)] text-2xs font-mono">Title *</label>
           <input
-            className="w-full mt-1 bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-green-500"
+            className="w-full mt-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-green-500"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Q4 planning meeting"
@@ -115,7 +115,7 @@ function NewMeetingForm({ onProcessed }: { onProcessed: (meeting: Meeting) => vo
           <label className="text-[rgba(255,255,255,0.4)] text-2xs font-mono">Date</label>
           <input
             type="date"
-            className="w-full mt-1 bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-green-500"
+            className="w-full mt-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-green-500"
             value={date}
             onChange={(e) => setDate(e.target.value)}
           />
@@ -124,7 +124,7 @@ function NewMeetingForm({ onProcessed }: { onProcessed: (meeting: Meeting) => vo
           <label className="text-[rgba(255,255,255,0.4)] text-2xs font-mono">Duration (minutes)</label>
           <input
             type="number"
-            className="w-full mt-1 bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-green-500"
+            className="w-full mt-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-green-500"
             value={duration}
             onChange={(e) => setDuration(e.target.value)}
             placeholder="60"
@@ -133,7 +133,7 @@ function NewMeetingForm({ onProcessed }: { onProcessed: (meeting: Meeting) => vo
         <div className="col-span-2">
           <label className="text-[rgba(255,255,255,0.4)] text-2xs font-mono">Participants (comma-separated)</label>
           <input
-            className="w-full mt-1 bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-green-500"
+            className="w-full mt-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-green-500"
             value={participants}
             onChange={(e) => setParticipants(e.target.value)}
             placeholder="Alice, Bob, Carol"
@@ -142,7 +142,7 @@ function NewMeetingForm({ onProcessed }: { onProcessed: (meeting: Meeting) => vo
         <div className="col-span-2">
           <label className="text-[rgba(255,255,255,0.4)] text-2xs font-mono">Transcript / Notes *</label>
           <textarea
-            className="w-full mt-1 bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded p-3 text-xs font-mono resize-none h-48 focus:outline-none focus:border-green-500"
+            className="w-full mt-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded p-3 text-xs font-mono resize-none h-48 focus:outline-none focus:border-green-500"
             value={transcript}
             onChange={(e) => setTranscript(e.target.value)}
             placeholder="Paste or type meeting notes / transcript here..."
@@ -262,7 +262,7 @@ function MeetingDetail({ meeting, onActionComplete }: { meeting: Meeting; onActi
                 className={`flex items-start gap-3 border rounded p-2.5 ${
                   item.completed
                     ? "border-[rgba(255,255,255,0.07)] opacity-50"
-                    : "border-[rgba(255,255,255,0.1)] bg-[#09090b]"
+                    : "border-[rgba(255,255,255,0.1)] bg-blade-bg"
                 }`}
               >
                 <button
@@ -313,11 +313,11 @@ function MeetingDetail({ meeting, onActionComplete }: { meeting: Meeting; onActi
       )}
 
       {/* Follow-up email */}
-      <div className="border border-[rgba(255,255,255,0.1)] rounded-lg p-4 bg-[#09090b]">
+      <div className="border border-[rgba(255,255,255,0.1)] rounded-lg p-4 bg-blade-bg">
         <p className="text-[rgba(255,255,255,0.5)] text-2xs font-mono uppercase tracking-wider mb-3">Generate Follow-up Email</p>
         <div className="flex gap-2 mb-3">
           <input
-            className="flex-1 bg-black border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-green-500"
+            className="flex-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-green-500"
             value={recipient}
             onChange={(e) => setRecipient(e.target.value)}
             placeholder="recipient@example.com"
@@ -334,12 +334,12 @@ function MeetingDetail({ meeting, onActionComplete }: { meeting: Meeting; onActi
           <div className="relative">
             <textarea
               readOnly
-              className="w-full bg-black border border-[rgba(255,255,255,0.1)] rounded p-3 text-xs font-mono resize-none h-40 text-[rgba(255,255,255,0.7)]"
+              className="w-full bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded p-3 text-xs font-mono resize-none h-40 text-[rgba(255,255,255,0.7)]"
               value={followUpEmail}
             />
             <button
               onClick={copyEmail}
-              className="absolute top-2 right-2 text-2xs font-mono px-2 py-1 border border-[rgba(255,255,255,0.1)] rounded bg-[#09090b] text-[rgba(255,255,255,0.5)] hover:text-green-400 hover:border-green-700"
+              className="absolute top-2 right-2 text-2xs font-mono px-2 py-1 border border-[rgba(255,255,255,0.1)] rounded bg-blade-bg text-[rgba(255,255,255,0.5)] hover:text-green-400 hover:border-green-700"
             >
               {copied ? "Copied!" : "Copy"}
             </button>
@@ -374,12 +374,12 @@ function Sidebar({
   const openGlobal = globalActions.filter((a) => !a.completed);
 
   return (
-    <div className="w-64 border-r border-[rgba(255,255,255,0.07)] flex flex-col bg-[#09090b] flex-shrink-0">
+    <div className="w-64 border-r border-[rgba(255,255,255,0.07)] flex flex-col bg-blade-bg flex-shrink-0">
       {/* Search */}
       <div className="p-3 border-b border-[rgba(255,255,255,0.07)]">
         <div className="flex gap-1.5">
           <input
-            className="flex-1 bg-[#09090b] border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-green-500"
+            className="flex-1 bg-blade-bg border border-[rgba(255,255,255,0.1)] rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-green-500"
             placeholder="Search meetings..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -434,8 +434,8 @@ function Sidebar({
             <button
               key={m.id}
               onClick={() => onSelect(m)}
-              className={`w-full text-left p-3 border-b border-[rgba(255,255,255,0.07)] hover:bg-[#09090b] transition-colors ${
-                selectedId === m.id ? "bg-[#09090b] border-l-2 border-l-green-500" : ""
+              className={`w-full text-left p-3 border-b border-[rgba(255,255,255,0.07)] hover:bg-blade-bg transition-colors ${
+                selectedId === m.id ? "bg-blade-bg border-l-2 border-l-green-500" : ""
               }`}
             >
               <div className="text-xs font-mono text-[rgba(255,255,255,0.85)] truncate">{m.title}</div>
@@ -501,7 +501,7 @@ function MoreTools({ meetings }: { meetings: Meeting[] }) {
   return (
     <div className="space-y-6">
       {/* Compare meetings */}
-      <div className="border border-[rgba(255,255,255,0.1)] rounded-lg p-4 bg-[#09090b]">
+      <div className="border border-[rgba(255,255,255,0.1)] rounded-lg p-4 bg-blade-bg">
         <h3 className="text-green-400 font-mono text-xs mb-3">Compare Meetings</h3>
         <p className="text-[rgba(255,255,255,0.4)] text-2xs font-mono mb-3">Select 2+ meetings to compare:</p>
         <div className="space-y-1 max-h-48 overflow-y-auto mb-3">
@@ -540,7 +540,7 @@ function MoreTools({ meetings }: { meetings: Meeting[] }) {
       </div>
 
       {/* Recurring themes */}
-      <div className="border border-[rgba(255,255,255,0.1)] rounded-lg p-4 bg-[#09090b]">
+      <div className="border border-[rgba(255,255,255,0.1)] rounded-lg p-4 bg-blade-bg">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-green-400 font-mono text-xs">Find Recurring Themes (30 days)</h3>
           <button
@@ -636,7 +636,7 @@ export function MeetingView({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-black text-[rgba(255,255,255,0.85)] font-mono">
+    <div className="flex flex-col h-screen bg-blade-bg text-[rgba(255,255,255,0.85)] font-mono">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.07)]">
         <div className="flex items-center gap-3">
