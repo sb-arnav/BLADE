@@ -23,7 +23,7 @@ interface PageShellProps {
 
 export function PageShell({ title, subtitle, onBack, actions, children, noPadding }: PageShellProps) {
   return (
-    <div className="flex flex-col h-full bg-[#09090b] text-white">
+    <div className="flex flex-col h-full text-white" style={{ background: "rgba(6,6,12,0.82)", backdropFilter: "blur(40px) saturate(1.4)", WebkitBackdropFilter: "blur(40px) saturate(1.4)" }}>
       {/* Header */}
       <div className="flex items-center justify-between px-5 h-[52px] flex-shrink-0 border-b border-[rgba(255,255,255,0.07)]">
         <div className="flex items-center gap-3">

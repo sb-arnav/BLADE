@@ -549,15 +549,9 @@ export function Dashboard({ onNavigate, chatPanelProps, activeRoute }: Dashboard
       >
         {/* Top row: 1.7fr 1fr 0.75fr */}
         <div className="grid gap-[10px] min-h-0" style={{ gridTemplateColumns: "1.7fr 1fr 0.75fr", flex: "0 0 47%" }}>
-          <div className="cursor-pointer" onClick={() => onNavigate("rewind")}>
-            <GodModeCard perception={perception} />
-          </div>
-          <div className="cursor-pointer" onClick={() => onNavigate("hive")}>
-            <HiveCard organsActive={organsActive} digest={hiveDigest} />
-          </div>
-          <div className="cursor-pointer" onClick={() => onNavigate("integrations")}>
-            <IntegrationsCard integrations={integrations} />
-          </div>
+          <GodModeCard perception={perception} />
+          <HiveCard organsActive={organsActive} digest={hiveDigest} />
+          <IntegrationsCard integrations={integrations} />
         </div>
 
         {/* Bottom row: 1.05fr 1.3fr */}

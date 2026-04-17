@@ -18,8 +18,7 @@
         "height": 680,
         "resizable": true,
         "decorations": false,
-        "transparent": false,
-        "backgroundColor": "#09090b",
+        "transparent": true,
         "alwaysOnTop": false,
         "center": true,
         "visible": true

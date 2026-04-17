@@ -1221,7 +1221,15 @@ export default function App() {
         </div>
       )}
       <Suspense fallback={<ShellFallback />}>
-        <div key={route} className="route-enter flex-1 min-h-0 flex flex-col">
+        <div
+          key={route}
+          className="route-enter flex-1 min-h-0 flex flex-col"
+          style={route !== "dashboard" ? {
+            background: "rgba(6,6,12,0.85)",
+            backdropFilter: "blur(40px) saturate(1.4)",
+            WebkitBackdropFilter: "blur(40px) saturate(1.4)",
+          } : undefined}
+        >
           {fullPageRoutes[route] ?? fullPageRoutes["dashboard"]}
         </div>
       </Suspense>
@@ -1234,7 +1242,7 @@ export default function App() {
   return (
     <ToastProvider>
     <ErrorBoundary>
-    <div className="h-screen flex flex-col bg-[#09090b] text-[#e4e4e7] relative overflow-hidden">
+    <div className="h-screen flex flex-col bg-transparent text-[#e4e4e7] relative overflow-hidden">
       {/* File drop overlay */}
       {isDragging && (
         <div className="absolute inset-0 z-50 bg-blade-bg/90 backdrop-blur-sm flex items-center justify-center border-2 border-dashed border-blade-accent/40 rounded-xl m-2 pointer-events-none animate-fade-in">

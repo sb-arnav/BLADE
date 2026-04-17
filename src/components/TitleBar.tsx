@@ -208,14 +208,16 @@ export function TitleBar() {
   return (
     <div
       className="
-        h-9 shrink-0 select-none
-        flex items-center gap-3 px-3
-        bg-blade-bg/95 backdrop-blur-sm
-        border-b border-blade-border/40
+        h-[34px] shrink-0 select-none
+        flex items-center gap-3 px-[14px]
+        border-b border-[rgba(255,255,255,0.1)]
+        fixed top-0 left-0 right-0 z-[300]
       "
       data-tauri-drag-region
       style={{
-        background: "linear-gradient(180deg, rgba(17,17,21,0.95) 0%, rgba(8,8,10,0.95) 100%)",
+        background: "rgba(0,0,0,0.35)",
+        backdropFilter: "blur(40px) saturate(1.4)",
+        WebkitBackdropFilter: "blur(40px) saturate(1.4)",
       }}
     >
       {/* Left: BLADE logotype */}
