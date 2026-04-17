@@ -5,24 +5,25 @@ export default {
     extend: {
       colors: {
         blade: {
-          // Apple dark palette
-          bg:               "#09090b",
-          surface:          "#1c1c1e",        // Apple's dark surface
-          "surface-2":      "#2c2c2e",        // elevated surface
-          "surface-hover":  "#2c2c2e",
-          "surface-active": "#3a3a3c",
+          // Glass-first palette — transparent backgrounds, glass material
+          bg:               "rgba(9,9,11,0.75)",     // semi-transparent dark (was opaque #09090b)
+          "bg-solid":       "#09090b",               // opaque fallback for inputs/modals
+          surface:          "rgba(28,28,30,0.65)",   // translucent surface
+          "surface-2":      "rgba(44,44,46,0.55)",   // translucent elevated
+          "surface-hover":  "rgba(44,44,46,0.7)",
+          "surface-active": "rgba(58,58,60,0.7)",
 
-          // Separators — Apple's subtle dark borders
-          border:           "#38383a",        // Apple's dark separator
-          "border-hover":   "#48484a",
-          "border-strong":  "#545456",
+          // Separators — slightly more visible for glass
+          border:           "rgba(255,255,255,0.13)", // glass border
+          "border-hover":   "rgba(255,255,255,0.2)",
+          "border-strong":  "rgba(255,255,255,0.25)",
 
-          // Accent — Apple purple + blue
-          accent:           "#5856D6",        // Apple purple
-          "accent-blue":    "#007AFF",        // Apple blue
-          "accent-hover":   "#6E6CE8",
-          "accent-muted":   "rgba(88, 86, 214, 0.12)",
-          "accent-glow":    "rgba(88, 86, 214, 0.20)",
+          // Accent — indigo (matches --accent CSS var)
+          accent:           "#818cf8",
+          "accent-blue":    "#60a5fa",
+          "accent-hover":   "#a5b4fc",
+          "accent-muted":   "rgba(129, 140, 248, 0.12)",
+          "accent-glow":    "rgba(129, 140, 248, 0.20)",
 
           // Text hierarchy — Apple's text colors
           text:             "#ffffff",
