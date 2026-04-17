@@ -5,7 +5,7 @@ pub async fn complete(
     model: &str,
     messages: &[ConversationMessage],
 ) -> Result<AssistantTurn, String> {
-    let client = Client::new();
+    let client = super::http_client();
 
     let msgs: Vec<serde_json::Value> = messages
         .iter()
@@ -70,7 +70,7 @@ pub async fn stream_text(
     use futures::StreamExt;
     use tauri::Emitter;
 
-    let client = Client::new();
+    let client = super::http_client();
     let msgs: Vec<serde_json::Value> = messages
         .iter()
         .filter_map(|m| match m {
@@ -142,7 +142,7 @@ pub async fn stream_text(
 }
 
 pub async fn test(model: &str) -> Result<String, String> {
-    let client = Client::new();
+    let client = super::http_client();
     let body = serde_json::json!({
         "model": model,
         "messages": [{"role": "user", "content": "Say hi in one word."}],

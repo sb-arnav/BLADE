@@ -96,7 +96,7 @@ pub async fn complete(
     messages: &[ConversationMessage],
     tools: &[ToolDefinition],
 ) -> Result<AssistantTurn, String> {
-    let client = Client::new();
+    let client = super::http_client();
     let encoded_model = urlencoding::encode(model);
     let url = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
@@ -158,7 +158,7 @@ pub async fn stream_text(
     use futures::StreamExt;
     use tauri::Emitter;
 
-    let client = Client::new();
+    let client = super::http_client();
     let encoded_model = urlencoding::encode(model);
     let url = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/{}:streamGenerateContent?alt=sse&key={}",
@@ -237,7 +237,7 @@ pub async fn stream_text(
 }
 
 pub async fn test(api_key: &str, model: &str) -> Result<String, String> {
-    let client = Client::new();
+    let client = super::http_client();
     let encoded_model = urlencoding::encode(model);
     let url = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",

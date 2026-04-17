@@ -102,7 +102,7 @@ pub async fn complete(
     messages: &[ConversationMessage],
     tools: &[ToolDefinition],
 ) -> Result<AssistantTurn, String> {
-    let client = Client::new();
+    let client = super::http_client();
     let body = build_body(model, messages, tools);
 
     let response = client
@@ -181,7 +181,7 @@ pub async fn stream_text(
     use futures::StreamExt;
     use tauri::Emitter;
 
-    let client = Client::new();
+    let client = super::http_client();
     let system = messages.iter().find_map(|m| match m {
         ConversationMessage::System(c) => Some(c.clone()),
         _ => None,
@@ -261,7 +261,7 @@ pub async fn stream_text_with_thinking(
     use futures::StreamExt;
     use tauri::Emitter;
 
-    let client = Client::new();
+    let client = super::http_client();
     let system = messages.iter().find_map(|m| match m {
         ConversationMessage::System(c) => Some(c.clone()),
         _ => None,
@@ -365,7 +365,7 @@ pub async fn stream_text_with_thinking(
 }
 
 pub async fn test(api_key: &str, model: &str) -> Result<String, String> {
-    let client = Client::new();
+    let client = super::http_client();
     let body = serde_json::json!({
         "model": model,
         "max_tokens": 32,

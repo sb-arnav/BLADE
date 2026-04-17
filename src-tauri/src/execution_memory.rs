@@ -46,6 +46,9 @@ pub fn open_db_pub() -> Result<Connection, String> {
 }
 
 fn init_schema(conn: &Connection) -> Result<(), String> {
+    // Enable WAL mode for crash safety (prevents corruption on power loss)
+    let _ = conn.pragma_update(None, "journal_mode", "WAL");
+
     conn.execute_batch(
         "
         CREATE TABLE IF NOT EXISTS executions (
