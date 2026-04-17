@@ -46,7 +46,10 @@ export function TaskAgentView({ onBack }: TaskAgentViewProps) {
       }));
     }).then((u) => cleanups.push(u));
 
-    listen<{ id: string }>("agent_done", () => {
+    listen<{ id: string }>("agent_complete", () => {
+      invoke<Agent[]>("agent_list_background").then(setAgents).catch(() => null);
+    }).then((u) => cleanups.push(u));
+    listen<{ id: string }>("agent_cancelled", () => {
       invoke<Agent[]>("agent_list_background").then(setAgents).catch(() => null);
     }).then((u) => cleanups.push(u));
 
@@ -60,15 +63,17 @@ export function TaskAgentView({ onBack }: TaskAgentViewProps) {
     if (!newTask.trim()) return;
     setSpawning(true);
     try {
-      const id = await invoke<string>("reproductive_spawn", {
+      const id = await invoke<string>("agent_spawn", {
         agentType,
         task: newTask,
-        workingDir: null,
+        cwd: null,
       });
       setSelectedId(id);
       setNewTask("");
       invoke<Agent[]>("agent_list_background").then(setAgents).catch(() => null);
-    } catch { /* ignore */ }
+    } catch (e) {
+      console.error("agent_spawn failed:", e);
+    }
     setSpawning(false);
   };
 

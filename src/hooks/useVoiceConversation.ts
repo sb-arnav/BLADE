@@ -267,11 +267,14 @@ export function useVoiceConversation(): UseVoiceConversationResult {
     // it emits voice_chat_submit. We catch it here and call send_message_stream.
     // The response tokens flow back via chat_token events which the voice
     // backend collects and speaks via TTS.
-    listen<{ content: string; voice_mode: boolean }>("voice_chat_submit", (event) => {
-      const { content } = event.payload;
-      invoke("send_message_stream", {
-        messages: [{ role: "user", content, image_base64: null }],
-      }).catch((err: unknown) => {
+    listen<{ content: string; voice_mode: boolean; history?: Array<{ role: string; content: string }> }>("voice_chat_submit", (event) => {
+      const { content, history } = event.payload;
+      // Include conv history so BLADE has context across voice turns
+      const messages = [
+        ...(history ?? []).map((m) => ({ role: m.role, content: m.content, image_base64: null })),
+        { role: "user", content, image_base64: null },
+      ];
+      invoke("send_message_stream", { messages }).catch((err: unknown) => {
         console.warn("[voice] send_message_stream failed:", err);
       });
     }).then((unlisten) => cleanups.push(unlisten));
