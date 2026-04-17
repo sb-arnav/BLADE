@@ -1100,7 +1100,7 @@ export default function App() {
 
   if (!config?.onboarded) {
     return (
-      <div className="h-screen flex flex-col bg-blade-bg text-blade-text">
+      <div className="h-screen flex flex-col bg-transparent text-white">
         <TitleBar />
         <Suspense fallback={<ShellFallback label="Preparing Blade..." />}>
           <InitWizard onComplete={async () => {
