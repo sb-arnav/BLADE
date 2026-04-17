@@ -1,0 +1,373 @@
+/* ===================================================================
+   BLADE — Liquid Glass Design System
+   Apple-style translucent surfaces over user wallpaper.
+   Target viewport: 1920 x 1080, dark mode only.
+   =================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Viewport */
+  --w: 1920px;
+  --h: 1080px;
+
+  /* Glass fills — stacked translucency */
+  --g-fill-weak:    rgba(255, 255, 255, 0.04);
+  --g-fill:         rgba(255, 255, 255, 0.07);
+  --g-fill-strong:  rgba(255, 255, 255, 0.11);
+  --g-fill-heavy:   rgba(255, 255, 255, 0.16);
+
+  /* Glass edges — mimic refraction: bright top/left, dim bottom/right */
+  --g-edge-hi:      rgba(255, 255, 255, 0.32);
+  --g-edge-mid:     rgba(255, 255, 255, 0.14);
+  --g-edge-lo:      rgba(255, 255, 255, 0.04);
+
+  /* Inset rim — thin bright pixel that sells the glass edge */
+  --g-rim:          inset 0 1px 0 rgba(255, 255, 255, 0.28),
+                    inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+                    inset 1px 0 0 rgba(255, 255, 255, 0.12),
+                    inset -1px 0 0 rgba(255, 255, 255, 0.03);
+
+  /* Drop shadow — glass casts a soft shadow onto wallpaper */
+  --g-shadow-sm:    0 8px 24px rgba(0, 0, 0, 0.24);
+  --g-shadow-md:    0 20px 50px rgba(0, 0, 0, 0.32);
+  --g-shadow-lg:    0 40px 80px rgba(0, 0, 0, 0.42);
+
+  /* Text — white on glass */
+  --t-1: rgba(255, 255, 255, 0.97);
+  --t-2: rgba(255, 255, 255, 0.72);
+  --t-3: rgba(255, 255, 255, 0.50);
+  --t-4: rgba(255, 255, 255, 0.32);
+
+  /* Dividers */
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.14);
+
+  /* Accents — neutral, wallpaper-adaptive. No hard brand color.
+     Accents are desaturated whites with a warm/cool hint so they sit
+     against any wallpaper without fighting it. */
+  --a-warm: #ffd2a6;   /* sun-side glass edge */
+  --a-cool: #c8e0ff;   /* shadow-side glass edge */
+  --a-ok:   #8affc7;
+  --a-warn: #ffc48a;
+  --a-hot:  #ff9ab0;
+
+  /* Radii — iOS-ish, soft */
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r-md: 18px;
+  --r-lg: 26px;
+  --r-xl: 34px;
+  --r-2xl: 44px;
+  --r-pill: 999px;
+
+  /* Spacing scale */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 20px; --s-6: 24px; --s-8: 32px; --s-10: 40px;
+  --s-12: 48px; --s-16: 64px; --s-20: 80px;
+}
+
+html, body {
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  background: #000;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  color: var(--t-1);
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-feature-settings: 'zero', 'ss01'; }
+
+/* ========================================================
+   WALLPAPER — single shared photograph-like gradient.
+   Rich in hue variance so glass cards have something to refract.
+   Same wallpaper used across ALL screens for consistency.
+   ======================================================== */
+.wallpaper {
+  position: fixed; inset: 0; z-index: 0;
+  overflow: hidden;
+}
+.wallpaper::before {
+  /* base: deep indigo night with painterly color blooms */
+  content: '';
+  position: absolute; inset: -5%;
+  background:
+    /* warm sunset bloom top-right */
+    radial-gradient(900px 700px at 82% 8%,   #ff7a4a 0%, rgba(255,122,74,0) 55%),
+    radial-gradient(700px 600px at 90% 22%,  #ffb86b 0%, rgba(255,184,107,0) 50%),
+    /* pink / magenta mid */
+    radial-gradient(1000px 800px at 65% 45%, #d857b6 0%, rgba(216,87,182,0) 55%),
+    /* violet core */
+    radial-gradient(1100px 900px at 42% 62%, #6046d6 0%, rgba(96,70,214,0) 60%),
+    /* cool teal bottom-left */
+    radial-gradient(900px 800px at 10% 92%,  #1ebfc6 0%, rgba(30,191,198,0) 55%),
+    radial-gradient(700px 700px at 5% 70%,   #2d6bff 0%, rgba(45,107,255,0) 55%),
+    /* base night */
+    linear-gradient(145deg, #0c0a1f 0%, #140b2e 35%, #1a0b2a 65%, #0a0a1d 100%);
+  filter: saturate(108%);
+}
+.wallpaper::after {
+  /* grain — photography feel, prevents banding, gives glass something to blur */
+  content: '';
+  position: absolute; inset: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.55 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  opacity: 0.09;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+/* Vignette — subtle edge darkening, premium photography feel */
+.vignette {
+  position: fixed; inset: 0; z-index: 1; pointer-events: none;
+  background: radial-gradient(120% 90% at 50% 50%, transparent 55%, rgba(0,0,0,0.35) 100%);
+}
+
+/* ========================================================
+   GLASS — the core primitive. Apply to any surface.
+   Uses backdrop-filter for real blur + saturation boost.
+   ======================================================== */
+.glass {
+  position: relative;
+  background:
+    linear-gradient(180deg,
+      rgba(255, 255, 255, 0.13) 0%,
+      rgba(255, 255, 255, 0.06) 45%,
+      rgba(255, 255, 255, 0.04) 100%);
+  backdrop-filter: blur(32px) saturate(180%) brightness(1.05);
+  -webkit-backdrop-filter: blur(32px) saturate(180%) brightness(1.05);
+  border: 1px solid var(--g-edge-mid);
+  border-radius: var(--r-lg);
+  box-shadow: var(--g-rim), var(--g-shadow-md);
+  isolation: isolate;
+}
+
+/* Specular highlight — subtle diagonal sheen on top-left quarter */
+.glass::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(130% 80% at 0% 0%, rgba(255,255,255,0.14) 0%, transparent 45%),
+    radial-gradient(90% 60% at 100% 100%, rgba(0,0,0,0.10) 0%, transparent 55%);
+  pointer-events: none;
+  z-index: 0;
+}
+.glass > * { position: relative; z-index: 1; }
+
+.glass.flat   { backdrop-filter: blur(20px) saturate(160%); }
+.glass.heavy  { backdrop-filter: blur(48px) saturate(200%) brightness(1.08); background: linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.08) 100%); }
+.glass.pill   { border-radius: var(--r-pill); }
+.glass.sm     { border-radius: var(--r-md); }
+
+/* Hover lift */
+.glass.interactive { transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 200ms; cursor: pointer; }
+.glass.interactive:hover { transform: translateY(-2px); box-shadow: var(--g-rim), var(--g-shadow-lg); }
+.glass.interactive.hovered { transform: translateY(-2px); box-shadow: var(--g-rim), var(--g-shadow-lg); background: linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.08) 100%); }
+
+/* ========================================================
+   Layout helpers
+   ======================================================== */
+.stage {
+  position: relative;
+  width: 1920px; height: 1080px;
+  z-index: 2;
+}
+
+.row { display: flex; flex-direction: row; }
+.col { display: flex; flex-direction: column; }
+.center { display: flex; align-items: center; justify-content: center; }
+.between { display: flex; align-items: center; justify-content: space-between; }
+.gap-1 { gap: 4px; } .gap-2 { gap: 8px; } .gap-3 { gap: 12px; }
+.gap-4 { gap: 16px; } .gap-5 { gap: 20px; } .gap-6 { gap: 24px; }
+.gap-8 { gap: 32px; } .gap-10 { gap: 40px; }
+
+/* ========================================================
+   Typography
+   ======================================================== */
+.t-display { font-weight: 600; font-size: 56px; line-height: 1.05; letter-spacing: -0.03em; }
+.t-h1     { font-weight: 600; font-size: 40px; line-height: 1.1;  letter-spacing: -0.025em; }
+.t-h2     { font-weight: 600; font-size: 28px; line-height: 1.15; letter-spacing: -0.02em; }
+.t-h3     { font-weight: 600; font-size: 20px; line-height: 1.2;  letter-spacing: -0.015em; }
+.t-body   { font-weight: 400; font-size: 15px; line-height: 1.5; }
+.t-small  { font-weight: 400; font-size: 13px; line-height: 1.45; color: var(--t-2); }
+.t-micro  { font-weight: 500; font-size: 11px; line-height: 1.4; color: var(--t-3); letter-spacing: 0.04em; text-transform: uppercase; }
+.t-num    { font-family: 'JetBrains Mono'; font-weight: 500; letter-spacing: -0.02em; }
+
+.t-1 { color: var(--t-1); } .t-2 { color: var(--t-2); } .t-3 { color: var(--t-3); } .t-4 { color: var(--t-4); }
+
+/* ========================================================
+   Nav Rail (left side, 88px wide)
+   ======================================================== */
+.nav-rail {
+  position: absolute; top: 24px; left: 24px; bottom: 24px;
+  width: 76px;
+  padding: 20px 0;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 8px;
+  border-radius: var(--r-xl);
+}
+.nav-rail .nav-logo {
+  width: 44px; height: 44px; border-radius: 14px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,255,255,0.6));
+  display: flex; align-items: center; justify-content: center;
+  color: #1a0b2a; font-weight: 700; font-size: 18px;
+  margin-bottom: 14px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 4px 12px rgba(0,0,0,0.3);
+}
+.nav-rail .nav-item {
+  width: 48px; height: 48px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--t-2);
+  transition: all 180ms;
+  position: relative;
+}
+.nav-rail .nav-item:hover, .nav-rail .nav-item.hovered {
+  background: rgba(255,255,255,0.08);
+  color: var(--t-1);
+}
+.nav-rail .nav-item.active {
+  background: rgba(255,255,255,0.16);
+  color: var(--t-1);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 4px 12px rgba(0,0,0,0.18);
+}
+.nav-rail .nav-item.active::before {
+  content: ''; position: absolute; left: -12px; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 20px; border-radius: 3px;
+  background: #fff; box-shadow: 0 0 12px rgba(255,255,255,0.8);
+}
+.nav-rail .nav-spacer { flex: 1; }
+.nav-rail .nav-avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: linear-gradient(135deg, #ffb380, #ff7a5c);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 600; font-size: 14px; color: #1a0b2a;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 4px 10px rgba(0,0,0,0.3);
+}
+
+/* ========================================================
+   Buttons
+   ======================================================== */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px 20px; border-radius: var(--r-pill);
+  font-size: 14px; font-weight: 500; color: var(--t-1);
+  border: 1px solid var(--g-edge-mid);
+  background: linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.05) 100%);
+  backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: var(--g-rim), 0 4px 12px rgba(0,0,0,0.18);
+  cursor: pointer; transition: all 180ms;
+  letter-spacing: -0.005em;
+}
+.btn:hover { background: linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.08) 100%); transform: translateY(-1px); }
+.btn.primary {
+  background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.82) 100%);
+  color: #1a0b2a;
+  border-color: rgba(255,255,255,0.5);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,1), 0 8px 24px rgba(0,0,0,0.25);
+}
+.btn.primary:hover { background: #fff; transform: translateY(-1px); box-shadow: inset 0 1px 0 rgba(255,255,255,1), 0 12px 30px rgba(0,0,0,0.3); }
+.btn.ghost { background: transparent; border-color: var(--g-edge-mid); }
+.btn.icon { padding: 12px; width: 44px; height: 44px; }
+.btn.sm { padding: 8px 14px; font-size: 13px; }
+.btn.lg { padding: 16px 28px; font-size: 15px; }
+
+/* ========================================================
+   Inputs
+   ======================================================== */
+.input {
+  width: 100%;
+  padding: 14px 18px;
+  font: inherit; font-size: 15px; color: var(--t-1);
+  background: rgba(0,0,0,0.22);
+  border: 1px solid var(--g-edge-mid);
+  border-radius: var(--r-md);
+  backdrop-filter: blur(20px);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
+  outline: none;
+}
+.input::placeholder { color: var(--t-3); }
+.input.mono { font-family: 'JetBrains Mono'; font-size: 14px; letter-spacing: 0; }
+
+/* ========================================================
+   Chips / Badges
+   ======================================================== */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: var(--r-pill);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid var(--g-edge-mid);
+  color: var(--t-1);
+  text-transform: uppercase;
+}
+.chip.free { background: rgba(138,255,199,0.16); border-color: rgba(138,255,199,0.35); color: #c4ffe0; }
+.chip.new  { background: rgba(255,154,176,0.16); border-color: rgba(255,154,176,0.35); color: #ffccd8; }
+.chip.pro  { background: rgba(200,224,255,0.14); border-color: rgba(200,224,255,0.35); color: #d8e7ff; }
+.chip.dot  { width: 8px; height: 8px; padding: 0; border-radius: 50%; }
+.chip.dot.live { background: #8affc7; box-shadow: 0 0 10px #8affc7, inset 0 0 4px rgba(255,255,255,0.6); }
+.chip.dot.warn { background: #ffc48a; box-shadow: 0 0 10px #ffc48a; }
+.chip.dot.idle { background: rgba(255,255,255,0.3); }
+
+/* ========================================================
+   Icons (inline SVG stroke style)
+   ======================================================== */
+.icon-svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ========================================================
+   Ambient strip (bottom)
+   ======================================================== */
+.ambient {
+  position: absolute; left: 124px; right: 24px; bottom: 24px;
+  height: 64px; padding: 0 20px;
+  display: flex; align-items: center; gap: 20px;
+  border-radius: var(--r-pill);
+}
+.waveform { display: flex; align-items: center; gap: 3px; height: 28px; }
+.waveform span {
+  display: block; width: 3px; border-radius: 2px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.3));
+}
+
+/* ========================================================
+   Progress bars
+   ======================================================== */
+.bar { position: relative; height: 6px; border-radius: var(--r-pill); background: rgba(0,0,0,0.25); overflow: hidden; }
+.bar > span { display: block; height: 100%; border-radius: var(--r-pill); background: linear-gradient(90deg, rgba(255,255,255,0.95), rgba(255,255,255,0.6)); box-shadow: 0 0 12px rgba(255,255,255,0.35); }
+.bar.warm > span { background: linear-gradient(90deg, #ffd2a6, #ff9ab0); box-shadow: 0 0 12px rgba(255,210,166,0.5); }
+.bar.cool > span { background: linear-gradient(90deg, #c8e0ff, #8abfff); box-shadow: 0 0 12px rgba(200,224,255,0.5); }
+.bar.ok   > span { background: linear-gradient(90deg, #8affc7, #6be0a8); box-shadow: 0 0 12px rgba(138,255,199,0.5); }
+
+/* ========================================================
+   FAB
+   ======================================================== */
+.fab {
+  position: absolute; right: 32px; bottom: 32px;
+  width: 64px; height: 64px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,255,255,0.78));
+  color: #1a0b2a;
+  box-shadow: inset 0 1px 0 #fff, 0 12px 32px rgba(0,0,0,0.45), 0 0 0 4px rgba(255,255,255,0.12);
+  cursor: pointer;
+  transition: all 200ms;
+  z-index: 20;
+}
+.fab:hover { transform: scale(1.05) translateY(-2px); }
+
+/* ========================================================
+   Annotation overlay (second pass)
+   ======================================================== */
+.annot { position: absolute; font-family: 'JetBrains Mono'; font-size: 10px; color: #ffd95c; pointer-events: none; z-index: 100; letter-spacing: 0; }
+.annot.label { background: rgba(0,0,0,0.72); padding: 3px 7px; border-radius: 4px; border: 1px solid rgba(255,217,92,0.5); }
+.annot .ruler { position: absolute; background: rgba(255,217,92,0.8); }
+.annot .ruler.h { height: 1px; }
+.annot .ruler.v { width: 1px; }
+
+/* Utility */
+.divider { height: 1px; background: var(--line); }
+.divider-strong { height: 1px; background: var(--line-strong); }

@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>BLADE — Prototype map</title>
+<link rel="stylesheet" href="shared.css"/>
+<link rel="stylesheet" href="proto.css"/>
+<style>
+  body { overflow: auto; }
+  .map-stage {
+    position: relative;
+    min-height: 1080px;
+    padding: 56px 72px 120px;
+    z-index: 2;
+  }
+
+  .map-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 40px; }
+  .map-title { font-size: 34px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.1; }
+  .map-title .brand-mark {
+    width: 40px; height: 40px; border-radius: 13px;
+    background: linear-gradient(135deg, #fff, rgba(255,255,255,0.72));
+    color: #1a0b2a; display: inline-grid; place-items: center;
+    font-weight: 800; font-size: 17px; letter-spacing: -0.04em;
+    vertical-align: -8px; margin-right: 12px;
+    box-shadow: inset 0 1px 0 #fff, 0 6px 20px rgba(0,0,0,0.35);
+  }
+  .map-sub { font-size: 15px; color: var(--t-2); margin-top: 10px; max-width: 640px; line-height: 1.5; }
+
+  .map-help {
+    display: flex; flex-direction: column; gap: 8px; align-items: flex-end; font-size: 12px; color: var(--t-3);
+  }
+  .map-help .row { display: flex; align-items: center; gap: 8px; }
+  .map-help .kbd {
+    font-family: 'JetBrains Mono'; font-size: 10px; font-weight: 600;
+    padding: 2px 7px; border-radius: 5px; background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12); color: var(--t-2);
+  }
+
+  .section-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700;
+    color: var(--t-3); margin: 48px 0 16px; display: flex; align-items: center; gap: 12px;
+  }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .grid.two { grid-template-columns: repeat(2, 1fr); }
+
+  .tile {
+    display: block; text-decoration: none; color: inherit;
+    border-radius: 20px; overflow: hidden;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.10);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+    transition: transform 200ms cubic-bezier(0.2,0.8,0.2,1), box-shadow 200ms, border-color 200ms;
+  }
+  .tile:hover { transform: translateY(-4px); box-shadow: 0 32px 60px rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.22); }
+
+  .tile .thumb {
+    width: 100%; aspect-ratio: 16 / 9; overflow: hidden; position: relative;
+    background: #0b0720;
+  }
+  .tile .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .tile .thumb::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.35) 100%);
+  }
+
+  .tile .meta { padding: 16px 18px 18px; display: flex; align-items: center; gap: 12px; }
+  .tile .meta .num {
+    width: 26px; height: 26px; border-radius: 8px;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+    display: grid; place-items: center;
+    font-family: 'JetBrains Mono'; font-size: 11px; font-weight: 600; color: var(--t-2);
+    flex-shrink: 0;
+  }
+  .tile .meta .name { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; }
+  .tile .meta .desc { font-size: 12px; color: var(--t-3); margin-top: 2px; }
+  .tile .meta .chev {
+    margin-left: auto; width: 24px; height: 24px; border-radius: 50%;
+    background: rgba(255,255,255,0.06); display: grid; place-items: center;
+    color: var(--t-3); transition: all 160ms;
+  }
+  .tile .meta .chev svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+  .tile:hover .meta .chev { background: rgba(255,255,255,0.16); color: #fff; }
+
+  .tile.wide { grid-column: span 2; }
+
+  /* Flow ribbon showing connections */
+  .flow-ribbon {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 14px 20px;
+    background: rgba(255,255,255,0.04); border: 1px solid var(--line);
+    border-radius: 999px;
+    margin-bottom: 32px;
+  }
+  .flow-ribbon .step {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--t-2);
+  }
+  .flow-ribbon .step .dot {
+    width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.3);
+  }
+  .flow-ribbon .step.done .dot { background: #8affc7; box-shadow: 0 0 8px #8affc7; }
+  .flow-ribbon .arr { color: var(--t-4); font-size: 12px; }
+
+  .principles {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+    margin-top: 20px;
+  }
+  .principle {
+    padding: 18px 20px; border-radius: 16px;
+    background: rgba(255,255,255,0.04); border: 1px solid var(--line);
+  }
+  .principle .pt { font-size: 13px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 6px; }
+  .principle .pd { font-size: 12px; color: var(--t-2); line-height: 1.55; }
+  .principle .pt span { color: var(--t-3); font-weight: 400; margin-left: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+</style>
+</head>
+<body>
+<div class="wallpaper"></div>
+<div class="vignette"></div>
+
+<div class="map-stage">
+
+  <div class="map-head">
+    <div>
+      <div class="map-title">
+        <span class="brand-mark">B</span>BLADE · Design prototype
+      </div>
+      <div class="map-sub">Liquid glass on your wallpaper. Click any screen to enter the flow, or tab through with <span style="font-family:'JetBrains Mono';font-size:12px;color:var(--t-1)">← →</span>.</div>
+    </div>
+    <div class="map-help">
+      <div class="row">Prev / Next <span class="kbd">←</span><span class="kbd">→</span></div>
+      <div class="row">Jump to map <span class="kbd">M</span> or <span class="kbd">Esc</span></div>
+      <div class="row">Show 8pt grid <span class="kbd">G</span></div>
+    </div>
+  </div>
+
+  <div class="flow-ribbon">
+    <span class="step done"><span class="dot"></span>Onboarding ×3</span>
+    <span class="arr">→</span>
+    <span class="step done"><span class="dot"></span>Dashboard</span>
+    <span class="arr">→</span>
+    <span class="step done"><span class="dot"></span>Chat</span>
+    <span class="arr">→</span>
+    <span class="step done"><span class="dot"></span>QuickAsk text · voice</span>
+    <span class="arr">→</span>
+    <span class="step done"><span class="dot"></span>Orb live · states</span>
+    <span class="arr">→</span>
+    <span class="step done"><span class="dot"></span>Ghost Mode</span>
+    <span class="arr">→</span>
+    <span class="step done"><span class="dot"></span>Settings</span>
+  </div>
+
+  <div class="section-title">Onboarding · 3 states</div>
+  <div class="grid">
+    <a class="tile" href="onboarding-01-provider.html">
+      <div class="thumb"><img src="onboarding-01-provider.png" alt=""/></div>
+      <div class="meta">
+        <div class="num">01</div>
+        <div><div class="name">Pick a provider</div><div class="desc">Free, fast, local badges · Anthropic pre-selected</div></div>
+        <div class="chev"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+      </div>
+    </a>
+    <a class="tile" href="onboarding-02-apikey.html">
+      <div class="thumb"><img src="onboarding-02-apikey.png" alt=""/></div>
+      <div class="meta">
+        <div class="num">02</div>
+        <div><div class="name">Paste your key</div><div class="desc">Smart paste · test · verified state</div></div>
+        <div class="chev"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+      </div>
+    </a>
+    <a class="tile" href="onboarding-03-ready.html">
+      <div class="thumb"><img src="onboarding-03-ready.png" alt=""/></div>
+      <div class="meta">
+        <div class="num">03</div>
+        <div><div class="name">You're in</div><div class="desc">Deep scan progress · enter BLADE</div></div>
+        <div class="chev"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+      </div>
+    </a>
+  </div>
+
+  <div class="section-title">Home · The page the user sees every day</div>
+  <div class="grid two">
+    <a class="tile" href="dashboard.html">
+      <div class="thumb"><img src="dashboard.png" alt=""/></div>
+      <div class="meta">
+        <div class="num">04</div>
+        <div><div class="name">Dashboard</div><div class="desc">Right Now · Hive · Calendar · Integrations · Ambient strip</div></div>
+        <div class="chev"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+      </div>
+    </a>
+    <a class="tile" href="dashboard-chat.html">
+      <div class="thumb"><img src="dashboard-chat.png" alt=""/></div>
+      <div class="meta">
+        <div class="num">05</div>
+        <div><div class="name">Dashboard · Chat open</div><div class="desc">Side panel from FAB · streaming reply · tool calls inline</div></div>
+        <div class="chev"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+      </div>
+    </a>
+  </div>
+
+  <div class="section-title">Ambient presence · The orb is BLADE's face</div>
+  <div class="grid">
+    <a class="tile" href="voice-orb.html">
+      <div class="thumb"><img src="voice-orb.png" alt=""/></div>
+      <div class="meta">
+        <div class="num">06</div>
+        <div><div class="name">Voice orb · live</div><div class="desc">Ctrl+Shift+B · single overlay window · 4 phases</div></div>
+        <div class="chev"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+      </div>
+    </a>
+    <a class="tile" href="voice-orb-states.html">
+      <div class="thumb"><img src="voice-orb-states.png" alt=""/></div>
+      <div class="meta">
+        <div class="num">07</div>
+        <div><div class="name">Orb · 4 phase states</div><div class="desc">Idle · Listening · Thinking · Speaking — OpenClaw math</div></div>
+        <div class="chev"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+      </div>
+    </a>
+    <a class="tile" href="ghost-overlay.html">
+      <div class="thumb"><img src="ghost-overlay.png" alt=""/></div>
+      <div class="meta">
+        <div class="num">08</div>
+        <div><div class="name">Ghost Mode</div><div class="desc">Invisible-to-screen-share meeting whisper · Cluely format</div></div>
+        <div class="chev"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+      </div>
+    </a>
+  </div>
+
+  <div class="section-title">Overlays &amp; settings</div>
+  <div class="grid">
+    <a class="tile" href="quickask.html">
+      <div class="thumb"><img src="quickask.png" alt=""/></div>
+      <div class="meta">
+        <div class="num">09</div>
+        <div><div class="name">QuickAsk · text</div><div class="desc">Alt+Space · streamed answer · grouped results</div></div>
+        <div class="chev"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+      </div>
+    </a>
+    <a class="tile" href="quickask-voice.html">
+      <div class="thumb"><img src="quickask-voice.png" alt=""/></div>
+      <div class="meta">
+        <div class="num">10</div>
+        <div><div class="name">QuickAsk · voice</div><div class="desc">Ctrl+Shift+B · orb hero · live transcript</div></div>
+        <div class="chev"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+      </div>
+    </a>
+    <a class="tile" href="settings.html">
+      <div class="thumb"><img src="settings.png" alt=""/></div>
+      <div class="meta">
+        <div class="num">11</div>
+        <div><div class="name">Settings · Provider</div><div class="desc">Key vault · smart paste · routing · fallback</div></div>
+        <div class="chev"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+      </div>
+    </a>
+  </div>
+
+  <div class="section-title">HIG principles this prototype targets</div>
+  <div class="principles">
+    <div class="principle">
+      <div class="pt">Hierarchy <span>Content ≻ chrome</span></div>
+      <div class="pd">One dominant element per surface. Right Now is the hero; Hive signals are the feed; everything else supports, never competes.</div>
+    </div>
+    <div class="principle">
+      <div class="pt">Harmony <span>Same fabric</span></div>
+      <div class="pd">Single glass treatment, 8pt grid for every margin, iOS radii (10/16/20/28/40), one type scale (SF Pro, tight tracking).</div>
+    </div>
+    <div class="principle">
+      <div class="pt">Consistency <span>One gesture fits all</span></div>
+      <div class="pd">Cards lift 2px on hover, buttons tap-scale 0.985, Esc closes overlays everywhere, ⌘K opens QuickAsk from any screen.</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Map page — no flow nav needed, but keyboard toggles still work
+  window.PROTO_CURRENT = 'index.html';
+  window.PROTO_LABEL = 'Map';
+</script>
+<script src="proto.js"></script>
+</body>
+</html>

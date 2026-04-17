@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>BLADE — Onboarding · Paste key</title>
+<link rel="stylesheet" href="shared.css"/>
+<link rel="stylesheet" href="proto.css"/>
+<style>
+  .onb {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 760px; padding: 56px 64px 52px;
+    border-radius: var(--r-2xl);
+  }
+  .onb-steps { display: flex; gap: 10px; align-items: center; margin-bottom: 28px; }
+  .step-pill { display: flex; align-items: center; gap: 10px; padding: 8px 16px 8px 10px; border-radius: var(--r-pill);
+               background: rgba(255,255,255,0.08); font-size: 12px; color: var(--t-3); border: 1px solid var(--g-edge-lo); }
+  .step-pill .num { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+                     background: rgba(255,255,255,0.08); font-weight: 600; font-size: 11px; color: var(--t-3); }
+  .step-pill.active { color: var(--t-1); background: rgba(255,255,255,0.16); border-color: var(--g-edge-mid); }
+  .step-pill.active .num { background: #fff; color: #1a0b2a; }
+  .step-pill.done .num { background: rgba(138,255,199,0.22); color: #8affc7; border: 1px solid rgba(138,255,199,0.4);
+                         background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238affc7' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='20 6 9 17 4 12'/></svg>"); background-size: 12px; background-position: center; background-repeat: no-repeat; color: transparent; }
+  .step-divider { width: 18px; height: 1px; background: var(--line-strong); }
+
+  .brand { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
+  .brand-mark { width: 52px; height: 52px; border-radius: 16px;
+    background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 100%);
+    color: #1a0b2a; display: grid; place-items: center; font-weight: 800; font-size: 20px;
+    box-shadow: inset 0 1px 0 #fff, 0 10px 30px rgba(0,0,0,0.35); }
+  .brand-text .name { font-weight: 600; font-size: 17px; letter-spacing: -0.02em; }
+  .brand-text .tag  { font-size: 12px; color: var(--t-3); margin-top: 2px; }
+
+  h1.title { font-weight: 600; font-size: 40px; letter-spacing: -0.03em; line-height: 1.05; margin-bottom: 12px; }
+  p.subtitle { font-size: 15px; color: var(--t-2); max-width: 560px; line-height: 1.5; }
+
+  .provider-tag {
+    display: inline-flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px;
+    background: rgba(255,255,255,0.08); border: 1px solid var(--g-edge-mid); border-radius: var(--r-pill);
+    font-size: 13px; font-weight: 500; margin-bottom: 14px;
+  }
+  .provider-tag .p-logo { width: 26px; height: 26px; border-radius: 8px; font-size: 12px; }
+
+  .field { margin-top: 32px; }
+  .field label { display: block; font-size: 12px; color: var(--t-3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; margin-bottom: 10px; }
+  .key-input-wrap { position: relative; }
+  .key-input {
+    width: 100%; padding: 18px 200px 18px 52px;
+    font-family: 'JetBrains Mono'; font-size: 14px; letter-spacing: 0.02em; color: var(--t-1);
+    background: rgba(0,0,0,0.3); border: 1px solid var(--g-edge-mid);
+    border-radius: var(--r-md);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+    outline: none;
+  }
+  .key-input:focus { border-color: rgba(255,255,255,0.4); box-shadow: inset 0 1px 3px rgba(0,0,0,0.3), 0 0 0 4px rgba(255,255,255,0.06); }
+  .key-prefix { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); color: var(--t-3); pointer-events: none; }
+  .key-prefix svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+  .key-actions { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); display: flex; gap: 6px; }
+  .key-actions .btn { padding: 8px 14px; font-size: 12px; }
+
+  .status {
+    margin-top: 14px; display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px; border-radius: var(--r-md);
+    background: rgba(138,255,199,0.10); border: 1px solid rgba(138,255,199,0.3);
+    font-size: 13px; color: #c4ffe0;
+  }
+  .status .s-dot { width: 8px; height: 8px; border-radius: 50%; background: #8affc7; box-shadow: 0 0 10px #8affc7; }
+  .status .s-meta { margin-left: auto; font-family: 'JetBrains Mono'; font-size: 11px; color: rgba(196,255,224,0.7); }
+
+  .pill-row { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .mini-pill { padding: 5px 10px; background: rgba(255,255,255,0.06); border: 1px solid var(--g-edge-lo); border-radius: var(--r-pill); font-size: 11px; color: var(--t-2); display: flex; align-items: center; gap: 6px; }
+  .mini-pill .dot { width: 5px; height: 5px; border-radius: 50%; background: #8affc7; }
+
+  .actions { display: flex; justify-content: space-between; align-items: center; margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--line); }
+  .link-btn { font-size: 13px; color: var(--t-2); text-decoration: none; border: none; background: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .link-btn:hover { color: var(--t-1); }
+  .link-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+</style>
+</head>
+<body>
+<div class="wallpaper"></div>
+<div class="vignette"></div>
+<div class="stage">
+
+  <div class="onb glass heavy">
+    <div class="between" style="align-items: flex-start;">
+      <div class="brand">
+        <div class="brand-mark">B</div>
+        <div class="brand-text">
+          <div class="name">BLADE</div>
+          <div class="tag">Your personal intelligence</div>
+        </div>
+      </div>
+      <div class="onb-steps">
+        <div class="step-pill done"><span class="num">1</span>Provider</div>
+        <div class="step-divider"></div>
+        <div class="step-pill active"><span class="num">2</span>Key</div>
+        <div class="step-divider"></div>
+        <div class="step-pill"><span class="num">3</span>Ready</div>
+      </div>
+    </div>
+
+    <div class="provider-tag">
+      <div class="p-logo anthropic" style="width:26px;height:26px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(135deg,#c96442,#f0a97e);color:#fff;font-weight:700;font-size:12px;">A</div>
+      Anthropic
+      <svg style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;opacity:0.5;margin-left:2px" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+
+    <h1 class="title">Paste your key.</h1>
+    <p class="subtitle">Find it at <span style="color:var(--t-1);font-family:'JetBrains Mono';font-size:13px;padding:1px 6px;background:rgba(255,255,255,0.08);border-radius:4px;">console.anthropic.com</span> → API keys. BLADE stores it encrypted in your OS keychain.</p>
+
+    <div class="field">
+      <label>Anthropic API Key</label>
+      <div class="key-input-wrap">
+        <span class="key-prefix">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        </span>
+        <input class="key-input" value="sk-ant-api03-••••••••••••••••••••••••••••••••••••-U8vW"/>
+        <div class="key-actions">
+          <button class="btn ghost">Paste</button>
+          <button class="btn primary">Test</button>
+        </div>
+      </div>
+
+      <div class="status">
+        <span class="s-dot"></span>
+        <div>Key verified. Access to <b>Claude Opus 4.7</b>, Sonnet 4.6, Haiku 4.5.</div>
+        <div class="s-meta">240ms · $28.12 credit</div>
+      </div>
+
+      <div class="pill-row">
+        <div class="mini-pill"><span class="dot"></span>claude-opus-4-7</div>
+        <div class="mini-pill"><span class="dot"></span>claude-sonnet-4-6</div>
+        <div class="mini-pill"><span class="dot"></span>claude-haiku-4-5</div>
+        <div class="mini-pill"><span class="dot" style="background:#ffc48a"></span>1M context</div>
+        <div class="mini-pill"><span class="dot" style="background:#c8e0ff"></span>vision</div>
+        <div class="mini-pill"><span class="dot" style="background:#ffb3d0"></span>tool use</div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <a class="link-btn" href="onboarding-01-provider.html">
+        <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Back
+      </a>
+      <a class="btn primary lg hotspot primary-cta" href="onboarding-03-ready.html">
+        Continue
+        <svg class="icon-svg" style="width:16px;height:16px;stroke-width:2" viewBox="0 0 24 24"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+      </a>
+    </div>
+  </div>
+
+</div>
+<script>window.PROTO_CURRENT = 'onboarding-02-apikey.html';</script>
+<script src="proto.js"></script>
+</body>
+</html>

@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>BLADE — Settings · Provider</title>
+<link rel="stylesheet" href="shared.css"/>
+<link rel="stylesheet" href="_parts.css"/>
+<link rel="stylesheet" href="proto.css"/>
+<style>
+  .settings-page {
+    position: absolute;
+    top: 24px; left: 124px; right: 24px; bottom: 24px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+
+  .settings-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 28px; border-radius: var(--r-xl);
+  }
+  .settings-header .title { font-size: 28px; font-weight: 600; letter-spacing: -0.025em; }
+  .settings-header .title .t-3 { font-weight: 400; margin-left: 10px; }
+
+  .tab-strip {
+    display: flex; align-items: center; gap: 4px;
+    padding: 6px; border-radius: var(--r-pill);
+    background: rgba(0,0,0,0.22); border: 1px solid var(--g-edge-lo);
+  }
+  .tab { padding: 8px 16px; border-radius: var(--r-pill); font-size: 13px; color: var(--t-2); cursor: pointer; transition: all 160ms; letter-spacing: -0.005em; display: flex; align-items: center; gap: 6px; }
+  .tab svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.8; opacity: 0.8; }
+  .tab:hover { color: var(--t-1); }
+  .tab.active {
+    background: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.08));
+    color: var(--t-1); box-shadow: inset 0 1px 0 rgba(255,255,255,0.28), 0 4px 10px rgba(0,0,0,0.25);
+    border: 1px solid var(--g-edge-mid);
+  }
+
+  .settings-body { flex: 1; display: grid; grid-template-columns: 280px 1fr; gap: 20px; min-height: 0; }
+
+  /* Left side nav */
+  .side-nav { padding: 20px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .side-nav .group-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--t-4); font-weight: 700; padding: 8px 12px 6px; }
+  .side-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--r-sm); color: var(--t-2); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 140ms; position: relative; }
+  .side-item:hover { background: rgba(255,255,255,0.05); color: var(--t-1); }
+  .side-item.active { background: rgba(255,255,255,0.1); color: var(--t-1); box-shadow: inset 0 1px 0 rgba(255,255,255,0.14); }
+  .side-item.active::before { content: ''; position: absolute; left: -6px; top: 50%; transform: translateY(-50%); width: 3px; height: 16px; background: #fff; border-radius: 3px; box-shadow: 0 0 8px rgba(255,255,255,0.6); }
+  .side-item svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.7; flex-shrink: 0; }
+  .side-item .badge { margin-left: auto; font-family: 'JetBrains Mono'; font-size: 10px; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.08); color: var(--t-3); }
+
+  /* Right content */
+  .content { padding: 32px 40px; overflow: hidden; display: flex; flex-direction: column; gap: 28px; }
+  .section { display: flex; flex-direction: column; gap: 14px; }
+  .section-head .sh-title { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+  .section-head .sh-sub { font-size: 13px; color: var(--t-3); margin-top: 3px; line-height: 1.5; max-width: 640px; }
+
+  /* Smart paste input */
+  .paste {
+    display: flex; align-items: center; gap: 0;
+    padding: 6px 6px 6px 18px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+    border: 1px dashed rgba(255,255,255,0.28);
+    border-radius: var(--r-md);
+  }
+  .paste svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.6; color: var(--t-3); }
+  .paste input {
+    flex: 1; background: transparent; border: none; outline: none;
+    font: inherit; font-family: 'JetBrains Mono'; font-size: 14px; color: var(--t-1); padding: 12px 14px;
+  }
+  .paste input::placeholder { color: var(--t-3); font-family: 'Inter'; font-size: 14px; }
+  .paste .hint { font-family: 'JetBrains Mono'; font-size: 11px; color: var(--t-4); padding-right: 12px; display: flex; align-items: center; gap: 6px; }
+  .paste .hint b { padding: 2px 6px; background: rgba(255,255,255,0.08); border: 1px solid var(--g-edge-lo); border-radius: 4px; font-weight: 600; color: var(--t-2); }
+
+  /* Key vault list */
+  .vault { display: flex; flex-direction: column; gap: 10px; }
+  .vault-item {
+    display: flex; align-items: center; gap: 16px; padding: 16px 20px;
+    border-radius: var(--r-md);
+    background: rgba(255,255,255,0.05); border: 1px solid var(--g-edge-lo);
+    transition: all 160ms;
+  }
+  .vault-item:hover { background: rgba(255,255,255,0.08); border-color: var(--g-edge-mid); }
+  .vault-item .p-logo { width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0; display: grid; place-items: center; font-weight: 700; font-size: 16px; color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,0.25); }
+  .p-logo.anthropic  { background: linear-gradient(135deg, #c96442, #f0a97e); }
+  .p-logo.openai     { background: linear-gradient(135deg, #0f8a60, #10b27a); }
+  .p-logo.google     { background: linear-gradient(135deg, #4285f4, #34a0f5); }
+  .p-logo.groq       { background: linear-gradient(135deg, #f55036, #ff7a50); }
+  .p-logo.ollama     { background: linear-gradient(135deg, #2c2c2c, #555); }
+  .p-logo.openrouter { background: linear-gradient(135deg, #5b5fe8, #8b6fff); }
+
+  .v-info { display: flex; flex-direction: column; gap: 4px; min-width: 220px; }
+  .v-info .n { font-size: 15px; font-weight: 600; letter-spacing: -0.005em; }
+  .v-info .m { font-size: 11px; color: var(--t-3); display: flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono'; }
+  .v-info .m .pre { color: var(--t-1); }
+
+  .v-state { display: flex; align-items: center; gap: 8px; padding: 5px 12px 5px 10px; border-radius: var(--r-pill); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .v-state.ok  { background: rgba(138,255,199,0.12); color: #c4ffe0; border: 1px solid rgba(138,255,199,0.3); }
+  .v-state.warn{ background: rgba(255,196,138,0.12); color: #ffe0c0; border: 1px solid rgba(255,196,138,0.3); }
+  .v-state.off { background: rgba(255,255,255,0.05); color: var(--t-3); border: 1px solid var(--g-edge-lo); }
+  .v-state .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .v-state.ok .dot  { background: #8affc7; box-shadow: 0 0 8px #8affc7; }
+  .v-state.warn .dot{ background: #ffc48a; }
+  .v-state.off .dot { background: rgba(255,255,255,0.25); }
+
+  .v-models { flex: 1; display: flex; gap: 6px; flex-wrap: wrap; }
+  .v-models .m-pill {
+    padding: 4px 9px; border-radius: var(--r-pill);
+    background: rgba(0,0,0,0.18); border: 1px solid var(--g-edge-lo);
+    font-size: 10px; font-family: 'JetBrains Mono'; color: var(--t-2);
+  }
+
+  .v-usage { text-align: right; display: flex; flex-direction: column; gap: 3px; min-width: 100px; }
+  .v-usage .big { font-family: 'JetBrains Mono'; font-size: 15px; font-weight: 500; letter-spacing: -0.01em; }
+  .v-usage .sm { font-size: 10px; color: var(--t-3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+
+  .v-actions { display: flex; gap: 6px; }
+  .v-actions .icon-btn {
+    width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+    background: rgba(255,255,255,0.05); border: 1px solid var(--g-edge-lo); color: var(--t-2);
+    cursor: pointer; transition: all 140ms;
+  }
+  .v-actions .icon-btn:hover { background: rgba(255,255,255,0.1); color: var(--t-1); }
+  .v-actions .icon-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.7; }
+
+  /* Routing preview */
+  .routing { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .route {
+    padding: 14px; border-radius: var(--r-md);
+    background: rgba(255,255,255,0.04); border: 1px solid var(--g-edge-lo);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .route .r-head { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--t-3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+  .route .r-model { font-size: 14px; font-weight: 600; letter-spacing: -0.005em; }
+  .route .r-prov { font-size: 11px; color: var(--t-3); font-family: 'JetBrains Mono'; }
+  .route .r-fb { font-size: 10px; color: var(--t-4); margin-top: auto; display: flex; gap: 4px; align-items: center; }
+  .route .r-fb svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  /* Save bar at bottom */
+  .save-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-radius: var(--r-pill); }
+  .save-bar .left { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--t-2); }
+  .save-bar .left svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+  .save-bar .right { display: flex; align-items: center; gap: 10px; }
+</style>
+</head>
+<body>
+<div class="wallpaper"></div>
+<div class="vignette"></div>
+<div class="stage">
+
+  <!-- NAV RAIL -->
+  <aside class="nav-rail glass">
+    <div class="nav-logo">B</div>
+    <a href="dashboard.html" class="nav-item hotspot" title="Home"><svg class="icon-svg" viewBox="0 0 24 24"><path d="M3 10l9-7 9 7v10a2 2 0 0 1-2 2h-4v-7h-6v7H5a2 2 0 0 1-2-2V10z"/></svg></a>
+    <a href="dashboard-chat.html" class="nav-item hotspot" title="Chat"><svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></a>
+    <a href="index.html" class="nav-item hotspot" title="Hive"><svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></a>
+    <a href="index.html" class="nav-item hotspot" title="Calendar"><svg class="icon-svg" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg></a>
+    <a href="index.html" class="nav-item hotspot" title="Files"><svg class="icon-svg" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></a>
+    <a href="settings.html" class="nav-item active hotspot" title="Settings"><svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></a>
+    <div class="nav-spacer"></div>
+    <div class="nav-avatar">A</div>
+  </aside>
+
+  <div class="settings-page">
+
+    <!-- Header with tabs -->
+    <div class="settings-header glass">
+      <div class="title">Settings <span class="t-3" style="font-size: 15px">/ Provider</span></div>
+      <div class="tab-strip">
+        <div class="tab active">
+          <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0zM12 7v10M7 12h10"/></svg>
+          Provider
+        </div>
+        <div class="tab"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M22 2l-10 10"/></svg>Memory</div>
+        <div class="tab"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>MCP</div>
+        <div class="tab"><svg viewBox="0 0 24 24"><path d="M12 2a5 5 0 0 0-5 5v2a5 5 0 0 0 10 0V7a5 5 0 0 0-5-5z"/><path d="M4 22a8 8 0 0 1 16 0"/></svg>Personality</div>
+        <div class="tab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>Hive</div>
+        <div class="tab"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Privacy</div>
+        <div class="tab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>About</div>
+      </div>
+    </div>
+
+    <div class="settings-body">
+
+      <!-- Side nav (Provider sub-nav) -->
+      <div class="card glass side-nav">
+        <div class="group-label">Provider</div>
+        <div class="side-item active">
+          <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Keys &amp; Access <span class="badge">6</span>
+        </div>
+        <div class="side-item"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>Routing rules</div>
+        <div class="side-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 2"/></svg>Rate limits</div>
+        <div class="side-item"><svg viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/></svg>Fallback chains</div>
+        <div class="side-item"><svg viewBox="0 0 24 24"><path d="M3 3h18v18H3z"/><path d="M3 9h18M9 21V9"/></svg>Cost &amp; budgets <span class="badge">$118</span></div>
+
+        <div class="group-label" style="margin-top: 14px">Local</div>
+        <div class="side-item"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>Ollama models</div>
+        <div class="side-item"><svg viewBox="0 0 24 24"><path d="M21 15V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9"/><path d="M17 21l4-4M17 17h4v4"/></svg>Whisper local</div>
+        <div class="side-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z"/></svg>Offline mode</div>
+      </div>
+
+      <!-- Content -->
+      <div class="card glass content">
+
+        <!-- Smart paste -->
+        <div class="section">
+          <div class="section-head">
+            <div class="sh-title">Add an API key</div>
+            <div class="sh-sub">Paste any key — BLADE auto-detects the provider, validates it, and stores it encrypted in your OS keychain.</div>
+          </div>
+          <div class="paste">
+            <svg viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+            <input placeholder="Paste a key — sk-..., gsk_..., AIza..., or pick below"/>
+            <div class="hint"><span>auto-detect</span><b>⌘ V</b></div>
+          </div>
+        </div>
+
+        <!-- Key vault -->
+        <div class="section">
+          <div class="section-head">
+            <div class="sh-title">Connected providers</div>
+            <div class="sh-sub">Stacking providers gives BLADE fallback chains. If one is down or over budget, the next takes over automatically.</div>
+          </div>
+          <div class="vault">
+
+            <div class="vault-item">
+              <div class="p-logo anthropic">A</div>
+              <div class="v-info">
+                <div class="n">Anthropic <span style="color:var(--t-3);font-weight:400;font-size:12px;margin-left:6px">default</span></div>
+                <div class="m"><span class="pre">sk-ant-•••</span><span>-U8vW</span></div>
+              </div>
+              <div class="v-state ok"><span class="dot"></span>Active</div>
+              <div class="v-models">
+                <span class="m-pill">opus-4.7</span>
+                <span class="m-pill">sonnet-4.6</span>
+                <span class="m-pill">haiku-4.5</span>
+              </div>
+              <div class="v-usage"><div class="big">$28.12</div><div class="sm">of $50 / mo</div></div>
+              <div class="v-actions">
+                <div class="icon-btn" title="Test"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+                <div class="icon-btn" title="Reveal"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>
+                <div class="icon-btn" title="More"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></div>
+              </div>
+            </div>
+
+            <div class="vault-item">
+              <div class="p-logo openai">O</div>
+              <div class="v-info">
+                <div class="n">OpenAI</div>
+                <div class="m"><span class="pre">sk-proj-•••</span><span>-mQ2f</span></div>
+              </div>
+              <div class="v-state ok"><span class="dot"></span>Active</div>
+              <div class="v-models">
+                <span class="m-pill">gpt-5</span>
+                <span class="m-pill">gpt-4.1</span>
+                <span class="m-pill">o4-mini</span>
+              </div>
+              <div class="v-usage"><div class="big">$41.80</div><div class="sm">of $75 / mo</div></div>
+              <div class="v-actions">
+                <div class="icon-btn"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+                <div class="icon-btn"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>
+                <div class="icon-btn"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></div>
+              </div>
+            </div>
+
+            <div class="vault-item">
+              <div class="p-logo google">G</div>
+              <div class="v-info">
+                <div class="n">Google Gemini</div>
+                <div class="m"><span class="pre">AIza•••</span><span>-T3rP</span></div>
+              </div>
+              <div class="v-state ok"><span class="dot"></span>Active</div>
+              <div class="v-models">
+                <span class="m-pill">gemini-2.5-pro</span>
+                <span class="m-pill">flash</span>
+              </div>
+              <div class="v-usage"><div class="big">$6.40</div><div class="sm">of $25 / mo</div></div>
+              <div class="v-actions">
+                <div class="icon-btn"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+                <div class="icon-btn"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>
+                <div class="icon-btn"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></div>
+              </div>
+            </div>
+
+            <div class="vault-item">
+              <div class="p-logo groq">⚡</div>
+              <div class="v-info">
+                <div class="n">Groq</div>
+                <div class="m"><span class="pre">gsk_•••</span><span>-yE4k</span></div>
+              </div>
+              <div class="v-state warn"><span class="dot"></span>Rate limited</div>
+              <div class="v-models">
+                <span class="m-pill">llama-4</span>
+                <span class="m-pill">mixtral</span>
+              </div>
+              <div class="v-usage"><div class="big">$0.00</div><div class="sm">free tier</div></div>
+              <div class="v-actions">
+                <div class="icon-btn"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+                <div class="icon-btn"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>
+                <div class="icon-btn"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></div>
+              </div>
+            </div>
+
+            <div class="vault-item">
+              <div class="p-logo ollama">◉</div>
+              <div class="v-info">
+                <div class="n">Ollama <span style="color:#8affc7;font-size:11px;font-weight:500;margin-left:6px">local</span></div>
+                <div class="m"><span class="pre">localhost:11434</span></div>
+              </div>
+              <div class="v-state ok"><span class="dot"></span>Active</div>
+              <div class="v-models">
+                <span class="m-pill">llama3.3:70b</span>
+                <span class="m-pill">qwen2.5:32b</span>
+                <span class="m-pill">+4 more</span>
+              </div>
+              <div class="v-usage"><div class="big">$0.00</div><div class="sm">free · local</div></div>
+              <div class="v-actions">
+                <div class="icon-btn"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+                <div class="icon-btn"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>
+                <div class="icon-btn"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Routing preview -->
+        <div class="section">
+          <div class="section-head">
+            <div class="sh-title">Smart routing</div>
+            <div class="sh-sub">BLADE picks the right model per task. Override any row to force a specific one.</div>
+          </div>
+          <div class="routing">
+            <div class="route">
+              <div class="r-head"><span>Deep reasoning</span></div>
+              <div class="r-model">Opus 4.7</div>
+              <div class="r-prov">anthropic</div>
+              <div class="r-fb"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 5l7 7-7 7"/></svg>gpt-5 · gemini-2.5-pro</div>
+            </div>
+            <div class="route">
+              <div class="r-head"><span>Daily chat</span></div>
+              <div class="r-model">Sonnet 4.6</div>
+              <div class="r-prov">anthropic</div>
+              <div class="r-fb"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 5l7 7-7 7"/></svg>gpt-4.1 · flash</div>
+            </div>
+            <div class="route">
+              <div class="r-head"><span>Fast replies</span></div>
+              <div class="r-model">Haiku 4.5</div>
+              <div class="r-prov">anthropic</div>
+              <div class="r-fb"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 5l7 7-7 7"/></svg>llama-4 · qwen2.5</div>
+            </div>
+            <div class="route">
+              <div class="r-head"><span>Vision</span></div>
+              <div class="r-model">Gemini 2.5 Pro</div>
+              <div class="r-prov">google</div>
+              <div class="r-fb"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 5l7 7-7 7"/></svg>opus · gpt-5</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Save bar -->
+    <div class="save-bar glass pill">
+      <div class="left">
+        <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+        Changes saved locally · encrypted at rest · <span class="mono" style="color:var(--t-1)">4s ago</span>
+      </div>
+      <div class="right">
+        <button class="btn ghost">Reset to defaults</button>
+        <button class="btn">Export config</button>
+        <button class="btn primary">Save &amp; test all</button>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+<script>window.PROTO_CURRENT = 'settings.html'; window.PROTO_POSITION = 'top-right';</script>
+<script src="proto.js"></script>
+</body>
+</html>

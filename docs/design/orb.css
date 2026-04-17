@@ -1,0 +1,251 @@
+/* ===================================================================
+   BLADE Voice Orb — OpenClaw animation math ported to CSS/SVG.
+   Reference: docs/research/openclaw-deep-read.md
+   Overlay: 440×440. Orb core: 96px. Accent: violet-white on purple.
+   =================================================================== */
+
+:root {
+  /* Orb dimensions — straight from OpenClaw spec */
+  --orb-overlay: 440px;
+  --orb-core:    96px;
+
+  /* Accent — neutral-warm, reads over any wallpaper.
+     White core → violet edge, so the orb looks alive but doesn't fight content. */
+  --orb-accent:       #b8a0ff;
+  --orb-accent-glow:  rgba(184, 160, 255, 0.55);
+  --orb-accent-deep:  #5f5bff;
+
+  /* Stroke for rings */
+  --orb-ring-stroke: 1.6px;
+}
+
+/* ---------- Overlay container (frameless, transparent) -------------- */
+.orb-overlay {
+  position: relative;
+  width: var(--orb-overlay);
+  height: var(--orb-overlay);
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+}
+
+/* Soft halo behind the orb — gives the sense of presence on any wallpaper */
+.orb-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 15%;
+  border-radius: 50%;
+  background: radial-gradient(circle at center,
+    rgba(184, 160, 255, 0.18) 0%,
+    rgba(184, 160, 255, 0.06) 45%,
+    transparent 70%);
+  filter: blur(20px);
+  z-index: -1;
+}
+
+/* ---------- The core orb — 96px sphere with radial gradient --------- */
+.orb-core {
+  width: var(--orb-core);
+  height: var(--orb-core);
+  border-radius: 50%;
+  position: relative;
+  background:
+    radial-gradient(circle at 30% 26%,
+      #ffffff 0%,
+      #efe7ff 18%,
+      var(--orb-accent) 58%,
+      var(--orb-accent-deep) 100%);
+  box-shadow:
+    inset -6px -10px 22px rgba(40, 10, 80, 0.35),
+    inset 8px 10px 22px rgba(255, 255, 255, 0.55),
+    0 0 60px var(--orb-accent-glow),
+    0 14px 40px rgba(0, 0, 0, 0.35);
+  transform-origin: center;
+  will-change: transform;
+}
+
+/* Tiny specular hotspot — sells the 3D sphere */
+.orb-core::after {
+  content: '';
+  position: absolute;
+  top: 14%; left: 22%;
+  width: 28%; height: 22%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0) 70%);
+  filter: blur(2px);
+  pointer-events: none;
+}
+
+/* ---------- Rings — 3 expanding circles, staggered by 0.28 cycles --- */
+.orb-rings,
+.orb-arcs {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.orb-rings circle,
+.orb-arcs circle {
+  transform-origin: center;
+  transform-box: fill-box;
+  will-change: transform, opacity;
+  stroke: var(--orb-accent);
+  stroke-width: var(--orb-ring-stroke);
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+/* ---------- Phase: IDLE ---------------------------------------------
+   OpenClaw: speed 0.6 (period ≈ 1.67s)
+   amplitude 0.35 (scale 0.75 → 1.1)
+   alpha 0.4 (opacity 0.4 → -0.2 clamped 0)
+   orb scale: 1.0, subtle breathe @ 6s for life signal
+--------------------------------------------------------------------- */
+.orb-overlay[data-phase="idle"] .orb-core {
+  animation: orb-idle-breath 6.2s ease-in-out infinite;
+}
+.orb-overlay[data-phase="idle"] .orb-rings .ring {
+  animation: ring-idle 1.667s linear infinite;
+}
+.orb-overlay[data-phase="idle"] .ring-1 { animation-delay: -0.467s; }
+.orb-overlay[data-phase="idle"] .ring-2 { animation-delay: -0.933s; }
+
+@keyframes orb-idle-breath {
+  0%, 100% { transform: scale(1.0); }
+  50%      { transform: scale(1.015); }
+}
+@keyframes ring-idle {
+  0%   { transform: scale(0.75); opacity: 0.40; }
+  100% { transform: scale(1.10); opacity: 0.00; }
+}
+
+/* ---------- Phase: LISTENING ----------------------------------------
+   Speed 0.9 (period ≈ 1.11s). Level is simulated at ~0.5 via sine.
+   amplitude 0.5 + level*0.7 ≈ 0.85 (scale 0.75 → 1.60)
+   alpha 0.58 + level*0.28 ≈ 0.72 (opacity 0.72 → 0.12)
+   Orb: 1 + level*0.12, breathes with voice — simulate at 1.4s period.
+--------------------------------------------------------------------- */
+.orb-overlay[data-phase="listening"] .orb-core {
+  animation: orb-listen-breath 1.4s ease-in-out infinite;
+}
+.orb-overlay[data-phase="listening"] .orb-rings .ring {
+  animation: ring-listening 1.111s linear infinite;
+}
+.orb-overlay[data-phase="listening"] .ring-1 { animation-delay: -0.311s; }
+.orb-overlay[data-phase="listening"] .ring-2 { animation-delay: -0.622s; }
+
+@keyframes orb-listen-breath {
+  0%, 100% { transform: scale(1.00); }
+  50%      { transform: scale(1.090); }  /* simulates level≈0.75 peak */
+}
+@keyframes ring-listening {
+  0%   { transform: scale(0.75); opacity: 0.72; }
+  100% { transform: scale(1.60); opacity: 0.12; }
+}
+
+/* ---------- Phase: THINKING -----------------------------------------
+   Rings use idle speed. Orb scale 1.0.
+   Two counter-rotating arcs: arc1 +42°/s (8.57s), arc2 -35°/s (10.29s).
+--------------------------------------------------------------------- */
+.orb-overlay[data-phase="thinking"] .orb-core {
+  animation: orb-idle-breath 6.2s ease-in-out infinite;
+}
+.orb-overlay[data-phase="thinking"] .orb-rings .ring {
+  animation: ring-idle 1.667s linear infinite;
+  opacity: 0.35;
+}
+.orb-overlay[data-phase="thinking"] .ring-1 { animation-delay: -0.467s; }
+.orb-overlay[data-phase="thinking"] .ring-2 { animation-delay: -0.933s; }
+
+.orb-overlay[data-phase="thinking"] .orb-arcs {
+  display: block;
+}
+.orb-arcs { display: none; }
+.orb-arcs circle {
+  stroke-width: 2.2px;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.45));
+}
+.orb-arcs .arc-1 {
+  stroke: rgba(255, 255, 255, 0.88);
+  stroke-dasharray: 79.2 439.8;         /* 18% of 2π·70 circumference */
+  stroke-dashoffset: -35.2;             /* start at 0.08 of circle */
+  animation: arc-spin-cw 8.57s linear infinite;
+}
+.orb-arcs .arc-2 {
+  stroke: rgba(255, 255, 255, 0.70);
+  stroke-dasharray: 105.5 439.8;        /* 24% length */
+  stroke-dashoffset: -272.7;            /* start at 0.62 of circle */
+  animation: arc-spin-ccw 10.29s linear infinite;
+}
+@keyframes arc-spin-cw  { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes arc-spin-ccw { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
+
+/* ---------- Phase: SPEAKING -----------------------------------------
+   Rings speed 1.4 (period ≈ 0.71s).
+   amplitude 0.95 (scale 0.75 → 1.70), alpha 0.72 (op 0.72 → 0.12)
+   Orb: 1 + 0.06 * sin(t*6) — 6Hz pulse, 0.94 ↔ 1.06, period ≈ 0.167s?
+   sin(t*6 rad) period = 2π/6 ≈ 1.047s → use 1.047s for the pulse.
+--------------------------------------------------------------------- */
+.orb-overlay[data-phase="speaking"] .orb-core {
+  animation: orb-speak-pulse 1.047s linear infinite;
+}
+.orb-overlay[data-phase="speaking"] .orb-rings .ring {
+  animation: ring-speaking 0.714s linear infinite;
+}
+.orb-overlay[data-phase="speaking"] .ring-1 { animation-delay: -0.200s; }
+.orb-overlay[data-phase="speaking"] .ring-2 { animation-delay: -0.400s; }
+
+@keyframes orb-speak-pulse {
+  0%   { transform: scale(1.00); }
+  25%  { transform: scale(1.06); }
+  50%  { transform: scale(1.00); }
+  75%  { transform: scale(0.94); }
+  100% { transform: scale(1.00); }
+}
+@keyframes ring-speaking {
+  0%   { transform: scale(0.75); opacity: 0.72; }
+  100% { transform: scale(1.70); opacity: 0.12; }
+}
+
+/* ---------- Phase badge (debug/review) ------------------------------ */
+.orb-phase-label {
+  position: absolute; bottom: 32px; left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 14px 6px 10px;
+  border-radius: 999px;
+  background: rgba(10, 5, 30, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(20px) saturate(160%);
+  color: rgba(255, 255, 255, 0.92);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px; font-weight: 500; letter-spacing: -0.005em;
+}
+.orb-phase-label .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--orb-accent); box-shadow: 0 0 10px var(--orb-accent); }
+.orb-phase-label .dot.listening { background: #8affc7; box-shadow: 0 0 10px #8affc7; animation: pulse-dot 1.4s ease-in-out infinite; }
+.orb-phase-label .dot.thinking  { background: #ffd2a6; box-shadow: 0 0 10px #ffd2a6; }
+.orb-phase-label .dot.speaking  { background: #fff; box-shadow: 0 0 10px #fff; animation: pulse-dot 1s ease-in-out infinite; }
+.orb-phase-label .dot.idle      { background: rgba(255,255,255,0.4); }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
+/* ---------- Transcript line below orb ------------------------------- */
+.orb-transcript {
+  position: absolute; bottom: 80px; left: 50%;
+  transform: translateX(-50%);
+  max-width: 380px; text-align: center;
+  color: rgba(255, 255, 255, 0.92);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 17px; line-height: 1.35; letter-spacing: -0.015em; font-weight: 400;
+}
+.orb-transcript .final { color: rgba(255, 255, 255, 0.98); }
+.orb-transcript .partial { color: rgba(255, 255, 255, 0.55); }
+.orb-transcript .caret {
+  display: inline-block; width: 2px; height: 16px; margin-left: 2px;
+  background: #fff; vertical-align: -2px;
+  animation: caret-blink 1s step-end infinite;
+}
+@keyframes caret-blink { 50% { opacity: 0; } }

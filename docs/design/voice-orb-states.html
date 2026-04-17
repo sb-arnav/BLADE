@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>BLADE — Voice orb · 4 phase states</title>
+<link rel="stylesheet" href="shared.css"/>
+<link rel="stylesheet" href="orb.css"/>
+<link rel="stylesheet" href="proto.css"/>
+<style>
+  .page {
+    position: absolute; inset: 0;
+    padding: 56px 72px;
+    z-index: 2;
+    display: flex; flex-direction: column;
+    gap: 32px;
+  }
+
+  .page-head { display: flex; align-items: flex-start; justify-content: space-between; }
+  .page-head .lead { max-width: 680px; }
+  .page-head h1 {
+    font-size: 34px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.1;
+    margin-bottom: 10px;
+  }
+  .page-head .sub { font-size: 15px; color: var(--t-2); line-height: 1.5; }
+  .page-head .sub code {
+    font-family: 'JetBrains Mono'; font-size: 13px;
+    padding: 2px 7px; border-radius: 5px;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14);
+    color: var(--t-1);
+  }
+
+  .ref {
+    font-size: 11px; color: var(--t-3);
+    font-family: 'JetBrains Mono'; letter-spacing: 0;
+    display: flex; flex-direction: column; gap: 4px; text-align: right;
+  }
+  .ref b { color: var(--t-1); font-weight: 500; }
+
+  .grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    min-height: 0;
+  }
+
+  .cell {
+    position: relative;
+    display: flex; flex-direction: column;
+    border-radius: 24px;
+    overflow: hidden;
+    background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
+    border: 1px solid rgba(255,255,255,0.12);
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    box-shadow: 0 30px 60px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+
+  .cell .stage-area {
+    flex: 1;
+    display: grid; place-items: center;
+    position: relative;
+    min-height: 0;
+  }
+
+  .cell .orb-overlay {
+    width: 320px; height: 320px;
+  }
+  .cell .orb-overlay::before { inset: 10%; }
+
+  .cell .caption {
+    padding: 18px 20px 20px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    background: rgba(0,0,0,0.18);
+  }
+  .cell .phase {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+    color: var(--t-3); text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .cell .phase .d { width: 6px; height: 6px; border-radius: 50%; background: var(--orb-accent); }
+  .cell .phase .d.listening { background: #8affc7; box-shadow: 0 0 8px #8affc7; }
+  .cell .phase .d.thinking  { background: #ffd2a6; box-shadow: 0 0 8px #ffd2a6; }
+  .cell .phase .d.speaking  { background: #fff;    box-shadow: 0 0 8px #fff; }
+  .cell .phase .d.idle      { background: rgba(255,255,255,0.4); }
+
+  .cell .name {
+    font-size: 20px; font-weight: 600; letter-spacing: -0.02em;
+    margin-bottom: 10px;
+  }
+  .cell .body {
+    font-size: 12px; color: var(--t-2); line-height: 1.55;
+  }
+  .cell .body code {
+    font-family: 'JetBrains Mono'; font-size: 11px;
+    padding: 1px 5px; border-radius: 3px;
+    background: rgba(255,255,255,0.08); color: var(--t-1);
+  }
+  .cell .math {
+    margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08);
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .cell .math .row {
+    font-family: 'JetBrains Mono'; font-size: 10.5px; color: var(--t-3);
+    display: flex; justify-content: space-between; gap: 10px;
+  }
+  .cell .math .row b { color: var(--t-1); font-weight: 500; }
+
+  /* Footnote */
+  .footnote {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 22px;
+    background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 999px;
+    font-size: 12px; color: var(--t-3);
+  }
+  .footnote b { color: var(--t-1); font-family: 'JetBrains Mono'; font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="wallpaper"></div>
+<div class="vignette"></div>
+
+<div class="page">
+
+  <div class="page-head">
+    <div class="lead">
+      <h1>Voice orb · 4 phase states</h1>
+      <p class="sub">The orb is BLADE's presence. Math lifted from <code>openclaw/TalkOverlayView.swift</code>: ring speed, amplitude, and alpha change per phase; orb core breathes with mic level when listening and pulses at 6&nbsp;Hz when speaking.</p>
+    </div>
+    <div class="ref">
+      <span>OpenClaw reference</span>
+      <span>overlay <b>440&nbsp;px</b> · core <b>96&nbsp;px</b></span>
+      <span>stroke <b>1.6&nbsp;px</b> · rings ×3 · stagger <b>0.28</b></span>
+      <span>RMS smoothing <b>0.45·prev + 0.55·new</b></span>
+      <span>UI throttle <b>12&nbsp;fps</b> (83&nbsp;ms)</span>
+    </div>
+  </div>
+
+  <div class="grid">
+
+    <!-- IDLE ------------------------------------------------------- -->
+    <div class="cell">
+      <div class="stage-area">
+        <div class="orb-overlay" data-phase="idle">
+          <svg class="orb-rings" viewBox="-220 -220 440 440">
+            <circle class="ring ring-0" cx="0" cy="0" r="90"/>
+            <circle class="ring ring-1" cx="0" cy="0" r="90"/>
+            <circle class="ring ring-2" cx="0" cy="0" r="90"/>
+          </svg>
+          <svg class="orb-arcs" viewBox="-220 -220 440 440">
+            <circle class="arc arc-1" cx="0" cy="0" r="70"/>
+            <circle class="arc arc-2" cx="0" cy="0" r="70"/>
+          </svg>
+          <div class="orb-core"></div>
+        </div>
+      </div>
+      <div class="caption">
+        <div class="phase"><span class="d idle"></span>Phase · Idle</div>
+        <div class="name">Resting</div>
+        <div class="body">No mic. Orb barely breathes. Rings drift slowly at low alpha. BLADE is present but not listening.</div>
+        <div class="math">
+          <div class="row"><span>ring speed</span><b>0.6</b></div>
+          <div class="row"><span>amplitude</span><b>0.35</b></div>
+          <div class="row"><span>alpha</span><b>0.40</b></div>
+          <div class="row"><span>orb scale</span><b>1.00</b></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LISTENING -------------------------------------------------- -->
+    <div class="cell">
+      <div class="stage-area">
+        <div class="orb-overlay" data-phase="listening">
+          <svg class="orb-rings" viewBox="-220 -220 440 440">
+            <circle class="ring ring-0" cx="0" cy="0" r="90"/>
+            <circle class="ring ring-1" cx="0" cy="0" r="90"/>
+            <circle class="ring ring-2" cx="0" cy="0" r="90"/>
+          </svg>
+          <svg class="orb-arcs" viewBox="-220 -220 440 440">
+            <circle class="arc arc-1" cx="0" cy="0" r="70"/>
+            <circle class="arc arc-2" cx="0" cy="0" r="70"/>
+          </svg>
+          <div class="orb-core"></div>
+        </div>
+      </div>
+      <div class="caption">
+        <div class="phase"><span class="d listening"></span>Phase · Listening</div>
+        <div class="name">Hearing you</div>
+        <div class="body">Rings expand with mic level. Orb scale <code>1 + level × 0.12</code> breathes with voice. Accent warms slightly — tactile confirmation.</div>
+        <div class="math">
+          <div class="row"><span>ring speed</span><b>0.9</b></div>
+          <div class="row"><span>amplitude</span><b>0.5 + level·0.7</b></div>
+          <div class="row"><span>alpha</span><b>0.58 + level·0.28</b></div>
+          <div class="row"><span>orb scale</span><b>1 + level·0.12</b></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- THINKING --------------------------------------------------- -->
+    <div class="cell">
+      <div class="stage-area">
+        <div class="orb-overlay" data-phase="thinking">
+          <svg class="orb-rings" viewBox="-220 -220 440 440">
+            <circle class="ring ring-0" cx="0" cy="0" r="90"/>
+            <circle class="ring ring-1" cx="0" cy="0" r="90"/>
+            <circle class="ring ring-2" cx="0" cy="0" r="90"/>
+          </svg>
+          <svg class="orb-arcs" viewBox="-220 -220 440 440">
+            <circle class="arc arc-1" cx="0" cy="0" r="70"/>
+            <circle class="arc arc-2" cx="0" cy="0" r="70"/>
+          </svg>
+          <div class="orb-core"></div>
+        </div>
+      </div>
+      <div class="caption">
+        <div class="phase"><span class="d thinking"></span>Phase · Thinking</div>
+        <div class="name">Working on it</div>
+        <div class="body">Two counter-rotating arcs overlay the orb. Rings drop to idle speed — signals processing, not listening.</div>
+        <div class="math">
+          <div class="row"><span>arc 1</span><b>+42°/s · trim 0.08→0.26</b></div>
+          <div class="row"><span>arc 2</span><b>−35°/s · trim 0.62→0.86</b></div>
+          <div class="row"><span>ring speed</span><b>0.6</b></div>
+          <div class="row"><span>orb scale</span><b>1.00</b></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SPEAKING --------------------------------------------------- -->
+    <div class="cell">
+      <div class="stage-area">
+        <div class="orb-overlay" data-phase="speaking">
+          <svg class="orb-rings" viewBox="-220 -220 440 440">
+            <circle class="ring ring-0" cx="0" cy="0" r="90"/>
+            <circle class="ring ring-1" cx="0" cy="0" r="90"/>
+            <circle class="ring ring-2" cx="0" cy="0" r="90"/>
+          </svg>
+          <svg class="orb-arcs" viewBox="-220 -220 440 440">
+            <circle class="arc arc-1" cx="0" cy="0" r="70"/>
+            <circle class="arc arc-2" cx="0" cy="0" r="70"/>
+          </svg>
+          <div class="orb-core"></div>
+        </div>
+      </div>
+      <div class="caption">
+        <div class="phase"><span class="d speaking"></span>Phase · Speaking</div>
+        <div class="name">Replying</div>
+        <div class="body">Orb pulses at 6&nbsp;Hz — <code>1 + 0.06 × sin(t·6)</code>. Rings run fast and wide. Brightest moment.</div>
+        <div class="math">
+          <div class="row"><span>ring speed</span><b>1.4</b></div>
+          <div class="row"><span>amplitude</span><b>0.95</b></div>
+          <div class="row"><span>alpha</span><b>0.72</b></div>
+          <div class="row"><span>orb scale</span><b>1 + 0.06·sin(t·6)</b></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footnote">
+    <div>Transitions · phase changes cross-fade over <b>180&nbsp;ms</b> easeOut. Window: <b>NSPanel</b> non-activating, borderless, transparent · level <b>popUpMenu−4</b>.</div>
+    <div>Open in app: <b>Ctrl&nbsp;Shift&nbsp;B</b> · "Hey BLADE" wake word · content-protected.</div>
+  </div>
+
+</div>
+
+<script>window.PROTO_CURRENT = 'voice-orb-states.html';</script>
+<script src="proto.js"></script>
+</body>
+</html>

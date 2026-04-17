@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>BLADE — Dashboard</title>
+<link rel="stylesheet" href="shared.css"/>
+<link rel="stylesheet" href="_parts.css"/>
+<link rel="stylesheet" href="proto.css"/>
+</head>
+<body>
+<div class="wallpaper"></div>
+<div class="vignette"></div>
+<div class="stage">
+
+  <!-- NAV RAIL -->
+  <aside class="nav-rail glass">
+    <div class="nav-logo">B</div>
+    <a href="dashboard.html" class="nav-item active hotspot" title="Home">
+      <svg class="icon-svg" viewBox="0 0 24 24"><path d="M3 10l9-7 9 7v10a2 2 0 0 1-2 2h-4v-7h-6v7H5a2 2 0 0 1-2-2V10z"/></svg>
+    </a>
+    <a href="dashboard-chat.html" class="nav-item hotspot" title="Chat">
+      <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    </a>
+    <a href="index.html" class="nav-item hotspot" title="Hive">
+      <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>
+    </a>
+    <a href="index.html" class="nav-item hotspot" title="Calendar">
+      <svg class="icon-svg" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>
+    </a>
+    <a href="index.html" class="nav-item hotspot" title="Files">
+      <svg class="icon-svg" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+    </a>
+    <a href="settings.html" class="nav-item hotspot" title="Settings">
+      <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </a>
+    <div class="nav-spacer"></div>
+    <div class="nav-avatar" title="Arnav">A</div>
+  </aside>
+
+  <!-- SHELL -->
+  <div class="shell">
+
+    <!-- TOP BAR -->
+    <div class="topbar glass">
+      <div class="hello">
+        Good afternoon, Arnav. <span class="t-2">Here's where you are.</span>
+      </div>
+      <a href="quickask.html" class="search-pill hotspot" style="text-decoration:none;">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        Ask BLADE, or search everything…
+        <span class="k">⌘ K</span>
+      </a>
+      <div class="meta">
+        <span class="mono">3:47 PM</span>
+        <span class="dot"></span>
+        <span>Fri, Apr 17</span>
+        <span class="dot"></span>
+        <span style="color:#8affc7">● Online</span>
+      </div>
+      <div class="top-actions">
+        <button class="btn icon" title="Notifications">
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- MAIN GRID -->
+    <div class="main">
+
+      <!-- LEFT COL -->
+      <div class="col-l">
+
+        <!-- RIGHT NOW (hero) -->
+        <div class="card glass right-now">
+          <div class="card-head">
+            <div class="label"><span class="lg-dot"></span>Right Now · Focus</div>
+            <div class="action">Timeline <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+          </div>
+
+          <div class="rn-head">
+            <div class="app-icon">VS</div>
+            <div class="rn-meta">
+              <div class="title">Styling the chat side panel</div>
+              <div class="sub">
+                VS Code · <span class="pth">~/blade/src/components/ChatPanel.tsx</span> · branch <span class="pth">design/liquid-glass</span>
+              </div>
+            </div>
+            <div class="rn-time">
+              <div class="big">47<span style="font-size:16px;color:var(--t-3);margin-left:2px">m</span></div>
+              <div class="tag">in flow</div>
+            </div>
+          </div>
+
+          <div class="rn-quote">
+            <b>BLADE noticed</b> — you've shipped 3 components in the last hour and skipped lunch. Your wrists are probably tired. Want me to queue a 12-minute break and draft your commit checkpoint?
+          </div>
+
+          <div class="rn-stats">
+            <div class="rn-stat">
+              <div class="lbl">Focus</div>
+              <div class="val"><span class="n">92</span><span class="u">/100</span></div>
+              <div class="bar ok"><span style="width:92%"></span></div>
+            </div>
+            <div class="rn-stat">
+              <div class="lbl">Keystrokes</div>
+              <div class="val"><span class="n">4,218</span><span class="u">last hour</span></div>
+              <div class="bar warm"><span style="width:78%"></span></div>
+            </div>
+            <div class="rn-stat">
+              <div class="lbl">Since commit</div>
+              <div class="val"><span class="n">22</span><span class="u">min</span></div>
+              <div class="bar cool"><span style="width:44%"></span></div>
+            </div>
+          </div>
+
+          <div class="rn-actions">
+            <div class="chip-action">
+              <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+              Commit checkpoint
+            </div>
+            <div class="chip-action">
+              <svg viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.9l-6.2 4.4 2.4-7.4L2 9.4h7.6z"/></svg>
+              Summarize session
+            </div>
+            <div class="chip-action">
+              <svg viewBox="0 0 24 24"><path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="9"/></svg>
+              Break in 12 min
+            </div>
+            <div class="chip-action">
+              <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-3"/><polyline points="12 14 8 10 12 6"/><path d="M8 10h10"/></svg>
+              Switch context
+            </div>
+          </div>
+        </div>
+
+        <!-- BOTTOM ROW -->
+        <div class="bottom">
+
+          <!-- NEXT UP -->
+          <div class="card glass calendar">
+            <div class="card-head">
+              <div class="label">Next Up · Today</div>
+              <div class="action">This week <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+            </div>
+            <div class="date-head">
+              <div class="d">17</div>
+              <div class="m">Friday, April</div>
+            </div>
+            <div class="events">
+              <div class="evt hot">
+                <div class="time"><div class="start">4:15 PM</div><div class="end">→ 4:45 PM</div></div>
+                <div class="body">
+                  <div class="t">Federico · Solana Frontier check-in</div>
+                  <div class="s">
+                    <span>in 28 min</span>
+                    <span class="attendees"><span class="a">F</span><span class="a">A</span></span>
+                    <span>Google Meet</span>
+                  </div>
+                </div>
+              </div>
+              <div class="evt soon">
+                <div class="time"><div class="start">6:00 PM</div><div class="end">→ 6:30 PM</div></div>
+                <div class="body">
+                  <div class="t">Design review — BLADE dashboard</div>
+                  <div class="s"><span>2h 13m away</span><span class="attendees"><span class="a">S</span><span class="a">A</span></span></div>
+                </div>
+              </div>
+              <div class="evt">
+                <div class="time"><div class="start">9:30 PM</div><div class="end">→ 10:00 PM</div></div>
+                <div class="body">
+                  <div class="t">Staq · Play Store submission window</div>
+                  <div class="s"><span>solo · reminder</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- INTEGRATIONS -->
+          <div class="card glass integrations">
+            <div class="card-head">
+              <div class="label">Integrations · 8 connected</div>
+              <div class="action">Manage <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+            </div>
+            <div class="int-grid">
+              <div class="int"><div class="ic gmail">M</div><div class="int-info"><div class="n">Gmail</div><div class="s">3 unread · 1 draft</div></div><div class="ind live"></div></div>
+              <div class="int"><div class="ic cal">C</div><div class="int-info"><div class="n">Calendar</div><div class="s">3 today</div></div><div class="ind live"></div></div>
+              <div class="int"><div class="ic slack">S</div><div class="int-info"><div class="n">Slack</div><div class="s">1 mention</div></div><div class="ind live"></div></div>
+              <div class="int"><div class="ic gh">⎇</div><div class="int-info"><div class="n">GitHub</div><div class="s">2 PRs open</div></div><div class="ind live"></div></div>
+              <div class="int"><div class="ic lin">L</div><div class="int-info"><div class="n">Linear</div><div class="s">7 in cycle</div></div><div class="ind live"></div></div>
+              <div class="int"><div class="ic fig">F</div><div class="int-info"><div class="n">Figma</div><div class="s">1 comment</div></div><div class="ind warn"></div></div>
+              <div class="int"><div class="ic not">N</div><div class="int-info"><div class="n">Notion</div><div class="s">synced 4m</div></div><div class="ind live"></div></div>
+              <div class="int"><div class="ic stripe">$</div><div class="int-info"><div class="n">Stripe</div><div class="s">not connected</div></div><div class="ind off"></div></div>
+            </div>
+            <div style="margin-top:auto;display:flex;justify-content:space-between;align-items:center;padding-top:14px;border-top:1px solid var(--line);font-size:12px;color:var(--t-3);">
+              <span>Last synced <b class="mono t-2">4m ago</b></span>
+              <span>+ Add MCP server</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT COL — HIVE PULSE -->
+      <div class="card glass hive">
+        <div class="card-head">
+          <div class="label"><span class="lg-dot"></span>Hive Pulse · 10 tentacles</div>
+          <div class="action">View all <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+        </div>
+
+        <div class="tentacles">
+          <div class="t-cell"><div class="t-dot live">✉</div><div class="t-name">Mail</div><span class="t-n">28</span></div>
+          <div class="t-cell"><div class="t-dot live">◫</div><div class="t-name">Calendar</div><span class="t-n">3</span></div>
+          <div class="t-cell"><div class="t-dot live">#</div><div class="t-name">Slack</div><span class="t-n">17</span></div>
+          <div class="t-cell"><div class="t-dot live">⎇</div><div class="t-name">GitHub</div><span class="t-n">9</span></div>
+          <div class="t-cell"><div class="t-dot live">◎</div><div class="t-name">Linear</div><span class="t-n">12</span></div>
+          <div class="t-cell"><div class="t-dot warn">◈</div><div class="t-name">Figma</div><span class="t-n">1</span></div>
+          <div class="t-cell"><div class="t-dot live">▤</div><div class="t-name">Notion</div><span class="t-n">4</span></div>
+          <div class="t-cell"><div class="t-dot live">$</div><div class="t-name">Stripe</div><span class="t-n">7</span></div>
+          <div class="t-cell"><div class="t-dot live">▸</div><div class="t-name">Shell</div><span class="t-n">41</span></div>
+          <div class="t-cell"><div class="t-dot live">◐</div><div class="t-name">Browser</div><span class="t-n">20</span></div>
+        </div>
+
+        <div class="signal-feed">
+          <div class="feed-label">
+            <span>Signal feed · last 12 minutes</span>
+            <span class="mono" style="color:var(--t-2)">live</span>
+          </div>
+
+          <div class="signal-row">
+            <div class="t">3:44</div>
+            <div class="src gh">GitHub</div>
+            <div class="msg"><b>Federico</b> approved PR <span class="mono t-2">#84</span> · <span class="q">"LGTM, merge when ready."</span></div>
+          </div>
+          <div class="signal-row">
+            <div class="t">3:40</div>
+            <div class="src mail">Mail</div>
+            <div class="msg">Anthropic billing — <span class="q">April invoice $118.20 charged.</span> Filed under Receipts.</div>
+          </div>
+          <div class="signal-row">
+            <div class="t">3:36</div>
+            <div class="src slack">Slack</div>
+            <div class="msg"><b>Simran</b> in #design — <span class="q">"can you drop a preview of the new glass treatment?"</span></div>
+          </div>
+          <div class="signal-row">
+            <div class="t">3:28</div>
+            <div class="src cal">Cal</div>
+            <div class="msg">Tomorrow 10am with Play Store review call <b>auto-accepted</b> (you're free).</div>
+          </div>
+          <div class="signal-row">
+            <div class="t">3:22</div>
+            <div class="src gh">GitHub</div>
+            <div class="msg">Build <span class="mono t-2">release-0.6.2</span> passed on all 3 platforms · 4m 12s.</div>
+          </div>
+          <div class="signal-row">
+            <div class="t">3:15</div>
+            <div class="src mail">Mail</div>
+            <div class="msg"><b>Rohan @ Razorpay</b> — <span class="q">"activation docs received, review in 48h."</span> Draft reply ready.</div>
+          </div>
+        </div>
+
+        <div class="hive-footer">
+          <div class="stat"><b>142</b> signals today · <b style="color:#ffc48a">3</b> flagged · <b>0</b> asks</div>
+          <div class="chip-action" style="padding:6px 12px">
+            <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:1.8"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            Open Hive
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- FAB -->
+  <a href="dashboard-chat.html" class="fab hotspot primary-cta" title="Open chat">
+    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#1a0b2a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+  </a>
+
+</div>
+<script>window.PROTO_CURRENT = 'dashboard.html'; window.PROTO_POSITION = 'top-right';</script>
+<script src="proto.js"></script>
+<script>
+  // Dashboard-only keyboard: ⌘K / Ctrl+K → QuickAsk
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault(); location.href = 'quickask.html';
+    }
+  });
+</script>
+</body>
+</html>

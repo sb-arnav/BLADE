@@ -1,0 +1,235 @@
+/* ===================================================================
+   Prototype chrome — floating flow bar, keyboard hints, cursor polish.
+   Plus Apple-HIG refinements applied over shared.css.
+   =================================================================== */
+
+/* ---------- HIG harmony overrides (strict 8pt grid) ------------------
+   Apple's iOS corner radii: 8 / 10 / 13 / 14 / 16 / 20 / 28 / 40.
+   Spacing scale: 4-multiples, default 8pt snap.
+   Type scale: SF Pro Text / Display equivalents.
+   -------------------------------------------------------------------- */
+:root {
+  --r-xs: 8px;
+  --r-sm: 10px;
+  --r-md: 16px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-2xl: 40px;
+
+  /* SF Pro Text/Display scale, px */
+  --fs-large-title: 34px;
+  --fs-title-1: 28px;
+  --fs-title-2: 22px;
+  --fs-title-3: 20px;
+  --fs-headline: 17px;
+  --fs-body: 15px;
+  --fs-callout: 14px;
+  --fs-subhead: 13px;
+  --fs-footnote: 12px;
+  --fs-caption: 11px;
+}
+
+/* Stronger text rendering tweaks — tighter like SF Pro */
+body {
+  font-feature-settings: 'cv11', 'ss01', 'ss03', 'tnum';
+  letter-spacing: -0.011em;
+}
+
+/* ---------- Prototype flow bar -------------------------------------- */
+.proto-bar {
+  position: fixed; left: 24px; bottom: 24px;
+  z-index: 200;
+  display: flex; align-items: center; gap: 4px;
+  padding: 6px;
+  background: rgba(10, 10, 20, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45),
+              inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* Hide proto bar on the ambient strip's side — but dashboard has strip at bottom,
+   so put proto bar top-right on dashboard-like pages. Override per page with .proto-bar.top-right */
+.proto-bar.top-right {
+  left: auto; right: 24px; top: 24px; bottom: auto;
+}
+
+.pb-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 12px;
+  border: none; background: transparent;
+  color: inherit; font: inherit; font-size: 12px; font-weight: 500;
+  border-radius: 999px; cursor: pointer;
+  text-decoration: none;
+  transition: background 140ms ease, color 140ms ease;
+  letter-spacing: -0.005em;
+}
+.pb-btn:hover { background: rgba(255, 255, 255, 0.10); color: #fff; }
+.pb-btn[aria-disabled="true"] { opacity: 0.35; pointer-events: none; }
+
+.pb-btn svg {
+  width: 13px; height: 13px;
+  stroke: currentColor; fill: none; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+.pb-label {
+  padding: 0 12px 0 14px;
+  font-size: 11px; font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  border-left: 1px solid rgba(255, 255, 255, 0.10);
+  margin-left: 2px;
+  height: 20px; display: flex; align-items: center;
+}
+.pb-label .screen { color: #fff; margin-left: 6px; text-transform: none; letter-spacing: -0.005em; font-weight: 500; font-size: 12px; }
+
+.pb-divider { width: 1px; height: 16px; background: rgba(255,255,255,0.10); margin: 0 2px; }
+
+.pb-kbd {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px; padding: 2px 6px; border-radius: 4px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.75); font-weight: 600;
+}
+
+/* ---------- Hotspot targets ---------------------------------------- */
+a.hotspot, button.hotspot { text-decoration: none; color: inherit; cursor: pointer; outline: none; }
+a.hotspot:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.6); outline-offset: 3px; border-radius: inherit; }
+
+/* Subtle pulse on the first hotspot to hint interactivity, once */
+@keyframes hotspot-hint {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+  50%      { box-shadow: 0 0 0 6px rgba(255,255,255,0.12); }
+}
+.hotspot.primary-cta:not(:hover) {
+  animation: hotspot-hint 2.4s ease-in-out 1s 3;
+}
+
+/* ---------- Micro-interactions, consistent ------------------------- */
+.glass, .btn, .chip-action, .chip, .vault-item, .provider, .evt, .int, .qa-row, .side-item {
+  transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+              box-shadow 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+              background 180ms ease;
+}
+
+/* Button press — Apple-feel tap down */
+.btn:active, .chip-action:active, .pb-btn:active { transform: translateY(0.5px) scale(0.985); }
+
+/* ---------- 8pt grid debug overlay (togglable) --------------------- */
+body.grid-on::after {
+  content: '';
+  position: fixed; inset: 0; z-index: 999; pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px);
+  background-size: 8px 8px;
+  mix-blend-mode: overlay;
+}
+
+/* ---------- Print/export helper — hide proto chrome in screenshots -- */
+body.shoot .proto-bar,
+body.shoot [data-proto-only] { display: none !important; }
+
+/* ===================================================================
+   HIG POLISH LAYER — Hierarchy, Harmony, Consistency.
+   Applied over the baseline design to strip noise and let content lead.
+   =================================================================== */
+
+/* --- Onboarding: 3-pill step indicator → 3 dots + label ------------- */
+.onb-steps {
+  gap: 6px !important;
+  padding: 6px 14px 6px 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 999px;
+  backdrop-filter: blur(20px) saturate(160%);
+}
+.onb-steps .step-divider { display: none !important; }
+.onb-steps .step-pill {
+  background: transparent !important;
+  border: none !important;
+  padding: 4px 2px !important;
+  color: var(--t-4) !important;
+  font-size: 11px !important;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+.onb-steps .step-pill .num {
+  width: 8px !important; height: 8px !important; min-width: 8px;
+  font-size: 0 !important;
+  background: rgba(255,255,255,0.22) !important;
+  border: none !important;
+  background-image: none !important;
+  color: transparent !important;
+  border-radius: 50% !important;
+  padding: 0 !important;
+}
+.onb-steps .step-pill.active .num {
+  background: #fff !important;
+  box-shadow: 0 0 10px rgba(255,255,255,0.6);
+}
+.onb-steps .step-pill.done .num {
+  background: rgba(255,255,255,0.55) !important;
+}
+.onb-steps .step-pill.active { color: var(--t-1) !important; }
+.onb-steps .step-pill.done { color: var(--t-3) !important; }
+
+/* --- Onboarding-02: drop capability chip row (noise, reveal later) -- */
+.pill-row { display: none !important; }
+.status .s-meta { font-size: 10px !important; }
+
+/* --- Dashboard: hormone bars off ambient strip (hero = whisper) ----- */
+.ambient .hormones { display: none !important; }
+.ambient .whisper { margin-left: auto; }
+
+/* --- Dashboard: reduce Right Now action chips from 4 → 2 (Apple rule: primary + one) */
+.rn-actions .chip-action:nth-child(n+3) { display: none !important; }
+.rn-actions .chip-action:first-child {
+  background: rgba(255,255,255,0.95) !important;
+  color: #1a0b2a !important;
+  border-color: rgba(255,255,255,0.3) !important;
+  box-shadow: inset 0 1px 0 #fff, 0 6px 14px rgba(0,0,0,0.25);
+}
+.rn-actions .chip-action:first-child svg { color: #1a0b2a; opacity: 1; }
+
+/* --- Settings vault: collapse to pure list row (Apple Settings feel) - */
+.vault-item { padding: 14px 16px !important; gap: 14px !important; }
+.v-models { display: none !important; }  /* models → subtle text under name, see below */
+.v-info .m { display: flex !important; align-items: center; gap: 8px; }
+.vault-item::after {
+  content: '›';
+  color: var(--t-4);
+  font-size: 22px;
+  font-weight: 300;
+  margin-left: 4px;
+  padding-right: 4px;
+  line-height: 1;
+}
+.v-actions { display: none !important; }  /* hide 3 tiny icon buttons — disclosure reveals */
+.v-info { flex: 1; min-width: 0 !important; }
+
+/* --- Settings: tighten smart-paste visual noise ---------------------- */
+.paste { border-style: solid !important; border-color: rgba(255,255,255,0.14) !important; }
+
+/* --- QuickAsk: one result group is enough; hide "Files & context" --- */
+.qa-results .qa-group-label:nth-of-type(3),
+.qa-results .qa-group-label:nth-of-type(3) ~ .qa-row { display: none; }
+
+/* --- Hotspot / link-styled elements should lose underline ----------- */
+a.nav-item, a.search-pill, a.fab, a.icon-btn, a.chip-action, a.provider, a.vault-item {
+  text-decoration: none; color: inherit;
+}
+
+/* --- Tighten focus ring (Apple uses soft outer glow, not hard line) - */
+a.hotspot:focus-visible,
+button.hotspot:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.35), 0 0 0 1px rgba(255,255,255,0.6) inset !important;
+}
+
