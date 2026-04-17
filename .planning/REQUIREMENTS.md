@@ -297,32 +297,34 @@ Populated by `/gsd-roadmapper` during roadmap creation. Each v1 requirement maps
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUND-01 through FOUND-11 | TBD | Pending |
-| WIN-01 through WIN-09 | TBD | Pending |
-| ONBD-01 through ONBD-06 | TBD | Pending |
-| SHELL-01 through SHELL-07 | TBD | Pending |
-| DASH-01 through DASH-08 | TBD | Pending |
-| CHAT-01 through CHAT-10 | TBD | Pending |
-| QUICK-01 through QUICK-07 | TBD | Pending |
-| ORB-01 through ORB-08 | TBD | Pending |
-| GHOST-01 through GHOST-08 | TBD | Pending |
-| HUD-01 through HUD-05 | TBD | Pending |
-| SET-01 through SET-10 | TBD | Pending |
-| AGENT-01 through AGENT-10 | TBD | Pending |
-| KNOW-01 through KNOW-10 | TBD | Pending |
-| LIFE-01 through LIFE-10 | TBD | Pending |
-| IDEN-01 through IDEN-09 | TBD | Pending |
-| DEV-01 through DEV-11 | TBD | Pending |
-| ADMIN-01 through ADMIN-10 | TBD | Pending |
-| BODY-01 through BODY-07 | TBD | Pending |
-| HIVE-01 through HIVE-06 | TBD | Pending |
-| POL-01 through POL-10 | TBD | Pending |
-| WIRE-01 through WIRE-08 | TBD | Pending |
+| FOUND-01 through FOUND-11 | Phase 1 — Foundation | Pending |
+| WIN-01 through WIN-09 | Phase 1 — Foundation | Pending |
+| WIRE-08 | Phase 1 — Foundation | Pending |
+| ONBD-01 through ONBD-06 | Phase 2 — Onboarding + Main Shell | Pending |
+| SHELL-01 through SHELL-07 | Phase 2 — Onboarding + Main Shell | Pending |
+| DASH-01 through DASH-08 | Phase 3 — Dashboard + Chat + Settings | Pending |
+| CHAT-01 through CHAT-10 | Phase 3 — Dashboard + Chat + Settings | Pending |
+| SET-01 through SET-10 | Phase 3 — Dashboard + Chat + Settings | Pending |
+| WIRE-01 through WIRE-06 | Phase 3 — Dashboard + Chat + Settings | Pending |
+| QUICK-01 through QUICK-07 | Phase 4 — Overlay Windows | Pending |
+| ORB-01 through ORB-08 | Phase 4 — Overlay Windows | Pending |
+| GHOST-01 through GHOST-08 | Phase 4 — Overlay Windows | Pending |
+| HUD-01 through HUD-05 | Phase 4 — Overlay Windows | Pending |
+| WIRE-07 | Phase 4 — Overlay Windows | Pending |
+| AGENT-01 through AGENT-10 | Phase 5 — Agents + Knowledge | Pending |
+| KNOW-01 through KNOW-10 | Phase 5 — Agents + Knowledge | Pending |
+| LIFE-01 through LIFE-10 | Phase 6 — Life OS + Identity | Pending |
+| IDEN-01 through IDEN-09 | Phase 6 — Life OS + Identity | Pending |
+| DEV-01 through DEV-11 | Phase 7 — Dev Tools + Admin | Pending |
+| ADMIN-01 through ADMIN-10 | Phase 7 — Dev Tools + Admin | Pending |
+| BODY-01 through BODY-07 | Phase 8 — Body Visualization + Hive Mesh | Pending |
+| HIVE-01 through HIVE-06 | Phase 8 — Body Visualization + Hive Mesh | Pending |
+| POL-01 through POL-10 | Phase 9 — Polish Pass | Pending |
 
 **Coverage:**
 - v1 requirements: **156 total** across 21 categories
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 156 ⚠️ (to be resolved by roadmapper)
+- Mapped to phases: **156/156** ✓
+- Unmapped: 0 ✓ (roadmap complete 2026-04-17)
 
 ---
 *Requirements defined: 2026-04-17*
