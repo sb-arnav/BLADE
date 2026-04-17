@@ -753,11 +753,16 @@ async fn process_voice_turn_with_history(
         // Pass the conversation history so BLADE has context across voice turns.
         // Without this, every voice turn is stateless and BLADE can't refer to
         // anything said earlier in the conversation.
-        let history_json: Vec<serde_json::Value> = history_owned.iter().map(|m| {
-            serde_json::json!({
-                "role": m.role,
-                "content": m.content,
-            })
+        let history_json: Vec<serde_json::Value> = history_owned.iter().filter_map(|m| {
+            match m {
+                crate::providers::ConversationMessage::User(text) => Some(serde_json::json!({
+                    "role": "user", "content": text,
+                })),
+                crate::providers::ConversationMessage::Assistant { content, .. } => Some(serde_json::json!({
+                    "role": "assistant", "content": content,
+                })),
+                _ => None, // Skip system/tool/image messages — voice conv history is text-only
+            }
         }).collect();
         let _ = app_send.emit("voice_chat_submit", serde_json::json!({
             "content": user_text_owned,
