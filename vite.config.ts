@@ -1,32 +1,46 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import tailwindcss from "@tailwindcss/vite";
-import { resolve } from "node:path";
+import { resolve } from "path";
 
-// Port 1420 must match src-tauri/tauri.conf.json → build.devUrl.
-// Each entry is a separate Tauri webview window created in src-tauri/src/lib.rs:
-//   index.html    → main window   (label: main)
-//   quickask.html → overlay pill   (label: quickask, 500×72, always-on-top)
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
-  clearScreen: false,
-  server: {
-    port: 1420,
-    strictPort: true,
-    host: "127.0.0.1",
-    hmr: { host: "127.0.0.1", port: 1421 },
-    watch: { ignored: ["**/src-tauri/**"] },
-  },
-  envPrefix: ["VITE_", "TAURI_ENV_*"],
+// @ts-expect-error process is a nodejs global
+const host = process.env.TAURI_DEV_HOST;
+
+// https://vite.dev/config/
+export default defineConfig(async () => ({
+  plugins: [react()],
+
+  // Multi-page: main window + quickask floating widget
   build: {
-    target: "chrome110",
-    minify: "esbuild",
-    sourcemap: false,
     rollupOptions: {
       input: {
         main: resolve(__dirname, "index.html"),
         quickask: resolve(__dirname, "quickask.html"),
+        overlay: resolve(__dirname, "overlay.html"),
+        hud: resolve(__dirname, "hud.html"),
+        ghost_overlay: resolve(__dirname, "ghost_overlay.html"),
       },
     },
   },
-});
+
+  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
+  //
+  // 1. prevent Vite from obscuring rust errors
+  clearScreen: false,
+  // 2. tauri expects a fixed port, fail if that port is not available
+  server: {
+    port: 1420,
+    strictPort: true,
+    host: host || false,
+    hmr: host
+      ? {
+          protocol: "ws",
+          host,
+          port: 1421,
+        }
+      : undefined,
+    watch: {
+      // 3. tell Vite to ignore watching `src-tauri`
+      ignored: ["**/src-tauri/**"],
+    },
+  },
+}));

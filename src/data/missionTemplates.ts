@@ -1,0 +1,478 @@
+// src/data/missionTemplates.ts
+// 20 built-in Mission DSL templates. Loaded at runtime and seeded into ~/.blade/missions/.
+
+import { MissionSpec } from "../types";
+
+export const BUILT_IN_TEMPLATES: MissionSpec[] = [
+  // ── Research & Intelligence ───────────────────────────────────────────────
+  {
+    id: "research-deep-dive",
+    title: "Deep Research Report",
+    description: "Research {{topic}} thoroughly and produce a structured markdown report.",
+    tags: ["research", "writing"],
+    builtIn: true,
+    inputVars: ["topic"],
+    stages: [
+      {
+        id: "s1",
+        title: "Web research",
+        goalTemplate: "Search the web exhaustively for information about {{topic}}. Collect sources, statistics, key facts, and expert opinions. Output a raw research dump.",
+        dependsOn: [],
+        runtimeHint: "tavily",
+      },
+      {
+        id: "s2",
+        title: "Synthesis",
+        goalTemplate: "Using the research gathered in the previous stage, write a detailed, structured markdown report on {{topic}}. Include: executive summary, key findings, analysis, and sources.",
+        dependsOn: ["s1"],
+        runtimeHint: "blade-native",
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "competitor-analysis",
+    title: "Competitor Analysis",
+    description: "Analyse {{competitor}} and compare against {{product}}.",
+    tags: ["research", "strategy"],
+    builtIn: true,
+    inputVars: ["competitor", "product"],
+    stages: [
+      {
+        id: "s1",
+        title: "Scrape competitor",
+        goalTemplate: "Visit {{competitor}}'s website and any public pages. Extract: pricing, key features, positioning, target market, unique claims, and weaknesses you can observe.",
+        dependsOn: [],
+        runtimeHint: "browser-use",
+      },
+      {
+        id: "s2",
+        title: "Comparison report",
+        goalTemplate: "Using the competitor data from stage 1, write a competitive analysis comparing {{competitor}} vs {{product}}. Include: side-by-side feature matrix, pricing comparison, positioning gaps, and actionable opportunities for {{product}}.",
+        dependsOn: ["s1"],
+        runtimeHint: "blade-native",
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "market-sizing",
+    title: "Market Sizing",
+    description: "Estimate the TAM/SAM/SOM for {{market}}.",
+    tags: ["research", "strategy"],
+    builtIn: true,
+    inputVars: ["market"],
+    stages: [
+      {
+        id: "s1",
+        title: "Data collection",
+        goalTemplate: "Search for market size data, industry reports, and analyst estimates for {{market}}. Find revenue figures, user counts, growth rates.",
+        dependsOn: [],
+        runtimeHint: "tavily",
+      },
+      {
+        id: "s2",
+        title: "Size the market",
+        goalTemplate: "Using collected data, calculate TAM (total addressable market), SAM (serviceable addressable market), and SOM (serviceable obtainable market) for {{market}}. Show workings, cite sources, give ranges not point estimates.",
+        dependsOn: ["s1"],
+        runtimeHint: "blade-native",
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+
+  // ── Code & Engineering ────────────────────────────────────────────────────
+  {
+    id: "code-feature",
+    title: "Build a Feature",
+    description: "Design and implement {{feature}} in the codebase at {{repo_path}}.",
+    tags: ["code", "engineering"],
+    builtIn: true,
+    inputVars: ["feature", "repo_path"],
+    stages: [
+      {
+        id: "s1",
+        title: "Explore & plan",
+        goalTemplate: "In the repo at {{repo_path}}, explore the existing codebase structure. Then write a detailed implementation plan for: {{feature}}. List files to create/modify, describe the approach, identify risks.",
+        dependsOn: [],
+        runtimeHint: "claude-code",
+      },
+      {
+        id: "s2",
+        title: "Implement",
+        goalTemplate: "Following the plan from stage 1, implement {{feature}} in {{repo_path}}. Write tests. Commit when done.",
+        dependsOn: ["s1"],
+        runtimeHint: "claude-code",
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "code-review",
+    title: "Code Review",
+    description: "Review the diff or PR at {{target}} for bugs, security issues, and quality.",
+    tags: ["code", "engineering"],
+    builtIn: true,
+    inputVars: ["target"],
+    stages: [
+      {
+        id: "s1",
+        title: "Review",
+        goalTemplate: "Review the code changes at {{target}}. Check for: bugs, security vulnerabilities (OWASP top 10), performance issues, code quality, test coverage gaps. Output a structured review with severity ratings.",
+        dependsOn: [],
+        runtimeHint: "claude-code",
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "refactor-module",
+    title: "Refactor Module",
+    description: "Refactor {{module_path}} for clarity and maintainability.",
+    tags: ["code", "engineering"],
+    builtIn: true,
+    inputVars: ["module_path"],
+    stages: [
+      {
+        id: "s1",
+        title: "Analyse",
+        goalTemplate: "Read {{module_path}} and identify: code smells, duplication, unclear naming, missing tests, coupling issues. Output a list of specific refactoring opportunities with justifications.",
+        dependsOn: [],
+        runtimeHint: "claude-code",
+      },
+      {
+        id: "s2",
+        title: "Refactor",
+        goalTemplate: "Apply the refactoring plan from stage 1 to {{module_path}}. Make changes incrementally. Ensure existing tests still pass. Do not change behaviour.",
+        dependsOn: ["s1"],
+        runtimeHint: "aider",
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "debug-issue",
+    title: "Debug & Fix Issue",
+    description: "Diagnose and fix {{issue}} in {{repo_path}}.",
+    tags: ["code", "debugging"],
+    builtIn: true,
+    inputVars: ["issue", "repo_path"],
+    stages: [
+      {
+        id: "s1",
+        title: "Diagnose",
+        goalTemplate: "In {{repo_path}}, diagnose the following issue: {{issue}}. Trace execution paths, identify the root cause, and explain why it happens.",
+        dependsOn: [],
+        runtimeHint: "claude-code",
+      },
+      {
+        id: "s2",
+        title: "Fix",
+        goalTemplate: "Apply the fix for the issue diagnosed in stage 1. Write a regression test. Commit the fix with a clear message.",
+        dependsOn: ["s1"],
+        runtimeHint: "claude-code",
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+
+  // ── Writing & Content ─────────────────────────────────────────────────────
+  {
+    id: "write-blog-post",
+    title: "Write Blog Post",
+    description: "Write a {{length}} blog post about {{topic}} for {{audience}}.",
+    tags: ["writing", "content"],
+    builtIn: true,
+    inputVars: ["topic", "audience", "length"],
+    stages: [
+      {
+        id: "s1",
+        title: "Outline",
+        goalTemplate: "Create a detailed outline for a {{length}} blog post about {{topic}} targeted at {{audience}}. Include: hook, key sections with subpoints, conclusion CTA.",
+        dependsOn: [],
+        runtimeHint: "blade-native",
+      },
+      {
+        id: "s2",
+        title: "Draft",
+        goalTemplate: "Write the full blog post following the outline from stage 1. Target audience: {{audience}}. Tone: engaging, authoritative. Include examples and specific details. Aim for {{length}}.",
+        dependsOn: ["s1"],
+        runtimeHint: "blade-native",
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "summarise-document",
+    title: "Summarise Document",
+    description: "Read and summarise the document at {{file_path}}.",
+    tags: ["writing", "productivity"],
+    builtIn: true,
+    inputVars: ["file_path"],
+    stages: [
+      {
+        id: "s1",
+        title: "Summarise",
+        goalTemplate: "Read the document at {{file_path}}. Produce: 1) a 3-sentence executive summary, 2) key points as bullet list, 3) action items if any, 4) open questions.",
+        dependsOn: [],
+        runtimeHint: "open-interpreter",
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "draft-email",
+    title: "Draft Email",
+    description: "Draft a {{tone}} email to {{recipient}} about {{subject}}.",
+    tags: ["writing", "productivity"],
+    builtIn: true,
+    inputVars: ["recipient", "subject", "tone"],
+    stages: [
+      {
+        id: "s1",
+        title: "Draft",
+        goalTemplate: "Write a {{tone}} email to {{recipient}} about: {{subject}}. Keep it concise, clear, and appropriately professional. Include subject line.",
+        dependsOn: [],
+        runtimeHint: "blade-native",
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+
+  // ── Web & Browser ─────────────────────────────────────────────────────────
+  {
+    id: "web-scrape-extract",
+    title: "Scrape & Extract Data",
+    description: "Scrape {{url}} and extract {{data_to_extract}}.",
+    tags: ["web", "data"],
+    builtIn: true,
+    inputVars: ["url", "data_to_extract"],
+    stages: [
+      {
+        id: "s1",
+        title: "Scrape",
+        goalTemplate: "Visit {{url}} and extract: {{data_to_extract}}. Handle pagination if necessary. Output as structured JSON.",
+        dependsOn: [],
+        runtimeHint: "browser-use",
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "monitor-price",
+    title: "Price Monitor",
+    description: "Check the current price of {{product}} on {{url}} and compare to {{target_price}}.",
+    tags: ["web", "monitoring"],
+    builtIn: true,
+    inputVars: ["product", "url", "target_price"],
+    stages: [
+      {
+        id: "s1",
+        title: "Check price",
+        goalTemplate: "Visit {{url}} and find the current price for {{product}}. Compare it to the target price of {{target_price}}. If current price ≤ target_price, say 'BUY NOW'. Output: current price, % difference from target, and recommendation.",
+        dependsOn: [],
+        runtimeHint: "browser-use",
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "news-digest",
+    title: "News Digest",
+    description: "Compile today's top news on {{topic}} into a digest.",
+    tags: ["research", "news"],
+    builtIn: true,
+    inputVars: ["topic"],
+    stages: [
+      {
+        id: "s1",
+        title: "Gather news",
+        goalTemplate: "Search for the latest news about {{topic}} from the past 24-48 hours. Find 5-10 significant stories with sources.",
+        dependsOn: [],
+        runtimeHint: "tavily",
+      },
+      {
+        id: "s2",
+        title: "Write digest",
+        goalTemplate: "Using the news gathered in stage 1, write a concise daily digest on {{topic}}. Format: brief intro, then one paragraph per story with key facts, sorted by importance.",
+        dependsOn: ["s1"],
+        runtimeHint: "blade-native",
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+
+  // ── System & Files ────────────────────────────────────────────────────────
+  {
+    id: "organise-files",
+    title: "Organise Files",
+    description: "Organise files in {{folder_path}} by {{strategy}}.",
+    tags: ["system", "files"],
+    builtIn: true,
+    inputVars: ["folder_path", "strategy"],
+    stages: [
+      {
+        id: "s1",
+        title: "Analyse folder",
+        goalTemplate: "List and analyse all files in {{folder_path}}. Identify file types, naming patterns, and suggest an organisation scheme based on strategy: {{strategy}}.",
+        dependsOn: [],
+        runtimeHint: "open-interpreter",
+      },
+      {
+        id: "s2",
+        title: "Reorganise",
+        goalTemplate: "Apply the organisation scheme from stage 1 to {{folder_path}}. Create subdirectories as needed. Move files. Log all changes made.",
+        dependsOn: ["s1"],
+        runtimeHint: "open-interpreter",
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "data-analysis",
+    title: "Data Analysis",
+    description: "Analyse the dataset at {{file_path}} and answer: {{question}}.",
+    tags: ["data", "analysis"],
+    builtIn: true,
+    inputVars: ["file_path", "question"],
+    stages: [
+      {
+        id: "s1",
+        title: "Explore data",
+        goalTemplate: "Load the dataset at {{file_path}}. Describe its structure: columns, types, row count, missing values, distributions. Output a data profile.",
+        dependsOn: [],
+        runtimeHint: "open-interpreter",
+      },
+      {
+        id: "s2",
+        title: "Answer question",
+        goalTemplate: "Using the dataset from {{file_path}}, answer this question with data: {{question}}. Show code, calculations, and visualise if helpful. Interpret the results in plain language.",
+        dependsOn: ["s1"],
+        runtimeHint: "open-interpreter",
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+
+  // ── Strategy & Planning ───────────────────────────────────────────────────
+  {
+    id: "business-plan",
+    title: "Business Plan",
+    description: "Write a lean business plan for {{idea}}.",
+    tags: ["strategy", "writing"],
+    builtIn: true,
+    inputVars: ["idea"],
+    stages: [
+      {
+        id: "s1",
+        title: "Validate idea",
+        goalTemplate: "Research and validate the business idea: {{idea}}. Analyse: market demand, existing competitors, target customer, potential business models, and key risks.",
+        dependsOn: [],
+        runtimeHint: "tavily",
+      },
+      {
+        id: "s2",
+        title: "Write plan",
+        goalTemplate: "Write a lean 1-page business plan for: {{idea}}. Sections: problem, solution, target market, revenue model, competitive advantage, key metrics, 90-day plan.",
+        dependsOn: ["s1"],
+        runtimeHint: "blade-native",
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "weekly-review",
+    title: "Weekly Review",
+    description: "Conduct a weekly review: wins, misses, plan for next week.",
+    tags: ["productivity", "planning"],
+    builtIn: true,
+    inputVars: ["wins", "misses", "priorities_next_week"],
+    stages: [
+      {
+        id: "s1",
+        title: "Review",
+        goalTemplate: "Conduct a structured weekly review based on:\n\nWins this week: {{wins}}\nMisses/learnings: {{misses}}\nPriorities next week: {{priorities_next_week}}\n\nOutput: 1) Key insights from this week, 2) What to stop/start/continue, 3) Prioritised action plan for next week with specific tasks.",
+        dependsOn: [],
+        runtimeHint: "blade-native",
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+
+  // ── Self-improvement (Brain) ───────────────────────────────────────────────
+  {
+    id: "learn-topic",
+    title: "Learn a Topic",
+    description: "Build a structured learning plan and first lesson for {{topic}}.",
+    tags: ["learning", "education"],
+    builtIn: true,
+    inputVars: ["topic", "current_level"],
+    stages: [
+      {
+        id: "s1",
+        title: "Curriculum design",
+        goalTemplate: "Design a 4-week curriculum to learn {{topic}} starting from level: {{current_level}}. Break into weekly themes with daily 30-minute session goals.",
+        dependsOn: [],
+        runtimeHint: "blade-native",
+      },
+      {
+        id: "s2",
+        title: "First lesson",
+        goalTemplate: "Write the first learning session (30 minutes) for {{topic}} based on the curriculum from stage 1. Include: key concept explanation, worked example, practice exercise, and suggested resources.",
+        dependsOn: ["s1"],
+        runtimeHint: "blade-native",
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "decision-framework",
+    title: "Decision Framework",
+    description: "Evaluate decision: {{decision}} using a structured framework.",
+    tags: ["strategy", "thinking"],
+    builtIn: true,
+    inputVars: ["decision", "context"],
+    stages: [
+      {
+        id: "s1",
+        title: "Analyse options",
+        goalTemplate: "For the decision: {{decision}}\nContext: {{context}}\n\nIdentify: 1) All viable options (min 3), 2) Key decision criteria, 3) Information gaps that would change the answer.",
+        dependsOn: [],
+        runtimeHint: "blade-native",
+      },
+      {
+        id: "s2",
+        title: "Recommend",
+        goalTemplate: "Based on the options and criteria from stage 1, score each option against the criteria. Output: scored matrix, recommendation with confidence, key risks of your recommended option, and what would make you change your mind.",
+        dependsOn: ["s1"],
+        runtimeHint: "blade-native",
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "social-content",
+    title: "Social Media Content",
+    description: "Create a week of {{platform}} content for {{brand}} on the theme of {{theme}}.",
+    tags: ["content", "marketing"],
+    builtIn: true,
+    inputVars: ["platform", "brand", "theme"],
+    stages: [
+      {
+        id: "s1",
+        title: "Content plan",
+        goalTemplate: "Create a 7-day {{platform}} content calendar for {{brand}} around the theme: {{theme}}. For each day: content type, hook, key message, call to action.",
+        dependsOn: [],
+        runtimeHint: "blade-native",
+      },
+      {
+        id: "s2",
+        title: "Write posts",
+        goalTemplate: "Write the actual {{platform}} post copy for each of the 7 days planned in stage 1 for {{brand}}. Optimise for {{platform}} format, tone, and engagement. Include hashtags.",
+        dependsOn: ["s1"],
+        runtimeHint: "blade-native",
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+];
