@@ -2,6 +2,9 @@
 
 Working note for split ownership between Artemis and Claude on the Blade repo.
 
+> **Full command registry:** `docs/architecture/connection-map.md` — verified against source, kept up to date.
+> This file covers coordination decisions and early-batch context. The command tables here are April 8 snapshots and are NOT comprehensive.
+
 ## Current Split
 
 - **Claude** owns backend logic, provider adapters, tool-calling behavior, MCP execution, approvals, Rust-side decision engines, CI, and config architecture.
@@ -91,7 +94,10 @@ Working note for split ownership between Artemis and Claude on the Blade repo.
 
 ## Open Backend Work
 
-- No open items. Backend is feature-complete for current scope.
+- ~35 backend modules have no frontend route (see Known Gaps in `docs/architecture/connection-map.md` for full list)
+- Notable surfaces waiting for UI: `runtimes.rs` (OperatorCenter), `kali.rs` (KaliView), `workflow_builder.rs` (WorkflowBuilderView), `accountability.rs` (AccountabilityView), `authority_engine.rs`, `tool_forge.rs`, `autonomous_research.rs`, `dream_mode.rs`
+- `voice_intelligence.rs` commands not wired to any UI state
+- Tentacle UI routes (log monitor, cloud costs, linear/jira, discord deep) have commands but no App.tsx routes
 
 ## Recently Shipped by Artemis (2026-04-08, batch 2)
 

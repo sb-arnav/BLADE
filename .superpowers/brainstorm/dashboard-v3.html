@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>BLADE v3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,600;12..96,700&family=Unbounded:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Font themes ── */
+:root {
+  --f-display: 'Syne', sans-serif;
+  --f-body: 'Syne', sans-serif;
+  --f-mono: 'JetBrains Mono', monospace;
+}
+.font-bricolage { --f-display: 'Bricolage Grotesque', sans-serif; --f-body: 'Bricolage Grotesque', sans-serif; --f-mono: 'DM Mono', monospace; }
+.font-unbounded { --f-display: 'Unbounded', sans-serif; --f-body: 'Unbounded', sans-serif; --f-mono: 'DM Mono', monospace; }
+
+/* ── Colors ── */
+:root {
+  --text: rgba(255,255,255,0.95);
+  --text2: rgba(255,255,255,0.55);
+  --text3: rgba(255,255,255,0.28);
+  --accent: #818cf8;
+  --accent-glow: rgba(129,140,248,0.3);
+  --green: #4ade80;
+  --amber: #fbbf24;
+  --red: #f87171;
+  --blue: #60a5fa;
+  --nav: 62px;
+  --chat: 400px;
+  --r: 20px;
+  --rs: 12px;
+  --gap: 10px;
+}
+
+html, body {
+  height: 100%;
+  font-family: var(--f-body);
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  background: #050508;
+}
+
+/* ── Wallpaper ── */
+.wp {
+  position: fixed; inset: 0; z-index: 0;
+  background-image: url('./wallpaper.jpg');
+  background-size: cover;
+  background-position: center;
+}
+/* Dark scrim so text is always readable regardless of wallpaper */
+.wp::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.38);
+}
+
+/* ── Glass material ── */
+.g {
+  background: rgba(255,255,255,0.07);
+  backdrop-filter: blur(44px) saturate(1.6) brightness(0.88);
+  -webkit-backdrop-filter: blur(44px) saturate(1.6) brightness(0.88);
+  border: 1px solid rgba(255,255,255,0.13);
+  border-radius: var(--r);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    inset 0 -1px 0 rgba(0,0,0,0.1),
+    0 24px 60px rgba(0,0,0,0.35);
+  position: relative;
+  overflow: hidden;
+}
+.g::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 55%);
+  pointer-events: none; border-radius: inherit;
+}
+
+/* ── App shell ── */
+.shell { position: relative; z-index: 1; display: flex; height: 100vh; overflow: hidden; }
+
+/* ── Titlebar ── */
+.tb {
+  position: fixed; top:0; left:0; right:0; height:34px;
+  display: flex; align-items: center; padding: 0 14px;
+  background: rgba(0,0,0,0.35);
+  backdrop-filter: blur(40px) saturate(1.4);
+  -webkit-backdrop-filter: blur(40px) saturate(1.4);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  z-index: 300; user-select: none;
+}
+.tb-dots { display: flex; gap: 7px; }
+.tb-dot { width: 11px; height: 11px; border-radius: 50%; cursor: pointer; }
+.dr { background: #ff5f57; } .da { background: #febc2e; } .dg { background: #28c840; }
+
+.tb-center {
+  position: absolute; left:50%; transform:translateX(-50%);
+  display: flex; align-items: center; gap: 8px;
+}
+.tb-brand { font-family: var(--f-display); font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.5); }
+
+.tb-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.live-badge {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
+  color: var(--green);
+  background: rgba(74,222,128,0.1);
+  border: 1px solid rgba(74,222,128,0.22);
+  padding: 3px 9px; border-radius: 20px;
+}
+.live-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); animation: ldp 2s ease-in-out infinite; }
+@keyframes ldp { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
+
+/* Font switcher in tb */
+.font-sw { display: flex; gap: 4px; }
+.fsw-btn {
+  font-size: 9.5px; font-weight: 600; letter-spacing: 0.05em;
+  padding: 2px 8px; border-radius: 5px; cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.35);
+  transition: all 0.15s; font-family: 'JetBrains Mono', monospace;
+}
+.fsw-btn.on { background: rgba(129,140,248,0.18); border-color: rgba(129,140,248,0.35); color: var(--accent); }
+.fsw-btn:hover:not(.on) { color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.08); }
+
+/* ── Nav rail ── */
+.nav {
+  position: fixed; top:34px; left:0; bottom:0;
+  width: var(--nav);
+  display: flex; flex-direction: column; align-items: center;
+  padding: 18px 0 14px;
+  background: rgba(0,0,0,0.28);
+  backdrop-filter: blur(60px) saturate(1.6);
+  -webkit-backdrop-filter: blur(60px) saturate(1.6);
+  border-right: 1px solid rgba(255,255,255,0.09);
+  z-index: 200; gap: 3px;
+}
+.nav-logo {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: linear-gradient(145deg, #7c3aed, #6366f1, #3b82f6);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 18px;
+  box-shadow: 0 0 22px rgba(129,140,248,0.4), 0 4px 14px rgba(0,0,0,0.5);
+  font-family: var(--f-display); font-size: 14px; font-weight: 800; color: white;
+  flex-shrink: 0;
+}
+.nb {
+  width: 40px; height: 40px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: rgba(255,255,255,0.3);
+  position: relative; transition: all 0.16s;
+  border: 1px solid transparent;
+}
+.nb:hover { color: var(--text); background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.12); }
+.nb.on {
+  color: white;
+  background: rgba(129,140,248,0.2);
+  border-color: rgba(129,140,248,0.35);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.15);
+}
+.nb.on::before {
+  content: '';
+  position: absolute; left: -10px; top:50%; transform:translateY(-50%);
+  width: 3px; height: 20px; border-radius: 2px;
+  background: var(--accent); box-shadow: 0 0 10px var(--accent);
+}
+.nb svg { width: 16px; height: 16px; stroke-width: 1.7; }
+.nb::after {
+  content: attr(data-t);
+  position: absolute; left: calc(100% + 12px); top: 50%;
+  transform: translateY(-50%) translateX(-4px);
+  background: rgba(10,10,20,0.92); backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.14); border-radius: 8px;
+  color: var(--text); font-size: 11.5px; font-weight: 500;
+  padding: 5px 10px; white-space: nowrap; pointer-events: none;
+  opacity: 0; transition: opacity 0.1s, transform 0.1s;
+  font-family: 'JetBrains Mono', monospace;
+}
+.nb:hover::after { opacity: 1; transform: translateY(-50%) translateX(0); }
+.nsep { width: 26px; height: 1px; background: rgba(255,255,255,0.08); margin: 6px 0; }
+.nsp { flex: 1; }
+
+/* ── Main grid ── */
+.main {
+  margin-left: var(--nav); margin-top: 34px;
+  flex: 1; display: grid;
+  grid-template-rows: 47% 53%;
+  gap: var(--gap);
+  padding: 12px;
+  height: calc(100vh - 34px);
+  overflow: hidden;
+  transition: margin-right 0.46s cubic-bezier(0.32,0.72,0,1);
+}
+.main.co { margin-right: var(--chat); }
+
+/* Top row: hero big left + agents mid + integrations right */
+.top-row {
+  display: grid;
+  grid-template-columns: 1.7fr 1fr 0.75fr;
+  gap: var(--gap);
+  min-height: 0;
+}
+
+/* Bottom row: calendar left + queue+stats right */
+.bot-row {
+  display: grid;
+  grid-template-columns: 1.05fr 1.3fr;
+  gap: var(--gap);
+  min-height: 0;
+}
+.bot-right { display: flex; flex-direction: column; gap: var(--gap); min-height: 0; }
+
+/* ── Hero card (God Mode) ── */
+.hero { display: flex; flex-direction: column; padding: 20px; gap: 0; }
+
+.hero-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.hero-label {
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--text3);
+}
+.gm-badge {
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em;
+  padding: 3px 9px; border-radius: 20px;
+  background: rgba(129,140,248,0.15);
+  color: var(--accent);
+  border: 1px solid rgba(129,140,248,0.28);
+}
+
+/* Big display area */
+.hero-display { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.hero-context {
+  font-family: var(--f-display);
+  font-size: 11px; font-weight: 500; letter-spacing: 0.04em;
+  color: var(--text3); text-transform: uppercase; margin-bottom: 6px;
+}
+.hero-app {
+  font-family: var(--f-display);
+  font-size: 44px; font-weight: 800; letter-spacing: -0.03em; line-height: 0.95;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.hero-file {
+  font-family: var(--f-mono);
+  font-size: 12px; color: var(--blue); letter-spacing: 0.01em;
+  margin-bottom: 16px;
+}
+.hero-state {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 20px;
+  background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.22);
+  font-size: 11px; font-weight: 600; color: var(--green);
+  align-self: flex-start;
+}
+.hero-state-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: ldp 2s ease-in-out infinite; }
+
+/* Hero footer bar */
+.hero-footer {
+  margin-top: 16px;
+  display: flex; gap: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+}
+.hf-item { display: flex; flex-direction: column; gap: 2px; }
+.hf-val { font-family: var(--f-display); font-size: 18px; font-weight: 700; letter-spacing: -0.03em; }
+.hf-lbl { font-size: 9.5px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); }
+.hf-div { width: 1px; background: rgba(255,255,255,0.08); align-self: stretch; margin: 0 4px; }
+
+/* ── Agents card ── */
+.agents-card { display: flex; flex-direction: column; padding: 16px; gap: 12px; }
+.card-hdr { display: flex; align-items: center; justify-content: space-between; }
+.card-lbl {
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text3);
+  display: flex; align-items: center; gap: 6px;
+}
+.cl-icon { width: 18px; height: 18px; border-radius: 5px; display: flex; align-items: center; justify-content: center; }
+.cl-icon svg { width: 10px; height: 10px; }
+.ci-g { background: rgba(74,222,128,0.15); color: var(--green); }
+.ci-p { background: rgba(129,140,248,0.15); color: var(--accent); }
+.ci-a { background: rgba(251,191,36,0.13); color: var(--amber); }
+.chip {
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em;
+  padding: 2px 8px; border-radius: 20px;
+}
+.chip-g { background: rgba(74,222,128,0.12); color: var(--green); border: 1px solid rgba(74,222,128,0.22); }
+.chip-a { background: rgba(251,191,36,0.1); color: var(--amber); border: 1px solid rgba(251,191,36,0.2); }
+.chip-d { background: rgba(255,255,255,0.05); color: var(--text3); border: 1px solid rgba(255,255,255,0.08); }
+
+.ags { display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.ag { display: flex; flex-direction: column; gap: 3px; }
+.ag-row { display: flex; align-items: center; justify-content: space-between; }
+.ag-name { font-size: 12px; font-weight: 600; }
+.ag-t { font-family: var(--f-mono); font-size: 10px; color: var(--text3); }
+.ag-task { font-size: 11px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ag-bar { height: 2px; background: rgba(255,255,255,0.07); border-radius: 2px; margin-top: 3px; overflow: hidden; }
+.ag-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--accent), #a78bfa); animation: shimmer 2.2s ease-in-out infinite; }
+@keyframes shimmer { 0%,100%{opacity:1} 50%{opacity:0.55} }
+
+/* ── Integrations card ── */
+.int-card { display: flex; flex-direction: column; padding: 16px; gap: 12px; }
+.int-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; flex: 1; }
+.it {
+  padding: 9px 10px; border-radius: var(--rs);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  display: flex; flex-direction: column; gap: 3px;
+  cursor: default; transition: all 0.14s;
+}
+.it:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.13); }
+.it-n { font-size: 9.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); }
+.it-v { font-family: var(--f-display); font-size: 24px; font-weight: 700; letter-spacing: -0.04em; line-height: 1; }
+.it-s { font-size: 10px; color: var(--text2); }
+.c-g { color: var(--green); } .c-a { color: var(--amber); } .c-p { color: var(--accent); } .c-b { color: var(--blue); }
+
+/* ── Calendar ── */
+.cal-card { display: flex; flex-direction: column; padding: 18px; gap: 14px; }
+.cal-events { display: flex; flex-direction: column; gap: 0; flex: 1; position: relative; }
+/* Vertical line */
+.cal-events::before {
+  content: '';
+  position: absolute; left: 6px; top: 8px; bottom: 8px;
+  width: 1px; background: rgba(255,255,255,0.08);
+}
+.cev {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 10px 10px 10px 0;
+  border-radius: var(--rs);
+  cursor: default;
+  position: relative;
+  transition: background 0.14s;
+}
+.cev:hover { background: rgba(255,255,255,0.04); }
+.cev-dot {
+  width: 13px; height: 13px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  margin-top: 2px; position: relative; z-index: 1;
+}
+.cev-dot-inner { width: 7px; height: 7px; border-radius: 50%; }
+.cev.next .cev-dot { border: 1.5px solid var(--accent); background: rgba(129,140,248,0.15); }
+.cev.next .cev-dot-inner { background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: ldp 2s ease-in-out infinite; }
+.cev .cev-dot { border: 1.5px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); }
+.cev .cev-dot-inner { background: rgba(255,255,255,0.2); }
+.cev-body { flex: 1; min-width: 0; }
+.cev-time { font-family: var(--f-mono); font-size: 10px; color: var(--text3); margin-bottom: 2px; }
+.cev.next .cev-time { color: var(--accent); }
+.cev-name { font-size: 13px; font-weight: 600; }
+.cev-meta { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.cev-tag {
+  display: inline-block; margin-top: 5px;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 20px;
+  background: rgba(129,140,248,0.14); color: var(--accent);
+}
+
+/* ── Queue card ── */
+.queue-card { display: flex; flex-direction: column; padding: 16px; gap: 10px; flex: 1; min-height: 0; }
+.qitems { display: flex; flex-direction: column; gap: 5px; flex: 1; overflow: hidden; }
+.qi {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: var(--rs);
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+  cursor: pointer; transition: all 0.14s;
+}
+.qi:hover {
+  background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.12);
+  transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+}
+.qi-acc { width: 3px; border-radius: 3px; align-self: stretch; flex-shrink: 0; }
+.acc-a { background: var(--amber); } .acc-p { background: var(--accent); } .acc-g { background: var(--green); }
+.qi-body { flex: 1; min-width: 0; }
+.qi-t { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qi-s { font-size: 10.5px; color: var(--text2); margin-top: 1px; }
+.qi-cta {
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em;
+  padding: 3px 9px; border-radius: 6px;
+  border: 1px solid rgba(129,140,248,0.28); background: rgba(129,140,248,0.12);
+  color: var(--accent); flex-shrink: 0; white-space: nowrap; transition: background 0.14s;
+}
+.qi:hover .qi-cta { background: rgba(129,140,248,0.22); }
+
+/* ── Stats row (inside bot-right, below queue) ── */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; flex-shrink: 0; }
+.stat {
+  padding: 10px 12px; border-radius: var(--rs);
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+  display: flex; flex-direction: column; gap: 2px;
+  cursor: default; transition: all 0.14s;
+}
+.stat:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.12); }
+.stat-l { font-size: 9.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); }
+.stat-v { font-family: var(--f-display); font-size: 22px; font-weight: 700; letter-spacing: -0.04em; line-height: 1.1; }
+.stat-d { font-size: 9.5px; font-weight: 500; margin-top: 1px; }
+.up { color: var(--green); } .dn { color: var(--red); }
+
+/* ── Chat panel ── */
+.chat-panel {
+  position: fixed; top: 34px; right: 0; bottom: 0; width: var(--chat);
+  background: rgba(6,6,18,0.65);
+  backdrop-filter: blur(60px) saturate(1.7);
+  -webkit-backdrop-filter: blur(60px) saturate(1.7);
+  border-left: 1px solid rgba(255,255,255,0.14);
+  display: flex; flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.46s cubic-bezier(0.32,0.72,0,1);
+  z-index: 180; box-shadow: -30px 0 80px rgba(0,0,0,0.5);
+}
+.chat-panel.open { transform: translateX(0); }
+.chat-hdr {
+  height: 52px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 18px; border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0;
+}
+.chat-hl { display: flex; align-items: center; gap: 9px; }
+.chat-title { font-family: var(--f-display); font-size: 15px; font-weight: 700; }
+.chat-model-tag {
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em;
+  padding: 2px 8px; border-radius: 5px;
+  background: rgba(129,140,248,0.14); color: var(--accent);
+  border: 1px solid rgba(129,140,248,0.25); font-family: var(--f-mono);
+}
+.chat-x {
+  width: 28px; height: 28px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--text3); border: 1px solid transparent; transition: all 0.14s;
+}
+.chat-x:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.1); color: var(--text); }
+.chat-msgs {
+  flex: 1; overflow-y: auto; padding: 18px 16px;
+  display: flex; flex-direction: column; gap: 18px;
+  scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.07) transparent;
+}
+.msg { display: flex; flex-direction: column; gap: 5px; animation: min 0.22s ease; }
+.msg.u { align-items: flex-end; }
+.msg.b { align-items: flex-start; }
+@keyframes min { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+.bub { max-width: 86%; padding: 11px 14px; font-size: 13px; line-height: 1.6; }
+.msg.u .bub { background: var(--accent); border-radius: 16px 16px 4px 16px; color: white; box-shadow: 0 4px 20px rgba(129,140,248,0.35); }
+.msg.b .bub {
+  background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px 16px 16px 4px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+}
+.mts { font-family: var(--f-mono); font-size: 10px; color: var(--text3); }
+.chat-in-area { padding: 12px; border-top: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; }
+.in-shell {
+  display: flex; align-items: flex-end; gap: 8px;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 14px; padding: 9px 9px 9px 14px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);
+  transition: border-color 0.14s;
+}
+.in-shell:focus-within { border-color: rgba(129,140,248,0.45); }
+.chat-ta {
+  flex: 1; background: none; border: none; outline: none;
+  color: var(--text); font-family: var(--f-body); font-size: 13px;
+  resize: none; min-height: 20px; max-height: 120px; line-height: 1.5;
+  caret-color: var(--accent);
+}
+.chat-ta::placeholder { color: var(--text3); }
+.send {
+  width: 32px; height: 32px; border-radius: 9px; background: var(--accent);
+  border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: white; flex-shrink: 0; transition: opacity 0.14s, transform 0.1s;
+  box-shadow: 0 2px 12px rgba(129,140,248,0.4);
+}
+.send:hover { opacity: 0.85; }
+.send:active { transform: scale(0.9); }
+
+/* ── History drawer ── */
+.hist {
+  position: fixed; top:34px; left:var(--nav); bottom:0; width:250px;
+  background: rgba(5,5,16,0.72);
+  backdrop-filter: blur(60px) saturate(1.6);
+  -webkit-backdrop-filter: blur(60px) saturate(1.6);
+  border-right: 1px solid rgba(255,255,255,0.12);
+  transform: translateX(-100%);
+  transition: transform 0.43s cubic-bezier(0.32,0.72,0,1);
+  z-index: 195; display: flex; flex-direction: column;
+  box-shadow: 16px 0 50px rgba(0,0,0,0.4);
+}
+.hist.open { transform: translateX(0); }
+.hist-hdr {
+  height: 52px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 14px; border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0;
+}
+.hist-t { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text3); }
+.hist-x { width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text3);transition:all 0.14s; }
+.hist-x:hover { background:rgba(255,255,255,0.07);color:var(--text); }
+.hist-list { flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:1px; }
+.hi { padding:9px 10px;border-radius:9px;cursor:pointer;transition:background 0.12s;border:1px solid transparent; }
+.hi:hover { background:rgba(255,255,255,0.05); }
+.hi.on { background:rgba(129,140,248,0.08);border-color:rgba(129,140,248,0.2); }
+.hi-t { font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.hi-m { font-size:10.5px;color:var(--text3);margin-top:2px; }
+
+/* ── FAB ── */
+.fab {
+  position:fixed;bottom:20px;right:20px;width:50px;height:50px;
+  border-radius:16px;background:var(--accent);border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;color:white;
+  z-index:170;box-shadow:0 6px 24px rgba(129,140,248,0.45),0 12px 40px rgba(0,0,0,0.4);
+  transition:all 0.22s;
+}
+.fab:hover { transform:scale(1.06);box-shadow:0 8px 32px rgba(129,140,248,0.55); }
+.fab:active { transform:scale(0.92); }
+.fab svg { width:20px;height:20px; }
+
+/* ── Stagger-in ── */
+.g { opacity:0; animation: gin 0.5s cubic-bezier(0.22,1,0.36,1) forwards; }
+.s0{animation-delay:0.03s}.s1{animation-delay:0.08s}.s2{animation-delay:0.13s}
+.s3{animation-delay:0.18s}.s4{animation-delay:0.22s}.s5{animation-delay:0.26s}
+@keyframes gin {
+  from { opacity:0; transform:translateY(14px) scale(0.97); }
+  to   { opacity:1; transform:translateY(0) scale(1); }
+}
+
+::-webkit-scrollbar { width:3px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.07);border-radius:2px; }
+</style>
+</head>
+<body>
+
+<div class="wp"></div>
+
+<div class="shell">
+
+<!-- Titlebar -->
+<div class="tb">
+  <div class="tb-dots">
+    <div class="tb-dot dr"></div><div class="tb-dot da"></div><div class="tb-dot dg"></div>
+  </div>
+  <div class="tb-center">
+    <div class="tb-brand">Blade</div>
+  </div>
+  <div class="tb-right">
+    <div class="font-sw">
+      <div class="fsw-btn on" onclick="setFont('syne',this)">Syne</div>
+      <div class="fsw-btn" onclick="setFont('bricolage',this)">Bricolage</div>
+      <div class="fsw-btn" onclick="setFont('unbounded',this)">Unbounded</div>
+    </div>
+    <div class="live-badge"><div class="live-dot"></div>Live</div>
+  </div>
+</div>
+
+<!-- Nav -->
+<nav class="nav">
+  <div class="nav-logo">B</div>
+  <div class="nb on" data-t="Dashboard">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg>
+  </div>
+  <div class="nb" data-t="Conversations" onclick="toggleHist()">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13a2 2 0 01-2 2H6l-4 3V4a2 2 0 012-2h12a2 2 0 012 2v9z"/></svg>
+  </div>
+  <div class="nb" data-t="Terminal">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="16" height="14" rx="2"/><path d="M6 8l3 3-3 3M11 14h3"/></svg>
+  </div>
+  <div class="nb" data-t="Git">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="5" r="2"/><circle cx="15" cy="5" r="2"/><circle cx="5" cy="15" r="2"/><path d="M5 7v6M7 5h3a3 3 0 010 6H5"/></svg>
+  </div>
+  <div class="nb" data-t="Hive">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polygon points="12,2 18,6 18,14 12,18 6,14 6,6"/><circle cx="12" cy="10" r="2"/></svg>
+  </div>
+  <div class="nsp"></div><div class="nsep"></div>
+  <div class="nb" data-t="Ghost Mode">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2a6 6 0 016 6v8l-2-2-2 2-2-2-2 2-2-2-2 2V8a6 6 0 016-6z"/></svg>
+  </div>
+  <div class="nb" data-t="Settings">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="2.5"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42"/></svg>
+  </div>
+</nav>
+
+<!-- History drawer -->
+<div class="hist" id="hist">
+  <div class="hist-hdr">
+    <div class="hist-t">Conversations</div>
+    <div class="hist-x" onclick="toggleHist()"><svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 1l9 9M10 1l-9 9"/></svg></div>
+  </div>
+  <div class="hist-list">
+    <div class="hi on"><div class="hi-t">Fix auth middleware bug</div><div class="hi-m">Today 2:14 PM · 12 msgs</div></div>
+    <div class="hi"><div class="hi-t">BLADE dashboard layout</div><div class="hi-m">Today 11:30 AM · 28 msgs</div></div>
+    <div class="hi"><div class="hi-t">Staq Play Store prep</div><div class="hi-m">Yesterday · 41 msgs</div></div>
+    <div class="hi"><div class="hi-t">Razorpay integration</div><div class="hi-m">Yesterday · 17 msgs</div></div>
+    <div class="hi"><div class="hi-t">Solana reputation protocol</div><div class="hi-m">Apr 13 · 55 msgs</div></div>
+    <div class="hi"><div class="hi-t">RIFTDUEL Phase 1 retro</div><div class="hi-m">Apr 12 · 22 msgs</div></div>
+    <div class="hi"><div class="hi-t">MCP server debugging</div><div class="hi-m">Apr 11 · 9 msgs</div></div>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main" id="main">
+
+  <!-- TOP ROW -->
+  <div class="top-row">
+
+    <!-- HERO: God Mode -->
+    <div class="g s0 hero">
+      <div class="hero-top">
+        <div class="hero-label">God Mode · Perception</div>
+        <div class="gm-badge">Extreme</div>
+      </div>
+      <div class="hero-display">
+        <div class="hero-context">Currently in</div>
+        <div class="hero-app" id="heroApp">VS Code</div>
+        <div class="hero-file">~/blade/src/App.tsx · line 199</div>
+        <div class="hero-state">
+          <div class="hero-state-dot"></div>
+          Focused · flow state detected
+        </div>
+      </div>
+      <div class="hero-footer">
+        <div class="hf-item">
+          <div class="hf-val">3</div>
+          <div class="hf-lbl">Agents</div>
+        </div>
+        <div class="hf-div"></div>
+        <div class="hf-item">
+          <div class="hf-val" style="color:var(--blue)">1.2k</div>
+          <div class="hf-lbl">Memories</div>
+        </div>
+        <div class="hf-div"></div>
+        <div class="hf-item">
+          <div class="hf-val" style="color:var(--green)">On</div>
+          <div class="hf-lbl">Mic</div>
+        </div>
+        <div class="hf-div"></div>
+        <div class="hf-item">
+          <div class="hf-val" style="font-size:14px;color:var(--amber)">$0.84</div>
+          <div class="hf-lbl">Today</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Agents -->
+    <div class="g s1 agents-card">
+      <div class="card-hdr">
+        <div class="card-lbl">
+          <div class="cl-icon ci-g"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="4" cy="4" r="1.5"/><circle cx="9" cy="3" r="1.5"/><circle cx="9" cy="9" r="1.5"/><path d="M5.5 4h1.5a2 2 0 010 4H4M9 4.5v3"/></svg></div>
+          Agents
+        </div>
+        <div class="chip chip-g">3 running</div>
+      </div>
+      <div class="ags">
+        <div class="ag">
+          <div class="ag-row"><div class="ag-name">Code Reviewer</div><div class="ag-t">04:12</div></div>
+          <div class="ag-task">PR #47 · blade auth refactor</div>
+          <div class="ag-bar"><div class="ag-fill" style="width:72%"></div></div>
+        </div>
+        <div class="ag">
+          <div class="ag-row"><div class="ag-name">Morning Briefing</div><div class="ag-t">01:03</div></div>
+          <div class="ag-task">Digest from 8 sources</div>
+          <div class="ag-bar"><div class="ag-fill" style="width:38%"></div></div>
+        </div>
+        <div class="ag">
+          <div class="ag-row"><div class="ag-name">Security Monitor</div><div class="ag-t">∞</div></div>
+          <div class="ag-task">Network watch · 0 anomalies</div>
+          <div class="ag-bar"><div class="ag-fill" style="width:100%;opacity:0.22"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Integrations -->
+    <div class="g s2 int-card">
+      <div class="card-hdr">
+        <div class="card-lbl">
+          <div class="cl-icon ci-a"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="1" y="1" width="4" height="4" rx="1"/><rect x="7" y="1" width="4" height="4" rx="1"/><rect x="1" y="7" width="4" height="4" rx="1"/><path d="M9 7v4M11 9H7"/></svg></div>
+          Integrations
+        </div>
+        <div class="chip chip-a">4 pending</div>
+      </div>
+      <div class="int-tiles">
+        <div class="it"><div class="it-n">Email</div><div class="it-v c-a">2</div><div class="it-s">need reply</div></div>
+        <div class="it"><div class="it-n">Slack</div><div class="it-v c-a">4</div><div class="it-s">mentions</div></div>
+        <div class="it"><div class="it-n">GitHub</div><div class="it-v c-g" style="font-size:18px">✓</div><div class="it-s">CI passing</div></div>
+        <div class="it"><div class="it-n">Calendar</div><div class="it-v c-p">2</div><div class="it-s">events today</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- BOTTOM ROW -->
+  <div class="bot-row">
+
+    <!-- Calendar -->
+    <div class="g s3 cal-card">
+      <div class="card-hdr">
+        <div class="card-lbl">
+          <div class="cl-icon ci-p"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="1" y="2" width="10" height="9" rx="1.5"/><path d="M1 5h10M4 1v2M8 1v2"/></svg></div>
+          Calendar
+        </div>
+      </div>
+      <div class="cal-events">
+        <div class="cev next">
+          <div class="cev-dot"><div class="cev-dot-inner"></div></div>
+          <div class="cev-body">
+            <div class="cev-time">3:00 PM</div>
+            <div class="cev-name">Staq sync — Federico</div>
+            <div class="cev-meta">Solana Reputation Protocol</div>
+            <div class="cev-tag">in 47 min</div>
+          </div>
+        </div>
+        <div class="cev">
+          <div class="cev-dot"><div class="cev-dot-inner"></div></div>
+          <div class="cev-body">
+            <div class="cev-time">5:30 PM</div>
+            <div class="cev-name">PollPe standup</div>
+            <div class="cev-meta">Google Meet · 5 attendees</div>
+          </div>
+        </div>
+        <div class="cev">
+          <div class="cev-dot"><div class="cev-dot-inner"></div></div>
+          <div class="cev-body">
+            <div class="cev-time">Tomorrow 10:00 AM</div>
+            <div class="cev-name">Investor call · demo prep</div>
+            <div class="cev-meta">Zoom · Staq deck needed</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Queue + Stats -->
+    <div class="bot-right">
+
+      <div class="g s4 queue-card">
+        <div class="card-hdr">
+          <div class="card-lbl">
+            <div class="cl-icon ci-a"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="6" cy="6" r="5"/><path d="M6 4v2l1.5 1.5"/></svg></div>
+            Action Queue
+          </div>
+          <div class="chip chip-a">3 waiting</div>
+        </div>
+        <div class="qitems">
+          <div class="qi">
+            <div class="qi-acc acc-a"></div>
+            <div class="qi-body"><div class="qi-t">Reply to Rohan — API timeline</div><div class="qi-s">Draft ready · Slack · 2h ago</div></div>
+            <div class="qi-cta">Review</div>
+          </div>
+          <div class="qi">
+            <div class="qi-acc acc-p"></div>
+            <div class="qi-body"><div class="qi-t">Approve PR merge — blade#47</div><div class="qi-s">Review complete · CI passing</div></div>
+            <div class="qi-cta">Approve</div>
+          </div>
+          <div class="qi">
+            <div class="qi-acc acc-g"></div>
+            <div class="qi-body"><div class="qi-t">Accept calendar invite</div><div class="qi-s">Tomorrow 10 AM · Zoom · investor</div></div>
+            <div class="qi-cta">Accept</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="g s5" style="padding:14px 16px;flex-shrink:0">
+        <div class="stats-row">
+          <div class="stat"><div class="stat-l">Chats</div><div class="stat-v">12</div><div class="stat-d up">↑ 3</div></div>
+          <div class="stat"><div class="stat-l">Spend</div><div class="stat-v" style="font-size:18px">$0.84</div><div class="stat-d up">under budget</div></div>
+          <div class="stat"><div class="stat-l">Memories</div><div class="stat-v">1.2k</div><div class="stat-d up">+14</div></div>
+          <div class="stat"><div class="stat-l">Screen</div><div class="stat-v" style="font-size:17px">4h 21m</div><div class="stat-d dn">↑ above avg</div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Chat panel -->
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-hdr">
+    <div class="chat-hl">
+      <div class="chat-title">Chat</div>
+      <div class="chat-model-tag">claude-sonnet-4-6</div>
+    </div>
+    <div class="chat-x" onclick="toggleChat()"><svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 1l9 9M10 1l-9 9"/></svg></div>
+  </div>
+  <div class="chat-msgs">
+    <div class="msg b">
+      <div class="bub">Morning. 2 emails need replies, Staq sync with Federico in 47 min, CI is green on blade#47. Want me to prep your sync notes?</div>
+      <div class="mts">2:14 PM</div>
+    </div>
+    <div class="msg u">
+      <div class="bub">Yes — pull from last 3 Solana convos and BRIDGE.md</div>
+      <div class="mts">2:15 PM</div>
+    </div>
+    <div class="msg b">
+      <div class="bub">Done. Key threads:<br><br><strong>1.</strong> Attestation split — Federico owns Anchor program, you own API layer.<br><br><strong>2.</strong> Open: finality window for writes. You leaned optimistic last call.<br><br><strong>3.</strong> BRIDGE.md: providers/ is off-limits — keep Solana in separate package.</div>
+      <div class="mts">2:15 PM</div>
+    </div>
+  </div>
+  <div class="chat-in-area">
+    <div class="in-shell">
+      <textarea class="chat-ta" placeholder="Ask BLADE anything…" rows="1" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+      <button class="send"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l4 2 1 4 5-11z"/></svg></button>
+    </div>
+  </div>
+</div>
+
+<!-- FAB -->
+<button class="fab" id="fab" onclick="toggleChat()">
+  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13a2 2 0 01-2 2H6l-4 3V4a2 2 0 012-2h12a2 2 0 012 2v9z"/></svg>
+</button>
+
+<script>
+let chatOpen = false, histOpen = false;
+
+function toggleChat() {
+  chatOpen = !chatOpen;
+  document.getElementById('chatPanel').classList.toggle('open', chatOpen);
+  document.getElementById('main').classList.toggle('co', chatOpen);
+  const fab = document.getElementById('fab');
+  fab.style.opacity = chatOpen ? '0' : '1';
+  fab.style.pointerEvents = chatOpen ? 'none' : 'auto';
+  fab.style.transform = chatOpen ? 'scale(0.8)' : '';
+}
+
+function toggleHist() {
+  histOpen = !histOpen;
+  document.getElementById('hist').classList.toggle('open', histOpen);
+}
+
+function setFont(name, el) {
+  document.querySelectorAll('.fsw-btn').forEach(b => b.classList.remove('on'));
+  el.classList.add('on');
+  const body = document.body;
+  body.classList.remove('font-bricolage', 'font-unbounded');
+  if (name === 'bricolage') body.classList.add('font-bricolage');
+  if (name === 'unbounded') body.classList.add('font-unbounded');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { if (chatOpen) toggleChat(); if (histOpen) toggleHist(); }
+});
+
+setTimeout(() => toggleChat(), 900);
+</script>
+</body>
+</html>

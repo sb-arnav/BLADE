@@ -2,7 +2,7 @@
 
 ## What This Is
 
-BLADE is a JARVIS-level desktop AI agent. Tauri 2 (Rust) + React (TypeScript) + SQLite. 127 Rust modules, 132 React components, 50+ routes. It sees your screen, hears your voice, remembers everything, controls your desktop, and acts autonomously. Local-first, zero telemetry.
+BLADE is a JARVIS-level desktop AI agent. Tauri 2 (Rust) + React (TypeScript) + SQLite. 130+ Rust modules, 145 React components, 50+ routes. It sees your screen, hears your voice, remembers everything, controls your desktop, and acts autonomously. Local-first, zero telemetry.
 
 ## Build Commands
 

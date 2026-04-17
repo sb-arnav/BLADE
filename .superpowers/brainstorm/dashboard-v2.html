@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>BLADE Dashboard v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --text: rgba(255,255,255,0.93);
+  --text-sec: rgba(255,255,255,0.55);
+  --text-dim: rgba(255,255,255,0.28);
+  --accent: #7c7fff;
+  --accent-soft: rgba(124,127,255,0.18);
+  --green: #5effa0;
+  --green-soft: rgba(94,255,160,0.12);
+  --amber: #ffd166;
+  --amber-soft: rgba(255,209,102,0.12);
+  --red: #ff6b8a;
+  --glass: rgba(255,255,255,0.062);
+  --glass-strong: rgba(255,255,255,0.09);
+  --border: rgba(255,255,255,0.1);
+  --border-bright: rgba(255,255,255,0.2);
+  --nav-w: 62px;
+  --chat-w: 390px;
+  --r: 18px;
+  --r-sm: 11px;
+}
+
+html, body {
+  height: 100%;
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Wallpaper layer (user-replaceable) ── */
+.wallpaper {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 90% 70% at 15% 25%, rgba(88,50,220,0.65) 0%, transparent 65%),
+    radial-gradient(ellipse 70% 90% at 85% 15%, rgba(40,20,140,0.55) 0%, transparent 60%),
+    radial-gradient(ellipse 80% 60% at 70% 85%, rgba(160,30,90,0.4) 0%, transparent 65%),
+    radial-gradient(ellipse 100% 80% at 5% 90%, rgba(20,60,160,0.45) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 50% 50%, rgba(60,20,100,0.3) 0%, transparent 70%),
+    #06060f;
+  background-size: cover;
+  background-position: center;
+  animation: wallpaper-breathe 25s ease-in-out infinite alternate;
+}
+@keyframes wallpaper-breathe {
+  0%   { filter: brightness(1) saturate(1); }
+  50%  { filter: brightness(1.06) saturate(1.1); }
+  100% { filter: brightness(0.97) saturate(1.05); }
+}
+
+/* Grain */
+.wallpaper::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+
+/* ── App shell ── */
+.app {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Titlebar ── */
+.titlebar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  background: rgba(6,6,15,0.45);
+  backdrop-filter: blur(40px) saturate(1.6);
+  border-bottom: 1px solid var(--border);
+  z-index: 200;
+  user-select: none;
+  -webkit-app-region: drag;
+}
+.tb-dots { display: flex; gap: 7px; -webkit-app-region: no-drag; }
+.tb-dot { width: 11px; height: 11px; border-radius: 50%; cursor: pointer; }
+.dot-r { background: #ff5f57; }
+.dot-a { background: #febc2e; }
+.dot-g { background: #28c840; }
+.tb-title {
+  position: absolute;
+  left: 50%; transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.tb-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+.tb-pill {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: var(--green-soft);
+  color: var(--green);
+  border: 1px solid rgba(94,255,160,0.2);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.live-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: live-pulse 2.4s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%,100% { transform:scale(1); opacity:1; }
+  50% { transform:scale(0.7); opacity:0.5; }
+}
+
+/* ── Nav rail ── */
+.nav-rail {
+  position: fixed;
+  top: 36px; left: 0; bottom: 0;
+  width: var(--nav-w);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 0 16px;
+  background: rgba(255,255,255,0.028);
+  backdrop-filter: blur(60px) saturate(1.8);
+  border-right: 1px solid var(--border);
+  z-index: 150;
+  gap: 2px;
+}
+
+.nav-logo {
+  width: 34px; height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #8b5cf6, #6366f1, #3b82f6);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 20px;
+  box-shadow: 0 0 20px rgba(124,127,255,0.35), 0 4px 12px rgba(0,0,0,0.4);
+  font-size: 15px;
+  font-weight: 700;
+  color: white;
+  letter-spacing: -0.5px;
+  flex-shrink: 0;
+}
+
+.nav-btn {
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  color: var(--text-dim);
+  position: relative;
+  transition: all 0.18s ease;
+  border: 1px solid transparent;
+  background: transparent;
+}
+.nav-btn:hover {
+  color: var(--text);
+  background: rgba(255,255,255,0.08);
+  border-color: var(--border);
+}
+.nav-btn.active {
+  color: white;
+  background: rgba(124,127,255,0.18);
+  border-color: rgba(124,127,255,0.3);
+  box-shadow: 0 0 16px rgba(124,127,255,0.15), inset 0 1px 0 rgba(255,255,255,0.15);
+}
+.nav-btn.active::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 50%; transform: translateY(-50%);
+  width: 3px; height: 20px;
+  border-radius: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+}
+.nav-btn svg { width: 16px; height: 16px; stroke-width: 1.7; }
+
+/* Tooltip */
+.nav-btn::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%; transform: translateY(-50%) translateX(-4px);
+  background: rgba(12,12,24,0.92);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-bright);
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s, transform 0.12s;
+}
+.nav-btn:hover::after {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+.nav-spacer { flex: 1; }
+.nav-sep {
+  width: 26px; height: 1px;
+  background: var(--border);
+  margin: 6px 0;
+}
+
+/* ── Glass mixin via class ── */
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(48px) saturate(1.8) brightness(1.04);
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.14),
+    0 24px 48px rgba(0,0,0,0.32),
+    0 4px 12px rgba(0,0,0,0.2);
+  position: relative;
+  overflow: hidden;
+}
+.glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 50%, rgba(255,255,255,0.02) 100%);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ── Main ── */
+.main {
+  margin-left: var(--nav-w);
+  margin-top: 36px;
+  flex: 1;
+  display: grid;
+  grid-template-rows: 44% 1fr;
+  height: calc(100vh - 36px);
+  gap: 0;
+  padding: 14px 14px 14px 14px;
+  overflow: hidden;
+  transition: margin-right 0.48s cubic-bezier(0.32,0.72,0,1);
+}
+.main.chat-open { margin-right: var(--chat-w); }
+
+/* ── Top: Live section ── */
+.live-section {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+  gap: 10px;
+  padding-bottom: 10px;
+  min-height: 0;
+}
+
+/* ── Bottom: Today section ── */
+.today-section {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr 0.9fr;
+  gap: 10px;
+  min-height: 0;
+}
+
+/* ── Card internals ── */
+.card-inner { padding: 16px; display: flex; flex-direction: column; gap: 12px; height: 100%; }
+
+.card-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.card-label-icon {
+  width: 20px; height: 20px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+}
+.card-label-icon svg { width: 11px; height: 11px; }
+.cli { background: var(--accent-soft); color: var(--accent); }
+.clg { background: var(--green-soft); color: var(--green); }
+.cla { background: var(--amber-soft); color: var(--amber); }
+
+.status-chip {
+  margin-left: auto;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+.sc-live { background: var(--green-soft); color: var(--green); border: 1px solid rgba(94,255,160,0.25); }
+.sc-warn { background: var(--amber-soft); color: var(--amber); border: 1px solid rgba(255,209,102,0.25); }
+.sc-dim  { background: rgba(255,255,255,0.05); color: var(--text-dim); border: 1px solid var(--border); }
+
+/* God Mode perception rows */
+.perc-rows { display: flex; flex-direction: column; gap: 5px; flex: 1; }
+.perc-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+.perc-key { font-size: 10.5px; color: var(--text-dim); flex: 0 0 82px; }
+.perc-val { font-size: 11.5px; color: var(--text); font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.perc-mono { font-family: 'JetBrains Mono', monospace; color: #93c5fd; font-size: 10.5px; }
+.perc-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.pd-g { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.pd-a { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+.pd-b { background: #60a5fa; }
+
+/* Agent rows */
+.agent-rows { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.ag-row { display: flex; flex-direction: column; gap: 4px; }
+.ag-top { display: flex; align-items: center; justify-content: space-between; }
+.ag-name { font-size: 12px; font-weight: 500; }
+.ag-elapsed { font-size: 10px; font-family: 'JetBrains Mono', monospace; color: var(--text-dim); }
+.ag-task { font-size: 10.5px; color: var(--text-sec); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ag-bar { height: 2px; background: rgba(255,255,255,0.07); border-radius: 2px; margin-top: 2px; overflow: hidden; }
+.ag-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent), #a78bfa);
+  animation: bar-breathe 2s ease-in-out infinite;
+}
+@keyframes bar-breathe { 0%,100%{opacity:1} 50%{opacity:0.6} }
+
+/* Integration tiles */
+.int-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; flex: 1; }
+.int-tile {
+  padding: 9px 10px;
+  border-radius: var(--r-sm);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  cursor: default;
+  transition: background 0.15s, border-color 0.15s;
+}
+.int-tile:hover { background: rgba(255,255,255,0.06); border-color: var(--border); }
+.int-name { font-size: 10px; color: var(--text-dim); font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; }
+.int-count { font-size: 22px; font-weight: 600; letter-spacing: -0.03em; line-height: 1; }
+.int-sub { font-size: 10px; color: var(--text-sec); }
+.int-g { color: var(--green); }
+.int-a { color: var(--amber); }
+.int-p { color: var(--accent); }
+.int-b { color: #60a5fa; }
+
+/* ── Calendar ── */
+.cal-items { display: flex; flex-direction: column; gap: 7px; flex: 1; overflow: hidden; }
+.cal-item {
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  cursor: default;
+  transition: all 0.15s;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.cal-item:hover { background: rgba(255,255,255,0.055); border-color: var(--border); }
+.cal-item.next-up {
+  background: rgba(124,127,255,0.1);
+  border-color: rgba(124,127,255,0.28);
+}
+.cal-time-col { display: flex; flex-direction: column; align-items: center; gap: 3px; flex-shrink: 0; }
+.cal-time { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500; color: var(--accent); line-height: 1; }
+.cal-tline { flex: 1; width: 1px; background: rgba(255,255,255,0.1); min-height: 8px; }
+.cal-body { flex: 1; min-width: 0; }
+.cal-name { font-size: 12.5px; font-weight: 500; }
+.cal-meta { font-size: 10.5px; color: var(--text-sec); margin-top: 2px; }
+.cal-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 20px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  margin-top: 4px;
+}
+
+/* ── Action Queue ── */
+.queue-items { display: flex; flex-direction: column; gap: 6px; flex: 1; overflow: hidden; }
+.q-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border-radius: var(--r-sm);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.q-item:hover {
+  background: rgba(255,255,255,0.06);
+  border-color: var(--border);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+}
+.q-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.q-p  { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.q-a  { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+.q-g  { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.q-body { flex: 1; min-width: 0; }
+.q-title { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.q-sub { font-size: 10.5px; color: var(--text-sec); margin-top: 1px; }
+.q-cta {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 9px;
+  border-radius: 6px;
+  border: 1px solid rgba(124,127,255,0.3);
+  background: var(--accent-soft);
+  color: var(--accent);
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.q-item:hover .q-cta { background: rgba(124,127,255,0.25); }
+
+/* ── Quick Stats ── */
+.stats-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; flex: 1; }
+.stat-tile {
+  padding: 11px 12px;
+  border-radius: var(--r-sm);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: all 0.15s;
+  cursor: default;
+}
+.stat-tile:hover { background: rgba(255,255,255,0.055); border-color: var(--border); }
+.stat-lbl { font-size: 9.5px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-dim); }
+.stat-num { font-size: 26px; font-weight: 600; letter-spacing: -0.04em; line-height: 1.1; }
+.stat-chg { font-size: 10px; font-weight: 500; margin-top: 1px; }
+.chg-up { color: var(--green); }
+.chg-dn { color: var(--red); }
+
+/* ── Section divider label ── */
+.sec-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding: 0 2px 8px;
+  grid-column: 1 / -1;
+}
+
+/* ── Chat panel ── */
+.chat-panel {
+  position: fixed;
+  top: 36px; right: 0; bottom: 0;
+  width: var(--chat-w);
+  background: rgba(8,8,20,0.6);
+  backdrop-filter: blur(60px) saturate(1.8);
+  border-left: 1px solid var(--border-bright);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.48s cubic-bezier(0.32,0.72,0,1);
+  z-index: 140;
+  box-shadow: -30px 0 80px rgba(0,0,0,0.5);
+}
+.chat-panel.open { transform: translateX(0); }
+
+.chat-hdr {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.chat-hdr-left { display: flex; align-items: center; gap: 9px; }
+.chat-title { font-size: 14px; font-weight: 600; }
+.chat-model {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid rgba(124,127,255,0.25);
+}
+.chat-x {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  color: var(--text-dim);
+  border: 1px solid transparent;
+  transition: all 0.15s;
+}
+.chat-x:hover { background: rgba(255,255,255,0.07); border-color: var(--border); color: var(--text); }
+
+.chat-msgs {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.07) transparent;
+}
+
+.msg { display: flex; flex-direction: column; gap: 4px; animation: msg-appear 0.22s ease; }
+.msg.u { align-items: flex-end; }
+.msg.b { align-items: flex-start; }
+@keyframes msg-appear {
+  from { opacity:0; transform: translateY(8px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+.bubble {
+  max-width: 86%;
+  padding: 11px 14px;
+  font-size: 13px;
+  line-height: 1.58;
+}
+.msg.u .bubble {
+  background: var(--accent);
+  border-radius: 16px 16px 4px 16px;
+  color: white;
+  box-shadow: 0 4px 16px rgba(124,127,255,0.3);
+}
+.msg.b .bubble {
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  border-radius: 16px 16px 16px 4px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+}
+.msg-ts { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
+
+.chat-input-area {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.input-shell {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-bright);
+  border-radius: 14px;
+  padding: 9px 9px 9px 14px;
+  transition: border-color 0.15s;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);
+}
+.input-shell:focus-within { border-color: rgba(124,127,255,0.5); }
+.chat-ta {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  resize: none;
+  min-height: 20px;
+  max-height: 120px;
+  line-height: 1.5;
+  caret-color: var(--accent);
+}
+.chat-ta::placeholder { color: var(--text-dim); }
+.send-btn {
+  width: 32px; height: 32px;
+  border-radius: 9px;
+  background: var(--accent);
+  border: none;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: white;
+  flex-shrink: 0;
+  transition: opacity 0.15s, transform 0.1s;
+  box-shadow: 0 2px 10px rgba(124,127,255,0.4);
+}
+.send-btn:hover { opacity: 0.85; }
+.send-btn:active { transform: scale(0.9); }
+
+/* ── History drawer ── */
+.hist-drawer {
+  position: fixed;
+  top: 36px; left: var(--nav-w); bottom: 0;
+  width: 252px;
+  background: rgba(6,6,18,0.7);
+  backdrop-filter: blur(60px) saturate(1.8);
+  border-right: 1px solid var(--border-bright);
+  transform: translateX(-100%);
+  transition: transform 0.42s cubic-bezier(0.32,0.72,0,1);
+  z-index: 145;
+  display: flex; flex-direction: column;
+  box-shadow: 16px 0 50px rgba(0,0,0,0.45);
+}
+.hist-drawer.open { transform: translateX(0); }
+.hist-hdr {
+  height: 52px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.hist-title { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); }
+.hist-x {
+  width: 26px; height: 26px;
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--text-dim);
+  transition: all 0.15s;
+}
+.hist-x:hover { background: rgba(255,255,255,0.07); color: var(--text); }
+.hist-list { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 1px; }
+.hist-item {
+  padding: 9px 10px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.12s;
+  border: 1px solid transparent;
+}
+.hist-item:hover { background: rgba(255,255,255,0.05); }
+.hist-item.on { background: rgba(124,127,255,0.08); border-color: rgba(124,127,255,0.2); }
+.hi-t { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hi-m { font-size: 10.5px; color: var(--text-dim); margin-top: 2px; }
+
+/* ── FAB ── */
+.fab {
+  position: fixed;
+  bottom: 22px; right: 22px;
+  width: 50px; height: 50px;
+  border-radius: 16px;
+  background: var(--accent);
+  border: none;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: white;
+  z-index: 130;
+  transition: all 0.22s;
+  box-shadow: 0 6px 24px rgba(124,127,255,0.4), 0 12px 40px rgba(0,0,0,0.4);
+}
+.fab:hover { transform: scale(1.06); box-shadow: 0 8px 30px rgba(124,127,255,0.5); }
+.fab:active { transform: scale(0.93); }
+.fab svg { width: 20px; height: 20px; }
+
+/* ── Wallpaper set button ── */
+.wp-btn {
+  position: fixed;
+  bottom: 22px; left: 78px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  z-index: 130;
+  display: flex; align-items: center; gap: 6px;
+}
+.wp-btn:hover { background: rgba(255,255,255,0.09); color: var(--text); border-color: var(--border-bright); }
+.wp-btn svg { width: 12px; height: 12px; }
+#wp-input { display: none; }
+
+/* ── Stagger load ── */
+.glass {
+  opacity: 0;
+  animation: card-in 0.45s cubic-bezier(0.22,1,0.36,1) forwards;
+}
+.s0  { animation-delay: 0.04s; }
+.s1  { animation-delay: 0.09s; }
+.s2  { animation-delay: 0.14s; }
+.s3  { animation-delay: 0.19s; }
+.s4  { animation-delay: 0.24s; }
+.s5  { animation-delay: 0.29s; }
+@keyframes card-in {
+  from { opacity:0; transform: translateY(12px) scale(0.98); }
+  to   { opacity:1; transform: translateY(0) scale(1); }
+}
+
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.07); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- Wallpaper -->
+<div class="wallpaper" id="wallpaper"></div>
+
+<!-- Titlebar -->
+<div class="titlebar">
+  <div class="tb-dots">
+    <div class="tb-dot dot-r"></div>
+    <div class="tb-dot dot-a"></div>
+    <div class="tb-dot dot-g"></div>
+  </div>
+  <div class="tb-title">BLADE</div>
+  <div class="tb-right">
+    <div class="tb-pill"><div class="live-dot"></div>3 agents · all systems live</div>
+  </div>
+</div>
+
+<!-- Nav -->
+<nav class="nav-rail">
+  <div class="nav-logo">B</div>
+
+  <div class="nav-btn active" data-tip="Dashboard">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/>
+      <rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/>
+    </svg>
+  </div>
+
+  <div class="nav-btn" data-tip="Conversations" onclick="toggleHist()">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 13a2 2 0 01-2 2H6l-4 3V4a2 2 0 012-2h12a2 2 0 012 2v9z"/>
+    </svg>
+  </div>
+
+  <div class="nav-btn" data-tip="Terminal">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="3" width="16" height="14" rx="2"/>
+      <path d="M6 8l3 3-3 3M11 14h3"/>
+    </svg>
+  </div>
+
+  <div class="nav-btn" data-tip="Git">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="5" cy="5" r="2"/><circle cx="15" cy="5" r="2"/><circle cx="5" cy="15" r="2"/>
+      <path d="M5 7v6M7 5h3a3 3 0 010 6H5"/>
+    </svg>
+  </div>
+
+  <div class="nav-btn" data-tip="Hive">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="12,2 18,6 18,14 12,18 6,14 6,6"/>
+      <circle cx="12" cy="10" r="2"/>
+    </svg>
+  </div>
+
+  <div class="nav-spacer"></div>
+  <div class="nav-sep"></div>
+
+  <div class="nav-btn" data-tip="Ghost Mode">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10 2a6 6 0 016 6v8l-2-2-2 2-2-2-2 2-2-2-2 2V8a6 6 0 016-6z"/>
+    </svg>
+  </div>
+
+  <div class="nav-btn" data-tip="Settings">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="10" cy="10" r="2.5"/>
+      <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42"/>
+    </svg>
+  </div>
+</nav>
+
+<!-- History drawer -->
+<div class="hist-drawer" id="histDrawer">
+  <div class="hist-hdr">
+    <div class="hist-title">Conversations</div>
+    <div class="hist-x" onclick="toggleHist()">
+      <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M1 1l9 9M10 1l-9 9"/>
+      </svg>
+    </div>
+  </div>
+  <div class="hist-list">
+    <div class="hist-item on"><div class="hi-t">Fix auth middleware bug</div><div class="hi-m">Today 2:14 PM · 12 msgs</div></div>
+    <div class="hist-item"><div class="hi-t">BLADE dashboard layout plan</div><div class="hi-m">Today 11:30 AM · 28 msgs</div></div>
+    <div class="hist-item"><div class="hi-t">Staq Play Store prep</div><div class="hi-m">Yesterday · 41 msgs</div></div>
+    <div class="hist-item"><div class="hi-t">Razorpay integration review</div><div class="hi-m">Yesterday · 17 msgs</div></div>
+    <div class="hist-item"><div class="hi-t">Solana reputation protocol spec</div><div class="hi-m">Apr 13 · 55 msgs</div></div>
+    <div class="hist-item"><div class="hi-t">RIFTDUEL Phase 1 retrospective</div><div class="hi-m">Apr 12 · 22 msgs</div></div>
+    <div class="hist-item"><div class="hi-t">MCP server config debugging</div><div class="hi-m">Apr 11 · 9 msgs</div></div>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main" id="main">
+
+  <!-- Live Intelligence -->
+  <div class="live-section">
+
+    <!-- God Mode perception card -->
+    <div class="glass s0">
+      <div class="card-inner">
+        <div class="card-label">
+          <div class="card-label-icon cli">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="6" r="4.5" stroke-dasharray="1.8 2.5"/>
+            </svg>
+          </div>
+          God Mode
+          <div class="status-chip sc-live">Extreme</div>
+        </div>
+        <div class="perc-rows">
+          <div class="perc-row">
+            <div class="perc-dot pd-g"></div>
+            <div class="perc-key">Active window</div>
+            <div class="perc-val perc-mono">VS Code</div>
+          </div>
+          <div class="perc-row">
+            <div class="perc-dot pd-a"></div>
+            <div class="perc-key">Working on</div>
+            <div class="perc-val perc-mono">blade/App.tsx:199</div>
+          </div>
+          <div class="perc-row">
+            <div class="perc-dot pd-g"></div>
+            <div class="perc-key">User state</div>
+            <div class="perc-val">Focused · flow detected</div>
+          </div>
+          <div class="perc-row">
+            <div class="perc-dot pd-b"></div>
+            <div class="perc-key">Screen recall</div>
+            <div class="perc-val">Captured 2 min ago</div>
+          </div>
+          <div class="perc-row">
+            <div class="perc-dot pd-g"></div>
+            <div class="perc-key">Ambient audio</div>
+            <div class="perc-val">Listening · 0 action items</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Agents card -->
+    <div class="glass s1">
+      <div class="card-inner">
+        <div class="card-label">
+          <div class="card-label-icon clg">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <circle cx="4" cy="4" r="1.5"/><circle cx="9" cy="3" r="1.5"/><circle cx="9" cy="9" r="1.5"/>
+              <path d="M5.5 4h1.5a2 2 0 010 4H4M9 4.5v3"/>
+            </svg>
+          </div>
+          Agents
+          <div class="status-chip sc-live">3 running</div>
+        </div>
+        <div class="agent-rows">
+          <div class="ag-row">
+            <div class="ag-top"><div class="ag-name">Code Reviewer</div><div class="ag-elapsed">04:12</div></div>
+            <div class="ag-task">Reviewing PR #47 · blade auth refactor</div>
+            <div class="ag-bar"><div class="ag-fill" style="width:72%"></div></div>
+          </div>
+          <div class="ag-row">
+            <div class="ag-top"><div class="ag-name">Morning Briefing</div><div class="ag-elapsed">01:03</div></div>
+            <div class="ag-task">Composing daily digest from 8 sources</div>
+            <div class="ag-bar"><div class="ag-fill" style="width:38%"></div></div>
+          </div>
+          <div class="ag-row">
+            <div class="ag-top"><div class="ag-name">Security Monitor</div><div class="ag-elapsed">∞</div></div>
+            <div class="ag-task">Network watch · 0 anomalies detected</div>
+            <div class="ag-bar"><div class="ag-fill" style="width:100%;opacity:0.25"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Integrations card -->
+    <div class="glass s2">
+      <div class="card-inner">
+        <div class="card-label">
+          <div class="card-label-icon cla">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <rect x="1" y="1" width="4" height="4" rx="1"/><rect x="7" y="1" width="4" height="4" rx="1"/>
+              <rect x="1" y="7" width="4" height="4" rx="1"/><path d="M9 7v4M11 9H7"/>
+            </svg>
+          </div>
+          Integrations
+          <div class="status-chip sc-warn">4 pending</div>
+        </div>
+        <div class="int-grid">
+          <div class="int-tile">
+            <div class="int-name">Email</div>
+            <div class="int-count int-a">2</div>
+            <div class="int-sub">need reply</div>
+          </div>
+          <div class="int-tile">
+            <div class="int-name">Slack</div>
+            <div class="int-count int-a">4</div>
+            <div class="int-sub">mentions</div>
+          </div>
+          <div class="int-tile">
+            <div class="int-name">GitHub</div>
+            <div class="int-count int-g">✓</div>
+            <div class="int-sub">CI passing</div>
+          </div>
+          <div class="int-tile">
+            <div class="int-name">Calendar</div>
+            <div class="int-count int-p">2</div>
+            <div class="int-sub">events today</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Today -->
+  <div class="today-section">
+
+    <!-- Calendar -->
+    <div class="glass s3">
+      <div class="card-inner">
+        <div class="card-label">
+          <div class="card-label-icon cli">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <rect x="1" y="2" width="10" height="9" rx="1.5"/><path d="M1 5h10M4 1v2M8 1v2"/>
+            </svg>
+          </div>
+          Calendar
+        </div>
+        <div class="cal-items">
+          <div class="cal-item next-up">
+            <div class="cal-time-col">
+              <div class="cal-time">3:00</div>
+              <div class="cal-tline"></div>
+            </div>
+            <div class="cal-body">
+              <div class="cal-name">Staq sync — Federico</div>
+              <div class="cal-meta">Solana Reputation Protocol</div>
+              <div class="cal-badge">in 47 min</div>
+            </div>
+          </div>
+          <div class="cal-item">
+            <div class="cal-time-col">
+              <div class="cal-time">5:30</div>
+              <div class="cal-tline"></div>
+            </div>
+            <div class="cal-body">
+              <div class="cal-name">PollPe standup</div>
+              <div class="cal-meta">Google Meet · 5 attendees</div>
+            </div>
+          </div>
+          <div class="cal-item">
+            <div class="cal-time-col">
+              <div class="cal-time">Tmrw</div>
+            </div>
+            <div class="cal-body">
+              <div class="cal-name">Investor call · demo prep</div>
+              <div class="cal-meta">Zoom · Staq deck needed</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Queue -->
+    <div class="glass s4">
+      <div class="card-inner">
+        <div class="card-label">
+          <div class="card-label-icon cla">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <circle cx="6" cy="6" r="5"/><path d="M6 4v2l1.5 1.5"/>
+            </svg>
+          </div>
+          Action Queue
+          <div class="status-chip sc-warn">3 waiting</div>
+        </div>
+        <div class="queue-items">
+          <div class="q-item">
+            <div class="q-dot q-a"></div>
+            <div class="q-body">
+              <div class="q-title">Reply to Rohan — API timeline</div>
+              <div class="q-sub">Draft ready · Slack DM · 2h ago</div>
+            </div>
+            <div class="q-cta">Review</div>
+          </div>
+          <div class="q-item">
+            <div class="q-dot q-p"></div>
+            <div class="q-body">
+              <div class="q-title">Approve PR merge — blade#47</div>
+              <div class="q-sub">Review complete · CI passing</div>
+            </div>
+            <div class="q-cta">Approve</div>
+          </div>
+          <div class="q-item">
+            <div class="q-dot q-g"></div>
+            <div class="q-body">
+              <div class="q-title">Accept calendar invite</div>
+              <div class="q-sub">Tomorrow 10 AM · Zoom · investor</div>
+            </div>
+            <div class="q-cta">Accept</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="glass s5">
+      <div class="card-inner">
+        <div class="card-label">
+          <div class="card-label-icon clg">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <path d="M1 9l3-3 2 2 3-4 3 2"/>
+            </svg>
+          </div>
+          Today
+        </div>
+        <div class="stats-wrap">
+          <div class="stat-tile">
+            <div class="stat-lbl">Chats</div>
+            <div class="stat-num">12</div>
+            <div class="stat-chg chg-up">↑ 3 from yesterday</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-lbl">AI Spend</div>
+            <div class="stat-num" style="font-size:20px">$0.84</div>
+            <div class="stat-chg chg-up">↓ under budget</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-lbl">Memories</div>
+            <div class="stat-num" style="font-size:22px">1.2k</div>
+            <div class="stat-chg chg-up">+14 today</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-lbl">Screen time</div>
+            <div class="stat-num" style="font-size:18px">4h 21m</div>
+            <div class="stat-chg chg-dn">↑ above avg</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Chat panel -->
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-hdr">
+    <div class="chat-hdr-left">
+      <div class="chat-title">Chat</div>
+      <div class="chat-model">claude-sonnet-4-6</div>
+    </div>
+    <div class="chat-x" onclick="toggleChat()">
+      <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M1 1l9 9M10 1l-9 9"/>
+      </svg>
+    </div>
+  </div>
+  <div class="chat-msgs">
+    <div class="msg b">
+      <div class="bubble">Morning. 2 emails need replies, Staq sync with Federico in 47 min, and CI is green on blade#47. Want me to prep your sync notes?</div>
+      <div class="msg-ts">2:14 PM</div>
+    </div>
+    <div class="msg u">
+      <div class="bubble">Yes — pull context from our last 3 Solana convos and BRIDGE.md</div>
+      <div class="msg-ts">2:15 PM</div>
+    </div>
+    <div class="msg b">
+      <div class="bubble">Done. Key threads from your last 3 sessions:<br><br>
+        <strong>1.</strong> Attestation ownership split — Federico has the Anchor program, you own the API layer.<br><br>
+        <strong>2.</strong> Open: finality window for on-chain writes. You leaned optimistic last call.<br><br>
+        <strong>3.</strong> BRIDGE.md flags providers/ as off-limits — keep Solana in a separate package.<br><br>
+        Formatted as a 1-page brief you can share directly if needed.
+      </div>
+      <div class="msg-ts">2:15 PM</div>
+    </div>
+  </div>
+  <div class="chat-input-area">
+    <div class="input-shell">
+      <textarea class="chat-ta" placeholder="Ask BLADE anything…" rows="1"
+        oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+      <button class="send-btn">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L2 7l4 2 1 4 5-11z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- FAB -->
+<button class="fab" id="fab" onclick="toggleChat()" title="Open chat">
+  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 13a2 2 0 01-2 2H6l-4 3V4a2 2 0 012-2h12a2 2 0 012 2v9z"/>
+  </svg>
+</button>
+
+<!-- Wallpaper picker -->
+<label class="wp-btn" title="Set your wallpaper to see the liquid glass effect">
+  <input type="file" id="wp-input" accept="image/*" onchange="setWallpaper(this)"/>
+  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+    <rect x="1" y="2" width="10" height="8" rx="1.5"/>
+    <circle cx="4" cy="5" r="1"/>
+    <path d="M1 8l3-2.5 2 1.5 2-2 3 2.5"/>
+  </svg>
+  Set wallpaper
+</label>
+
+<script>
+let chatOpen = false, histOpen = false;
+
+function toggleChat() {
+  chatOpen = !chatOpen;
+  document.getElementById('chatPanel').classList.toggle('open', chatOpen);
+  document.getElementById('main').classList.toggle('chat-open', chatOpen);
+  const fab = document.getElementById('fab');
+  fab.style.opacity = chatOpen ? '0' : '1';
+  fab.style.pointerEvents = chatOpen ? 'none' : 'auto';
+  fab.style.transform = chatOpen ? 'scale(0.8)' : 'scale(1)';
+}
+
+function toggleHist() {
+  histOpen = !histOpen;
+  document.getElementById('histDrawer').classList.toggle('open', histOpen);
+}
+
+function setWallpaper(input) {
+  if (!input.files[0]) return;
+  const url = URL.createObjectURL(input.files[0]);
+  const wp = document.getElementById('wallpaper');
+  wp.style.backgroundImage = `url(${url})`;
+  wp.style.backgroundSize = 'cover';
+  wp.style.backgroundPosition = 'center';
+  wp.style.animation = 'none';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (chatOpen) toggleChat();
+    if (histOpen) toggleHist();
+  }
+});
+
+// Auto-demo
+setTimeout(() => toggleChat(), 1000);
+</script>
+</body>
+</html>

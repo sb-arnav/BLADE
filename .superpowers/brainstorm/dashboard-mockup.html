@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BLADE — Dashboard Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #050507;
+    --surface: rgba(255,255,255,0.035);
+    --surface-hover: rgba(255,255,255,0.06);
+    --border: rgba(255,255,255,0.08);
+    --border-strong: rgba(255,255,255,0.14);
+    --text: rgba(255,255,255,0.92);
+    --muted: rgba(255,255,255,0.38);
+    --subtle: rgba(255,255,255,0.18);
+    --accent: #6366f1;
+    --accent-glow: rgba(99,102,241,0.25);
+    --green: #34d399;
+    --green-dim: rgba(52,211,153,0.15);
+    --amber: #fbbf24;
+    --amber-dim: rgba(251,191,36,0.12);
+    --red: #f87171;
+    --red-dim: rgba(248,113,113,0.12);
+    --blue: #60a5fa;
+    --blue-dim: rgba(96,165,250,0.12);
+    --nav-w: 56px;
+    --chat-w: 400px;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Grain overlay ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.6;
+  }
+
+  /* ── App shell ── */
+  .app {
+    display: flex;
+    height: 100vh;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ── Title bar ── */
+  .titlebar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    background: rgba(5,5,7,0.8);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    z-index: 100;
+    user-select: none;
+  }
+  .titlebar-dots { display: flex; gap: 6px; }
+  .titlebar-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .titlebar-dot:hover { opacity: 0.8; }
+  .dot-red   { background: #ff5f57; }
+  .dot-amber { background: #febc2e; }
+  .dot-green { background: #28c840; }
+  .titlebar-title {
+    position: absolute;
+    left: 50%; transform: translateX(-50%);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--subtle);
+    letter-spacing: 0.02em;
+  }
+  .titlebar-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 10.5px;
+    font-weight: 500;
+    background: var(--green-dim);
+    color: var(--green);
+    border: 1px solid rgba(52,211,153,0.2);
+  }
+  .status-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+  @keyframes pulse-dot {
+    0%,100% { opacity:1; transform:scale(1); }
+    50% { opacity:0.5; transform:scale(0.8); }
+  }
+
+  /* ── Left nav rail ── */
+  .nav-rail {
+    position: fixed;
+    top: 32px; left: 0; bottom: 0;
+    width: var(--nav-w);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 0 12px;
+    background: rgba(255,255,255,0.02);
+    border-right: 1px solid var(--border);
+    backdrop-filter: blur(20px);
+    z-index: 90;
+    gap: 4px;
+  }
+
+  .nav-logo {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), #818cf8);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 16px;
+    box-shadow: 0 0 16px var(--accent-glow);
+    font-size: 14px;
+    font-weight: 700;
+    color: white;
+    letter-spacing: -0.5px;
+  }
+
+  .nav-spacer { flex: 1; }
+  .nav-divider {
+    width: 28px; height: 1px;
+    background: var(--border);
+    margin: 8px 0;
+  }
+
+  .nav-btn {
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: var(--muted);
+    position: relative;
+    transition: all 0.15s;
+    border: 1px solid transparent;
+  }
+  .nav-btn:hover {
+    color: var(--text);
+    background: var(--surface-hover);
+    border-color: var(--border);
+  }
+  .nav-btn.active {
+    color: white;
+    background: rgba(99,102,241,0.15);
+    border-color: rgba(99,102,241,0.3);
+  }
+  .nav-btn.active::before {
+    content: '';
+    position: absolute;
+    left: -9px; top: 50%; transform: translateY(-50%);
+    width: 3px; height: 18px;
+    border-radius: 2px;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+  }
+  .nav-btn svg { width: 17px; height: 17px; }
+
+  /* Tooltip */
+  .nav-btn::after {
+    content: attr(data-tip);
+    position: absolute;
+    left: calc(100% + 10px);
+    top: 50%; transform: translateY(-50%);
+    background: rgba(20,20,28,0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    font-size: 11.5px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  }
+  .nav-btn:hover::after { opacity: 1; }
+
+  /* ── Main content ── */
+  .main {
+    margin-left: var(--nav-w);
+    margin-top: 32px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 32px);
+    overflow: hidden;
+    transition: margin-right 0.45s cubic-bezier(0.32,0.72,0,1);
+  }
+  .main.chat-open { margin-right: var(--chat-w); }
+
+  /* ── Ticker ── */
+  .ticker-bar {
+    height: 32px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    overflow: hidden;
+    flex-shrink: 0;
+    position: relative;
+    background: rgba(255,255,255,0.015);
+  }
+  .ticker-label {
+    padding: 0 12px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    text-transform: uppercase;
+    border-right: 1px solid var(--border);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .ticker-track {
+    overflow: hidden;
+    flex: 1;
+    position: relative;
+  }
+  .ticker-items {
+    display: flex;
+    gap: 0;
+    animation: ticker 30s linear infinite;
+    white-space: nowrap;
+  }
+  .ticker-items:hover { animation-play-state: paused; }
+  .ticker-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 20px;
+    font-size: 11.5px;
+    color: var(--muted);
+    border-right: 1px solid var(--border);
+  }
+  .ticker-item .tick-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .tick-green { background: var(--green); }
+  .tick-amber { background: var(--amber); }
+  .tick-blue  { background: var(--blue); }
+  .tick-red   { background: var(--red); }
+  @keyframes ticker {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  /* ── Dashboard sections ── */
+  .dashboard-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .section-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--subtle);
+    padding: 14px 20px 8px;
+    flex-shrink: 0;
+  }
+
+  /* ── Live Feed (top ~45%) ── */
+  .live-feed {
+    flex: 0 0 45%;
+    display: flex;
+    flex-direction: column;
+    border-bottom: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .feed-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    padding: 0 16px 14px;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .glass-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, background 0.2s;
+    cursor: default;
+  }
+  .glass-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .glass-card:hover {
+    border-color: var(--border-strong);
+    background: var(--surface-hover);
+  }
+  .glass-card.active-card {
+    border-color: rgba(99,102,241,0.25);
+    box-shadow: 0 0 0 1px rgba(99,102,241,0.1), inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+  .glass-card.active-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.6;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .card-icon-label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--subtle);
+    text-transform: uppercase;
+  }
+  .card-icon {
+    width: 24px; height: 24px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .card-icon svg { width: 13px; height: 13px; }
+  .icon-indigo { background: rgba(99,102,241,0.15); color: var(--accent); }
+  .icon-green  { background: var(--green-dim); color: var(--green); }
+  .icon-amber  { background: var(--amber-dim); color: var(--amber); }
+
+  .card-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 20px;
+  }
+  .badge-active { background: var(--green-dim); color: var(--green); border: 1px solid rgba(52,211,153,0.2); }
+  .badge-idle   { background: rgba(255,255,255,0.06); color: var(--muted); border: 1px solid var(--border); }
+  .badge-alert  { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(251,191,36,0.2); }
+
+  .card-value {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+  .card-value span {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--muted);
+    letter-spacing: 0;
+    margin-left: 4px;
+  }
+
+  .card-rows { display: flex; flex-direction: column; gap: 6px; flex: 1; overflow: hidden; }
+  .card-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11.5px;
+    padding: 6px 8px;
+    border-radius: 7px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.04);
+  }
+  .row-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .row-label { color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-value { color: var(--text); font-weight: 500; font-size: 11px; }
+  .row-mono  { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--blue); }
+
+  /* Agent activity bars */
+  .agent-list { display: flex; flex-direction: column; gap: 7px; flex: 1; overflow: hidden; }
+  .agent-item { display: flex; flex-direction: column; gap: 3px; }
+  .agent-meta { display: flex; align-items: center; justify-content: space-between; }
+  .agent-name { font-size: 11.5px; color: var(--text); font-weight: 500; }
+  .agent-task { font-size: 10.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .agent-time { font-size: 10px; color: var(--subtle); font-family: 'JetBrains Mono', monospace; flex-shrink: 0; }
+  .progress-bar { height: 2px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
+  .progress-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--accent), #818cf8);
+    animation: progress-shimmer 2s ease-in-out infinite;
+  }
+  @keyframes progress-shimmer {
+    0%,100% { opacity:1; }
+    50% { opacity:0.65; }
+  }
+
+  /* ── Today section (bottom ~55%) ── */
+  .today-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+  }
+  .today-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    padding: 0 16px 14px;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* Calendar */
+  .cal-event {
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    background: rgba(255,255,255,0.025);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    transition: background 0.15s, border-color 0.15s;
+    cursor: default;
+  }
+  .cal-event:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+  .cal-event.next { border-color: rgba(99,102,241,0.25); background: rgba(99,102,241,0.06); }
+  .cal-time { font-size: 10px; font-family: 'JetBrains Mono', monospace; color: var(--accent); font-weight: 500; }
+  .cal-name { font-size: 12px; font-weight: 500; color: var(--text); }
+  .cal-meta { font-size: 10.5px; color: var(--muted); }
+  .cal-countdown {
+    font-size: 9.5px;
+    background: var(--accent-glow);
+    color: var(--accent);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    align-self: flex-start;
+    margin-top: 2px;
+  }
+
+  /* Queue */
+  .queue-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    background: rgba(255,255,255,0.025);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .queue-item:hover {
+    background: var(--surface-hover);
+    border-color: var(--border-strong);
+    transform: translateY(-1px);
+  }
+  .queue-icon {
+    width: 22px; height: 22px;
+    border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .queue-icon svg { width: 11px; height: 11px; }
+  .q-indigo { background: rgba(99,102,241,0.15); color: var(--accent); }
+  .q-amber  { background: var(--amber-dim); color: var(--amber); }
+  .q-green  { background: var(--green-dim); color: var(--green); }
+  .queue-content { flex: 1; min-width: 0; }
+  .queue-title { font-size: 11.5px; font-weight: 500; color: var(--text); }
+  .queue-sub { font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .queue-action {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-glow);
+    padding: 2px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    align-self: center;
+  }
+
+  /* Stats */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex: 1; }
+  .stat-card {
+    background: rgba(255,255,255,0.025);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    transition: all 0.15s;
+  }
+  .stat-card:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+  .stat-label { font-size: 10px; color: var(--muted); font-weight: 500; letter-spacing: 0.03em; text-transform: uppercase; }
+  .stat-value { font-size: 22px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.1; }
+  .stat-delta { font-size: 10px; color: var(--green); font-weight: 500; }
+  .stat-delta.down { color: var(--red); }
+
+  /* ── Chat panel ── */
+  .chat-panel {
+    position: fixed;
+    top: 32px; right: 0; bottom: 0;
+    width: var(--chat-w);
+    background: rgba(10,10,16,0.75);
+    backdrop-filter: blur(32px) saturate(1.4);
+    border-left: 1px solid var(--border-strong);
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.45s cubic-bezier(0.32,0.72,0,1);
+    z-index: 80;
+    box-shadow: -20px 0 60px rgba(0,0,0,0.5);
+  }
+  .chat-panel.open { transform: translateX(0); }
+
+  .chat-header {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .chat-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .chat-model-badge {
+    font-size: 10px;
+    background: var(--accent-glow);
+    color: var(--accent);
+    border: 1px solid rgba(99,102,241,0.25);
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  .chat-close {
+    width: 28px; height: 28px;
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: var(--muted);
+    border: 1px solid transparent;
+    transition: all 0.15s;
+  }
+  .chat-close:hover { background: var(--surface-hover); border-color: var(--border); color: var(--text); }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.08) transparent;
+  }
+
+  .msg {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    animation: msg-in 0.25s ease;
+  }
+  @keyframes msg-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .msg.user { align-items: flex-end; }
+  .msg.ai   { align-items: flex-start; }
+  .msg-bubble {
+    max-width: 85%;
+    padding: 10px 13px;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  .msg.user .msg-bubble {
+    background: var(--accent);
+    color: white;
+    border-radius: 12px 12px 3px 12px;
+  }
+  .msg.ai .msg-bubble {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 12px 12px 12px 3px;
+  }
+  .msg-time { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+  .chat-input-area {
+    padding: 12px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .chat-input-wrap {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    padding: 8px 8px 8px 14px;
+    transition: border-color 0.15s;
+  }
+  .chat-input-wrap:focus-within { border-color: rgba(99,102,241,0.4); }
+  .chat-textarea {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 13px;
+    resize: none;
+    min-height: 20px;
+    max-height: 120px;
+    line-height: 1.5;
+    caret-color: var(--accent);
+  }
+  .chat-textarea::placeholder { color: var(--muted); }
+  .chat-send {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: var(--accent);
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: opacity 0.15s, transform 0.1s;
+    color: white;
+  }
+  .chat-send:hover { opacity: 0.85; }
+  .chat-send:active { transform: scale(0.92); }
+
+  /* ── History drawer ── */
+  .history-drawer {
+    position: fixed;
+    top: 32px; left: var(--nav-w); bottom: 0;
+    width: 260px;
+    background: rgba(8,8,14,0.85);
+    backdrop-filter: blur(24px);
+    border-right: 1px solid var(--border-strong);
+    transform: translateX(-100%);
+    transition: transform 0.4s cubic-bezier(0.32,0.72,0,1);
+    z-index: 85;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 10px 0 40px rgba(0,0,0,0.4);
+  }
+  .history-drawer.open { transform: translateX(0); }
+  .history-header {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .history-title { font-size: 12px; font-weight: 600; color: var(--subtle); letter-spacing: 0.05em; text-transform: uppercase; }
+  .history-close {
+    width: 24px; height: 24px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: var(--muted);
+    transition: all 0.15s;
+  }
+  .history-close:hover { background: var(--surface-hover); color: var(--text); }
+  .history-list { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 2px; }
+  .history-item {
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.1s;
+    border: 1px solid transparent;
+  }
+  .history-item:hover { background: var(--surface-hover); border-color: var(--border); }
+  .history-item.active { background: rgba(99,102,241,0.08); border-color: rgba(99,102,241,0.2); }
+  .hi-title { font-size: 12px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hi-meta { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+
+  /* ── Floating action ── */
+  .fab-chat {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 48px; height: 48px;
+    border-radius: 14px;
+    background: var(--accent);
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 20px var(--accent-glow), 0 8px 32px rgba(0,0,0,0.4);
+    transition: all 0.2s;
+    z-index: 70;
+    color: white;
+  }
+  .fab-chat:hover { transform: scale(1.05); box-shadow: 0 6px 28px var(--accent-glow); }
+  .fab-chat:active { transform: scale(0.95); }
+  .fab-chat svg { width: 20px; height: 20px; }
+
+  /* ── Stagger animation on load ── */
+  .glass-card, .cal-event, .queue-item, .stat-card {
+    opacity: 0;
+    animation: stagger-in 0.4s ease forwards;
+  }
+  .glass-card:nth-child(1) { animation-delay: 0.05s; }
+  .glass-card:nth-child(2) { animation-delay: 0.1s; }
+  .glass-card:nth-child(3) { animation-delay: 0.15s; }
+  .cal-event:nth-child(1) { animation-delay: 0.2s; }
+  .cal-event:nth-child(2) { animation-delay: 0.25s; }
+  .cal-event:nth-child(3) { animation-delay: 0.3s; }
+  .queue-item:nth-child(1) { animation-delay: 0.22s; }
+  .queue-item:nth-child(2) { animation-delay: 0.27s; }
+  .queue-item:nth-child(3) { animation-delay: 0.32s; }
+  .stat-card:nth-child(1) { animation-delay: 0.24s; }
+  .stat-card:nth-child(2) { animation-delay: 0.29s; }
+  .stat-card:nth-child(3) { animation-delay: 0.34s; }
+  .stat-card:nth-child(4) { animation-delay: 0.39s; }
+  @keyframes stagger-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- Title bar -->
+<div class="titlebar">
+  <div class="titlebar-dots">
+    <div class="titlebar-dot dot-red"></div>
+    <div class="titlebar-dot dot-amber"></div>
+    <div class="titlebar-dot dot-green"></div>
+  </div>
+  <div class="titlebar-title">BLADE</div>
+  <div class="titlebar-right">
+    <div class="status-pill">
+      <div class="status-dot"></div>
+      3 agents active
+    </div>
+  </div>
+</div>
+
+<!-- Left nav rail -->
+<nav class="nav-rail">
+  <div class="nav-logo">B</div>
+
+  <div class="nav-btn active" data-tip="Dashboard" onclick="">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/>
+      <rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/>
+    </svg>
+  </div>
+
+  <div class="nav-btn" data-tip="Conversations" onclick="toggleHistory()">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 13a2 2 0 01-2 2H6l-4 3V4a2 2 0 012-2h12a2 2 0 012 2v9z"/>
+    </svg>
+  </div>
+
+  <div class="nav-btn" data-tip="Terminal">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="3" width="16" height="14" rx="2"/>
+      <path d="M6 8l3 3-3 3M11 14h3"/>
+    </svg>
+  </div>
+
+  <div class="nav-btn" data-tip="Git">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="5" cy="5" r="2"/><circle cx="15" cy="5" r="2"/><circle cx="5" cy="15" r="2"/>
+      <path d="M5 7v6M7 5h3a3 3 0 010 6H5"/>
+    </svg>
+  </div>
+
+  <div class="nav-btn" data-tip="Hive">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="12,2 18,6 18,14 12,18 6,14 6,6"/>
+      <circle cx="12" cy="10" r="2"/>
+    </svg>
+  </div>
+
+  <div class="nav-btn" data-tip="Security">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10 2l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V5l7-3z"/>
+    </svg>
+  </div>
+
+  <div class="nav-spacer"></div>
+  <div class="nav-divider"></div>
+
+  <div class="nav-btn" data-tip="Ghost Mode">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10 2a6 6 0 016 6v8l-2-2-2 2-2-2-2 2-2-2-2 2V8a6 6 0 016-6z"/>
+    </svg>
+  </div>
+
+  <div class="nav-btn" data-tip="Settings">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="10" cy="10" r="2.5"/>
+      <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42"/>
+    </svg>
+  </div>
+</nav>
+
+<!-- History drawer -->
+<div class="history-drawer" id="historyDrawer">
+  <div class="history-header">
+    <div class="history-title">Conversations</div>
+    <div class="history-close" onclick="toggleHistory()">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M2 2l8 8M10 2l-8 8"/>
+      </svg>
+    </div>
+  </div>
+  <div class="history-list">
+    <div class="history-item active">
+      <div class="hi-title">Fix auth middleware bug</div>
+      <div class="hi-meta">Today, 2:14 PM · 12 msgs</div>
+    </div>
+    <div class="history-item">
+      <div class="hi-title">BLADE dashboard layout plan</div>
+      <div class="hi-meta">Today, 11:30 AM · 28 msgs</div>
+    </div>
+    <div class="history-item">
+      <div class="hi-title">Staq Play Store prep</div>
+      <div class="hi-meta">Yesterday · 41 msgs</div>
+    </div>
+    <div class="history-item">
+      <div class="hi-title">Razorpay integration review</div>
+      <div class="hi-meta">Yesterday · 17 msgs</div>
+    </div>
+    <div class="history-item">
+      <div class="hi-title">Solana reputation protocol spec</div>
+      <div class="hi-meta">Apr 13 · 55 msgs</div>
+    </div>
+    <div class="history-item">
+      <div class="hi-title">RIFTDUEL Phase 1 retrospective</div>
+      <div class="hi-meta">Apr 12 · 22 msgs</div>
+    </div>
+    <div class="history-item">
+      <div class="hi-title">MCP server config debugging</div>
+      <div class="hi-meta">Apr 11 · 9 msgs</div>
+    </div>
+    <div class="history-item">
+      <div class="hi-title">Weekly review — April week 2</div>
+      <div class="hi-meta">Apr 10 · 6 msgs</div>
+    </div>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main" id="mainArea">
+
+  <!-- Ticker -->
+  <div class="ticker-bar">
+    <div class="ticker-label">LIVE</div>
+    <div class="ticker-track">
+      <div class="ticker-items">
+        <div class="ticker-item"><span class="tick-dot tick-green"></span>VS Code · blade/src/App.tsx</div>
+        <div class="ticker-item"><span class="tick-dot tick-blue"></span>3 background agents running</div>
+        <div class="ticker-item"><span class="tick-dot tick-amber"></span>2 emails awaiting reply</div>
+        <div class="ticker-item"><span class="tick-dot tick-green"></span>GitHub CI passing · sb-arnav/BLADE</div>
+        <div class="ticker-item"><span class="tick-dot tick-blue"></span>Memory: 1,247 facts stored</div>
+        <div class="ticker-item"><span class="tick-dot tick-green"></span>Mic active · ambient listening</div>
+        <div class="ticker-item"><span class="tick-dot tick-amber"></span>Slack: 4 unread mentions</div>
+        <div class="ticker-item"><span class="tick-dot tick-green"></span>All systems nominal</div>
+        <!-- duplicate for seamless loop -->
+        <div class="ticker-item"><span class="tick-dot tick-green"></span>VS Code · blade/src/App.tsx</div>
+        <div class="ticker-item"><span class="tick-dot tick-blue"></span>3 background agents running</div>
+        <div class="ticker-item"><span class="tick-dot tick-amber"></span>2 emails awaiting reply</div>
+        <div class="ticker-item"><span class="tick-dot tick-green"></span>GitHub CI passing · sb-arnav/BLADE</div>
+        <div class="ticker-item"><span class="tick-dot tick-blue"></span>Memory: 1,247 facts stored</div>
+        <div class="ticker-item"><span class="tick-dot tick-green"></span>Mic active · ambient listening</div>
+        <div class="ticker-item"><span class="tick-dot tick-amber"></span>Slack: 4 unread mentions</div>
+        <div class="ticker-item"><span class="tick-dot tick-green"></span>All systems nominal</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dashboard-body">
+
+    <!-- Live Feed -->
+    <div class="live-feed">
+      <div class="section-label">Live Intelligence</div>
+      <div class="feed-cards">
+
+        <!-- God Mode card -->
+        <div class="glass-card active-card">
+          <div class="card-header">
+            <div class="card-icon-label">
+              <div class="card-icon icon-indigo">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="10" cy="10" r="3"/><circle cx="10" cy="10" r="7" stroke-dasharray="2 3"/>
+                </svg>
+              </div>
+              God Mode
+            </div>
+            <div class="card-badge badge-active">Extreme</div>
+          </div>
+          <div class="card-rows">
+            <div class="card-row">
+              <div class="row-dot" style="background:var(--green)"></div>
+              <div class="row-label">Active window</div>
+              <div class="row-mono">VS Code</div>
+            </div>
+            <div class="card-row">
+              <div class="row-dot" style="background:var(--blue)"></div>
+              <div class="row-label">Working on</div>
+              <div class="row-mono">App.tsx:199</div>
+            </div>
+            <div class="card-row">
+              <div class="row-dot" style="background:var(--amber)"></div>
+              <div class="row-label">User state</div>
+              <div class="row-value">Focused</div>
+            </div>
+            <div class="card-row">
+              <div class="row-dot" style="background:var(--green)"></div>
+              <div class="row-label">Screen capture</div>
+              <div class="row-value">Every 30s</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active Agents card -->
+        <div class="glass-card">
+          <div class="card-header">
+            <div class="card-icon-label">
+              <div class="card-icon icon-green">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="7" cy="7" r="2"/><circle cx="14" cy="5" r="2"/><circle cx="14" cy="14" r="2"/>
+                  <path d="M9 7h2a3 3 0 010 6H7M14 7v5"/>
+                </svg>
+              </div>
+              Agents
+            </div>
+            <div class="card-badge badge-active">3 running</div>
+          </div>
+          <div class="agent-list">
+            <div class="agent-item">
+              <div class="agent-meta">
+                <div class="agent-name">Code Reviewer</div>
+                <div class="agent-time">04:12</div>
+              </div>
+              <div class="agent-task">Reviewing PR #47 · blade auth refactor</div>
+              <div class="progress-bar"><div class="progress-fill" style="width:72%"></div></div>
+            </div>
+            <div class="agent-item">
+              <div class="agent-meta">
+                <div class="agent-name">Morning Briefing</div>
+                <div class="agent-time">01:03</div>
+              </div>
+              <div class="agent-task">Composing daily digest from 8 sources</div>
+              <div class="progress-bar"><div class="progress-fill" style="width:38%"></div></div>
+            </div>
+            <div class="agent-item">
+              <div class="agent-meta">
+                <div class="agent-name">Security Monitor</div>
+                <div class="agent-time">∞</div>
+              </div>
+              <div class="agent-task">Network watch · 0 anomalies</div>
+              <div class="progress-bar"><div class="progress-fill" style="width:100%; opacity:0.3"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Integrations card -->
+        <div class="glass-card">
+          <div class="card-header">
+            <div class="card-icon-label">
+              <div class="card-icon icon-amber">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 4h5v5H4zM11 4h5v5h-5zM4 11h5v5H4zM14 13v4M16 15h-4"/>
+                </svg>
+              </div>
+              Integrations
+            </div>
+            <div class="card-badge badge-alert">4 pending</div>
+          </div>
+          <div class="card-rows">
+            <div class="card-row">
+              <div class="row-dot" style="background:var(--red)"></div>
+              <div class="row-label">Email</div>
+              <div class="row-value">2 need reply</div>
+            </div>
+            <div class="card-row">
+              <div class="row-dot" style="background:var(--amber)"></div>
+              <div class="row-label">Slack mentions</div>
+              <div class="row-value">4 unread</div>
+            </div>
+            <div class="card-row">
+              <div class="row-dot" style="background:var(--green)"></div>
+              <div class="row-label">GitHub</div>
+              <div class="row-value">CI passing</div>
+            </div>
+            <div class="card-row">
+              <div class="row-dot" style="background:var(--blue)"></div>
+              <div class="row-label">Calendar</div>
+              <div class="row-value">2 events today</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Today section -->
+    <div class="today-section">
+      <div class="section-label">Today</div>
+      <div class="today-grid">
+
+        <!-- Calendar -->
+        <div class="glass-card" style="display:flex;flex-direction:column;gap:8px;animation-delay:0.2s">
+          <div class="card-icon-label" style="margin-bottom:2px">
+            <div class="card-icon icon-indigo">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="14" height="13" rx="2"/><path d="M3 8h14M7 2v4M13 2v4"/>
+              </svg>
+            </div>
+            Calendar
+          </div>
+          <div class="cal-event next">
+            <div class="cal-time">3:00 PM</div>
+            <div class="cal-name">Staq sync — Federico</div>
+            <div class="cal-meta">Solana Reputation Protocol</div>
+            <div class="cal-countdown">in 47 min</div>
+          </div>
+          <div class="cal-event">
+            <div class="cal-time">5:30 PM</div>
+            <div class="cal-name">PollPe standup</div>
+            <div class="cal-meta">Google Meet · 5 attendees</div>
+          </div>
+          <div class="cal-event">
+            <div class="cal-time">Tomorrow 10:00 AM</div>
+            <div class="cal-name">Investor call — demo prep</div>
+            <div class="cal-meta">Zoom · Staq</div>
+          </div>
+        </div>
+
+        <!-- Action Queue -->
+        <div class="glass-card" style="display:flex;flex-direction:column;gap:8px;animation-delay:0.25s">
+          <div class="card-icon-label" style="margin-bottom:2px">
+            <div class="card-icon icon-amber">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10 2v6l3 3M10 18a8 8 0 100-16 8 8 0 000 16z"/>
+              </svg>
+            </div>
+            Action Queue
+          </div>
+          <div class="queue-item">
+            <div class="queue-icon q-indigo">
+              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                <path d="M11 8a2 2 0 01-2 2H3L1 12V2a2 2 0 012-2h6a2 2 0 012 2v6z"/>
+              </svg>
+            </div>
+            <div class="queue-content">
+              <div class="queue-title">Reply to Rohan about API timeline</div>
+              <div class="queue-sub">Draft ready · Slack DM · 2h ago</div>
+            </div>
+            <div class="queue-action">Review</div>
+          </div>
+          <div class="queue-item">
+            <div class="queue-icon q-amber">
+              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                <circle cx="6" cy="6" r="5"/><path d="M6 4v2l1.5 1.5"/>
+              </svg>
+            </div>
+            <div class="queue-content">
+              <div class="queue-title">Approve PR merge — blade#47</div>
+              <div class="queue-sub">Code review complete · CI passing</div>
+            </div>
+            <div class="queue-action">Approve</div>
+          </div>
+          <div class="queue-item">
+            <div class="queue-icon q-green">
+              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                <path d="M2 6h8M6 2l4 4-4 4"/>
+              </svg>
+            </div>
+            <div class="queue-content">
+              <div class="queue-title">Accept calendar invite — investor</div>
+              <div class="queue-sub">Tomorrow 10 AM · Zoom</div>
+            </div>
+            <div class="queue-action">Accept</div>
+          </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="glass-card" style="display:flex;flex-direction:column;gap:8px;animation-delay:0.3s">
+          <div class="card-icon-label" style="margin-bottom:2px">
+            <div class="card-icon icon-green">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 14l4-4 4 4 4-6 4 3"/>
+              </svg>
+            </div>
+            Today's Stats
+          </div>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-label">Conversations</div>
+              <div class="stat-value">12</div>
+              <div class="stat-delta">↑ 3 from yesterday</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">AI Cost</div>
+              <div class="stat-value" style="font-size:18px">$0.84</div>
+              <div class="stat-delta">↓ budget ok</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Memories</div>
+              <div class="stat-value">1.2k</div>
+              <div class="stat-delta">↑ 14 new</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Screen time</div>
+              <div class="stat-value" style="font-size:18px">4h 21m</div>
+              <div class="stat-delta down">↑ above avg</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Chat panel -->
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-header">
+    <div class="chat-title">
+      Chat
+      <div class="chat-model-badge">claude-sonnet-4-6</div>
+    </div>
+    <div class="chat-close" onclick="toggleChat()">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M2 2l8 8M10 2l-8 8"/>
+      </svg>
+    </div>
+  </div>
+  <div class="chat-messages">
+    <div class="msg ai">
+      <div class="msg-bubble">Morning. You have 2 emails waiting for replies, a sync with Federico at 3 PM, and CI is green on blade#47. Want me to prep notes for the sync?</div>
+      <div class="msg-time">2:14 PM</div>
+    </div>
+    <div class="msg user">
+      <div class="msg-bubble">Yes, pull context from our last 3 Solana convos and the BRIDGE.md</div>
+      <div class="msg-time">2:15 PM</div>
+    </div>
+    <div class="msg ai">
+      <div class="msg-bubble">Done. Key points from the last 3 sessions:<br><br>
+        <strong>1.</strong> Reputation Protocol uses on-chain attestations — Federico owns the Anchor program, you own the API layer.<br><br>
+        <strong>2.</strong> Open question from last call: finality window for attestation writes (you leaned toward optimistic).<br><br>
+        <strong>3.</strong> BRIDGE.md shows the providers/ modules are off-limits — keep Solana work in a separate package.<br><br>
+        Prepped as a brief you can share with Federico if needed.
+      </div>
+      <div class="msg-time">2:15 PM</div>
+    </div>
+  </div>
+  <div class="chat-input-area">
+    <div class="chat-input-wrap">
+      <textarea class="chat-textarea" placeholder="Ask BLADE anything…" rows="1"
+        oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
+      ></textarea>
+      <button class="chat-send">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L2 7l4 2 1 4 5-11z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- FAB -->
+<button class="fab-chat" id="fabChat" onclick="toggleChat()" title="Open chat">
+  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 13a2 2 0 01-2 2H6l-4 3V4a2 2 0 012-2h12a2 2 0 012 2v9z"/>
+  </svg>
+</button>
+
+<script>
+  let chatOpen = false;
+  let historyOpen = false;
+
+  function toggleChat() {
+    chatOpen = !chatOpen;
+    document.getElementById('chatPanel').classList.toggle('open', chatOpen);
+    document.getElementById('mainArea').classList.toggle('chat-open', chatOpen);
+    const fab = document.getElementById('fabChat');
+    fab.style.opacity = chatOpen ? '0' : '1';
+    fab.style.pointerEvents = chatOpen ? 'none' : 'auto';
+  }
+
+  function toggleHistory() {
+    historyOpen = !historyOpen;
+    document.getElementById('historyDrawer').classList.toggle('open', historyOpen);
+  }
+
+  // Close on ESC
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (chatOpen) toggleChat();
+      if (historyOpen) toggleHistory();
+    }
+  });
+
+  // Auto-open chat after 1.2s for demo effect
+  setTimeout(() => {
+    toggleChat();
+  }, 1200);
+</script>
+
+</body>
+</html>
