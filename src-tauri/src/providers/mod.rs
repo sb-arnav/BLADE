@@ -6,6 +6,15 @@ pub mod openai;
 
 use serde::{Deserialize, Serialize};
 
+/// Shared HTTP client with timeouts. Prevents permanent hangs when network drops.
+pub fn http_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(120))
+        .connect_timeout(std::time::Duration::from_secs(15))
+        .build()
+        .unwrap_or_default()
+}
+
 // ── Unified model-string routing (litellm-style) ─────────────────────────────
 //
 // Accepts model strings in "provider/model" format, e.g.:

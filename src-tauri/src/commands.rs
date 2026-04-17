@@ -22,6 +22,7 @@ pub type ApprovalMap = Arc<Mutex<StdHashMap<String, oneshot::Sender<bool>>>>;
 
 /// Global cancel flag — set to true to abort the current chat inference.
 static CHAT_CANCEL: AtomicBool = AtomicBool::new(false);
+static CHAT_INFLIGHT: AtomicBool = AtomicBool::new(false);
 
 // ---------------------------------------------------------------------------
 // Phase 4: Self-healing circuit breaker + exponential backoff
@@ -69,6 +70,7 @@ fn backoff_secs(base: u64, kind: &str) -> u64 {
 #[tauri::command]
 pub fn cancel_chat(app: tauri::AppHandle) {
     CHAT_CANCEL.store(true, Ordering::SeqCst);
+    CHAT_INFLIGHT.store(false, Ordering::SeqCst);
     let _ = app.emit("chat_cancelled", ());
     let _ = app.emit("blade_status", "idle");
 }
@@ -557,6 +559,19 @@ pub async fn send_message_stream(
     vector_store: tauri::State<'_, crate::embeddings::SharedVectorStore>,
     messages: Vec<ChatMessage>,
 ) -> Result<(), String> {
+    // Concurrency guard — prevent interleaved responses from rapid-fire messages
+    if CHAT_INFLIGHT.swap(true, Ordering::SeqCst) {
+        return Err("Already processing a message. Wait for the current response to finish, or cancel it first.".to_string());
+    }
+    // Drop guard: clear inflight flag when this function exits (any path)
+    struct InflightGuard;
+    impl Drop for InflightGuard {
+        fn drop(&mut self) {
+            CHAT_INFLIGHT.store(false, Ordering::SeqCst);
+        }
+    }
+    let _inflight = InflightGuard;
+
     // Reset cancel flag at the start of every new request
     CHAT_CANCEL.store(false, Ordering::SeqCst);
 

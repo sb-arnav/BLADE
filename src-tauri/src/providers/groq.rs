@@ -159,7 +159,7 @@ pub async fn complete(
     messages: &[ConversationMessage],
     tools: &[ToolDefinition],
 ) -> Result<AssistantTurn, String> {
-    let client = Client::new();
+    let client = super::http_client();
 
     // First attempt: with tools.
     let result = groq_request(&client, api_key, build_body(model, messages, tools)).await;
@@ -251,7 +251,7 @@ pub async fn stream_text(
     use futures::StreamExt;
     use tauri::Emitter;
 
-    let client = Client::new();
+    let client = super::http_client();
     let mut msgs: Vec<serde_json::Value> = messages.iter().filter_map(serialize_simple).collect();
 
     // Non-vision models reject array content — flatten image messages to text only
@@ -329,7 +329,7 @@ pub async fn stream_text(
 }
 
 pub async fn test(api_key: &str, model: &str) -> Result<String, String> {
-    let client = Client::new();
+    let client = super::http_client();
     let body = serde_json::json!({
         "model": model,
         "messages": [{"role": "user", "content": "Say hi in one word."}],

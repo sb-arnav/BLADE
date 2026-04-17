@@ -433,7 +433,16 @@ fn set_api_key_in_keyring(provider: &str, api_key: &str) -> Result<(), String> {
 pub fn load_config() -> BladeConfig {
     let path = config_path();
     let disk: DiskConfig = match fs::read_to_string(&path) {
-        Ok(data) => serde_json::from_str(&data).unwrap_or_default(),
+        Ok(data) => match serde_json::from_str(&data) {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                log::warn!("[config] Config file corrupt, using defaults: {}", e);
+                // Backup the corrupt file so user can recover manually
+                let backup = path.with_extension("json.bak");
+                let _ = fs::copy(&path, &backup);
+                DiskConfig::default()
+            }
+        },
         Err(_) => DiskConfig::default(),
     };
 

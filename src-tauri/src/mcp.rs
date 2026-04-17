@@ -189,6 +189,12 @@ impl McpProcess {
             return Err("No Content-Length in response".to_string());
         }
 
+        // Cap response size to prevent OOM from malicious/buggy MCP servers
+        const MAX_MCP_RESPONSE_BYTES: usize = 50 * 1024 * 1024; // 50 MB
+        if content_length > MAX_MCP_RESPONSE_BYTES {
+            return Err(format!("MCP response too large: {} bytes (max {})", content_length, MAX_MCP_RESPONSE_BYTES));
+        }
+
         let mut body = vec![0u8; content_length];
         self.reader
             .read_exact(&mut body)

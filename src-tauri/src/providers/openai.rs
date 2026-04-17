@@ -138,7 +138,7 @@ pub async fn complete(
     tools: &[ToolDefinition],
     base_url: Option<&str>,
 ) -> Result<AssistantTurn, String> {
-    let client = Client::new();
+    let client = super::http_client();
     let body = build_body(model, messages, tools);
     let url = chat_url(base_url);
 
@@ -218,7 +218,7 @@ pub async fn stream_text(
     use futures::StreamExt;
     use tauri::Emitter;
 
-    let client = Client::new();
+    let client = super::http_client();
     let msgs: Vec<serde_json::Value> = messages.iter().filter_map(serialize_simple).collect();
     let url = chat_url(base_url);
 
@@ -293,7 +293,7 @@ pub async fn stream_text(
 }
 
 pub async fn test(api_key: &str, model: &str, base_url: Option<&str>) -> Result<String, String> {
-    let client = Client::new();
+    let client = super::http_client();
     let url = chat_url(base_url);
     let body = serde_json::json!({
         "model": model,
