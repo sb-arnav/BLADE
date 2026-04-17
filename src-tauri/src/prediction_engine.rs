@@ -14,18 +14,18 @@
 ///   detect_frequency_patterns()  — "you check research queue every 2 days"
 ///   generate_predictions()      — combines detectors, produces 3-5 actionable predictions
 ///   contextual_prediction()     — immediate follow-up predictions after each user message
-///   start_prediction_loop()     — runs generate_predictions every 30 min in background
+///
+/// NOTE: No independent loop. `learning_engine::start_learning_engine` drives
+/// `generate_predictions()` in its 30-min tick. Do not create a separate loop.
 
 use chrono::{Datelike, Local, Timelike, Weekday};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Emitter;
 
-// ── Static guard ──────────────────────────────────────────────────────────────
-
-static PREDICTION_RUNNING: AtomicBool = AtomicBool::new(false);
+// Note: No independent loop. `learning_engine::start_learning_engine` drives
+// `generate_predictions()` directly in its 30-min tick. Do NOT start a separate loop.
 
 // ── Structs ───────────────────────────────────────────────────────────────────
 
@@ -854,29 +854,6 @@ pub fn get_prediction_context() -> String {
         .collect();
 
     format!("## BLADE Predictions\n\nBased on your patterns:\n{}", lines.join("\n"))
-}
-
-// ── Background loop ───────────────────────────────────────────────────────────
-
-/// Start the prediction loop. Runs generate_predictions every 30 minutes.
-/// AtomicBool guard prevents double-start.
-pub fn start_prediction_loop(app: tauri::AppHandle) {
-    if PREDICTION_RUNNING.swap(true, Ordering::SeqCst) {
-        return; // already running
-    }
-
-    ensure_tables();
-
-    tauri::async_runtime::spawn(async move {
-        // Initial delay — let the app fully start before the first scan
-        tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
-
-        loop {
-            let _ = generate_predictions(app.clone()).await;
-            // Run every 30 minutes
-            tokio::time::sleep(tokio::time::Duration::from_secs(1800)).await;
-        }
-    });
 }
 
 // ── Tauri commands ────────────────────────────────────────────────────────────
