@@ -685,21 +685,21 @@ fn tick_terminal_watcher(app: &AppHandle) {
         }
 
         // Workflow pattern learning and deviation detection
-        let prev_cmd = if i > 0 {
-            Some(new_cmds[i - 1].as_str())
+        // Clone the string to avoid use-after-free from raw pointer across mutex release
+        let prev_cmd_owned: Option<String> = if i > 0 {
+            Some(new_cmds[i - 1].clone())
         } else {
-            let state = watcher_state().lock().unwrap();
+            let state = watcher_state().lock().unwrap_or_else(|e| e.into_inner());
             state.recent_commands
                 .iter()
                 .rev()
                 .nth(1)
-                .map(|(c, _)| c.as_str() as *const str)
-                .map(|p| unsafe { &*p })
+                .map(|(c, _)| c.clone())
         };
 
         {
-            let mut state = watcher_state().lock().unwrap();
-            learn_workflow_pattern(&mut state.workflow_patterns, cmd, prev_cmd);
+            let mut state = watcher_state().lock().unwrap_or_else(|e| e.into_inner());
+            learn_workflow_pattern(&mut state.workflow_patterns, cmd, prev_cmd_owned.as_deref());
         }
 
         let workflow_reminder = {

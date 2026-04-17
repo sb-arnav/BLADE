@@ -88,10 +88,13 @@ pub async fn transcribe_segment(wav_bytes: &[u8], sample_rate: u32) -> Option<Tr
         }
     };
 
-    request.headers_mut().insert(
-        "Authorization",
-        format!("Token {api_key}").parse().unwrap(),
-    );
+    match format!("Token {api_key}").parse() {
+        Ok(v) => { request.headers_mut().insert("Authorization", v); }
+        Err(e) => {
+            log::warn!("[deepgram] invalid API key format: {e}");
+            return None;
+        }
+    }
 
     let (ws_stream, _) = match connect_async(request).await {
         Ok(r) => r,

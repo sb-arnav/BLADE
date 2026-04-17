@@ -231,13 +231,17 @@ public class AudioManager {{
 pub async fn launch_app(name: String) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
-        // Use Start-Process so Windows resolves shortcuts, app IDs, etc.
+        // Sanitize app name to prevent PowerShell injection
+        let sanitized = name.replace(['\'', '"', '`', ';', '|', '&', '$', '(', ')', '{', '}'], "");
+        if sanitized.is_empty() {
+            return Err("Invalid app name".to_string());
+        }
         let out = crate::cmd_util::silent_tokio_cmd("powershell")
             .args([
                 "-NoProfile",
                 "-NonInteractive",
                 "-Command",
-                &format!("Start-Process '{}'", name),
+                &format!("Start-Process '{}'", sanitized),
             ])
             .output()
             .await
@@ -427,6 +431,14 @@ pub async fn list_running_apps() -> Result<Vec<String>, String> {
 
 #[tauri::command]
 pub async fn sc_focus_window(title_pattern: String) -> Result<(), String> {
+    // Sanitize to prevent shell injection — only allow alphanumeric, spaces, hyphens, dots
+    let sanitized: String = title_pattern.chars()
+        .filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '-' || *c == '.' || *c == '_')
+        .collect();
+    if sanitized.is_empty() {
+        return Err("Invalid window title pattern".to_string());
+    }
+
     #[cfg(target_os = "windows")]
     {
         let script = format!(
@@ -440,7 +452,7 @@ if ($proc) {{
     Write-Error "No window matching '{}'"
 }}
 "#,
-            title_pattern, title_pattern
+            sanitized, sanitized
         );
         let out = crate::cmd_util::silent_tokio_cmd("powershell")
             .args(["-NoProfile", "-NonInteractive", "-Command", &script])
@@ -463,7 +475,7 @@ if ($proc) {{
         set frontmost of item 1 of procs to true
     end if
 end tell"#,
-            title_pattern
+            sanitized
         );
         crate::cmd_util::silent_cmd("osascript")
             .args(["-e", &script])

@@ -391,7 +391,8 @@ pub fn compute_daily_focus_score() -> DailyFocusScore {
     let today_start = {
         let now = chrono::Local::now();
         now.date_naive().and_hms_opt(0, 0, 0)
-            .map(|t| t.and_local_timezone(chrono::Local).unwrap().timestamp())
+            .and_then(|t| t.and_local_timezone(chrono::Local).earliest())
+            .map(|dt| dt.timestamp())
             .unwrap_or(0)
     };
 

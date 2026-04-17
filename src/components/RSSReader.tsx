@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import DOMPurify from "dompurify";
 import { useRSSReader, RSSItem } from "../hooks/useRSSReader";
 
 // ── Props ──────────────────────────────────────────────────────────────
@@ -646,7 +647,11 @@ export default function RSSReader({ onBack, onSendToChat }: Props) {
               <div
                 className="prose-reader mt-4 text-sm leading-[1.8] text-white/65 [&_a]:text-blue-400 [&_a]:underline [&_a:hover]:text-blue-300 [&_h1]:text-base [&_h1]:font-semibold [&_h1]:text-white/80 [&_h1]:mt-6 [&_h1]:mb-3 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-white/75 [&_h2]:mt-5 [&_h2]:mb-2 [&_h3]:text-sm [&_h3]:font-medium [&_h3]:text-white/70 [&_h3]:mt-4 [&_h3]:mb-2 [&_p]:mb-3 [&_ul]:mb-3 [&_ul]:pl-5 [&_ul]:list-disc [&_ol]:mb-3 [&_ol]:pl-5 [&_ol]:list-decimal [&_li]:mb-1 [&_code]:bg-white/[0.06] [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:text-orange-300/70 [&_pre]:bg-white/[0.04] [&_pre]:rounded-lg [&_pre]:p-4 [&_pre]:overflow-x-auto [&_pre]:mb-4 [&_blockquote]:border-l-2 [&_blockquote]:border-white/10 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-white/45 [&_blockquote]:my-4 [&_img]:rounded-lg [&_img]:my-4 [&_img]:max-w-full"
                 dangerouslySetInnerHTML={{
-                  __html: selectedItem.content || selectedItem.description || "<p>No content available.</p>",
+                  // Sanitized with DOMPurify to prevent XSS from malicious RSS feeds
+                  __html: DOMPurify.sanitize(
+                    selectedItem.content || selectedItem.description || "<p>No content available.</p>",
+                    { FORBID_TAGS: ["script", "style", "iframe", "object", "embed"], FORBID_ATTR: ["onerror", "onload", "onclick"] }
+                  ),
                 }}
               />
 
