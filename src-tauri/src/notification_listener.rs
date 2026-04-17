@@ -1,3 +1,5 @@
+#![allow(dead_code)] // OS-specific helpers gated by cfg
+
 // src-tauri/src/notification_listener.rs
 // Phase 5 (partial): OS Notification Listener — surface Windows (and macOS/Linux) notifications to BLADE.
 //

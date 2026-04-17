@@ -666,7 +666,7 @@ pub fn get_active_agents() -> Vec<BackgroundAgent> {
 /// Extract a human-readable summary from a completed agent's output.
 /// Looks for git commit messages, file change lists, and error summaries.
 pub fn extract_completion_summary(agent: &BackgroundAgent) -> String {
-    let output = agent.output.join("\n");
+    let _output = agent.output.join("\n");
     let mut lines: Vec<String> = Vec::new();
 
     // Find git commit lines

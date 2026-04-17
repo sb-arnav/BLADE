@@ -1,3 +1,5 @@
+#![allow(dead_code)] // Tentacle module — feature-complete, wired via hive
+
 /// TENTACLE: filesystem_watch.rs — Proactive file-system management.
 ///
 /// Scans the Downloads folder every 5 min. Auto-categorises new files and

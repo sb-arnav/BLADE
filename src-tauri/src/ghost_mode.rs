@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_assignments)] // Ghost mode helpers invoked via dynamic tool dispatch
+
 /// BLADE Ghost Mode — invisible AI overlay for meetings and chat
 ///
 /// Listens to system audio during meetings (Zoom, Meet, Teams, Discord, Slack)

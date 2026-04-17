@@ -1,3 +1,5 @@
+#![allow(dead_code)] // Tentacle module — feature-complete, wired via hive
+
 /// BLADE Discord Deep Tentacle — BLADE manages communities, not just watches them.
 ///
 /// This tentacle interacts with the Discord REST API (v10) using a bot token

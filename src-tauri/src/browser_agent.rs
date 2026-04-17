@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_assignments)]
+
 // src-tauri/src/browser_agent.rs
 //
 // Browser automation agent for BLADE — Phase 1 of the JARVIS plan.

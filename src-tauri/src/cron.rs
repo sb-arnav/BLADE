@@ -558,7 +558,7 @@ async fn execute_pulse_task(task: &CronTask, app: &tauri::AppHandle) {
 }
 
 /// Execute the inbox_check task: poll integration state and alert on urgent items.
-async fn execute_inbox_check(task: &CronTask, app: &tauri::AppHandle) {
+async fn execute_inbox_check(_task: &CronTask, app: &tauri::AppHandle) {
     let state = crate::integration_bridge::get_integration_state();
 
     let mut alerts: Vec<String> = Vec::new();

@@ -1,3 +1,5 @@
+#![allow(dead_code)] // Tentacle module — feature-complete, wired via hive
+
 /// HEAD MODELS — Domain-specific AI coordinators for BLADE's Hive.
 ///
 /// Each Head is a specialized intelligence layer that:

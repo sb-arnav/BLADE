@@ -274,7 +274,7 @@ fn vad_capture_loop(
 }
 
 fn emit_segment(
-    config: &VadConfig,
+    _config: &VadConfig,
     samples: &[f32],
     sample_rate: u32,
     tx: &mpsc::SyncSender<SpeechSegment>,

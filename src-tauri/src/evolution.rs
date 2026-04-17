@@ -594,7 +594,6 @@ async fn auto_install_mcp(entry: &CatalogEntry, app: &tauri::AppHandle) -> Resul
             tool_names.join(", "),
             entry.description,
         );
-        let app_clone = app.clone();
         tauri::async_runtime::spawn(async move {
             crate::knowledge_graph::grow_graph_from_conversation(&kg_text).await;
         });

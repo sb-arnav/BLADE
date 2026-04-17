@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_assignments)]
+
 /// HOMEOSTASIS — BLADE's hypothalamus + neuromodulatory hormone bus.
 ///
 /// A set of global state scalars that every module can read. These scalars

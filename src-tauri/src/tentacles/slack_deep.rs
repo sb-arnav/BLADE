@@ -1,3 +1,5 @@
+#![allow(dead_code)] // Feature-complete module; API exposed via hive router
+
 /// BLADE Slack Deep Tentacle — BLADE lives in Slack, not just watches it.
 ///
 /// BLADE acts *as* the user in Slack: reading DMs, classifying what needs a

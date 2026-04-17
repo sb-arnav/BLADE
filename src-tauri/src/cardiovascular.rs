@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 /// CARDIOVASCULAR SYSTEM — BLADE's data flow monitoring and event registry.
 ///
 /// The heart pumps data through the body. Arteries (emit) carry data from
@@ -222,7 +224,7 @@ fn ev(name: &str, direction: &str, category: &str, description: &str) -> EventIn
 
 /// Call this from providers/mod.rs after every complete_turn call.
 /// Tracks API call volume for blood pressure monitoring.
-pub fn on_provider_call_complete(provider: &str, model: &str, success: bool) {
+pub fn on_provider_call_complete(_provider: &str, _model: &str, success: bool) {
     record_api_call();
     if !success {
         record_error();

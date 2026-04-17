@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 /// BLADE Temporal Intelligence — "What was I doing N hours ago?"
 ///
 /// Queries the screen timeline, god-mode snapshots, and conversation history

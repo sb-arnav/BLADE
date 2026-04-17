@@ -1,5 +1,4 @@
 use super::{AssistantTurn, ConversationMessage, ToolCall, ToolDefinition};
-use reqwest::Client;
 
 fn build_body(messages: &[ConversationMessage], tools: &[ToolDefinition]) -> serde_json::Value {
     let system_instruction = messages.iter().find_map(|message| match message {

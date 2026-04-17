@@ -1,3 +1,5 @@
+#![allow(dead_code)] // Supervisor framework — some helpers reserved for future services
+
 /// SERVICE SUPERVISOR — keeps BLADE's background services alive.
 ///
 /// Problem: if any of the 36 background threads panics (bad DB query,

@@ -1,5 +1,4 @@
 use super::{AssistantTurn, ConversationMessage};
-use reqwest::Client;
 
 pub async fn complete(
     model: &str,

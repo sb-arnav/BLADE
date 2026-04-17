@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_variables, unused_assignments)] // Tentacle module — feature-complete, wired via hive
+
 /// TENTACLE: terminal_watch.rs — Watches terminal activity and provides intelligent assistance.
 ///
 /// Polls PowerShell history every 10 s. Classifies commands as routine/interesting/failed.

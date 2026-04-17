@@ -1,3 +1,5 @@
+#![allow(dead_code)] // Shared knowledge API — some helpers reserved for future callers
+
 /// DNA — BLADE's shared knowledge query layer.
 ///
 /// Every organ writes observations into existing data stores (typed_memory,
@@ -384,7 +386,7 @@ pub fn get_recent_audio_context() -> String {
     lines.push("**Recent audio (what BLADE heard):**".to_string());
 
     let mut in_meeting = false;
-    for (ts, transcript, source, action_items, meeting_id) in &entries {
+    for (ts, transcript, _source, action_items, meeting_id) in &entries {
         if !meeting_id.is_empty() && !in_meeting {
             in_meeting = true;
             lines.push("*In meeting:*".to_string());

@@ -168,7 +168,7 @@ pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
             first_run = false;
 
             // BLADE's ambient awareness is always on — no "god mode off" state.
-            let config = crate::config::load_config();
+            let _config = crate::config::load_config();
 
             // Vagus nerve: skip expensive operations in conservation mode.
             // Perception fusion still runs (it's cheap), but the LLM-heavy

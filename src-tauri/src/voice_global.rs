@@ -737,7 +737,7 @@ async fn process_voice_turn_with_history(
     });
 
     // Run the full chat pipeline (tools, brain planner, everything)
-    let messages = vec![chat_msg];
+    let _messages = vec![chat_msg];
     let app_send = app.clone();
 
     // We need to get the MCP manager state. Use a detached task since

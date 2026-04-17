@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 /// Local Whisper transcription via whisper-rs (whisper.cpp bindings)
 ///
 /// Downloads the model on first use to ~/.config/blade/models/ (or platform equivalent).

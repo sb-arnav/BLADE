@@ -1,3 +1,5 @@
+#![allow(dead_code)] // Planner helpers wired via swarm_commands
+
 /// BLADE Swarm Planner — LLM-based DAG decomposition
 ///
 /// Takes a high-level goal and returns a validated DAG of 3-8 SwarmTasks.

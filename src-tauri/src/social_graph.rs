@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 /// BLADE Social Graph — Personal CRM with Emotional Intelligence
 ///
 /// Tracks the people in the user's life: traits, interaction history,
