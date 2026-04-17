@@ -40,7 +40,7 @@ export default {
       },
 
       fontFamily: {
-        sans: ["-apple-system", "BlinkMacSystemFont", "Inter", "Segoe UI", "sans-serif"],
+        sans: ["Syne", "Bricolage Grotesque", "-apple-system", "BlinkMacSystemFont", "Inter", "Segoe UI", "sans-serif"],
         mono: ["SF Mono", "JetBrains Mono", "Consolas", "monospace"],
       },
 
