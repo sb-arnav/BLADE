@@ -1877,7 +1877,12 @@ pub async fn send_message_stream(
 
 #[tauri::command]
 pub fn get_config() -> BladeConfig {
-    load_config()
+    let mut cfg = load_config();
+    // Never expose API keys to the frontend — redact them
+    if !cfg.api_key.is_empty() {
+        cfg.api_key = "••••••••".to_string();
+    }
+    cfg
 }
 
 #[tauri::command]

@@ -78,8 +78,8 @@ pub fn filter_waste() -> u64 {
     // Nephron 14: proactive_actions — keep 7 days
     total_pruned += del(&conn, "DELETE FROM proactive_actions WHERE created_at < ?1", cutoff_7d);
 
-    // Nephron 15: streak_activity — keep 30 days
-    total_pruned += del(&conn, "DELETE FROM streak_activity WHERE timestamp < ?1", cutoff_30d);
+    // Nephron 15: streak_activity — keep 30 days (column is `last_active`, not `timestamp`)
+    total_pruned += del(&conn, "DELETE FROM streak_activity WHERE last_active < ?1", cutoff_30d);
 
     // Nephron 16: accountability_checkins — keep 30 days
     total_pruned += del(&conn, "DELETE FROM accountability_checkins WHERE timestamp < ?1", cutoff_30d);
