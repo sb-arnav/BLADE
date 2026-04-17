@@ -73,7 +73,7 @@ Conditional entries only start if the corresponding config flag is enabled.
 | `start_activity_monitor` | `activity_monitor.rs` | Continuous | Passive window + file watcher, feeds persona engine |
 | `start_sidecar_monitor` | `sidecar.rs` | 5 min | Ping registered cross-devices |
 | `start_proactive_engine` | `proactive_engine.rs` | Continuous | 5-signal detectors → decision_gate → action queue |
-| `start_prediction_loop` | `prediction_engine.rs` | Periodic | Anticipatory intelligence, pattern-based foresight |
+| ~~`start_prediction_loop`~~ | `prediction_engine.rs` | Removed (dead code) | Driven by `start_learning_engine` directly |
 | `start_workflow_scheduler` | `workflow_builder.rs` | 60s | n8n-style scheduled workflow execution |
 | Integration bridge (inline) *(conditional)* | `integration_bridge.rs` | Varies | Gmail / Calendar / Slack / GitHub MCP polling |
 | `notification_listener_start` | `notification_listener.rs` | Continuous | OS notification interception |
