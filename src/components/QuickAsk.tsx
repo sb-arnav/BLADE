@@ -465,25 +465,33 @@ export function QuickAsk() {
       `}</style>
 
       <div
-        className="flex flex-col w-full overflow-hidden"
+        className="flex flex-col w-full overflow-hidden blade-glass g2-heavy"
         style={{
-          background: "rgba(18,18,22,0.92)",
-          backdropFilter: "blur(28px) saturate(1.8)",
-          WebkitBackdropFilter: "blur(28px) saturate(1.8)",
-          borderRadius: "14px",
-          border: "1px solid rgba(255,255,255,0.1)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.06) inset",
-          minHeight: "64px",
-          fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          minHeight: "76px",
+          fontFamily: "var(--font-ui)",
+          borderRadius: "var(--r-xl, 34px)",
         }}
       >
-        {/* Input row */}
-        <div className="flex items-center gap-3 px-4" style={{ height: "64px", flexShrink: 0 }}>
-          {/* Search icon */}
-          <svg viewBox="0 0 16 16" className="flex-shrink-0 w-4 h-4" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" strokeLinecap="round">
-            <circle cx="7" cy="7" r="4.5" />
-            <path d="M10.5 10.5L14 14" />
-          </svg>
+        {/* Input row — prototype layout with orb + big text input + mode pill + Esc */}
+        <div className="flex items-center gap-[14px] px-6" style={{ height: "76px", flexShrink: 0, borderBottom: "1px solid var(--line)" }}>
+          {/* BLADE orb */}
+          <div
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 11,
+              flexShrink: 0,
+              background: "linear-gradient(135deg, #fff, rgba(255,255,255,0.7))",
+              color: "#1a0b2a",
+              display: "grid",
+              placeItems: "center",
+              fontWeight: 800,
+              fontSize: 15,
+              boxShadow: "inset 0 1px 0 #fff, 0 4px 12px rgba(0,0,0,0.3)",
+            }}
+          >
+            B
+          </div>
 
           <input
             ref={inputRef}
@@ -495,14 +503,16 @@ export function QuickAsk() {
               setSelectedIdx(-1);
             }}
             onKeyDown={handleKeyDown}
-            placeholder={isSlashMode ? "Type a command…" : "Ask BLADE…"}
+            placeholder={isSlashMode ? "Type a command…" : "Ask BLADE, or search everything…"}
             disabled={loading}
             className="quickask-input flex-1 bg-transparent"
             style={{
-              fontSize: "15px",
-              fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-              color: "rgba(255,255,255,0.9)",
-              caretColor: "#818cf8",
+              fontSize: "22px",
+              fontFamily: "var(--font-ui)",
+              color: "var(--t-1)",
+              letterSpacing: "-0.02em",
+              fontWeight: 400,
+              caretColor: "#fff",
               border: "none",
             }}
             autoComplete="off"
