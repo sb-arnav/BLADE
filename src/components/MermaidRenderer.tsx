@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
+import DOMPurify from "dompurify";
 import mermaid from "mermaid";
 
 /* ── Types ────────────────────────────────────────────────────────── */
@@ -288,7 +289,8 @@ function MermaidRendererInner({ code, className }: MermaidRendererProps) {
             ? "overflow-auto max-h-[80vh] cursor-zoom-out"
             : "overflow-hidden max-h-96"
         }`}
-        dangerouslySetInnerHTML={{ __html: svg }}
+        // Sanitized with DOMPurify to prevent XSS from user-controlled diagram content
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true }, ADD_TAGS: ["foreignObject"] }) }}
       />
     </div>
   );
