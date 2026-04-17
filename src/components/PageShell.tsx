@@ -23,30 +23,49 @@ interface PageShellProps {
 
 export function PageShell({ title, subtitle, onBack, actions, children, noPadding }: PageShellProps) {
   return (
-    <div className="flex flex-col h-full text-white" style={{ background: "rgba(6,6,12,0.82)", backdropFilter: "blur(40px) saturate(1.4)", WebkitBackdropFilter: "blur(40px) saturate(1.4)" }}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 h-[52px] flex-shrink-0 border-b border-[rgba(255,255,255,0.07)]">
-        <div className="flex items-center gap-3">
+    <div className="flex flex-col h-full text-white">
+      {/* Sticky glass header — matches Settings header */}
+      <div
+        className="sticky top-0 z-20 flex items-center justify-between px-6 h-[64px] flex-shrink-0 border-b border-[rgba(255,255,255,0.06)]"
+        style={{
+          background: "rgba(8,8,14,0.72)",
+          backdropFilter: "blur(32px) saturate(1.6)",
+          WebkitBackdropFilter: "blur(32px) saturate(1.6)",
+        }}
+      >
+        <div className="flex items-center gap-4">
           <button
             onClick={onBack}
-            className="flex items-center gap-1 text-[12px] text-[rgba(255,255,255,0.4)] hover:text-white transition-colors"
+            className="group flex items-center gap-2 text-[12px] font-semibold text-[rgba(255,255,255,0.45)] hover:text-white transition-colors"
           >
-            <svg viewBox="0 0 16 16" className="w-[14px] h-[14px]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <svg
+              viewBox="0 0 16 16"
+              className="w-[14px] h-[14px] transition-transform group-hover:-translate-x-0.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M10 12L6 8l4-4" />
             </svg>
             Back
           </button>
           <div className="w-px h-4 bg-[rgba(255,255,255,0.08)]" />
           <div>
-            <h1 className="text-[14px] font-semibold tracking-[-0.01em] leading-none">{title}</h1>
-            {subtitle && <p className="text-[10px] text-[rgba(255,255,255,0.35)] mt-[2px]">{subtitle}</p>}
+            <h1 className="font-display text-[20px] font-bold tracking-[-0.025em] leading-none text-white">
+              {title}
+            </h1>
+            {subtitle && (
+              <p className="text-[11px] text-[rgba(255,255,255,0.45)] mt-[4px] leading-none">{subtitle}</p>
+            )}
           </div>
         </div>
         {actions && <div className="flex items-center gap-2">{actions}</div>}
       </div>
 
       {/* Content */}
-      <div className={`flex-1 overflow-y-auto ${noPadding ? "" : "p-5"}`}>
+      <div className={`flex-1 overflow-y-auto ${noPadding ? "" : "px-6 py-7"}`}>
         {children}
       </div>
     </div>

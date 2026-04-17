@@ -169,7 +169,7 @@ function GodModeCard({ perception }: { perception: PerceptionState | null }) {
   }, []);
 
   return (
-    <div className="blade-glass flex flex-col p-5 gap-0 animate-[blade-card-in_0.5s_cubic-bezier(0.22,1,0.36,1)_0.03s_both]">
+    <div className="blade-glass blade-glass-accent is-interactive flex flex-col p-5 gap-0 animate-[blade-card-in_0.5s_cubic-bezier(0.22,1,0.36,1)_0.03s_both]">
       <div className="flex items-center justify-between mb-4">
         <CardLabel icon={<svg viewBox="0 0 12 12" className="w-[10px] h-[10px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="6" r="4.5" strokeDasharray="1.8 2.5"/></svg>}>
           God Mode
@@ -181,7 +181,7 @@ function GodModeCard({ perception }: { perception: PerceptionState | null }) {
         <div className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[rgba(255,255,255,0.28)] mb-1">
           Currently in
         </div>
-        <div className="text-[44px] font-extrabold leading-[0.95] tracking-[-0.03em] text-white mb-2 truncate">
+        <div className="font-display text-[44px] font-extrabold leading-[0.95] tracking-[-0.04em] text-white mb-2 truncate">
           {appName}
         </div>
         <div className="font-mono text-[12px] text-[#60a5fa] mb-4 truncate">
@@ -211,9 +211,10 @@ function GodModeCard({ perception }: { perception: PerceptionState | null }) {
         ].map(({ label, value, color }, i) => (
           <React.Fragment key={label}>
             {i > 0 && <div className="w-px bg-[rgba(255,255,255,0.08)] self-stretch" />}
-            <div className="flex flex-col gap-[2px]">
-              <div className={`text-[18px] font-bold tracking-[-0.03em] leading-none ${color}`}>{value}</div>
-              <div className="text-[9.5px] font-semibold tracking-[0.08em] uppercase text-[rgba(255,255,255,0.28)]">{label}</div>
+            <div className="flex flex-col gap-[3px]">
+              <div className={`font-serif text-[22px] font-semibold tracking-[-0.03em] leading-none ${color}`}
+                style={{ fontVariationSettings: "'opsz' 144" }}>{value}</div>
+              <div className="text-[9px] font-bold tracking-[0.14em] uppercase text-[rgba(255,255,255,0.3)]">{label}</div>
             </div>
           </React.Fragment>
         ))}
@@ -236,7 +237,7 @@ function HiveCard({ organsActive, digest }: { organsActive: number; digest: stri
   const statusLabel = organsActive > 0 ? `${organsActive} active` : "dormant";
 
   return (
-    <div className="blade-glass flex flex-col p-4 gap-3 animate-[blade-card-in_0.5s_cubic-bezier(0.22,1,0.36,1)_0.08s_both]">
+    <div className="blade-glass is-interactive flex flex-col p-4 gap-3 animate-[blade-card-in_0.5s_cubic-bezier(0.22,1,0.36,1)_0.08s_both]">
       <div className="flex items-center justify-between">
         <CardLabel icon={<svg viewBox="0 0 12 12" className="w-[10px] h-[10px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="4" cy="4" r="1.5"/><circle cx="9" cy="3" r="1.5"/><circle cx="9" cy="9" r="1.5"/><path d="M5.5 4h1.5a2 2 0 010 4H4M9 4.5v3"/></svg>}>
           Hive
@@ -282,7 +283,7 @@ function IntegrationsCard({ integrations }: { integrations: IntegrationState }) 
     { name: "Calendar", value: String(eventCount), sub: "today", color: "#818cf8" },
   ];
   return (
-    <div className="blade-glass flex flex-col p-4 gap-3 animate-[blade-card-in_0.5s_cubic-bezier(0.22,1,0.36,1)_0.13s_both]">
+    <div className="blade-glass is-interactive flex flex-col p-4 gap-3 animate-[blade-card-in_0.5s_cubic-bezier(0.22,1,0.36,1)_0.13s_both]">
       <div className="flex items-center justify-between">
         <CardLabel icon={<svg viewBox="0 0 12 12" className="w-[10px] h-[10px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="1" y="1" width="4" height="4" rx="1"/><rect x="7" y="1" width="4" height="4" rx="1"/><rect x="1" y="7" width="4" height="4" rx="1"/><path d="M9 7v4M11 9H7"/></svg>}>
           Integrations
@@ -292,7 +293,7 @@ function IntegrationsCard({ integrations }: { integrations: IntegrationState }) 
         {tiles.map((t) => (
           <div key={t.name} className="p-[9px_10px] rounded-[11px] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.07)] flex flex-col gap-[3px] hover:bg-[rgba(255,255,255,0.07)] transition-colors cursor-default">
             <div className="text-[9.5px] font-semibold tracking-[0.1em] uppercase text-[rgba(255,255,255,0.28)]">{t.name}</div>
-            <div className="text-[24px] font-bold tracking-[-0.04em] leading-none" style={{ color: t.color }}>{t.value}</div>
+            <div className="font-serif text-[28px] font-semibold tracking-[-0.03em] leading-none" style={{ color: t.color, fontVariationSettings: "'opsz' 144" }}>{t.value}</div>
             <div className="text-[10px] text-[rgba(255,255,255,0.55)]">{t.sub}</div>
           </div>
         ))}
@@ -544,7 +545,7 @@ export function Dashboard({ onNavigate, chatPanelProps, activeRoute }: Dashboard
         className="relative z-[10] flex flex-col ml-[62px] mt-[34px] h-[calc(100vh-34px-26px)] p-[12px] gap-[10px] overflow-hidden transition-[margin-right] duration-[460ms]"
         style={{
           transitionTimingFunction: "cubic-bezier(0.32,0.72,0,1)",
-          marginRight: chatOpen ? "400px" : "0px",
+          marginRight: chatOpen ? "420px" : "0px",
         }}
       >
         {/* Top row: 1.7fr 1fr 0.75fr */}
@@ -575,15 +576,27 @@ export function Dashboard({ onNavigate, chatPanelProps, activeRoute }: Dashboard
       {!chatOpen && (
         <button
           onClick={() => setChatOpen(true)}
-          className="fixed bottom-[20px] right-[20px] w-[50px] h-[50px] rounded-[16px] z-[170]
-            bg-[#818cf8] border-none cursor-pointer flex items-center justify-center text-white
-            shadow-[0_6px_24px_rgba(129,140,248,0.45),0_12px_40px_rgba(0,0,0,0.4)]
-            hover:scale-105 hover:shadow-[0_8px_32px_rgba(129,140,248,0.55)]
-            active:scale-[0.92] transition-all duration-200"
+          className="fixed bottom-[24px] right-[24px] w-[56px] h-[56px] rounded-[18px] z-[170] cursor-pointer flex items-center justify-center text-white
+            hover:scale-[1.05] active:scale-[0.94] transition-all duration-200 ease-[var(--ease-spring)]
+            group"
+          style={{
+            background: "linear-gradient(145deg, #8b95f9 0%, #6366f1 55%, #4f46e5 100%)",
+            boxShadow:
+              "inset 0 1px 0 rgba(255,255,255,0.24), 0 0 0 1px rgba(129,140,248,0.4), 0 8px 24px rgba(99,102,241,0.5), 0 16px 48px rgba(0,0,0,0.45)",
+          }}
+          title="Open chat"
         >
-          <svg viewBox="0 0 20 20" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <svg viewBox="0 0 20 20" className="w-[22px] h-[22px] group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M18 13a2 2 0 01-2 2H6l-4 3V4a2 2 0 012-2h12a2 2 0 012 2v9z"/>
           </svg>
+          {/* Pulsing halo */}
+          <span
+            className="absolute inset-[-4px] rounded-[22px] pointer-events-none opacity-40"
+            style={{
+              background: "radial-gradient(circle, rgba(129,140,248,0.4) 0%, transparent 70%)",
+              animation: "pulseBreathe 3s ease-in-out infinite",
+            }}
+          />
         </button>
       )}
     </div>

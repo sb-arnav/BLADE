@@ -53,14 +53,19 @@ export function ChatPanel({ open, onClose, ...chatProps }: ChatPanelProps) {
   return (
     <div
       className={[
-        "fixed top-[34px] right-0 bottom-0 w-[400px] z-[180] flex flex-col",
-        "bg-[rgba(6,6,18,0.65)] backdrop-blur-[60px]",
-        "border-l border-[rgba(255,255,255,0.14)]",
-        "shadow-[-30px_0_80px_rgba(0,0,0,0.5)]",
+        "fixed top-[34px] right-0 bottom-0 w-[420px] z-[180] flex flex-col",
+        "border-l border-[rgba(255,255,255,0.1)]",
         "transition-transform duration-[460ms]",
         open ? "translate-x-0" : "translate-x-full",
       ].join(" ")}
-      style={{ transitionTimingFunction: "cubic-bezier(0.32,0.72,0,1)" }}
+      style={{
+        transitionTimingFunction: "cubic-bezier(0.32,0.72,0,1)",
+        background: "linear-gradient(180deg, rgba(10,10,18,0.88) 0%, rgba(6,6,14,0.92) 100%)",
+        backdropFilter: "blur(56px) saturate(1.8)",
+        WebkitBackdropFilter: "blur(56px) saturate(1.8)",
+        boxShadow:
+          "inset 1px 0 0 rgba(255,255,255,0.06), -32px 0 90px rgba(0,0,0,0.55), -8px 0 24px rgba(0,0,0,0.3)",
+      }}
     >
       {/* Close handle */}
       <div className="absolute top-3 left-[-32px] z-10">
