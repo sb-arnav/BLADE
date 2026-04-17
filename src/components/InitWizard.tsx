@@ -141,18 +141,36 @@ export function InitWizard({ onComplete, isReinit = false }: Props) {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex-1 flex flex-col justify-center bg-blade-bg text-blade-text p-6 overflow-y-auto">
-      <div className="max-w-sm mx-auto w-full">
+    <div
+      className="fixed inset-0 z-[50] flex items-center justify-center text-blade-text overflow-y-auto p-6"
+      style={{
+        background: "radial-gradient(ellipse 90% 70% at 20% 30%, rgba(88,50,220,0.35) 0%, transparent 60%), radial-gradient(ellipse 70% 90% at 85% 20%, rgba(40,20,140,0.3) 0%, transparent 55%), radial-gradient(ellipse 80% 60% at 70% 85%, rgba(160,30,90,0.2) 0%, transparent 60%), #050508",
+      }}
+    >
+      <div
+        className="w-full max-w-[440px] rounded-[24px] p-8"
+        style={{
+          background: "rgba(14,14,20,0.78)",
+          backdropFilter: "blur(40px) saturate(1.6)",
+          WebkitBackdropFilter: "blur(40px) saturate(1.6)",
+          border: "1px solid rgba(255,255,255,0.1)",
+          boxShadow: "0 30px 90px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)",
+        }}
+      >
 
         {/* Logo */}
-        <div className="flex items-center gap-2 mb-8">
-          <div className="w-6 h-6 rounded-md bg-blade-accent-muted flex items-center justify-center">
-            <div className="w-1.5 h-1.5 rounded-full bg-blade-accent shadow-[0_0_6px_rgba(99,102,241,0.6)]" />
+        <div className="flex items-center gap-2.5 mb-10">
+          <div className="w-8 h-8 rounded-[10px] flex items-center justify-center"
+            style={{
+              background: "linear-gradient(145deg, #7c3aed, #6366f1, #3b82f6)",
+              boxShadow: "0 0 22px rgba(129,140,248,0.4), 0 4px 14px rgba(0,0,0,0.5)",
+            }}>
+            <div className="w-2 h-2 rounded-full bg-white" />
           </div>
-          <span className="text-xs font-semibold tracking-[0.3em] text-blade-muted">BLADE</span>
+          <span className="text-[12px] font-bold tracking-[0.34em] text-white">BLADE</span>
           {isReinit && (
-            <span className="ml-auto text-2xs px-1.5 py-0.5 rounded border border-blade-border text-blade-muted">
-              re-init
+            <span className="ml-auto text-[9.5px] font-semibold tracking-[0.08em] uppercase px-2 py-[3px] rounded-full border border-[rgba(255,255,255,0.15)] text-[rgba(255,255,255,0.4)]">
+              Re-init
             </span>
           )}
         </div>
@@ -162,57 +180,67 @@ export function InitWizard({ onComplete, isReinit = false }: Props) {
           <div className="animate-fade-in">
             {!selectedProvider ? (
               <>
-                <div className="mb-6">
-                  <h2 className="text-base font-semibold text-blade-text tracking-tight">
-                    {isReinit ? "Pick a provider." : "Connect your AI brain."}
+                <div className="mb-7">
+                  <h2 className="text-[22px] font-bold text-white tracking-[-0.02em] leading-tight mb-1.5">
+                    {isReinit ? "Pick a provider" : "Connect your AI brain"}
                   </h2>
-                  <p className="text-xs text-blade-muted mt-1">
+                  <p className="text-[13px] text-[rgba(255,255,255,0.5)] leading-relaxed">
                     {isReinit
                       ? "Switch to a different provider or re-enter your key."
                       : "Free options available. You can switch any time."}
                   </p>
                 </div>
 
-                <div className="space-y-1.5">
-                  {PROVIDERS.map((p) => (
-                    <button
-                      key={p.id + p.model}
-                      onClick={() => {
-                        setSelectedProvider(p);
-                        setApiKey("");
-                        setTestState("idle");
-                        // Ollama needs no key — go straight to test
-                        if (!p.needsKey) {
-                          setTestState("testing");
-                          invoke("test_provider", { provider: p.id, apiKey: "", model: p.model })
-                            .then(() => setTestState("ok"))
-                            .catch((e: unknown) => {
-                              setTestState("error");
-                              setTestError(typeof e === "string" ? e : String(e));
-                            });
-                        }
-                      }}
-                      className="w-full text-left px-3.5 py-3 rounded-xl border border-blade-border hover:border-blade-accent/40 hover:bg-blade-surface transition-colors group"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-[0.8125rem] font-medium text-blade-text">
-                          {p.name}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-2xs text-blade-muted">{p.badge}</span>
+                <div className="space-y-2">
+                  {PROVIDERS.map((p) => {
+                    const isFree = p.badge.toLowerCase().includes("free") || p.id === "ollama";
+                    return (
+                      <button
+                        key={p.id + p.model}
+                        onClick={() => {
+                          setSelectedProvider(p);
+                          setApiKey("");
+                          setTestState("idle");
+                          if (!p.needsKey) {
+                            setTestState("testing");
+                            invoke("test_provider", { provider: p.id, apiKey: "", model: p.model })
+                              .then(() => setTestState("ok"))
+                              .catch((e: unknown) => {
+                                setTestState("error");
+                                setTestError(typeof e === "string" ? e : String(e));
+                              });
+                          }
+                        }}
+                        className="w-full text-left px-4 py-3.5 rounded-[14px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.025)] hover:border-[rgba(129,140,248,0.35)] hover:bg-[rgba(129,140,248,0.06)] transition-all group"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[14px] font-semibold text-white">
+                                {p.name}
+                              </span>
+                              {isFree && (
+                                <span className="text-[9px] font-bold px-1.5 py-[1px] rounded-full bg-[rgba(74,222,128,0.12)] text-[#4ade80] border border-[rgba(74,222,128,0.25)]">
+                                  FREE
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-[rgba(255,255,255,0.4)] mt-0.5">{p.badge}</div>
+                          </div>
                           <svg
                             viewBox="0 0 24 24"
-                            className="w-3 h-3 text-blade-muted group-hover:text-blade-accent transition-colors"
+                            className="w-4 h-4 text-[rgba(255,255,255,0.25)] group-hover:text-[#818cf8] group-hover:translate-x-0.5 transition-all flex-shrink-0"
                             fill="none"
                             stroke="currentColor"
                             strokeWidth="2"
+                            strokeLinecap="round"
                           >
                             <path d="M9 6l6 6-6 6" />
                           </svg>
                         </div>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
               </>
             ) : (
