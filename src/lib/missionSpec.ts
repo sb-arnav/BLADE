@@ -7,8 +7,21 @@ import { MissionSpec, MissionStageSpec, OperatorMission, MissionStage, RuntimeRo
 // ── Remote CRUD ──────────────────────────────────────────────────────────────
 
 export async function listMissionSpecs(): Promise<MissionSpec[]> {
-  const raw = await invoke<unknown[]>("list_mission_specs");
-  return raw as MissionSpec[];
+  try {
+    const raw = await invoke<MissionSpec[]>("list_mission_specs");
+    // Basic shape validation — drops malformed entries rather than rendering broken UI
+    return Array.isArray(raw)
+      ? raw.filter((s): s is MissionSpec =>
+          typeof s === "object" && s !== null &&
+          typeof (s as MissionSpec).id === "string" &&
+          Array.isArray((s as MissionSpec).stages) &&
+          Array.isArray((s as MissionSpec).inputVars)
+        )
+      : [];
+  } catch (e) {
+    console.error("list_mission_specs failed:", e);
+    return [];
+  }
 }
 
 export async function saveMissionSpec(spec: MissionSpec): Promise<void> {

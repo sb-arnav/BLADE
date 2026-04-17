@@ -654,15 +654,25 @@ export function GoalView({ onBack }: { onBack: () => void }) {
   };
 
   const handleDelete = async (id: string) => {
-    await invoke("goal_delete", { id });
-    setGoals((prev) => prev.filter((g) => g.id !== id));
+    try {
+      await invoke("goal_delete", { id });
+      // Only update UI after backend confirms — prevents frontend/DB desync
+      setGoals((prev) => prev.filter((g) => g.id !== id));
+    } catch (e) {
+      console.error("goal_delete failed:", e);
+    }
   };
 
   const handleComplete = async (id: string) => {
-    await invoke("goal_complete", { id });
-    setGoals((prev) =>
-      prev.map((g) => (g.id === id ? { ...g, status: "completed" as const } : g))
-    );
+    try {
+      await invoke("goal_complete", { id });
+      setGoals((prev) =>
+        prev.map((g) => (g.id === id ? { ...g, status: "completed" as const } : g))
+      );
+    } catch (e) {
+      console.error("goal_complete failed:", e);
+      return;
+    }
   };
 
   const handlePursue = async (id: string) => {

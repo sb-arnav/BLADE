@@ -1650,14 +1650,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
               onClick={async () => {
                 const next = !timelineEnabled;
                 setTimelineEnabled(next);
-                await invoke("set_config", {
-                  config: {
-                    ...config,
-                    screen_timeline_enabled: next,
-                    timeline_capture_interval: timelineInterval,
-                    timeline_retention_days: timelineRetention,
-                  },
-                });
+                await invoke("save_config_field", { key: "screen_timeline_enabled", value: String(next) }).catch(() => {});
               }}
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${timelineEnabled ? "bg-blade-accent" : "bg-blade-border"}`}
             >
@@ -1679,14 +1672,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
                       key={s}
                       onClick={async () => {
                         setTimelineInterval(s);
-                        await invoke("set_config", {
-                          config: {
-                            ...config,
-                            screen_timeline_enabled: timelineEnabled,
-                            timeline_capture_interval: s,
-                            timeline_retention_days: timelineRetention,
-                          },
-                        });
+                        await invoke("save_config_field", { key: "timeline_capture_interval", value: String(s) }).catch(() => {});
                       }}
                       className={`flex-1 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
                         timelineInterval === s
@@ -1715,14 +1701,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
                       key={d}
                       onClick={async () => {
                         setTimelineRetention(d);
-                        await invoke("set_config", {
-                          config: {
-                            ...config,
-                            screen_timeline_enabled: timelineEnabled,
-                            timeline_capture_interval: timelineInterval,
-                            timeline_retention_days: d,
-                          },
-                        });
+                        await invoke("save_config_field", { key: "timeline_retention_days", value: String(d) }).catch(() => {});
                       }}
                       className={`flex-1 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
                         timelineRetention === d

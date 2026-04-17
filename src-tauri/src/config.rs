@@ -735,6 +735,17 @@ pub fn save_config_field(key: String, value: String) -> Result<(), String> {
         "response_style" => config.response_style = value,
         "trusted_ai_delegate" => config.trusted_ai_delegate = value,
         "ha_base_url" => config.ha_base_url = value,
+        // Boolean fields — accept "true"/"false"
+        "screen_timeline_enabled" => {
+            config.screen_timeline_enabled = value == "true";
+        }
+        // Integer fields
+        "timeline_capture_interval" => {
+            config.timeline_capture_interval = value.parse().map_err(|e: std::num::ParseIntError| e.to_string())?;
+        }
+        "timeline_retention_days" => {
+            config.timeline_retention_days = value.parse().map_err(|e: std::num::ParseIntError| e.to_string())?;
+        }
         _ => return Err(format!("Unknown config field: {}", key)),
     }
     save_config(&config)
