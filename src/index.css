@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -770,3 +770,189 @@ textarea:focus-visible {
   0%, 100% { opacity: 1;    transform: scale(1); }
   50%       { opacity: 0.6; transform: scale(0.92); }
 }
+
+/* =================================================================== */
+/* BLADE — LIQUID GLASS DESIGN SYSTEM (v2, matches /docs/design proto)  */
+/* =================================================================== */
+
+:root {
+  /* Glass fills */
+  --g-fill-weak:    rgba(255, 255, 255, 0.04);
+  --g-fill:         rgba(255, 255, 255, 0.07);
+  --g-fill-strong:  rgba(255, 255, 255, 0.11);
+  --g-fill-heavy:   rgba(255, 255, 255, 0.16);
+
+  /* Glass edges */
+  --g-edge-hi:      rgba(255, 255, 255, 0.32);
+  --g-edge-mid:     rgba(255, 255, 255, 0.14);
+  --g-edge-lo:      rgba(255, 255, 255, 0.04);
+
+  /* Inset rim — the thin bright pixel that sells glass */
+  --g-rim:          inset 0 1px 0 rgba(255, 255, 255, 0.28),
+                    inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+                    inset 1px 0 0 rgba(255, 255, 255, 0.12),
+                    inset -1px 0 0 rgba(255, 255, 255, 0.03);
+
+  /* Drop shadows */
+  --g-shadow-sm:    0 8px 24px rgba(0, 0, 0, 0.24);
+  --g-shadow-md:    0 20px 50px rgba(0, 0, 0, 0.32);
+  --g-shadow-lg:    0 40px 80px rgba(0, 0, 0, 0.42);
+
+  /* Text tiers */
+  --t-1: rgba(255, 255, 255, 0.97);
+  --t-2: rgba(255, 255, 255, 0.72);
+  --t-3: rgba(255, 255, 255, 0.50);
+  --t-4: rgba(255, 255, 255, 0.32);
+
+  /* Dividers */
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.14);
+
+  /* Accents — wallpaper-adaptive neutrals */
+  --a-warm: #ffd2a6;
+  --a-cool: #c8e0ff;
+  --a-ok:   #8affc7;
+  --a-warn: #ffc48a;
+  --a-hot:  #ff9ab0;
+
+  /* Radii */
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r-md: 18px;
+  --r-lg: 26px;
+  --r-xl: 34px;
+  --r-2xl: 44px;
+  --r-pill: 999px;
+
+  /* Spacing */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 20px; --s-6: 24px; --s-8: 32px; --s-10: 40px;
+  --s-12: 48px; --s-16: 64px; --s-20: 80px;
+
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-num: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+.font-ui  { font-family: var(--font-ui); font-feature-settings: 'cv11','ss01','ss03'; letter-spacing: -0.01em; }
+.mono     { font-family: var(--font-num); font-feature-settings: 'zero','ss01'; }
+
+/* Wallpaper — the core atmosphere */
+.wallpaper-v2 {
+  position: fixed; inset: 0; z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.wallpaper-v2::before {
+  content: '';
+  position: absolute; inset: -5%;
+  background:
+    radial-gradient(900px 700px at 82% 8%,   #ff7a4a 0%, rgba(255,122,74,0) 55%),
+    radial-gradient(700px 600px at 90% 22%,  #ffb86b 0%, rgba(255,184,107,0) 50%),
+    radial-gradient(1000px 800px at 65% 45%, #d857b6 0%, rgba(216,87,182,0) 55%),
+    radial-gradient(1100px 900px at 42% 62%, #6046d6 0%, rgba(96,70,214,0) 60%),
+    radial-gradient(900px 800px at 10% 92%,  #1ebfc6 0%, rgba(30,191,198,0) 55%),
+    radial-gradient(700px 700px at 5% 70%,   #2d6bff 0%, rgba(45,107,255,0) 55%),
+    linear-gradient(145deg, #0c0a1f 0%, #140b2e 35%, #1a0b2a 65%, #0a0a1d 100%);
+  filter: saturate(108%);
+}
+.wallpaper-v2::after {
+  content: '';
+  position: absolute; inset: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.55 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  opacity: 0.09;
+  mix-blend-mode: overlay;
+}
+.vignette-v2 {
+  position: fixed; inset: 0; z-index: 1; pointer-events: none;
+  background: radial-gradient(120% 90% at 50% 50%, transparent 55%, rgba(0,0,0,0.35) 100%);
+}
+
+/* Glass primitive — v2 (replaces old blade-glass behavior) */
+.g2 {
+  position: relative;
+  background:
+    linear-gradient(180deg,
+      rgba(255, 255, 255, 0.13) 0%,
+      rgba(255, 255, 255, 0.06) 45%,
+      rgba(255, 255, 255, 0.04) 100%);
+  backdrop-filter: blur(32px) saturate(180%) brightness(1.05);
+  -webkit-backdrop-filter: blur(32px) saturate(180%) brightness(1.05);
+  border: 1px solid var(--g-edge-mid);
+  border-radius: var(--r-lg);
+  box-shadow: var(--g-rim), var(--g-shadow-md);
+  isolation: isolate;
+}
+.g2::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(130% 80% at 0% 0%, rgba(255,255,255,0.14) 0%, transparent 45%),
+    radial-gradient(90% 60% at 100% 100%, rgba(0,0,0,0.10) 0%, transparent 55%);
+  pointer-events: none;
+  z-index: 0;
+}
+.g2 > * { position: relative; z-index: 1; }
+.g2.g2-heavy {
+  backdrop-filter: blur(48px) saturate(200%) brightness(1.08);
+  background: linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.08) 100%);
+}
+.g2.g2-flat { backdrop-filter: blur(20px) saturate(160%); }
+.g2.g2-pill { border-radius: var(--r-pill); }
+.g2.g2-sm   { border-radius: var(--r-md); }
+
+.g2-interactive { transition: transform 200ms cubic-bezier(0.2,0.8,0.2,1), box-shadow 200ms; cursor: pointer; }
+.g2-interactive:hover { transform: translateY(-2px); box-shadow: var(--g-rim), var(--g-shadow-lg); }
+
+/* Primary button (white with dark text) */
+.btn2-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px 22px; border-radius: var(--r-pill);
+  font-family: var(--font-ui); font-size: 14px; font-weight: 500;
+  color: #1a0b2a;
+  border: 1px solid rgba(255,255,255,0.5);
+  background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.82) 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,1), 0 8px 24px rgba(0,0,0,0.25);
+  cursor: pointer;
+  transition: all 180ms cubic-bezier(0.2,0.8,0.2,1);
+  letter-spacing: -0.005em;
+}
+.btn2-primary:hover { background: #fff; transform: translateY(-1px); box-shadow: inset 0 1px 0 rgba(255,255,255,1), 0 12px 30px rgba(0,0,0,0.3); }
+.btn2-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Secondary button (glass) */
+.btn2-secondary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px 20px; border-radius: var(--r-pill);
+  font-family: var(--font-ui); font-size: 14px; font-weight: 500;
+  color: var(--t-1);
+  border: 1px solid var(--g-edge-mid);
+  background: linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.05) 100%);
+  backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: var(--g-rim), 0 4px 12px rgba(0,0,0,0.18);
+  cursor: pointer;
+  transition: all 180ms;
+}
+.btn2-secondary:hover { background: linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.08) 100%); transform: translateY(-1px); }
+
+/* Chip */
+.chip2 {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: var(--r-pill);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid var(--g-edge-mid);
+  color: var(--t-1);
+}
+.chip2-free { background: rgba(138,255,199,0.16); border-color: rgba(138,255,199,0.35); color: #c4ffe0; }
+.chip2-new  { background: rgba(255,154,176,0.16); border-color: rgba(255,154,176,0.35); color: #ffccd8; }
+.chip2-pro  { background: rgba(200,224,255,0.14); border-color: rgba(200,224,255,0.35); color: #d8e7ff; }
+
+/* Typography helpers */
+.td-display { font-weight: 600; font-size: 56px; line-height: 1.02; letter-spacing: -0.035em; }
+.td-h1      { font-weight: 600; font-size: 44px; line-height: 1.05; letter-spacing: -0.03em; }
+.td-h2      { font-weight: 600; font-size: 28px; line-height: 1.15; letter-spacing: -0.02em; }
+.td-h3      { font-weight: 600; font-size: 20px; line-height: 1.2;  letter-spacing: -0.015em; }
+.td-body    { font-weight: 400; font-size: 15px; line-height: 1.5; }
+.td-small   { font-weight: 400; font-size: 13px; line-height: 1.45; color: var(--t-2); }
+.td-micro   { font-weight: 600; font-size: 11px; line-height: 1.4; color: var(--t-3); letter-spacing: 0.08em; text-transform: uppercase; }
