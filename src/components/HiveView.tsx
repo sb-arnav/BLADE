@@ -1581,7 +1581,7 @@ export function HiveView({ onBack }: HiveViewProps) {
   return (
     <div
       className="flex flex-col h-full overflow-hidden select-none"
-      style={{ background: "#0a0a0e", color: "rgba(255,255,255,0.85)", fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}
+      style={{ background: "transparent", color: "rgba(255,255,255,0.9)", fontFamily: "'Bricolage Grotesque', 'Syne', -apple-system, BlinkMacSystemFont, sans-serif" }}
     >
 
       {/* ── Top bar ─────────────────────────────────────────────────────────── */}
