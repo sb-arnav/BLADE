@@ -25,13 +25,58 @@ interface ProviderEntry {
 
 // ── Smart API key detection ────────────────────────────────────────────────
 
-function detectProvider(key: string): { provider: string; model: string } | null {
-  if (key.startsWith("sk-or-v1-")) return { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free" };
-  if (key.startsWith("sk-ant-")) return { provider: "anthropic", model: "claude-sonnet-4-20250514" };
-  if (key.startsWith("sk-")) return { provider: "openai", model: "gpt-4o-mini" };
-  if (key.startsWith("gsk_")) return { provider: "groq", model: "llama-3.3-70b-versatile" };
-  if (key.startsWith("AIza")) return { provider: "gemini", model: "gemini-2.0-flash" };
+function detectProvider(key: string): { provider: string; model: string; baseUrl?: string } | null {
+  const trimmed = key.trim();
+
+  // Direct key detection
+  if (trimmed.startsWith("sk-or-v1-")) return { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free" };
+  if (trimmed.startsWith("sk-ant-")) return { provider: "anthropic", model: "claude-sonnet-4-20250514" };
+  if (trimmed.startsWith("gsk_")) return { provider: "groq", model: "llama-3.3-70b-versatile" };
+  if (trimmed.startsWith("AIza")) return { provider: "gemini", model: "gemini-2.0-flash" };
+  if (trimmed.startsWith("xai-")) return { provider: "openai", model: "grok-3-mini", baseUrl: "https://api.x.ai/v1" };
+  if (trimmed.startsWith("nvapi-")) return { provider: "openai", model: "nvidia/llama-3.1-nemotron-ultra-253b-v1", baseUrl: "https://integrate.api.nvidia.com/v1" };
+  if (trimmed.startsWith("sk-")) return { provider: "openai", model: "gpt-4o-mini" };
+
+  // Curl snippet parsing — extract key and base URL from curl commands
+  if (trimmed.startsWith("curl")) {
+    const bearerMatch = trimmed.match(/[Bb]earer\s+([A-Za-z0-9_-]+)/);
+    const xApiKeyMatch = trimmed.match(/x-api-key:\s*([A-Za-z0-9_-]+)/i);
+    const urlMatch = trimmed.match(/https?:\/\/[^\s"']+/);
+    const extractedKey = bearerMatch?.[1] || xApiKeyMatch?.[1];
+
+    if (extractedKey) {
+      // Try to detect provider from the extracted key
+      const fromKey = detectProvider(extractedKey);
+      if (fromKey) return fromKey;
+
+      // Try to detect from URL
+      const url = urlMatch?.[0] || "";
+      if (url.includes("anthropic")) return { provider: "anthropic", model: "claude-sonnet-4-20250514" };
+      if (url.includes("openai.com")) return { provider: "openai", model: "gpt-4o-mini" };
+      if (url.includes("generativelanguage.googleapis")) return { provider: "gemini", model: "gemini-2.0-flash" };
+      if (url.includes("groq.com")) return { provider: "groq", model: "llama-3.3-70b-versatile" };
+      if (url.includes("openrouter.ai")) return { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free" };
+      if (url.includes("x.ai")) return { provider: "openai", model: "grok-3-mini", baseUrl: "https://api.x.ai/v1" };
+      if (url.includes("deepseek")) return { provider: "openai", model: "deepseek-chat", baseUrl: "https://api.deepseek.com/v1" };
+
+      // Generic OpenAI-compatible endpoint
+      const baseUrl = url.replace(/\/chat\/completions.*/, "").replace(/\/v1\/.*/, "/v1");
+      if (baseUrl) return { provider: "openai", model: "gpt-4o-mini", baseUrl };
+    }
+  }
+
   return null;
+}
+
+/** Extract just the API key from either a raw key or a curl snippet */
+function extractKeyFromInput(input: string): string {
+  const trimmed = input.trim();
+  if (trimmed.startsWith("curl")) {
+    const bearerMatch = trimmed.match(/[Bb]earer\s+([A-Za-z0-9_-]+)/);
+    const xApiKeyMatch = trimmed.match(/x-api-key:\s*([A-Za-z0-9_-]+)/i);
+    return bearerMatch?.[1] || xApiKeyMatch?.[1] || "";
+  }
+  return trimmed;
 }
 
 const PROVIDER_FREE_TIER: Record<string, string> = {
@@ -539,6 +584,63 @@ function KeyVault({ activeProvider }: { activeProvider: string }) {
         );
       })}
       <p className="text-2xs text-blade-muted">All keys stored in OS keychain. BLADE uses the right key for each task automatically — Anthropic for chat, Groq/Ollama for pentest mode.</p>
+    </div>
+  );
+}
+
+function AgentSetupPanel() {
+  const [agents, setAgents] = useState<Array<{ name: string; installed: boolean; description: string; installCmd: string; keyEnv: string }>>([]);
+
+  useEffect(() => {
+    // Check which agents are installed
+    const checkAgents = async () => {
+      const list = [
+        { name: "Claude Code", bin: "claude", description: "Anthropic's coding agent — best for complex refactoring and multi-file changes", installCmd: "npm install -g @anthropic-ai/claude-code", keyEnv: "ANTHROPIC_API_KEY" },
+        { name: "Aider", bin: "aider", description: "AI pair programming — great for iterating on existing code with git awareness", installCmd: "pip install aider-chat", keyEnv: "OPENAI_API_KEY or ANTHROPIC_API_KEY" },
+        { name: "Goose", bin: "goose", description: "Block's open-source coding agent — extensible with MCP plugins", installCmd: "pip install goose-ai", keyEnv: "OPENAI_API_KEY" },
+      ];
+      const results = list.map((a) => ({ ...a, installed: false }));
+      // Use the detection endpoint if available
+      try {
+        const detected = await invoke<{ claude: boolean; aider: boolean; goose: boolean }>("detect_coding_agents");
+        for (const r of results) {
+          if (r.name === "Claude Code") r.installed = detected.claude;
+          if (r.name === "Aider") r.installed = detected.aider;
+          if (r.name === "Goose") r.installed = detected.goose;
+        }
+      } catch { /* detection endpoint may not exist yet */ }
+      setAgents(results);
+    };
+    checkAgents();
+  }, []);
+
+  return (
+    <div className="space-y-2">
+      {agents.length === 0 ? (
+        <div className="text-xs text-blade-muted/50">Checking installed agents…</div>
+      ) : agents.map((a) => (
+        <div key={a.name} className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${a.installed ? "border-emerald-500/30 bg-emerald-500/5" : "border-blade-border"}`}>
+          <div className={`w-[8px] h-[8px] rounded-full flex-shrink-0 ${a.installed ? "bg-emerald-400" : "bg-blade-muted/30"}`} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] font-semibold">{a.name}</span>
+              {a.installed ? (
+                <span className="text-[9px] px-[6px] py-[1px] rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">installed</span>
+              ) : (
+                <span className="text-[9px] px-[6px] py-[1px] rounded-full bg-blade-muted/10 text-blade-muted/50 border border-blade-border">not installed</span>
+              )}
+            </div>
+            <p className="text-[10px] text-blade-muted/60 mt-[2px]">{a.description}</p>
+            {!a.installed && (
+              <code className="block text-[10px] font-mono text-blade-accent/70 bg-blade-bg rounded-lg px-2 py-1 mt-1.5 border border-blade-border select-all">{a.installCmd}</code>
+            )}
+            {a.installed && (
+              <p className="text-[9px] text-blade-muted/40 mt-1">Uses: <code className="font-mono">{a.keyEnv}</code> — set via Key Vault above or env var</p>
+            )}
+          </div>
+        </div>
+      ))}
+      <p className="text-2xs text-blade-muted/50">Agents run as separate processes. Tell BLADE "build a login page" or "refactor this module" and it spawns the right agent.</p>
     </div>
   );
 }
@@ -1183,20 +1285,24 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
 
           {/* Quick start: just paste your key */}
           <div className="space-y-2">
-            <p className="text-[11px] font-semibold text-blade-text">Quick start — paste any API key</p>
-            <p className="text-[10px] text-blade-muted/60">BLADE auto-detects the provider from the key format</p>
+            <p className="text-[11px] font-semibold text-blade-text">Quick start — paste a key or curl snippet</p>
+            <p className="text-[10px] text-blade-muted/60">Paste an API key, or copy the curl example from any provider's docs — BLADE detects everything automatically</p>
             <input
               type="text"
               value={apiKey}
               onChange={(e) => {
                 const val = e.target.value;
-                setApiKey(val);
                 setTestState("idle");
                 setTestMessage(null);
                 const detected = detectProvider(val.trim());
                 if (detected) {
-                  const entry = PROVIDER_MATRIX.find(p => p.id === detected.provider && !p.baseUrl);
-                  if (entry) { setSelectedEntry(entry); setProvider(detected.provider); setBaseUrl(""); }
+                  // Extract just the key if it's a curl snippet
+                  const cleanKey = extractKeyFromInput(val);
+                  setApiKey(cleanKey || val);
+                  const entry = PROVIDER_MATRIX.find(p => p.id === detected.provider && (detected.baseUrl ? p.baseUrl === detected.baseUrl : !p.baseUrl));
+                  if (entry) { setSelectedEntry(entry); setProvider(detected.provider); }
+                  if (detected.baseUrl) setBaseUrl(detected.baseUrl);
+                  else setBaseUrl("");
                   setModel(detected.model);
                   const providerNames: Record<string, string> = {
                     openrouter: "OpenRouter — free models available",
@@ -1205,12 +1311,15 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
                     groq: "Groq — Llama 3.3 70B",
                     gemini: "Gemini — Flash 2.0",
                   };
-                  setDetectedToast(`Detected: ${providerNames[detected.provider] ?? detected.provider}`);
+                  const isCurl = val.trim().startsWith("curl");
+                  setDetectedToast(`${isCurl ? "Parsed curl → " : "Detected: "}${providerNames[detected.provider] ?? detected.provider}`);
                   setTimeout(() => setDetectedToast(null), 4000);
+                } else {
+                  setApiKey(val);
                 }
               }}
               className="w-full bg-blade-bg border border-blade-border rounded-xl px-4 py-3 text-[13px] outline-none font-mono focus:border-blade-accent/50 transition-colors placeholder-blade-muted/40"
-              placeholder="sk-ant-... or sk-or-v1-... or AIza... or gsk_..."
+              placeholder="Paste API key (sk-ant-...) or curl snippet from docs"
             />
             {detectedToast && (
               <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px]">
@@ -1385,6 +1494,14 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
             <p className="text-xs text-blade-muted mt-0.5">Store all your provider keys at once. BLADE keeps them all — switches automatically based on context.</p>
           </div>
           <KeyVault activeProvider={provider} />
+        </section>
+
+        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+          <div>
+            <h2 className="text-sm font-semibold">Coding Agents</h2>
+            <p className="text-xs text-blade-muted mt-0.5">BLADE can spawn autonomous coding agents for complex tasks. Install them to unlock "build this feature" commands.</p>
+          </div>
+          <AgentSetupPanel />
         </section>
 
         <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">

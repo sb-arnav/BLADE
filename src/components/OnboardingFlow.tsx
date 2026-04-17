@@ -120,25 +120,63 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
 
         {step === "provider" && (
           <StepContainer>
-            <StepHeader title="AI Provider" sub="Choose which AI model powers BLADE" step={2} total={8} />
-            <div className="space-y-2 mb-4">
-              {["anthropic", "openai", "gemini", "groq", "openrouter", "ollama"].map((p) => (
-                <button key={p} onClick={() => setProvider(p)}
-                  className={`w-full px-4 py-3 rounded-xl text-left text-[13px] font-medium transition-all ${
-                    provider === p
-                      ? "bg-[rgba(129,140,248,0.15)] border border-[#818cf8] text-white"
-                      : "bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-[rgba(255,255,255,0.6)] hover:bg-[rgba(255,255,255,0.07)]"
+            <StepHeader title="Connect an AI" sub="Paste an API key or curl snippet — BLADE figures out the rest" step={2} total={8} />
+
+            {/* Smart paste — just paste anything */}
+            <div className="mb-4">
+              <input type="text" value={apiKey}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setApiKey(val);
+                  // Auto-detect provider from key or curl
+                  const trimmed = val.trim();
+                  if (trimmed.startsWith("sk-ant-")) setProvider("anthropic");
+                  else if (trimmed.startsWith("sk-or-v1-")) setProvider("openrouter");
+                  else if (trimmed.startsWith("sk-")) setProvider("openai");
+                  else if (trimmed.startsWith("gsk_")) setProvider("groq");
+                  else if (trimmed.startsWith("AIza")) setProvider("gemini");
+                  else if (trimmed.startsWith("curl")) {
+                    const m = trimmed.match(/[Bb]earer\s+([A-Za-z0-9_-]+)/);
+                    if (m) {
+                      setApiKey(m[1]);
+                      if (m[1].startsWith("sk-ant-")) setProvider("anthropic");
+                      else if (m[1].startsWith("sk-or-v1-")) setProvider("openrouter");
+                      else if (m[1].startsWith("sk-")) setProvider("openai");
+                      else if (m[1].startsWith("gsk_")) setProvider("groq");
+                    }
+                  }
+                }}
+                placeholder="Paste API key or curl snippet from provider docs"
+                className="w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] rounded-xl text-[13px] text-white placeholder-[rgba(255,255,255,0.3)] focus:outline-none focus:border-[#818cf8] font-mono" />
+              {provider && (
+                <div className="mt-2 px-3 py-2 rounded-xl bg-[rgba(74,222,128,0.1)] border border-[rgba(74,222,128,0.25)] text-[rgba(74,222,128,0.9)] text-[11px]">
+                  Detected: {provider.charAt(0).toUpperCase() + provider.slice(1)}
+                </div>
+              )}
+            </div>
+
+            {/* Or pick manually */}
+            <p className="text-[10px] text-[rgba(255,255,255,0.3)] mb-2">Or choose a provider:</p>
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {[
+                { id: "anthropic", label: "Anthropic", sub: "Claude" },
+                { id: "openai", label: "OpenAI", sub: "GPT-4o" },
+                { id: "gemini", label: "Gemini", sub: "free tier" },
+                { id: "groq", label: "Groq", sub: "fast + free" },
+                { id: "openrouter", label: "OpenRouter", sub: "200+ models" },
+                { id: "ollama", label: "Ollama", sub: "local, free" },
+              ].map((p) => (
+                <button key={p.id} onClick={() => setProvider(p.id)}
+                  className={`px-3 py-2 rounded-xl text-center transition-all ${
+                    provider === p.id
+                      ? "bg-[rgba(129,140,248,0.15)] border border-[#818cf8]"
+                      : "bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.07)]"
                   }`}>
-                  {p.charAt(0).toUpperCase() + p.slice(1)}
-                  {p === "ollama" && <span className="text-[10px] text-[rgba(255,255,255,0.3)] ml-2">(local, no key needed)</span>}
+                  <div className="text-[12px] font-semibold">{p.label}</div>
+                  <div className="text-[9px] text-[rgba(255,255,255,0.35)]">{p.sub}</div>
                 </button>
               ))}
             </div>
-            {provider && provider !== "ollama" && (
-              <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)}
-                placeholder={`Enter your ${provider} API key`}
-                className="w-full px-4 py-3 mb-4 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] rounded-xl text-[13px] text-white placeholder-[rgba(255,255,255,0.3)] focus:outline-none focus:border-[#818cf8]" />
-            )}
             <div className="flex gap-2">
               <BtnGhost onClick={back}>Back</BtnGhost>
               <Btn onClick={provider === "ollama" ? next : saveProvider} disabled={!provider || (provider !== "ollama" && !apiKey)}>
