@@ -952,62 +952,72 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
   };
 
   return (
-    <div className="h-full overflow-y-auto">
-      {/* Sticky glass header — back button, title, tab strip all in one bar */}
+    <div className="h-full overflow-y-auto" style={{ fontFamily: "var(--font-ui)" }}>
+      {/* Wallpaper behind (the Settings route doesn't get the glass route wrapper) */}
+      <div className="wallpaper-v2" style={{ position: "fixed" }} />
+      <div className="vignette-v2" />
+
+      {/* Prototype-style header — big title + pill tab strip inside a glass bar */}
       <div
-        className="sticky top-0 z-20 border-b border-[rgba(255,255,255,0.06)]"
-        style={{
-          background: "rgba(8,8,14,0.72)",
-          backdropFilter: "blur(32px) saturate(1.6)",
-          WebkitBackdropFilter: "blur(32px) saturate(1.6)",
-        }}
+        className="sticky top-0 z-20"
+        style={{ padding: "20px 24px 0", background: "transparent" }}
       >
-        <div className="max-w-3xl mx-auto px-6 pt-6 pb-0">
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={onBack}
-                className="group flex items-center gap-2 text-[12px] text-[rgba(255,255,255,0.45)] hover:text-white transition-colors"
-              >
-                <svg viewBox="0 0 16 16" className="w-[14px] h-[14px] transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M10 12L6 8l4-4" />
-                </svg>
-                Back
-              </button>
-              <div className="w-px h-4 bg-[rgba(255,255,255,0.08)]" />
-              <h1 className="font-display text-[22px] font-bold tracking-[-0.025em] text-white">
-                Settings
-              </h1>
-            </div>
-            <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-[rgba(255,255,255,0.28)]">
-              BLADE · v{appVersion}
-            </p>
+        <div className="blade-glass" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 28px", borderRadius: "var(--r-xl, 34px)" }}>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onBack}
+              className="group flex items-center gap-2"
+              style={{ background: "none", border: "none", color: "var(--t-3)", fontSize: 13, cursor: "pointer" }}
+            >
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10 12L6 8l4-4" />
+              </svg>
+              Back
+            </button>
+            <div style={{ width: 1, height: 18, background: "rgba(255,255,255,0.08)" }} />
+            <h1 style={{ fontSize: 28, fontWeight: 600, letterSpacing: "-0.025em", color: "var(--t-1)" }}>
+              Settings
+              <span style={{ color: "var(--t-3)", fontWeight: 400, marginLeft: 10, fontSize: 18 }}>
+                {TABS.find((t) => t.id === tab)?.label || ""}
+              </span>
+            </h1>
           </div>
 
-          {/* Apple-style segmented tab strip */}
-          <div className="flex items-center gap-1 overflow-x-auto -mb-px">
+          {/* Pill-shape segmented tab strip */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              padding: 6,
+              borderRadius: "var(--r-pill)",
+              background: "rgba(0,0,0,0.22)",
+              border: "1px solid var(--g-edge-lo)",
+            }}
+          >
             {TABS.map((t) => {
               const active = tab === t.id;
               return (
                 <button
                   key={t.id}
                   onClick={() => setTab(t.id)}
-                  className={`relative px-4 py-2.5 text-[12.5px] font-semibold tracking-[-0.005em] transition-all duration-200 whitespace-nowrap ${
-                    active
-                      ? "text-white"
-                      : "text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.75)]"
-                  }`}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "var(--r-pill)",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    letterSpacing: "-0.005em",
+                    background: active
+                      ? "linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.08))"
+                      : "transparent",
+                    border: active ? "1px solid var(--g-edge-mid)" : "1px solid transparent",
+                    color: active ? "var(--t-1)" : "var(--t-2)",
+                    cursor: "pointer",
+                    boxShadow: active ? "inset 0 1px 0 rgba(255,255,255,0.28), 0 4px 10px rgba(0,0,0,0.25)" : "none",
+                    transition: "all 160ms",
+                  }}
                 >
                   {t.label}
-                  {active && (
-                    <span
-                      className="absolute left-3 right-3 bottom-0 h-[2px] rounded-full"
-                      style={{
-                        background: "linear-gradient(90deg, transparent, #818cf8 30%, #818cf8 70%, transparent)",
-                        boxShadow: "0 0 12px rgba(129,140,248,0.5)",
-                      }}
-                    />
-                  )}
                 </button>
               );
             })}
@@ -1015,7 +1025,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
         </div>
       </div>
 
-      {/* Scrollable content — same max-width to align with header */}
+      {/* Scrollable content */}
       <div className="max-w-3xl mx-auto px-6 py-8 space-y-5">
 
         {tab === "general" && <>
