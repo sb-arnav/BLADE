@@ -3,7 +3,7 @@ import React from "react";
 export type NavRailRoute =
   | "dashboard" | "chat" | "terminal" | "git"
   | "hive" | "agent-factory" | "security" | "settings"
-  | "rewind" | "live-notes";
+  | "rewind" | "live-notes" | "focus-page";
 
 interface NavRailProps {
   activeRoute: string;
@@ -103,8 +103,8 @@ export function NavRail({ activeRoute, onNavigate, onOpenHistory }: NavRailProps
       <div className="flex-1" />
       <div className="w-[26px] h-px bg-[rgba(255,255,255,0.08)] my-[6px]" />
 
-      <NavBtn tip="Ghost Mode" active={false} onClick={() => onNavigate("settings")}>
-        <Ico d={<path d="M10 2a6 6 0 016 6v8l-2-2-2 2-2-2-2 2-2-2-2 2V8a6 6 0 016-6z"/>} />
+      <NavBtn tip="Focus" active={activeRoute === "focus-page"} onClick={() => onNavigate("focus-page")}>
+        <Ico d={<><circle cx="10" cy="10" r="3.5" fill="none"/><circle cx="10" cy="10" r="7" fill="none"/></>} />
       </NavBtn>
 
       <NavBtn tip="Settings" active={activeRoute === "settings"} onClick={() => onNavigate("settings")}>
