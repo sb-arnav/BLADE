@@ -493,7 +493,7 @@ export function ChatWindow({
   const runtimeStrip = (runtimes ?? []).slice(0, 4);
 
   return (
-    <div className="flex h-full bg-blade-bg text-blade-text">
+    <div className="flex h-full bg-transparent text-blade-text">
       {/* Welcome tour overlay */}
       {tourStep >= 0 && tourStep < TOUR_STEPS.length && (
         <div className="fixed inset-0 z-50 flex items-end justify-center pb-24 pointer-events-none">

@@ -1228,6 +1228,7 @@ export default function App() {
             background: "rgba(6,6,12,0.85)",
             backdropFilter: "blur(40px) saturate(1.4)",
             WebkitBackdropFilter: "blur(40px) saturate(1.4)",
+            paddingBottom: "26px", // Space for AmbientStrip at bottom
           } : undefined}
         >
           {fullPageRoutes[route] ?? fullPageRoutes["dashboard"]}
