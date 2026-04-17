@@ -72,6 +72,33 @@ export function AmbientStrip() {
         const payload = ev.payload as { trigger?: string };
         addActivity("Showing: " + (payload?.trigger || "content"), "act");
       }),
+      // BLADE's internal activity — makes it feel alive
+      listen<{ prediction: string }>("blade_suggestion", (ev) => {
+        addActivity("Suggestion: " + (ev.payload.prediction || "").slice(0, 60), "think");
+      }),
+      listen("blade_reflex", () => {
+        addActivity("Autonomous reflex fired", "act");
+      }),
+      listen<string>("blade_planning", () => {
+        addActivity("Deep reasoning in progress…", "think");
+      }),
+      listen("blade_evolving", () => {
+        addActivity("Searching for new capabilities", "think");
+      }),
+      listen<{ step: string }>("computer_use_step", (ev) => {
+        const payload = ev.payload as { step?: string; action?: string };
+        addActivity("Desktop: " + (payload?.step || payload?.action || "acting"), "act");
+      }),
+      listen<{ title: string }>("os_notification", (ev) => {
+        const payload = ev.payload as { title?: string; app?: string };
+        addActivity("Notification: " + (payload?.title || payload?.app || "system"), "see");
+      }),
+      listen("smart_interrupt", () => {
+        addActivity("Interrupting — something needs attention", "act");
+      }),
+      listen<string>("blade_routing_switched", () => {
+        addActivity("Switched to backup AI provider", "think");
+      }),
     ];
 
     return () => { unsubs.forEach((p) => p.then((fn) => fn())); };
