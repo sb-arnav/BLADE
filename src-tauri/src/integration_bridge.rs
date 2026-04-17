@@ -118,9 +118,7 @@ fn mcp_server_registered(server_name: &str) -> bool {
 /// Falls back to simulated data if the server is not configured.
 async fn poll_gmail() -> u32 {
     if !mcp_server_registered("gmail") {
-        // Simulated: rotate through a small set so the UI looks live in dev
-        let base = (now_secs() / 120) % 7;
-        return base as u32;
+        return 0; // No Gmail MCP server configured — show nothing, not fake data
     }
 
     // Real MCP call: gmail_search_messages with query "is:unread"
@@ -149,20 +147,7 @@ async fn poll_gmail() -> u32 {
 /// Poll Google Calendar for events in the next 24 hours.
 async fn poll_calendar() -> Vec<CalendarEvent> {
     if !mcp_server_registered("calendar") {
-        // Simulated: one event ~20 minutes from now, one ~2 hours from now
-        let now = now_secs();
-        return vec![
-            CalendarEvent {
-                title: "Team Standup".to_string(),
-                start_ts: now + 20 * 60,
-                minutes_until: 20,
-            },
-            CalendarEvent {
-                title: "Product Review".to_string(),
-                start_ts: now + 120 * 60,
-                minutes_until: 120,
-            },
-        ];
+        return Vec::new(); // No Calendar MCP server configured — show nothing
     }
 
     let now = now_secs();
@@ -220,8 +205,7 @@ async fn poll_calendar() -> Vec<CalendarEvent> {
 /// Poll Slack for direct-message mentions.
 async fn poll_slack() -> u32 {
     if !mcp_server_registered("slack") {
-        let base = (now_secs() / 60) % 4;
-        return base as u32;
+        return 0; // No Slack MCP server configured
     }
 
     let args = serde_json::json!({ "query": "is:dm has:mention", "count": 20 });
@@ -244,8 +228,7 @@ async fn poll_slack() -> u32 {
 /// Poll GitHub for unread notifications.
 async fn poll_github() -> u32 {
     if !mcp_server_registered("github") {
-        let base = (now_secs() / 300) % 5;
-        return base as u32;
+        return 0; // No GitHub MCP server configured
     }
 
     // GitHub MCP typically exposes a notifications tool; try a generic approach.
