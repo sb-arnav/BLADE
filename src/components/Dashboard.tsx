@@ -187,11 +187,18 @@ function GodModeCard({ perception }: { perception: PerceptionState | null }) {
         <div className="font-mono text-[12px] text-[#60a5fa] mb-4 truncate">
           {filePath.length > 50 ? `…${filePath.slice(-48)}` : filePath}
         </div>
-        <div className="inline-flex items-center gap-[6px] px-3 py-[5px] rounded-full
-          bg-[rgba(74,222,128,0.1)] border border-[rgba(74,222,128,0.22)]
-          text-[#4ade80] text-[11px] font-semibold self-start">
-          <Dot color="#4ade80" glow />
-          {userState}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="inline-flex items-center gap-[6px] px-3 py-[5px] rounded-full
+            bg-[rgba(74,222,128,0.1)] border border-[rgba(74,222,128,0.22)]
+            text-[#4ade80] text-[11px] font-semibold">
+            <Dot color="#4ade80" glow />
+            {userState}
+          </div>
+          {perception?.context_tags?.slice(0, 4).map((tag) => (
+            <span key={tag} className="text-[9.5px] px-[7px] py-[3px] rounded-full bg-[rgba(129,140,248,0.08)] text-[rgba(129,140,248,0.65)] border border-[rgba(129,140,248,0.15)]">
+              {tag}
+            </span>
+          ))}
         </div>
       </div>
 
