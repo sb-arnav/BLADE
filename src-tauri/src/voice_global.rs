@@ -686,7 +686,7 @@ async fn transcribe_samples(samples: &[f32], sample_rate: u32) -> Result<String,
 async fn process_voice_turn_with_history(
     app: &tauri::AppHandle,
     user_text: &str,
-    _conv_history: &[crate::providers::ConversationMessage],
+    conv_history: &[crate::providers::ConversationMessage],
     emotion: &str,
     lang: &str,
 ) -> Result<String, String> {
@@ -744,14 +744,25 @@ async fn process_voice_turn_with_history(
     // send_message_stream requires Tauri managed state we can't easily
     // pass. Instead, invoke it as if the frontend called it.
     let user_text_owned = user_text.to_string();
+    let history_owned: Vec<_> = conv_history.to_vec();
     let send_handle = tokio::spawn(async move {
         // Use invoke_internal pattern: call the command directly
         // This is a simplified path that sends messages through the
         // existing streaming pipeline. The tokens will be emitted as
         // chat_token events which we capture above.
+        // Pass the conversation history so BLADE has context across voice turns.
+        // Without this, every voice turn is stateless and BLADE can't refer to
+        // anything said earlier in the conversation.
+        let history_json: Vec<serde_json::Value> = history_owned.iter().map(|m| {
+            serde_json::json!({
+                "role": m.role,
+                "content": m.content,
+            })
+        }).collect();
         let _ = app_send.emit("voice_chat_submit", serde_json::json!({
             "content": user_text_owned,
             "voice_mode": true,
+            "history": history_json,
         }));
     });
 
