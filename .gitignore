@@ -28,6 +28,9 @@ backend/venv/
 target/
 .fastembed_cache/
 
+# Apple font DMGs — reference only, not redistributable, ~376MB
+docs/apple-research/fonts/*.dmg
+
 # Claude Code (dev tooling — not part of the project)
 .claude/settings.local.json
 vendor/
