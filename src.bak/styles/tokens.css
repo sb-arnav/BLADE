@@ -1,0 +1,122 @@
+/* ============================================================================
+ * BLADE design tokens — single source of truth.
+ * Derived from docs/apple-research/DESIGN_TOKENS.md.
+ * Rule: components reference tokens, never raw hex.
+ * ========================================================================== */
+
+:root, :root[data-theme="dark"] {
+  /* Labels ------------------------------------------------------------------- */
+  --label:               #FFFFFF;
+  --label-secondary:     #EBEBF599;   /* .60 */
+  --label-tertiary:      #EBEBF54C;   /* .30 */
+  --label-quaternary:    #EBEBF52D;   /* .18 */
+
+  /* Fills -------------------------------------------------------------------- */
+  --fill-1:              #7878805B;   /* .36 */
+  --fill-2:              #78788051;   /* .32 */
+  --fill-3:              #7676803D;   /* .24 */
+  --fill-4:              #74748029;   /* .16 */
+
+  /* Hairlines — elevation is a separator + vibrancy, never a shadow. -------- */
+  --separator:           #54545899;   /* .60 */
+  --separator-opaque:    #38383A;
+
+  /* Canvas vs chrome — FCP dual-tone rule ----------------------------------- */
+  --bg-canvas:           #000000;
+  --bg-window:           #1C1C1E;
+  --bg-sidebar:          #1C1C1E;
+  --bg-control:          #2C2C2E;
+  --bg-grouped-1:        #000000;
+  --bg-grouped-2:        #1C1C1E;
+  --bg-grouped-3:        #2C2C2E;
+
+  /* Accent — system blue; user-overridable later ---------------------------- */
+  --system-blue:         #0A84FF;
+  --system-blue-hover:   #409CFF;
+  --focus-ring:          rgba(10, 132, 255, 0.40);
+}
+
+:root[data-theme="light"] {
+  --label:               #000000;
+  --label-secondary:     #3C3C4399;
+  --label-tertiary:      #3C3C434C;
+  --label-quaternary:    #3C3C432D;
+
+  --fill-1:              #78788033;
+  --fill-2:              #78788028;
+  --fill-3:              #7878801F;
+  --fill-4:              #78788014;
+
+  --separator:           #3C3C4349;
+  --separator-opaque:    #C6C6C8;
+
+  --bg-canvas:           #FFFFFF;
+  --bg-window:           #F2F2F7;
+  --bg-sidebar:          #F2F2F7;
+  --bg-control:          #FFFFFF;
+  --bg-grouped-1:        #FFFFFF;
+  --bg-grouped-2:        #F2F2F7;
+  --bg-grouped-3:        #FFFFFF;
+
+  --system-blue:         #007AFF;
+  --system-blue-hover:   #0060DF;
+  --focus-ring:          rgba(0, 122, 255, 0.40);
+}
+
+/* Chrome height per OS — read by layout primitives ------------------------- */
+:root                           { --titlebar-h: 28px; --hud-h: 28px; }
+:root[data-platform="windows"]  { --titlebar-h: 32px; --hud-h: 32px; }
+:root[data-platform="linux"]    { --titlebar-h: 28px; --hud-h: 28px; }
+
+/* Motion durations + curves — named, not scattered ------------------------- */
+:root {
+  --ease-hover:   cubic-bezier(0.25, 0.10, 0.25, 1.00);
+  --ease-reveal:  cubic-bezier(0.22, 1.00, 0.36, 1.00);
+  --ease-dismiss: cubic-bezier(0.40, 0.00, 1.00, 1.00);
+  --ease-state:   cubic-bezier(0.40, 0.00, 0.20, 1.00);
+
+  --dur-hover:    100ms;
+  --dur-focus:    150ms;
+  --dur-reveal:   250ms;
+  --dur-dismiss:  200ms;
+  --dur-state:    300ms;
+}
+
+/* AI-active shimmer — BOUNDED, only on actively-generating regions.
+ * Bounded 3-color oklch cycle; never a full rainbow. Stops within 120ms of
+ * stream end (handled in TS; keyframes are the animation half only).
+ * ------------------------------------------------------------------------- */
+@keyframes ai-shimmer {
+  0%, 100% { background-position:   0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
+.ai-active {
+  position: relative;
+  padding: 1px;
+  border-radius: calc(var(--radius-card) + 1px);
+  background: linear-gradient(
+    110deg,
+    oklch(0.78 0.15 310),
+    oklch(0.80 0.14 25),
+    oklch(0.82 0.14 200),
+    oklch(0.78 0.15 310)
+  );
+  background-size: 300% 300%;
+  animation: ai-shimmer 2.4s var(--ease-state) infinite;
+}
+.ai-active > :first-child {
+  background: var(--bg-canvas);
+  border-radius: var(--radius-card);
+}
+
+/* Popover shadow — the ONE shadow recipe. Pane edges use hairlines. -------- */
+.popover-shadow {
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.12),
+    0 8px 32px rgba(0, 0, 0, 0.24),
+    0 2px 8px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+}
