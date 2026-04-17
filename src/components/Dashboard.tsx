@@ -507,19 +507,22 @@ export function Dashboard({ onNavigate, chatPanelProps, activeRoute }: Dashboard
     onNavigate(route);
   }, [onNavigate]);
 
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const dateStr = now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+  const hour = now.getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+
+  // Suppress unused warnings while we keep the old cards around
+  void wallpaperUrl;
+  void GodModeCard; void HiveCard; void IntegrationsCard;
+  void CalendarCard; void VitalSignsCard; void ProactiveCardsPanel;
+
   return (
-    <div className="relative w-full h-full overflow-hidden">
-      {/* Wallpaper background */}
-      <div
-        className="fixed inset-0 z-0 bg-cover bg-center"
-        style={{
-          backgroundImage: wallpaperUrl
-            ? `url(${wallpaperUrl})`
-            : "radial-gradient(ellipse 90% 70% at 15% 25%, rgba(88,50,220,0.65) 0%, transparent 65%), radial-gradient(ellipse 70% 90% at 85% 15%, rgba(40,20,140,0.55) 0%, transparent 60%), radial-gradient(ellipse 80% 60% at 70% 85%, rgba(160,30,90,0.4) 0%, transparent 65%), #06060f",
-        }}
-      />
-      {/* Dark scrim */}
-      <div className="fixed inset-0 z-[1] pointer-events-none" style={{ background: "rgba(0,0,0,0.38)" }} />
+    <div className="relative w-full h-full overflow-hidden" style={{ fontFamily: "var(--font-ui)" }}>
+      {/* Vibrant wallpaper + vignette */}
+      <div className="wallpaper-v2" />
+      <div className="vignette-v2" />
 
       {/* Nav rail */}
       <div className="relative z-[200]">
@@ -540,28 +543,185 @@ export function Dashboard({ onNavigate, chatPanelProps, activeRoute }: Dashboard
         onNew={() => { chatPanelProps.onNewConversation(); setChatOpen(true); setHistOpen(false); }}
       />
 
-      {/* Main grid */}
+      {/* Main shell */}
       <div
-        className="relative z-[10] flex flex-col ml-[62px] mt-[34px] h-[calc(100vh-34px-26px)] p-[12px] gap-[10px] overflow-hidden transition-[margin-right] duration-[460ms]"
+        className="relative z-[10] flex flex-col h-screen overflow-hidden transition-[margin-right] duration-[460ms]"
         style={{
           transitionTimingFunction: "cubic-bezier(0.32,0.72,0,1)",
-          marginRight: chatOpen ? "420px" : "0px",
+          marginLeft: 62,
+          marginTop: 34,
+          padding: "20px 24px 104px 20px",
+          height: "calc(100vh - 34px)",
+          gap: 20,
+          marginRight: chatOpen ? 420 : 0,
         }}
       >
-        {/* Top row: 1.7fr 1fr 0.75fr */}
-        <div className="grid gap-[10px] min-h-0" style={{ gridTemplateColumns: "1.7fr 1fr 0.75fr", flex: "0 0 47%" }}>
-          <GodModeCard perception={perception} />
-          <HiveCard organsActive={organsActive} digest={hiveDigest} />
-          <IntegrationsCard integrations={integrations} />
+        {/* Top bar — hello + search + meta */}
+        <div
+          className="g2"
+          style={{
+            height: 64,
+            display: "flex",
+            alignItems: "center",
+            gap: 20,
+            padding: "0 24px",
+            borderRadius: "var(--r-pill)",
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em" }}>
+            {greeting}
+            {(perception?.active_app || chatPanelProps.conversations?.length) ? (
+              <span style={{ color: "var(--t-2)", fontWeight: 400 }}>
+                . Here's where you are.
+              </span>
+            ) : null}
+          </div>
+
+          <button
+            onClick={() => onNavigate("chat")}
+            className="g2"
+            style={{
+              flex: 1,
+              maxWidth: 440,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "10px 18px",
+              background: "rgba(0,0,0,0.22)",
+              border: "1px solid var(--g-edge-lo)",
+              borderRadius: "var(--r-pill)",
+              color: "var(--t-3)",
+              fontSize: 13,
+              fontFamily: "var(--font-ui)",
+              cursor: "pointer",
+              textAlign: "left",
+              boxShadow: "none",
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M21 21l-4.3-4.3" />
+            </svg>
+            Ask BLADE, or search everything…
+            <span
+              className="mono"
+              style={{
+                marginLeft: "auto",
+                fontSize: 10,
+                padding: "2px 6px",
+                background: "rgba(255,255,255,0.08)",
+                border: "1px solid var(--g-edge-lo)",
+                borderRadius: 4,
+                color: "var(--t-3)",
+              }}
+            >
+              ⌘ K
+            </span>
+          </button>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 13, color: "var(--t-2)" }}>
+            <span className="mono">{timeStr}</span>
+            <span style={{ width: 4, height: 4, borderRadius: "50%", background: "var(--t-4)" }} />
+            <span>{dateStr}</span>
+            <span style={{ width: 4, height: 4, borderRadius: "50%", background: "var(--t-4)" }} />
+            <span style={{ color: "#8affc7" }}>● Online</span>
+          </div>
         </div>
 
-        {/* Bottom row: 1.05fr 1.3fr */}
-        <div className="grid gap-[10px] flex-1 min-h-0" style={{ gridTemplateColumns: "1.05fr 1.3fr" }}>
-          <CalendarCard integrations={integrations} />
-          <div className="flex flex-col gap-[10px] min-h-0">
-            <VitalSignsCard />
-            <ProactiveCardsPanel />
+        {/* Main grid: left col (stacked) + right col (Hive Pulse sidebar) */}
+        <div
+          style={{
+            flex: 1,
+            display: "grid",
+            gridTemplateColumns: "1fr 560px",
+            gap: 20,
+            minHeight: 0,
+          }}
+        >
+          {/* LEFT COLUMN */}
+          <div style={{ display: "grid", gridTemplateRows: "1fr 340px", gap: 20, minHeight: 0 }}>
+            <GodModeCard perception={perception} />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+              <CalendarCard integrations={integrations} />
+              <IntegrationsCard integrations={integrations} />
+            </div>
           </div>
+
+          {/* RIGHT COLUMN — Hive + Vitals stacked */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 20, minHeight: 0 }}>
+            <HiveCard organsActive={organsActive} digest={hiveDigest} />
+            <div style={{ display: "grid", gridTemplateRows: "auto 1fr", gap: 20, minHeight: 0 }}>
+              <VitalSignsCard />
+              <ProactiveCardsPanel />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Ambient strip */}
+      <div
+        className="g2 g2-pill"
+        style={{
+          position: "absolute",
+          left: 124,
+          right: chatOpen ? 444 : 24,
+          bottom: 24,
+          height: 64,
+          padding: "0 24px",
+          display: "flex",
+          alignItems: "center",
+          gap: 24,
+          zIndex: 60,
+          transition: "right 460ms cubic-bezier(0.32,0.72,0,1)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: "#8affc7",
+              boxShadow: "0 0 10px #8affc7, inset 0 0 3px rgba(255,255,255,0.6)",
+            }}
+          />
+          <span className="td-micro" style={{ color: "var(--t-2)" }}>Listening</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 3, height: 28 }}>
+          {[8, 16, 22, 12, 26, 18, 8, 14, 22, 10, 18, 8].map((h, i) => (
+            <span
+              key={i}
+              style={{
+                display: "block",
+                width: 3,
+                height: h,
+                borderRadius: 2,
+                background: "linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.3))",
+                animation: `wv 1.2s ease-in-out infinite ${i * 0.05}s`,
+              }}
+            />
+          ))}
+        </div>
+        <div
+          style={{
+            marginLeft: "auto",
+            padding: "8px 14px",
+            borderRadius: "var(--r-pill)",
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid var(--g-edge-lo)",
+            fontSize: 12,
+            color: "var(--t-2)",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7 }}>
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z" />
+          </svg>
+          <b style={{ fontWeight: 500, color: "var(--t-1)" }}>Whisper</b>
+          <span>· BLADE is watching quietly.</span>
         </div>
       </div>
 
