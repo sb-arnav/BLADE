@@ -952,36 +952,75 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
   };
 
   return (
-    <div className="h-full overflow-y-auto px-4 py-4">
-      <div className="max-w-2xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-lg font-semibold">Settings</h1>
-          <button
-            onClick={onBack}
-            className="text-sm text-blade-muted hover:text-blade-text transition-colors"
-          >
-            back
-          </button>
+    <div className="h-full overflow-y-auto">
+      {/* Sticky glass header — back button, title, tab strip all in one bar */}
+      <div
+        className="sticky top-0 z-20 border-b border-[rgba(255,255,255,0.06)]"
+        style={{
+          background: "rgba(8,8,14,0.72)",
+          backdropFilter: "blur(32px) saturate(1.6)",
+          WebkitBackdropFilter: "blur(32px) saturate(1.6)",
+        }}
+      >
+        <div className="max-w-3xl mx-auto px-6 pt-6 pb-0">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={onBack}
+                className="group flex items-center gap-2 text-[12px] text-[rgba(255,255,255,0.45)] hover:text-white transition-colors"
+              >
+                <svg viewBox="0 0 16 16" className="w-[14px] h-[14px] transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 12L6 8l4-4" />
+                </svg>
+                Back
+              </button>
+              <div className="w-px h-4 bg-[rgba(255,255,255,0.08)]" />
+              <h1 className="font-display text-[22px] font-bold tracking-[-0.025em] text-white">
+                Settings
+              </h1>
+            </div>
+            <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-[rgba(255,255,255,0.28)]">
+              BLADE · v{appVersion}
+            </p>
+          </div>
+
+          {/* Apple-style segmented tab strip */}
+          <div className="flex items-center gap-1 overflow-x-auto -mb-px">
+            {TABS.map((t) => {
+              const active = tab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={`relative px-4 py-2.5 text-[12.5px] font-semibold tracking-[-0.005em] transition-all duration-200 whitespace-nowrap ${
+                    active
+                      ? "text-white"
+                      : "text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.75)]"
+                  }`}
+                >
+                  {t.label}
+                  {active && (
+                    <span
+                      className="absolute left-3 right-3 bottom-0 h-[2px] rounded-full"
+                      style={{
+                        background: "linear-gradient(90deg, transparent, #818cf8 30%, #818cf8 70%, transparent)",
+                        boxShadow: "0 0 12px rgba(129,140,248,0.5)",
+                      }}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
-        <div className="flex items-center gap-1 border-b border-blade-border pb-0">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`px-3 py-1.5 text-xs rounded-t-lg transition-colors -mb-px ${
-                tab === t.id
-                  ? "text-blade-text bg-blade-surface border border-blade-border border-b-blade-surface"
-                  : "text-blade-muted hover:text-blade-secondary"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+      </div>
+
+      {/* Scrollable content — same max-width to align with header */}
+      <div className="max-w-3xl mx-auto px-6 py-8 space-y-5">
 
         {tab === "general" && <>
         {/* God Mode tier selector */}
-        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+        <section className="blade-glass p-5 space-y-4">
           <div className="space-y-3">
             <div>
               <p className="text-sm font-medium">God Mode</p>
@@ -1031,7 +1070,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
         </section>
 
         {/* Voice Mode */}
-        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+        <section className="blade-glass p-5 space-y-4">
           <div className="space-y-3">
             <div>
               <p className="text-sm font-medium">Voice Mode</p>
@@ -1082,7 +1121,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
 
         {/* TTS Voice */}
         {(voiceMode === "tts" || voiceMode === "always-on") && ttsVoices.length > 0 && (
-          <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+          <section className="blade-glass p-5 space-y-4">
             <div className="space-y-2">
               <div>
                 <p className="text-sm font-medium">Voice</p>
@@ -1111,7 +1150,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
         )}
 
         {/* Shortcuts */}
-        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+        <section className="blade-glass p-5 space-y-4">
           <div className="space-y-3">
             <div>
               <p className="text-sm font-medium">Keyboard Shortcuts</p>
@@ -1161,7 +1200,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
         </section>
 
         {/* Obsidian Vault */}
-        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+        <section className="blade-glass p-5 space-y-4">
           <label className="space-y-2 block">
             <span className="text-xs uppercase tracking-wide text-blade-muted">
               Obsidian Vault Path <span className="normal-case text-blade-muted/60">(optional — Blade will read and write notes here)</span>
@@ -1177,7 +1216,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
         </section>
 
         {/* Background AI */}
-        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+        <section className="blade-glass p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold">Background AI</p>
@@ -1200,7 +1239,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
         </section>
 
         {/* System Scan */}
-        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+        <section className="blade-glass p-5 space-y-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold">System Scan</p>
@@ -1281,7 +1320,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
         </div>
 
         {/* ── Provider picker — clean, not overwhelming ── */}
-        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
+        <section className="blade-glass p-5 space-y-4">
 
           {/* Quick start: just paste your key */}
           <div className="space-y-2">
@@ -1488,7 +1527,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
           </div>
         </section>
 
-        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+        <section className="blade-glass p-5 space-y-4">
           <div>
             <h2 className="text-sm font-semibold">Key Vault</h2>
             <p className="text-xs text-blade-muted mt-0.5">Store all your provider keys at once. BLADE keeps them all — switches automatically based on context.</p>
@@ -1496,7 +1535,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
           <KeyVault activeProvider={provider} />
         </section>
 
-        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+        <section className="blade-glass p-5 space-y-4">
           <div>
             <h2 className="text-sm font-semibold">Coding Agents</h2>
             <p className="text-xs text-blade-muted mt-0.5">BLADE can spawn autonomous coding agents for complex tasks. Install them to unlock "build this feature" commands.</p>
@@ -1504,7 +1543,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
           <AgentSetupPanel />
         </section>
 
-        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+        <section className="blade-glass p-5 space-y-4">
           <div>
             <h2 className="text-sm font-semibold">Smart Routing</h2>
             <p className="text-xs text-blade-muted mt-0.5">Route different task types to different providers. Code → Claude, quick replies → Groq, vision → Gemini. One brain, best model per job.</p>
@@ -1514,7 +1553,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
         </>}
 
         {tab === "memory" && <>
-        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
+        <section className="blade-glass p-5 space-y-4">
           <div>
             <h2 className="text-base font-semibold">Blade Memory</h2>
             <p className="text-sm text-blade-muted">
@@ -1560,7 +1599,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
 
         {tab === "privacy" && <>
         {/* Privacy & Trust panel */}
-        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
+        <section className="blade-glass p-5 space-y-4">
           <div>
             <h2 className="text-base font-semibold">Privacy & Data</h2>
             <p className="text-sm text-blade-muted">Exactly what BLADE stores and what leaves your machine.</p>
@@ -1632,7 +1671,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
           </div>
         </section>
 
-        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
+        <section className="blade-glass p-5 space-y-4">
           <div>
             <h2 className="text-base font-semibold">Total Recall — Screen Timeline</h2>
             <p className="text-sm text-blade-muted">
@@ -1727,7 +1766,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
         </>}
 
         {tab === "about" && <>
-        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-3">
+        <section className="blade-glass p-5 space-y-4">
           <div>
             <h2 className="text-base font-semibold">Diagnostics</h2>
             <p className="text-sm text-blade-muted">Quick view of the current runtime setup.</p>
@@ -1756,7 +1795,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
           </div>
         </section>
 
-        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
+        <section className="blade-glass p-5 space-y-4">
           <div>
             <h2 className="text-base font-semibold">JITRO — Self-Coding</h2>
             <p className="text-sm text-blade-muted">
@@ -1821,7 +1860,7 @@ export function Settings({ config, onBack, onSaved, onConfigRefresh }: Props) {
           </p>
         </section>
 
-        <section className="bg-blade-surface border border-blade-border rounded-2xl p-4 space-y-4">
+        <section className="blade-glass p-5 space-y-4">
           <div>
             <h2 className="text-base font-semibold">Updates</h2>
             <p className="text-sm text-blade-muted">
