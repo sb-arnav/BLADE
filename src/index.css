@@ -206,6 +206,14 @@ body {
   pointer-events: none;
   border-radius: inherit;
 }
+.blade-glass:hover {
+  border-color: rgba(255,255,255,0.14);
+  box-shadow: var(--glass-shadow), 0 0 20px rgba(129,140,248,0.04);
+  transform: translateY(-1px);
+}
+.blade-glass:active {
+  transform: translateY(0) scale(0.995);
+}
 
 /* ─── Blade Animations ───────────────────────────────────────────────────────── */
 
