@@ -213,6 +213,10 @@ body {
   from { opacity: 0; transform: translateY(14px) scale(0.97); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
+@keyframes blade-card-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(-10px) scale(0.97); }
+}
 @keyframes blade-shimmer {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.55; }

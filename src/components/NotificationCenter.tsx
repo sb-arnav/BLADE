@@ -1,5 +1,11 @@
 import { useState, useCallback, useEffect } from "react";
 
+export interface NotificationAction {
+  label: string;
+  route?: string;
+  callback?: () => void;
+}
+
 export interface BladeNotification {
   id: string;
   type: "info" | "success" | "warning" | "error" | "agent" | "tool";
@@ -7,11 +13,9 @@ export interface BladeNotification {
   message: string;
   timestamp: number;
   read: boolean;
-  action?: {
-    label: string;
-    route?: string;
-    callback?: () => void;
-  };
+  action?: NotificationAction;
+  /** Multiple quick action buttons shown on the notification */
+  actions?: NotificationAction[];
 }
 
 const STORAGE_KEY = "blade-notifications";
