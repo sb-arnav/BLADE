@@ -362,7 +362,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
 
   if (!active) {
     return (
-      <div className="flex flex-col h-full bg-[#09090b] text-[rgba(255,255,255,0.85)]">
+      <div className="flex flex-col h-full bg-blade-bg text-[rgba(255,255,255,0.85)]">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-[rgba(255,255,255,0.07)]/70">
           <div className="flex items-center gap-3">
@@ -403,7 +403,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
               {sortedPresentations.map((pres) => (
                 <div
                   key={pres.id}
-                  className="group bg-[#0a0a0f]/60 border border-[rgba(255,255,255,0.07)]/60 rounded-xl p-4 cursor-pointer hover:border-indigo-500/40 hover:bg-[#0a0a0f]/80 transition-all"
+                  className="group bg-blade-bg/60 border border-[rgba(255,255,255,0.07)]/60 rounded-xl p-4 cursor-pointer hover:border-indigo-500/40 hover:bg-blade-bg/80 transition-all"
                   onClick={() => {
                     setActive(pres.id);
                     setActiveSlideIdx(0);
@@ -448,7 +448,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
         {/* New dialog */}
         {showNewDialog && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.1)]/60 rounded-xl p-6 w-full max-w-md shadow-2xl">
+            <div className="bg-blade-bg border border-[rgba(255,255,255,0.1)]/60 rounded-xl p-6 w-full max-w-md shadow-2xl">
               <h2 className="text-base font-semibold mb-4">New Presentation</h2>
               <div className="space-y-3">
                 <input
@@ -505,7 +505,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
   // ── Editor view ──────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-full bg-[#09090b] text-[rgba(255,255,255,0.85)]">
+    <div className="flex flex-col h-full bg-blade-bg text-[rgba(255,255,255,0.85)]">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-[rgba(255,255,255,0.07)]/70 shrink-0">
         <div className="flex items-center gap-3">
@@ -686,7 +686,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
         </div>
 
         {/* ── Slide Editor (center) ───────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto flex items-center justify-center p-6 bg-[#0a0a0f]/30">
+        <div className="flex-1 overflow-y-auto flex items-center justify-center p-6 bg-blade-bg/30">
           {currentSlide ? (
             <div
               className="w-full max-w-3xl aspect-video rounded-xl shadow-2xl flex flex-col items-center justify-center p-10 relative overflow-hidden"
@@ -1077,7 +1077,7 @@ export default function PresentationBuilder({ onBack, onSendToChat }: Props) {
       {/* Generate dialog */}
       {showGenerateDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.1)]/60 rounded-xl p-6 w-full max-w-md shadow-2xl">
+          <div className="bg-blade-bg border border-[rgba(255,255,255,0.1)]/60 rounded-xl p-6 w-full max-w-md shadow-2xl">
             <h2 className="text-base font-semibold mb-1">Generate Deck with AI</h2>
             <p className="text-xs text-[rgba(255,255,255,0.4)] mb-4">
               Describe the topic and the AI will create a full slide deck.

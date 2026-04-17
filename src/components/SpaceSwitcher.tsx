@@ -353,7 +353,7 @@ export function SpaceSwitcher({
   return (
     <>
       {/* Vertical sidebar bar */}
-      <div className="w-12 h-full bg-[#09090b] border-r border-[rgba(255,255,255,0.07)]/60 flex flex-col items-center py-2 gap-1.5 relative shrink-0">
+      <div className="w-12 h-full bg-blade-bg border-r border-[rgba(255,255,255,0.07)]/60 flex flex-col items-center py-2 gap-1.5 relative shrink-0">
         {/* Active spaces */}
         {activeSpaces.map((space) => renderSpaceIcon(space, space.id === activeSpaceId))}
 
@@ -406,7 +406,7 @@ export function SpaceSwitcher({
       {contextMenu && (
         <div
           ref={contextMenuRef}
-          className="fixed z-[110] bg-[#0a0a0f] border border-[rgba(255,255,255,0.1)]/60 rounded-lg shadow-2xl py-1 min-w-[160px]"
+          className="fixed z-[110] bg-blade-bg border border-[rgba(255,255,255,0.1)]/60 rounded-lg shadow-2xl py-1 min-w-[160px]"
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
           {[
@@ -444,7 +444,7 @@ export function SpaceSwitcher({
         >
           <div
             ref={modalRef}
-            className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.1)]/60 rounded-2xl shadow-2xl w-[480px] max-h-[85vh] flex flex-col overflow-hidden"
+            className="bg-blade-bg border border-[rgba(255,255,255,0.1)]/60 rounded-2xl shadow-2xl w-[480px] max-h-[85vh] flex flex-col overflow-hidden"
           >
             {/* Modal header */}
             <div className="flex items-center justify-between px-5 pt-5 pb-3">

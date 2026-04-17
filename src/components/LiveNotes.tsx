@@ -99,7 +99,7 @@ export function LiveNotes({ onBack }: LiveNotesProps) {
   }, []);
 
   return (
-    <div className="flex flex-col h-full bg-[#0a0a0f] text-white">
+    <div className="flex flex-col h-full bg-blade-bg text-white">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-[rgba(255,255,255,0.08)]">
         <div className="flex items-center gap-3">

@@ -172,7 +172,7 @@ export function CapabilityReports({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#09090b]">
+    <div className="flex flex-col h-full bg-blade-bg">
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#1f1f1f] flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -260,7 +260,7 @@ export function CapabilityReports({ onBack }: { onBack: () => void }) {
               onClick={() => setFilter(s)}
               className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
                 filter === s
-                  ? "bg-[#09090b] text-[#c8cbff] border border-[#6366f1]/30"
+                  ? "bg-blade-bg text-[#c8cbff] border border-[#6366f1]/30"
                   : "text-[#666] hover:text-[#e5e5e5] hover:bg-[#111]"
               }`}
             >

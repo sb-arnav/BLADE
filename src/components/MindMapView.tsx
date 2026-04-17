@@ -475,10 +475,10 @@ export default function MindMapView({ onBack, onSendToChat }: MindMapViewProps) 
   // ── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-full bg-[#09090b] text-white select-none overflow-hidden">
+    <div className="flex h-full bg-blade-bg text-white select-none overflow-hidden">
       {/* ── Sidebar ─────────────────────────────────────────────────────────── */}
       {showSidebar && (
-        <div className="w-56 flex-shrink-0 border-r border-[rgba(255,255,255,0.07)] bg-[#09090b] flex flex-col">
+        <div className="w-56 flex-shrink-0 border-r border-[rgba(255,255,255,0.07)] bg-blade-bg flex flex-col">
           <div className="flex items-center justify-between px-3 py-2 border-b border-[rgba(255,255,255,0.07)]">
             <span className="text-xs font-semibold text-[rgba(255,255,255,0.5)] uppercase tracking-wider">Mind Maps</span>
             <button
@@ -522,7 +522,7 @@ export default function MindMapView({ onBack, onSendToChat }: MindMapViewProps) 
       {/* ── Main area ──────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* ── Header ─────────────────────────────────────────────────────── */}
-        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[rgba(255,255,255,0.07)] bg-[#09090b]">
+        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[rgba(255,255,255,0.07)] bg-blade-bg">
           <button onClick={onBack} className="text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.85)] transition-colors text-xs px-2 py-1 rounded hover:bg-[rgba(255,255,255,0.04)]" title="Back">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
           </button>
@@ -842,7 +842,7 @@ export default function MindMapView({ onBack, onSendToChat }: MindMapViewProps) 
             <p className="text-xs text-[rgba(255,255,255,0.4)] mb-3">Describe a topic or idea and AI will create a structured mind map for you.</p>
             <textarea
               autoFocus
-              className="w-full h-24 rounded-lg bg-[#09090b] border border-[rgba(255,255,255,0.1)] text-sm text-[rgba(255,255,255,0.85)] p-3 outline-none focus:border-indigo-500 resize-none placeholder-zinc-600"
+              className="w-full h-24 rounded-lg bg-blade-bg border border-[rgba(255,255,255,0.1)] text-sm text-[rgba(255,255,255,0.85)] p-3 outline-none focus:border-indigo-500 resize-none placeholder-zinc-600"
               placeholder="e.g. Machine learning fundamentals and applications..."
               value={generatePrompt}
               onChange={(e) => setGeneratePrompt(e.target.value)}
@@ -867,7 +867,7 @@ export default function MindMapView({ onBack, onSendToChat }: MindMapViewProps) 
             <h3 className="text-sm font-semibold text-[rgba(255,255,255,0.85)] mb-1">Notes: {selectedNode.text}</h3>
             <textarea
               autoFocus
-              className="w-full h-32 mt-2 rounded-lg bg-[#09090b] border border-[rgba(255,255,255,0.1)] text-sm text-[rgba(255,255,255,0.85)] p-3 outline-none focus:border-indigo-500 resize-none placeholder-zinc-600"
+              className="w-full h-32 mt-2 rounded-lg bg-blade-bg border border-[rgba(255,255,255,0.1)] text-sm text-[rgba(255,255,255,0.85)] p-3 outline-none focus:border-indigo-500 resize-none placeholder-zinc-600"
               placeholder="Add notes about this topic..."
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}

@@ -131,7 +131,7 @@ export function SkillModeSelector({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={(e) => e.target === overlayRef.current && onClose()}
     >
-      <div className="bg-[#0a0a0f] border border-[rgba(255,255,255,0.1)]/60 rounded-2xl shadow-2xl w-[720px] max-h-[85vh] flex flex-col overflow-hidden">
+      <div className="bg-blade-bg border border-[rgba(255,255,255,0.1)]/60 rounded-2xl shadow-2xl w-[720px] max-h-[85vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
           <div>

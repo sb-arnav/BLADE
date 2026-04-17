@@ -135,7 +135,7 @@ function StepRow({ step, isLast }: { step: AgentStep; isLast: boolean }) {
             </button>
 
             {resultOpen && (
-              <div className="mt-1.5 rounded-lg bg-[#09090b] border border-[#1f1f1f] px-3 py-2 max-h-40 overflow-y-auto animate-fade-in">
+              <div className="mt-1.5 rounded-lg bg-blade-bg border border-[#1f1f1f] px-3 py-2 max-h-40 overflow-y-auto animate-fade-in">
                 <pre className="text-xs text-[#a1a1aa] font-mono whitespace-pre-wrap break-words leading-relaxed">
                   {step.result.length > 2000
                     ? step.result.slice(0, 2000) + "\n\n... (truncated)"

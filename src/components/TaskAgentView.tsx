@@ -81,7 +81,7 @@ export function TaskAgentView({ onBack }: TaskAgentViewProps) {
   const output = selectedId ? (liveOutput[selectedId] || selected?.output || "") : "";
 
   return (
-    <div className="flex h-full bg-[#0a0a0f] text-white">
+    <div className="flex h-full bg-blade-bg text-white">
       {/* Left panel: agent list + spawn */}
       <div className="w-[280px] border-r border-[rgba(255,255,255,0.08)] flex flex-col">
         <div className="flex items-center gap-2 px-4 py-3 border-b border-[rgba(255,255,255,0.08)]">

@@ -64,7 +64,7 @@ function RelevanceBar({ score }: { score: number }) {
     pct >= 25 ? "bg-orange-500" : "bg-red-500";
   return (
     <div className="flex items-center gap-2">
-      <div className="flex-1 h-1.5 bg-[#09090b] rounded overflow-hidden">
+      <div className="flex-1 h-1.5 bg-blade-bg rounded overflow-hidden">
         <div className={`h-full ${color} transition-all`} style={{ width: `${pct}%` }} />
       </div>
       <span className="text-[rgba(255,255,255,0.4)] font-mono text-xs min-w-[32px] text-right">{pct}%</span>
@@ -79,7 +79,7 @@ function ChunkCard({ chunk }: { chunk: ContextChunk }) {
   const preview = chunk.content.length > 200 ? chunk.content.slice(0, 200) + "…" : chunk.content;
 
   return (
-    <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded overflow-hidden">
+    <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded overflow-hidden">
       <div className="px-3 py-2 flex items-center gap-3 border-b border-[rgba(255,255,255,0.07)]/50">
         <SourceBadge source={chunk.source} />
         <RelevanceBar score={chunk.relevance_score} />
@@ -190,7 +190,7 @@ export function ContextEngineView({ onBack }: { onBack: () => void }) {
   const SOURCE_LIST: SourceType[] = ["memory", "screen", "goals", "files", "conversation"];
 
   return (
-    <div className="flex flex-col h-full bg-black text-[rgba(255,255,255,0.85)]">
+    <div className="flex flex-col h-full bg-blade-bg text-[rgba(255,255,255,0.85)]">
       {/* Header */}
       <div className="flex items-center gap-4 px-4 py-3 border-b border-[rgba(255,255,255,0.07)] shrink-0">
         <button
@@ -227,7 +227,7 @@ export function ContextEngineView({ onBack }: { onBack: () => void }) {
               <label className="text-[rgba(255,255,255,0.4)] font-mono text-xs">QUERY — what context to retrieve</label>
               <textarea
                 rows={2}
-                className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700 resize-none"
+                className="bg-blade-bg border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.85)] font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-green-700 resize-none"
                 placeholder="e.g. What are my current project deadlines and financial goals?"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -252,7 +252,7 @@ export function ContextEngineView({ onBack }: { onBack: () => void }) {
           <div className="flex-1 overflow-y-auto px-4 pb-4 flex flex-col gap-3">
             {/* Footer summary (shown at top when results present) */}
             {result && (
-              <div className="bg-[#09090b] border border-[rgba(255,255,255,0.07)] rounded px-4 py-3 flex flex-wrap items-center gap-3">
+              <div className="bg-blade-bg border border-[rgba(255,255,255,0.07)] rounded px-4 py-3 flex flex-wrap items-center gap-3">
                 <div className="flex items-center gap-2">
                   <span className="text-[rgba(255,255,255,0.3)] font-mono text-xs">TOKENS:</span>
                   <span className={`font-mono text-xs ${result.was_truncated ? "text-amber-400" : "text-green-400"}`}>
@@ -317,7 +317,7 @@ export function ContextEngineView({ onBack }: { onBack: () => void }) {
                       className={`flex items-center gap-2 px-3 py-2 border rounded transition-colors text-left ${
                         enabled
                           ? `${c.bg} ${c.border} ${c.text}`
-                          : "bg-[#09090b] border-[rgba(255,255,255,0.07)] text-[rgba(255,255,255,0.3)] hover:border-[rgba(255,255,255,0.1)]"
+                          : "bg-blade-bg border-[rgba(255,255,255,0.07)] text-[rgba(255,255,255,0.3)] hover:border-[rgba(255,255,255,0.1)]"
                       }`}
                     >
                       <div className={`w-3 h-3 border-2 rounded-sm flex items-center justify-center shrink-0 ${enabled ? c.border : "border-[rgba(255,255,255,0.1)]"}`}>
@@ -387,7 +387,7 @@ export function ContextEngineView({ onBack }: { onBack: () => void }) {
                   <button
                     onClick={scoreChunkFn}
                     disabled={scoreLoading || !scoreQuery.trim() || !scoreChunk.trim()}
-                    className="bg-[#09090b] border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)] font-mono text-xs py-1.5 hover:border-green-700 hover:text-green-400 disabled:opacity-40 transition-colors"
+                    className="bg-blade-bg border border-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)] font-mono text-xs py-1.5 hover:border-green-700 hover:text-green-400 disabled:opacity-40 transition-colors"
                   >
                     {scoreLoading ? "..." : "SCORE →"}
                   </button>
