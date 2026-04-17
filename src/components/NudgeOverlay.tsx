@@ -4,7 +4,7 @@
  * Way more alive than a silent notification in a panel nobody opens.
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 
 
@@ -128,6 +128,16 @@ export function NudgeOverlay({
   const [nudge, setNudge] = useState<ActiveNudge | null>(null);
   const [exiting, setExiting] = useState(false);
 
+  // Refs hold latest callback identity without causing effect re-runs
+  const onSendChatRef = useRef(onSendChat);
+  const onNavigateRef = useRef(onNavigate);
+  onSendChatRef.current = onSendChat;
+  onNavigateRef.current = onNavigate;
+
+  // Timer refs for cleanup between rapid nudges
+  const autoHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const dismiss = useCallback(() => {
     setExiting(true);
     setTimeout(() => {
@@ -146,22 +156,30 @@ export function NudgeOverlay({
       "proactive_nudge",
       (event) => {
         const { message, type, raw } = event.payload;
-        const actions = nudgeActions(type, message, raw, onSendChat, onNavigate);
+        const actions = nudgeActions(type, message, raw, onSendChatRef.current, onNavigateRef.current);
+
+        // Cancel any pending dismiss timers from a previous nudge
+        if (autoHideTimerRef.current) { clearTimeout(autoHideTimerRef.current); autoHideTimerRef.current = null; }
+        if (fadeTimerRef.current) { clearTimeout(fadeTimerRef.current); fadeTimerRef.current = null; }
+
         setNudge({ message, type, raw, actions });
         setExiting(false);
 
-        // Auto-dismiss after 12 seconds
-        setTimeout(() => {
+        autoHideTimerRef.current = setTimeout(() => {
           setExiting(true);
-          setTimeout(() => {
+          fadeTimerRef.current = setTimeout(() => {
             setNudge(null);
             setExiting(false);
           }, 300);
         }, 12000);
       },
     );
-    return () => { unlisten.then((fn) => fn()); };
-  }, [onSendChat, onNavigate]);
+    return () => {
+      unlisten.then((fn) => fn());
+      if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
+      if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
+    };
+  }, []); // Run once — callbacks accessed via refs
 
   if (!nudge) return null;
 

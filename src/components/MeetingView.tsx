@@ -174,8 +174,12 @@ function MeetingDetail({ meeting, onActionComplete }: { meeting: Meeting; onActi
   const [copied, setCopied] = useState(false);
 
   async function completeAction(index: number) {
-    await invoke("meeting_complete_action", { meetingId: meeting.id, itemIndex: index });
-    onActionComplete();
+    try {
+      await invoke("meeting_complete_action", { meetingId: meeting.id, itemIndex: index });
+      onActionComplete();
+    } catch (e) {
+      console.error("meeting_complete_action failed:", e);
+    }
   }
 
   async function generateFollowUp() {

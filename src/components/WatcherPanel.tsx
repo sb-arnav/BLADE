@@ -91,12 +91,14 @@ export function WatcherPanel() {
   };
 
   const handleRemove = async (id: string) => {
-    await invoke("watcher_remove", { id });
+    try { await invoke("watcher_remove", { id }); }
+    catch (e) { console.error("watcher_remove failed:", e); }
     refresh();
   };
 
   const handleToggle = async (id: string, active: boolean) => {
-    await invoke("watcher_toggle", { id, active: !active });
+    try { await invoke("watcher_toggle", { id, active: !active }); }
+    catch (e) { console.error("watcher_toggle failed:", e); }
     refresh();
   };
 
