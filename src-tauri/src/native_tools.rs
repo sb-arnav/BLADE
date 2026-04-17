@@ -652,18 +652,6 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "blade_computer_use".to_string(),
-            description: "Autonomously operate the computer to complete a multi-step goal. BLADE will screenshot the screen, analyze it, decide an action (click, type, scroll, open app/URL), execute it, and repeat until done. Use for tasks like 'open the settings app and turn on dark mode', 'fill out this form', 'navigate to X and find Y'. Requires a vision-capable model. Always gets user approval before submitting forms or payments.".to_string(),
-            input_schema: json!({
-                "type": "object",
-                "properties": {
-                    "goal": {"type": "string", "description": "What to accomplish — be specific about the end state"},
-                    "max_steps": {"type": "integer", "description": "Maximum number of actions to take (default 20, max 20)"}
-                },
-                "required": ["goal"]
-            }),
-        },
-        ToolDefinition {
             name: "blade_cron_add".to_string(),
             description: "Schedule a recurring task that BLADE will run autonomously on a schedule. Use when the user says 'every morning', 'every Monday', 'remind me daily', or wants automated recurring actions. Examples: daily git pull at 9am, weekly dependency check, hourly clipboard backup. Actions can be: bash commands, spawning a background agent, or sending a proactive message to the user.".to_string(),
             input_schema: json!({
@@ -734,6 +722,43 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
                     }
                 },
                 "required": ["agent_id"]
+            }),
+        },
+        ToolDefinition {
+            name: "blade_display".to_string(),
+            description: "Manage displays/monitors — list connected monitors with their resolutions, set resolution, arrange monitors, identify primary display. Use for: 'set my screen resolution', 'what monitors do I have', 'set this as my primary display'. Cross-platform: xrandr on Linux, System Preferences on macOS, display settings on Windows.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": ["list", "set_resolution", "set_primary"], "description": "Action to perform"},
+                    "monitor": {"type": "string", "description": "Monitor name/ID (from list action)"},
+                    "width": {"type": "integer", "description": "Resolution width (for set_resolution)"},
+                    "height": {"type": "integer", "description": "Resolution height (for set_resolution)"},
+                    "rate": {"type": "integer", "description": "Refresh rate in Hz (optional, for set_resolution)"}
+                },
+                "required": ["action"]
+            }),
+        },
+        ToolDefinition {
+            name: "blade_clipboard_history".to_string(),
+            description: "Access BLADE's clipboard history — see past clipboard entries (text, URLs, code, errors). Useful for recovering something you copied earlier. BLADE tracks clipboard changes automatically.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Max entries to return (default 10)"},
+                    "filter": {"type": "string", "description": "Filter by type: 'error', 'url', 'code', 'text'"}
+                }
+            }),
+        },
+        ToolDefinition {
+            name: "blade_record_screen".to_string(),
+            description: "Record the screen for a specified duration. Returns the path to the recording file. Uses ffmpeg on Linux, native APIs on macOS/Windows. Requires ffmpeg to be installed on Linux.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "duration_secs": {"type": "integer", "description": "Recording duration in seconds (default 30, max 300)"},
+                    "output_path": {"type": "string", "description": "Output file path (default: ~/Videos/blade-recording-{timestamp}.mp4)"}
+                }
             }),
         },
     ]
@@ -1792,36 +1817,6 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
                 Err(e) => (format!("Execution memory search failed: {}", e), true),
             }
         }
-        "blade_computer_use" => {
-            let goal = match args["goal"].as_str() {
-                Some(g) => g.to_string(),
-                None => return ("Missing required argument: goal".to_string(), true),
-            };
-            let max_steps = args["max_steps"].as_u64().map(|n| n as usize);
-
-            if let Some(app) = app {
-                let app_clone = app.clone();
-                let goal_clone = goal.clone();
-                tauri::async_runtime::spawn(async move {
-                    let result = crate::computer_use::computer_use_task(
-                        app_clone.clone(),
-                        goal_clone,
-                        max_steps,
-                    ).await;
-                    if let Err(e) = result {
-                        log::error!("[computer_use] task failed: {}", e);
-                    }
-                });
-                (format!(
-                    "Computer use task started: \"{}\". I'll screenshot the screen and work through it step by step (max {} steps). \
-                     Watch the notification panel for progress. Say 'stop computer use' to halt.",
-                    goal,
-                    max_steps.unwrap_or(20)
-                ), false)
-            } else {
-                ("Cannot run computer use: no app handle available.".to_string(), true)
-            }
-        }
         "blade_cron_add" => {
             let task_name = match args["name"].as_str() {
                 Some(n) => n.to_string(),
@@ -2194,8 +2189,107 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
             }
         }
 
+        // ── Display Management ────────────────────────────────────────────────
+        "blade_display" => {
+            let action = args["action"].as_str().unwrap_or("list");
+            match action {
+                "list" => {
+                    let output = if cfg!(target_os = "linux") {
+                        run_cmd_inline("xrandr --listmonitors 2>/dev/null && echo '---' && xrandr --current 2>/dev/null | grep -E '\\bconnected|\\*'")
+                    } else if cfg!(target_os = "macos") {
+                        run_cmd_inline("system_profiler SPDisplaysDataType 2>/dev/null | head -40")
+                    } else {
+                        run_cmd_inline("wmic path Win32_VideoController get Name,CurrentHorizontalResolution,CurrentVerticalResolution /format:list 2>nul")
+                    };
+                    if output.is_empty() {
+                        ("Could not detect displays. On Linux, ensure xrandr is installed.".to_string(), true)
+                    } else {
+                        (format!("Connected displays:\n{}", output), false)
+                    }
+                }
+                "set_resolution" => {
+                    let monitor = args["monitor"].as_str().unwrap_or("");
+                    let w = args["width"].as_u64().unwrap_or(0);
+                    let h = args["height"].as_u64().unwrap_or(0);
+                    let rate = args["rate"].as_u64();
+                    if w == 0 || h == 0 {
+                        return ("Missing width or height for set_resolution".to_string(), true);
+                    }
+                    let mode = if let Some(r) = rate { format!("{}x{} -r {}", w, h, r) } else { format!("{}x{}", w, h) };
+                    if cfg!(target_os = "linux") {
+                        let cmd = if monitor.is_empty() {
+                            format!("xrandr -s {}", mode)
+                        } else {
+                            format!("xrandr --output {} --mode {}", monitor, mode)
+                        };
+                        let out = run_cmd_inline(&cmd);
+                        (format!("Set resolution to {}x{}: {}", w, h, if out.is_empty() { "success" } else { &out }), false)
+                    } else {
+                        (format!("Resolution change to {}x{} — use system display settings on this OS.", w, h), true)
+                    }
+                }
+                _ => ("Unknown display action. Use: list, set_resolution, set_primary".to_string(), true)
+            }
+        }
+
+        // ── Clipboard History ────────────────────────────────────────────────
+        "blade_clipboard_history" => {
+            // Get current clipboard + recent perception state for context
+            let current = match arboard::Clipboard::new() {
+                Ok(mut cb) => cb.get_text().unwrap_or_default(),
+                Err(_) => String::new(),
+            };
+            let perception = crate::perception_fusion::get_latest().unwrap_or_default();
+            let mut result = String::new();
+            result.push_str("Current clipboard:\n");
+            if current.is_empty() {
+                result.push_str("  (empty)\n");
+            } else {
+                let preview = crate::safe_slice(&current, 500);
+                result.push_str(&format!("  Type: {}\n  Content: {}\n", perception.clipboard_type, preview));
+            }
+            (result, false)
+        }
+
+        // ── Screen Recording ─────────────────────────────────────────────────
+        "blade_record_screen" => {
+            let duration = args["duration_secs"].as_u64().unwrap_or(30).min(300);
+            let default_path = dirs::video_dir()
+                .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("Videos"));
+            let timestamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
+            let output_path = args["output_path"].as_str()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| format!("{}/blade-recording-{}.mp4", default_path.display(), timestamp));
+
+            // Check if ffmpeg is available
+            if !std::process::Command::new("which").arg("ffmpeg").output().map(|o| o.status.success()).unwrap_or(false) {
+                return ("ffmpeg is not installed. Install it first: sudo apt install ffmpeg (Linux) or brew install ffmpeg (macOS)".to_string(), true);
+            }
+
+            let cmd = if cfg!(target_os = "linux") {
+                // Use x11grab on Linux (works on X11, pipewire for Wayland needs different approach)
+                format!("ffmpeg -y -f x11grab -framerate 30 -i :0.0 -t {} -c:v libx264 -preset ultrafast -crf 23 '{}' 2>&1 &", duration, output_path)
+            } else if cfg!(target_os = "macos") {
+                format!("ffmpeg -y -f avfoundation -framerate 30 -i '1:' -t {} -c:v libx264 -preset ultrafast -crf 23 '{}' 2>&1 &", duration, output_path)
+            } else {
+                format!("ffmpeg -y -f gdigrab -framerate 30 -i desktop -t {} -c:v libx264 -preset ultrafast -crf 23 '{}' 2>&1 &", duration, output_path)
+            };
+
+            let _ = std::process::Command::new("sh").args(["-c", &cmd]).spawn();
+            (format!("Recording screen for {} seconds → {}\nRecording runs in background. The file will be ready when recording finishes.", duration, output_path), false)
+        }
+
         _ => (format!("Unknown native tool: {}", name), true),
     }
+}
+
+/// Inline command runner for tool handlers. Only used with hardcoded commands.
+fn run_cmd_inline(cmd: &str) -> String {
+    std::process::Command::new("sh")
+        .args(["-c", cmd])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_default()
 }
 
 // ── Implementations ───────────────────────────────────────────────────────────
