@@ -1,3 +1,5 @@
+#![allow(dead_code)] // Trait framework — implementations wire up gradually
+
 /// JOINTS — Trait-based contracts between BLADE modules.
 ///
 /// In biology, joints connect bones and define how they can move relative

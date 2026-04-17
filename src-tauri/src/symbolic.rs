@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 /// SYMBOLIC REASONING LAYER — deterministic logic that LLMs can't be trusted with.
 ///
 /// Neuro-symbolic architecture: the LLM (neural) handles perception, language,
@@ -18,7 +20,6 @@
 ///   - Access control: deterministic permission checks
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
 // ── Policy Engine ────────────────────────────────────────────────────────────

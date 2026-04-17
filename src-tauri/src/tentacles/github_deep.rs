@@ -1,3 +1,5 @@
+#![allow(dead_code)] // Tentacle module — feature-complete, wired via hive
+
 /// GITHUB DEEP TENTACLE — BLADE lives inside GitHub.
 ///
 /// This tentacle goes far beyond notification polling. It:

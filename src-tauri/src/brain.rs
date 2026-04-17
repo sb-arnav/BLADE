@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::config::{blade_config_dir, write_blade_file};
 use rusqlite;
 use crate::mcp::McpTool;

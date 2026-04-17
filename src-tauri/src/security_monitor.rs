@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 // src-tauri/src/security_monitor.rs
 // Phase 9 — Security Fortress
 // Network monitoring, password breach detection, sensitive file scanning,

@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_variables, unused_assignments)] // Feature-complete module; API exposed via hive router
+
 /// BLADE Email Deep Tentacle — full email management, not just monitoring.
 ///
 /// Fetches and triages the entire inbox, drafts context-aware replies in the
@@ -395,7 +397,7 @@ fn extract_header(m: &serde_json::Value, name: &str) -> String {
 async fn classify_email(email: &EmailSummary) -> String {
     // Fast heuristics before hitting the LLM
     let subject_lower = email.subject.to_lowercase();
-    let from_lower = email.from.to_lowercase();
+    let _from_lower = email.from.to_lowercase();
     let snippet_lower = email.snippet.to_lowercase();
 
     // Meeting invite heuristics

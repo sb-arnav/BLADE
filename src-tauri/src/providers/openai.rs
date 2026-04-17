@@ -1,5 +1,4 @@
 use super::{AssistantTurn, ConversationMessage, ToolCall, ToolDefinition};
-use reqwest::Client;
 
 /// Resolve a base_url (e.g. "https://openrouter.ai/api/v1") to a full
 /// chat completions endpoint, or fall back to the OpenAI default.

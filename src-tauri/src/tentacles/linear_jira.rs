@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_variables)] // Tentacle module — feature-complete, wired via hive
+
 /// BLADE Linear/Jira Tentacle — Project management automation.
 ///
 /// Supports both Linear (GraphQL) and Jira (REST v3). Which one is active

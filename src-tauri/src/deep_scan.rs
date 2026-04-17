@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 //! Deep System Discovery — scans the user's machine on first run to build
 //! a complete identity profile stored in ~/.blade/identity/scan_results.json.
 //!

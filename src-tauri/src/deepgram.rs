@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 /// BLADE Deepgram Streaming STT Client
 ///
 /// Replaces batch Whisper (5s latency) with Deepgram WebSocket streaming (~200ms).
@@ -202,7 +204,7 @@ pub async fn transcribe_segment(wav_bytes: &[u8], sample_rate: u32) -> Option<Tr
 /// This is the primary STT function for ghost_mode.
 pub async fn transcribe_with_fallback(
     wav_bytes: &[u8],
-    samples: &[f32],
+    _samples: &[f32],
     sample_rate: u32,
 ) -> Option<Transcript> {
     // Try Deepgram first

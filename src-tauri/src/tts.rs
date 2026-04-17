@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 // src-tauri/src/tts.rs
 // BLADE Text-to-Speech — OS-native + OpenAI TTS.
 //

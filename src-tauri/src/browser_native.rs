@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::json;

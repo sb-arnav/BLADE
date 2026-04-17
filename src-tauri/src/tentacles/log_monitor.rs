@@ -1,3 +1,5 @@
+#![allow(dead_code)] // Tentacle module — feature-complete, wired via hive
+
 /// BLADE Log Monitor Tentacle — Production log intelligence.
 ///
 /// Tails log files and HTTP log endpoints in real-time, detects error patterns,

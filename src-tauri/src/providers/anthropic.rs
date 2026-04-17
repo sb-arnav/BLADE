@@ -1,5 +1,4 @@
 use super::{AssistantTurn, ConversationMessage, ToolCall, ToolDefinition};
-use reqwest::Client;
 
 fn build_body(
     model: &str,
