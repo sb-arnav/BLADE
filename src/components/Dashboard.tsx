@@ -144,9 +144,9 @@ function useIntegrations() {
 // ── Card components ────────────────────────────────────────────────────────────
 
 function GodModeCard({ perception }: { perception: PerceptionState | null }) {
-  const appName = perception?.active_app || "—";
-  const filePath = perception?.active_title || "—";
-  const userState = perception?.user_state || "Idle";
+  const appName = perception?.active_app || "Scanning…";
+  const filePath = perception?.active_title || "BLADE is learning your environment";
+  const userState = perception?.user_state || "Initializing";
 
   const [stats, setStats] = useState({ agents: 0, services: 0, apiPerMin: 0, focus: 0 });
   useEffect(() => {
@@ -243,7 +243,16 @@ function HiveCard({ organsActive, digest }: { organsActive: number; digest: stri
             <span className="text-[12px] font-semibold capitalize">{name}</span>
           </div>
         )) : (
-          <div className="text-[11px] text-[rgba(255,255,255,0.35)] italic">No organs connected yet</div>
+          <div className="flex flex-col items-center justify-center py-3 gap-2">
+            <div className="w-[28px] h-[28px] rounded-full border border-[rgba(129,140,248,0.2)] flex items-center justify-center"
+              style={{ animation: "blade-pulse 3s ease-in-out infinite" }}>
+              <div className="w-[10px] h-[10px] rounded-full bg-[rgba(129,140,248,0.3)]" />
+            </div>
+            <div className="text-[10px] text-[rgba(255,255,255,0.3)] text-center">
+              Hive is scanning your environment…<br/>
+              <span className="text-[rgba(129,140,248,0.5)]">Connect APIs in Settings to activate tentacles</span>
+            </div>
+          </div>
         )}
         {urgentLines.length > 0 && (
           <div className="mt-1 pt-2 border-t border-[rgba(255,255,255,0.07)]">
@@ -300,8 +309,14 @@ function CalendarCard({ integrations }: { integrations: IntegrationState }) {
         Calendar
       </CardLabel>
       {events.length === 0 ? (
-        <div className="flex items-center justify-center py-6 text-[11px] text-[rgba(255,255,255,0.25)] italic">
-          No upcoming events — connect Google Calendar in Settings
+        <div className="flex flex-col items-center justify-center py-5 gap-2">
+          <svg viewBox="0 0 24 24" className="w-[20px] h-[20px] text-[rgba(255,255,255,0.15)]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+          </svg>
+          <div className="text-[10px] text-[rgba(255,255,255,0.25)] text-center">
+            No events yet<br/>
+            <span className="text-[rgba(129,140,248,0.5)]">Connect Google Calendar in Settings</span>
+          </div>
         </div>
       ) : (
       <div className="flex flex-col relative">
@@ -429,7 +444,10 @@ function ProactiveCardsPanel() {
           </CardLabel>
           <Chip color="dim">quiet</Chip>
         </div>
-        <div className="text-[11px] text-[rgba(255,255,255,0.3)] italic">No proactive cards right now</div>
+        <div className="flex items-center gap-2">
+          <div className="w-[6px] h-[6px] rounded-full bg-[rgba(129,140,248,0.4)]" style={{ animation: "blade-pulse 3s ease-in-out infinite" }} />
+          <span className="text-[11px] text-[rgba(255,255,255,0.3)]">Watching and learning your patterns…</span>
+        </div>
       </div>
     );
   }
