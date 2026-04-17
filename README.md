@@ -6,7 +6,7 @@
 
 **The AI that watches, learns, and works — while others just talk.**
 
-Not a chat window. An operating intelligence wired into your screen, files, apps, memory, finances, health, and home. Runs 5 agents in parallel. Remembers everything. Sees your screen. Hears your meetings. Controls your desktop. Fully local.
+Not a chat window. An operating intelligence with 60+ native tools, 24 auto-discoverable MCP servers, and full desktop control. Sees your screen. Hears your voice. Detects your hardware. Manages your system. Spawns coding agents. Learns your patterns. Acts without being asked.
 
 [![Release](https://img.shields.io/github/v/release/sb-arnav/BLADE?style=flat-square&label=latest&color=0f0f0f)](https://github.com/sb-arnav/BLADE/releases/latest)
 [![License](https://img.shields.io/github/license/sb-arnav/BLADE?style=flat-square&color=0f0f0f)](LICENSE)
@@ -140,7 +140,12 @@ BLADE monitors active network connections and flags suspicious ones. It checks e
 BLADE analyzes your own writing across chat history and imported external logs (WhatsApp, Telegram, Discord, iMessage, CSV) to build a PersonalityProfile: average message length, emoji frequency, formality level, technical depth, humor style, signature phrases, greeting and sign-off patterns. That profile gets injected into every response — BLADE writes back to you the way you write.
 
 ### Computer Use — Desktop Agent
-BLADE can see your screen and control it. Click buttons, fill forms, read UI elements with OCR, navigate apps, take screenshots and reason about them. 40+ desktop action types.
+BLADE can see your screen and control it. Click buttons, fill forms, read UI elements with OCR, navigate apps, take screenshots and reason about them. Vision-driven autonomous loop: screenshot → analyze → decide → act → repeat until the goal is done.
+
+### System Administration — GPU Passthrough to Service Management
+Deep hardware detection (CPU features, GPUs with PCI IDs and IOMMU groups, virtualization readiness). Dry-run mode previews dangerous changes before applying them with risk assessment. Task checkpoints persist multi-step admin tasks across reboots with file rollback. Cross-platform package management auto-detects apt/dnf/pacman/zypper/brew. Display management, screen recording, and system cron.
+
+*"Set up a Windows 10 VM with GPU passthrough"* — BLADE detects your hardware, creates a checkpoint, previews each config change, backs up files before editing, and walks through every step.
 
 ### Memory That Compounds
 BLADE maintains three living memory blocks: what it knows about you (role, habits, preferences), its own persona, and a rolling conversation summary. Each block auto-compresses via LLM when full — there's no context limit that wipes your history. Every conversation, command, and tool result is also embedded locally and indexed with hybrid BM25 + vector search with Reciprocal Rank Fusion. The second week is smarter than the first. The second month is a different class of tool entirely.
@@ -149,7 +154,7 @@ BLADE maintains three living memory blocks: what it knows about you (role, habit
 Spawn Claude Code, Aider, or Goose as background workers with one command. BLADE stays the orchestrator — one surface, multiple specialists.
 
 ### Auto-Evolving MCP Catalog
-BLADE ships with 20+ MCP servers pre-catalogued and auto-installs them as you use new apps — Git, Chrome, Linear, Figma, Slack, databases, terminals. The toolkit grows without you touching a config file.
+BLADE ships with 24 MCP servers pre-catalogued (GitHub, Slack, Notion, Linear, Figma, Jira, PostgreSQL, Puppeteer, Playwright, Spotify, Obsidian, Supabase, Vercel, Gmail, Docker, AWS, Cloudflare, Stripe, MongoDB, Brave Search, Tavily, Filesystem, Memory, Composio) and auto-installs them as you use new apps. The toolkit grows without you touching a config file.
 
 ### BLADE Cron
 Schedule recurring autonomous tasks: *"every Monday at 9am, summarize my GitHub notifications and brief me on what matters."* Runs while you sleep.
@@ -166,10 +171,10 @@ Security testing with mandatory ownership verification. Uses Groq or Ollama — 
 
 | Platform | Download |
 |----------|----------|
-| **macOS** (Apple Silicon) | [`.dmg` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.6.0_aarch64.dmg) |
-| **macOS** (Intel) | [`.dmg` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.6.0_x64.dmg) |
-| **Windows** | [`.exe` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.6.0_x64-setup.exe) |
-| **Linux** | [`.AppImage` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.6.0_amd64.AppImage) |
+| **macOS** (Apple Silicon) | [`.dmg` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.7.4_aarch64.dmg) |
+| **macOS** (Intel) | [`.dmg` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.7.4_x64.dmg) |
+| **Windows** | [`.exe` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.7.4_x64-setup.exe) |
+| **Linux** | [`.AppImage` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.7.4_amd64.AppImage) |
 
 > **macOS note:** If you see "Blade is damaged and can't be opened", run:
 > ```bash
@@ -223,7 +228,7 @@ sudo apt-get install -y \
 ```
 BLADE/
 ├── src/                              # React + Vite frontend (TypeScript)
-│   ├── components/                   # 132 UI components
+│   ├── components/                   # 145+ UI components
 │   │   ├── ChatWindow.tsx            # Main chat + streaming UI
 │   │   ├── SwarmView.tsx             # DAG visualization for parallel agents
 │   │   ├── ScreenTimeline.tsx        # Total Recall thumbnail grid + search
@@ -240,7 +245,7 @@ BLADE/
 │       ├── useScreenTimeline.ts      # Timeline browse + semantic search
 │       ├── useVoiceMode.ts           # Conversational voice state
 │       └── ...                       # 90+ hooks
-└── src-tauri/src/                    # Rust backend (127 modules)
+└── src-tauri/src/                    # Rust backend (140+ modules)
     ├── swarm.rs                      # SwarmTask DAG — parallel orchestration
     ├── swarm_commands.rs             # Coordinator loop + agent spawning
     ├── swarm_planner.rs              # LLM goal decomposition + DAG synthesis
@@ -268,7 +273,8 @@ BLADE/
     ├── commands.rs                   # Message loop + tool execution
     ├── db.rs                         # SQLite (memory, swarms, timeline, embeddings)
     ├── embeddings.rs                 # Hybrid BM25 + vector search (RRF)
-    ├── native_tools.rs               # 20+ built-in tools (bash, file, web, UI)
+    ├── native_tools.rs               # 60+ built-in tools (bash, file, web, UI, sysadmin, display)
+    ├── sysadmin.rs                   # Hardware detection, dry-run, checkpoints, sudo
     ├── mcp.rs                        # MCP client + auto-evolving tool catalog
     ├── evolution.rs                  # Background research loop
     ├── computer_use.rs               # Click, type, OCR, screenshot
@@ -313,34 +319,37 @@ Create `~/.blade/BLADE.md` to give BLADE workspace-level instructions (restrict 
 
 ## Roadmap
 
+### Done in v0.7.4
+- [x] Sysadmin toolkit — hardware detection (GPU, IOMMU, CPU features), dry-run preview, task checkpoints with rollback, sudo bridge
+- [x] 60 native tools — bash, files, browser, display, screen recording, clipboard, search, system control, sysadmin, agents
+- [x] 24 MCP servers in auto-discovery catalog (GitHub, Slack, Notion, Figma, Playwright, Docker, AWS, Composio, etc.)
+- [x] Ambient Strip — persistent bottom bar showing what BLADE sees, hears, and is doing
+- [x] NudgeOverlay — glass card with contextual quick-action buttons for proactive events
+- [x] Proactive event sounds — nudge arpeggio, completion chime, error alert
+- [x] Personality variations — BLADE doesn't repeat the same line for nudges
+- [x] File staleness guard — prevents stale overwrites (OpenCode pattern)
+- [x] Cross-platform package install — auto-detects apt/dnf/pacman/zypper/brew
+- [x] Curl snippet auto-setup — paste a curl command from any provider's docs
+- [x] Agent setup panel — install/manage Claude Code, Aider, Goose from Settings
+- [x] Chat concurrency guard — prevents garbled interleaved responses
+- [x] HTTP timeouts on all providers — prevents permanent hang on network drop
+- [x] 5 security fixes — API key redaction, PowerShell injection, RSS/SVG XSS
+- [x] 9 bug fixes — use-after-free, DST crash, WAL mode, MCP size cap, and more
+
 ### Done in v0.6.0
-- [x] Ghost Mode — invisible meeting overlay with content protection
-- [x] Deep System Discovery — 12 parallel scanners on first launch
-- [x] People Graph — auto-learned relationship database
-- [x] Auto-Reply — message drafting in your own style
-- [x] Typed Memory — 7 semantic categories with proactive surfacing
-- [x] Decision Gate — autonomous action classifier with per-source thresholds
-- [x] Browser Automation — CDP-backed vision agent in your real browser
-- [x] System Control — lock, volume, brightness, apps, network, battery
-- [x] Smart Home — Home Assistant entities + Spotify playback control
-- [x] Financial Brain — transaction tracking, spending analysis, CSV import
-- [x] Health Guardian — screen time monitoring + break reminders
-- [x] Audio Timeline — always-on capture, transcription, and action extraction
-- [x] Personality Mirror — communication style extraction from chat history
-- [x] Conversational Voice — emotion-aware multi-turn voice sessions
-- [x] Temporal Intelligence — recall, standup generation, pattern detection
-- [x] Security Fortress — network monitoring, phishing detection, breach check, code scan
-- [x] Onboarding v2 — paste key → auto-detect → system scan → personality questions
+- [x] Ghost Mode, Deep System Discovery, People Graph, Auto-Reply
+- [x] Typed Memory, Decision Gate, Browser Automation, System Control
+- [x] Smart Home, Financial Brain, Health Guardian, Audio Timeline
+- [x] Personality Mirror, Conversational Voice, Temporal Intelligence
+- [x] Security Fortress, Onboarding v2, "Hey BLADE" wake word
 
 ### What's next
-- [ ] "Hey BLADE" wake word (local Whisper + Vosk) — always-on without hotkey
-- [ ] SOUL.md diff — weekly transparency report on what BLADE has learned about you
-- [ ] God Mode privacy controls — per-app allowlist, blur sensitive areas
-- [ ] OpenHands integration as 6th background agent target
-- [ ] MCP marketplace — community tool discovery without config files
+- [ ] LSP integration — run language servers, feed diagnostics back into tool results after edits
+- [ ] Interactive terminal — proper PTY for SSH sessions and interactive commands
+- [ ] Bluetooth management — pair/unpair devices
+- [ ] Multi-browser profiles — per-site profile routing
 - [ ] Offline TTS — Piper / Coqui for 100% local voice
-- [ ] Ghost Mode for more platforms — Teams Web, LinkedIn messages, Gmail
-- [ ] Mobile companion app — push BLADE summaries and decisions to your phone
+- [ ] Mobile companion app — push BLADE summaries to your phone
 - [ ] Cross-device sync — encrypted vault for memory portability
 
 ---
