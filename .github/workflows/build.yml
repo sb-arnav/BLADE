@@ -53,6 +53,7 @@ jobs:
             libxdo-dev \
             libpipewire-0.3-dev \
             libspa-0.2-dev \
+            libclang-dev \
             pkg-config
 
       - name: Rust check (catch compile errors early)

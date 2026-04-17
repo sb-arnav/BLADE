@@ -144,9 +144,29 @@ function useIntegrations() {
 // ── Card components ────────────────────────────────────────────────────────────
 
 function GodModeCard({ perception }: { perception: PerceptionState | null }) {
-  const appName = perception?.active_app || "VS Code";
+  const appName = perception?.active_app || "—";
   const filePath = perception?.active_title || "—";
   const userState = perception?.user_state || "Idle";
+
+  const [stats, setStats] = useState({ agents: 0, services: 0, apiPerMin: 0, focus: 0 });
+  useEffect(() => {
+    const load = () => {
+      Promise.all([
+        invoke<Array<unknown>>("agent_list_background").catch(() => []),
+        invoke<{ services_alive: number; blood_pressure: { api_calls_per_minute: number }; focus_score: number }>("blade_vital_signs").catch(() => null),
+      ]).then(([agents, vitals]) => {
+        setStats({
+          agents: (agents as Array<unknown>).length,
+          services: vitals?.services_alive || 0,
+          apiPerMin: vitals?.blood_pressure?.api_calls_per_minute || 0,
+          focus: vitals?.focus_score || 0,
+        });
+      });
+    };
+    load();
+    const interval = setInterval(load, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="blade-glass flex flex-col p-5 gap-0 animate-[blade-card-in_0.5s_cubic-bezier(0.22,1,0.36,1)_0.03s_both]">
@@ -177,10 +197,10 @@ function GodModeCard({ perception }: { perception: PerceptionState | null }) {
 
       <div className="mt-4 pt-4 border-t border-[rgba(255,255,255,0.07)] flex gap-4">
         {[
-          { label: "Agents", value: "3", color: "text-white" },
-          { label: "Memories", value: "1.2k", color: "text-[#60a5fa]" },
-          { label: "Mic", value: "On", color: "text-[#4ade80]" },
-          { label: "Spend", value: "$0.84", color: "text-[#fbbf24]" },
+          { label: "Agents", value: String(stats.agents), color: stats.agents > 0 ? "text-white" : "text-[rgba(255,255,255,0.35)]" },
+          { label: "Services", value: String(stats.services), color: "text-[#60a5fa]" },
+          { label: "API/min", value: String(stats.apiPerMin), color: stats.apiPerMin > 10 ? "text-[#fbbf24]" : "text-[#4ade80]" },
+          { label: "Focus", value: `${stats.focus}%`, color: stats.focus >= 60 ? "text-[#4ade80]" : "text-[#fbbf24]" },
         ].map(({ label, value, color }, i) => (
           <React.Fragment key={label}>
             {i > 0 && <div className="w-px bg-[rgba(255,255,255,0.08)] self-stretch" />}
@@ -266,28 +286,24 @@ function IntegrationsCard({ integrations }: { integrations: IntegrationState }) 
 }
 
 function CalendarCard({ integrations }: { integrations: IntegrationState }) {
-  const realEvents = integrations.upcoming_events.slice(0, 3);
-  const mockEvents = [
-    { time: "3:00 PM", name: "Staq sync — Federico", meta: "Solana Reputation Protocol", badge: "in 47 min", isNext: true },
-    { time: "5:30 PM", name: "PollPe standup", meta: "Google Meet · 5 attendees", badge: null as string | null, isNext: false },
-    { time: "Tmrw 10:00", name: "Investor call · demo prep", meta: "Zoom · Staq deck needed", badge: null as string | null, isNext: false },
-  ];
-
-  const events = realEvents.length > 0
-    ? realEvents.map((ev, i) => ({
-        time: new Date(ev.start_ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        name: ev.title,
-        meta: ev.minutes_until > 0 ? `in ${ev.minutes_until} min` : "happening now",
-        badge: i === 0 && ev.minutes_until > 0 ? `in ${ev.minutes_until} min` : null as string | null,
-        isNext: i === 0,
-      }))
-    : mockEvents;
+  const events = integrations.upcoming_events.slice(0, 3).map((ev, i) => ({
+    time: new Date(ev.start_ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    name: ev.title,
+    meta: ev.minutes_until > 0 ? `in ${ev.minutes_until} min` : "happening now",
+    badge: i === 0 && ev.minutes_until > 0 ? `in ${ev.minutes_until} min` : null as string | null,
+    isNext: i === 0,
+  }));
 
   return (
     <div className="blade-glass flex flex-col p-[18px] gap-[14px] animate-[blade-card-in_0.5s_cubic-bezier(0.22,1,0.36,1)_0.18s_both]">
       <CardLabel icon={<svg viewBox="0 0 12 12" className="w-[10px] h-[10px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="1" y="2" width="10" height="9" rx="1.5"/><path d="M1 5h10M4 1v2M8 1v2"/></svg>}>
         Calendar
       </CardLabel>
+      {events.length === 0 ? (
+        <div className="flex items-center justify-center py-6 text-[11px] text-[rgba(255,255,255,0.25)] italic">
+          No upcoming events — connect Google Calendar in Settings
+        </div>
+      ) : (
       <div className="flex flex-col relative">
         <div className="absolute left-[6px] top-[8px] bottom-[8px] w-px bg-[rgba(255,255,255,0.08)]" />
         {events.map((ev, i) => (
@@ -317,6 +333,7 @@ function CalendarCard({ integrations }: { integrations: IntegrationState }) {
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 }

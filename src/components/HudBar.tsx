@@ -176,16 +176,11 @@ export function HudBar() {
   // ── Alert pulse on errors/warnings ──────────────────────────────────────────
 
   useEffect(() => {
-    const unlistenErr = listen("blade_alert_error", () => {
-      triggerAlert("error");
+    const unlistenStatus = listen<string>("blade_status", (ev) => {
+      if (ev.payload === "error") triggerAlert("error");
     });
-    const unlistenWarn = listen("blade_alert_warning", () => {
-      triggerAlert("warning");
-    });
-    // Also fire on error/warning toasts
     return () => {
-      unlistenErr.then((fn) => fn());
-      unlistenWarn.then((fn) => fn());
+      unlistenStatus.then((fn) => fn());
     };
   }, []);
 
@@ -316,9 +311,7 @@ export function HudBar() {
         await main.show();
         await main.setFocus();
       }
-    } catch {
-      invoke("open_main_window").catch(() => {});
-    }
+    } catch { /* main window not found — ignore */ }
   }, []);
 
   const dismissToast = useCallback((id: string) => {

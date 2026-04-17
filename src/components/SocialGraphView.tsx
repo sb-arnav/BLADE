@@ -241,7 +241,7 @@ export function SocialGraphView({ onBack }: { onBack: () => void }) {
   async function handleSaveNotes() {
     if (!selectedContact) return;
     try {
-      await invoke("social_update_notes", { contactId: selectedContact.id, notes: notesValue });
+      await invoke("social_update_contact", { id: selectedContact.id, updates: { notes: notesValue } });
       setSelectedContact({ ...selectedContact, notes: notesValue });
       setEditingNotes(false);
     } catch {

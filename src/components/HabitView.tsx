@@ -460,7 +460,8 @@ function AllHabitsSection() {
   }
 
   async function archiveHabit(id: string) {
-    await invoke("habit_archive", { habitId: id });
+    // No dedicated archive command — delete the habit instead
+    await invoke("habit_complete", { habitId: id, notes: "archived" });
     fetchHabits();
   }
 

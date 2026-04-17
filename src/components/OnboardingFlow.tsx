@@ -81,7 +81,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     if (!goal.trim()) { next(); return; }
     setSaving(true);
     try {
-      await invoke("goal_create", { title: goal, description: "" });
+      await invoke("goal_add", { title: goal, description: "" });
     } catch { /* ignore */ }
     setSaving(false);
     next();

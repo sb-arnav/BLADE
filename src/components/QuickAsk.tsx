@@ -377,9 +377,7 @@ export function QuickAsk() {
         await main.show();
         await main.setFocus();
       }
-    } catch {
-      invoke("open_main_window").catch(() => {});
-    }
+    } catch { /* main window not found — ignore */ }
     await getCurrentWindow().hide();
     resetState();
   }, [resetState]);
