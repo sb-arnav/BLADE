@@ -99,6 +99,15 @@ fn is_fallback_eligible_error(err: &str) -> bool {
         || lower.contains("service unavailable")
         || lower.contains("bad gateway")
         || lower.contains("internal server error")
+        // Network failures — the most common case when WiFi drops or provider stalls
+        || lower.contains("timed out")
+        || lower.contains("timeout")
+        || lower.contains("connection refused")
+        || lower.contains("connection reset")
+        || lower.contains("dns error")
+        || lower.contains("network error")
+        || lower.contains("failed to connect")
+        || lower.contains("operation canceled")
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

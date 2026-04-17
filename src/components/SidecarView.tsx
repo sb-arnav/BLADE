@@ -237,11 +237,8 @@ export function SidecarView({ onBack }: { onBack: () => void }) {
   }, [load]);
 
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    listen("sidecar_status_update", () => {
-      load();
-    }).then((fn) => { unlisten = fn; });
-    return () => unlisten?.();
+    const unlisten = listen("sidecar_status_update", () => { load(); });
+    return () => { unlisten.then((fn) => fn()); };
   }, [load]);
 
   async function pingDevice(id: string) {

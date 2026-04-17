@@ -105,98 +105,68 @@ export function AutoFixCard({ onDismiss }: AutoFixCardProps) {
   // ── Event listeners ──────────────────────────────────────────────────────
 
   useEffect(() => {
-    const unlisteners: (() => void)[] = [];
-
-    // Pipeline started by Hive.
-    const started = listen<AutoFixStartedPayload>("hive_auto_fix_started", (e) => {
-      const { repo_path, workflow_name, run_id, summary } = e.payload;
-      const parts = repo_path.split("/");
-      const repoName = parts[parts.length - 1] ?? repo_path;
-      setState((prev) => ({
-        ...prev,
-        repoName,
-        workflowName: workflow_name,
-        runId: run_id,
-        errorSummary: summary,
-        step: "analyzing",
-        result: null,
-        ciPassed: null,
-        filesEdited: 0,
-        filesTotal: 0,
-      }));
-    });
-    started.then((fn) => unlisteners.push(fn));
-
-    // Step: analyzing
-    const analyzing = listen("auto_fix_analyzing", () => {
-      setState((prev) => ({ ...prev, step: "analyzing" }));
-    });
-    analyzing.then((fn) => unlisteners.push(fn));
-
-    // Step: editing
-    const editing = listen<{ edits: number; files: string[] }>(
-      "auto_fix_editing",
-      (e) => {
+    // Collect all listen() promises; on cleanup, await each and call fn
+    // (safe against unmount-before-resolve races).
+    const promises: Promise<() => void>[] = [
+      listen<AutoFixStartedPayload>("hive_auto_fix_started", (e) => {
+        const { repo_path, workflow_name, run_id, summary } = e.payload;
+        const parts = repo_path.split("/");
+        const repoName = parts[parts.length - 1] ?? repo_path;
+        setState((prev) => ({
+          ...prev,
+          repoName,
+          workflowName: workflow_name,
+          runId: run_id,
+          errorSummary: summary,
+          step: "analyzing",
+          result: null,
+          ciPassed: null,
+          filesEdited: 0,
+          filesTotal: 0,
+        }));
+      }),
+      listen("auto_fix_analyzing", () => {
+        setState((prev) => ({ ...prev, step: "analyzing" }));
+      }),
+      listen<{ edits: number; files: string[] }>("auto_fix_editing", (e) => {
         setState((prev) => ({
           ...prev,
           step: "editing",
           filesTotal: e.payload.edits ?? 0,
         }));
-      }
-    );
-    editing.then((fn) => unlisteners.push(fn));
-
-    // Step: verifying (two sub-steps: local_check + llm_retry)
-    const verifying = listen<{ step: string; files_changed?: number }>(
-      "auto_fix_verifying",
-      (e) => {
+      }),
+      listen<{ step: string; files_changed?: number }>("auto_fix_verifying", (e) => {
         setState((prev) => ({
           ...prev,
           step: "verifying",
           filesEdited: e.payload.files_changed ?? prev.filesEdited,
         }));
-      }
-    );
-    verifying.then((fn) => unlisteners.push(fn));
-
-    // Step: pushing
-    const pushing = listen("auto_fix_pushing", () => {
-      setState((prev) => ({ ...prev, step: "pushing" }));
-    });
-    pushing.then((fn) => unlisteners.push(fn));
-
-    // Step: monitoring
-    const monitoring = listen("auto_fix_monitoring", () => {
-      setState((prev) => ({ ...prev, step: "monitoring" }));
-    });
-    monitoring.then((fn) => unlisteners.push(fn));
-
-    // Complete
-    const complete = listen<{ result: FixResult; ci_passed: boolean }>(
-      "auto_fix_complete",
-      (e) => {
+      }),
+      listen("auto_fix_pushing", () => {
+        setState((prev) => ({ ...prev, step: "pushing" }));
+      }),
+      listen("auto_fix_monitoring", () => {
+        setState((prev) => ({ ...prev, step: "monitoring" }));
+      }),
+      listen<{ result: FixResult; ci_passed: boolean }>("auto_fix_complete", (e) => {
         setState((prev) => ({
           ...prev,
           step: "complete",
           result: e.payload.result,
           ciPassed: e.payload.ci_passed,
         }));
-      }
-    );
-    complete.then((fn) => unlisteners.push(fn));
-
-    // Failed
-    const failed = listen<{ result: FixResult }>("auto_fix_failed", (e) => {
-      setState((prev) => ({
-        ...prev,
-        step: "failed",
-        result: e.payload.result,
-      }));
-    });
-    failed.then((fn) => unlisteners.push(fn));
+      }),
+      listen<{ result: FixResult }>("auto_fix_failed", (e) => {
+        setState((prev) => ({
+          ...prev,
+          step: "failed",
+          result: e.payload.result,
+        }));
+      }),
+    ];
 
     return () => {
-      unlisteners.forEach((fn) => fn());
+      promises.forEach((p) => p.then((fn) => fn()));
     };
   }, []);
 
