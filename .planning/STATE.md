@@ -1,8 +1,23 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+current_phase: Phase 0 — Pre-Rebuild Audit
+status: executing
+last_updated: "2026-04-18T07:58:05.538Z"
+progress:
+  total_phases: 10
+  completed_phases: 0
+  total_plans: 2
+  completed_plans: 0
+  percent: 0
+---
+
 # STATE — BLADE Skin Rebuild (V1)
 
 **Project:** BLADE Skin Rebuild V1
 **Current Phase:** Phase 0 — Pre-Rebuild Audit
-**Status:** Planned, not started
+**Status:** Ready to execute
 **Last Updated:** 2026-04-17
 
 ---
@@ -52,6 +67,7 @@
 ## Accumulated Context
 
 ### Key Decisions Locked
+
 - D-01: Self-built 8 primitives, no shadcn/Radix
 - D-02: CSS-only motion, no Framer Motion
 - D-03: Hand-written Tauri wrappers in `src/lib/tauri/`
@@ -70,6 +86,7 @@
 - D-16: Token compaction at ratio > 0.65; frontend shows `blade_token_ratio` indicator
 
 ### Phase Gate Requirements (Phase 1 must pass ALL of these)
+
 - **P-01**: Dashboard first paint ≤ 200ms on integrated GPU; max 3 backdrop-filter per viewport
 - **P-02**: QuickAsk → Main bridge documented (from RECOVERY_LOG.md); contract explicit before QuickAsk phase
 - **P-03**: Migration ledger tracking all 59 routes; no route removed before replacement ships
@@ -78,6 +95,7 @@
 - **P-06**: `useTauriEvent` hook built before any component; listener leak test passing
 
 ### Backend Wiring Gaps (WIRE category)
+
 | Gap | Location | Phase |
 |-----|----------|-------|
 | `quickask_submit` command | `commands.rs` | Phase 3 (stub) + Phase 4 (test) |
@@ -90,6 +108,7 @@
 | `emit_all` audit + refactor | Rust codebase-wide | Phase 1 |
 
 ### Active Todos
+
 - [ ] Create `.planning/RECOVERY_LOG.md` (Phase 0 output)
 - [ ] Read `src.bak/src/quickask.tsx` and document bridge contract
 - [ ] Audit `src.bak/` for voice orb, event listeners, onboarding patterns
@@ -97,6 +116,7 @@
 - [ ] Get Arnav review before Phase 1 begins
 
 ### Blockers
+
 None. Phase 0 can start immediately.
 
 ---
@@ -106,6 +126,7 @@ None. Phase 0 can start immediately.
 **Last session:** 2026-04-17 — Roadmap and STATE initialized by `/gsd-roadmapper` agent.
 **Next action:** Start Phase 0 Pre-Rebuild Audit — read `src.bak/src/quickask.tsx`, `src.bak/src/VoiceOrb.tsx` (or equivalent), and audit `emit_all` in Rust. Produce `RECOVERY_LOG.md`.
 **Context cliff notes:**
+
 - Backend is complete (178 Rust modules, 764 commands); this project is frontend only
 - `src.bak/` is the backup of the old `src/` — read-only reference, never import from it
 - Three HTML files are missing: `overlay.html`, `hud.html`, `ghost_overlay.html` — Rust crashes without them
