@@ -23,11 +23,43 @@ jobs:
       - name: Install frontend deps
         run: npm ci
 
+      # ───── Phase 1 invariants (D-27, D-31, D-33, D-34, D-45-regress) ─────
+      # Run BEFORE typecheck / build — these are pure fs-scan scripts that
+      # fail in ~3s, giving a clean early-abort signal without waiting for
+      # the 60s Vite + 90s cargo-check pipelines.
+      - name: Phase 1 verify:all
+        run: npm run verify:all
+
+      - name: ESLint (blade/no-raw-tauri rule)
+        # D-34: CI-enforced, not reviewer-required. src/ is freshly built in
+        # Phase 1 with the rule active from Day 1 — zero pre-existing
+        # violations expected. Failure blocks merge (no `|| true` escape).
+        run: npm run lint
+
+      - name: Migration-ledger idempotency
+        # D-28: re-seeding should produce identical output. Drift means the
+        # ledger was hand-edited but `npm run seed:ledger` wasn't re-run
+        # (or a feature cluster changed without a corresponding ledger row).
+        run: |
+          npm run seed:ledger
+          git diff --exit-code .planning/migration-ledger.md || {
+            echo "::error::migration-ledger.md regenerated with drift; commit the seed output"
+            exit 1
+          }
+
       - name: Typecheck frontend
         run: npx tsc --noEmit
 
       - name: Build frontend
         run: npm run build
+
+      - name: Verify all 5 HTML files present in dist/ (WIN-09)
+        run: npm run verify:html-entries
+
+      # Phase 1 intentional: Playwright listener-leak test runs locally via
+      # `npm run test:e2e` — wiring into CI deferred to Phase 9 Polish Pass
+      # (requires xvfb-run + extra ~2min per job; not worth it while the full
+      # Tauri harness isn't live).
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
