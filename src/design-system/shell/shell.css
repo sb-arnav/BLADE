@@ -149,3 +149,213 @@
   font-size: 10.5px;
   color: var(--t-2);
 }
+
+/* ── NavRail (Plan 02-05) ─────────────────────────────────────────────── */
+
+.navrail {
+  position: sticky;
+  top: var(--title-height);
+  width: var(--nav-width, 62px);
+  height: calc(100vh - var(--title-height));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 0;
+  background: rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(60px);
+  -webkit-backdrop-filter: blur(60px);
+  border-right: 1px solid var(--g-edge-lo);
+  z-index: 400;
+}
+
+.navrail-logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  margin-bottom: 14px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #7c3aed, #6366f1, #3b82f6);
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  box-shadow: var(--g-shadow-sm);
+  flex-shrink: 0;
+}
+
+.navrail-divider {
+  width: 22px;
+  height: 1px;
+  background: var(--line);
+  margin: 8px 0;
+  flex-shrink: 0;
+}
+
+.navrail-btn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--t-3);
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease-smooth),
+    background-color var(--dur-fast) var(--ease-smooth),
+    border-color var(--dur-fast) var(--ease-smooth);
+}
+.navrail-btn:hover {
+  color: var(--t-1);
+  background: var(--g-fill);
+  border-color: var(--g-edge-lo);
+}
+.navrail-btn.active {
+  color: var(--t-1);
+  background: rgba(129, 140, 248, 0.2);
+  border-color: rgba(129, 140, 248, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+.navrail-btn.active::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 20px;
+  border-radius: 2px;
+  background: rgb(129, 140, 248);
+  box-shadow: 0 0 10px rgb(129, 140, 248);
+}
+.navrail-btn:focus-visible {
+  outline: 2px solid var(--a-cool);
+  outline-offset: 2px;
+}
+
+.nav-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* Tooltip — appears on hover to the right of the button. */
+.navrail-tip {
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%) translateX(-4px);
+  opacity: 0;
+  pointer-events: none;
+  background: rgba(10, 10, 20, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--g-edge-mid);
+  color: var(--t-1);
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: var(--r-sm);
+  white-space: nowrap;
+  z-index: 50;
+  transition:
+    opacity var(--dur-fast) var(--ease-smooth),
+    transform var(--dur-fast) var(--ease-smooth);
+  font-family: var(--font-mono);
+}
+.navrail-btn:hover .navrail-tip {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+/* ── CommandPalette (Plan 02-05) ──────────────────────────────────────── */
+/* The <dialog> element already has native centered positioning; we style its
+ * content. The palette sits at 25vh from top instead of centered — feels
+ * command-palette-native rather than modal-dialog-native. */
+.palette {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: min(640px, calc(100vw - 40px));
+  max-height: 70vh;
+}
+
+.palette-input {
+  width: 100%;
+  padding: 16px 20px;
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: var(--t-1);
+  background: transparent;
+  border: 0;
+  outline: none;
+  border-bottom: 1px solid var(--line);
+}
+.palette-input::placeholder {
+  color: var(--t-3);
+}
+
+.palette-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.palette-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--t-1);
+  text-align: left;
+  border: 0;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-smooth);
+}
+.palette-row:hover,
+.palette-row.selected {
+  background: var(--g-fill-strong);
+}
+
+.palette-row-label {
+  font-size: 14px;
+  font-weight: 500;
+}
+.palette-row-desc {
+  font-size: 12px;
+  color: var(--t-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.palette-row-kbd kbd {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  background: var(--g-fill);
+  border: 1px solid var(--g-edge-lo);
+  padding: 2px 6px;
+  border-radius: var(--r-sm);
+  color: var(--t-2);
+}
+
+.palette-empty {
+  padding: 28px 14px;
+  text-align: center;
+  color: var(--t-3);
+}
+
+/* Lift the palette up so it feels like a command palette, not a centered
+ * modal. Phase 1's dialog.glass positioning is already good for other
+ * dialogs; this selector only applies when the dialog contains a .palette. */
+dialog.glass:has(.palette) {
+  top: 25vh;
+  transform: translate(-50%, 0);
+}

@@ -18,6 +18,7 @@
 @import './typography.css';
 @import '../design-system/primitives/primitives.css';  /* Plan 01-04 — primitive classes layered on glass tiers */
 @import '../lib/context/toast.css';                    /* Plan 02-02 — toast system visuals (SHELL-04, D-59) */
+@import '../design-system/shell/shell.css';            /* Plans 02-03 + 02-05 + 02-06 — shell-scope rules (hand-off from 02-03) */
 @import 'tailwindcss';
 
 @theme {
