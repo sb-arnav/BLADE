@@ -16,6 +16,7 @@
 @import './motion.css';
 @import './layout.css';
 @import './typography.css';
+@import '../design-system/primitives/primitives.css';  /* Plan 01-04 — primitive classes layered on glass tiers */
 @import 'tailwindcss';
 
 @theme {
