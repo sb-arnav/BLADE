@@ -1,0 +1,85 @@
+/* src/styles/tokens.css — root colors, typography vars, radii, spacing (D-22)
+ *
+ * Source of truth for every downstream surface. Tailwind v4 @theme block in
+ * index.css bridges a curated subset of these to utility names (bg-glass-1,
+ * text-text-strong, rounded-card, p-sp-4) via var() references — so adding a
+ * new token here propagates to both CSS-var consumers and Tailwind utilities
+ * in one edit (D-23).
+ *
+ * Radii follow proto.css values (RECOVERY_LOG §B.12 — HIG-tighter) which
+ * override the shared.css defaults.
+ * Text opacities floor at --t-3=0.50 (P-08 WCAG, verified by Plan 09
+ * audit-contrast.mjs).
+ * Fonts are self-hosted WOFF2 (D-24) — see typography.css @font-face blocks.
+ */
+:root {
+  /* Glass fills (D-22) */
+  --g-fill-weak:   rgba(255, 255, 255, 0.04);
+  --g-fill:        rgba(255, 255, 255, 0.07);
+  --g-fill-strong: rgba(255, 255, 255, 0.11);
+  --g-fill-heavy:  rgba(255, 255, 255, 0.16);
+
+  /* Glass edges */
+  --g-edge-hi:  rgba(255, 255, 255, 0.32);
+  --g-edge-mid: rgba(255, 255, 255, 0.14);
+  --g-edge-lo:  rgba(255, 255, 255, 0.04);
+
+  /* Inset rim */
+  --g-rim: inset 0 1px 0 rgba(255,255,255,0.28),
+           inset 0 -1px 0 rgba(255,255,255,0.04),
+           inset 1px 0 0 rgba(255,255,255,0.12),
+           inset -1px 0 0 rgba(255,255,255,0.03);
+
+  /* Shadows */
+  --g-shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.24);
+  --g-shadow-md: 0 20px 50px rgba(0, 0, 0, 0.32);
+  --g-shadow-lg: 0 40px 80px rgba(0, 0, 0, 0.42);
+
+  /* Text opacities (floor >=0.50 for t-3, P-08 verified by audit-contrast.mjs Plan 09) */
+  --t-1: rgba(255, 255, 255, 0.97);
+  --t-2: rgba(255, 255, 255, 0.72);
+  --t-3: rgba(255, 255, 255, 0.50);
+  --t-4: rgba(255, 255, 255, 0.32);
+
+  /* Dividers */
+  --line:        rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.14);
+
+  /* Accents */
+  --a-warm: #ffd2a6;
+  --a-cool: #c8e0ff;
+  --a-ok:   #8affc7;
+  --a-warn: #ffc48a;
+  --a-hot:  #ff9ab0;
+
+  /* Radii — RECOVERY_LOG §B.12 proto.css values (tighter / HIG-aligned) */
+  --r-xs:   8px;
+  --r-sm:  10px;   /* was 12 in shared.css — proto wins */
+  --r-md:  16px;   /* was 18 */
+  --r-lg:  20px;   /* was 26 */
+  --r-xl:  28px;   /* was 34 */
+  --r-2xl: 40px;   /* was 44 */
+  --r-pill: 999px;
+
+  /* Spacing (shared.css verbatim) */
+  --s-1:  4px;  --s-2:  8px;  --s-3: 12px;  --s-4: 16px;
+  --s-5: 20px;  --s-6: 24px;  --s-8: 32px;  --s-10: 40px;
+  --s-12: 48px; --s-16: 64px; --s-20: 80px;
+
+  /* Font families (D-24 self-hosted) */
+  --font-display: 'Syne', -apple-system, system-ui, sans-serif;
+  --font-body:    'Bricolage Grotesque', -apple-system, system-ui, sans-serif;
+  --font-serif:   'Fraunces', Georgia, serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, monospace;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #000;
+  color: var(--t-1);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
+}

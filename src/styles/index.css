@@ -1,0 +1,42 @@
+/* src/styles/index.css — barrel + Tailwind v4 @theme bridge (D-22 + D-23)
+ *
+ * Single entry point for design tokens. Imported once per window bootstrap
+ * (src/windows/<w>/main.tsx). The @import chain pulls all 5 sibling files in
+ * deterministic order (tokens must load before any rule that references
+ * var(--...)).
+ *
+ * D-23 strategy: CSS custom properties are the source of truth. Tailwind v4
+ * @theme bridges a curated subset to utility names by referencing var(--x).
+ * Adding a new token = one edit in tokens.css (or its sibling); if the token
+ * should also be a Tailwind utility, one extra line here. No two-places drift.
+ * Motion cubic-beziers stay in :root only (@theme can't model them cleanly).
+ */
+@import './tokens.css';
+@import './glass.css';
+@import './motion.css';
+@import './layout.css';
+@import './typography.css';
+@import 'tailwindcss';
+
+@theme {
+  --color-glass-1:      var(--g-fill);
+  --color-glass-2:      var(--g-fill-strong);
+  --color-glass-3:      var(--g-fill-heavy);
+  --color-text-strong:  var(--t-1);
+  --color-text-muted:   var(--t-2);
+  --color-text-subtle:  var(--t-3);
+  --color-accent-ok:    var(--a-ok);
+  --color-accent-warn:  var(--a-warn);
+  --color-accent-warm:  var(--a-warm);
+  --color-accent-cool:  var(--a-cool);
+  --radius-card:        var(--r-md);
+  --radius-panel:       var(--r-lg);
+  --radius-pill:        var(--r-pill);
+  --spacing-sp-1:       var(--s-1);
+  --spacing-sp-2:       var(--s-2);
+  --spacing-sp-3:       var(--s-3);
+  --spacing-sp-4:       var(--s-4);
+  --spacing-sp-6:       var(--s-6);
+  --spacing-sp-8:       var(--s-8);
+  /* Motion tokens stay in :root only — @theme doesn't model cubic-bezier cleanly (D-23) */
+}

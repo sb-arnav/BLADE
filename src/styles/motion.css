@@ -1,0 +1,33 @@
+/* src/styles/motion.css — easings, durations, orb constants, @keyframes (D-22)
+ *
+ * D-23 note: motion tokens stay in :root only. Tailwind's @theme block does
+ * not model cubic-bezier values cleanly, so these are NOT mirrored into
+ * index.css's @theme — consumers must reference var(--ease-*) / var(--dur-*)
+ * directly.
+ *
+ * Phase 4 VoiceOrb constants (--orb-rms-alpha, --orb-throttle) are declared
+ * here so Phase 4 doesn't retrofit tokens.css (PRIOR_ART.md tuned values).
+ */
+:root {
+  /* Easings */
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Durations */
+  --dur-snap:   80ms;
+  --dur-fast:  150ms;
+  --dur-base:  200ms;
+  --dur-enter: 280ms;
+  --dur-slow:  400ms;
+  --dur-float: 6200ms;
+
+  /* Phase 4 orb constants (PRIOR_ART.md tuned — do NOT retrofit later) */
+  --orb-rms-alpha: 0.55;   /* RMS EMA smoothing: new = 0.45*prev + 0.55*new */
+  --orb-throttle:  83;     /* ms, 12fps UI throttle */
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}

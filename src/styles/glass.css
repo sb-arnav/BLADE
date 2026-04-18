@@ -1,0 +1,68 @@
+/* src/styles/glass.css — Liquid Glass tier classes (D-22)
+ *
+ * CRITICAL: blur caps are 20 / 12 / 8 per tier (D-07 + RECOVERY_LOG §B.3).
+ * Prototype shared.css used a larger blur (32-pixel) in places; those values are capped here
+ * to keep the GPU budget below P-01's ceiling (research/PITFALLS.md). No
+ * component may override via prop in later plans — GlassPanel (Plan 04)
+ * enforces this at the props level.
+ *
+ * Opacity floor on the darkest tier is >=0.55 to guarantee WCAG contrast
+ * against bright wallpapers (P-08 / D-22).
+ */
+
+.glass {
+  position: relative;
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.13) 0%,
+    rgba(255,255,255,0.06) 45%,
+    rgba(255,255,255,0.04) 100%);
+  backdrop-filter: blur(20px) saturate(160%) brightness(1.05);
+  -webkit-backdrop-filter: blur(20px) saturate(160%) brightness(1.05);
+  border: 1px solid var(--g-edge-mid);
+  border-radius: var(--r-lg);
+  box-shadow: var(--g-rim), var(--g-shadow-md);
+  isolation: isolate;
+}
+
+.glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(130% 80% at 0% 0%,   rgba(255,255,255,0.14) 0%, transparent 45%),
+    radial-gradient(90%  60% at 100% 100%, rgba(0,0,0,0.10)     0%, transparent 55%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.glass > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Tiers — D-07 blur caps: 20 / 12 / 8. Never higher. */
+.glass-1 {
+  backdrop-filter:        blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+}
+.glass-2 {
+  backdrop-filter:        blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+}
+.glass-3 {
+  backdrop-filter:        blur(8px)  saturate(140%);
+  -webkit-backdrop-filter: blur(8px)  saturate(140%);
+}
+
+.glass.pill { border-radius: var(--r-pill); }
+.glass.sm   { border-radius: var(--r-md); }
+
+/* Fallback: environments without backdrop-filter get a solid dark panel
+ * (prevents unreadable white-on-white on older browsers / Linux edge cases). */
+@supports not (backdrop-filter: blur(1px)) {
+  .glass, .glass-1, .glass-2, .glass-3 {
+    background: rgba(20, 10, 40, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+  }
+}

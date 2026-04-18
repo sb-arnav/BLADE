@@ -1,0 +1,11 @@
+/* src/styles/layout.css — global layout tokens (D-22)
+ *
+ * Window chrome constants shared across all 5 windows. Consumed by Phase 2
+ * Shell (nav rail, topbar) and Phase 3 feature views.
+ */
+:root {
+  --nav-width:    76px;
+  --chat-width:   420px;
+  --title-height: 40px;
+  --gap:          var(--s-4);
+}
