@@ -193,11 +193,23 @@ export interface WakeWordDetectedPayload {
 // Onboarding / background
 // ---------------------------------------------------------------------------
 
+/**
+ * Emitted by src-tauri/src/deep_scan.rs:1325 during `deep_scan_start`. Shape:
+ * `{phase, found}` — the Rust emit fires once per scanner completion, producing
+ * ~11 distinct phase names per run: `starting`, `installed_apps`, `git_repos`,
+ * `ides`, `ai_tools`, `wsl_distros`, `ssh_keys`, `package_managers`, `docker`,
+ * `bookmarks`, `complete`.
+ *
+ * The UI derives a display percent client-side; see
+ * `src/features/onboarding/deepScanPhases.ts` for the enumeration and helper.
+ *
+ * Phase 2 D-49 correction of the prior Plan 01-06 shape (`{step, total, label,
+ * percent}`), which did NOT match the Rust emit at deep_scan.rs:1325. Rust is
+ * the authoritative source per D-38-payload.
+ */
 export interface DeepScanProgressPayload {
-  step: number;
-  total: number;
-  label: string;
-  percent: number;
+  phase: string;
+  found: number;
 }
 
 export interface GodmodeUpdatePayload {
