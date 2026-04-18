@@ -51,7 +51,7 @@ The src.bak implementation existed and presumably worked, but the bridge was nev
 - Backend event `chat_done` fires in the QuickAsk webview but the main window's `listen("chat_done")` does not fire
 
 **How to avoid:**
-1. **Before any rebuild begins**, read `src.bak/src/quickask.tsx` and trace exactly how it submits and whether it emits a Tauri event to the main window or relies on shared SQLite state.
+1. **Before any rebuild begins**, read `src.bak/quickask.tsx` and trace exactly how it submits and whether it emits a Tauri event to the main window or relies on shared SQLite state.
 2. **Design the bridge explicitly as a contract:** QuickAsk sends a message via the normal `send_message_stream` command (creating a real conversation in SQLite), then emits a custom Tauri event `"quickask_submitted"` with the conversation ID. The main window listens to `"quickask_submitted"` and optionally surfaces the thread.
 3. **Write the bridge specification before Phase 2 (QuickAsk phase)** and get it reviewed. Do not discover it's broken in Phase 5.
 
@@ -289,7 +289,7 @@ The project doc says `src.bak/` is "read-only reference. If any recovered patter
 - Developer invents a new pattern for something that `src.bak/` already solved correctly
 
 **How to avoid:**
-1. **Before each phase**, add a mandatory step: grep `src.bak/src/` for the relevant component file and read it. Document what the old implementation did, extract any implicit contracts, and carry forward the good parts.
+1. **Before each phase**, add a mandatory step: grep `src.bak/` for the relevant component file and read it. Document what the old implementation did, extract any implicit contracts, and carry forward the good parts. Note: `src.bak/` is flat — files live at `src.bak/<name>.tsx` (e.g., `src.bak/quickask.tsx`), not under a `src.bak/src/` subdir.
 2. **Create a `src.bak/RECOVERY_LOG.md`** (or a section in the planning doc) that lists every pattern/contract recovered from `src.bak/`, with the target phase that should apply it.
 3. **The QuickAsk bridge, event listener patterns, and voice orb state machine** are the three highest-risk items — do the `src.bak/` read on these explicitly before building.
 
