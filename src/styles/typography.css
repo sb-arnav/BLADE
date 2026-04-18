@@ -1,0 +1,83 @@
+/* src/styles/typography.css — self-hosted @font-face + type scale (D-24)
+ *
+ * WOFF2 binaries live at src/assets/fonts/ (committed to repo, not fetched at
+ * runtime). See src/assets/fonts/SOURCES.md for per-weight origin URLs +
+ * licenses + W1 / W2 invariants.
+ *
+ * font-display: swap on every face — prevents FOIT / P-01 cold-start stall.
+ * Vite resolves the `/src/assets/fonts/...` paths through its asset pipeline
+ * (import.meta.url-relative), producing hashed output paths in prod.
+ */
+
+/* ---- Syne (display) ---- */
+@font-face {
+  font-family: 'Syne';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('/src/assets/fonts/syne-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Syne';
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url('/src/assets/fonts/syne-700.woff2') format('woff2');
+}
+
+/* ---- Bricolage Grotesque (body) ---- */
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('/src/assets/fonts/bricolage-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src: url('/src/assets/fonts/bricolage-600.woff2') format('woff2');
+}
+
+/* ---- Fraunces (serif) ---- */
+@font-face {
+  font-family: 'Fraunces';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('/src/assets/fonts/fraunces-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Fraunces';
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src: url('/src/assets/fonts/fraunces-600.woff2') format('woff2');
+}
+
+/* ---- JetBrains Mono (mono) ---- */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('/src/assets/fonts/jetbrains-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src: url('/src/assets/fonts/jetbrains-600.woff2') format('woff2');
+}
+
+/* Type scale (Phase 1 minimum — expanded in Phase 2 Shell)
+ * Consumed as utility classes on any element: <h1 className="t-h1">. */
+.t-h1    { font-family: var(--font-display); font-size: 44px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+.t-h2    { font-family: var(--font-display); font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+.t-h3    { font-family: var(--font-body);    font-size: 18px; font-weight: 600; line-height: 1.3; }
+.t-body  { font-family: var(--font-body);    font-size: 15px; font-weight: 400; line-height: 1.55; }
+.t-small { font-family: var(--font-body);    font-size: 13px; font-weight: 400; line-height: 1.5; }
+.t-mono  { font-family: var(--font-mono);    font-size: 13px; font-weight: 400; letter-spacing: 0; }
