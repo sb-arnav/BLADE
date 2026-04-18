@@ -9,6 +9,13 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(async () => ({
   plugins: [react()],
 
+  // Mirror tsconfig.json paths so `@/foo` imports resolve at bundle time.
+  resolve: {
+    alias: {
+      "@": resolve(__dirname, "src"),
+    },
+  },
+
   // Multi-page: main window + quickask floating widget
   build: {
     rollupOptions: {
