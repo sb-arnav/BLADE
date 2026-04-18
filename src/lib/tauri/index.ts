@@ -20,12 +20,20 @@ export {
   saveConfig,
   getOnboardingStatus,
   completeOnboarding,
+  testProvider,
+  getAllProviderKeys,
+  storeProviderKey,
+  switchProvider,
+  setConfig,
 } from './config';
 
 export {
   sendMessageStream,
   cancelChat,
 } from './chat';
+
+export { deepScanStart, deepScanResults, deepScanSummary } from './deepscan';
+export { minimizeWindow, closeWindow, toggleMaximize } from './window';
 
 // Events convenience re-export (D-38-evt, D-38-hook). Raw `listen`/`invoke`
 // are intentionally NOT re-exported here — the wrapped surfaces (useTauriEvent,
