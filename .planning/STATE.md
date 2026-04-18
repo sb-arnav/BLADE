@@ -2,22 +2,22 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: "00-pre-rebuild-audit"
-status: executing
-last_updated: "2026-04-18T09:00:00.000Z"
+current_phase: "01-foundation"
+status: phase-complete
+last_updated: "2026-04-18T10:00:00.000Z"
 progress:
   total_phases: 10
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 5
+  completed_plans: 2
+  percent: 10
 ---
 
 # STATE — BLADE Skin Rebuild (V1)
 
 **Project:** BLADE Skin Rebuild V1
-**Current Phase:** 00-pre-rebuild-audit
-**Status:** Executing Phase 00 — Plan 01 complete, Plan 02 (Wave 2) pending
+**Current Phase:** 01-foundation (Phase 0 complete — awaiting Arnav review before Phase 1 begins)
+**Status:** Phase 00 COMPLETE — RECOVERY_LOG.md delivered; Phase 1 unblocked pending review
 **Last Updated:** 2026-04-18
 
 ---
@@ -26,22 +26,22 @@ progress:
 
 **Core Value:** Every surface the user touches is coherent, Liquid-Glass-native, and wired end-to-end. No orphan screens, no dead buttons, no stringly-typed invokes that silently fail.
 
-**Current Focus:** Phase null
+**Current Focus:** Phase 1 Foundation (awaiting Arnav review of Phase 0 output before starting)
 
 ---
 
 ## Current Position
 
-Phase: 00 — EXECUTING
-Plan: 2 of 2
+Phase: 00 — COMPLETE
+Plan: 2 of 2 (both done)
 **Phase:** 0 — Pre-Rebuild Audit
-**Plan:** 01 complete (Wave 1 extractions). Plan 02 (Wave 2: RECOVERY_LOG synthesis) — not started.
-**Phase Status:** In progress (50% — 1 of 2 plans complete)
+**Plan:** 02 complete (Wave 2: RECOVERY_LOG.md synthesized). Phase 00 fully done.
+**Phase Status:** Complete (100% — 2 of 2 plans complete)
 **Overall Progress:**
 
 ```
-[Phase 0] Pre-Rebuild Audit    ██████████░░░░░░░░░░  50% (Plan 01 done)
-[Phase 1] Foundation           ░░░░░░░░░░░░░░░░░░░░  Not started
+[Phase 0] Pre-Rebuild Audit    ████████████████████  100% COMPLETE (b26a965)
+[Phase 1] Foundation           ░░░░░░░░░░░░░░░░░░░░  Not started (awaiting review)
 [Phase 2] Onboarding + Shell   ░░░░░░░░░░░░░░░░░░░░  Not started
 [Phase 3] Dashboard+Chat+Set   ░░░░░░░░░░░░░░░░░░░░  Not started
 [Phase 4] Overlay Windows      ░░░░░░░░░░░░░░░░░░░░  Not started
@@ -59,7 +59,7 @@ Plan: 2 of 2
 | Metric | Target | Current |
 |--------|--------|---------|
 | Requirements mapped | 156/156 | 156/156 ✓ |
-| Phases complete | 10 | 0 |
+| Phases complete | 10 | 1 (Phase 0) |
 | Routes rebuilt | 59 | 0 |
 | Typed wrapper coverage | 764 commands | 0 |
 | HTML entries created | 5 | 2 (index.html, quickask.html) |
@@ -117,19 +117,19 @@ Plan: 2 of 2
 - [x] Audit all `emit_all` calls in `src-tauri/src/` — DONE (00-EMIT-AUDIT.md, 247 sites classified)
 - [x] Document backend contracts (commands, events, WIRE gaps) — DONE (00-BACKEND-EXTRACT.md)
 - [x] Map all 11 prototypes to flow contracts — DONE (00-PROTO-FLOW.md)
-- [ ] Create `.planning/RECOVERY_LOG.md` (Phase 0 Plan 02 — Wave 2 synthesis)
-- [ ] Get Arnav review before Phase 1 begins
+- [x] Create `.planning/RECOVERY_LOG.md` — DONE (Plan 00-02, b26a965, 1178 lines)
+- [ ] Get Arnav review of RECOVERY_LOG.md before Phase 1 begins
 
 ### Blockers
 
-None. Plan 02 (Wave 2 synthesis → RECOVERY_LOG.md) can start immediately.
+None. Phase 1 Foundation is ready to start after Arnav reviews RECOVERY_LOG.md.
 
 ---
 
 ## Session Continuity
 
-**Last session:** 2026-04-18 — GSD executor ran Plan 00-01 (Wave 1 extractions). All 3 artifacts produced and committed (c6957a1).
-**Next action:** Run Plan 00-02 — synthesize BACKEND-EXTRACT.md + EMIT-AUDIT.md + PROTO-FLOW.md into `.planning/RECOVERY_LOG.md`. Then get Arnav sign-off before Phase 1.
+**Last session:** 2026-04-18 — GSD executor ran Plan 00-02 (Wave 2 synthesis). RECOVERY_LOG.md produced and committed (b26a965). Phase 0 complete.
+**Next action:** Arnav reviews `.planning/RECOVERY_LOG.md`. After sign-off, begin Phase 1 Foundation planning.
 **Context cliff notes:**
 
 - Backend is complete (178 Rust modules, 764 commands); this project is frontend only
@@ -138,7 +138,8 @@ None. Plan 02 (Wave 2 synthesis → RECOVERY_LOG.md) can start immediately.
 - WIRE-02: `homeostasis_update` event needs rename to `hormone_update` — Phase 3
 - `src/` is currently the old frontend (not yet nuked); nuke happens at Phase 1 start
 - 156 requirements, 10 phases, all mapped in ROADMAP.md
-- Wave 1 artifacts: `.planning/phases/00-pre-rebuild-audit/` — BACKEND-EXTRACT, EMIT-AUDIT, PROTO-FLOW
+- Phase 0 artifacts: `.planning/RECOVERY_LOG.md` (singular deliverable), `.planning/phases/00-pre-rebuild-audit/` (intermediate extracts)
+- `src.bak/` is the backup of the old `src/` — read-only reference, never import from it
 
 ---
 

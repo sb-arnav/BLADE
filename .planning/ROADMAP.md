@@ -42,7 +42,7 @@ Phase 9: Polish Pass ◄──────────────────�
 
 ## Phases
 
-- [x] **Phase 0: Pre-Rebuild Audit** — No-code reading pass: QuickAsk bridge, orb patterns, event listeners, onboarding wiring. Output: RECOVERY_LOG.md. Gate: Arnav reviews before Phase 1.
+- [x] **Phase 0: Pre-Rebuild Audit** — No-code reading pass: QuickAsk bridge, orb patterns, event listeners, onboarding wiring. Output: RECOVERY_LOG.md. Gate: Arnav reviews before Phase 1. COMPLETE 2026-04-18 (b26a965)
 - [ ] **Phase 1: Foundation** — Design tokens, 8 primitives, typed Tauri wrapper, event hook, route registry, 5 HTML entries, migration ledger, P-01..P-06 gate checks.
 - [ ] **Phase 2: Onboarding + Main Shell** — 3 onboarding screens wired to backend; main shell (TitleBar, Nav, CommandPalette, ToastContext, GlobalOverlays).
 - [ ] **Phase 3: Dashboard + Chat + Settings** — Three parallel workstreams; adds 6 missing Rust events.
@@ -69,7 +69,7 @@ Phase 9: Polish Pass ◄──────────────────�
   5. `emit_all` audit complete — every `app.emit_all(...)` classified as cross-window (keep) or single-window (convert to `emit_to`); proposed `emit_to(label, ...)` replacement inline for every single-window row.
 **Plans**: 2 plans
 - [x] 00-01-PLAN.md — Wave 1: 3 parallel extractions (backend contracts, emit_all classification, prototype flow map) — COMPLETE 2026-04-18 (c6957a1)
-- [ ] 00-02-PLAN.md — Wave 2: synthesize `.planning/RECOVERY_LOG.md` + patch ROADMAP/STATE + commit audit bundle
+- [x] 00-02-PLAN.md — Wave 2: synthesize `.planning/RECOVERY_LOG.md` + patch ROADMAP/STATE + commit audit bundle — COMPLETE 2026-04-18 (b26a965)
 **UI hint**: no
 
 ---
@@ -218,7 +218,7 @@ Phase 9: Polish Pass ◄──────────────────�
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 0. Pre-Rebuild Audit | 0/2 | Not started | - |
+| 0. Pre-Rebuild Audit | 2/2 | Complete | 2026-04-18 (b26a965) |
 | 1. Foundation | 0/TBD | Not started | - |
 | 2. Onboarding + Main Shell | 0/TBD | Not started | - |
 | 3. Dashboard + Chat + Settings | 0/TBD | Not started | - |
