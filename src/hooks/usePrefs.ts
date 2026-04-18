@@ -30,6 +30,23 @@ export interface Prefs {
   'chat.inlineToolCalls'?: boolean;
   /** Ghost Mode: user has acknowledged Linux screen-capture warning. */
   'ghost.linuxWarningAcknowledged'?: boolean;
+  /**
+   * Phase 2 D-57: JSON-encoded array of recent route ids (max 5) surfaced at
+   * the top of CommandPalette when the query is empty. Stored as a string
+   * because the Prefs index signature below is `string | number | boolean
+   * | undefined`; CommandPalette JSON.parse/stringify around this key.
+   *
+   * Alternative considered — widening the index signature to include
+   * `string[]` — rejected: it would ripple typechecks through every Phase 1
+   * consumer of `Prefs[K]`.
+   */
+  'palette.recent'?: string;
+  /**
+   * Phase 2 D-47: set `true` after `deep_scan_start` completes once, so a
+   * returning user does not re-trigger the 12-scanner pass. Phase 3 Settings
+   * "Re-run onboarding" button clears this to force a re-run.
+   */
+  'onboarding.deep_scan_completed'?: boolean;
   /** Forward-compat — other dotted keys accepted as string | number | boolean. */
   [k: string]: string | number | boolean | undefined;
 }
