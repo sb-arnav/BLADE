@@ -178,7 +178,7 @@ pub async fn stream_text(
     messages: &[ConversationMessage],
 ) -> Result<(), String> {
     use futures::StreamExt;
-    use tauri::Emitter;
+    use tauri::{Emitter, Manager};
 
     let client = super::http_client();
     let system = messages.iter().find_map(|m| match m {
@@ -233,7 +233,7 @@ pub async fn stream_text(
                         }
                         if json["type"] == "content_block_delta" {
                             if let Some(text) = json["delta"]["text"].as_str() {
-                                let _ = app.emit("chat_token", text);
+                                let _ = app.emit_to("main", "chat_token", text);
                             }
                         }
                     }
@@ -244,7 +244,7 @@ pub async fn stream_text(
     }.await;
 
     // Always emit chat_done so the frontend never gets stuck in loading state
-    let _ = app.emit("chat_done", ());
+    let _ = app.emit_to("main", "chat_done", ());
     result
 }
 
@@ -258,7 +258,7 @@ pub async fn stream_text_with_thinking(
     budget_tokens: u32,
 ) -> Result<(), String> {
     use futures::StreamExt;
-    use tauri::Emitter;
+    use tauri::{Emitter, Manager};
 
     let client = super::http_client();
     let system = messages.iter().find_map(|m| match m {
@@ -334,18 +334,18 @@ pub async fn stream_text_with_thinking(
                             "content_block_stop" => {
                                 if in_thinking_block {
                                     in_thinking_block = false;
-                                    let _ = app.emit("chat_thinking_done", ());
+                                    let _ = app.emit_to("main", "chat_thinking_done", ());
                                 }
                             }
                             "content_block_delta" => {
                                 let delta_type = json["delta"]["type"].as_str().unwrap_or_default();
                                 if delta_type == "thinking_delta" {
                                     if let Some(text) = json["delta"]["thinking"].as_str() {
-                                        let _ = app.emit("chat_thinking", text);
+                                        let _ = app.emit_to("main", "chat_thinking", text);
                                     }
                                 } else if delta_type == "text_delta" {
                                     if let Some(text) = json["delta"]["text"].as_str() {
-                                        let _ = app.emit("chat_token", text);
+                                        let _ = app.emit_to("main", "chat_token", text);
                                     }
                                 }
                             }
@@ -359,7 +359,7 @@ pub async fn stream_text_with_thinking(
     }.await;
 
     // Always emit chat_done so the frontend never gets stuck in loading state
-    let _ = app.emit("chat_done", ());
+    let _ = app.emit_to("main", "chat_done", ());
     result
 }
 

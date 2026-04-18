@@ -215,7 +215,7 @@ pub async fn stream_text(
     base_url: Option<&str>,
 ) -> Result<(), String> {
     use futures::StreamExt;
-    use tauri::Emitter;
+    use tauri::{Emitter, Manager};
 
     let client = super::http_client();
     let msgs: Vec<serde_json::Value> = messages.iter().filter_map(serialize_simple).collect();
@@ -276,7 +276,7 @@ pub async fn stream_text(
                             return Err(format!("API error during stream: {}", msg));
                         }
                         if let Some(text) = json["choices"][0]["delta"]["content"].as_str() {
-                            let _ = app.emit("chat_token", text);
+                            let _ = app.emit_to("main", "chat_token", text);
                         }
                     }
                 }
@@ -286,7 +286,7 @@ pub async fn stream_text(
     }.await;
 
     // Always emit chat_done so the frontend never gets stuck in loading state
-    let _ = app.emit("chat_done", ());
+    let _ = app.emit_to("main", "chat_done", ());
 
     result
 }
