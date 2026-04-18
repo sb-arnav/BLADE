@@ -2,23 +2,23 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: Phase 0 — Pre-Rebuild Audit
+current_phase: "00-pre-rebuild-audit"
 status: executing
-last_updated: "2026-04-18T07:58:05.538Z"
+last_updated: "2026-04-18T09:00:00.000Z"
 progress:
   total_phases: 10
   completed_phases: 0
   total_plans: 2
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 5
 ---
 
 # STATE — BLADE Skin Rebuild (V1)
 
 **Project:** BLADE Skin Rebuild V1
-**Current Phase:** Phase 0 — Pre-Rebuild Audit
-**Status:** Ready to execute
-**Last Updated:** 2026-04-17
+**Current Phase:** 00-pre-rebuild-audit
+**Status:** Executing Phase 00 — Plan 01 complete, Plan 02 (Wave 2) pending
+**Last Updated:** 2026-04-18
 
 ---
 
@@ -26,19 +26,21 @@ progress:
 
 **Core Value:** Every surface the user touches is coherent, Liquid-Glass-native, and wired end-to-end. No orphan screens, no dead buttons, no stringly-typed invokes that silently fail.
 
-**Current Focus:** Phase 0 — reading only. Document the QuickAsk bridge, voice orb patterns, event listeners, and onboarding wiring from `src.bak/` before a single line of new code is written. Output: `.planning/RECOVERY_LOG.md`.
+**Current Focus:** Phase null
 
 ---
 
 ## Current Position
 
+Phase: 00 — EXECUTING
+Plan: 2 of 2
 **Phase:** 0 — Pre-Rebuild Audit
-**Plan:** None (no plans in Phase 0; it is audit-only)
-**Phase Status:** Not started
+**Plan:** 01 complete (Wave 1 extractions). Plan 02 (Wave 2: RECOVERY_LOG synthesis) — not started.
+**Phase Status:** In progress (50% — 1 of 2 plans complete)
 **Overall Progress:**
 
 ```
-[Phase 0] Pre-Rebuild Audit    ░░░░░░░░░░░░░░░░░░░░  Not started
+[Phase 0] Pre-Rebuild Audit    ██████████░░░░░░░░░░  50% (Plan 01 done)
 [Phase 1] Foundation           ░░░░░░░░░░░░░░░░░░░░  Not started
 [Phase 2] Onboarding + Shell   ░░░░░░░░░░░░░░░░░░░░  Not started
 [Phase 3] Dashboard+Chat+Set   ░░░░░░░░░░░░░░░░░░░░  Not started
@@ -84,6 +86,9 @@ progress:
 - D-14: `emit_to(window_label, ...)` for single-window; `emit_all` for cross-window only
 - D-15: No light theme; single Liquid Glass dark treatment
 - D-16: Token compaction at ratio > 0.65; frontend shows `blade_token_ratio` indicator
+- D-17: src.bak is dead reference — backend + prototypes are canonical audit sources (Phase 0 confirmed)
+- D-18: QuickAsk-voice uses blur(48px) — intentional override; sole backdrop-filter layer on that screen
+- D-19: homeostasis emits `homeostasis_update` (not `hormone_update`) — rename WIRE-02 deferred to Phase 3
 
 ### Phase Gate Requirements (Phase 1 must pass ALL of these)
 
@@ -109,30 +114,32 @@ progress:
 
 ### Active Todos
 
-- [ ] Create `.planning/RECOVERY_LOG.md` (Phase 0 output)
-- [ ] Read `src.bak/src/quickask.tsx` and document bridge contract
-- [ ] Audit `src.bak/` for voice orb, event listeners, onboarding patterns
-- [ ] Audit all `emit_all` calls in `src-tauri/src/`
+- [x] Audit all `emit_all` calls in `src-tauri/src/` — DONE (00-EMIT-AUDIT.md, 247 sites classified)
+- [x] Document backend contracts (commands, events, WIRE gaps) — DONE (00-BACKEND-EXTRACT.md)
+- [x] Map all 11 prototypes to flow contracts — DONE (00-PROTO-FLOW.md)
+- [ ] Create `.planning/RECOVERY_LOG.md` (Phase 0 Plan 02 — Wave 2 synthesis)
 - [ ] Get Arnav review before Phase 1 begins
 
 ### Blockers
 
-None. Phase 0 can start immediately.
+None. Plan 02 (Wave 2 synthesis → RECOVERY_LOG.md) can start immediately.
 
 ---
 
 ## Session Continuity
 
-**Last session:** 2026-04-17 — Roadmap and STATE initialized by `/gsd-roadmapper` agent.
-**Next action:** Start Phase 0 Pre-Rebuild Audit — read `src.bak/src/quickask.tsx`, `src.bak/src/VoiceOrb.tsx` (or equivalent), and audit `emit_all` in Rust. Produce `RECOVERY_LOG.md`.
+**Last session:** 2026-04-18 — GSD executor ran Plan 00-01 (Wave 1 extractions). All 3 artifacts produced and committed (c6957a1).
+**Next action:** Run Plan 00-02 — synthesize BACKEND-EXTRACT.md + EMIT-AUDIT.md + PROTO-FLOW.md into `.planning/RECOVERY_LOG.md`. Then get Arnav sign-off before Phase 1.
 **Context cliff notes:**
 
 - Backend is complete (178 Rust modules, 764 commands); this project is frontend only
-- `src.bak/` is the backup of the old `src/` — read-only reference, never import from it
-- Three HTML files are missing: `overlay.html`, `hud.html`, `ghost_overlay.html` — Rust crashes without them
+- Three HTML files are missing: `overlay.html`, `hud.html`, `ghost_overlay.html` — Rust crashes without them (P-05)
+- WIRE-01: `quickask_submit` command + `blade_quickask_bridged` event missing from Rust — Phase 3 stub
+- WIRE-02: `homeostasis_update` event needs rename to `hormone_update` — Phase 3
 - `src/` is currently the old frontend (not yet nuked); nuke happens at Phase 1 start
 - 156 requirements, 10 phases, all mapped in ROADMAP.md
+- Wave 1 artifacts: `.planning/phases/00-pre-rebuild-audit/` — BACKEND-EXTRACT, EMIT-AUDIT, PROTO-FLOW
 
 ---
 
-*State initialized: 2026-04-17*
+*State initialized: 2026-04-17 | Last updated: 2026-04-18*

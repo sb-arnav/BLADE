@@ -68,7 +68,7 @@ Phase 9: Polish Pass ◄──────────────────�
   4. Onboarding backend wiring documented: `get_onboarding_status`, `complete_onboarding`, `deep_scan_*` call sequence and expected payloads.
   5. `emit_all` audit complete: every `app.emit_all(...)` in `src-tauri/src/` classified as cross-window (keep) or single-window (convert to `emit_to`).
 **Plans**: 2 plans
-- [ ] 00-01-PLAN.md — Wave 1: 3 parallel extractions (backend contracts, emit_all classification, prototype flow map)
+- [x] 00-01-PLAN.md — Wave 1: 3 parallel extractions (backend contracts, emit_all classification, prototype flow map) — COMPLETE 2026-04-18 (c6957a1)
 - [ ] 00-02-PLAN.md — Wave 2: synthesize `.planning/RECOVERY_LOG.md` + patch ROADMAP/STATE + commit audit bundle
 **UI hint**: no
 
