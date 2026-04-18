@@ -1,4 +1,5 @@
 // QuickAsk window bootstrap — Phase 1 foundation
+import '@/styles/index.css';  // Design tokens + Tailwind + glass + typography (FOUND-01)
 // No performance.mark (P-01 applies to Main only).
 import { createRoot } from 'react-dom/client';
 
