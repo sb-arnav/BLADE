@@ -2,23 +2,23 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: "01-foundation"
-status: awaiting-wcag-checkpoint
-last_updated: "2026-04-18T12:00:00.000Z"
+current_phase: "02-onboarding-shell"
+status: awaiting-operator-smoke-checkpoints
+last_updated: "2026-04-18T21:40:00.000Z"
 progress:
   total_phases: 10
   completed_phases: 1
-  total_plans: 11
-  completed_plans: 10
-  percent: 50
+  total_plans: 18
+  completed_plans: 16
+  percent: 60
 ---
 
 # STATE — BLADE Skin Rebuild (V1)
 
 **Project:** BLADE Skin Rebuild V1
-**Current Phase:** 01-foundation (9/9 plans substrate shipped; Plan 09 awaits operator WCAG checkpoint)
-**Status:** Phase 01 SUBSTRATE COMPLETE — 35 commits landed, npm run verify:all passes all 5 automated gates, npx tsc clean. Next: operator performs Plan 09 WCAG checkpoint (npm run tauri dev + 5-wallpaper screenshots + listener-leak e2e + build+verify:html).
-**Last Updated:** 2026-04-18
+**Current Phase:** 02-onboarding-shell (7/7 plans substrate shipped; Plan 02-07 awaits operator smoke + Phase 1 Plan 01-09 WCAG checkpoint still open)
+**Status:** Phases 1 + 2 SUBSTRATE COMPLETE — ~55 commits landed across both phases, npm run verify:all passes all 5 automated gates, npx tsc clean. 2 deferred operator checkpoints queued for next desktop session.
+**Last Updated:** 2026-04-18 21:40 UTC
 
 ---
 
@@ -32,17 +32,17 @@ progress:
 
 ## Current Position
 
-Phase: 01 — SUBSTRATE COMPLETE (WCAG checkpoint pending)
-Plan: 9 of 9 shipped (01-09 Task 4 WCAG checkpoint remains)
-**Phase:** 1 — Foundation
-**Plan:** 01-09 automated tasks complete; final human-verify checkpoint owned by operator
-**Phase Status:** 95% — code substrate + CI gates landed; needs 5-wallpaper screenshot + e2e + build verification pass before marking phase COMPLETE
+Phase: 02 — SUBSTRATE COMPLETE (operator smoke + WCAG checkpoints pending)
+Plan: 16 of 18 shipped (Phase 0 + Phase 1 substrate + Phase 2 substrate); 01-09 Task 4 WCAG + 02-07 Task 2 smoke deferred
+**Phase:** 2 — Onboarding + Main Shell
+**Plan:** 02-07 automated specs complete; operator-smoke checkpoint owned by operator (desktop session required)
+**Phase Status:** 95% — all 7 plans code-complete; needs Playwright run + manual onboarding walk-through + 5-wallpaper WCAG backstop
 **Overall Progress:**
 
 ```
 [Phase 0] Pre-Rebuild Audit    ████████████████████  100% COMPLETE (b26a965)
 [Phase 1] Foundation           ███████████████████░   95% SUBSTRATE SHIPPED (WCAG checkpoint pending)
-[Phase 2] Onboarding + Shell   ░░░░░░░░░░░░░░░░░░░░  Not started
+[Phase 2] Onboarding + Shell   ███████████████████░   95% SUBSTRATE SHIPPED (operator smoke pending)
 [Phase 3] Dashboard+Chat+Set   ░░░░░░░░░░░░░░░░░░░░  Not started
 [Phase 4] Overlay Windows      ░░░░░░░░░░░░░░░░░░░░  Not started
 [Phase 5] Agents + Knowledge   ░░░░░░░░░░░░░░░░░░░░  Not started
