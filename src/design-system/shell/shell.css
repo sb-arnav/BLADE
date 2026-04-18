@@ -1,0 +1,151 @@
+/* src/design-system/shell/shell.css — Shell-scope CSS (Phase 2).
+ *
+ * Plan 02-03 (this file) ships: .titlebar, .tlight*, .titlebar-status*,
+ * .titlebar-hint. Plan 02-05 appends: .navrail*, .palette*. Plan 02-06
+ * appends: .main-shell layout + .global-overlays.
+ *
+ * **Hand-off note (Wave-1 coordination):** This plan deliberately does NOT
+ * modify src/styles/index.css. Plan 02-02 also edits index.css (to add the
+ * toast.css @import) so editing it here would create an intra-wave conflict.
+ * Plan 02-05 owns the append of `@import '../design-system/shell/shell.css';`
+ * to src/styles/index.css — see 02-03-SUMMARY.md for the explicit hand-off.
+ *
+ * Layered on Phase 1 tokens.css + glass.css + primitives.css. Every rule
+ * consumes var(--x) from tokens.css — no hardcoded hex except the three
+ * macOS traffic-light accents (#ff5f57 / #febc2e / #28c840) which are
+ * deliberate system-native colors and would be meaningless as tokens.
+ *
+ * @see .planning/phases/02-onboarding-shell/02-CONTEXT.md §D-54
+ */
+
+/* ── TitleBar ──────────────────────────────────────────────────────────── */
+
+.titlebar {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--title-height);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  padding: 0 10px;
+  background: rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--line);
+  color: var(--t-2);
+  user-select: none;
+  z-index: 500;
+}
+
+.titlebar-traffic {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px;
+}
+
+.tlight {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+  color: rgba(0, 0, 0, 0);
+  font-size: 10px;
+  line-height: 1;
+  transition: color var(--dur-fast) var(--ease-smooth);
+}
+.tlight:hover { color: rgba(0, 0, 0, 0.65); }
+.tlight:focus-visible {
+  outline: 2px solid var(--a-cool);
+  outline-offset: 2px;
+}
+.tlight-close { background: #ff5f57; }
+.tlight-min   { background: #febc2e; }
+.tlight-max   { background: #28c840; }
+
+.titlebar-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 12px;
+  letter-spacing: -0.01em;
+}
+
+.titlebar-brand {
+  color: var(--t-1);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.titlebar-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  background: var(--g-fill);
+  border: 1px solid var(--g-edge-lo);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--t-2);
+}
+
+.titlebar-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--t-3);
+}
+
+.titlebar-status-processing { color: rgba(186, 220, 255, 0.98); }
+.titlebar-status-processing .titlebar-status-dot {
+  background: rgba(96, 165, 250, 0.92);
+  animation: titlebar-pulse 1.2s infinite;
+}
+.titlebar-status-thinking { color: rgba(216, 180, 254, 0.98); }
+.titlebar-status-thinking .titlebar-status-dot {
+  background: rgba(168, 85, 247, 0.92);
+  animation: titlebar-pulse 0.9s infinite;
+}
+.titlebar-status-idle { color: var(--t-3); }
+.titlebar-status-idle .titlebar-status-dot {
+  background: rgba(52, 211, 153, 0.7);
+}
+.titlebar-status-error { color: rgba(254, 202, 202, 0.98); }
+.titlebar-status-error .titlebar-status-dot {
+  background: rgba(248, 113, 113, 0.92);
+}
+
+@keyframes titlebar-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+.titlebar-hint {
+  padding: 0 10px;
+  color: var(--t-3);
+  font-size: 11px;
+}
+.titlebar-hint kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--r-sm);
+  background: var(--g-fill);
+  border: 1px solid var(--g-edge-lo);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--t-2);
+}
