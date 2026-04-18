@@ -519,7 +519,7 @@ pub async fn auto_reply(app: &tauri::AppHandle, platform: &str, message: &str) -
     match platform {
         "zoom" | "teams" | "meet" => {
             // Don't try to type into voice meeting apps — overlay already shows the text
-            let _ = app.emit("ghost_suggestion_ready_to_speak", serde_json::json!({
+            let _ = app.emit_to("ghost_overlay", "ghost_suggestion_ready_to_speak", serde_json::json!({
                 "message": message,
                 "platform": platform
             }));
@@ -623,7 +623,7 @@ async fn run_ghost_loop(app: tauri::AppHandle, state: Arc<Mutex<GhostState>>) {
                     if s.meeting_start_secs.is_some() {
                         s.meeting_start_secs = None;
                         s.current_speaker = None;
-                        let _ = app.emit("ghost_meeting_ended", serde_json::json!({}));
+                        let _ = app.emit_to("ghost_overlay", "ghost_meeting_ended", serde_json::json!({}));
                     }
                 } else {
                     let is_new_meeting = s.platform != current_platform || s.meeting_start_secs.is_none();
@@ -635,7 +635,7 @@ async fn run_ghost_loop(app: tauri::AppHandle, state: Arc<Mutex<GhostState>>) {
                         .map(|start| now_secs.saturating_sub(start))
                         .unwrap_or(0);
                     let speaker_name = s.current_speaker.clone();
-                    let _ = app.emit("ghost_meeting_state", &GhostMeetingState {
+                    let _ = app.emit_to("ghost_overlay", "ghost_meeting_state", &GhostMeetingState {
                         platform: current_platform.clone(),
                         meeting_name: platform_display_name(&current_platform),
                         speaker_name,
@@ -736,7 +736,7 @@ async fn run_ghost_loop(app: tauri::AppHandle, state: Arc<Mutex<GhostState>>) {
                     duration_secs,
                     listening: true,
                 };
-                let _ = app.emit("ghost_meeting_state", &meeting_state);
+                let _ = app.emit_to("ghost_overlay", "ghost_meeting_state", &meeting_state);
             }
         }
 

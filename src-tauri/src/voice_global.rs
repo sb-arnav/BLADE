@@ -111,19 +111,19 @@ pub fn toggle_voice_input(app: &tauri::AppHandle) {
         // Start recording
         IS_RECORDING.store(true, Ordering::SeqCst);
         let _ = crate::voice::voice_start_recording();
-        let _ = app.emit("voice_global_started", ());
+        let _ = app.emit_to("quickask", "voice_global_started", ());
     }
 }
 
 async fn transcribe_and_emit(app: tauri::AppHandle) {
-    let _ = app.emit("voice_global_transcribing", ());
+    let _ = app.emit_to("quickask", "voice_global_transcribing", ());
 
     // Get the audio (WAV bytes as base64)
     let audio_b64 = match crate::voice::voice_stop_recording() {
         Ok(a) => a,
         Err(e) => {
             log::warn!("[voice_global] stop_recording error: {}", e);
-            let _ = app.emit("voice_global_error", e);
+            let _ = app.emit_to("quickask", "voice_global_error", e);
             return;
         }
     };
@@ -138,7 +138,7 @@ async fn transcribe_and_emit(app: tauri::AppHandle) {
             Err(e) => {
                 let msg = format!("Audio decode error: {}", e);
                 log::warn!("[voice_global] {}", msg);
-                let _ = app.emit("voice_global_error", msg);
+                let _ = app.emit_to("quickask", "voice_global_error", msg);
                 return;
             }
         };
@@ -146,14 +146,14 @@ async fn transcribe_and_emit(app: tauri::AppHandle) {
         let samples = crate::voice::audio_bytes_to_f32_approx(&wav_bytes);
         if !crate::whisper_local::is_speech(&samples, crate::whisper_local::DEFAULT_VAD_THRESHOLD) {
             log::debug!("[voice_global] VAD: silence, skipping");
-            let _ = app.emit("voice_global_error", "No speech detected");
+            let _ = app.emit_to("quickask", "voice_global_error", "No speech detected");
             return;
         }
         match crate::whisper_local::transcribe_audio(&wav_bytes).await {
             Ok(t) => t,
             Err(e) => {
                 log::warn!("[voice_global] local transcription error: {}", e);
-                let _ = app.emit("voice_global_error", e);
+                let _ = app.emit_to("quickask", "voice_global_error", e);
                 return;
             }
         }
@@ -163,14 +163,14 @@ async fn transcribe_and_emit(app: tauri::AppHandle) {
             Ok(t) => t,
             Err(e) => {
                 log::warn!("[voice_global] transcription error: {}", e);
-                let _ = app.emit("voice_global_error", e);
+                let _ = app.emit_to("quickask", "voice_global_error", e);
                 return;
             }
         }
     };
 
     if text.trim().is_empty() {
-        let _ = app.emit("voice_global_error", "No speech detected");
+        let _ = app.emit_to("quickask", "voice_global_error", "No speech detected");
         return;
     }
 
@@ -181,7 +181,7 @@ async fn transcribe_and_emit(app: tauri::AppHandle) {
         let _ = win.set_focus();
     }
 
-    let _ = app.emit("voice_transcript_ready", serde_json::json!({ "text": text }));
+    let _ = app.emit_to("quickask", "voice_transcript_ready", serde_json::json!({ "text": text }));
     log::info!("[voice_global] transcript: {}", crate::safe_slice(&text, 80));
 }
 
@@ -489,7 +489,7 @@ async fn run_conversation_loop(app: tauri::AppHandle) -> Result<(), String> {
                             let (lang, is_foreign) = crate::voice_intelligence::detect_non_english(&trimmed).await;
                             if is_foreign {
                                 log::info!("[voice_conv] non-English detected: {}", lang);
-                                let _ = app.emit("voice_language_detected", serde_json::json!({
+                                let _ = app.emit_to("main", "voice_language_detected", serde_json::json!({
                                     "language": &lang,
                                 }));
                             }
@@ -660,7 +660,7 @@ async fn save_voice_session_to_history(
         }
     }).await;
 
-    let _ = app.emit("voice_session_saved", serde_json::json!({
+    let _ = app.emit_to("main", "voice_session_saved", serde_json::json!({
         "conversation_id": conversation_id,
         "turn_count": turn_count,
     }));
@@ -764,7 +764,7 @@ async fn process_voice_turn_with_history(
                 _ => None, // Skip system/tool/image messages — voice conv history is text-only
             }
         }).collect();
-        let _ = app_send.emit("voice_chat_submit", serde_json::json!({
+        let _ = app_send.emit_to("main", "voice_chat_submit", serde_json::json!({
             "content": user_text_owned,
             "voice_mode": true,
             "history": history_json,

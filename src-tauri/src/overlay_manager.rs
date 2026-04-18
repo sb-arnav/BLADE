@@ -248,8 +248,8 @@ pub fn start_hud_update_loop(app: tauri::AppHandle) {
                 let _ = hud.emit("hud_update", &data);
             }
 
-            // Also emit to main window so Dashboard can reflect HUD state
-            let _ = app.emit("hud_data_updated", &data);
+            // Also emit to HUD window so dashboard-in-HUD can reflect state
+            let _ = app.emit_to("hud", "hud_data_updated", &data);
         }
     });
 }
@@ -288,8 +288,8 @@ pub fn overlay_update_hud(app: tauri::AppHandle, data: HudData) -> Result<(), St
     if let Some(w) = app.get_webview_window("blade_hud") {
         let _ = w.emit("hud_update", &data);
     }
-    // Also broadcast so other windows can react
-    let _ = app.emit("hud_data_updated", &data);
+    // Also broadcast to HUD window
+    let _ = app.emit_to("hud", "hud_data_updated", &data);
     Ok(())
 }
 
