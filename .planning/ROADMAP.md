@@ -87,7 +87,17 @@ Phase 9: Polish Pass ◄──────────────────�
   6. `.planning/migration-ledger.md` lists all 59 routes from `src.bak/` with status, target component, and destination phase. (Addresses P-03.)
   7. WCAG 4.5:1 contrast verified on 5 representative macOS wallpapers using the tokens from `src/styles/tokens.css`. (Addresses P-08.)
 **Notes**: Gate checks P-01..P-06 are explicit pass/fail, not best-effort. Phase does not close until all 7 criteria are verified.
-**Plans**: TBD
+**Plans**: 9 plans
+Plans:
+- [ ] 01-01-PLAN.md — Nuke src/ + 5 HTML entries + 5 window bootstraps (WIN-01..07, P-05 gate setup)
+- [ ] 01-02-PLAN.md — Design tokens + glass/motion/layout + typography + self-hosted WOFF2 fonts (FOUND-01, P-01 cap)
+- [ ] 01-03-PLAN.md — invokeTyped base + TauriError + BladeConfig/ChatMessage types (FOUND-03, P-04 prevention)
+- [ ] 01-04-PLAN.md — 8 primitives + ComingSoonSkeleton + primitives.css (FOUND-02, D-07 cap enforcement)
+- [ ] 01-05-PLAN.md — config.ts + chat.ts typed wrappers with Rust JSDoc cites (FOUND-04)
+- [ ] 01-06-PLAN.md — BLADE_EVENTS registry + useTauriEvent hook + payload types (FOUND-05, FOUND-06, P-06 prevention)
+- [ ] 01-07-PLAN.md — RouteDefinition + 13 feature index stubs (~81 routes) + router aggregator + usePrefs + ConfigContext (FOUND-07..10)
+- [ ] 01-08-PLAN.md — Migration ledger seed script + WIRE-08 emit_all → emit_to refactor (FOUND-11, WIRE-08)
+- [ ] 01-09-PLAN.md — 6 verify scripts + ESLint rule + 3 dev surfaces + Playwright harness + CI wiring + P-08 WCAG checkpoint (WIN-09, all gate verification)
 **UI hint**: yes
 
 ---
