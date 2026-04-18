@@ -1,4 +1,5 @@
 // Overlay window (Voice Orb) bootstrap — Phase 1 foundation
+import '@/styles/index.css';  // Design tokens + Tailwind + glass + typography (FOUND-01)
 // Rust creation site: src-tauri/src/lib.rs:349-366 — this file stops the panic.
 import { createRoot } from 'react-dom/client';
 
