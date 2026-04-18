@@ -2,7 +2,7 @@ use super::{Agent, AgentStatus, StepStatus};
 use crate::mcp::McpManager;
 use crate::providers::{self, ChatMessage};
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::Mutex;
 
 /// Maximum number of retry attempts per step (including the first attempt).
@@ -96,8 +96,7 @@ pub async fn execute_next_step(
     let goal = agent.goal.clone();
 
     // Emit progress
-    let _ = app.emit(
-        "agent_step_started",
+    let _ = app.emit_to("main", "agent_step_started",
         serde_json::json!({
             "agent_id": &agent_id,
             "step_id": &step_id,
@@ -175,8 +174,7 @@ pub async fn execute_next_step(
 
         // Emit a retry event on subsequent real attempts so the UI can show it.
         if real_attempts > 0 {
-            let _ = app.emit(
-                "agent_step_retrying",
+            let _ = app.emit_to("main", "agent_step_retrying",
                 serde_json::json!({
                     "agent_id": &agent_id,
                     "step_id": &step_id,
@@ -237,8 +235,7 @@ pub async fn execute_next_step(
                             active_tool = Some(fb_tool.to_string());
                             active_args = Some(fb_args);
                             tool_fallback_used = true;
-                            let _ = app.emit(
-                                "agent_step_tool_fallback",
+                            let _ = app.emit_to("main", "agent_step_tool_fallback",
                                 serde_json::json!({
                                     "agent_id": &agent_id,
                                     "step_id": &step_id,
@@ -262,8 +259,7 @@ pub async fn execute_next_step(
                 // Also does NOT consume a real attempt.
                 if is_llm_error && provider_idx < fallback_providers.len() {
                     provider_idx += 1;
-                    let _ = app.emit(
-                        "agent_step_provider_fallback",
+                    let _ = app.emit_to("main", "agent_step_provider_fallback",
                         serde_json::json!({
                             "agent_id": &agent_id,
                             "step_id": &step_id,
@@ -310,8 +306,7 @@ pub async fn execute_next_step(
         )
         .await;
         // Emit a warning but treat as a soft success so dependent tasks can still run
-        let _ = app.emit(
-            "agent_step_partial",
+        let _ = app.emit_to("main", "agent_step_partial",
             serde_json::json!({
                 "agent_id": &agent_id,
                 "step_id": &step_id,
@@ -332,8 +327,7 @@ pub async fn execute_next_step(
         agent.steps[idx].status = StepStatus::Completed;
         agent.steps[idx].result = Some(final_output.clone());
 
-        let _ = app.emit(
-            "agent_step_completed",
+        let _ = app.emit_to("main", "agent_step_completed",
             serde_json::json!({
                 "agent_id": &agent_id,
                 "step_id": &step_id,
@@ -346,8 +340,7 @@ pub async fn execute_next_step(
         agent.steps[idx].status = StepStatus::Failed;
         agent.steps[idx].result = Some(last_error.clone());
 
-        let _ = app.emit(
-            "agent_step_failed",
+        let _ = app.emit_to("main", "agent_step_failed",
             serde_json::json!({
                 "agent_id": &agent_id,
                 "step_id": &step_id,

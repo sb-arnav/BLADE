@@ -116,9 +116,9 @@ fn queue_proactive_task(app: &tauri::AppHandle, suggestion: &str, category: &str
         }
     }
 
-    let _ = app.emit("proactive_suggestion", &task);
+    let _ = app.emit_to("main", "proactive_suggestion", &task);
     // Also feed the dashboard alerts panel
-    let _ = app.emit("proactive_task_added", &task);
+    let _ = app.emit_to("main", "proactive_task_added", &task);
 }
 
 #[tauri::command]
@@ -212,7 +212,7 @@ pub fn start_god_mode(app: tauri::AppHandle, tier: &str) {
             if tier == "extreme" {
                 if let Some(understanding) = screen_vision_snapshot() {
                     // Notify HUD: screenshot was taken (camera blink + screen flash)
-                    let _ = app.emit("screenshot_taken", ());
+                    let _ = app.emit_to("main", "screenshot_taken", ());
                     // Append vision context to the brief file
                     let path = crate::config::blade_config_dir().join("godmode_context.md");
                     if let Ok(mut contents) = std::fs::read_to_string(&path) {

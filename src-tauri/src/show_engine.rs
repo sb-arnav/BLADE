@@ -21,7 +21,7 @@
 
 use serde::{Deserialize, Serialize};
 use rusqlite::params;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShowPattern {
@@ -184,7 +184,7 @@ pub async fn trigger_auto_show(app: &tauri::AppHandle, trigger: &str) {
             _ => pattern.content_query.clone(),
         };
 
-        let _ = app.emit("blade_auto_show", serde_json::json!({
+        let _ = app.emit_to("main", "blade_auto_show", serde_json::json!({
             "trigger": trigger,
             "show_type": pattern.show_type,
             "content_query": pattern.content_query,

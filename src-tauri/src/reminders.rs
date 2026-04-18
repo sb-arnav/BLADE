@@ -10,7 +10,7 @@
 
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // ── DB helpers ────────────────────────────────────────────────────────────────
 
@@ -299,8 +299,8 @@ If there is NO clear reminder intent, respond with exactly: null"#,
     match reminder_add_natural(title.clone(), note, time_expr) {
         Ok(id) => {
             // Silently emit so UI can surface a toast — don't interrupt with TTS
-            use tauri::Emitter;
-            let _ = app.emit("blade_reminder_created", serde_json::json!({
+            use tauri::{Emitter, Manager};
+            let _ = app.emit_to("main", "blade_reminder_created", serde_json::json!({
                 "id": &id,
                 "title": &title,
                 "source": "auto_extract",

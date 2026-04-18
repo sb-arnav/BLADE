@@ -14,7 +14,7 @@ use chrono::{Local, Timelike};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use uuid::Uuid;
 
 // ── Structs ───────────────────────────────────────────────────────────────────
@@ -413,8 +413,7 @@ pub async fn daily_health_nudge(app: tauri::AppHandle) {
 
     // Past 9pm and no log yet — remind the user to log
     if hour >= 21 && today_log.is_none() {
-        let _ = app.emit(
-            "blade_health_nudge",
+        let _ = app.emit_to("main", "blade_health_nudge",
             serde_json::json!({
                 "type": "missing_log",
                 "message": "Hey — you haven't logged your health today. Takes 30 seconds. How did you sleep, how's your energy?"
@@ -448,8 +447,7 @@ pub async fn daily_health_nudge(app: tauri::AppHandle) {
 
         if let Some(sleep_h) = yesterday_sleep {
             if sleep_h < 6.0 {
-                let _ = app.emit(
-                    "blade_health_nudge",
+                let _ = app.emit_to("main", "blade_health_nudge",
                     serde_json::json!({
                         "type": "poor_sleep_alert",
                         "sleep_hours": sleep_h,
@@ -468,8 +466,7 @@ pub async fn daily_health_nudge(app: tauri::AppHandle) {
         let low_energy = log.energy_level.map(|e| e <= 4).unwrap_or(false);
         let low_mood = log.mood.map(|m| m <= 4).unwrap_or(false);
         if low_energy || low_mood {
-            let _ = app.emit(
-                "blade_health_nudge",
+            let _ = app.emit_to("main", "blade_health_nudge",
                 serde_json::json!({
                     "type": "low_energy_day",
                     "energy": log.energy_level,

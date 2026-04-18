@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use rusqlite::params;
 
 // ---------------------------------------------------------------------------
@@ -789,7 +789,7 @@ pub async fn proactive_suggestion(app: &tauri::AppHandle) {
 
                 match outcome {
                     crate::decision_gate::DecisionOutcome::ActAutonomously { action, .. } => {
-                        let _ = app.emit("blade_reflex", serde_json::json!({
+                        let _ = app.emit_to("main", "blade_reflex", serde_json::json!({
                             "prediction": pred.prediction,
                             "action": action,
                             "confidence": pred.confidence,
@@ -798,7 +798,7 @@ pub async fn proactive_suggestion(app: &tauri::AppHandle) {
                     }
                     _ => {
                         // Decision gate said don't act autonomously — fall back to suggestion
-                        let _ = app.emit("blade_suggestion", serde_json::json!({
+                        let _ = app.emit_to("main", "blade_suggestion", serde_json::json!({
                             "prediction": pred.prediction,
                             "confidence": pred.confidence,
                             "context": pred.context,
@@ -808,8 +808,7 @@ pub async fn proactive_suggestion(app: &tauri::AppHandle) {
                     }
                 }
             } else {
-                let _ = app.emit(
-                    "blade_suggestion",
+                let _ = app.emit_to("main", "blade_suggestion",
                     serde_json::json!({
                         "prediction": pred.prediction,
                         "confidence": pred.confidence,

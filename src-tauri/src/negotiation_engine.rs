@@ -9,7 +9,7 @@
 
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // ── Structs ──────────────────────────────────────────────────────────────────
 
@@ -516,7 +516,7 @@ pub async fn debate_round(
     save_debate_session(&session)?;
 
     // Emit event with round data
-    let _ = app.emit("blade_debate_update", serde_json::json!({
+    let _ = app.emit_to("main", "blade_debate_update", serde_json::json!({
         "session_id": session_id,
         "round_num": round_num,
         "round": round

@@ -13,7 +13,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::UNIX_EPOCH;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Child;
 use tokio::sync::Mutex;
@@ -2858,8 +2858,7 @@ fn emit_runtime_state(
     session_id: Option<&str>,
     error: Option<&str>,
 ) {
-    let _ = app.emit(
-        "runtime_state_changed",
+    let _ = app.emit_to("main", "runtime_state_changed",
         serde_json::json!({
             "taskId": task_id,
             "runtimeId": runtime_id,
@@ -2881,8 +2880,7 @@ fn emit_runtime_message(
     content: String,
     metadata: Value,
 ) {
-    let _ = app.emit(
-        "runtime_message",
+    let _ = app.emit_to("main", "runtime_message",
         serde_json::json!({
             "taskId": task_id,
             "runtimeId": runtime_id,
@@ -2904,8 +2902,7 @@ fn emit_task_checkpoint(
     detail: &str,
     status: &str,
 ) {
-    let _ = app.emit(
-        "task_checkpoint",
+    let _ = app.emit_to("main", "task_checkpoint",
         serde_json::json!({
             "taskId": task_id,
             "runtimeId": runtime_id,
@@ -2929,8 +2926,7 @@ fn emit_task_done(
     summary: Option<&str>,
     error: Option<&str>,
 ) {
-    let _ = app.emit(
-        "task_done",
+    let _ = app.emit_to("main", "task_done",
         serde_json::json!({
             "taskId": task_id,
             "runtimeId": runtime_id,
@@ -3353,8 +3349,7 @@ async fn spawn_runtime_process(
 
         // Emit agent_completed with the rich summary so the frontend / chat pipeline
         // can inject it into the current conversation thread.
-        let _ = app_wait.emit(
-            "agent_completed",
+        let _ = app_wait.emit_to("main", "agent_completed",
             serde_json::json!({
                 "id": task_id_wait,
                 "runtime_id": runtime_id_wait,

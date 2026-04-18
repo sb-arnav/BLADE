@@ -62,13 +62,13 @@ pub fn create_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
             "reminders" => {
                 // Show BLADE window and emit event to open reminders panel
                 crate::toggle_window(&handle);
-                use tauri::Emitter;
-                let _ = handle.emit("open_settings_tab", "integrations");
+                use tauri::{Emitter, Manager};
+                let _ = handle.emit_to("main", "open_settings_tab", "integrations");
             }
             "screenshot" => {
-                use tauri::Emitter;
+                use tauri::{Emitter, Manager};
                 crate::toggle_window(&handle);
-                let _ = handle.emit("tray_screenshot_requested", ());
+                let _ = handle.emit_to("main", "tray_screenshot_requested", ());
             }
             _ => {}
         })

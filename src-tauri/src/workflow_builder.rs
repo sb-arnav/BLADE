@@ -12,7 +12,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // ── Static guard ─────────────────────────────────────────────────────────────
 
@@ -463,7 +463,7 @@ async fn execute_node(
                 "title": title,
                 "message": message,
             });
-            app.emit("blade_workflow_notification", &payload)
+            app.emit_to("main", "blade_workflow_notification", &payload)
                 .map_err(|e| format!("notify node emit error: {}", e))?;
 
             Ok(format!("Notified: {}", crate::safe_slice(&message, 100)))

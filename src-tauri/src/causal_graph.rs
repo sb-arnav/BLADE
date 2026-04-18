@@ -14,7 +14,7 @@
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // ─── Structs ─────────────────────────────────────────────────────────────────
 
@@ -597,7 +597,7 @@ pub async fn run_causal_analysis(app: &tauri::AppHandle) {
     }
 
     // Emit count to frontend
-    let _ = app.emit("causal_insights", serde_json::json!({ "count": total }));
+    let _ = app.emit_to("main", "causal_insights", serde_json::json!({ "count": total }));
 }
 
 // ─── start_causal_engine ──────────────────────────────────────────────────────

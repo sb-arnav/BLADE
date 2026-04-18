@@ -19,7 +19,7 @@ use crate::db::{skill_candidate_delete, skill_candidate_record, skill_candidates
 use crate::providers::ConversationMessage;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 const SKILL_SYNTHESIS_THRESHOLD: i64 = 3;
 const MAX_ACTIVE_SKILLS: usize = 10;
@@ -97,7 +97,7 @@ pub async fn maybe_synthesize_skills(app: tauri::AppHandle) {
                 // Delete the raw candidate — it's been promoted
                 let _ = skill_candidate_delete(&conn, candidate.id);
 
-                let _ = app.emit("skill_learned", serde_json::json!({
+                let _ = app.emit_to("main", "skill_learned", serde_json::json!({
                     "name": skill.name,
                     "trigger_pattern": skill.trigger_pattern,
                 }));

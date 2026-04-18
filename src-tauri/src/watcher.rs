@@ -17,7 +17,7 @@ use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // ── Row type ──────────────────────────────────────────────────────────────────
 
@@ -209,8 +209,7 @@ pub fn start_watcher_loop(app: tauri::AppHandle) {
                     let alert = format!("Change detected: {}\n\n{}", label, summary);
 
                     // Emit to frontend
-                    let _ = app.emit(
-                        "watcher_alert",
+                    let _ = app.emit_to("main", "watcher_alert",
                         serde_json::json!({
                             "watcher_id": &w.id,
                             "url": &w.url,

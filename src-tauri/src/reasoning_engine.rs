@@ -10,7 +10,7 @@
 
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // ── Structs ────────────────────────────────────────────────────────────────────
 
@@ -642,8 +642,7 @@ pub async fn reason_through(
         steps.push(step.clone());
 
         // Emit event so the frontend can show live progress
-        let _ = app.emit(
-            "blade_reasoning_step",
+        let _ = app.emit_to("main", "blade_reasoning_step",
             &StepEvent {
                 trace_id: trace_id.clone(),
                 step: step.clone(),
@@ -665,8 +664,7 @@ pub async fn reason_through(
         critiques: vec![],
         revised: None,
     };
-    let _ = app.emit(
-        "blade_reasoning_step",
+    let _ = app.emit_to("main", "blade_reasoning_step",
         &StepEvent {
             trace_id: trace_id.clone(),
             step: conclude_step.clone(),

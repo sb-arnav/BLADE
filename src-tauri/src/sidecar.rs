@@ -14,7 +14,7 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // ---------------------------------------------------------------------------
 // Public data types
@@ -357,7 +357,7 @@ pub async fn check_all_devices(app: &tauri::AppHandle) {
         }
     }
 
-    let _ = app.emit("sidecar_status_update", &statuses);
+    let _ = app.emit_to("main", "sidecar_status_update", &statuses);
 }
 
 // ---------------------------------------------------------------------------

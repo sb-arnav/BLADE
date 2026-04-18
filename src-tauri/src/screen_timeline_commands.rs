@@ -2,6 +2,7 @@
 
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine as _;
+use tauri::Manager;
 
 use crate::screen_timeline::{
     ScreenTimelineEntry, TimelineConfig, TimelineStats,
@@ -172,7 +173,7 @@ pub fn timeline_set_audio_capture(app: tauri::AppHandle, enabled: bool) -> Resul
         crate::audio_timeline::start_audio_timeline_capture(app);
     } else {
         use tauri::Emitter;
-        let _ = app.emit("audio_capture_state", serde_json::json!({ "active": false }));
+        let _ = app.emit_to("main", "audio_capture_state", serde_json::json!({ "active": false }));
     }
     Ok(())
 }

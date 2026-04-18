@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
+use tauri::Manager;
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -604,8 +605,7 @@ pub async fn fix_and_rerun(
     };
 
     for iteration in 0..MAX_FIX_ITERATIONS {
-        let _ = app.emit(
-            "sandbox_fix_progress",
+        let _ = app.emit_to("main", "sandbox_fix_progress",
             serde_json::json!({
                 "iteration": iteration + 1,
                 "max": MAX_FIX_ITERATIONS,
@@ -635,8 +635,7 @@ Return only the fixed code:"#,
         // Strip any accidental markdown code fences
         let fixed_code = strip_code_fences(turn.content.trim());
 
-        let _ = app.emit(
-            "sandbox_fix_progress",
+        let _ = app.emit_to("main", "sandbox_fix_progress",
             serde_json::json!({
                 "iteration": iteration + 1,
                 "max": MAX_FIX_ITERATIONS,
@@ -647,8 +646,7 @@ Return only the fixed code:"#,
         let result = run_code(&lang, &fixed_code, DEFAULT_TIMEOUT_SECS).await?;
 
         if result.success {
-            let _ = app.emit(
-                "sandbox_fix_progress",
+            let _ = app.emit_to("main", "sandbox_fix_progress",
                 serde_json::json!({
                     "iteration": iteration + 1,
                     "max": MAX_FIX_ITERATIONS,

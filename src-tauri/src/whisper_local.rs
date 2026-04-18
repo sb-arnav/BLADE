@@ -9,6 +9,7 @@
 use base64::Engine;
 use std::fs;
 use std::path::PathBuf;
+use tauri::Manager;
 
 // --- Model definitions -------------------------------------------------------
 
@@ -356,12 +357,12 @@ pub async fn whisper_download_model(app: tauri::AppHandle, model_name: Option<St
         return Ok(format!("Model '{}' already downloaded.", name));
     }
 
-    let _ = app.emit("whisper_download_started", serde_json::json!({ "model": name }));
+    let _ = app.emit_to("main", "whisper_download_started", serde_json::json!({ "model": name }));
 
     let result = ensure_model_downloaded(&name).await?;
     let size_mb = fs::metadata(&result).map(|m| m.len()).unwrap_or(0) / 1_000_000;
 
-    let _ = app.emit("whisper_download_complete", serde_json::json!({
+    let _ = app.emit_to("main", "whisper_download_complete", serde_json::json!({
         "model": name,
         "size_mb": size_mb,
     }));

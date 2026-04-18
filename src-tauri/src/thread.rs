@@ -13,7 +13,7 @@
 /// always visible, limited in size so it forces prioritization.
 #[allow(dead_code)]
 
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use crate::providers::ConversationMessage;
 
 const THREAD_MAX_WORDS: usize = 200;
@@ -89,7 +89,7 @@ pub fn auto_update_thread(app: tauri::AppHandle, user_msg: String, assistant_msg
 
                 if !content.trim().is_empty() {
                     if let Ok(()) = write_thread(&title, &content, &project) {
-                        let _ = app.emit("thread_updated", serde_json::json!({
+                        let _ = app.emit_to("main", "thread_updated", serde_json::json!({
                             "title": title,
                             "project": project,
                         }));

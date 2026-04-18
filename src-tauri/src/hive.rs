@@ -2301,8 +2301,7 @@ pub async fn hive_tick(app: &AppHandle) {
                 }
 
                 // Emit health event so HiveView can show the degraded state
-                let _ = app.emit(
-                    "tentacle_error",
+                let _ = app.emit_to("main", "tentacle_error",
                     serde_json::json!({
                         "tentacle_id": tid,
                         "platform": platform,
@@ -2507,8 +2506,7 @@ pub async fn hive_tick(app: &AppHandle) {
             None
         };
 
-        let _ = app.emit(
-            "hive_ci_failure",
+        let _ = app.emit_to("main", "hive_ci_failure",
             serde_json::json!({
                 "repo": repo,
                 "failing_jobs": failing_jobs,
@@ -2529,8 +2527,7 @@ pub async fn hive_tick(app: &AppHandle) {
         // Wire AutoFixCard: emit the event it listens for so the card activates in the UI.
         // AutoFixCard.tsx listens on "hive_auto_fix_started" and drives the pipeline UI.
         let run_id_val = failure.details.get("run_id").and_then(|v| v.as_u64()).unwrap_or(0);
-        let _ = app.emit(
-            "hive_auto_fix_started",
+        let _ = app.emit_to("main", "hive_auto_fix_started",
             serde_json::json!({
                 "repo_path": repo,
                 "workflow_name": failing_jobs,
@@ -2603,8 +2600,7 @@ pub async fn hive_tick(app: &AppHandle) {
     let _ = app.emit("hive_tick", &status);
 
     if !to_queue.is_empty() {
-        let _ = app.emit(
-            "hive_pending_decisions",
+        let _ = app.emit_to("main", "hive_pending_decisions",
             serde_json::json!({
                 "count": to_queue.len(),
                 "decisions": to_queue
@@ -2687,7 +2683,7 @@ async fn execute_decision(app: &AppHandle, decision: &Decision) {
     match decision {
         Decision::Inform { summary } => {
             log::debug!("[Hive] Inform: {}", summary);
-            let _ = app.emit("hive_inform", serde_json::json!({ "summary": summary }));
+            let _ = app.emit_to("main", "hive_inform", serde_json::json!({ "summary": summary }));
             // Show engine: surface info if user trained BLADE to show it
             let app_show = app.clone();
             let summary_clone = summary.clone();
@@ -2724,8 +2720,7 @@ async fn execute_decision(app: &AppHandle, decision: &Decision) {
             let app_clone = app.clone();
             tokio::spawn(async move {
                 let sent = try_send_reply(&app_clone, &platform_clone, &to_clone, &draft_clone).await;
-                let _ = app_clone.emit(
-                    "hive_action",
+                let _ = app_clone.emit_to("main", "hive_action",
                     serde_json::json!({
                         "type": "reply",
                         "platform": platform_clone,
@@ -2765,8 +2760,7 @@ async fn execute_decision(app: &AppHandle, decision: &Decision) {
                     platform,
                     crate::safe_slice(action, 60)
                 );
-                let _ = app.emit(
-                    "hive_action_deferred",
+                let _ = app.emit_to("main", "hive_action_deferred",
                     serde_json::json!({
                         "type": "act",
                         "platform": platform,
@@ -2783,8 +2777,7 @@ async fn execute_decision(app: &AppHandle, decision: &Decision) {
                 reversible
             );
             log_hive_action(platform, action);
-            let _ = app.emit(
-                "hive_action",
+            let _ = app.emit_to("main", "hive_action",
                 serde_json::json!({
                     "type": "act",
                     "platform": platform,
@@ -2817,8 +2810,7 @@ async fn execute_decision(app: &AppHandle, decision: &Decision) {
         }
         Decision::Escalate { reason, context } => {
             log::warn!("[Hive] Escalate: {}", reason);
-            let _ = app.emit(
-                "hive_escalate",
+            let _ = app.emit_to("main", "hive_escalate",
                 serde_json::json!({
                     "reason": reason,
                     "context": context

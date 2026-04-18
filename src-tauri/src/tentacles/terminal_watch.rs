@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 // ── Static state ──────────────────────────────────────────────────────────────
 
@@ -617,8 +617,7 @@ fn tick_terminal_watcher(app: &AppHandle) {
     for (i, cmd) in new_cmds.iter().enumerate() {
         let class = classify_command(cmd);
 
-        let _ = app.emit(
-            "terminal_new_command",
+        let _ = app.emit_to("main", "terminal_new_command",
             serde_json::json!({
                 "command": cmd,
                 "class": class,
@@ -628,8 +627,7 @@ fn tick_terminal_watcher(app: &AppHandle) {
 
         // Better command suggestion
         if let Some(suggestion) = suggest_better_command(cmd) {
-            let _ = app.emit(
-                "proactive_suggestion",
+            let _ = app.emit_to("main", "proactive_suggestion",
                 serde_json::json!({
                     "source": "terminal_watch",
                     "title": "Better command available",
@@ -642,8 +640,7 @@ fn tick_terminal_watcher(app: &AppHandle) {
         // Intent understanding — what is the user trying to do?
         let intent = infer_intent(cmd);
         if let Some(intent_hint) = intent_suggestion(&intent, cmd) {
-            let _ = app.emit(
-                "proactive_suggestion",
+            let _ = app.emit_to("main", "proactive_suggestion",
                 serde_json::json!({
                     "source": "terminal_watch",
                     "title": "I noticed what you're doing",
@@ -659,8 +656,7 @@ fn tick_terminal_watcher(app: &AppHandle) {
             detect_loop_pattern(&state.recent_commands, cmd, 600, 3)
         };
         if let Some(msg) = loop_msg {
-            let _ = app.emit(
-                "proactive_suggestion",
+            let _ = app.emit_to("main", "proactive_suggestion",
                 serde_json::json!({
                     "source": "terminal_watch",
                     "title": "Possible loop detected",
@@ -675,8 +671,7 @@ fn tick_terminal_watcher(app: &AppHandle) {
             track_build_failure(&mut state.build_failures, cmd, ts)
         };
         if let Some(alert) = build_alert {
-            let _ = app.emit(
-                "proactive_suggestion",
+            let _ = app.emit_to("main", "proactive_suggestion",
                 serde_json::json!({
                     "source": "terminal_watch",
                     "title": "Repeated build failure",
@@ -709,8 +704,7 @@ fn tick_terminal_watcher(app: &AppHandle) {
             check_workflow_deviation(&state.workflow_patterns, &state.recent_commands, cmd)
         };
         if let Some(reminder) = workflow_reminder {
-            let _ = app.emit(
-                "proactive_suggestion",
+            let _ = app.emit_to("main", "proactive_suggestion",
                 serde_json::json!({
                     "source": "terminal_watch",
                     "title": "Workflow pattern deviation",
@@ -736,8 +730,7 @@ fn tick_terminal_watcher(app: &AppHandle) {
                 let mut state = watcher_state().lock().unwrap();
                 state.last_sequence_hint = Some(hint.clone());
             }
-            let _ = app.emit(
-                "proactive_suggestion",
+            let _ = app.emit_to("main", "proactive_suggestion",
                 serde_json::json!({
                     "source": "terminal_watch",
                     "title": "Command sequence detected",
@@ -755,8 +748,7 @@ fn tick_terminal_watcher(app: &AppHandle) {
     let retries = detect_retries(&new_cmds);
     for (cmd, fix) in retries {
         if let Some(fix_str) = fix {
-            let _ = app.emit(
-                "proactive_suggestion",
+            let _ = app.emit_to("main", "proactive_suggestion",
                 serde_json::json!({
                     "source": "terminal_watch",
                     "title": "Retry detected — better approach?",
@@ -765,8 +757,7 @@ fn tick_terminal_watcher(app: &AppHandle) {
                 }),
             );
         } else {
-            let _ = app.emit(
-                "proactive_suggestion",
+            let _ = app.emit_to("main", "proactive_suggestion",
                 serde_json::json!({
                     "source": "terminal_watch",
                     "title": "Retry detected",

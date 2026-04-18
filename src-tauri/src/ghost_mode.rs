@@ -804,8 +804,8 @@ async fn run_ghost_loop(app: tauri::AppHandle, state: Arc<Mutex<GhostState>>) {
                         timestamp_ms: now_ms,
                     };
 
-                    // Emit to main window and all overlays
-                    let _ = app_clone.emit("ghost_suggestion", &suggestion);
+                    // Emit to main window; HUD + overlay get explicit emits below
+                    let _ = app_clone.emit_to("main", "ghost_suggestion", &suggestion);
 
                     // Push to HUD bar so it can show the response card
                     if let Some(hud) = app_clone.get_webview_window("blade_hud") {

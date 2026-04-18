@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use chrono::Datelike;
 
 // ── Static state ──────────────────────────────────────────────────────────────
@@ -438,8 +438,7 @@ fn tick_filesystem_watcher(app: &AppHandle) {
         // Sensitive file detection — check BEFORE categorising
         if is_sensitive_file(&file_path) {
             let safe_loc = suggest_safe_location(&file_path);
-            let _ = app.emit(
-                "proactive_suggestion",
+            let _ = app.emit_to("main", "proactive_suggestion",
                 serde_json::json!({
                     "source": "filesystem_watch",
                     "title": "Sensitive file detected in unsafe location",
@@ -472,8 +471,7 @@ fn tick_filesystem_watcher(app: &AppHandle) {
                     if std::fs::rename(&file_path, &target).is_ok() {
                         // Record access for the moved file's new location
                         record_file_access(&target.display().to_string());
-                        let _ = app.emit(
-                            "proactive_suggestion",
+                        let _ = app.emit_to("main", "proactive_suggestion",
                             serde_json::json!({
                                 "source": "filesystem_watch",
                                 "title": format!("Auto-moved {} file", category),
@@ -509,7 +507,7 @@ fn tick_filesystem_watcher(app: &AppHandle) {
             "suggested_dest": dest_opt.as_ref().map(|d| d.display().to_string()),
             "action": "move_file",
         });
-        let _ = app.emit("proactive_suggestion", suggestion);
+        let _ = app.emit_to("main", "proactive_suggestion", suggestion);
     }
 
     // Surface day-of-week file patterns (e.g. "You always open README.md on Mondays")
@@ -527,8 +525,7 @@ fn tick_filesystem_watcher(app: &AppHandle) {
             .filter_map(|p| Path::new(p).file_name().and_then(|n| n.to_str()))
             .collect();
         if !preview.is_empty() {
-            let _ = app.emit(
-                "filesystem_pattern_reminder",
+            let _ = app.emit_to("main", "filesystem_pattern_reminder",
                 serde_json::json!({
                     "source": "filesystem_watch",
                     "title": format!("Your usual {} files", day_name),
@@ -632,8 +629,7 @@ fn check_stale_projects(app: &AppHandle) {
                 let proj_name = proj.file_name()
                     .and_then(|n| n.to_str())
                     .unwrap_or("project");
-                let _ = app.emit(
-                    "filesystem_stale_project",
+                let _ = app.emit_to("main", "filesystem_stale_project",
                     serde_json::json!({
                         "source": "filesystem_watch",
                         "title": format!("Stale project: {}", proj_name),

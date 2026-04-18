@@ -276,7 +276,7 @@ fn register_all_shortcuts(app: &tauri::AppHandle) {
         toggle_quickask(&qa_handle);
     }) {
         log::error!("Failed to register Quick Ask shortcut '{}': {}", config.quick_ask_shortcut, e);
-        let _ = app.emit("shortcut_registration_failed", serde_json::json!({
+        let _ = app.emit_to("main", "shortcut_registration_failed", serde_json::json!({
             "shortcut": &config.quick_ask_shortcut,
             "name": "Quick Ask",
             "error": e.to_string()
@@ -291,7 +291,7 @@ fn register_all_shortcuts(app: &tauri::AppHandle) {
         voice_global::toggle_voice_input(&voice_handle);
     }) {
         log::error!("Failed to register Voice shortcut '{}': {}", config.voice_shortcut, e);
-        let _ = app.emit("shortcut_registration_failed", serde_json::json!({
+        let _ = app.emit_to("main", "shortcut_registration_failed", serde_json::json!({
             "shortcut": &config.voice_shortcut,
             "name": "Voice Input",
             "error": e.to_string()
@@ -1337,7 +1337,8 @@ pub fn run() {
                             } else {
                                 // Re-discover tools now that it's back
                                 let _ = manager.discover_all_tools().await;
-                                let _ = health_app.emit(
+                                let _ = health_app.emit_to(
+                                    "main",
                                     "mcp_server_reconnected",
                                     serde_json::json!({ "server": &server.name }),
                                 );

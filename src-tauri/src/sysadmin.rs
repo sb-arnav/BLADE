@@ -14,6 +14,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tauri::Manager;
 
 // ── Hardware Detection ───────────────────────────────────────────────────────
 
@@ -572,7 +573,7 @@ pub async fn sudo_exec(app: &tauri::AppHandle, command: &str, reason: &str) -> R
     use tauri::Emitter;
 
     let approval_id = format!("sudo-{}", chrono::Utc::now().timestamp_millis());
-    let _ = app.emit("sudo_approval_needed", serde_json::json!({
+    let _ = app.emit_to("main", "sudo_approval_needed", serde_json::json!({
         "id": &approval_id,
         "command": command,
         "reason": reason,
@@ -594,7 +595,7 @@ pub async fn sudo_exec(app: &tauri::AppHandle, command: &str, reason: &str) -> R
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
     if stderr.contains("password is required") || stderr.contains("a password is required") {
-        let _ = app.emit("sudo_password_needed", serde_json::json!({
+        let _ = app.emit_to("main", "sudo_password_needed", serde_json::json!({
             "id": &approval_id,
             "command": command,
             "reason": reason,

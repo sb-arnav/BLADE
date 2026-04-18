@@ -12,7 +12,7 @@
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // ---------------------------------------------------------------------------
 // AtomicBool guard — prevents duplicate loops
@@ -368,8 +368,7 @@ pub async fn audio_capture_tick(
         if meeting_id.is_empty() {
             *meeting_id = format!("meeting_{}", now);
             log::info!("[audio_timeline] meeting detected — starting session {}", meeting_id);
-            let _ = app.emit(
-                "audio_meeting_started",
+            let _ = app.emit_to("main", "audio_meeting_started",
                 serde_json::json!({ "meeting_id": meeting_id.clone(), "timestamp": now }),
             );
         }
@@ -381,8 +380,7 @@ pub async fn audio_capture_tick(
         tauri::async_runtime::spawn(async move {
             match generate_meeting_summary(&ended_id).await {
                 Ok(summary) => {
-                    let _ = app_clone.emit(
-                        "audio_meeting_ended",
+                    let _ = app_clone.emit_to("main", "audio_meeting_ended",
                         serde_json::json!({
                             "meeting_id": summary.meeting_id,
                             "summary": summary.summary,
@@ -463,8 +461,7 @@ pub async fn audio_capture_tick(
     };
 
     // Emit to frontend
-    let _ = app.emit(
-        "audio_timeline_tick",
+    let _ = app.emit_to("main", "audio_timeline_tick",
         serde_json::json!({
             "id": entry_id,
             "timestamp": now,
@@ -663,7 +660,7 @@ pub fn start_audio_timeline_capture(app: tauri::AppHandle) {
     }
 
     // Notify HUD that audio capture is now active
-    let _ = app.emit("audio_capture_state", serde_json::json!({ "active": true }));
+    let _ = app.emit_to("main", "audio_capture_state", serde_json::json!({ "active": true }));
 
     tauri::async_runtime::spawn(async move {
         log::info!("[audio_timeline] capture loop started");
@@ -674,7 +671,7 @@ pub fn start_audio_timeline_capture(app: tauri::AppHandle) {
             if !config.audio_capture_enabled {
                 AUDIO_CAPTURE_ACTIVE.store(false, Ordering::SeqCst);
                 log::info!("[audio_timeline] disabled in config — stopping");
-                let _ = app.emit("audio_capture_state", serde_json::json!({ "active": false }));
+                let _ = app.emit_to("main", "audio_capture_state", serde_json::json!({ "active": false }));
                 break;
             }
 
@@ -691,7 +688,7 @@ pub fn start_audio_timeline_capture(app: tauri::AppHandle) {
             // Respect audio_capture_enabled between chunks too
             if !crate::config::load_config().audio_capture_enabled {
                 AUDIO_CAPTURE_ACTIVE.store(false, Ordering::SeqCst);
-                let _ = app.emit("audio_capture_state", serde_json::json!({ "active": false }));
+                let _ = app.emit_to("main", "audio_capture_state", serde_json::json!({ "active": false }));
                 break;
             }
 

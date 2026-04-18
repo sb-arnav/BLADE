@@ -22,7 +22,7 @@ use chrono::{Datelike, Local, Timelike, Weekday};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // Note: No independent loop. `learning_engine::start_learning_engine` drives
 // `generate_predictions()` directly in its 30-min tick. Do NOT start a separate loop.
@@ -586,7 +586,7 @@ Rules:
     // Emit high-confidence predictions as Tauri events
     for pred in &predictions {
         if pred.confidence > 0.75 {
-            let _ = app.emit("blade_prediction", pred.clone());
+            let _ = app.emit_to("main", "blade_prediction", pred.clone());
         }
     }
 

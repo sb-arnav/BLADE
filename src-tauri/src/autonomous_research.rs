@@ -5,7 +5,7 @@
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // ── Static guards ─────────────────────────────────────────────────────────────
 
@@ -286,8 +286,7 @@ pub async fn research_next_gap(app: &tauri::AppHandle) -> Option<String> {
             .ok();
         }
 
-        let _ = app.emit(
-            "blade_learned",
+        let _ = app.emit_to("main", "blade_learned",
             serde_json::json!({
                 "topic": topic,
                 "summary": crate::safe_slice(&result_text, 200),

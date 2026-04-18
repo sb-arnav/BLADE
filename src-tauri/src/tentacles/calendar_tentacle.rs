@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use chrono::Timelike;
 
 // Re-export CalendarEvent from integration_bridge so callers import one type.
@@ -420,8 +420,7 @@ pub async fn auto_block_focus_time(app: &AppHandle) -> Result<u32, String> {
         let start = format!("{}T{:02}:00:00Z", today, hour);
         let end = format!("{}T{:02}:00:00Z", today, hour + 1);
 
-        let _ = app.emit(
-            "calendar_create_event",
+        let _ = app.emit_to("main", "calendar_create_event",
             serde_json::json!({
                 "title": event_title,
                 "start": start,
@@ -514,7 +513,7 @@ pub async fn post_meeting_summary(
     summary.stored_memory_id = store_summary_in_memory(&summary);
 
     // Emit for UI and any Linear/Jira integration listening
-    let _ = app.emit("meeting_summary_ready", &summary);
+    let _ = app.emit_to("main", "meeting_summary_ready", &summary);
 
     Ok(summary)
 }
@@ -881,7 +880,7 @@ pub async fn post_meeting_summary_with_draft(
     };
 
     // Emit for UI — user sees draft and can approve/edit
-    let _ = app.emit("meeting_summary_draft_ready", &draft);
+    let _ = app.emit_to("main", "meeting_summary_draft_ready", &draft);
 
     Ok(draft)
 }

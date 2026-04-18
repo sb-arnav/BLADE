@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // ── Static guard ──────────────────────────────────────────────────────────────
 
@@ -604,7 +604,7 @@ async fn proactive_loop(app: tauri::AppHandle) {
 
                                 if should_emit {
                                     if save_action(&conn, &action).is_ok() {
-                                        let _ = app.emit("proactive_action", &action);
+                                        let _ = app.emit_to("main", "proactive_action", &action);
                                         mark_rule_fired(&conn, $rule_type);
                                         fired += 1;
                                     }
@@ -649,7 +649,7 @@ async fn proactive_loop(app: tauri::AppHandle) {
                             );
                             if should_emit {
                                 if save_action(&conn, &action).is_ok() {
-                                    let _ = app.emit("proactive_action", &action);
+                                    let _ = app.emit_to("main", "proactive_action", &action);
                                     mark_rule_fired(&conn, "context_switch");
                                     fired += 1;
                                 }
@@ -930,7 +930,7 @@ pub async fn proactive_trigger_check(app: tauri::AppHandle) -> Result<usize, Str
         );
 
         if should_emit && save_action(&conn, &action).is_ok() {
-            let _ = app.emit("proactive_action", &action);
+            let _ = app.emit_to("main", "proactive_action", &action);
             mark_rule_fired(&conn, rule_type);
             fired += 1;
         }

@@ -23,7 +23,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use std::sync::{Arc, Mutex};
 use tokio::io::AsyncBufReadExt;
 use uuid::Uuid;
@@ -202,8 +202,7 @@ pub async fn agent_spawn(
     });
 
     // Emit spawn event
-    let _ = app.emit(
-        "agent_spawned",
+    let _ = app.emit_to("main", "agent_spawned",
         serde_json::json!({
             "id": id,
             "agent_type": agent_type,
@@ -233,8 +232,7 @@ async fn run_agent(
         Err(e) => {
             let msg = format!("Failed to spawn {}: {}", cmd, e);
             update_agent_status(&id, AgentStatus::Failed, None, Some(msg.clone()));
-            let _ = app.emit(
-                "agent_error",
+            let _ = app.emit_to("main", "agent_error",
                 serde_json::json!({"id": id, "error": msg}),
             );
             return;
@@ -259,7 +257,7 @@ async fn run_agent(
         if cancel.load(std::sync::atomic::Ordering::Relaxed) {
             let _ = child.kill().await;
             update_agent_status(&id, AgentStatus::Cancelled, None, None);
-            let _ = app.emit("agent_cancelled", serde_json::json!({"id": id}));
+            let _ = app.emit_to("main", "agent_cancelled", serde_json::json!({"id": id}));
             return;
         }
 
@@ -273,7 +271,7 @@ async fn run_agent(
                 match line {
                     Ok(Some(l)) => {
                         append_agent_output(&id_for_stdout, &l);
-                        let _ = app_for_stdout.emit("agent_stdout", serde_json::json!({
+                        let _ = app_for_stdout.emit_to("main", "agent_stdout", serde_json::json!({
                             "id": &id_for_stdout,
                             "line": &l,
                         }));
@@ -286,7 +284,7 @@ async fn run_agent(
                 match line {
                     Ok(Some(l)) => {
                         append_agent_output(&id_for_stdout, &format!("[err] {}", l));
-                        let _ = app_for_stdout.emit("agent_stderr", serde_json::json!({
+                        let _ = app_for_stdout.emit_to("main", "agent_stderr", serde_json::json!({
                             "id": &id_for_stdout,
                             "line": l,
                         }));
@@ -337,8 +335,7 @@ async fn run_agent(
     }
 
     // Emit both the legacy event (for existing listeners) and a richer one
-    let _ = app.emit(
-        "agent_complete",
+    let _ = app.emit_to("main", "agent_complete",
         serde_json::json!({
             "id": id,
             "exit_code": code,
@@ -346,8 +343,7 @@ async fn run_agent(
         }),
     );
 
-    let _ = app.emit(
-        "agent_completed",
+    let _ = app.emit_to("main", "agent_completed",
         serde_json::json!({
             "id": id,
             "exit_code": code,
@@ -524,8 +520,7 @@ pub async fn auto_spawn_agent(
     let id = agent_spawn(app.clone(), chosen.clone(), enriched_task, cwd).await?;
 
     // Emit an auto-spawn event so the UI can surface why this agent was chosen
-    let _ = app.emit(
-        "agent_auto_spawned",
+    let _ = app.emit_to("main", "agent_auto_spawned",
         serde_json::json!({
             "id": id,
             "agent_type": chosen,
@@ -618,8 +613,7 @@ pub async fn spawn_codex_agent(
     let id = agent_spawn(app.clone(), agent_type.to_string(), final_task, cwd).await?;
 
     if !use_codex {
-        let _ = app.emit(
-            "agent_fallback",
+        let _ = app.emit_to("main", "agent_fallback",
             serde_json::json!({
                 "id": id,
                 "requested": "codex",

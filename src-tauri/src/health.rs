@@ -14,7 +14,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HealthIssue {

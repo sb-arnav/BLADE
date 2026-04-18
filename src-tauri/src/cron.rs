@@ -18,7 +18,7 @@
 use chrono::{Datelike, Timelike};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CronTask {
@@ -599,7 +599,7 @@ async fn execute_inbox_check(_task: &CronTask, app: &tauri::AppHandle) {
     }));
 
     // Also emit blade_briefing with the integration state so the frontend can display it
-    let _ = app.emit("blade_briefing", serde_json::json!({
+    let _ = app.emit_to("main", "blade_briefing", serde_json::json!({
         "briefing": msg,
         "date": chrono::Local::now().format("%Y-%m-%d").to_string(),
         "source": "inbox_check",
@@ -680,7 +680,7 @@ Voice: Direct, honest. No headers. No bullets. Start in the middle."#,
     match crate::pulse::call_provider_simple(config, &model, &prompt).await {
         Ok(review) if review.len() > 20 => {
             let date_str = now.format("%Y-%m-%d").to_string();
-            let _ = app.emit("blade_briefing", serde_json::json!({
+            let _ = app.emit_to("main", "blade_briefing", serde_json::json!({
                 "briefing": review,
                 "date": date_str,
                 "source": "weekly_review",

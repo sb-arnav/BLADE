@@ -7,7 +7,7 @@ use chrono::Local;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use uuid::Uuid;
 
 // ── Structs ───────────────────────────────────────────────────────────────────
@@ -752,8 +752,7 @@ pub async fn accountability_nudge(app: &tauri::AppHandle) {
     };
 
     if should_nudge_checkin {
-        let _ = app.emit(
-            "accountability_nudge",
+        let _ = app.emit_to("main", "accountability_nudge",
             serde_json::json!({
                 "type": "checkin",
                 "message": "You haven't checked in for a couple of days. Take 2 minutes — how are things actually going?"
@@ -775,8 +774,7 @@ pub async fn accountability_nudge(app: &tauri::AppHandle) {
 
         if !behind_krs.is_empty() {
             let kr_names: Vec<&str> = behind_krs.iter().map(|kr| kr.title.as_str()).collect();
-            let _ = app.emit(
-                "accountability_nudge",
+            let _ = app.emit_to("main", "accountability_nudge",
                 serde_json::json!({
                     "type": "objective_behind",
                     "objective_id": obj.id,

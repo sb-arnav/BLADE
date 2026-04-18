@@ -9,7 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::process::Command;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -427,7 +427,7 @@ pub async fn execute_fix(
         });
     }
 
-    let _ = app.emit("auto_fix_verifying", serde_json::json!({
+    let _ = app.emit_to("main", "auto_fix_verifying", serde_json::json!({
         "files_changed": changed_files.len(),
         "step": "local_check"
     }));
@@ -446,7 +446,7 @@ pub async fn execute_fix(
 
     // First check failed — try LLM-assisted retry.
     log::info!("[AutoFix] Local check failed, attempting LLM-assisted retry");
-    let _ = app.emit("auto_fix_verifying", serde_json::json!({
+    let _ = app.emit_to("main", "auto_fix_verifying", serde_json::json!({
         "step": "llm_retry",
         "error": check_result.err().unwrap_or_default()
     }));
@@ -822,8 +822,7 @@ pub async fn full_auto_fix_pipeline(app: &AppHandle, failure: CIFailure) -> FixR
         .to_string();
 
     // Step 1 — Analyze.
-    let _ = app.emit(
-        "auto_fix_analyzing",
+    let _ = app.emit_to("main", "auto_fix_analyzing",
         serde_json::json!({
             "repo": repo_name,
             "workflow": failure.workflow_name,
@@ -838,7 +837,7 @@ pub async fn full_auto_fix_pipeline(app: &AppHandle, failure: CIFailure) -> FixR
                 reason: format!("Could not parse CI errors: {}", e),
                 suggestion: "Check the CI log directly for the failing step".to_string(),
             };
-            let _ = app.emit("auto_fix_failed", serde_json::json!({ "result": result }));
+            let _ = app.emit_to("main", "auto_fix_failed", serde_json::json!({ "result": result }));
             return result;
         }
     };
@@ -849,7 +848,7 @@ pub async fn full_auto_fix_pipeline(app: &AppHandle, failure: CIFailure) -> FixR
             suggestion: "Consider using BLADE's code assistant to address the errors manually"
                 .to_string(),
         };
-        let _ = app.emit("auto_fix_failed", serde_json::json!({ "result": result }));
+        let _ = app.emit_to("main", "auto_fix_failed", serde_json::json!({ "result": result }));
         return result;
     }
 
@@ -889,14 +888,13 @@ pub async fn full_auto_fix_pipeline(app: &AppHandle, failure: CIFailure) -> FixR
                 suggestion: "Review the planned edits in the AutoFix card and approve manually"
                     .to_string(),
             };
-            let _ = app.emit("auto_fix_failed", serde_json::json!({ "result": result }));
+            let _ = app.emit_to("main", "auto_fix_failed", serde_json::json!({ "result": result }));
             return result;
         }
     }
 
     // Step 3 — Apply edits.
-    let _ = app.emit(
-        "auto_fix_editing",
+    let _ = app.emit_to("main", "auto_fix_editing",
         serde_json::json!({
             "edits": plan.edits.len(),
             "files": plan.edits.iter().map(|e| &e.file_path).collect::<Vec<_>>()
@@ -913,32 +911,30 @@ pub async fn full_auto_fix_pipeline(app: &AppHandle, failure: CIFailure) -> FixR
 
     // If fixing failed, bail early.
     if matches!(fix_result, FixResult::NeedHumanHelp { .. }) {
-        let _ = app.emit("auto_fix_failed", serde_json::json!({ "result": fix_result }));
+        let _ = app.emit_to("main", "auto_fix_failed", serde_json::json!({ "result": fix_result }));
         return fix_result;
     }
 
     // Step 4 — Push.
-    let _ = app.emit("auto_fix_pushing", serde_json::json!({ "repo": repo_name }));
+    let _ = app.emit_to("main", "auto_fix_pushing", serde_json::json!({ "repo": repo_name }));
     if let Err(e) = push_fix(&failure.repo_path).await {
         let result = FixResult::NeedHumanHelp {
             reason: format!("Push failed: {}", e),
             suggestion: "Verify git credentials and branch push permissions".to_string(),
         };
-        let _ = app.emit("auto_fix_failed", serde_json::json!({ "result": result }));
+        let _ = app.emit_to("main", "auto_fix_failed", serde_json::json!({ "result": result }));
         return result;
     }
 
     // Step 5 — Monitor new run.
-    let _ = app.emit(
-        "auto_fix_monitoring",
+    let _ = app.emit_to("main", "auto_fix_monitoring",
         serde_json::json!({ "run_id": failure.run_id }),
     );
     let passed = monitor_fix(&failure.repo_path, failure.run_id)
         .await
         .unwrap_or(false);
 
-    let _ = app.emit(
-        "auto_fix_complete",
+    let _ = app.emit_to("main", "auto_fix_complete",
         serde_json::json!({
             "result": fix_result,
             "ci_passed": passed
