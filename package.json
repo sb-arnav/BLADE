@@ -14,6 +14,7 @@
     "verify:all": "npm run verify:entries && npm run verify:no-raw-tauri && npm run verify:migration-ledger && npm run verify:emit-policy && npm run verify:contrast",
     "lint": "eslint src",
     "test:e2e": "playwright test",
+    "test:e2e:phase2": "playwright test tests/e2e/onboarding-boot.spec.ts tests/e2e/shell.spec.ts",
     "release:prepare-updater": "node .github/scripts/prepare-tauri-release-config.mjs"
   },
   "devDependencies": {
