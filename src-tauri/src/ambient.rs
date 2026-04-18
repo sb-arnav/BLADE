@@ -1,7 +1,7 @@
 /// Ambient intelligence monitor — runs in background from app launch.
 /// Tracks what the user is doing, emits proactive_nudge events when
 /// Blade has something useful to say without being asked.
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 /// Personality variations — BLADE doesn't repeat the same line.
 /// tick % N picks a different phrasing each time.
@@ -72,7 +72,7 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
     if let Ok(monitors) = xcap::Monitor::all() {
         last_monitor_count = monitors.len();
         if monitors.len() > 1 {
-            let _ = app.emit("multiple_monitors_detected", serde_json::json!({
+            let _ = app.emit_to("main", "multiple_monitors_detected", serde_json::json!({
                 "count": monitors.len(),
                 "message": format!(
                     "I can see {} monitors. Want to dedicate one exclusively to me? I'll open everything there and keep your main screen clean.",
@@ -104,7 +104,7 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
                 if new_count != monitor_count {
                     if new_count > monitor_count && new_count > 1 {
                         // New monitor connected
-                        let _ = app.emit("multiple_monitors_detected", serde_json::json!({
+                        let _ = app.emit_to("main", "multiple_monitors_detected", serde_json::json!({
                             "count": new_count,
                             "message": format!(
                                 "New monitor detected ({} total). Want me to move to it? I'll stay there and watch your main screen for you.",
@@ -119,7 +119,7 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
                             cfg.blade_dedicated_monitor = -1;
                             let _ = crate::config::save_config(&cfg);
                         }
-                        let _ = app.emit("monitor_disconnected", serde_json::json!({
+                        let _ = app.emit_to("main", "monitor_disconnected", serde_json::json!({
                             "count": new_count
                         }));
                     }
@@ -184,7 +184,7 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
                         tokio::spawn(async move {
                             let summary = generate_catchup_summary(away_mins).await;
                             if !summary.is_empty() {
-                                let _ = app_catchup.emit("blade_catchup", serde_json::json!({
+                                let _ = app_catchup.emit_to("main", "blade_catchup", serde_json::json!({
                                     "away_minutes": away_mins,
                                     "summary": &summary,
                                 }));
@@ -236,7 +236,7 @@ pub fn start_ambient_monitor(app: tauri::AppHandle) {
                 if tick % 20 == 0 {
                     let activity = crate::context::get_user_activity().ok().unwrap_or_default();
                     if !activity.is_empty() {
-                        let _ = app.emit("ambient_update", serde_json::json!({ "activity": activity }));
+                        let _ = app.emit_to("hud", "ambient_update", serde_json::json!({ "activity": activity }));
                     }
                 }
             } else {
