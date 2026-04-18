@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 static ENGINE_RUNNING: AtomicBool = AtomicBool::new(false);
 
@@ -386,8 +386,7 @@ Pick the most appropriate action and respond with EXACTLY ONE line starting with
         goal.subtasks[idx].last_error = output.clone();
         goal.subtasks[idx].status = "retrying".to_string();
 
-        let _ = app.emit(
-            "goal_subtask_update",
+        let _ = app.emit_to("main", "goal_subtask_update",
             GoalSubtaskUpdatePayload {
                 goal_id: goal.id.clone(),
                 subtask_description: subtask_desc,
@@ -401,8 +400,7 @@ Pick the most appropriate action and respond with EXACTLY ONE line starting with
         goal.subtasks[idx].result = output.clone();
         goal.subtasks[idx].last_error = String::new();
 
-        let _ = app.emit(
-            "goal_subtask_update",
+        let _ = app.emit_to("main", "goal_subtask_update",
             GoalSubtaskUpdatePayload {
                 goal_id: goal.id.clone(),
                 subtask_description: subtask_desc,
@@ -622,8 +620,7 @@ If NO, list what is still missing (be specific).",
                     .collect::<Vec<_>>()
                     .join("\n");
 
-                let _ = app.emit(
-                    "goal_completed",
+                let _ = app.emit_to("main", "goal_completed",
                     GoalCompletedPayload {
                         id: goal.id.clone(),
                         title: goal.title.clone(),
@@ -810,8 +807,7 @@ async fn pursuit_loop(app: tauri::AppHandle) {
         // Emit progress event
         let done_count = goal.subtasks.iter().filter(|s| s.status == "done").count();
         let total_count = goal.subtasks.len();
-        let _ = app.emit(
-            "goal_progress",
+        let _ = app.emit_to("main", "goal_progress",
             GoalProgressPayload {
                 id: goal.id.clone(),
                 title: goal.title.clone(),
@@ -976,8 +972,7 @@ pub async fn goal_pursue_now(id: String, app: tauri::AppHandle) -> Result<String
 
     // Emit progress
     let done_count = goal.subtasks.iter().filter(|s| s.status == "done").count();
-    let _ = app.emit(
-        "goal_progress",
+    let _ = app.emit_to("main", "goal_progress",
         GoalProgressPayload {
             id: goal.id.clone(),
             title: goal.title.clone(),

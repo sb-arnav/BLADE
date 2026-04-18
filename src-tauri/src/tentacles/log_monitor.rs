@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tauri::AppHandle;
 
 // ── Global stop flag ──────────────────────────────────────────────────────────
@@ -270,7 +270,7 @@ pub async fn start_log_tailing(app: AppHandle, paths: Vec<String>) {
                 let anomalies = detect_anomalies(&messages).await;
                 for anomaly in anomalies {
                     let payload = serde_json::to_string(&anomaly).unwrap_or_default();
-                    let _ = app.emit("log-anomaly", payload);
+                    let _ = app.emit_to("main", "log-anomaly", payload);
                 }
             }
 

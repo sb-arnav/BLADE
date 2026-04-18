@@ -12,7 +12,7 @@
 // and emits "browser_agent_step" events to the frontend after each step.
 
 use serde::{Deserialize, Serialize};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // ── Action enum ───────────────────────────────────────────────────────────────
 
@@ -265,8 +265,7 @@ pub async fn browser_agent_loop(
         // 5. Check for done
         if let BrowserAction::Done { ref summary } = action {
             final_result = summary.clone();
-            let _ = app.emit(
-                "browser_agent_step",
+            let _ = app.emit_to("main", "browser_agent_step",
                 serde_json::json!({
                     "step": step + 1,
                     "action": action_label,
@@ -282,8 +281,7 @@ pub async fn browser_agent_loop(
         let (result_text, is_error) = execute_browser_action(&action).await;
 
         // 7. Emit progress event to frontend
-        let _ = app.emit(
-            "browser_agent_step",
+        let _ = app.emit_to("main", "browser_agent_step",
             serde_json::json!({
                 "step": step + 1,
                 "action": action_label,

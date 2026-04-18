@@ -14,7 +14,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 /// One entry in the built-in MCP catalog.
 struct CatalogEntry {
@@ -789,7 +789,7 @@ pub async fn run_evolution_cycle(app: &tauri::AppHandle) {
 
     // Emit auto-installed notification
     if !auto_installed.is_empty() {
-        let _ = app.emit("blade_auto_upgraded", serde_json::json!({
+        let _ = app.emit_to("main", "blade_auto_upgraded", serde_json::json!({
             "installed": auto_installed,
             "message": format!("Wired into: {}", auto_installed.join(", ")),
         }));
@@ -797,7 +797,7 @@ pub async fn run_evolution_cycle(app: &tauri::AppHandle) {
 
     // Emit new suggestions to frontend
     for suggestion in &new_suggestions {
-        let _ = app.emit("evolution_suggestion", suggestion);
+        let _ = app.emit_to("main", "evolution_suggestion", suggestion);
     }
 
     // Hermes pattern: analyze failures and propose prompt mutations
@@ -809,7 +809,7 @@ pub async fn run_evolution_cycle(app: &tauri::AppHandle) {
     // Check if we leveled up
     let new_level = compute_level();
     if new_level.level > prev_level.level {
-        let _ = app.emit("blade_leveled_up", serde_json::json!({
+        let _ = app.emit_to("main", "blade_leveled_up", serde_json::json!({
             "level": new_level.level,
             "score": new_level.score,
             "breakdown": new_level.breakdown,
@@ -942,7 +942,7 @@ async fn evolve_from_failures(app: &tauri::AppHandle) {
     };
 
     let _ = save_suggestion(&suggestion);
-    let _ = app.emit("evolution_suggestion", &suggestion);
+    let _ = app.emit_to("main", "evolution_suggestion", &suggestion);
 
     log::info!("Evolution: proposed rule from {} failure(s): {}", failures.len(), crate::safe_slice(&rule_text, 80));
 }

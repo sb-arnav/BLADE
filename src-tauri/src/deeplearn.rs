@@ -10,7 +10,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DataSource {
@@ -710,8 +710,7 @@ fn walkdir_md(dir: &std::path::Path, max_depth: usize) -> Vec<String> {
 }
 
 fn emit_progress(app: &tauri::AppHandle, source: &str, status: &str, detail: &str, chunks: usize) {
-    let _ = app.emit(
-        "deeplearn_progress",
+    let _ = app.emit_to("main", "deeplearn_progress",
         LearnProgress {
             source: source.to_string(),
             status: status.to_string(),

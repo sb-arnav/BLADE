@@ -20,7 +20,7 @@
 /// decisions instead of user-specific ones.
 
 use serde::{Deserialize, Serialize};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 /// DNA package that gets injected into every spawned child.
 /// Compact (~500-1000 chars) so it doesn't bloat the child's context.
@@ -160,7 +160,7 @@ pub async fn spawn_with_dna(
         agent_type, dna.trust_level, dna.active_project
     );
 
-    let _ = app.emit("agent_spawned_with_dna", serde_json::json!({
+    let _ = app.emit_to("main", "agent_spawned_with_dna", serde_json::json!({
         "agent_type": agent_type,
         "task": crate::safe_slice(task, 100),
         "trust_level": dna.trust_level,

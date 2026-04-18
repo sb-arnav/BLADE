@@ -14,7 +14,7 @@
 ///     → cargo check runs, result emitted as blade_self_code_result
 #[allow(dead_code)]
 
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -117,7 +117,7 @@ pub async fn blade_self_code(
     };
 
     // Emit so the UI can surface progress
-    let _ = app.emit("blade_self_code_started", serde_json::json!({
+    let _ = app.emit_to("main", "blade_self_code_started", serde_json::json!({
         "agent_id": &agent_id,
         "feature": &feature,
         "source_path": &resolved_path,

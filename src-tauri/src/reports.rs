@@ -5,7 +5,7 @@ use crate::config::blade_config_dir;
 use crate::db::{self, CapabilityReport};
 use rusqlite;
 use serde::{Deserialize, Serialize};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // ── Incapability signal detection ────────────────────────────────────────────
 
@@ -275,7 +275,7 @@ pub async fn report_gap(
     )?;
 
     // Emit event to frontend
-    let _ = app.emit("capability_gap_detected", serde_json::json!({
+    let _ = app.emit_to("main", "capability_gap_detected", serde_json::json!({
         "id": &id,
         "category": &category,
         "title": &title,

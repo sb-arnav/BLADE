@@ -13,7 +13,7 @@
 ///   InsightAssistant — surface contextual insights/connections
 
 use serde::{Deserialize, Serialize};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProactiveCard {
@@ -69,7 +69,7 @@ pub async fn on_context_switch(
     let to_app2 = to_app.to_string();
     tokio::spawn(async move {
         if let Some(card) = extract_tasks(&ctx2, &to_app2).await {
-            let _ = app2.emit("proactive_card", &card);
+            let _ = app2.emit_to("main", "proactive_card", &card);
             store_card(&card);
         }
     });
@@ -80,7 +80,7 @@ pub async fn on_context_switch(
     let to_app3 = to_app.to_string();
     tokio::spawn(async move {
         if let Some(card) = detect_focus(&from_owned, &to_app3).await {
-            let _ = app3.emit("proactive_card", &card);
+            let _ = app3.emit_to("main", "proactive_card", &card);
         }
     });
 
@@ -115,7 +115,7 @@ pub async fn on_context_switch(
     let to_app4 = to_app.to_string();
     tokio::spawn(async move {
         if let Some(card) = extract_memory(&ctx4, &to_app4).await {
-            let _ = app4.emit("proactive_card", &card);
+            let _ = app4.emit_to("main", "proactive_card", &card);
             store_card(&card);
             // Also feed into typed_memory so it persists
             let _ = crate::typed_memory::store_typed_memory(
@@ -130,7 +130,7 @@ pub async fn on_context_switch(
     // Insight surfacing — connect what's on screen to what BLADE knows
     tokio::spawn(async move {
         if let Some(card) = surface_insight(&ctx1, &to_app_owned).await {
-            let _ = app1.emit("proactive_card", &card);
+            let _ = app1.emit_to("main", "proactive_card", &card);
             store_card(&card);
         }
     });

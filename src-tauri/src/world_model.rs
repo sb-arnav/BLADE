@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // ---------------------------------------------------------------------------
 // Data structures
@@ -866,7 +866,7 @@ pub fn start_world_model(app: tauri::AppHandle) {
 
             update_world_state(&cwd, &window);
 
-            let _ = app.emit("world_state_updated", get_world_summary());
+            let _ = app.emit_to("main", "world_state_updated", get_world_summary());
         }
     });
 }

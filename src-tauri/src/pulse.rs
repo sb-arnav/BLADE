@@ -8,7 +8,7 @@
 
 
 use std::time::Duration;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 const PULSE_INTERVAL_SECS: u64 = 15 * 60; // minimum 15 minutes between pulses
 const PULSE_POLL_SECS: u64 = 3 * 60;    // check every 3 minutes
@@ -81,7 +81,7 @@ pub fn start_pulse(app: tauri::AppHandle) {
                     Ok(thought) if thought.len() >= MIN_PULSE_CHARS => {
                         last_pulse_at = std::time::Instant::now();
 
-                        let _ = app.emit("blade_pulse", serde_json::json!({
+                        let _ = app.emit_to("main", "blade_pulse", serde_json::json!({
                             "thought": &thought,
                             "timestamp": chrono::Local::now().timestamp(),
                         }));
@@ -127,7 +127,7 @@ pub fn start_pulse(app: tauri::AppHandle) {
                         }
                     }
                     Err(ref e) if crate::config::check_and_disable_on_402(e) => {
-                        let _ = app.emit("background_ai_auto_disabled", serde_json::json!({
+                        let _ = app.emit_to("main", "background_ai_auto_disabled", serde_json::json!({
                             "reason": "credits_exhausted",
                             "message": "Out of credits — background AI auto-disabled. Re-enable in Settings → General."
                         }));
@@ -644,7 +644,7 @@ No "Good morning". No headers. No numbered lists. No bullet points. Start in the
 async fn emit_briefing(app: &tauri::AppHandle, briefing: &str, today: &str, source: &str) {
     let briefing_capped = cap_at_200_words(briefing);
 
-    let _ = app.emit("blade_briefing", serde_json::json!({
+    let _ = app.emit_to("main", "blade_briefing", serde_json::json!({
         "briefing": &briefing_capped,
         "date": today,
         "source": source,
@@ -820,7 +820,7 @@ pub async fn pulse_now(app: tauri::AppHandle) -> Result<String, String> {
         return Err("No API key configured".to_string());
     }
     let thought = generate_pulse_thought(&config).await?;
-    let _ = app.emit("blade_pulse", serde_json::json!({
+    let _ = app.emit_to("main", "blade_pulse", serde_json::json!({
         "thought": &thought,
         "timestamp": chrono::Local::now().timestamp(),
     }));
@@ -939,7 +939,7 @@ pub async fn generate_daily_digest(app: &tauri::AppHandle) -> Result<DailyDigest
     };
 
     // Emit so the Dashboard can show it
-    let _ = app.emit("blade_daily_digest", &digest);
+    let _ = app.emit_to("main", "blade_daily_digest", &digest);
 
     Ok(digest)
 }

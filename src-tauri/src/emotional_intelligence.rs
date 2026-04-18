@@ -10,7 +10,7 @@
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // ── Static current emotion ────────────────────────────────────────────────────
 
@@ -750,8 +750,7 @@ pub async fn process_message_emotion(message: &str, app: tauri::AppHandle) -> Em
     };
 
     if should_emit {
-        let _ = app.emit(
-            "blade_emotion_detected",
+        let _ = app.emit_to("main", "blade_emotion_detected",
             serde_json::json!({
                 "emotion": new_state.primary_emotion,
                 "valence": new_state.valence,

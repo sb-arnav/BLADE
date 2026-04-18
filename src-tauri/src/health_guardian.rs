@@ -15,7 +15,7 @@ use chrono::Timelike;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // ── State ─────────────────────────────────────────────────────────────────────
 

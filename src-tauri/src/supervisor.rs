@@ -24,7 +24,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 const MAX_RESTARTS: u32 = 5;
 const BACKOFF_BASE_SECS: u64 = 5;
@@ -141,7 +141,7 @@ where
                     );
 
                     // Alert homeostasis
-                    let _ = app.emit("service_crashed", serde_json::json!({
+                    let _ = app.emit_to("main", "service_crashed", serde_json::json!({
                         "service": name,
                         "crash_count": consecutive_crashes,
                         "error": format!("{}", e),
@@ -153,7 +153,7 @@ where
                             "[supervisor] {} permanently DEAD after {} crashes",
                             name, MAX_RESTARTS
                         );
-                        let _ = app.emit("service_dead", serde_json::json!({
+                        let _ = app.emit_to("main", "service_dead", serde_json::json!({
                             "service": name,
                             "crash_count": consecutive_crashes,
                         }));

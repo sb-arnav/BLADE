@@ -14,7 +14,7 @@ use crate::swarm::{
     self, build_task_context, get_swarm_progress, resolve_ready_tasks,
     ScratchpadEntry, SwarmStatus, SwarmTaskStatus, SwarmTask, Swarm,
 };
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // ---------------------------------------------------------------------------
 // Internal: spawn one agent for a swarm task
@@ -265,13 +265,13 @@ async fn coordinator_loop(
                                 timestamp: chrono::Utc::now().timestamp(),
                             };
                             swarm::write_scratchpad_entry(swarm_id, entry);
-                            let _ = app.emit("swarm_scratchpad_updated", serde_json::json!({
+                            let _ = app.emit_to("main", "swarm_scratchpad_updated", serde_json::json!({
                                 "swarm_id": swarm_id, "key": key, "source_task": task_id
                             }));
                         }
 
                         let result_end = result.char_indices().nth(200).map(|(i, _)| i).unwrap_or(result.len());
-                        let _ = app.emit("swarm_task_completed", serde_json::json!({
+                        let _ = app.emit_to("main", "swarm_task_completed", serde_json::json!({
                             "swarm_id": swarm_id,
                             "task_id": task_id,
                             "result_preview": &result[..result_end],
@@ -304,7 +304,7 @@ async fn coordinator_loop(
                         swarm.scratchpad.insert(failure_key, failure_note);
                         swarm::update_swarm_scratchpad(swarm_id, &swarm.scratchpad);
 
-                        let _ = app.emit("swarm_task_failed", serde_json::json!({
+                        let _ = app.emit_to("main", "swarm_task_failed", serde_json::json!({
                             "swarm_id": swarm_id,
                             "task_id": task_id,
                             "error": &error,
@@ -351,7 +351,7 @@ async fn coordinator_loop(
                         None,
                         Some("Dependency failed"),
                     );
-                    let _ = app.emit("swarm_task_failed", serde_json::json!({
+                    let _ = app.emit_to("main", "swarm_task_failed", serde_json::json!({
                         "swarm_id": swarm_id,
                         "task_id": &blocked_id,
                         "error": "Dependency failed",
@@ -387,7 +387,7 @@ async fn coordinator_loop(
 
             swarm::update_swarm_status(swarm_id, &SwarmStatus::Completed, Some(&final_result));
             let preview_end = final_result.char_indices().nth(300).map(|(i, _)| i).unwrap_or(final_result.len());
-            let _ = app.emit("swarm_completed", serde_json::json!({
+            let _ = app.emit_to("main", "swarm_completed", serde_json::json!({
                 "swarm_id": swarm_id,
                 "final_result_preview": &final_result[..preview_end],
             }));
@@ -413,7 +413,7 @@ async fn coordinator_loop(
                             None,
                             None,
                         );
-                        let _ = app.emit("swarm_task_started", serde_json::json!({
+                        let _ = app.emit_to("main", "swarm_task_started", serde_json::json!({
                             "swarm_id": swarm_id,
                             "task_id": &task_id,
                             "agent_id": &agent_id,
@@ -428,7 +428,7 @@ async fn coordinator_loop(
                             None,
                             Some(&e),
                         );
-                        let _ = app.emit("swarm_task_failed", serde_json::json!({
+                        let _ = app.emit_to("main", "swarm_task_failed", serde_json::json!({
                             "swarm_id": swarm_id,
                             "task_id": &task_id,
                             "error": &e,
@@ -449,7 +449,7 @@ async fn coordinator_loop(
 /// Emit a rich swarm_progress event to the frontend.
 fn emit_progress(swarm_id: &str, app: &tauri::AppHandle) {
     if let Some(progress) = get_swarm_progress(swarm_id) {
-        let _ = app.emit("swarm_progress", serde_json::json!({
+        let _ = app.emit_to("main", "swarm_progress", serde_json::json!({
             "swarm_id": swarm_id,
             "total": progress.total,
             "completed": progress.completed,
@@ -521,7 +521,7 @@ pub async fn swarm_create(
     }
 
     // Emit created event
-    let _ = app.emit("swarm_created", serde_json::json!({
+    let _ = app.emit_to("main", "swarm_created", serde_json::json!({
         "swarm_id": &swarm_id,
         "goal": &goal,
         "task_count": task_count,

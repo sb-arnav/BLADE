@@ -15,7 +15,7 @@
 /// The immune system doesn't duplicate their work — it's the decision layer
 /// that chains them together when a gap is detected.
 
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 /// Attempt to resolve a capability gap. Called when:
 /// - A tool call fails with "not found" or similar
@@ -28,7 +28,7 @@ pub async fn resolve_capability_gap(
     capability: &str,
     user_request: &str,
 ) -> String {
-    let _ = app.emit("blade_evolving", serde_json::json!({
+    let _ = app.emit_to("main", "blade_evolving", serde_json::json!({
         "capability": capability,
         "status": "searching",
     }));
@@ -42,7 +42,7 @@ pub async fn resolve_capability_gap(
     // Step 1: Check if an existing MCP server can handle this
     let mcp_match = check_mcp_catalog(capability).await;
     if let Some(server_name) = mcp_match {
-        let _ = app.emit("blade_evolving", serde_json::json!({
+        let _ = app.emit_to("main", "blade_evolving", serde_json::json!({
             "capability": capability,
             "status": "installing",
             "solution": &server_name,
@@ -75,14 +75,14 @@ pub async fn resolve_capability_gap(
     }
 
     // Step 4: Try to forge a new tool
-    let _ = app.emit("blade_evolving", serde_json::json!({
+    let _ = app.emit_to("main", "blade_evolving", serde_json::json!({
         "capability": capability,
         "status": "forging",
     }));
 
     match crate::tool_forge::forge_if_needed(user_request, &format!("Missing capability: {}", capability)).await {
         Some(tool) => {
-            let _ = app.emit("blade_evolving", serde_json::json!({
+            let _ = app.emit_to("main", "blade_evolving", serde_json::json!({
                 "capability": capability,
                 "status": "forged",
                 "tool_name": &tool.name,
@@ -94,7 +94,7 @@ pub async fn resolve_capability_gap(
             )
         }
         None => {
-            let _ = app.emit("blade_evolving", serde_json::json!({
+            let _ = app.emit_to("main", "blade_evolving", serde_json::json!({
                 "capability": capability,
                 "status": "failed",
             }));

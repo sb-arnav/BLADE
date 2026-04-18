@@ -14,7 +14,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::sync::{Mutex, OnceLock};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 #[cfg(target_os = "windows")]
 use rusqlite;
@@ -96,7 +96,7 @@ pub async fn start_notification_listener(app: tauri::AppHandle) {
             for n in &fresh {
                 store_notification(n.clone());
                 // Emit to frontend so it can surface in NotificationCenter
-                let _ = app.emit("os_notification", n);
+                let _ = app.emit_to("main", "os_notification", n);
                 if n.timestamp > max_ts {
                     max_ts = n.timestamp;
                 }

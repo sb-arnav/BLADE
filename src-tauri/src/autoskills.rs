@@ -9,7 +9,7 @@
 /// acquire the capability it needs. Fail → diagnose → install → retry.
 
 use std::collections::HashMap;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 /// Minimal description of a capability gap.
 pub struct GapContext<'a> {
@@ -173,8 +173,7 @@ pub async fn try_acquire(
 ) -> AutoskillResult {
     // Step 1: Check if a native tool already covers this capability — don't over-install.
     if let Some(native_name) = find_native_equivalent(gap.missing_capability) {
-        let _ = app.emit(
-            "autoskill_native_sufficient",
+        let _ = app.emit_to("main", "autoskill_native_sufficient",
             serde_json::json!({
                 "requested": gap.missing_capability,
                 "native_tool": native_name,
@@ -213,8 +212,7 @@ pub async fn try_acquire(
                 continue;
             }
 
-            let _ = app.emit(
-                "autoskill_attempting",
+            let _ = app.emit_to("main", "autoskill_attempting",
                 serde_json::json!({
                     "name": candidate_name,
                     "reason": gap.missing_capability,
@@ -244,8 +242,7 @@ pub async fn try_acquire(
                     if let Ok(tools) = manager.discover_all_tools().await {
                         let tool_count = tools.len();
                         // Emit both the legacy event and the new UI-friendly event
-                        let _ = app.emit(
-                            "autoskill_installed",
+                        let _ = app.emit_to("main", "autoskill_installed",
                             serde_json::json!({
                                 "name": candidate_name,
                                 "tool_count": tool_count,
@@ -256,8 +253,7 @@ pub async fn try_acquire(
                             }),
                         );
                         // New event for the UI toast / notification
-                        let _ = app.emit(
-                            "tool_auto_installed",
+                        let _ = app.emit_to("main", "tool_auto_installed",
                             serde_json::json!({
                                 "server": candidate_name,
                                 "tool_count": tool_count,
@@ -276,8 +272,7 @@ pub async fn try_acquire(
                 }
             } else {
                 // Needs credentials — surface suggestion
-                let _ = app.emit(
-                    "autoskill_suggestion",
+                let _ = app.emit_to("main", "autoskill_suggestion",
                     serde_json::json!({
                         "name": candidate_name,
                         "description": entry.description,

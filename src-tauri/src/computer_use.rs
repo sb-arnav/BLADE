@@ -15,7 +15,7 @@
 ///   - User can interrupt at any step via `computer_use_stop`
 
 use serde::{Deserialize, Serialize};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 const MAX_STEPS: usize = 20;
 
@@ -106,7 +106,7 @@ pub async fn computer_use_task(
         steps_taken += 1;
 
         // Emit the planned step for UI preview
-        let _ = app.emit("computer_use_step", serde_json::json!({
+        let _ = app.emit_to("main", "computer_use_step", serde_json::json!({
             "step": step + 1,
             "action": &action,
             "status": "executing",
@@ -116,7 +116,7 @@ pub async fn computer_use_task(
 
         match action {
             ComputerAction::Done { result } => {
-                let _ = app.emit("computer_use_complete", serde_json::json!({
+                let _ = app.emit_to("main", "computer_use_complete", serde_json::json!({
                     "success": true,
                     "result": &result,
                     "steps": steps_taken,
@@ -128,7 +128,7 @@ pub async fn computer_use_task(
                 });
             }
             ComputerAction::Failed { reason } => {
-                let _ = app.emit("computer_use_complete", serde_json::json!({
+                let _ = app.emit_to("main", "computer_use_complete", serde_json::json!({
                     "success": false,
                     "result": &reason,
                     "steps": steps_taken,
@@ -142,7 +142,7 @@ pub async fn computer_use_task(
             ComputerAction::NeedApproval { description, action_json } => {
                 // Emit approval request — frontend handles this via existing mechanism
                 let approval_id = uuid::Uuid::new_v4().to_string();
-                let _ = app.emit("computer_use_approval_needed", serde_json::json!({
+                let _ = app.emit_to("main", "computer_use_approval_needed", serde_json::json!({
                     "approval_id": &approval_id,
                     "step": step + 1,
                     "description": &description,
@@ -157,7 +157,7 @@ pub async fn computer_use_task(
             }
             action => {
                 if let Err(e) = execute_action(&action).await {
-                    let _ = app.emit("computer_use_step", serde_json::json!({
+                    let _ = app.emit_to("main", "computer_use_step", serde_json::json!({
                         "step": step + 1,
                         "action": &action,
                         "status": "error",

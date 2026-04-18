@@ -280,8 +280,7 @@ pub async fn capture_timeline_tick(app: &tauri::AppHandle) {
     };
 
     // 6. Emit to frontend so live timeline view can update
-    let _ = app.emit(
-        "timeline_tick",
+    let _ = app.emit_to("main", "timeline_tick",
         serde_json::json!({
             "id": entry_id,
             "timestamp": now,
@@ -290,7 +289,7 @@ pub async fn capture_timeline_tick(app: &tauri::AppHandle) {
         }),
     );
     // Notify HUD: screenshot taken (camera blink + blue screen flash)
-    let _ = app.emit("screenshot_taken", ());
+    let _ = app.emit_to("main", "screenshot_taken", ());
 
     // 7. Async: describe + embed
     // Omi approach: the CAPTURE is cheap (local JPEG, every 5s).
@@ -370,7 +369,7 @@ pub fn start_timeline_capture_loop(app: tauri::AppHandle) {
                     let new_title = current_title.clone();
                     tokio::spawn(async move {
                         // Emit context switch event for proactive assistants
-                        let _ = app_clone.emit("screen_context_switch", serde_json::json!({
+                        let _ = app_clone.emit_to("main", "screen_context_switch", serde_json::json!({
                             "from_app": departing_app,
                             "to_app": new_app,
                             "to_title": crate::safe_slice(&new_title, 100),

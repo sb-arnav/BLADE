@@ -14,7 +14,7 @@
 
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 const RESEARCH_THROTTLE_SECS: i64 = 30 * 60; // at most once per 30 min
 const RESEARCH_CONTEXT_CHARS: usize = 3_000;  // max chars to include in system prompt
@@ -236,8 +236,7 @@ pub async fn run_research_cycle(app: &tauri::AppHandle) {
 
     if !researched.is_empty() {
         log::info!("[research] Completed: {:?}", researched);
-        let _ = app.emit(
-            "blade_research_update",
+        let _ = app.emit_to("main", "blade_research_update",
             serde_json::json!({ "queries": researched }),
         );
     }

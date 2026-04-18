@@ -8,7 +8,7 @@ use crate::providers::{self, ConversationMessage};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 
@@ -287,7 +287,7 @@ async fn poll_loop(app: tauri::AppHandle, mut state: BotState) {
             }
 
             // Emit event to frontend so the status indicator updates
-            let _ = app.emit("telegram_message_handled", state.messages_handled);
+            let _ = app.emit_to("main", "telegram_message_handled", state.messages_handled);
         }
     }
 

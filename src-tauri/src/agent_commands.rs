@@ -386,7 +386,7 @@ pub(crate) async fn run_agent_loop_internal(
     model: &str,
     base_url: Option<String>,
 ) {
-    use tauri::Emitter;
+    use tauri::{Emitter, Manager};
 
     loop {
         let should_continue = {
@@ -423,8 +423,7 @@ pub(crate) async fn run_agent_loop_internal(
         q.get(agent_id).map(|a| a.status.clone())
     };
 
-    let _ = app.emit(
-        "agent_completed",
+    let _ = app.emit_to("main", "agent_completed",
         serde_json::json!({
             "agent_id": agent_id,
             "status": format!("{:?}", status.unwrap_or(AgentStatus::Failed)),
@@ -460,8 +459,7 @@ pub(crate) async fn run_agent_loop_internal(
                         agent.context.insert("synthesized_result".to_string(), result.clone());
                     }
                 }
-                let _ = app.emit(
-                    "agent_synthesized",
+                let _ = app.emit_to("main", "agent_synthesized",
                     serde_json::json!({
                         "agent_id": agent_id,
                         "result": result,
@@ -484,7 +482,7 @@ async fn run_desktop_agent_loop(
     model: &str,
     base_url: Option<String>,
 ) {
-    use tauri::Emitter;
+    use tauri::{Emitter, Manager};
 
     loop {
         let mut finished = false;
@@ -509,8 +507,7 @@ async fn run_desktop_agent_loop(
                 agent.steps[idx].status = agents::StepStatus::Running;
                 agent.steps[idx].started_at = Some(chrono::Utc::now().timestamp_millis());
 
-                let _ = app.emit(
-                    "agent_step_started",
+                let _ = app.emit_to("main", "agent_step_started",
                     serde_json::json!({
                         "agent_id": agent_id,
                         "step_id": &step_id,
@@ -543,8 +540,7 @@ async fn run_desktop_agent_loop(
                 agent.steps[idx].status = agents::StepStatus::Completed;
                 agent.steps[idx].result = Some(summary.clone());
                 record_desktop_history(agent, &summary);
-                let _ = app.emit(
-                    "agent_step_completed",
+                let _ = app.emit_to("main", "agent_step_completed",
                     serde_json::json!({
                         "agent_id": agent_id,
                         "step_id": &step_id,
@@ -557,8 +553,7 @@ async fn run_desktop_agent_loop(
                 agent.steps[idx].status = agents::StepStatus::Completed;
                 agent.steps[idx].result = Some(summary.clone());
                 record_desktop_history(agent, &summary);
-                let _ = app.emit(
-                    "agent_step_completed",
+                let _ = app.emit_to("main", "agent_step_completed",
                     serde_json::json!({
                         "agent_id": agent_id,
                         "step_id": &step_id,
@@ -586,8 +581,7 @@ async fn run_desktop_agent_loop(
                     })
                     .unwrap_or_else(|_| "{}".to_string()),
                 );
-                let _ = app.emit(
-                    "agent_desktop_action_pending",
+                let _ = app.emit_to("main", "agent_desktop_action_pending",
                     serde_json::json!({
                         "agent_id": agent_id,
                         "step_id": &step_id,
@@ -599,8 +593,7 @@ async fn run_desktop_agent_loop(
             Err(error) => {
                 agent.steps[idx].status = agents::StepStatus::Failed;
                 agent.steps[idx].result = Some(error.clone());
-                let _ = app.emit(
-                    "agent_step_failed",
+                let _ = app.emit_to("main", "agent_step_failed",
                     serde_json::json!({
                         "agent_id": agent_id,
                         "step_id": &step_id,
@@ -629,8 +622,7 @@ async fn run_desktop_agent_loop(
         q.get(agent_id).map(|a| a.status.clone())
     };
 
-    let _ = app.emit(
-        "agent_completed",
+    let _ = app.emit_to("main", "agent_completed",
         serde_json::json!({
             "agent_id": agent_id,
             "status": format!("{:?}", status.unwrap_or(AgentStatus::Failed)),
@@ -2724,7 +2716,7 @@ pub async fn agent_respond_desktop_action(
     agent_id: String,
     approved: bool,
 ) -> Result<(), String> {
-    use tauri::Emitter;
+    use tauri::{Emitter, Manager};
 
     let (step_id, pending_json, provider, api_key, model, base_url) = {
         let config = load_config();
@@ -2788,16 +2780,14 @@ pub async fn agent_respond_desktop_action(
         let error = "Desktop action denied by user".to_string();
         agent.fail(error.clone());
 
-        let _ = app.emit(
-            "agent_step_failed",
+        let _ = app.emit_to("main", "agent_step_failed",
             serde_json::json!({
                 "agent_id": &agent_id,
                 "step_id": &step_id,
                 "error": &error,
             }),
         );
-        let _ = app.emit(
-            "agent_completed",
+        let _ = app.emit_to("main", "agent_completed",
             serde_json::json!({
                 "agent_id": &agent_id,
                 "status": format!("{:?}", AgentStatus::Failed),
@@ -2825,8 +2815,7 @@ pub async fn agent_respond_desktop_action(
                 step.status = agents::StepStatus::Completed;
                 step.result = Some(summary.clone());
                 record_desktop_history(agent, &summary);
-                let _ = app.emit(
-                    "agent_step_completed",
+                let _ = app.emit_to("main", "agent_step_completed",
                     serde_json::json!({
                         "agent_id": &agent_id,
                         "step_id": &step_id,
@@ -2840,8 +2829,7 @@ pub async fn agent_respond_desktop_action(
                 step.status = agents::StepStatus::Completed;
                 step.result = Some(summary.clone());
                 record_desktop_history(agent, &summary);
-                let _ = app.emit(
-                    "agent_step_completed",
+                let _ = app.emit_to("main", "agent_step_completed",
                     serde_json::json!({
                         "agent_id": &agent_id,
                         "step_id": &step_id,

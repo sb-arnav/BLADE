@@ -9,7 +9,7 @@
 /// `extract_actions` strips these from the visible text and returns them as
 /// structured `ParsedAction` values. `execute_actions` dispatches each one.
 
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 /// A single parsed action tag from LLM output.
 #[derive(Debug, Clone)]
@@ -95,7 +95,7 @@ async fn dispatch_action(action: ParsedAction, app: tauri::AppHandle) {
             // Also store as a short-term memory entity
             let n = crate::brain::extract_entities_from_exchange("", &fact).await;
             if n > 0 {
-                let _ = app.emit("brain_grew", serde_json::json!({ "new_entities": n }));
+                let _ = app.emit_to("main", "brain_grew", serde_json::json!({ "new_entities": n }));
             }
             log::info!("[action_tags] REMEMBER executed: {}", crate::safe_slice(&fact, 80));
         }
@@ -140,7 +140,7 @@ async fn dispatch_action(action: ParsedAction, app: tauri::AppHandle) {
 
             match crate::reminders::reminder_add(message.clone(), String::new(), fire_at) {
                 Ok(id) => {
-                    let _ = app.emit("blade_reminder_created", serde_json::json!({
+                    let _ = app.emit_to("main", "blade_reminder_created", serde_json::json!({
                         "id": id,
                         "title": message,
                         "source": "action_tag",
@@ -161,7 +161,7 @@ async fn dispatch_action(action: ParsedAction, app: tauri::AppHandle) {
             }
             log::info!("[action_tags] RESEARCH spawning background task: {}", crate::safe_slice(&query, 80));
             // Emit notification so UI shows that research is happening
-            let _ = app.emit("blade_notification", serde_json::json!({
+            let _ = app.emit_to("main", "blade_notification", serde_json::json!({
                 "type": "info",
                 "message": format!("Researching: {}", crate::safe_slice(&query, 60))
             }));
@@ -189,7 +189,7 @@ async fn dispatch_action(action: ParsedAction, app: tauri::AppHandle) {
                 let path = dir.join(&filename);
                 match std::fs::write(&path, &content) {
                     Ok(_) => {
-                        let _ = app.emit("blade_notification", serde_json::json!({
+                        let _ = app.emit_to("main", "blade_notification", serde_json::json!({
                             "type": "success",
                             "message": format!("Saved: {}", filename)
                         }));

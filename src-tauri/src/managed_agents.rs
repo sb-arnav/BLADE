@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use std::path::PathBuf;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, BufReader};
 
 #[derive(Debug, Deserialize)]
@@ -100,8 +100,7 @@ pub async fn run_managed_agent(
             let envelope = match serde_json::from_str::<RunnerEnvelope>(&line) {
                 Ok(value) => value,
                 Err(_) => {
-                    let _ = app_stdout.emit(
-                        "agent_message",
+                    let _ = app_stdout.emit_to("main", "agent_message",
                         serde_json::json!({
                             "id": format!("{}-parse", run_id_stdout),
                             "type": "error",
@@ -120,14 +119,14 @@ pub async fn run_managed_agent(
                     if let Some(object) = payload.as_object_mut() {
                         object.insert("runId".to_string(), serde_json::json!(run_id_stdout));
                     }
-                    let _ = app_stdout.emit("agent_message", payload);
+                    let _ = app_stdout.emit_to("main", "agent_message", payload);
                 }
                 "done" => {
                     let mut payload = envelope.payload;
                     if let Some(object) = payload.as_object_mut() {
                         object.insert("runId".to_string(), serde_json::json!(run_id_stdout));
                     }
-                    let _ = app_stdout.emit("agent_done", payload);
+                    let _ = app_stdout.emit_to("main", "agent_done", payload);
                 }
                 "error" => {
                     let message = envelope
@@ -135,8 +134,7 @@ pub async fn run_managed_agent(
                         .get("message")
                         .and_then(|value| value.as_str())
                         .unwrap_or("Claude managed agent runner failed.");
-                    let _ = app_stdout.emit(
-                        "agent_message",
+                    let _ = app_stdout.emit_to("main", "agent_message",
                         serde_json::json!({
                             "id": format!("{}-error", run_id_stdout),
                             "type": "error",
@@ -159,8 +157,7 @@ pub async fn run_managed_agent(
             if line.trim().is_empty() {
                 continue;
             }
-            let _ = app_stderr.emit(
-                "agent_message",
+            let _ = app_stderr.emit_to("main", "agent_message",
                 serde_json::json!({
                     "id": format!("{}-stderr", run_id_stderr),
                     "type": "system",
@@ -178,8 +175,7 @@ pub async fn run_managed_agent(
         match child.wait().await {
             Ok(status) if status.success() => {}
             Ok(status) => {
-                let _ = app_exit.emit(
-                    "agent_done",
+                let _ = app_exit.emit_to("main", "agent_done",
                     serde_json::json!({
                         "runId": run_id_exit,
                         "sessionId": serde_json::Value::Null,
@@ -190,8 +186,7 @@ pub async fn run_managed_agent(
                 );
             }
             Err(error) => {
-                let _ = app_exit.emit(
-                    "agent_message",
+                let _ = app_exit.emit_to("main", "agent_message",
                     serde_json::json!({
                         "id": format!("{}-wait-error", run_id_exit),
                         "type": "error",
@@ -200,8 +195,7 @@ pub async fn run_managed_agent(
                         "metadata": { "runId": run_id_exit, "subtype": "process_wait_error" }
                     }),
                 );
-                let _ = app_exit.emit(
-                    "agent_done",
+                let _ = app_exit.emit_to("main", "agent_done",
                     serde_json::json!({
                         "runId": run_id_exit,
                         "sessionId": serde_json::Value::Null,

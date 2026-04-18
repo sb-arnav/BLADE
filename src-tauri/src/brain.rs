@@ -7,6 +7,7 @@ use std::fs;
 use std::path::PathBuf;
 use chrono::Timelike;
 use chrono::Datelike;
+use tauri::Manager;
 
 // ── Model capability tiers ────────────────────────────────────────────────────
 // Different models need different prompting strategies.
@@ -1647,7 +1648,7 @@ pub async fn brain_extract_from_exchange(
     let n = extract_entities_from_exchange(&user_text, &assistant_text).await;
     if n > 0 {
         use tauri::Emitter;
-        let _ = app.emit("brain_grew", serde_json::json!({ "new_entities": n }));
+        let _ = app.emit_to("main", "brain_grew", serde_json::json!({ "new_entities": n }));
     }
 
     // Embed the full exchange (user + assistant) for semantic memory recall.

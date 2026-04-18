@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 // ---------------------------------------------------------------------------
 // Clipboard prefetch cache — one slot, keyed by content hash
@@ -154,7 +154,7 @@ async fn prefetch_analysis(text: String, kind: ClipboardContentType, app: AppHan
                 *cache = Some(pf.clone());
             }
             // Notify frontend so it can show a subtle "ready" indicator
-            let _ = app.emit("clipboard_prefetch_ready", serde_json::json!({
+            let _ = app.emit_to("main", "clipboard_prefetch_ready", serde_json::json!({
                 "content_type": format!("{:?}", kind).to_lowercase(),
                 "preview": crate::safe_slice(&text, 60),
             }));
@@ -369,7 +369,7 @@ pub async fn clipboard_auto_action(app: &tauri::AppHandle, content: &str, conten
                         let title = fetch_url_title(&url).await
                             .unwrap_or_else(|| "Unknown page".to_string());
                         let summary = format!("Enriched URL — title: {}", title);
-                        let _ = app_clone.emit("clipboard_enriched", serde_json::json!({
+                        let _ = app_clone.emit_to("main", "clipboard_enriched", serde_json::json!({
                             "url": url,
                             "title": title,
                             "summary": summary,
@@ -378,7 +378,7 @@ pub async fn clipboard_auto_action(app: &tauri::AppHandle, content: &str, conten
                 }
                 "error" => {
                     // Surface error with suggested fix prompt
-                    let _ = app.emit("clipboard_error_detected", serde_json::json!({
+                    let _ = app.emit_to("main", "clipboard_error_detected", serde_json::json!({
                         "preview": preview,
                         "suggested_prompt": format!(
                             "I found this error in your clipboard. Diagnose it and suggest a fix:\n\n{}",
@@ -390,7 +390,7 @@ pub async fn clipboard_auto_action(app: &tauri::AppHandle, content: &str, conten
             }
         }
         DecisionOutcome::AskUser { question, .. } => {
-            let _ = app.emit("proactive_suggestion", serde_json::json!({
+            let _ = app.emit_to("main", "proactive_suggestion", serde_json::json!({
                 "question": question,
                 "content_type": content_type,
                 "preview": preview,

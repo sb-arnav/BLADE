@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // ── Result types ─────────────────────────────────────────────────────────────
 
@@ -1322,7 +1322,7 @@ pub fn load_scan_summary() -> Option<String> {
 pub async fn deep_scan_start(app: tauri::AppHandle) -> Result<DeepScanResults, String> {
 
     let emit = |phase: &str, found: usize| {
-        let _ = app.emit("deep_scan_progress", serde_json::json!({
+        let _ = app.emit_to("main", "deep_scan_progress", serde_json::json!({
             "phase": phase,
             "found": found,
         }));

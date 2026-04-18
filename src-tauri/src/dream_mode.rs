@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // ── Static state ──────────────────────────────────────────────────────────────
 
@@ -393,14 +393,13 @@ pub async fn run_dream_session(app: tauri::AppHandle) -> DreamSession {
     macro_rules! run_task {
         ($name:expr, $fut:expr) => {{
             let task_name = $name;
-            let _ = app.emit("dream_task_start", serde_json::json!({ "task": task_name }));
+            let _ = app.emit_to("main", "dream_task_start", serde_json::json!({ "task": task_name }));
             let result: String =
                 match tokio::time::timeout(tokio::time::Duration::from_secs(120), $fut).await {
                     Ok(insight) => insight,
                     Err(_) => format!("{} timed out", task_name),
                 };
-            let _ = app.emit(
-                "dream_task_complete",
+            let _ = app.emit_to("main", "dream_task_complete",
                 serde_json::json!({ "task": task_name, "insight": result }),
             );
             tasks_completed.push(task_name.to_string());
@@ -472,7 +471,7 @@ pub fn start_dream_monitor(app: tauri::AppHandle) {
             // If user became active while dreaming, interrupt
             if already_dreaming && idle_secs < 60 {
                 DREAMING.store(false, Ordering::SeqCst);
-                let _ = app.emit("dream_mode_end", serde_json::json!({
+                let _ = app.emit_to("main", "dream_mode_end", serde_json::json!({
                     "reason": "interrupted",
                     "tasks_completed": 0,
                 }));
@@ -482,7 +481,7 @@ pub fn start_dream_monitor(app: tauri::AppHandle) {
             // Trigger dream if idle > 20 minutes and not already dreaming
             if idle_secs >= 1200 && !already_dreaming {
                 DREAMING.store(true, Ordering::SeqCst);
-                let _ = app.emit("dream_mode_start", serde_json::json!({
+                let _ = app.emit_to("main", "dream_mode_start", serde_json::json!({
                     "idle_secs": idle_secs,
                 }));
 
@@ -492,8 +491,7 @@ pub fn start_dream_monitor(app: tauri::AppHandle) {
                     // Only clear DREAMING if we weren't interrupted (interrupt path clears it itself)
                     DREAMING.compare_exchange(true, false, Ordering::SeqCst, Ordering::Relaxed)
                         .ok();
-                    let _ = app_clone.emit(
-                        "dream_mode_end",
+                    let _ = app_clone.emit_to("main", "dream_mode_end",
                         serde_json::json!({
                             "status": session.status,
                             "tasks_completed": session.tasks_completed.len(),
@@ -519,11 +517,10 @@ pub async fn dream_trigger_now(app: tauri::AppHandle) -> Result<DreamSession, St
     if DREAMING.swap(true, Ordering::SeqCst) {
         return Err("Dream session already in progress".to_string());
     }
-    let _ = app.emit("dream_mode_start", serde_json::json!({ "idle_secs": 0, "manual": true }));
+    let _ = app.emit_to("main", "dream_mode_start", serde_json::json!({ "idle_secs": 0, "manual": true }));
     let session = run_dream_session(app.clone()).await;
     DREAMING.store(false, Ordering::SeqCst);
-    let _ = app.emit(
-        "dream_mode_end",
+    let _ = app.emit_to("main", "dream_mode_end",
         serde_json::json!({
             "status": session.status,
             "tasks_completed": session.tasks_completed.len(),
