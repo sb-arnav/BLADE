@@ -1,0 +1,137 @@
+/* src/lib/context/toast.css — Toast system visuals (SHELL-04, D-59).
+ *
+ * Layered on top of .glass .glass-1 (already shipped in src/styles/glass.css).
+ * Pure CSS motion via @keyframes — D-02 (no Framer Motion).
+ * All colors via tokens; no hardcoded hex except type-specific accent bars
+ * which re-use the existing emerald/red/amber/sky family found throughout
+ * Phase 1 primitives.
+ *
+ * @see src/lib/context/ToastContext.tsx
+ * @see src/lib/context/ToastViewport.tsx
+ */
+
+.toast-viewport {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 1000; /* above Dialog backdrop (native dialog uses z-index:100) */
+  pointer-events: none; /* children opt-in */
+  max-width: 380px;
+}
+
+.toast {
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: 4px 28px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  color: var(--t-1);
+  box-shadow: var(--g-shadow-sm);
+  animation: toast-in var(--dur-enter, 260ms)
+    var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast-bar {
+  width: 4px;
+  height: 100%;
+  border-radius: 2px;
+  align-self: stretch;
+}
+
+.toast-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.toast-body {
+  min-width: 0;
+}
+
+.toast-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toast-message {
+  font-size: 12px;
+  color: var(--t-2);
+  margin-top: 2px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.toast-dismiss {
+  background: transparent;
+  color: var(--t-3);
+  border: 0;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: var(--r-sm, 8px);
+}
+
+.toast-dismiss:hover {
+  color: var(--t-1);
+  background: var(--g-fill);
+}
+
+/* Type-specific bar + icon tints. These RGBs match Phase 1 primitive accent
+ * family — kept explicit so the toast feels "scoped" vs re-using t-x tokens. */
+.toast-info .toast-bar {
+  background: rgba(96, 165, 250, 0.92); /* sky-400 */
+}
+.toast-info .toast-icon {
+  background: rgba(96, 165, 250, 0.14);
+  color: rgba(186, 220, 255, 0.98);
+}
+
+.toast-success .toast-bar {
+  background: rgba(52, 211, 153, 0.92); /* emerald-400 */
+}
+.toast-success .toast-icon {
+  background: rgba(52, 211, 153, 0.14);
+  color: rgba(138, 255, 199, 0.98);
+}
+
+.toast-warn .toast-bar {
+  background: rgba(251, 191, 36, 0.92); /* amber-400 */
+}
+.toast-warn .toast-icon {
+  background: rgba(251, 191, 36, 0.14);
+  color: rgba(253, 230, 138, 0.98);
+}
+
+.toast-error .toast-bar {
+  background: rgba(248, 113, 113, 0.92); /* red-400 */
+}
+.toast-error .toast-icon {
+  background: rgba(248, 113, 113, 0.14);
+  color: rgba(254, 202, 202, 0.98);
+}
