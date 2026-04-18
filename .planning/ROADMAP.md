@@ -62,11 +62,11 @@ Phase 9: Polish Pass ◄──────────────────�
 **Depends on**: Nothing
 **Requirements**: None (no-code audit phase; outputs unlock Phase 1)
 **Success Criteria** (what must be TRUE):
-  1. `RECOVERY_LOG.md` exists in `.planning/` with explicit QuickAsk → Main bridge contract (event name, payload shape, conversation persistence path) traced from `src.bak/src/quickask.tsx`.
-  2. Voice orb state machine from `src.bak/` documented: which Tauri events drive which of the 4 phase states, what the old rAF loop looked like.
-  3. All 43 event-listener sites in `src.bak/` catalogued: which have cleanup, which leak, which patterns to carry forward.
-  4. Onboarding backend wiring documented: `get_onboarding_status`, `complete_onboarding`, `deep_scan_*` call sequence and expected payloads.
-  5. `emit_all` audit complete: every `app.emit_all(...)` in `src-tauri/src/` classified as cross-window (keep) or single-window (convert to `emit_to`).
+  1. `RECOVERY_LOG.md` exists in `.planning/` with explicit QuickAsk → Main bridge contract (invoke name, event name, payload shape, conversation persistence path) derived from `src-tauri/src/commands.rs` + `docs/design/quickask.html`.
+  2. Voice Orb state machine documented — which Rust events (`voice_conversation_*`, `wake_word_detected`, etc.) drive each of the 4 phase states — derived from `src-tauri/src/voice_global.rs`, `src-tauri/src/wake_word.rs`, and `docs/design/voice-orb-states.html` (OpenClaw math locked via D-08; see PRIOR_ART.md).
+  3. All Rust event emitters catalogued — every `emit_all` / `emit_to` site in `src-tauri/src/` with event name and payload type — forming the subscription surface for Phase 1's `useTauriEvent`.
+  4. Onboarding backend wiring documented — `get_onboarding_status`, `complete_onboarding`, and `deep_scan_*` call sequence and payloads — derived from `src-tauri/src/commands.rs` + the 3 onboarding prototype screens.
+  5. `emit_all` audit complete — every `app.emit_all(...)` classified as cross-window (keep) or single-window (convert to `emit_to`); proposed `emit_to(label, ...)` replacement inline for every single-window row.
 **Plans**: 2 plans
 - [x] 00-01-PLAN.md — Wave 1: 3 parallel extractions (backend contracts, emit_all classification, prototype flow map) — COMPLETE 2026-04-18 (c6957a1)
 - [ ] 00-02-PLAN.md — Wave 2: synthesize `.planning/RECOVERY_LOG.md` + patch ROADMAP/STATE + commit audit bundle
