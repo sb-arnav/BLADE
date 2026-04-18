@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::Emitter;
+use tauri::Manager;
 use tokio::sync::oneshot;
 use tokio::sync::Mutex;
 
@@ -74,7 +75,7 @@ pub fn cancel_chat(app: tauri::AppHandle) {
     // here creates a race where a second message could slip through before
     // the first stream actually stops.
     CHAT_CANCEL.store(true, Ordering::SeqCst);
-    let _ = app.emit("chat_cancelled", ());
+    let _ = app.emit_to("main", "chat_cancelled", ());
     let _ = app.emit("blade_status", "idle");
 }
 
@@ -303,7 +304,7 @@ async fn try_free_model_fallback(
 
         if key.is_empty() && *provider != "ollama" { continue; }
 
-        let _ = app.emit("blade_notification", serde_json::json!({
+        let _ = app.emit_to("main", "blade_notification", serde_json::json!({
             "type": "info",
             "message": format!("Rate limited on {} — switching to {} ({}) for this request.",
                 config.provider, provider, model)
@@ -312,7 +313,7 @@ async fn try_free_model_fallback(
 
         match providers::complete_turn(provider, &key, model, conversation, tools, None).await {
             Ok(t) => {
-                let _ = app.emit("blade_routing_switched", serde_json::json!({
+                let _ = app.emit_to("main", "blade_routing_switched", serde_json::json!({
                     "from_provider": &config.provider,
                     "from_model": &config.model,
                     "to_provider": provider,
@@ -637,7 +638,7 @@ pub async fn send_message_stream(
 
     // Emit routing decision so the UI can show which model/provider is active for this request
     let hive_active = !crate::hive::get_hive_digest().is_empty();
-    let _ = app.emit("chat_routing", serde_json::json!({
+    let _ = app.emit_to("main", "chat_routing", serde_json::json!({
         "provider": &config.provider,
         "model": &config.model,
         "hive_active": hive_active,
@@ -678,7 +679,7 @@ pub async fn send_message_stream(
         tokio::spawn(async move {
             match providers::stream_fast_acknowledgment(&ack_msg, &ack_config).await {
                 Ok(ack) if !ack.is_empty() => {
-                    let _ = ack_app.emit("chat_ack", ack);
+                    let _ = ack_app.emit_to("main", "chat_ack", ack);
                 }
                 _ => {}
             }
@@ -723,7 +724,7 @@ pub async fn send_message_stream(
         let needs_reasoning = is_reasoning_query(&last_user_text);
         if needs_reasoning && last_user_text.split_whitespace().count() > 5 {
             let _ = app.emit("blade_status", "thinking");
-            let _ = app.emit("blade_planning", serde_json::json!({
+            let _ = app.emit_to("main", "blade_planning", serde_json::json!({
                 "query": crate::safe_slice(&last_user_text, 120),
                 "mode": "deep_reasoning",
             }));
@@ -739,10 +740,10 @@ pub async fn send_message_stream(
                     // Stream the final answer as chat tokens
                     let answer = &trace.final_answer;
                     for word in answer.split_whitespace() {
-                        let _ = app.emit("chat_token", format!("{} ", word));
+                        let _ = app.emit_to("main", "chat_token", format!("{} ", word));
                         tokio::task::yield_now().await;
                     }
-                    let _ = app.emit("chat_done", ());
+                    let _ = app.emit_to("main", "chat_done", ());
                     let _ = app.emit("blade_status", "idle");
 
                     // Record the reasoning for solution memory
@@ -775,7 +776,7 @@ pub async fn send_message_stream(
     {
         let plan_score = count_task_steps(&last_user_text);
         if plan_score >= 3 {
-            let _ = app.emit("blade_planning", serde_json::json!({
+            let _ = app.emit_to("main", "blade_planning", serde_json::json!({
                 "query": crate::safe_slice(&last_user_text, 120),
                 "step_count": plan_score,
             }));
@@ -985,7 +986,7 @@ pub async fn send_message_stream(
             tokio::spawn(async move {
                 let n = brain::extract_entities_from_exchange(&user_text_clone, "").await;
                 if n > 0 {
-                    let _ = app2.emit("brain_grew", serde_json::json!({ "new_entities": n }));
+                    let _ = app2.emit_to("main", "brain_grew", serde_json::json!({ "new_entities": n }));
                 }
             });
             // PREDICTION ENGINE: fire-and-forget contextual prediction (streaming path)
@@ -1057,8 +1058,8 @@ pub async fn send_message_stream(
     for iteration in 0..12 {
         // Check cancellation before each iteration
         if CHAT_CANCEL.load(Ordering::SeqCst) {
-            let _ = app.emit("chat_cancelled", ());
-            let _ = app.emit("chat_done", ());
+            let _ = app.emit_to("main", "chat_cancelled", ());
+            let _ = app.emit_to("main", "chat_done", ());
             let _ = app.emit("blade_status", "idle");
             return Ok(());
         }
@@ -1086,7 +1087,7 @@ pub async fn send_message_stream(
                     ErrorRecovery::TruncateAndRetry => {
                         // Smart compress then retry
                         let _ = app.emit("blade_status", "processing");
-                        let _ = app.emit("blade_notification", serde_json::json!({
+                        let _ = app.emit_to("main", "blade_notification", serde_json::json!({
                             "type": "info", "message": "Context too long — compressing conversation and retrying"
                         }));
                         compress_conversation_smart(
@@ -1114,7 +1115,7 @@ pub async fn send_message_stream(
                     ErrorRecovery::SwitchModelAndRetry => {
                         let fallback = safe_fallback_model(&config.provider).to_string();
                         let _ = app.emit("blade_status", "processing");
-                        let _ = app.emit("blade_notification", serde_json::json!({
+                        let _ = app.emit_to("main", "blade_notification", serde_json::json!({
                             "type": "info",
                             "message": format!("Model '{}' not available — retrying with {}", config.model, fallback)
                         }));
@@ -1158,7 +1159,7 @@ pub async fn send_message_stream(
                         } else {
                             // No free model available — fall back to waiting
                             let wait = backoff_secs(secs, "rate_limit");
-                            let _ = app.emit("blade_notification", serde_json::json!({
+                            let _ = app.emit_to("main", "blade_notification", serde_json::json!({
                                 "type": "info",
                                 "message": format!("Rate limited on {}. Retrying in {}s.", config.provider, wait)
                             }));
@@ -1184,7 +1185,7 @@ pub async fn send_message_stream(
                             return Err("Server overload circuit breaker tripped — provider is consistently unavailable. Try again later or switch providers.".to_string());
                         }
                         let wait = backoff_secs(5, "overloaded");
-                        let _ = app.emit("blade_notification", serde_json::json!({
+                        let _ = app.emit_to("main", "blade_notification", serde_json::json!({
                             "type": "info", "message": format!("Server overloaded — retrying in {}s", wait)
                         }));
                         tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
@@ -1213,7 +1214,7 @@ pub async fn send_message_stream(
                                     let fb_model = crate::router::suggest_model(&fb_prov, &crate::router::TaskType::Complex)
                                         .unwrap_or_else(|| config.model.clone());
                                     let _ = app.emit("blade_status", "processing");
-                                    let _ = app.emit("blade_notification", serde_json::json!({
+                                    let _ = app.emit_to("main", "blade_notification", serde_json::json!({
                                         "type": "info",
                                         "message": format!("Switching to {} (fallback)", fb_prov)
                                     }));
@@ -1273,7 +1274,7 @@ pub async fn send_message_stream(
                     buf.push(ch);
                     // Emit on natural boundaries: space, newline, or every 6 chars
                     if ch == ' ' || ch == '\n' || buf.len() >= 6 {
-                        let _ = app.emit("chat_token", buf.clone());
+                        let _ = app.emit_to("main", "chat_token", buf.clone());
                         buf.clear();
                         // Yield to the async runtime so the IPC channel flushes this chunk
                         // before the next one — this produces a real streaming feel.
@@ -1281,14 +1282,14 @@ pub async fn send_message_stream(
                     }
                 }
                 if !buf.is_empty() {
-                    let _ = app.emit("chat_token", buf);
+                    let _ = app.emit_to("main", "chat_token", buf);
                 }
             } else {
                 // AI returned an empty response after tool calls — emit a brief fallback
                 // so the user doesn't see a blank assistant bubble.
-                let _ = app.emit("chat_token", "Done.".to_string());
+                let _ = app.emit_to("main", "chat_token", "Done.".to_string());
             }
-            let _ = app.emit("chat_done", ());
+            let _ = app.emit_to("main", "chat_done", ());
             let _ = app.emit("blade_status", "idle");
 
             // Complete prefrontal working memory so follow-up messages
@@ -1320,7 +1321,7 @@ pub async fn send_message_stream(
             tokio::spawn(async move {
                 let n = brain::extract_entities_from_exchange(&user_text, &assistant_text).await;
                 if n > 0 {
-                    let _ = app2.emit("brain_grew", serde_json::json!({ "new_entities": n }));
+                    let _ = app2.emit_to("main", "brain_grew", serde_json::json!({ "new_entities": n }));
                 }
                 // Embed the full exchange for persistent semantic memory
                 crate::embeddings::auto_embed_exchange(&store_clone, &user_text, &assistant_text, "tool_loop");
@@ -1368,7 +1369,7 @@ pub async fn send_message_stream(
 
                 // Capability gap detection — runs silently, fires webhook if gap found
                 if reports::detect_and_log(&user_text, &assistant_text) {
-                    let _ = app2.emit("capability_gap_detected", serde_json::json!({
+                    let _ = app2.emit_to("main", "capability_gap_detected", serde_json::json!({
                         "user_request": crate::safe_slice(&user_text, 120),
                     }));
                     // Deliver to webhook asynchronously
@@ -1383,7 +1384,7 @@ pub async fn send_message_stream(
                 }
                 // SELF-CRITIQUE: background quality check — rebuild if score < 7
                 if let Some(improved) = crate::self_critique::maybe_critique(&user_text, &assistant_text).await {
-                    let _ = app2.emit("response_improved", serde_json::json!({
+                    let _ = app2.emit_to("main", "response_improved", serde_json::json!({
                         "improved": improved,
                     }));
                 }
@@ -1605,7 +1606,7 @@ pub async fn send_message_stream(
                     ).await;
                     match decision {
                         crate::ai_delegate::DelegateDecision::Approved { reasoning } => {
-                            let _ = app.emit("ai_delegate_approved", serde_json::json!({
+                            let _ = app.emit_to("main", "ai_delegate_approved", serde_json::json!({
                                 "tool": &tool_call.name,
                                 "delegate": &delegate,
                                 "reasoning": reasoning,
@@ -1613,7 +1614,7 @@ pub async fn send_message_stream(
                             true
                         }
                         crate::ai_delegate::DelegateDecision::Denied { reasoning } => {
-                            let _ = app.emit("ai_delegate_denied", serde_json::json!({
+                            let _ = app.emit_to("main", "ai_delegate_denied", serde_json::json!({
                                 "tool": &tool_call.name,
                                 "delegate": &delegate,
                                 "reasoning": reasoning,
@@ -1628,7 +1629,8 @@ pub async fn send_message_stream(
                                 let mut map = approvals.lock().await;
                                 map.insert(approval_id.clone(), tx);
                             }
-                            let _ = app.emit(
+                            let _ = app.emit_to(
+                                "main",
                                 "tool_approval_needed",
                                 serde_json::json!({
                                     "approval_id": &approval_id,
@@ -1650,7 +1652,8 @@ pub async fn send_message_stream(
                         let mut map = approvals.lock().await;
                         map.insert(approval_id.clone(), tx);
                     }
-                    let _ = app.emit(
+                    let _ = app.emit_to(
+                        "main",
                         "tool_approval_needed",
                         serde_json::json!({
                             "approval_id": &approval_id,
@@ -1696,7 +1699,8 @@ pub async fn send_message_stream(
                 }
             }
 
-            let _ = app.emit(
+            let _ = app.emit_to(
+                "main",
                 "tool_executing",
                 serde_json::json!({
                     "name": &tool_call.name,
@@ -1798,7 +1802,8 @@ pub async fn send_message_stream(
             } else {
                 result_preview
             };
-            let _ = app.emit(
+            let _ = app.emit_to(
+                "main",
                 "tool_completed",
                 serde_json::json!({
                     "name": &tool_call.name,
@@ -1873,8 +1878,8 @@ pub async fn send_message_stream(
     // Check cancel flag before firing the final summary call —
     // the user may have hit stop during the last tool iteration.
     if CHAT_CANCEL.load(Ordering::SeqCst) {
-        let _ = app.emit("chat_cancelled", ());
-        let _ = app.emit("chat_done", ());
+        let _ = app.emit_to("main", "chat_cancelled", ());
+        let _ = app.emit_to("main", "chat_done", ());
         let _ = app.emit("blade_status", "idle");
         return Ok(());
     }
@@ -2209,7 +2214,8 @@ pub fn history_rename_conversation(
     title: String,
 ) -> Result<(), String> {
     crate::history::update_conversation_title(&conversation_id, &title)?;
-    let _ = app.emit(
+    let _ = app.emit_to(
+        "main",
         "conversation_titled",
         serde_json::json!({ "conversation_id": conversation_id, "title": title }),
     );
@@ -2267,7 +2273,8 @@ pub async fn auto_title_conversation(
 
     crate::history::update_conversation_title(&conversation_id, &title)?;
 
-    let _ = app.emit(
+    let _ = app.emit_to(
+        "main",
         "conversation_titled",
         serde_json::json!({ "conversation_id": conversation_id, "title": title }),
     );

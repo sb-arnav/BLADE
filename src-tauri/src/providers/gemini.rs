@@ -155,7 +155,7 @@ pub async fn stream_text(
     messages: &[super::ConversationMessage],
 ) -> Result<(), String> {
     use futures::StreamExt;
-    use tauri::Emitter;
+    use tauri::{Emitter, Manager};
 
     let client = super::http_client();
     let encoded_model = urlencoding::encode(model);
@@ -221,7 +221,7 @@ pub async fn stream_text(
                         if let Some(text) =
                             json["candidates"][0]["content"]["parts"][0]["text"].as_str()
                         {
-                            let _ = app.emit("chat_token", text);
+                            let _ = app.emit_to("main", "chat_token", text);
                         }
                     }
                 }
@@ -231,7 +231,7 @@ pub async fn stream_text(
     }.await;
 
     // Always emit chat_done so the frontend never gets stuck in loading state
-    let _ = app.emit("chat_done", ());
+    let _ = app.emit_to("main", "chat_done", ());
     result
 }
 
