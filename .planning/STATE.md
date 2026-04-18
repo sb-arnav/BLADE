@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 current_phase: "01-foundation"
-status: phase-complete
-last_updated: "2026-04-18T10:00:00.000Z"
+status: context-gathered
+last_updated: "2026-04-18T12:30:00.000Z"
 progress:
   total_phases: 10
   completed_phases: 1
@@ -16,8 +16,8 @@ progress:
 # STATE — BLADE Skin Rebuild (V1)
 
 **Project:** BLADE Skin Rebuild V1
-**Current Phase:** 01-foundation (Phase 0 complete — awaiting Arnav review before Phase 1 begins)
-**Status:** Phase 00 COMPLETE — RECOVERY_LOG.md delivered; Phase 1 unblocked pending review
+**Current Phase:** 01-foundation (CONTEXT captured — ready for /gsd-plan-phase 1)
+**Status:** Phase 01 CONTEXT COMPLETE — 26 new decisions locked (D-20..D-45); discuss-phase done
 **Last Updated:** 2026-04-18
 
 ---
@@ -26,7 +26,7 @@ progress:
 
 **Core Value:** Every surface the user touches is coherent, Liquid-Glass-native, and wired end-to-end. No orphan screens, no dead buttons, no stringly-typed invokes that silently fail.
 
-**Current Focus:** Phase 1 Foundation (awaiting Arnav review of Phase 0 output before starting)
+**Current Focus:** Phase 1 Foundation — CONTEXT.md captured, ready for planning
 
 ---
 
@@ -89,6 +89,15 @@ Plan: 2 of 2 (both done)
 - D-17: src.bak is dead reference — backend + prototypes are canonical audit sources (Phase 0 confirmed)
 - D-18: QuickAsk-voice uses blur(48px) — intentional override; sole backdrop-filter layer on that screen
 - D-19: homeostasis emits `homeostasis_update` (not `hormone_update`) — rename WIRE-02 deferred to Phase 3
+- D-20..D-45: Phase 1 Foundation implementation decisions (26 decisions) — see `.planning/phases/01-foundation/01-CONTEXT.md`. Key ones:
+  - D-20 props-variant primitive API with strict string unions
+  - D-22 token files split by concern (tokens/glass/motion/layout.css)
+  - D-23 CSS vars source of truth; Tailwind @theme bridges via var()
+  - D-24 self-hosted WOFF2 fonts
+  - D-26 hybrid nuke: rm -rf src/ then rebuild 5 windows + 59 RouteDefinition stubs with ComingSoonSkeleton
+  - D-27 migration ledger enforcement = CI script + checklist doc (no reviewer-required PR gate)
+  - D-29..D-34 gate verification methods (performance.mark, /wrapper-smoke route, verify-entries.mjs, Playwright, contrast audit, ESLint custom rule)
+  - D-35..D-45 directory + wrapper + event + route registry + config/prefs + HTML entry + WIRE-08 regression details
 
 ### Phase Gate Requirements (Phase 1 must pass ALL of these)
 
@@ -118,18 +127,19 @@ Plan: 2 of 2 (both done)
 - [x] Document backend contracts (commands, events, WIRE gaps) — DONE (00-BACKEND-EXTRACT.md)
 - [x] Map all 11 prototypes to flow contracts — DONE (00-PROTO-FLOW.md)
 - [x] Create `.planning/RECOVERY_LOG.md` — DONE (Plan 00-02, b26a965, 1178 lines)
-- [ ] Get Arnav review of RECOVERY_LOG.md before Phase 1 begins
+- [x] Phase 1 CONTEXT gathered — DONE (2026-04-18, 01-CONTEXT.md + 01-DISCUSSION-LOG.md)
+- [ ] Run `/gsd-plan-phase 1` — generate plans from context
 
 ### Blockers
 
-None. Phase 1 Foundation is ready to start after Arnav reviews RECOVERY_LOG.md.
+None. Phase 1 Foundation CONTEXT complete. Ready for `/gsd-plan-phase 1`.
 
 ---
 
 ## Session Continuity
 
-**Last session:** 2026-04-18 — GSD executor ran Plan 00-02 (Wave 2 synthesis). RECOVERY_LOG.md produced and committed (b26a965). Phase 0 complete.
-**Next action:** Arnav reviews `.planning/RECOVERY_LOG.md`. After sign-off, begin Phase 1 Foundation planning.
+**Last session:** 2026-04-18 — `/gsd-discuss-phase 1` completed. 01-CONTEXT.md + 01-DISCUSSION-LOG.md written covering 26 new decisions (D-20..D-45) across primitive API, token strategy, typed wrapper, route registry, migration ledger, gate verification, WIRE-08 regression prevention.
+**Next action:** Run `/gsd-plan-phase 1` to generate PLAN.md files from context.
 **Context cliff notes:**
 
 - Backend is complete (178 Rust modules, 764 commands); this project is frontend only
@@ -143,4 +153,4 @@ None. Phase 1 Foundation is ready to start after Arnav reviews RECOVERY_LOG.md.
 
 ---
 
-*State initialized: 2026-04-17 | Last updated: 2026-04-18*
+*State initialized: 2026-04-17 | Last updated: 2026-04-18 (Phase 1 CONTEXT)*
