@@ -359,3 +359,53 @@ dialog.glass:has(.palette) {
   top: 25vh;
   transform: translate(-50%, 0);
 }
+
+/* ── MainShell layout (Plan 02-06) ───────────────────────────────────── */
+
+.main-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: var(--title-height) 1fr;
+}
+.main-shell-body {
+  display: grid;
+  grid-template-columns: var(--nav-width, 62px) 1fr;
+  min-height: 0;
+}
+.main-shell-route {
+  position: relative;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* Onboarding surface — full-viewport below the titlebar. OnboardingFlow's
+ * own .onb-* rules live in src/features/onboarding/onboarding.css; this
+ * wrapper just carves out space beneath the TitleBar. */
+.onb-surface {
+  position: relative;
+  min-height: calc(100vh - var(--title-height));
+  width: 100%;
+}
+
+/* ── GlobalOverlays (Plan 02-06 stubs) ──────────────────────────────── */
+
+.global-overlays {
+  position: fixed;
+  top: 44px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 200;
+  pointer-events: none;
+}
+.overlay-stub {
+  pointer-events: auto;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px dashed var(--g-edge-lo);
+  color: var(--t-3);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
