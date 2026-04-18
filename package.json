@@ -4,6 +4,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "seed:ledger": "node scripts/seed-migration-ledger.mjs",
     "release:prepare-updater": "node .github/scripts/prepare-tauri-release-config.mjs"
   },
   "devDependencies": {
