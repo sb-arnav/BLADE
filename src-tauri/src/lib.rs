@@ -767,6 +767,7 @@ pub fn run() {
             memory::set_memory_block,
             memory::run_weekly_memory_consolidation,
             character::apply_reaction_to_traits,
+            character::delegate_feedback,
             router::classify_message,
             tray::set_tray_status,
             pulse::pulse_get_last_thought,
@@ -1287,6 +1288,7 @@ pub fn run() {
             hive::hive_get_digest,
             hive::hive_spawn_tentacle,
             dna::dna_get_identity,
+            dna::dna_set_identity,
             dna::dna_get_goals,
             dna::dna_get_patterns,
             dna::dna_query,
@@ -1335,6 +1337,7 @@ pub fn run() {
             proactive_vision::proactive_dismiss_card,
             hive::hive_get_reports,
             hive::hive_approve_decision,
+            hive::hive_reject_decision,
             hive::hive_set_autonomy,
             // Auto-Fix Pipeline — autonomous CI repair engine
             auto_fix::auto_fix_analyze,

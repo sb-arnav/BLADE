@@ -565,6 +565,54 @@ Be specific. Not "be better" but "avoid bullet lists for yes/no questions"."#,
     Ok(format!("Trait '{}' {} → rule stored (confidence: {:.0}%)", trait_name, direction, confidence * 100.0))
 }
 
+// ── AI Delegate feedback log ─────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct DelegateFeedbackEntry {
+    decision_id: String,
+    was_correct: bool,
+    note: Option<String>,
+    timestamp: String,
+}
+
+fn delegate_feedback_path() -> PathBuf {
+    blade_config_dir().join("delegate_feedback.jsonl")
+}
+
+/// Record operator feedback on an AI-delegate decision.
+/// Plan 09-01 closes Phase 8 D-205 deferral.
+///
+/// Appends a single JSON line to `delegate_feedback.jsonl` under blade config
+/// dir. Append-only audit log — existing entries are never rewritten.
+#[tauri::command]
+pub async fn delegate_feedback(
+    decision_id: String,
+    was_correct: bool,
+    note: Option<String>,
+) -> Result<(), String> {
+    use std::io::Write;
+
+    let entry = DelegateFeedbackEntry {
+        decision_id,
+        was_correct,
+        note,
+        timestamp: chrono::Utc::now().to_rfc3339(),
+    };
+    let line = serde_json::to_string(&entry).map_err(|e| e.to_string())?;
+
+    let path = delegate_feedback_path();
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|e| e.to_string())?;
+    writeln!(file, "{}", line).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// Get the top N learned preferences formatted for system prompt injection.
 /// These are the most high-confidence behavioral rules BLADE has learned.
 pub fn get_top_learned_preferences(n: usize) -> Vec<String> {
