@@ -9,7 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::process::Command;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

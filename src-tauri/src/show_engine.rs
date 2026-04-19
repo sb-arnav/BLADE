@@ -21,7 +21,7 @@
 
 use serde::{Deserialize, Serialize};
 use rusqlite::params;
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShowPattern {

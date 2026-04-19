@@ -9,7 +9,6 @@
 use base64::Engine;
 use std::fs;
 use std::path::PathBuf;
-use tauri::Manager;
 
 // --- Model definitions -------------------------------------------------------
 

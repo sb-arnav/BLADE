@@ -14,7 +14,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::Emitter;
-use tauri::Manager;
 use tokio::sync::oneshot;
 use tokio::sync::Mutex;
 

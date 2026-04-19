@@ -88,15 +88,8 @@ export function PrivacyPane() {
           <li>No analytics, no crash-report uploads, no usage pings.</li>
           <li>Provider API keys live in your OS keyring — BLADE only fetches them at invoke time.</li>
           <li>Screen + audio timelines are stored on disk. Disable in Voice + Diagnostics if uncomfortable.</li>
-          <li>
-            <a
-              href="docs/architecture/2026-04-16-blade-body-architecture-design.md"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="settings-link"
-            >
-              Architecture audit doc
-            </a>
+          <li style={{ color: 'var(--t-3)', fontSize: 13 }}>
+            See <code>docs/architecture/</code> in the repo for the full audit doc.
           </li>
         </ul>
       </Card>

@@ -22,7 +22,7 @@ use chrono::{Datelike, Local, Timelike, Weekday};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 // Note: No independent loop. `learning_engine::start_learning_engine` drives
 // `generate_predictions()` directly in its 30-min tick. Do NOT start a separate loop.

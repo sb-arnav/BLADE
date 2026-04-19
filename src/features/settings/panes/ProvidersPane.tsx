@@ -19,6 +19,7 @@
 // @see src-tauri/src/config.rs:645 switch_provider
 
 import { useEffect, useState } from 'react';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { Button, Card, Input, Pill } from '@/design-system/primitives';
 import { PROVIDERS } from '@/features/onboarding/providers';
 import {
@@ -148,7 +149,7 @@ export function ProvidersPane() {
                 type="password"
                 value={pendingValue}
                 onChange={(e) => setPending((s) => ({ ...s, [p.id]: e.target.value }))}
-                placeholder={p.needsKey ? (p.id === 'anthropic' ? 'sk-ant-…' : 'sk-…') : 'No key needed'}
+                placeholder={p.keyPlaceholder}
                 disabled={!p.needsKey || currentBusy != null}
                 autoComplete="off"
                 spellCheck={false}
@@ -158,8 +159,10 @@ export function ProvidersPane() {
                 <p className="provider-tagline" style={{ marginTop: 4 }}>
                   <a
                     href={p.keyUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      openUrl(p.keyUrl).catch(() => {});
+                    }}
                     className="settings-link"
                   >
                     Get an API key →

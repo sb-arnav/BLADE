@@ -249,7 +249,7 @@ pub async fn stream_text(
     messages: &[super::ConversationMessage],
 ) -> Result<(), String> {
     use futures::StreamExt;
-    use tauri::{Emitter, Manager};
+    use tauri::Emitter;
 
     let client = super::http_client();
     let mut msgs: Vec<serde_json::Value> = messages.iter().filter_map(serialize_simple).collect();

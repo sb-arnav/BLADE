@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 use rusqlite::params;
 
 // ---------------------------------------------------------------------------

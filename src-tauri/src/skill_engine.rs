@@ -19,7 +19,7 @@ use crate::db::{skill_candidate_delete, skill_candidate_record, skill_candidates
 use crate::providers::ConversationMessage;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 const SKILL_SYNTHESIS_THRESHOLD: i64 = 3;
 const MAX_ACTIVE_SKILLS: usize = 10;

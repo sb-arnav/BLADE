@@ -9,7 +9,7 @@
 /// `extract_actions` strips these from the visible text and returns them as
 /// structured `ParsedAction` values. `execute_actions` dispatches each one.
 
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 /// A single parsed action tag from LLM output.
 #[derive(Debug, Clone)]

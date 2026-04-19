@@ -1,7 +1,7 @@
 /// Ambient intelligence monitor — runs in background from app launch.
 /// Tracks what the user is doing, emits proactive_nudge events when
 /// Blade has something useful to say without being asked.
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 /// Personality variations — BLADE doesn't repeat the same line.
 /// tick % N picks a different phrasing each time.

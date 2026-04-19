@@ -12,6 +12,7 @@
 // @see .planning/phases/02-onboarding-shell/02-CONTEXT.md §D-50
 
 import { useState } from 'react';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { Button, Input } from '@/design-system/primitives';
 import { Steps } from './Steps';
 import { PROVIDERS } from './providers';
@@ -77,7 +78,17 @@ export function ApiKeyEntry({
         {provider.needsKey ? (
           <>
             We store it in your OS keyring. Nothing leaves your machine.{' '}
-            <a href={provider.keyUrl} target="_blank" rel="noopener noreferrer">
+            <a
+              href={provider.keyUrl}
+              onClick={(e) => {
+                // Tauri webview won't open <a target="_blank"> natively — bounce
+                // through tauri-plugin-opener so the OS handles the URL.
+                e.preventDefault();
+                openUrl(provider.keyUrl).catch(() => {
+                  /* noop — opener not initialised yet (pre-plugin register) */
+                });
+              }}
+            >
               Get a key →
             </a>
           </>
@@ -96,7 +107,7 @@ export function ApiKeyEntry({
             type={reveal ? 'text' : 'password'}
             value={state.apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            placeholder={provider.needsKey ? 'sk-...' : 'optional'}
+            placeholder={provider.keyPlaceholder}
             mono
             autoComplete="off"
             spellCheck={false}

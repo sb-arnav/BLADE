@@ -5,7 +5,7 @@ use crate::config::blade_config_dir;
 use crate::db::{self, CapabilityReport};
 use rusqlite;
 use serde::{Deserialize, Serialize};
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 // ── Incapability signal detection ────────────────────────────────────────────
 

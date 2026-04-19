@@ -8,7 +8,7 @@
 
 
 use std::time::Duration;
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 const PULSE_INTERVAL_SECS: u64 = 15 * 60; // minimum 15 minutes between pulses
 const PULSE_POLL_SECS: u64 = 3 * 60;    // check every 3 minutes

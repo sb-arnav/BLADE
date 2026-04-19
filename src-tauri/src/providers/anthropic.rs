@@ -178,7 +178,7 @@ pub async fn stream_text(
     messages: &[ConversationMessage],
 ) -> Result<(), String> {
     use futures::StreamExt;
-    use tauri::{Emitter, Manager};
+    use tauri::Emitter;
 
     let client = super::http_client();
     let system = messages.iter().find_map(|m| match m {
@@ -258,7 +258,7 @@ pub async fn stream_text_with_thinking(
     budget_tokens: u32,
 ) -> Result<(), String> {
     use futures::StreamExt;
-    use tauri::{Emitter, Manager};
+    use tauri::Emitter;
 
     let client = super::http_client();
     let system = messages.iter().find_map(|m| match m {

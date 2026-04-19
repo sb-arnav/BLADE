@@ -24,7 +24,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 const MAX_RESTARTS: u32 = 5;
 const BACKOFF_BASE_SECS: u64 = 5;

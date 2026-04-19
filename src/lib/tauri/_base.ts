@@ -1,10 +1,18 @@
 // src/lib/tauri/_base.ts
 //
 // Typed Tauri invoke base. The ONLY permitted invoke surface in the codebase
-// (D-13, D-34 — enforced in later phases by eslint-rules/no-raw-tauri.js).
+// (D-13, D-34 — enforced by eslint-rules/no-raw-tauri.js).
 //
-// Every wrapper in src/lib/tauri/*.ts builds on `invokeTyped`. Every component
-// imports from those wrappers, never from `@tauri-apps/api/core` directly.
+// D-38 REVISED (post-Mac-smoke discovery 2026-04-19): Tauri 2's
+// `#[tauri::command]` macro expects arg keys in camelCase on the JS side and
+// auto-converts to snake_case for Rust. Wrappers authored pre-Mac-smoke pass
+// args in snake_case ("arg-key-casing verbatim" per original D-38 read) —
+// which Tauri rejects with "missing required key <camelCased>".
+//
+// Rather than rewrite every wrapper site, we normalise outgoing arg keys here.
+// Wrappers may still declare either casing; this helper converts snake_case
+// keys to camelCase before calling `tauriInvoke`. Rust's receive side is
+// unchanged (it always deserialises via the camelCase alias Tauri generates).
 //
 // @see .planning/phases/01-foundation/01-CONTEXT.md §D-36, D-37, D-38
 // @see .planning/research/PITFALLS.md §P-04 (arg-key casing drift)
@@ -33,26 +41,40 @@ function classify(raw: string): TauriErrorKind {
 }
 
 /**
+ * Converts outgoing arg keys to camelCase so Tauri 2's command deserialiser
+ * finds them. `api_key` becomes `apiKey`; `baseUrl` stays `baseUrl`; nested
+ * object values pass through untouched (Tauri handles struct field casing
+ * via the serde derive on the Rust side).
+ */
+function toCamelArgs(args: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(args)) {
+    const ck = k.replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase());
+    out[ck] = v;
+  }
+  return out;
+}
+
+/**
  * Only permitted invoke surface (D-13, D-34 enforced by eslint-rules/no-raw-tauri.js).
- * Arg keys passed verbatim to Rust (snake_case) — no transformation (D-38, P-04 prevention).
  *
  * @example
- *   // @see src-tauri/src/commands.rs:2312 `get_onboarding_status() -> bool`
+ *   // @see src-tauri/src/commands.rs `get_onboarding_status() -> bool`
  *   const done = await invokeTyped<boolean>('get_onboarding_status');
  *
  * @example
- *   // @see src-tauri/src/config.rs:636 `store_provider_key(provider: String, api_key: String)`
- *   await invokeTyped<void, { provider: string; api_key: string }>(
- *     'store_provider_key',
- *     { provider: 'anthropic', api_key: 'sk-...' }
- *   );
+ *   // @see src-tauri/src/config.rs `store_provider_key(provider: String, api_key: String)`
+ *   // Either casing works (helper normalises to camelCase for Tauri):
+ *   await invokeTyped('store_provider_key', { provider: 'anthropic', api_key: 'sk-...' });
+ *   await invokeTyped('store_provider_key', { provider: 'anthropic', apiKey: 'sk-...' });
  */
 export async function invokeTyped<
   TReturn,
   TArgs extends Record<string, unknown> = Record<string, never>
 >(command: string, args?: TArgs): Promise<TReturn> {
   try {
-    return await tauriInvoke<TReturn>(command, args as Record<string, unknown> | undefined);
+    const payload = args ? toCamelArgs(args as Record<string, unknown>) : undefined;
+    return await tauriInvoke<TReturn>(command, payload);
   } catch (e) {
     const raw = typeof e === 'string' ? e : (e instanceof Error ? e.message : String(e));
     throw new TauriError(command, classify(raw), raw);

@@ -12,7 +12,7 @@
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 // ---------------------------------------------------------------------------
 // AtomicBool guard — prevents duplicate loops
@@ -357,7 +357,6 @@ pub async fn audio_capture_tick(
     app: &tauri::AppHandle,
     meeting_id: &mut String,
 ) {
-    use tauri::Manager;
 
     let config = crate::config::load_config();
     let now = chrono::Utc::now().timestamp();
