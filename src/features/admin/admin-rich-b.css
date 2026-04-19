@@ -1,0 +1,376 @@
+/* src/features/admin/admin-rich-b.css — Plan 07-06 scoped partial.
+   Extends admin.css (Plan 07-02) and admin-rich-a.css (Plan 07-05).
+   Consumed by Temporal, Diagnostics, DiagnosticsSysadminTab, IntegrationStatus,
+   McpSettings, ModelComparison, KeyVault.
+
+   @see .planning/phases/07-dev-tools-admin/07-PATTERNS.md §9
+   @see .planning/phases/07-dev-tools-admin/07-CONTEXT.md §D-184, §D-185 */
+
+@layer features {
+  /* ─── Temporal + Diagnostics shared layout ─────────────────────────────── */
+  .temporal-layout,
+  .diagnostics-layout,
+  .integration-layout,
+  .mcp-layout,
+  .model-comparison-layout,
+  .key-vault-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+  }
+
+  .temporal-hero,
+  .diagnostics-hero {
+    padding: var(--s-3);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+  }
+
+  .temporal-hero h3,
+  .diagnostics-hero h3 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 16px;
+    color: var(--t-1);
+  }
+
+  .temporal-standup-body {
+    white-space: pre-wrap;
+    color: var(--t-2);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .temporal-recall-card,
+  .temporal-meeting-prep-card,
+  .temporal-pattern-card {
+    padding: var(--s-2);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    color: var(--t-2);
+    font-size: 13px;
+  }
+
+  .temporal-pattern-confidence {
+    color: var(--t-3);
+    font-size: 11px;
+    font-family: var(--font-mono);
+  }
+
+  .temporal-exmem-row {
+    padding: var(--s-2);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    margin-bottom: var(--s-1);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--t-2);
+  }
+
+  .temporal-exmem-row-cmd {
+    color: var(--t-1);
+    font-weight: 600;
+  }
+
+  .temporal-exmem-row-meta {
+    color: var(--t-3);
+    font-size: 11px;
+    margin-top: var(--s-1);
+  }
+
+  /* ─── Diagnostics tab content ──────────────────────────────────────────── */
+  .diagnostics-traces-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+  }
+
+  .diagnostics-trace-row {
+    padding: var(--s-2);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--t-2);
+    display: flex;
+    justify-content: space-between;
+    gap: var(--s-2);
+  }
+
+  .diagnostics-config-pre {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-2);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--t-2);
+    max-height: 320px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    margin: 0;
+  }
+
+  .diagnostics-section {
+    padding: var(--s-3);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+  }
+
+  .diagnostics-section-title {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--t-1);
+    margin: 0;
+  }
+
+  .diagnostics-sysadmin-warning {
+    color: var(--t-3);
+    font-size: 11px;
+    font-family: var(--font-mono);
+  }
+
+  /* ─── Integration service cards (D-184) ───────────────────────────────── */
+  .integration-service-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--s-2);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    margin-bottom: var(--s-1);
+    gap: var(--s-2);
+  }
+
+  .integration-service-card-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .integration-service-card-name {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--t-1);
+  }
+
+  .integration-service-card-meta {
+    color: var(--t-3);
+    font-size: 11px;
+    font-family: var(--font-mono);
+  }
+
+  .integration-service-card-actions {
+    display: flex;
+    gap: var(--s-1);
+    align-items: center;
+  }
+
+  /* ─── McpSettings server rows (D-185) ─────────────────────────────────── */
+  .mcp-server-row {
+    padding: var(--s-2);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    margin-bottom: var(--s-1);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+  }
+
+  .mcp-server-row-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--s-2);
+  }
+
+  .mcp-server-row-name {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--t-1);
+  }
+
+  .mcp-server-row-actions {
+    display: flex;
+    gap: var(--s-1);
+    flex-wrap: wrap;
+  }
+
+  .mcp-server-row-meta {
+    color: var(--t-3);
+    font-size: 11px;
+    font-family: var(--font-mono);
+  }
+
+  .mcp-tool-trust-row {
+    display: grid;
+    grid-template-columns: 1fr 160px 80px;
+    gap: var(--s-2);
+    align-items: center;
+    padding: var(--s-1) var(--s-2);
+    border-bottom: 1px solid var(--line);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--t-2);
+  }
+
+  .mcp-tool-trust-select {
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--t-1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-1) var(--s-2);
+    font-size: 12px;
+  }
+
+  /* ─── ModelComparison task routing grid (D-185) ───────────────────────── */
+  .model-comparison-table {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .model-comparison-row {
+    display: grid;
+    grid-template-columns: 160px 1fr 140px 100px auto;
+    gap: var(--s-2);
+    align-items: center;
+    padding: var(--s-2);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .model-comparison-row-task {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--t-1);
+    text-transform: capitalize;
+  }
+
+  .model-comparison-row-model {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--t-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .model-comparison-row-actions {
+    display: flex;
+    gap: var(--s-1);
+    justify-self: end;
+  }
+
+  /* ─── KeyVault rows (D-185) ───────────────────────────────────────────── */
+  .key-vault-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--s-2);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    margin-bottom: var(--s-1);
+    gap: var(--s-2);
+  }
+
+  .key-vault-row-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .key-vault-row-provider {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--t-1);
+    text-transform: capitalize;
+  }
+
+  .key-masked {
+    font-family: var(--font-mono);
+    color: var(--t-3);
+    letter-spacing: 0.1em;
+    font-size: 12px;
+  }
+
+  .key-vault-note {
+    margin-top: var(--s-3);
+    padding: var(--s-2);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    color: var(--t-3);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  /* ─── Common dialog body helpers ──────────────────────────────────────── */
+  .admin-dialog-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    margin-top: var(--s-3);
+    min-width: 360px;
+  }
+
+  .admin-dialog-actions {
+    display: flex;
+    gap: var(--s-2);
+    justify-content: flex-end;
+    margin-top: var(--s-4);
+  }
+
+  .admin-dialog-label {
+    color: var(--t-2);
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+  }
+
+  .admin-dialog-textarea {
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--t-1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-2);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    min-height: 80px;
+    resize: vertical;
+  }
+
+  .admin-empty {
+    color: var(--t-3);
+    font-size: 12px;
+    font-style: italic;
+    padding: var(--s-2);
+  }
+
+  .admin-row-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+  }
+
+  .admin-inline-row {
+    display: flex;
+    gap: var(--s-2);
+    align-items: center;
+    flex-wrap: wrap;
+  }
+}
