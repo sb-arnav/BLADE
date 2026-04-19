@@ -1,0 +1,352 @@
+/* src/features/knowledge/knowledge-rich-a.css — Phase 5 Plan 05-05 additions.
+   Extends the shared knowledge.css base (Plan 05-02) with surface-specific
+   rules for the four rich routes: KnowledgeBase, KnowledgeGraph
+   (graph-specific rules live in KnowledgeGraph.css), ScreenTimeline,
+   RewindTimeline. Plan 05-06 ships its own knowledge-rich-b.css.
+   @see .planning/phases/05-agents-knowledge/05-CONTEXT.md §D-132 */
+
+@layer features {
+  /* ── KnowledgeBase (KNOW-01) ────────────────────────────────────────── */
+  .knowledge-base-layout {
+    display: grid;
+    grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr) minmax(280px, 1fr);
+    gap: var(--s-3);
+  }
+  @media (max-width: 960px) {
+    .knowledge-base-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .knowledge-search-bar {
+    display: flex;
+    gap: var(--s-2);
+    margin-bottom: var(--s-3);
+  }
+  .knowledge-search-bar .input {
+    flex: 1;
+  }
+
+  .knowledge-error {
+    color: var(--status-error);
+    background: rgba(255, 107, 107, 0.08);
+    border: 1px solid rgba(255, 107, 107, 0.2);
+    border-radius: var(--r-sm);
+    padding: var(--s-2) var(--s-3);
+    margin-bottom: var(--s-3);
+    font-size: 13px;
+  }
+
+  .knowledge-recent-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+  }
+
+  .knowledge-recent-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+  }
+
+  .knowledge-search-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+  }
+  .knowledge-search-group-heading {
+    font-family: var(--font-display);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--t-3);
+    padding-bottom: var(--s-1);
+    border-bottom: 1px solid var(--line);
+    margin: 0 0 var(--s-1) 0;
+  }
+
+  .knowledge-result-row {
+    all: unset;
+    display: block;
+    padding: var(--s-2);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    transition: background 120ms var(--ease-out), border-color 120ms var(--ease-out);
+    text-align: left;
+    color: inherit;
+  }
+  .knowledge-result-row:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--line-strong);
+  }
+  .knowledge-result-row-title {
+    font-size: 13px;
+    color: var(--t-1);
+    margin-bottom: 2px;
+    font-weight: 500;
+  }
+  .knowledge-result-row-preview {
+    font-size: 12px;
+    color: var(--t-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .knowledge-result-row-preview.expanded {
+    white-space: normal;
+    overflow: visible;
+    line-height: 1.5;
+  }
+
+  .knowledge-entry-detail {
+    min-width: min(640px, 90vw);
+    max-width: 90vw;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    padding: var(--s-4);
+  }
+  .knowledge-entry-detail-header {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+  }
+  .knowledge-entry-detail-header h2 {
+    flex: 1;
+    font-family: var(--font-display);
+    font-size: 18px;
+    margin: 0;
+    color: var(--t-1);
+  }
+  .knowledge-entry-detail-meta {
+    display: flex;
+    gap: var(--s-3);
+    font-size: 11px;
+    color: var(--t-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .knowledge-entry-detail-body {
+    flex: 1;
+    overflow: auto;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    padding: var(--s-3);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--t-2);
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+  }
+
+  /* ── ScreenTimeline + RewindTimeline shared list (KNOW-04 + KNOW-05) ── */
+  .screen-timeline-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: var(--s-2);
+    padding: var(--s-2);
+  }
+
+  .screen-timeline-empty,
+  .screen-timeline-loading,
+  .screen-timeline-error {
+    grid-column: 1 / -1;
+    font-size: 13px;
+    color: var(--t-3);
+    padding: var(--s-4);
+    text-align: center;
+  }
+  .screen-timeline-error {
+    color: var(--status-error);
+  }
+
+  .screen-timeline-thumb {
+    all: unset;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-1);
+    cursor: pointer;
+    transition: transform 140ms var(--ease-out), border-color 140ms var(--ease-out);
+    color: inherit;
+  }
+  .screen-timeline-thumb:hover {
+    transform: translateY(-2px);
+    border-color: var(--line-strong);
+  }
+  .screen-timeline-thumb img {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border-radius: calc(var(--r-md) - 2px);
+    display: block;
+  }
+  .screen-timeline-thumb-placeholder {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: rgba(255, 255, 255, 0.02);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--t-3);
+    border-radius: calc(var(--r-md) - 2px);
+    font-size: 12px;
+  }
+  .screen-timeline-thumb-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--t-3);
+    padding: 0 var(--s-1);
+  }
+  .screen-timeline-thumb-title {
+    font-size: 12px;
+    color: var(--t-2);
+    padding: 0 var(--s-1) 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .screen-timeline-sentinel {
+    grid-column: 1 / -1;
+    height: 1px;
+  }
+
+  /* ── ScreenTimeline surface shell ─────────────────────────────────── */
+  .screen-timeline-header {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    padding: 0 var(--s-2) var(--s-2);
+    border-bottom: 1px solid var(--line);
+    margin-bottom: var(--s-2);
+  }
+  .screen-timeline-header h2 {
+    font-family: var(--font-display);
+    font-size: 18px;
+    margin: 0;
+    color: var(--t-1);
+    flex: 1;
+  }
+  .screen-timeline-header-stats {
+    display: flex;
+    gap: var(--s-3);
+    font-size: 12px;
+    color: var(--t-3);
+  }
+
+  .screen-timeline-searchbar {
+    display: flex;
+    gap: var(--s-2);
+    padding: 0 var(--s-2) var(--s-2);
+  }
+  .screen-timeline-searchbar .input {
+    flex: 1;
+  }
+
+  .screen-timeline-detail {
+    min-width: min(720px, 92vw);
+    max-width: 92vw;
+    max-height: 86vh;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    padding: var(--s-4);
+  }
+  .screen-timeline-detail-header {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+  }
+  .screen-timeline-detail-header h2 {
+    flex: 1;
+    font-family: var(--font-display);
+    font-size: 16px;
+    margin: 0;
+    color: var(--t-1);
+  }
+  .screen-timeline-detail img {
+    max-width: 100%;
+    max-height: 60vh;
+    object-fit: contain;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--line);
+    display: block;
+    margin: 0 auto;
+  }
+  .screen-timeline-detail-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-3);
+    font-size: 11px;
+    color: var(--t-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .screen-timeline-detail-ocr {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    padding: var(--s-3);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--t-2);
+    white-space: pre-wrap;
+    max-height: 240px;
+    overflow: auto;
+  }
+
+  /* ── RewindTimeline playback slider (KNOW-05) ─────────────────────── */
+  .rewind-timeline-slider {
+    width: 100%;
+    padding: var(--s-3);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    margin-bottom: var(--s-3);
+  }
+  .rewind-timeline-slider-row {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+  }
+  .rewind-timeline-slider-row input[type='range'] {
+    flex: 1;
+    accent-color: var(--a-ok);
+  }
+  .rewind-timeline-slider-label {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--t-2);
+    min-width: 180px;
+  }
+  .rewind-timeline-slider-stats {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--t-3);
+  }
+
+  /* ── Toggle row (used by ScreenTimeline auto-load + RewindTimeline play) ── */
+  .screen-timeline-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    font-size: 12px;
+    color: var(--t-2);
+  }
+  .screen-timeline-toggle-row input[type='checkbox'] {
+    accent-color: var(--a-ok);
+  }
+}
