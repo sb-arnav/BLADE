@@ -213,6 +213,47 @@ export function hiveApproveDecision(args: {
 }
 
 /**
+ * @see src-tauri/src/hive.rs hive_reject_decision
+ *   `pub fn hive_reject_decision(head_id: String, decision_index: usize) -> Result<(), String>`
+ *
+ * Rejects a pending decision — drops it from the head's queue WITHOUT
+ * executing the action. Plan 09-01 closes Phase 8 D-205 deferral.
+ * ApprovalQueue "Reject" button calls this.
+ */
+export function hiveRejectDecision(args: {
+  headId: string;
+  decisionIndex: number;
+}): Promise<void> {
+  return invokeTyped<void, { head_id: string; decision_index: number }>(
+    'hive_reject_decision',
+    { head_id: args.headId, decision_index: args.decisionIndex },
+  );
+}
+
+/**
+ * @see src-tauri/src/character.rs delegate_feedback
+ *   `pub async fn delegate_feedback(decision_id: String, was_correct: bool, note: Option<String>) -> Result<(), String>`
+ *
+ * Records operator feedback on an AI-delegate decision. Appends a JSON line
+ * to delegate_feedback.jsonl under the blade config dir. Plan 09-01 closes
+ * Phase 8 D-205 deferral. AiDelegate per-decision "Feedback" Dialog calls this.
+ */
+export function delegateFeedback(args: {
+  decisionId: string;
+  wasCorrect: boolean;
+  note?: string;
+}): Promise<void> {
+  return invokeTyped<
+    void,
+    { decision_id: string; was_correct: boolean; note?: string }
+  >('delegate_feedback', {
+    decision_id: args.decisionId,
+    was_correct: args.wasCorrect,
+    note: args.note,
+  });
+}
+
+/**
  * @see src-tauri/src/hive.rs:3337
  *   `pub fn hive_set_autonomy(level: f32) -> Result<(), String>`
  *
