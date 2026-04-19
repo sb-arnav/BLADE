@@ -34,6 +34,7 @@ const CROSS_WINDOW_ALLOWLIST = new Set([
 
   // ───── homeostasis / hormone bus (main + hud + body) ──────────────────
   'homeostasis.rs:homeostasis_update',
+  'homeostasis.rs:hormone_update',  // Plan 03-01 WIRE-02 parallel emit (D-64)
 
   // ───── voice (overlay orb + main; wake + quickask) ────────────────────
   'voice_global.rs:voice_conversation_listening',
