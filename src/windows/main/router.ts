@@ -5,14 +5,23 @@
 // entry. Adding a route within an existing cluster = 1 entry in that cluster's
 // index.tsx (FOUND-08 acceptance).
 //
-// Dev-only surfaces (/primitives, /wrapper-smoke, /diagnostics-dev) use a
-// STATIC import with a runtime `import.meta.env.DEV` filter (W6 remediation:
-// top-level await is unnecessary and pessimizes dev builds). Vite's build-time
-// constant folding converts `import.meta.env.DEV` to a literal `false` in prod;
-// the spread becomes `...[]` and tree-shaking drops the dev feature module
-// entirely from the prod bundle.
+// Dev-only surfaces use a STATIC import with a runtime `import.meta.env.DEV`
+// filter (W6 remediation: top-level await is unnecessary and pessimizes dev
+// builds). Vite's build-time constant folding converts `import.meta.env.DEV` to
+// a literal `false` in prod; the spread becomes `...[]` and tree-shaking drops
+// the dev feature module entirely from the prod bundle.
+//
+// Registered dev route ids (all gated on import.meta.env.DEV via the
+// `devRoutes` spread below; definitions live in src/features/dev/index.tsx):
+//   - primitives       (Phase 1)
+//   - wrapper-smoke    (Phase 1)
+//   - diagnostics-dev  (Phase 1)
+//   - dev-voice-orb    (Phase 4 Plan 04-07 — SC-2 isolation)
+//   - dev-ghost        (Phase 4 Plan 04-07 — SC-3 / D-10 isolation)
+//   - dev-hud          (Phase 4 Plan 04-07 — SC-4 isolation)
 //
 // @see .planning/phases/01-foundation/01-CONTEXT.md §D-40, §D-40-palette
+// @see .planning/phases/04-overlay-windows/04-07-PLAN.md (dev-voice-orb, dev-ghost, dev-hud)
 // @see .planning/research/ARCHITECTURE.md §"route registry + aggregator"
 
 import type { RouteDefinition } from '@/lib/router';
