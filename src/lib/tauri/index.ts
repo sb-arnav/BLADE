@@ -77,6 +77,12 @@ export {
 export * as agents from './agents';
 export * as knowledge from './knowledge';
 
+// Phase 6 additions — Life OS + Identity cluster wrappers (Plan 06-02, D-139).
+// Same namespace-re-export convention as Phase 5; consumers can use either
+// `import { lifeOs } from '@/lib/tauri'` or `import { healthGetToday } from '@/lib/tauri/life_os'`.
+export * as lifeOs from './life_os';
+export * as identity from './identity';
+
 // Events convenience re-export (D-38-evt, D-38-hook). Raw `listen`/`invoke`
 // are intentionally NOT re-exported here — the wrapped surfaces (useTauriEvent,
 // invokeTyped) are the only permitted escape hatches per D-13.

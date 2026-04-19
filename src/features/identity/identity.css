@@ -1,0 +1,85 @@
+/* src/features/identity/identity.css — Plan 06-02 shared base
+   Plans 06-05 and 06-06 EXTEND (append) this file via additional @layer features
+   rules; never replace.
+   @see .planning/phases/06-life-os-identity/06-PATTERNS.md §7
+   @see .planning/phases/06-life-os-identity/06-CONTEXT.md §D-164 */
+
+@layer features {
+  .identity-surface {
+    padding: var(--s-4);
+    height: 100%;
+    overflow-y: auto;
+  }
+
+  .identity-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-2);
+    padding: var(--s-6);
+    text-align: center;
+  }
+
+  .identity-placeholder h2 {
+    font-family: var(--font-display);
+    font-size: 20px;
+    margin: 0;
+    color: var(--t-1);
+  }
+
+  .identity-placeholder-hint {
+    color: var(--t-3);
+    font-size: 14px;
+    margin: 0;
+  }
+
+  /* Identity card — rgba bg + no backdrop-filter (nested in GlassPanel tier).
+     D-07 + D-70 compliance. */
+  .identity-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-3);
+  }
+
+  /* Tabbed surface shell — PersonaView + NegotiationView (D-154, D-156). */
+  .identity-tabs {
+    display: flex;
+    gap: var(--s-1);
+    padding: var(--s-2) 0;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: var(--s-3);
+  }
+
+  .identity-tab-pill {
+    padding: var(--s-1) var(--s-2);
+    border-radius: var(--r-pill);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 140ms var(--ease-out);
+    color: var(--t-2);
+  }
+
+  .identity-tab-pill[data-active="true"] {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: var(--line-strong);
+    color: var(--t-1);
+  }
+
+  /* Edit-with-Dialog textarea (D-153 / D-155 flow). */
+  .identity-edit-textarea {
+    width: 100%;
+    min-height: 240px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-2);
+    color: var(--t-1);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    resize: vertical;
+  }
+}
