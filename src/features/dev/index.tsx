@@ -28,10 +28,18 @@
 //   - dev-character-bible → ./CharacterBibleDev (SC-4 bible content + honest log deferral)
 //   - dev-persona-view    → ./PersonaViewDev    (SC-3 + SC-4 4-tab dossier)
 //
+// Phase 7 Plan 07-07 adds 4 more isolation routes for the dev-tools + admin
+// Playwright specs (same passthrough pattern; test shim mocks the invokes):
+//   - dev-terminal            → ./TerminalDev            (SC-1 run_shell path)
+//   - dev-workflow-builder    → ./WorkflowBuilderDev     (DEV-05 list + detail + tabs)
+//   - dev-security-dashboard  → ./SecurityDashboardDev   (SC-4 hero + 4 tabs + pentest danger)
+//   - dev-mcp-settings        → ./McpSettingsDev         (ADMIN-09 CRUD + tool trust)
+//
 // @see .planning/phases/01-foundation/01-CONTEXT.md §D-21, §D-30, §D-40-palette
 // @see .planning/phases/04-overlay-windows/04-07-PLAN.md Sub-task 1f
 // @see .planning/phases/05-agents-knowledge/05-07-PLAN.md Task 1
 // @see .planning/phases/06-life-os-identity/06-07-PLAN.md Task 1
+// @see .planning/phases/07-dev-tools-admin/07-07-PLAN.md Task 1
 
 import { lazy } from 'react';
 import type { RouteDefinition } from '@/lib/router';
@@ -74,6 +82,18 @@ const CharacterBibleDev = lazy(() =>
 );
 const PersonaViewDev = lazy(() =>
   import('./PersonaViewDev').then((m) => ({ default: m.PersonaViewDev })),
+);
+const TerminalDev = lazy(() =>
+  import('./TerminalDev').then((m) => ({ default: m.TerminalDev })),
+);
+const WorkflowBuilderDev = lazy(() =>
+  import('./WorkflowBuilderDev').then((m) => ({ default: m.WorkflowBuilderDev })),
+);
+const SecurityDashboardDev = lazy(() =>
+  import('./SecurityDashboardDev').then((m) => ({ default: m.SecurityDashboardDev })),
+);
+const McpSettingsDev = lazy(() =>
+  import('./McpSettingsDev').then((m) => ({ default: m.McpSettingsDev })),
 );
 
 export const routes: RouteDefinition[] = [
@@ -193,5 +213,41 @@ export const routes: RouteDefinition[] = [
     phase: 6,
     paletteHidden: true,
     description: 'DEV: PersonaView isolation (SC-3 + SC-4 4-tab dossier)',
+  },
+  {
+    id: 'dev-terminal',
+    label: 'DEV: Terminal',
+    section: 'dev',
+    component: TerminalDev,
+    phase: 7,
+    paletteHidden: true,
+    description: 'DEV: Terminal isolation (SC-1 run_shell path)',
+  },
+  {
+    id: 'dev-workflow-builder',
+    label: 'DEV: WorkflowBuilder',
+    section: 'dev',
+    component: WorkflowBuilderDev,
+    phase: 7,
+    paletteHidden: true,
+    description: 'DEV: WorkflowBuilder isolation (DEV-05 list + detail + tabs)',
+  },
+  {
+    id: 'dev-security-dashboard',
+    label: 'DEV: SecurityDashboard',
+    section: 'dev',
+    component: SecurityDashboardDev,
+    phase: 7,
+    paletteHidden: true,
+    description: 'DEV: SecurityDashboard isolation (SC-4 hero + 4 tabs + pentest warning)',
+  },
+  {
+    id: 'dev-mcp-settings',
+    label: 'DEV: McpSettings',
+    section: 'dev',
+    component: McpSettingsDev,
+    phase: 7,
+    paletteHidden: true,
+    description: 'DEV: McpSettings isolation (ADMIN-09 CRUD + tool trust)',
   },
 ];
