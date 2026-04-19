@@ -19,7 +19,7 @@
 
 import { Suspense, useCallback, useState } from 'react';
 import { BackendToastBridge } from '@/lib/context';
-import { GlassSpinner } from '@/design-system/primitives';
+import { GlassSpinner, ErrorBoundary } from '@/design-system/primitives';
 import {
   TitleBar,
   NavRail,
@@ -118,9 +118,11 @@ function RouteSlot() {
   const Cmp = route.component;
   return (
     <Suspense fallback={<SuspenseFallback />}>
-      <div data-route-id={route.id}>
-        <Cmp />
-      </div>
+      <ErrorBoundary resetKey={route.id}>
+        <div data-route-id={route.id}>
+          <Cmp />
+        </div>
+      </ErrorBoundary>
     </Suspense>
   );
 }
