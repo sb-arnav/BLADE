@@ -50,3 +50,17 @@ export function homeostasisGetDirective(module: string): Promise<ModuleDirective
 export function homeostasisGetCircadian(): Promise<number[]> {
   return invokeTyped<number[]>('homeostasis_get_circadian');
 }
+
+/**
+ * @see src-tauri/src/homeostasis.rs:862
+ *   `pub fn homeostasis_relearn_circadian() -> Vec<f32>`
+ *
+ * Recomputes the circadian profile from recent activity and returns the fresh
+ * 24-hour array. This OVERWRITES the cached profile — Dialog-gate at the call
+ * site (D-205 destructive-op discipline). Phase 8 HormoneBus "Relearn" button.
+ *
+ * @see .planning/phases/08-body-hive/08-CONTEXT.md §D-194
+ */
+export function homeostasisRelearnCircadian(): Promise<number[]> {
+  return invokeTyped<number[]>('homeostasis_relearn_circadian');
+}
