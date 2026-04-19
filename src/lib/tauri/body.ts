@@ -300,6 +300,20 @@ export function dnaGetIdentity(): Promise<string> {
 }
 
 /**
+ * @see src-tauri/src/dna.rs dna_set_identity
+ *   `pub fn dna_set_identity(content: String) -> Result<(), String>`
+ *
+ * Writes the user's identity text to persona.md under the blade config dir.
+ * Uses write_blade_file (creates parent dir, 0o600 on Unix). Plan 09-01
+ * closes Phase 8 D-203 deferral. DNA Identity tab "Save" button calls this.
+ */
+export function dnaSetIdentity(args: { content: string }): Promise<void> {
+  return invokeTyped<void, { content: string }>('dna_set_identity', {
+    content: args.content,
+  });
+}
+
+/**
  * @see src-tauri/src/dna.rs:500
  *   `pub fn dna_get_goals() -> String`
  *
