@@ -9,8 +9,13 @@
 # Phase 8 ships zero new Rust; every command here is already registered as of
 # Plan 08-02 wrapper calibration. This script defends the surface for Phase 9+.
 #
+# Phase 9 Plan 09-01 adds 3 ADDITIVE commands (hive_reject_decision,
+# dna_set_identity, character::delegate_feedback) — these extend the baseline
+# to 40 total. The 37 Phase 8 commands above are preserved unchanged.
+#
 # Runtime: ~80ms (single grep pass over lib.rs).
 #
+# @see .planning/phases/09-polish/09-01-PLAN.md (3 command backfill)
 # @see .planning/phases/08-body-hive/08-CONTEXT.md §D-196, §D-200
 # @see .planning/phases/08-body-hive/08-PATTERNS.md §8
 # @see .planning/phases/08-body-hive/08-05-PLAN.md Task 2
@@ -136,15 +141,27 @@ for cmd in \
   'ai_delegate::ai_delegate_check'
 do check "$cmd"; done
 
+# ─────────────────────────────────────────────────────────────────────
+# Phase 9 Plan 09-01 additions (3)  — backfilled Phase 8 deferrals
+#   D-203: dna_set_identity    (DNA Save)
+#   D-205: hive_reject_decision (ApprovalQueue Reject)
+#   D-205: delegate_feedback    (AiDelegate Feedback)
+# ─────────────────────────────────────────────────────────────────────
+for cmd in \
+  'hive::hive_reject_decision' \
+  'dna::dna_set_identity' \
+  'character::delegate_feedback'
+do check "$cmd"; done
+
 if [ ${#MISSING[@]} -gt 0 ]; then
-  echo "[verify-phase8-rust-surface] ERROR: ${#MISSING[@]} Phase 8 Rust command(s) missing from $LIB_RS:" >&2
+  echo "[verify-phase8-rust-surface] ERROR: ${#MISSING[@]} Rust command(s) missing from $LIB_RS:" >&2
   for m in "${MISSING[@]}"; do
     echo "  - $m" >&2
   done
   echo "" >&2
-  echo "Phase 8 ships zero new Rust; every command in D-196 inventory must stay registered." >&2
+  echo "Phase 8 baseline (37) + Phase 9 Plan 09-01 additions (3) = 40 required." >&2
   echo "Re-add the missing handler(s) to the generate_handler![] in $LIB_RS." >&2
   exit 1
 fi
 
-echo "[verify-phase8-rust-surface] OK — all 37 Phase 8 Rust commands registered in $LIB_RS."
+echo "[verify-phase8-rust-surface] OK — all 40 body+hive Rust commands registered in $LIB_RS (37 Phase 8 + 3 Plan 09-01)."
