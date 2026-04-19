@@ -279,3 +279,70 @@ export interface AgentLifecyclePayload {
   id: string;
   [k: string]: unknown;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 5 Plan 05-01 additions — typed subtypes for the 6 new agent step
+// events + swarm lifecycle payloads. Every interface keeps an index signature
+// `[k: string]: unknown` for forward-compat with Rust shape drift
+// (D-38-payload accepted risk + D-125 AgentDetail consumer).
+//
+// @see .planning/phases/05-agents-knowledge/05-CONTEXT.md §D-125
+// @see src-tauri/src/agents/executor.rs:99,178,240,265,313,335,349
+// ---------------------------------------------------------------------------
+
+/** Mirrors Rust emit at `src-tauri/src/agents/executor.rs:99` (agent_step_started).
+ *  Subscribed by AgentDetail to seed timeline rows when a step begins. */
+export interface AgentStepStartedPayload {
+  step_id: string;
+  agent_id: string;
+  tool_name?: string;
+  role?: string;
+  input_preview?: string;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/agents/executor.rs:335` (agent_step_completed).
+ *  Carries duration and a preview of the step's result. */
+export interface AgentStepCompletedPayload {
+  step_id: string;
+  agent_id: string;
+  duration_ms?: number;
+  result_preview?: string;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/swarm_commands.rs:452` (swarm_progress).
+ *  SwarmView subscribes to drive the DAG's per-step status + progress bar. */
+export interface SwarmProgressPayload {
+  swarm_id: string;
+  completed_steps: number;
+  total_steps: number;
+  current_step_id?: string;
+  status?: 'pending' | 'running' | 'paused' | 'complete' | 'failed';
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/swarm_commands.rs:524` (swarm_created).
+ *  Fired when a swarm DAG is materialised; SwarmView inserts the new row. */
+export interface SwarmCreatedPayload {
+  swarm_id: string;
+  total_steps: number;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/swarm_commands.rs:390` (swarm_completed).
+ *  `error` is populated on failed runs only; success leaves it undefined. */
+export interface SwarmCompletedPayload {
+  swarm_id: string;
+  duration_ms?: number;
+  error?: string;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/background_agent.rs:236` (agent_output).
+ *  BackgroundAgents subscribes and appends the `output` chunk to the live log. */
+export interface AgentOutputPayload {
+  id: string;
+  output: string;
+  [k: string]: unknown;
+}

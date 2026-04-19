@@ -53,6 +53,17 @@ export interface Prefs {
    * "Re-run onboarding" button clears this to force a re-run.
    */
   'onboarding.deep_scan_completed'?: boolean;
+  // ───── Phase 5 (Plan 05-01, D-133) ─────
+  /** AgentDashboard status filter — persisted per-session. */
+  'agents.filterStatus'?: 'all' | 'running' | 'idle' | 'failed';
+  /** Last-viewed agent id for AgentDetail deep-link from dashboard. */
+  'agents.selectedAgent'?: string;
+  /** KnowledgeBase tab memory. */
+  'knowledge.lastTab'?: string;
+  /** KnowledgeGraph sidebar collapsed state. */
+  'knowledge.sidebarCollapsed'?: boolean;
+  /** ScreenTimeline auto-load latest toggle. */
+  'screenTimeline.autoLoadLatest'?: boolean;
   /** Forward-compat — other dotted keys accepted as string | number | boolean. */
   [k: string]: string | number | boolean | undefined;
 }
