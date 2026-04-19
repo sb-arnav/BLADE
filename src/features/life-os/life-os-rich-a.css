@@ -1,0 +1,736 @@
+/* src/features/life-os/life-os-rich-a.css — Plan 06-03 scoped partial.
+ *
+ * Extends the Plan 06-02 base (`life-os.css`). Parallel-safe with the
+ * Plan 06-04 `life-os-rich-b.css` partial: no class-name overlap.
+ *
+ * Scope: Health + Goal + Habit + Finance + Meetings rules used only by the
+ * five routes this plan ships. All tokens resolve against project tokens
+ * (--s-N / --r-md / --r-pill / --t-1..t-3 / --line / --line-strong /
+ *  --font-mono / --status-*). D-07 + D-70 — no backdrop-filter on inner
+ * cards (outer GlassPanel tier handles the blur).
+ *
+ * @see .planning/phases/06-life-os-identity/06-03-PLAN.md
+ * @see .planning/phases/06-life-os-identity/06-PATTERNS.md §7
+ */
+
+@layer features {
+  /* ─── HealthView ─────────────────────────────────────────────────── */
+
+  .health-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+    margin-bottom: var(--s-3);
+    flex-wrap: wrap;
+  }
+
+  .health-header-title {
+    font-family: var(--font-display);
+    font-size: 20px;
+    margin: 0;
+    color: var(--t-1);
+  }
+
+  .health-header-date {
+    color: var(--t-3);
+    font-size: 12px;
+    font-family: var(--font-mono);
+  }
+
+  .health-unit-toggle {
+    display: inline-flex;
+    gap: 2px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+    padding: 2px;
+  }
+
+  .health-unit-toggle-btn {
+    padding: 4px 10px;
+    border-radius: var(--r-pill);
+    background: transparent;
+    border: 0;
+    color: var(--t-2);
+    font-size: 12px;
+    cursor: pointer;
+    font-family: var(--font-body);
+  }
+
+  .health-unit-toggle-btn[data-active="true"] {
+    background: rgba(255, 255, 255, 0.14);
+    color: var(--t-1);
+  }
+
+  .health-stat {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-3);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 100px;
+  }
+
+  .health-stat[data-range="low"]  { border-color: var(--status-error); }
+  .health-stat[data-range="ok"]   { border-color: var(--line); }
+  .health-stat[data-range="good"] { border-color: var(--status-success); }
+
+  .health-stat-label {
+    color: var(--t-3);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .health-stat-value {
+    color: var(--t-1);
+    font-size: 24px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+  }
+
+  .health-stat-hint {
+    color: var(--t-3);
+    font-size: 11px;
+  }
+
+  .health-streak-chip {
+    display: inline-flex;
+    gap: var(--s-1);
+    align-items: center;
+    padding: var(--s-1) var(--s-2);
+    background: rgba(138, 255, 199, 0.08);
+    border: 1px solid rgba(138, 255, 199, 0.2);
+    border-radius: var(--r-pill);
+    font-size: 12px;
+    color: var(--status-success);
+    font-family: var(--font-mono);
+  }
+
+  .health-toolbar {
+    display: flex;
+    gap: var(--s-2);
+    align-items: center;
+    flex-wrap: wrap;
+    margin: var(--s-3) 0;
+  }
+
+  .health-insights {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-3);
+    margin-top: var(--s-3);
+  }
+
+  .health-insights-title {
+    font-family: var(--font-display);
+    font-size: 14px;
+    margin: 0 0 var(--s-2) 0;
+    color: var(--t-1);
+  }
+
+  .health-insights-list {
+    margin: 0;
+    padding-left: var(--s-4);
+    color: var(--t-2);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .health-insights-list li { margin-bottom: var(--s-1); }
+
+  .health-insight-urgency {
+    display: inline-block;
+    margin-right: var(--s-1);
+    padding: 0 6px;
+    border-radius: var(--r-pill);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-family: var(--font-mono);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--t-3);
+  }
+
+  .health-insight-urgency[data-level="high"]   { color: var(--status-error); background: rgba(255, 107, 107, 0.12); }
+  .health-insight-urgency[data-level="medium"] { color: var(--a-warm); background: rgba(255, 210, 166, 0.10); }
+  .health-insight-urgency[data-level="low"]    { color: var(--status-success); background: rgba(138, 255, 199, 0.10); }
+
+  .health-correlate-output {
+    margin-top: var(--s-2);
+    padding: var(--s-2) var(--s-3);
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 2px solid var(--a-cool);
+    border-radius: var(--r-sm);
+    color: var(--t-2);
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+  }
+
+  .health-scan-status {
+    color: var(--t-3);
+    font-size: 11px;
+    font-family: var(--font-mono);
+  }
+
+  /* ─── Goal + Habit shared grid ──────────────────────────────────── */
+
+  .goals-grid,
+  .habits-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--s-2);
+    margin-top: var(--s-3);
+  }
+
+  .goal-card-actions,
+  .habit-card-actions {
+    display: flex;
+    gap: var(--s-1);
+    margin-top: var(--s-1);
+    flex-wrap: wrap;
+  }
+
+  .goal-card-title,
+  .habit-card-title {
+    font-family: var(--font-display);
+    font-size: 15px;
+    margin: 0;
+    color: var(--t-1);
+  }
+
+  .goal-card-description,
+  .habit-card-description {
+    color: var(--t-3);
+    font-size: 12px;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  .goal-priority-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: var(--r-pill);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-family: var(--font-mono);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--t-2);
+  }
+
+  .goal-priority-pill[data-priority="3"],
+  .goal-priority-pill[data-priority="4"],
+  .goal-priority-pill[data-priority="5"] {
+    color: var(--status-error);
+    background: rgba(255, 107, 107, 0.10);
+  }
+
+  .goal-priority-pill[data-priority="2"] {
+    color: var(--a-warm);
+    background: rgba(255, 210, 166, 0.10);
+  }
+
+  .goal-priority-pill[data-priority="0"],
+  .goal-priority-pill[data-priority="1"] {
+    color: var(--status-success);
+    background: rgba(138, 255, 199, 0.08);
+  }
+
+  .goal-priority-row {
+    display: inline-flex;
+    gap: 2px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+    padding: 2px;
+  }
+
+  .goal-priority-row-btn {
+    padding: 3px 10px;
+    border-radius: var(--r-pill);
+    background: transparent;
+    border: 0;
+    color: var(--t-3);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    cursor: pointer;
+  }
+
+  .goal-priority-row-btn[data-active="true"] {
+    background: rgba(255, 255, 255, 0.14);
+    color: var(--t-1);
+  }
+
+  .goal-add-form,
+  .habit-add-form,
+  .habit-suggest-form {
+    display: flex;
+    gap: var(--s-2);
+    flex-wrap: wrap;
+    padding: var(--s-3);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    margin-bottom: var(--s-3);
+  }
+
+  .goal-add-form-field,
+  .habit-add-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1 1 180px;
+  }
+
+  .goal-add-form-field label,
+  .habit-add-form-field label {
+    color: var(--t-3);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-family: var(--font-mono);
+  }
+
+  /* Habit row — today's checklist. */
+  .habit-rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    margin-top: var(--s-2);
+  }
+
+  .habit-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    gap: var(--s-2);
+    padding: var(--s-2) var(--s-3);
+    align-items: center;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+  }
+
+  .habit-row[data-completed="true"] {
+    opacity: 0.55;
+  }
+
+  .habit-row-title {
+    color: var(--t-1);
+    font-size: 13px;
+  }
+
+  .habit-row-streak {
+    color: var(--t-3);
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+
+  /* Section headings used across Life OS rich routes. */
+  .life-section-title {
+    font-family: var(--font-display);
+    font-size: 14px;
+    margin: var(--s-3) 0 var(--s-2) 0;
+    color: var(--t-1);
+  }
+
+  .life-section-subtitle {
+    color: var(--t-3);
+    font-size: 12px;
+    margin: 0 0 var(--s-2) 0;
+  }
+
+  .life-empty {
+    color: var(--t-3);
+    font-size: 13px;
+    padding: var(--s-4);
+    text-align: center;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed var(--line);
+    border-radius: var(--r-md);
+  }
+
+  .life-dialog-body {
+    padding: var(--s-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+    min-width: 420px;
+  }
+
+  .life-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--s-2);
+  }
+
+  .life-dialog-heading {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 18px;
+  }
+
+  .life-dialog-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--s-2);
+  }
+
+  .life-dialog-grid-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .life-dialog-grid-field label {
+    color: var(--t-3);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-family: var(--font-mono);
+  }
+
+  /* ─── FinanceView — populated by Task 2 ──────────────────────────── */
+
+  .finance-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--s-2);
+    margin-bottom: var(--s-3);
+  }
+
+  @media (max-width: 900px) {
+    .finance-kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  .finance-kpi {
+    padding: var(--s-3);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 90px;
+  }
+
+  .finance-kpi-label {
+    color: var(--t-3);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .finance-kpi-value {
+    color: var(--t-1);
+    font-size: 22px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    margin-top: 4px;
+  }
+
+  .finance-kpi-hint {
+    color: var(--t-3);
+    font-size: 11px;
+    font-family: var(--font-mono);
+  }
+
+  .finance-layout {
+    display: grid;
+    grid-template-columns: 3fr 2fr;
+    gap: var(--s-3);
+  }
+
+  @media (max-width: 1100px) {
+    .finance-layout { grid-template-columns: 1fr; }
+  }
+
+  .finance-tx-pane,
+  .finance-side-pane {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-2);
+  }
+
+  .finance-tx-list {
+    max-height: 540px;
+    overflow-y: auto;
+  }
+
+  .finance-tx-row {
+    display: grid;
+    grid-template-columns: 90px 1fr 110px 110px;
+    gap: var(--s-2);
+    padding: var(--s-2);
+    font-size: 13px;
+    border-bottom: 1px solid var(--line);
+    align-items: center;
+  }
+
+  .finance-tx-row:last-child { border-bottom: 0; }
+
+  .finance-tx-date {
+    color: var(--t-3);
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  .finance-tx-description {
+    color: var(--t-1);
+  }
+
+  .finance-tx-category {
+    color: var(--t-3);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .finance-tx-amount {
+    font-family: var(--font-mono);
+    text-align: right;
+    color: var(--t-1);
+  }
+
+  .finance-tx-row[data-sign="positive"] .finance-tx-amount { color: var(--status-success); }
+  .finance-tx-row[data-sign="negative"] .finance-tx-amount { color: var(--status-error); }
+
+  .finance-toolbar {
+    display: flex;
+    gap: var(--s-2);
+    align-items: center;
+    margin-bottom: var(--s-3);
+    flex-wrap: wrap;
+  }
+
+  .finance-currency-select {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    color: var(--t-1);
+    padding: var(--s-1) var(--s-2);
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  .finance-goal-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-2);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: var(--s-2);
+  }
+
+  .finance-goal-progress {
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: var(--r-pill);
+    height: 6px;
+    overflow: hidden;
+  }
+
+  .finance-goal-progress-bar {
+    background: var(--status-success);
+    height: 100%;
+    border-radius: var(--r-pill);
+  }
+
+  .finance-sub-row {
+    display: grid;
+    grid-template-columns: 1fr 110px 110px;
+    gap: var(--s-2);
+    padding: var(--s-2);
+    border-bottom: 1px solid var(--line);
+    font-size: 12px;
+  }
+
+  .finance-sub-row:last-child { border-bottom: 0; }
+
+  .finance-sub-merchant { color: var(--t-1); }
+  .finance-sub-amount {
+    color: var(--status-error);
+    font-family: var(--font-mono);
+    text-align: right;
+  }
+  .finance-sub-date {
+    color: var(--t-3);
+    font-family: var(--font-mono);
+    text-align: right;
+  }
+
+  /* ─── MeetingsView — populated by Task 3 ─────────────────────────── */
+
+  .meetings-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: var(--s-3);
+    height: 100%;
+  }
+
+  @media (max-width: 900px) {
+    .meetings-layout { grid-template-columns: 1fr; }
+  }
+
+  .meetings-sidebar {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 200px);
+  }
+
+  .meetings-sidebar-search {
+    padding: var(--s-2);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    gap: var(--s-1);
+  }
+
+  .meetings-sidebar-actions {
+    display: flex;
+    gap: var(--s-1);
+    padding: var(--s-2);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .meetings-sidebar-list {
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .meeting-sidebar-row {
+    padding: var(--s-2) var(--s-3);
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    transition: background 120ms var(--ease-out, ease-out);
+    background: transparent;
+    border-left: 0;
+    border-right: 0;
+    border-top: 0;
+    display: block;
+    width: 100%;
+    text-align: left;
+  }
+
+  .meeting-sidebar-row:hover { background: rgba(255, 255, 255, 0.04); }
+  .meeting-sidebar-row[data-selected="true"] { background: rgba(255, 255, 255, 0.08); }
+
+  .meeting-sidebar-row-title {
+    color: var(--t-1);
+    font-size: 13px;
+    margin-bottom: 2px;
+  }
+
+  .meeting-sidebar-row-meta {
+    color: var(--t-3);
+    font-size: 11px;
+    font-family: var(--font-mono);
+  }
+
+  .meeting-detail-pane {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-3);
+    overflow-y: auto;
+  }
+
+  .meeting-detail-header {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    margin-bottom: var(--s-3);
+    padding-bottom: var(--s-2);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .meeting-detail-title {
+    font-family: var(--font-display);
+    font-size: 18px;
+    margin: 0;
+    color: var(--t-1);
+  }
+
+  .meeting-detail-meta {
+    color: var(--t-3);
+    font-size: 12px;
+    font-family: var(--font-mono);
+  }
+
+  .meeting-detail-banner {
+    padding: var(--s-2) var(--s-3);
+    background: rgba(138, 255, 199, 0.06);
+    border: 1px solid rgba(138, 255, 199, 0.2);
+    border-radius: var(--r-md);
+    margin-bottom: var(--s-3);
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--t-2);
+    white-space: pre-wrap;
+  }
+
+  .meeting-detail-actions {
+    display: flex;
+    gap: var(--s-2);
+    flex-wrap: wrap;
+    margin-bottom: var(--s-3);
+  }
+
+  .meeting-detail-summary {
+    color: var(--t-2);
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    margin-bottom: var(--s-3);
+  }
+
+  .meeting-action-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--s-2);
+    align-items: center;
+    padding: var(--s-2) var(--s-3);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    margin-bottom: var(--s-1);
+  }
+
+  .meeting-action-item[data-completed="true"] {
+    opacity: 0.55;
+  }
+
+  .meeting-action-item-text {
+    color: var(--t-1);
+    font-size: 13px;
+  }
+
+  .meeting-action-item-meta {
+    color: var(--t-3);
+    font-size: 11px;
+    font-family: var(--font-mono);
+  }
+
+  .meeting-compose-pre {
+    white-space: pre-wrap;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: var(--s-2);
+    border-radius: var(--r-sm);
+    max-height: 320px;
+    overflow-y: auto;
+    color: var(--t-1);
+  }
+}
