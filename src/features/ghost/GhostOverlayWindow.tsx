@@ -27,9 +27,9 @@
 //                  control works when the OS-level shortcut registration fails).
 //   - Esc        → hide the ghost window via `getCurrentWebviewWindow().hide()`.
 //
-// D-09 discipline: this file deliberately sets NO `cursor:` style (inline or
-// in CSS). Content-protection is a Rust window-flag concern; UI surface is
-// pure presentation.
+// D-09 discipline: this file deliberately sets NO pointer/mouse-pointer CSS
+// property (inline or elsewhere). Content-protection is a Rust window-flag
+// concern; UI surface is pure presentation.
 // D-111: NO auto-reply / "Send now" button. Phase 4 surfaces text only;
 // keyboard injection is deferred to Phase 7+ autonomy sliders.
 

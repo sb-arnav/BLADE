@@ -1,0 +1,175 @@
+/* src/features/ghost/ghost.css — Phase 4 Plan 04-04
+ *
+ * Ghost Mode overlay styles. Two visual tiers (D-109):
+ *   - `.ghost-idle`  — subtle pill (idle state)
+ *   - `.ghost-card`  — full suggestion card (blur 32px saturate 180%)
+ *
+ * D-09 discipline — CRITICAL INVARIANT
+ *   Content protection is set Rust-side at `src-tauri/src/ghost_mode.rs:481`
+ *   via `.content_protected(true)` at window creation. This stylesheet
+ *   DELIBERATELY DOES NOT set any pointer/mouse-pointer CSS property, nor
+ *   any click-through rule — those would be a no-op for content-protection
+ *   and would add a duplicate surface that can drift from the Rust source
+ *   of truth. `verify:all` + P-09 + the Plan 04-07 `verify:ghost-no-cursor`
+ *   grep all confirm the property is absent from this file.
+ *
+ * D-10 headline format enforcement (locked Phase 1)
+ *   `max-width: 60ch` on `.ghost-headline` and `.ghost-bullets li` enforces
+ *   the ≤60 chars/line rule visually. Word count (≤6) + bullet count (1–2)
+ *   are enforced in `clipHeadline.ts` at the TypeScript layer.
+ *
+ * Glass tier per RECOVERY_LOG Liquid Glass tokens
+ *   Ghost overlay has at most 2 concurrent blurred layers (idle pill OR card;
+ *   never both). Card uses 32px blur — within the per-layer budget because
+ *   no other surface compounds with it in this window.
+ *
+ * @see .planning/phases/01-foundation/01-CONTEXT.md §D-09, §D-10
+ * @see .planning/phases/04-overlay-windows/04-CONTEXT.md §D-109, §D-110
+ */
+
+/* ── Window body — transparent; Rust builder owns the frame (D-09) ───── */
+html, body, #root {
+  background: transparent;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Idle pill ────────────────────────────────────────────────────────── */
+.ghost-idle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  margin: 10px;
+  background: rgba(0, 0, 0, 0.40);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border-radius: var(--r-pill);
+  color: var(--t-3);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.ghost-idle .gd {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
+  animation: ghost-pulse 3s ease-in-out infinite;
+}
+
+@keyframes ghost-pulse {
+  0%, 100% { opacity: 0.30; }
+  50%      { opacity: 0.80; }
+}
+
+.ghost-idle .kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--t-3);
+  margin-left: 4px;
+}
+
+/* ── Suggestion card (D-109 full state) ───────────────────────────────── */
+.ghost-card {
+  /* Card width capped at 480px; max-width computes headroom for ≤60ch content
+   * + internal padding (64px = 16px padding * 2 + headline margin headroom). */
+  width: 480px;
+  max-width: min(480px, calc(60ch + 64px));
+  margin: 10px;
+  padding: 16px 18px 14px;
+  background: linear-gradient(
+    180deg,
+    rgba(10, 8, 20, 0.78) 0%,
+    rgba(10, 8, 20, 0.68) 100%
+  );
+  border: 1px solid var(--line);
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  border-radius: var(--r-md);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 30px 60px rgba(0, 0, 0, 0.45);
+  color: var(--t-1);
+  font-family: var(--font-body);
+  animation: ghost-card-enter 180ms ease-out;
+}
+
+@keyframes ghost-card-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.ghost-speaker {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ghost-conf {
+  font-size: 10px;
+  line-height: 1;
+}
+
+.ghost-platform {
+  color: var(--t-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+}
+
+.ghost-headline {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin: 0 0 10px 0;
+  max-width: 60ch; /* D-10 — ≤60 chars/line enforcement */
+  color: var(--t-1);
+}
+
+.ghost-bullets {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ghost-bullets li {
+  font-size: 13px;
+  color: var(--t-2);
+  line-height: 1.5;
+  padding-left: 12px;
+  max-width: 60ch; /* D-10 — ≤60 chars/line enforcement */
+  position: relative;
+}
+
+.ghost-bullets li::before {
+  content: '·';
+  position: absolute;
+  left: 0;
+  color: var(--t-3);
+}
+
+/* ── Linux warning dialog footer actions (D-110) ──────────────────────── */
+.ghost-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
