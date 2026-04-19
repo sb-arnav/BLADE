@@ -204,7 +204,13 @@ Plans:
   3. Hive landing shows all 10 tentacles (github, slack, email, calendar, discord, linear, cloud, log, terminal, filesystem) with live autonomy indicators; per-tentacle autonomy slider saves via `hive_*` commands.
   4. The decision approval queue displays pending approvals from all tentacles; a user can approve or reject an individual decision; the action is confirmed by BLADE's response.
   5. Both clusters registered via their own feature `index.ts` exports; no App.tsx edit was required.
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+- [ ] 08-01-PLAN.md — Wave 1: 10 hive+world event constants + 5 body/hive prefs keys (BODY-01,02,03,05,06 + HIVE-01..04)
+- [ ] 08-02-PLAN.md — Wave 1: body.ts + hive.ts wrappers (~33 funcs) + 2 index.tsx rewrites + 11 placeholder files + CSS + types (BODY-01..07 + HIVE-01..06)
+- [ ] 08-03-PLAN.md — Wave 2: 6 Body routes — BodyMap (SC-1), BodySystemDetail, HormoneBus (SC-2), OrganRegistry, DNA, WorldModel (BODY-01..07)
+- [ ] 08-04-PLAN.md — Wave 2: 5 Hive routes — HiveMesh (SC-3), TentacleDetail, AutonomyControls, ApprovalQueue (SC-4), AiDelegate (HIVE-01..06)
+- [ ] 08-05-PLAN.md — Wave 3: 4 Playwright specs + verify:phase8-rust + extended verify:feature-cluster-routes + 3 dev routes + Mac smoke M-35..M-40
 **UI hint**: yes
 
 ---
