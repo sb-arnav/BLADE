@@ -433,6 +433,26 @@ pub fn start_hypothalamus(app: tauri::AppHandle) {
                 "adrenaline": hormones.adrenaline,
                 "leptin": hormones.leptin,
             }));
+
+            // Phase 3 WIRE-02 (Plan 03-01, D-64): parallel-emit under the new
+            // canonical name `hormone_update`. Phase 4 HUD migration drops the
+            // legacy `homeostasis_update` emit. Both kept here for one release
+            // cycle to avoid breaking subscribers (HUD + body) mid-migration.
+            //
+            // Cross-window broadcast (`app.emit`, NOT `emit_to`) — matches
+            // RECOVERY_LOG §5: main + HUD + body all subscribe.
+            let _ = app.emit("hormone_update", serde_json::json!({
+                "arousal": hormones.arousal,
+                "energy_mode": hormones.energy_mode,
+                "exploration": hormones.exploration,
+                "trust": hormones.trust,
+                "urgency": hormones.urgency,
+                "hunger": hormones.hunger,
+                "thirst": hormones.thirst,
+                "insulin": hormones.insulin,
+                "adrenaline": hormones.adrenaline,
+                "leptin": hormones.leptin,
+            }));
         }
     });
 }
