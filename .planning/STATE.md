@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 current_phase: "08-body-hive"
-status: paused-at-quota-boundary
-last_updated: "2026-04-19T19:00:00.000Z"
+status: awaiting-mac-operator-smoke-checkpoints
+last_updated: "2026-04-19T20:00:00.000Z"
 progress:
   total_phases: 10
   completed_phases: 1
   total_plans: 58
-  completed_plans: 52
-  percent: 96
+  completed_plans: 57
+  percent: 99
 ---
 
 # STATE — BLADE Skin Rebuild (V1)
