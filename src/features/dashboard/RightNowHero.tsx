@@ -1,0 +1,155 @@
+// src/features/dashboard/RightNowHero.tsx — DASH-01 perception_fusion consumer.
+//
+// On mount: perceptionGetLatest() → if cache empty (cold boot before 30s
+// tick) fall back to perceptionUpdate() which forces a fresh capture. After
+// state lands, fire performance.mark('dashboard-paint') — this is the SC-5
+// first-paint mark asserted by Plan 03-07's dashboard-paint.spec.ts (D-77
+// falsifier: Playwright measures boot → dashboard-paint < 400ms headless).
+//
+// Poll: setInterval(perceptionUpdate, 30s) matches the backend cache cadence
+// (perception_fusion.rs start_perception_loop ticks every 30s; perception_
+// update is backend-cached for 30s so the IPC is cheap — D-74). Cleanup
+// clears the interval and sets a cancelled flag so the async fetcher never
+// setState after unmount (T-03-05-02 mitigation — back/forward navigation
+// would otherwise leak intervals).
+//
+// Visible errors are sliced to 5 max in render (T-03-05-05 — OCR may
+// surface arbitrary-length error lists; clamp defensively). `\u00A0`
+// placeholder for empty active_title prevents the secondary-line reflow on
+// apps that don't expose a window title.
+//
+// NO backdrop-filter in this component's CSS contribution — T-03-05-04
+// keeps us under the D-07 cap of 3 blur layers (NavRail + TitleBar + shell
+// already count; adding a fourth here blows the SC-5 budget).
+//
+// @see .planning/phases/03-dashboard-chat-settings/03-CONTEXT.md §D-74, §D-77
+// @see .planning/phases/03-dashboard-chat-settings/03-PATTERNS.md §7
+// @see src-tauri/src/perception_fusion.rs:19 (PerceptionState shape)
+
+import { useEffect, useState } from 'react';
+import { perceptionGetLatest, perceptionUpdate } from '@/lib/tauri/perception';
+import type { PerceptionState } from '@/types/perception';
+
+export function RightNowHero() {
+  const [state, setState] = useState<PerceptionState | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      let latest: PerceptionState | null = null;
+      try {
+        latest = await perceptionGetLatest();
+      } catch {
+        latest = null;
+      }
+      if (!latest) {
+        try {
+          latest = await perceptionUpdate();
+        } catch {
+          latest = null;
+        }
+      }
+      if (cancelled) return;
+      setState(latest);
+      // P-01 / D-77: first-paint mark. Fires AFTER setState has queued the
+      // render so the Playwright assertion boot → dashboard-paint covers
+      // the full perception fetch + commit path.
+      try {
+        performance.mark('dashboard-paint');
+        if (import.meta.env.DEV) {
+          try {
+            performance.measure('boot-to-dashboard-paint', 'boot', 'dashboard-paint');
+            const m = performance.getEntriesByName('boot-to-dashboard-paint').slice(-1)[0];
+            if (m) {
+              // eslint-disable-next-line no-console
+              console.log(
+                `[perf] dashboard-first-paint: ${m.duration.toFixed(1)}ms (budget 200ms)`,
+              );
+            }
+          } catch {
+            /* noop — boot mark missing (e.g. hot-reload) */
+          }
+        }
+      } catch {
+        /* perf API unavailable */
+      }
+    })();
+
+    // 30s poll matches backend cache cadence — cheap IPC, bounded render
+    // pressure. Cleared in cleanup to prevent T-03-05-02 (interval leak on
+    // route churn back/forward ×N).
+    const interval = window.setInterval(async () => {
+      try {
+        const next = await perceptionUpdate();
+        if (!cancelled) setState(next);
+      } catch {
+        /* transient backend error — next tick retries */
+      }
+    }, 30_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  if (!state) {
+    return (
+      <section className="dash-hero dash-hero-loading" aria-busy="true">
+        <span className="dash-hero-loading-text">Reading the room…</span>
+      </section>
+    );
+  }
+
+  const activeApp = state.active_app || 'No active app';
+  const activeTitle = state.active_title || '\u00A0';
+  const userState = state.user_state || 'focused';
+  // T-03-05-05: clamp OCR visible_errors to 5 max for rendering; the full
+  // list stays in state for DEV inspection but never goes to the DOM.
+  const errorsShown = state.visible_errors.slice(0, 5);
+
+  return (
+    <section className="dash-hero" aria-label="Right now">
+      <header className="dash-hero-head">
+        <h2 className="dash-hero-app t-h2">{activeApp}</h2>
+        <span
+          className={`dash-hero-state state-${userState}`}
+          aria-label={`user state: ${userState}`}
+        >
+          {userState}
+        </span>
+      </header>
+      <p className="dash-hero-title t-body" title={state.active_title || undefined}>
+        {activeTitle}
+      </p>
+      <ul className="dash-hero-chips">
+        <li className="dash-hero-chip">
+          <span className="dash-hero-chip-label">RAM</span>
+          <span className="dash-hero-chip-value">{state.ram_used_gb.toFixed(1)} GB</span>
+        </li>
+        <li className="dash-hero-chip">
+          <span className="dash-hero-chip-label">Disk free</span>
+          <span className="dash-hero-chip-value">{state.disk_free_gb.toFixed(1)} GB</span>
+        </li>
+        <li className="dash-hero-chip">
+          <span className="dash-hero-chip-label">Top</span>
+          <span className="dash-hero-chip-value">{state.top_cpu_process || '—'}</span>
+        </li>
+      </ul>
+      {state.visible_errors.length > 0 ? (
+        <details className="dash-hero-errors">
+          <summary>
+            {state.visible_errors.length} visible error
+            {state.visible_errors.length === 1 ? '' : 's'}
+          </summary>
+          <ul>
+            {errorsShown.map((err, i) => (
+              <li key={i}>{err}</li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </section>
+  );
+}
