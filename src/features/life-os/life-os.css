@@ -1,0 +1,92 @@
+/* src/features/life-os/life-os.css — Plan 06-02 shared base
+   Plans 06-03 and 06-04 EXTEND (append) this file via additional @layer features
+   rules; never replace.
+   @see .planning/phases/06-life-os-identity/06-PATTERNS.md §7
+   @see .planning/phases/06-life-os-identity/06-CONTEXT.md §D-164 */
+
+@layer features {
+  .life-surface {
+    padding: var(--s-4);
+    height: 100%;
+    overflow-y: auto;
+  }
+
+  .life-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-2);
+    padding: var(--s-6);
+    text-align: center;
+  }
+
+  .life-placeholder h2 {
+    font-family: var(--font-display);
+    font-size: 20px;
+    margin: 0;
+    color: var(--t-1);
+  }
+
+  .life-placeholder-hint {
+    color: var(--t-3);
+    font-size: 14px;
+    margin: 0;
+  }
+
+  /* Life card — used by HealthView / FinanceView / GoalView / HabitView grids.
+     rgba bg + no backdrop-filter: these nest inside a GlassPanel tier, so they
+     must NOT stack another blur layer (D-07 + D-70). */
+  .life-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    transition: border-color 180ms var(--ease-out);
+  }
+
+  .life-card:hover {
+    border-color: var(--line-strong);
+  }
+
+  /* Reuse Phase 5 Plan 05-02 status tokens (D-132) — do NOT redeclare. */
+  .life-card[data-status="running"]  { border-left: 3px solid var(--status-running); }
+  .life-card[data-status="complete"] { border-left: 3px solid var(--status-success); }
+  .life-card[data-status="failed"]   { border-left: 3px solid var(--status-error); }
+  .life-card[data-status="idle"],
+  .life-card:not([data-status])      { border-left: 3px solid var(--status-idle); }
+
+  /* Stat grid — HealthView 5-stat row, FinanceView KPI row. */
+  .life-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--s-2);
+  }
+
+  /* Tab pill row — used by MeetingsView + FinanceView right-pane. */
+  .life-tab-row {
+    display: flex;
+    gap: var(--s-1);
+    padding: var(--s-2) 0;
+  }
+
+  .life-tab-pill {
+    padding: var(--s-1) var(--s-2);
+    border-radius: var(--r-pill);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 140ms var(--ease-out);
+    color: var(--t-2);
+  }
+
+  .life-tab-pill[data-active="true"] {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: var(--line-strong);
+    color: var(--t-1);
+  }
+}
