@@ -161,6 +161,26 @@ export const BLADE_EVENTS = {
   SERVICE_CRASHED:       'service_crashed',       // supervisor.rs:144 — background watchdog when a managed service crashes (Admin Diagnostics + SecurityDashboard)
   SERVICE_DEAD:          'service_dead',          // supervisor.rs:156 — background watchdog after MAX_RESTARTS crashes (Admin Diagnostics + SecurityDashboard)
   WATCHER_ALERT:         'watcher_alert',         // watcher.rs:212 — background URL-watcher change detection (Admin SecurityDashboard / Reports)
+
+  // ───── Phase 8 — Body + Hive lifecycle (Plan 08-01 audit additions) ──────
+  // All 10 emits confirmed by grep audit at
+  // .planning/phases/08-body-hive/08-CONTEXT.md §code_context.
+  // Constant values mirror the Rust emit strings verbatim; file:line cites
+  // inline. Phase 8 consumers subscribe via useTauriEvent per D-13 / D-38-hook.
+  //
+  // Already-existing constants Phase 8 consumers re-use (NOT re-added):
+  //   - HORMONE_UPDATE / HOMEOSTASIS_UPDATE (HormoneBus BODY-03)
+  //   - AI_DELEGATE_APPROVED / AI_DELEGATE_DENIED (AiDelegate HIVE-06)
+  HIVE_TICK:              'hive_tick',              // hive.rs:2600 — 30s status refresh (HiveMesh HIVE-01)
+  HIVE_ACTION:            'hive_action',            // hive.rs:2723, 2780 — hive action (HiveMesh + ApprovalQueue)
+  HIVE_ESCALATE:          'hive_escalate',          // hive.rs:2813 — hive needs user decision (ApprovalQueue HIVE-04)
+  HIVE_INFORM:            'hive_inform',            // hive.rs:2686 — hive info surfacing (HiveMesh HIVE-01)
+  HIVE_PENDING_DECISIONS: 'hive_pending_decisions', // hive.rs:2603 — pending decisions changed (ApprovalQueue HIVE-04)
+  HIVE_CI_FAILURE:        'hive_ci_failure',        // hive.rs:2509 — CI failure detected (HiveMesh HIVE-01)
+  HIVE_AUTO_FIX_STARTED:  'hive_auto_fix_started',  // hive.rs:2530 — auto-fix started (HiveMesh HIVE-01)
+  HIVE_ACTION_DEFERRED:   'hive_action_deferred',   // hive.rs:2763 — hive action deferred (ApprovalQueue HIVE-04)
+  TENTACLE_ERROR:         'tentacle_error',         // hive.rs:2304 — tentacle Error status (HiveMesh + TentacleDetail)
+  WORLD_STATE_UPDATED:    'world_state_updated',    // world_model.rs:869 — background world refresh (WorldModel BODY-06)
 } as const;
 
 /** Literal union of every string in BLADE_EVENTS. */

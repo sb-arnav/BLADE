@@ -86,6 +86,17 @@ export interface Prefs {
   'admin.activeTab'?: string;
   /** Last-expanded alert id in SecurityDashboard (scroll-restore-ish deep-link). */
   'admin.security.expandedAlert'?: string;
+  // ───── Phase 8 — Body + Hive (Plan 08-01 / D-210) ───────────────────────
+  /** BodyMap → BodySystemDetail cluster handoff (D-201, D-202). */
+  'body.activeSystem'?: string;
+  /** DNA route active tab: 'identity' | 'goals' | 'patterns' | 'query'. */
+  'body.dna.activeDoc'?: string;
+  /** HiveMesh → TentacleDetail cluster handoff (D-204). */
+  'hive.activeTentacle'?: string;
+  /** Last-expanded approval card in ApprovalQueue (D-205). */
+  'hive.approval.expandedId'?: string;
+  /** HiveMesh tentacle-status filter chips: 'all' | 'active' | 'dormant' | 'error' | 'disconnected'. */
+  'hive.filterStatus'?: string;
   /** Forward-compat — other dotted keys accepted as string | number | boolean. */
   [k: string]: string | number | boolean | undefined;
 }
