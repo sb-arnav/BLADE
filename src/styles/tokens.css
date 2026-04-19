@@ -84,10 +84,26 @@
 html, body {
   margin: 0;
   padding: 0;
-  background: #000;
+  /* tauri.conf.json windows[].transparent=true — wallpaper must show through.
+     Liquid Glass (D-06/D-07) blurs the wallpaper via backdrop-filter on
+     individual panels. DO NOT set an opaque bg here. */
+  background: transparent;
   color: var(--t-1);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: -0.01em;
 }
+
+/* Scrollbar styling — default chromium bar ruins the Liquid Glass vibe.
+   Thin, semi-transparent, hover-reveal track. D-07 opacity tier. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.22); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }

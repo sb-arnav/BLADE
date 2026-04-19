@@ -18,7 +18,7 @@
 use chrono::{Datelike, Timelike};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CronTask {

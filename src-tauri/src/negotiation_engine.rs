@@ -9,7 +9,7 @@
 
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 // ── Structs ──────────────────────────────────────────────────────────────────
 

@@ -2,7 +2,7 @@ use super::{Agent, AgentStatus, StepStatus};
 use crate::mcp::McpManager;
 use crate::providers::{self, ChatMessage};
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 use tokio::sync::Mutex;
 
 /// Maximum number of retry attempts per step (including the first attempt).

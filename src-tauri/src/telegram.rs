@@ -8,7 +8,7 @@ use crate::providers::{self, ConversationMessage};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 

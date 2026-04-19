@@ -13,7 +13,7 @@
 /// always visible, limited in size so it forces prioritization.
 #[allow(dead_code)]
 
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 use crate::providers::ConversationMessage;
 
 const THREAD_MAX_WORDS: usize = 200;

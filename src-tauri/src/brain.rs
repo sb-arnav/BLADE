@@ -7,7 +7,6 @@ use std::fs;
 use std::path::PathBuf;
 use chrono::Timelike;
 use chrono::Datelike;
-use tauri::Manager;
 
 // ── Model capability tiers ────────────────────────────────────────────────────
 // Different models need different prompting strategies.

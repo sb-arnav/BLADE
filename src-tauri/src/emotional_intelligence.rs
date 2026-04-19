@@ -10,7 +10,7 @@
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 // ── Static current emotion ────────────────────────────────────────────────────
 

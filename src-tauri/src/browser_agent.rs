@@ -12,7 +12,7 @@
 // and emits "browser_agent_step" events to the frontend after each step.
 
 use serde::{Deserialize, Serialize};
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 // ── Action enum ───────────────────────────────────────────────────────────────
 

@@ -15,7 +15,7 @@
 ///   - User can interrupt at any step via `computer_use_stop`
 
 use serde::{Deserialize, Serialize};
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 const MAX_STEPS: usize = 20;
 

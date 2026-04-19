@@ -9,6 +9,7 @@
 //
 // @see .planning/phases/03-dashboard-chat-settings/03-CONTEXT.md §D-90
 
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { Card, Pill } from '@/design-system/primitives';
 
 declare const __APP_VERSION__: string | undefined;
@@ -55,8 +56,10 @@ export function AboutPane() {
         <p>
           <a
             href="https://github.com/arnavmaurya/blade"
-            target="_blank"
-            rel="noopener noreferrer"
+            onClick={(e) => {
+              e.preventDefault();
+              openUrl('https://github.com/arnavmaurya/blade').catch(() => {});
+            }}
             className="settings-link"
           >
             github.com/arnavmaurya/blade

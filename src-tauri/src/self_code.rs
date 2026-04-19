@@ -14,7 +14,7 @@
 ///     → cargo check runs, result emitted as blade_self_code_result
 #[allow(dead_code)]
 
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

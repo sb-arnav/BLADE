@@ -2,7 +2,6 @@
 
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine as _;
-use tauri::Manager;
 
 use crate::screen_timeline::{
     ScreenTimelineEntry, TimelineConfig, TimelineStats,

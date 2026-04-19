@@ -386,7 +386,7 @@ pub(crate) async fn run_agent_loop_internal(
     model: &str,
     base_url: Option<String>,
 ) {
-    use tauri::{Emitter, Manager};
+    use tauri::Emitter;
 
     loop {
         let should_continue = {
@@ -482,7 +482,7 @@ async fn run_desktop_agent_loop(
     model: &str,
     base_url: Option<String>,
 ) {
-    use tauri::{Emitter, Manager};
+    use tauri::Emitter;
 
     loop {
         let mut finished = false;
@@ -2716,7 +2716,7 @@ pub async fn agent_respond_desktop_action(
     agent_id: String,
     approved: bool,
 ) -> Result<(), String> {
-    use tauri::{Emitter, Manager};
+    use tauri::Emitter;
 
     let (step_id, pending_json, provider, api_key, model, base_url) = {
         let config = load_config();

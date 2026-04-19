@@ -14,7 +14,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::sync::{Mutex, OnceLock};
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 #[cfg(target_os = "windows")]
 use rusqlite;

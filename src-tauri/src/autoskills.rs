@@ -9,7 +9,7 @@
 /// acquire the capability it needs. Fail → diagnose → install → retry.
 
 use std::collections::HashMap;
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 /// Minimal description of a capability gap.
 pub struct GapContext<'a> {

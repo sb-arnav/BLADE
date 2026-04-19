@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
-use tauri::Manager;
 
 // ── Public types ──────────────────────────────────────────────────────────────
 

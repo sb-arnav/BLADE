@@ -12,7 +12,7 @@ use chrono::{Datelike, Local, NaiveDate};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 use uuid::Uuid;
 
 // ── Structs ───────────────────────────────────────────────────────────────────

@@ -15,7 +15,7 @@
 /// The immune system doesn't duplicate their work — it's the decision layer
 /// that chains them together when a gap is detected.
 
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 /// Attempt to resolve a capability gap. Called when:
 /// - A tool call fails with "not found" or similar
@@ -181,7 +181,7 @@ fn check_cli_tools(capability: &str) -> Option<String> {
     for (keywords, tool_name) in tools {
         if keywords.iter().any(|k| cap_lower.contains(k)) {
             // Check if the tool is actually installed
-            let check = std::process::Command::new("which")
+            let _check = std::process::Command::new("which")
                 .arg(tool_name)
                 .output();
 

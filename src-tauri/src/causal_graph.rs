@@ -14,7 +14,7 @@
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 // ─── Structs ─────────────────────────────────────────────────────────────────
 

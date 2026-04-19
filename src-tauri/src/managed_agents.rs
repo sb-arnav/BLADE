@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use std::path::PathBuf;
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 use tokio::io::{AsyncBufReadExt, BufReader};
 
 #[derive(Debug, Deserialize)]

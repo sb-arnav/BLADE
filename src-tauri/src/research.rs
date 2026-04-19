@@ -14,7 +14,7 @@
 
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 const RESEARCH_THROTTLE_SECS: i64 = 30 * 60; // at most once per 30 min
 const RESEARCH_CONTEXT_CHARS: usize = 3_000;  // max chars to include in system prompt

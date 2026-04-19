@@ -14,7 +14,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 /// One entry in the built-in MCP catalog.
 struct CatalogEntry {
@@ -548,7 +548,6 @@ fn save_suggestion(suggestion: &EvolutionSuggestion) -> Result<(), String> {
 /// Returns Ok(discovered tools) on success.
 /// Feeds discovered tool names into the knowledge graph.
 async fn auto_install_mcp(entry: &CatalogEntry, app: &tauri::AppHandle) -> Result<Vec<crate::mcp::McpTool>, String> {
-    use tauri::Manager;
 
     // Check node/npx is available
     let npx_check = crate::cmd_util::silent_cmd("npx")

@@ -31,6 +31,10 @@ export interface ProviderDef {
   needsKey: boolean;
   /** 2-stop CSS gradient for the provider logo chip (from/to hex colours). */
   gradient: [string, string];
+  /** Provider-specific API key prefix used as the input placeholder. Anthropic
+   *  keys start `sk-ant-`, Groq keys start `gsk_`, Gemini `AIza…`, etc. Shown
+   *  as `<prefix>…` in the field so users know they pasted the right key type. */
+  keyPlaceholder: string;
 }
 
 export const PROVIDERS: ProviderDef[] = [
@@ -42,6 +46,7 @@ export const PROVIDERS: ProviderDef[] = [
     keyUrl: 'https://console.anthropic.com/settings/keys',
     needsKey: true,
     gradient: ['#c96442', '#f0a97e'],
+    keyPlaceholder: 'sk-ant-…',
   },
   {
     id: 'openai',
@@ -51,6 +56,7 @@ export const PROVIDERS: ProviderDef[] = [
     keyUrl: 'https://platform.openai.com/api-keys',
     needsKey: true,
     gradient: ['#0f8a60', '#10b27a'],
+    keyPlaceholder: 'sk-…',
   },
   {
     id: 'openrouter',
@@ -60,6 +66,7 @@ export const PROVIDERS: ProviderDef[] = [
     keyUrl: 'https://openrouter.ai/settings/keys',
     needsKey: true,
     gradient: ['#5b5fe8', '#8b6fff'],
+    keyPlaceholder: 'sk-or-…',
   },
   {
     id: 'gemini',
@@ -69,6 +76,7 @@ export const PROVIDERS: ProviderDef[] = [
     keyUrl: 'https://aistudio.google.com/apikey',
     needsKey: true,
     gradient: ['#4285f4', '#34a0f5'],
+    keyPlaceholder: 'AIza…',
   },
   {
     id: 'groq',
@@ -78,6 +86,7 @@ export const PROVIDERS: ProviderDef[] = [
     keyUrl: 'https://console.groq.com/keys',
     needsKey: true,
     gradient: ['#f55036', '#ff7a50'],
+    keyPlaceholder: 'gsk_…',
   },
   {
     id: 'ollama',
@@ -87,6 +96,7 @@ export const PROVIDERS: ProviderDef[] = [
     keyUrl: '',
     needsKey: false,
     gradient: ['#2c2c2c', '#555555'],
+    keyPlaceholder: 'optional',
   },
 ];
 

@@ -14,7 +14,7 @@ use crate::swarm::{
     self, build_task_context, get_swarm_progress, resolve_ready_tasks,
     ScratchpadEntry, SwarmStatus, SwarmTaskStatus, SwarmTask, Swarm,
 };
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 // ---------------------------------------------------------------------------
 // Internal: spawn one agent for a swarm task

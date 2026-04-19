@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 // ── Static state ──────────────────────────────────────────────────────────────
 
