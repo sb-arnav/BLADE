@@ -116,6 +116,22 @@ export const BLADE_EVENTS = {
   AGENT_STEP_PARTIAL:           'agent_step_partial',           // executor.rs:314
   AGENT_STEP_COMPLETED:         'agent_step_completed',         // executor.rs:335
   AGENT_STEP_FAILED:            'agent_step_failed',            // executor.rs:349
+
+  // ───── Phase 6 — Life OS + Identity lifecycle (Plan 06-01 audit additions) ─
+  // All 9 events below fire from scheduled/background loops or streaming
+  // long-running commands (not simple request-response). Phase 6 consumers
+  // benefit from subscribing vs polling. Values match Rust emit strings verbatim.
+  BLADE_HEALTH_NUDGE:     'blade_health_nudge',     // health_tracker.rs:416,450,469 — scheduled nudge loop
+  HEALTH_BREAK_REMINDER:  'health_break_reminder',  // health_guardian.rs:150,160,180 — scheduled break loop
+  BLADE_EMOTION_DETECTED: 'blade_emotion_detected', // emotional_intelligence.rs:753 — fires on valence shift during detection
+  ACCOUNTABILITY_NUDGE:   'accountability_nudge',   // accountability.rs:755,777 — scheduled check-in + behind-KR alerts
+  BLADE_PREDICTION:       'blade_prediction',       // prediction_engine.rs:589 — high-confidence predictions fired during background generation
+  BLADE_HABIT_REMINDER:   'blade_habit_reminder',   // habit_engine.rs:760 — scheduled habit reminder loop
+  GOAL_PROGRESS:          'goal_progress',          // goal_engine.rs:810,975 — emitted during async goal_pursue_now loop
+  GOAL_SUBTASK_UPDATE:    'goal_subtask_update',    // goal_engine.rs:389,403 — per-subtask streaming during pursue
+  GOAL_COMPLETED:         'goal_completed',         // goal_engine.rs:623 — emitted when pursue loop reaches verification success
+  BLADE_DEBATE_UPDATE:    'blade_debate_update',    // negotiation_engine.rs:519 — streaming per-round during async debate
+  BLADE_REASONING_STEP:   'blade_reasoning_step',   // reasoning_engine.rs:645,667 — streaming per-step during multi-step reasoning
 } as const;
 
 /** Literal union of every string in BLADE_EVENTS. */
