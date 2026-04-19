@@ -1,3 +1,5 @@
+@import '../../styles/motion-entrance.css';
+
 /* src/features/admin/admin.css — Plan 07-02 shared base
    Plans 07-05 and 07-06 EXTEND this file via scoped partial CSS files
    (admin-rich-a.css, admin-rich-b.css); never replace.

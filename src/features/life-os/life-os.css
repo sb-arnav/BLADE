@@ -1,3 +1,5 @@
+@import '../../styles/motion-entrance.css';
+
 /* src/features/life-os/life-os.css — Plan 06-02 shared base
    Plans 06-03 and 06-04 EXTEND (append) this file via additional @layer features
    rules; never replace.
