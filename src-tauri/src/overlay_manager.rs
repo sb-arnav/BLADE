@@ -248,7 +248,11 @@ pub fn start_hud_update_loop(app: tauri::AppHandle) {
                 let _ = hud.emit("hud_update", &data);
             }
 
-            // Also emit to HUD window so dashboard-in-HUD can reflect state
+            // Phase 4 Plan 04-01 (D-97): parallel-emit to BOTH the canonical
+            // `blade_hud` window label (Rust-side truth per create_hud_window)
+            // AND the `hud` alias the React HUD bootstrap subscribes to. Keeps
+            // forward-compat so Plan 04-05 can rename without a race.
+            let _ = app.emit_to("blade_hud", "hud_data_updated", &data);
             let _ = app.emit_to("hud", "hud_data_updated", &data);
         }
     });
@@ -288,7 +292,10 @@ pub fn overlay_update_hud(app: tauri::AppHandle, data: HudData) -> Result<(), St
     if let Some(w) = app.get_webview_window("blade_hud") {
         let _ = w.emit("hud_update", &data);
     }
-    // Also broadcast to HUD window
+    // Phase 4 Plan 04-01 (D-97): parallel-emit to both `blade_hud` (Rust-side
+    // canonical label) and `hud` (React bootstrap alias) — see
+    // start_hud_update_loop for the matching site.
+    let _ = app.emit_to("blade_hud", "hud_data_updated", &data);
     let _ = app.emit_to("hud", "hud_data_updated", &data);
     Ok(())
 }
@@ -324,4 +331,45 @@ pub fn overlay_show_notification(
 
     log::info!("[overlay_manager] toast: {} — {}", payload.title, payload.body);
     Ok(())
+}
+
+// ── Phase 4 Plan 04-01 — HUD safe-area + route-request helpers ─────────────────
+
+/// Emit a cross-window route request to the main window. Consumed by
+/// `useRouter` in the main shell (Plan 04-05 HUD right-click menu, Plan 04-06
+/// bridge, future Phase 7 admin surfaces).
+///
+/// Main-side validates `route_id` against the ALL_ROUTES whitelist before
+/// navigating — invalid ids silently no-op (T-04-01-05 mitigation).
+///
+/// @see .planning/phases/04-overlay-windows/04-CONTEXT.md §D-114
+#[tauri::command]
+pub fn emit_route_request(app: tauri::AppHandle, route_id: String) -> Result<(), String> {
+    let _ = app.emit_to(
+        "main",
+        "blade_route_request",
+        serde_json::json!({ "route_id": route_id }),
+    );
+    Ok(())
+}
+
+/// Safe-area insets for the primary monitor. Used by the HUD bootstrap to
+/// offset its top position below the macOS notch on notched hardware.
+///
+/// Current implementation is a conservative heuristic — macOS returns a fixed
+/// 37px top inset (covers all notched MacBook Pros M1/M2/M3); other platforms
+/// return all zeros. A future Phase 9 polish pass replaces the heuristic with
+/// a real FFI call to `NSScreen::safeAreaInsets.top`.
+///
+/// @see .planning/phases/04-overlay-windows/04-CONTEXT.md §D-115
+#[tauri::command]
+pub fn get_primary_safe_area_insets(_app: tauri::AppHandle) -> serde_json::Value {
+    #[cfg(target_os = "macos")]
+    {
+        // Heuristic: assume notch present on all modern MacBooks. Conservative
+        // upper bound covers MBP 14"/16" (2021+) and MBA 13"/15" (2022+).
+        return serde_json::json!({ "top": 37, "bottom": 0, "left": 0, "right": 0 });
+    }
+    #[allow(unreachable_code)]
+    serde_json::json!({ "top": 0, "bottom": 0, "left": 0, "right": 0 })
 }

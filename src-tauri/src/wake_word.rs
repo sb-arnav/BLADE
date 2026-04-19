@@ -371,3 +371,29 @@ pub fn wake_word_stop() {
 pub fn wake_word_status() -> bool {
     is_active()
 }
+
+/// Runtime toggle for wake-word detection — saves config + starts/stops the
+/// background listener as a single invoke.
+///
+/// Exposed for the Phase 3 Voice settings pane (Plan 03-06 D-84) and Phase 4
+/// UI surfaces (HUD right-click menu, Voice Orb settings sheet) that need a
+/// live toggle without the user restarting the app.
+///
+/// - `enabled = true`: persists `wake_word_enabled=true` and calls
+///   `wake_word_start` (may fail if mic permission denied — error surfaces).
+/// - `enabled = false`: persists `wake_word_enabled=false` and calls
+///   `wake_word_stop` (always Ok).
+///
+/// @see .planning/phases/04-overlay-windows/04-CONTEXT.md §D-95
+#[tauri::command]
+pub async fn set_wake_word_enabled(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    let mut config = crate::config::load_config();
+    config.wake_word_enabled = enabled;
+    crate::config::save_config(&config)?;
+    if enabled {
+        wake_word_start(app)
+    } else {
+        wake_word_stop();
+        Ok(())
+    }
+}
