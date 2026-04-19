@@ -1,0 +1,481 @@
+/* src/features/dev-tools/dev-tools-rich-a.css — Plan 07-03 scoped partial
+   Extends dev-tools.css with Plan-03-specific rules (FileBrowser layout,
+   WorkflowBuilder sidebar/detail, Canvas deferral card, Git style card).
+   Parallel with 07-04 (dev-tools-rich-b.css — not written by this plan).
+   @see .planning/phases/07-dev-tools-admin/07-PATTERNS.md §9
+   @see .planning/phases/07-dev-tools-admin/07-03-PLAN.md Task 1
+   NOTE: Uses actual token names --s-* / --r-* / --r-pill per Plan 07-02 §CSS
+   decision; plan-draft prescribed --sp-*/--radius-* which don't exist. */
+
+@layer features {
+  /* ─── FileBrowser two-pane layout ─────────────────────────────────────── */
+  .file-browser-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: var(--s-2);
+    height: calc(100vh - 200px);
+    min-height: 0;
+  }
+
+  .file-browser-tree-pane {
+    overflow-y: auto;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: rgba(0, 0, 0, 0.18);
+    padding: var(--s-1);
+  }
+
+  .file-browser-preview-pane {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    min-height: 0;
+  }
+
+  .file-browser-preview {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: rgba(0, 0, 0, 0.22);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-2);
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    flex: 1;
+    min-height: 0;
+    color: var(--t-2);
+  }
+
+  .file-browser-topbar {
+    display: flex;
+    gap: var(--s-1);
+    align-items: center;
+    padding: var(--s-2) 0;
+    flex-wrap: wrap;
+  }
+
+  .file-browser-path {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--t-3);
+    padding: 2px var(--s-1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-xs);
+    background: rgba(0, 0, 0, 0.15);
+    max-width: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .file-browser-search-results {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--s-1) 0;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .file-browser-search-row {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 2px var(--s-1);
+    cursor: pointer;
+    border-radius: var(--r-xs);
+    color: var(--t-2);
+  }
+
+  .file-browser-search-row:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--t-1);
+  }
+
+  .file-browser-projects {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: var(--s-2);
+  }
+
+  /* ─── WorkflowBuilder sidebar + detail layout ─────────────────────────── */
+  .workflow-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: var(--s-2);
+    height: calc(100vh - 200px);
+    min-height: 0;
+  }
+
+  .workflow-sidebar {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: rgba(0, 0, 0, 0.18);
+  }
+
+  .workflow-sidebar-header {
+    padding: var(--s-2);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+  }
+
+  .workflow-sidebar-row {
+    padding: var(--s-2);
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: background 120ms var(--ease-out);
+  }
+
+  .workflow-sidebar-row:hover { background: rgba(255, 255, 255, 0.04); }
+  .workflow-sidebar-row[data-selected="true"] { background: rgba(255, 255, 255, 0.08); }
+
+  .workflow-sidebar-row-name {
+    color: var(--t-1);
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  .workflow-sidebar-row-meta {
+    color: var(--t-3);
+    font-size: 11px;
+    display: flex;
+    gap: var(--s-1);
+    align-items: center;
+  }
+
+  .workflow-detail-root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  .workflow-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--s-2);
+    padding-bottom: var(--s-2);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .workflow-detail-title {
+    font-family: var(--font-display);
+    font-size: 18px;
+    margin: 0;
+    color: var(--t-1);
+  }
+
+  .workflow-detail-description {
+    color: var(--t-3);
+    font-size: 13px;
+    margin: 0;
+  }
+
+  .workflow-detail-section {
+    padding: var(--s-2) 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+  }
+
+  .workflow-run-card {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: var(--s-2);
+    align-items: center;
+  }
+
+  .workflow-run-output {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--t-3);
+    max-height: 80px;
+    overflow: auto;
+    white-space: pre-wrap;
+  }
+
+  .workflow-step-row {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: var(--s-2);
+    padding: var(--s-1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-xs);
+    align-items: start;
+  }
+
+  .workflow-step-index {
+    font-family: var(--font-mono);
+    color: var(--t-3);
+    font-weight: 700;
+  }
+
+  .workflow-step-type {
+    font-family: var(--font-mono);
+    color: var(--t-1);
+    font-weight: 600;
+    font-size: 12px;
+  }
+
+  .workflow-step-config {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--t-3);
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 120px;
+    overflow: auto;
+  }
+
+  .workflow-empty-state {
+    padding: var(--s-6);
+    text-align: center;
+    color: var(--t-3);
+    font-size: 14px;
+  }
+
+  /* ─── Canvas / GitPanel shared deferral-card styling ──────────────────── */
+  .deferred-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--status-idle);
+    border-radius: var(--r-md);
+    padding: var(--s-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+  }
+
+  .deferred-card h3 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 14px;
+    color: var(--t-1);
+  }
+
+  .deferred-card p {
+    margin: 0;
+    color: var(--t-3);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .deferred-card code {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--t-3);
+    background: rgba(0, 0, 0, 0.25);
+    padding: 1px 6px;
+    border-radius: var(--r-xs);
+  }
+
+  /* ─── Canvas output panels ─────────────────────────────────────────────── */
+  .canvas-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+  }
+
+  .canvas-editor {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+  }
+
+  .canvas-textarea {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    min-height: 200px;
+    background: rgba(0, 0, 0, 0.28);
+    color: var(--t-1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-2);
+    resize: vertical;
+    outline: none;
+  }
+
+  .canvas-output-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s-2);
+  }
+
+  @media (max-width: 800px) {
+    .canvas-output-grid { grid-template-columns: 1fr; }
+    .file-browser-layout { grid-template-columns: 1fr; height: auto; }
+    .workflow-layout { grid-template-columns: 1fr; height: auto; }
+  }
+
+  .canvas-output-pane {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: rgba(0, 0, 0, 0.22);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-2);
+    white-space: pre-wrap;
+    max-height: 240px;
+    overflow: auto;
+    min-height: 80px;
+    color: var(--t-2);
+  }
+
+  .canvas-output-pane[data-status="failed"] {
+    border-left: 3px solid var(--status-error);
+  }
+
+  .canvas-output-pane[data-status="complete"] {
+    border-left: 3px solid var(--status-success);
+  }
+
+  .canvas-output-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--t-3);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0 0 2px 0;
+  }
+
+  /* ─── GitPanel style card ─────────────────────────────────────────────── */
+  .git-style-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+  }
+
+  .git-style-guide {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    white-space: pre-wrap;
+    background: rgba(0, 0, 0, 0.22);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-2);
+    max-height: 320px;
+    overflow: auto;
+    color: var(--t-2);
+  }
+
+  .git-style-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    font-size: 12px;
+    color: var(--t-3);
+  }
+
+  /* ─── Dialog body helpers (inputs + labels) ───────────────────────────── */
+  .dialog-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    padding: var(--s-2);
+    min-width: 420px;
+  }
+
+  .dialog-body label {
+    font-size: 12px;
+    color: var(--t-3);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .dialog-body textarea {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    min-height: 120px;
+    background: rgba(0, 0, 0, 0.28);
+    color: var(--t-1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-xs);
+    padding: var(--s-1);
+    resize: vertical;
+    outline: none;
+  }
+
+  .dialog-body select {
+    background: rgba(0, 0, 0, 0.3);
+    color: var(--t-1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-xs);
+    padding: 4px var(--s-1);
+    font-size: 13px;
+    outline: none;
+  }
+
+  .dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--s-1);
+    padding-top: var(--s-2);
+    border-top: 1px solid var(--line);
+    margin-top: var(--s-1);
+  }
+
+  .dialog-title {
+    font-family: var(--font-display);
+    font-size: 16px;
+    margin: 0;
+    padding: var(--s-2) var(--s-2) 0 var(--s-2);
+    color: var(--t-1);
+  }
+
+  /* ─── Terminal helpers (Plan 07-03 extras on top of dev-tools.css) ────── */
+  .terminal-actions {
+    display: flex;
+    gap: var(--s-1);
+    align-items: center;
+  }
+
+  .terminal-inline-output {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--t-2);
+    white-space: pre-wrap;
+    padding: var(--s-1);
+    background: rgba(0, 0, 0, 0.22);
+    border: 1px solid var(--line);
+    border-radius: var(--r-xs);
+  }
+
+  /* Status chip next to sidebar row */
+  .workflow-status-chip {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--line);
+    color: var(--t-3);
+    background: rgba(255, 255, 255, 0.04);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .workflow-status-chip[data-status="success"] {
+    border-color: var(--status-success);
+    color: var(--status-success);
+  }
+
+  .workflow-status-chip[data-status="failed"] {
+    border-color: var(--status-error);
+    color: var(--status-error);
+  }
+
+  .workflow-status-chip[data-status="running"] {
+    border-color: var(--status-running);
+    color: var(--status-running);
+  }
+}
