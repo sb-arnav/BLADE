@@ -59,6 +59,7 @@ export {
   homeostasisGet,
   homeostasisGetDirective,
   homeostasisGetCircadian,
+  homeostasisRelearnCircadian,
 } from './homeostasis';
 export {
   iotListEntities,
@@ -89,6 +90,12 @@ export * as identity from './identity';
 // `@/lib/tauri/admin` — both paths resolve to the same module.
 export * as devTools from './dev_tools';
 export * as admin from './admin';
+
+// Phase 8 additions — Body + Hive cluster wrappers (Plan 08-02, D-193).
+// Mirror the Phase 5/6/7 namespace pattern. Per-route files in Plans 08-03/04
+// may also import named wrappers directly from `@/lib/tauri/body` or
+// `@/lib/tauri/hive` — both paths resolve to the same module.
+export * as body from './body';
 
 // Events convenience re-export (D-38-evt, D-38-hook). Raw `listen`/`invoke`
 // are intentionally NOT re-exported here — the wrapped surfaces (useTauriEvent,
