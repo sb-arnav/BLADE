@@ -44,16 +44,23 @@
 | onboarding | src.bak/components/OnboardingFlow.tsx | src/features/onboarding/Onboarding.tsx | core | 2 | Pending | – | First-run flow; palette-hidden |
 | chat | src.bak/components/ChatWindow.tsx | src/features/chat/Chat.tsx | core | 3 | Pending | – | Streaming; tool approval dialog |
 | dashboard | src.bak/components/Dashboard.tsx | src/features/dashboard/Dashboard.tsx | core | 3 | Pending | – | Default route; P-01 gate surface |
-| settings | src.bak/components/Settings.tsx | src/features/settings/Settings.tsx | core | 3 | Pending | – | 10 sub-tabs |
-| settings-about | src.bak/components/Settings.tsx | src/features/settings/About.tsx | core | 3 | Pending | – |  |
-| settings-advanced | src.bak/components/Settings.tsx | src/features/settings/Advanced.tsx | core | 3 | Pending | – |  |
-| settings-ambient | src.bak/components/Settings.tsx | src/features/settings/Ambient.tsx | core | 3 | Pending | – |  |
-| settings-autonomy | src.bak/components/Settings.tsx | src/features/settings/Autonomy.tsx | core | 3 | Pending | – |  |
-| settings-ghost | src.bak/components/Settings.tsx | src/features/settings/Ghost.tsx | core | 3 | Pending | – |  |
-| settings-integrations | src.bak/components/IntegrationHub.tsx | src/features/settings/Integrations.tsx | core | 3 | Pending | – |  |
-| settings-providers | src.bak/components/Settings.tsx | src/features/settings/Providers.tsx | core | 3 | Pending | – |  |
-| settings-shortcuts | src.bak/components/Settings.tsx | src/features/settings/Shortcuts.tsx | core | 3 | Pending | – |  |
-| settings-voice | src.bak/components/Settings.tsx | src/features/settings/Voice.tsx | core | 3 | Pending | – |  |
+| settings | src.bak/components/Settings.tsx | src/features/settings/SettingsShell.tsx | core | 3 | Shipped | – | Tabbed shell — 10 child panes (D-79) |
+| settings-about | src.bak/components/Settings.tsx | src/features/settings/panes/AboutPane.tsx | core | 3 | Shipped | – | SET-10 |
+| settings-advanced | src.bak/components/Settings.tsx | src/features/settings/Advanced.tsx | core | 3 | Deferred | – | Phase 3 D-79 dropped from top-level tabs; reachable via palette only |
+| settings-ambient | src.bak/components/Settings.tsx | src/features/settings/panes/PersonalityPane.tsx | core | 3 | Deferred | settings-personality | Renamed to settings-personality per D-79 |
+| settings-autonomy | src.bak/components/Settings.tsx | src/features/settings/Autonomy.tsx | core | 3 | Deferred | – | Phase 3 D-79 dropped from top-level tabs; reachable via palette only |
+| settings-ghost | src.bak/components/Settings.tsx | src/features/settings/Ghost.tsx | core | 3 | Deferred | – | Phase 3 D-79 dropped from top-level tabs; reachable via palette only |
+| settings-integrations | src.bak/components/IntegrationHub.tsx | src/features/settings/panes/IoTPane.tsx | core | 3 | Deferred | settings-iot | Renamed to settings-iot per D-79 |
+| settings-providers | src.bak/components/Settings.tsx | src/features/settings/panes/ProvidersPane.tsx | core | 3 | Shipped | – | SET-01 |
+| settings-shortcuts | src.bak/components/Settings.tsx | src/features/settings/Shortcuts.tsx | core | 3 | Deferred | – | Phase 3 D-79 dropped from top-level tabs; reachable via palette only |
+| settings-voice | src.bak/components/Settings.tsx | src/features/settings/panes/VoicePane.tsx | core | 3 | Shipped | – | SET-04 |
+| settings-models | N/A (new — D-79 + ROADMAP SET-02) | src/features/settings/panes/ModelsPane.tsx | core | 3 | Shipped | – | SET-02 |
+| settings-routing | N/A (new — D-79 + ROADMAP SET-03) | src/features/settings/panes/RoutingPane.tsx | core | 3 | Shipped | – | SET-03 |
+| settings-personality | src.bak/components/Settings.tsx | src/features/settings/panes/PersonalityPane.tsx | core | 3 | Shipped | settings-ambient | SET-05 (renamed from settings-ambient per D-79) |
+| settings-appearance | N/A (new — D-79 + ROADMAP SET-06) | src/features/settings/panes/AppearancePane.tsx | core | 3 | Shipped | – | SET-06 |
+| settings-iot | src.bak/components/IntegrationHub.tsx | src/features/settings/panes/IoTPane.tsx | core | 3 | Shipped | settings-integrations | SET-07 (renamed from settings-integrations per D-79) |
+| settings-privacy | N/A (new — D-79 + ROADMAP SET-08) | src/features/settings/panes/PrivacyPane.tsx | core | 3 | Shipped | – | SET-08 |
+| settings-diagnostics | N/A (new — D-79 + ROADMAP SET-09) | src/features/settings/panes/DiagnosticsEntryPane.tsx | core | 3 | Shipped | – | SET-09 — DEV opens diagnostics-dev; PROD shows Phase 7 admin notice |
 | diagnostics-dev | src.bak/components/Diagnostics.tsx | src/features/dev/Diagnostics.tsx | dev | 1 | Shipped | – | DEV-only listener counter + perf marks; palette-hidden |
 | primitives | N/A (new — dev showcase) | src/features/dev/Primitives.tsx | dev | 1 | Shipped | – | DEV-only showcase; palette-hidden |
 | wrapper-smoke | N/A (new — P-04 harness) | src/features/dev/WrapperSmoke.tsx | dev | 1 | Shipped | – | DEV-only P-04 harness; palette-hidden |
