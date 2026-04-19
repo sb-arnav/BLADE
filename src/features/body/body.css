@@ -1,0 +1,134 @@
+/* src/features/body/body.css — Body cluster scoped styles.
+ *
+ * Plan 08-02 seeds the base classes needed by placeholder components plus
+ * the class names Plan 08-03 will use verbatim (per 08-PATTERNS §9). All
+ * rules wrapped in @layer features-body per D-210 — cluster scoping.
+ *
+ * @see .planning/phases/08-body-hive/08-PATTERNS.md §9
+ * @see .planning/phases/08-body-hive/08-CONTEXT.md §D-210
+ */
+
+@layer features-body {
+  /* ── BodyMap grid (BODY-01) ───────────────────────────────────────── */
+  .body-map {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+
+  .body-system-card {
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--glass-1-bg);
+    cursor: pointer;
+    transition: transform 200ms ease, background 200ms ease;
+  }
+
+  .body-system-card:hover {
+    transform: translateY(-1px);
+    background: var(--glass-2-bg);
+  }
+
+  /* ── BodySystemDetail (BODY-02) ───────────────────────────────────── */
+  .body-system-detail {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+
+  /* ── HormoneBus (BODY-03) ─────────────────────────────────────────── */
+  .hormone-bus {
+    display: grid;
+    grid-template-columns: 2fr 1fr 2fr;
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+
+  .hormone-row {
+    display: grid;
+    grid-template-columns: 100px 1fr 60px;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .hormone-meter {
+    height: 8px;
+    background: var(--glass-1-bg);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .hormone-meter > div {
+    height: 100%;
+    background: var(--status-running);
+    transition: width 250ms ease;
+  }
+
+  .hormone-row.accent-red .hormone-meter > div {
+    background: var(--status-error);
+  }
+
+  .hormone-row.accent-green .hormone-meter > div {
+    background: var(--status-success);
+  }
+
+  .hormone-row.accent-blue .hormone-meter > div {
+    background: var(--status-running);
+  }
+
+  .hormone-row.accent-purple .hormone-meter > div {
+    background: var(--status-idle);
+  }
+
+  .hormone-row.accent-neutral .hormone-meter > div {
+    background: var(--status-idle);
+  }
+
+  .circadian-grid {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 120px;
+  }
+
+  .circadian-bar {
+    flex: 1;
+    background: var(--status-running);
+    min-height: 2%;
+    transition: height 250ms ease;
+    border-radius: 2px 2px 0 0;
+  }
+
+  .circadian-bar.current-hour {
+    background: var(--status-success);
+  }
+
+  /* ── OrganRegistry (BODY-04) ──────────────────────────────────────── */
+  .organ-registry {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
+
+  /* ── DNA (BODY-05) ────────────────────────────────────────────────── */
+  .dna {
+    padding: var(--space-4);
+  }
+
+  .dna-tabs {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+  }
+
+  /* ── WorldModel (BODY-06) ─────────────────────────────────────────── */
+  .world-model {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+}
