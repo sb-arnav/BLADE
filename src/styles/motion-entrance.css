@@ -1,0 +1,28 @@
+/* src/styles/motion-entrance.css — Plan 09-04 (D-219 sub-check 2, D-229).
+ *
+ * Cross-cluster list entrance animation. Consumers import this file at the
+ * top of each cluster CSS (dashboard / agents / body / hive / dev-tools /
+ * admin / knowledge / life-os) so listings can opt-in via .list-entrance.
+ *
+ * Kept in a sibling file separate from motion.css to satisfy the Wave 2
+ * disjoint-files invariant (D-229): Plan 09-03 owns motion.css edits,
+ * Plan 09-04 owns motion-entrance.css.
+ *
+ * Animation tokens are pulled from motion.css:
+ *   --dur-enter  = 280ms
+ *   --ease-spring = cubic-bezier(0.22, 1, 0.36, 1)
+ *
+ * prefers-reduced-motion disables the animation entirely (D-216 sub-check 3).
+ */
+@keyframes blade-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.list-entrance {
+  animation: blade-enter var(--dur-enter) var(--ease-spring) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .list-entrance { animation: none; }
+}
