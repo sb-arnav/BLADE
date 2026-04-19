@@ -9,33 +9,325 @@
  */
 
 @layer features-body {
-  /* ── BodyMap grid (BODY-01) ───────────────────────────────────────── */
-  .body-map {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  /* ── BodyMap (BODY-01) ────────────────────────────────────────────── */
+  .body-map-surface {
+    display: flex;
+    flex-direction: column;
     gap: var(--space-4);
     padding: var(--space-4);
   }
 
+  .body-map-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .body-map-title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+  }
+
+  .body-map-sub {
+    margin: 2px 0 0;
+    opacity: 0.8;
+    font-size: 13px;
+  }
+
+  .body-map-loading,
+  .body-system-detail-loading {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-4);
+  }
+
+  .body-map-error,
+  .body-system-detail-error {
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid var(--status-error, rgba(239, 68, 68, 0.5));
+  }
+
+  .body-map-empty,
+  .body-system-detail-empty {
+    opacity: 0.7;
+    font-size: 13px;
+    padding: var(--space-2) 0;
+  }
+
+  .body-map {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-4);
+  }
+
   .body-system-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
     padding: var(--space-3);
     border-radius: var(--radius-md);
     background: var(--glass-1-bg);
+    border: 1px solid var(--border-1, rgba(255, 255, 255, 0.08));
     cursor: pointer;
-    transition: transform 200ms ease, background 200ms ease;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    transition: transform 200ms ease, background 200ms ease, border-color 200ms ease;
   }
 
   .body-system-card:hover {
     transform: translateY(-1px);
     background: var(--glass-2-bg);
+    border-color: var(--status-running);
+  }
+
+  .body-system-card:focus-visible {
+    outline: 2px solid var(--status-running);
+    outline-offset: 2px;
+  }
+
+  .body-system-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  .body-system-name {
+    font-weight: 600;
+    font-size: 14px;
+    text-transform: capitalize;
+  }
+
+  .body-system-preview {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12px;
+    opacity: 0.75;
+  }
+
+  .body-system-preview-item {
+    font-family: var(--font-mono);
+  }
+
+  .body-system-preview-empty {
+    opacity: 0.6;
+    font-style: italic;
+  }
+
+  .body-system-card-cta {
+    margin-top: auto;
+    font-size: 11px;
+    opacity: 0.6;
   }
 
   /* ── BodySystemDetail (BODY-02) ───────────────────────────────────── */
   .body-system-detail {
-    display: grid;
-    grid-template-columns: 1fr 320px;
+    display: flex;
+    flex-direction: column;
     gap: var(--space-4);
     padding: var(--space-4);
+  }
+
+  .body-system-detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .body-system-detail-title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+    text-transform: capitalize;
+  }
+
+  .body-system-detail-sub {
+    margin: 2px 0 0;
+    opacity: 0.8;
+    font-size: 13px;
+  }
+
+  .body-system-detail-actions {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .body-system-detail-tabs {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .body-system-detail-tab {
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--glass-1-bg);
+    border: 1px solid var(--border-1, rgba(255, 255, 255, 0.08));
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+  }
+
+  .body-system-detail-tab[data-active='true'] {
+    background: var(--glass-2-bg);
+    border-color: var(--status-running);
+  }
+
+  .body-system-detail-body {
+    min-height: 180px;
+  }
+
+  .body-module-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .body-module-row {
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--glass-1-bg);
+    border: 1px solid var(--border-1, rgba(255, 255, 255, 0.08));
+  }
+
+  .body-module-row-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .body-module-name {
+    font-weight: 600;
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+
+  .body-module-related {
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--status-running);
+    font: inherit;
+    font-size: 12px;
+    text-transform: capitalize;
+  }
+
+  .body-module-desc {
+    margin: var(--space-2) 0 0;
+    opacity: 0.85;
+    font-size: 12px;
+  }
+
+  .body-vitals-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--space-3);
+  }
+
+  .body-vitals-card {
+    padding: var(--space-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .body-vitals-card h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .body-vitals-stats {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .body-vitals-stats li {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+    font-size: 12px;
+  }
+
+  .body-vitals-stats li span {
+    opacity: 0.7;
+  }
+
+  .body-vitals-stats li strong {
+    font-family: var(--font-mono);
+  }
+
+  .body-vitals-services {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+  }
+
+  .body-vitals-service-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .body-vitals-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .body-events-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .body-events-table th,
+  .body-events-table td {
+    padding: var(--space-2);
+    border-bottom: 1px solid var(--border-1, rgba(255, 255, 255, 0.08));
+    text-align: left;
+  }
+
+  .body-events-table code {
+    font-family: var(--font-mono);
+  }
+
+  .body-dialog-label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    margin-top: var(--space-2);
+  }
+
+  .body-dialog-actions {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+    justify-content: flex-end;
   }
 
   /* ── HormoneBus (BODY-03) ─────────────────────────────────────────── */
