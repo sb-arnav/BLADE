@@ -31,6 +31,12 @@ export interface Prefs {
   /** Ghost Mode: user has acknowledged Linux screen-capture warning. */
   'ghost.linuxWarningAcknowledged'?: boolean;
   /**
+   * Phase 4 D-107 — Voice Orb corner position; persisted after drag-release
+   * snap. Values: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
+   * (stored as string because the index signature below is the widened type).
+   */
+  'voice_orb.corner'?: string;
+  /**
    * Phase 2 D-57: JSON-encoded array of recent route ids (max 5) surfaced at
    * the top of CommandPalette when the query is empty. Stored as a string
    * because the Prefs index signature below is `string | number | boolean
