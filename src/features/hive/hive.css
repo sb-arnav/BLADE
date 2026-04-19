@@ -11,13 +11,75 @@
   /* ── HiveMesh (HIVE-01) ───────────────────────────────────────────── */
   .hive-mesh {
     display: grid;
-    grid-template-rows: auto 1fr auto;
+    grid-template-rows: auto auto 1fr auto;
     gap: var(--space-4);
     padding: var(--space-4);
   }
 
   .hive-hero {
     padding: var(--space-4);
+  }
+
+  .hive-hero-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: var(--space-4);
+    align-items: start;
+  }
+
+  @media (max-width: 960px) {
+    .hive-hero-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .hive-hero-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-2);
+  }
+
+  .hive-hero-stats > div {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .hive-hero-stats strong {
+    font-size: 18px;
+    color: var(--t-1);
+  }
+
+  .hive-hero-stats span {
+    font-size: 11px;
+    color: var(--t-2);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .hive-autonomy {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .hive-autonomy-label {
+    font-size: 13px;
+    color: var(--t-1);
+  }
+
+  .hive-autonomy-scale {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--t-2);
+  }
+
+  .hive-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    align-items: center;
   }
 
   .tentacle-grid {
@@ -34,10 +96,19 @@
     cursor: pointer;
     text-align: left;
     transition: transform 200ms ease, border-color 200ms ease;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
   }
 
-  .tentacle-card:hover {
+  .tentacle-card:hover:not(.status-dormant) {
     transform: translateY(-1px);
+    box-shadow: 0 0 0 1px var(--status-running);
+  }
+
+  .tentacle-card:focus-visible {
+    outline: 2px solid var(--status-running);
+    outline-offset: 2px;
   }
 
   .tentacle-card.status-active {
@@ -65,7 +136,7 @@
 
   .tentacle-status {
     font-size: 12px;
-    color: var(--text-secondary);
+    color: var(--t-2);
   }
 
   .tentacle-head {
@@ -74,7 +145,36 @@
 
   .tentacle-reports {
     font-size: 12px;
-    color: var(--text-secondary);
+    color: var(--t-2);
+  }
+
+  .tentacle-heartbeat {
+    font-size: 11px;
+    color: var(--t-2);
+  }
+
+  .hive-decisions {
+    padding: var(--space-3);
+  }
+
+  .hive-decisions-list {
+    list-style: none;
+    padding: 0;
+    margin: var(--space-2) 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .hive-decisions-list li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: 13px;
+  }
+
+  .hive-decision-summary {
+    color: var(--t-1);
   }
 
   /* ── TentacleDetail (HIVE-02) ─────────────────────────────────────── */
@@ -85,19 +185,215 @@
     padding: var(--space-4);
   }
 
+  @media (max-width: 960px) {
+    .tentacle-detail {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .tentacle-detail-main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-width: 0;
+  }
+
+  .tentacle-hero {
+    padding: var(--space-4);
+  }
+
+  .tentacle-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+
+  .tentacle-stats > div {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .tentacle-stats strong {
+    font-size: 16px;
+  }
+
+  .tentacle-stats span {
+    font-size: 11px;
+    color: var(--t-2);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .tentacle-reports {
+    padding: var(--space-3);
+  }
+
+  .tentacle-report-list {
+    list-style: none;
+    padding: 0;
+    margin: var(--space-2) 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .tentacle-report-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--space-3);
+    align-items: start;
+    width: 100%;
+    padding: var(--space-2);
+    background: var(--glass-1-bg);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .tentacle-report-row:hover {
+    border-color: var(--status-running);
+  }
+
+  .tentacle-report-main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+
+  .tentacle-report-summary {
+    color: var(--t-1);
+    font-size: 13px;
+  }
+
+  .tentacle-report-meta {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+    font-size: 11px;
+    color: var(--t-2);
+  }
+
+  .tentacle-side {
+    padding: var(--space-3);
+  }
+
+  .tentacle-autonomy-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+  }
+
+  .tentacle-autonomy-row {
+    display: grid;
+    grid-template-columns: 110px 1fr 24px;
+    gap: var(--space-2);
+    align-items: center;
+  }
+
+  .tentacle-autonomy-row input[type='range'] {
+    width: 100%;
+  }
+
+  .tentacle-autonomy-value {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    text-align: right;
+  }
+
+  .tentacle-spawn-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+
+  .tentacle-spawn-form label {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    font-size: 12px;
+    color: var(--t-2);
+  }
+
+  .tentacle-spawn-form textarea.input {
+    width: 100%;
+    min-height: 120px;
+    padding: var(--space-2);
+    border-radius: var(--radius-sm);
+    background: var(--glass-1-bg);
+    border: 1px solid var(--border-1, transparent);
+    color: var(--t-1);
+  }
+
   /* ── AutonomyControls (HIVE-03) ───────────────────────────────────── */
   .autonomy-controls {
     padding: var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .autonomy-global {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-3);
+  }
+
+  .autonomy-matrix-wrap {
+    overflow-x: auto;
   }
 
   .autonomy-matrix {
     display: grid;
-    grid-template-columns: 160px repeat(6, 1fr);
-    gap: 2px;
+    grid-template-columns: 160px repeat(6, minmax(120px, 1fr));
+    gap: 1px;
+    background: var(--border-1, var(--glass-1-bg));
+    border: 1px solid var(--border-1, var(--glass-1-bg));
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    min-width: 860px;
   }
 
-  .autonomy-matrix input[type='range'] {
+  .autonomy-cell {
+    background: var(--glass-1-bg);
+    padding: var(--space-2);
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .autonomy-cell.header {
+    background: var(--glass-2-bg, var(--glass-1-bg));
+    font-weight: var(--font-weight-semibold);
+    font-size: 12px;
+    text-transform: lowercase;
+  }
+
+  .autonomy-cell.label {
+    font-weight: var(--font-weight-semibold);
+    font-size: 13px;
+  }
+
+  .autonomy-cell input[type='range'] {
     width: 100%;
+  }
+
+  .autonomy-cell-value {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--t-2);
+  }
+
+  .autonomy-cell-empty {
+    color: var(--t-2);
+    text-align: center;
+    font-size: 13px;
   }
 
   /* ── ApprovalQueue (HIVE-04) ──────────────────────────────────────── */
@@ -108,19 +404,63 @@
     padding: var(--space-4);
   }
 
+  .approval-header {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .approval-filters {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .approval-row {
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--glass-1-bg);
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: var(--space-3);
+    align-items: start;
+  }
+
+  .approval-row.expanded {
+    grid-template-columns: 1fr;
+  }
+
   .decision-type {
     font-weight: var(--font-weight-semibold);
-    color: var(--text-primary);
+    color: var(--t-1);
+  }
+
+  .decision-type.type-reply {
+    color: var(--status-running);
+  }
+
+  .decision-type.type-escalate {
+    color: var(--status-error);
+  }
+
+  .decision-type.type-act {
+    color: var(--status-success);
+  }
+
+  .decision-type.type-inform {
+    color: var(--t-1);
   }
 
   .decision-details {
     font-family: var(--font-mono);
     font-size: 12px;
-    background: var(--glass-1-bg);
+    background: rgba(0, 0, 0, 0.05);
     padding: var(--space-2);
     border-radius: var(--radius-sm);
     max-height: 200px;
     overflow: auto;
+    white-space: pre-wrap;
   }
 
   .decision-actions {
@@ -131,5 +471,69 @@
   /* ── AiDelegate (HIVE-06) ─────────────────────────────────────────── */
   .ai-delegate {
     padding: var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .ai-delegate-hero {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-3);
+  }
+
+  .delegate-log {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    max-height: 600px;
+    overflow-y: auto;
+    padding: var(--space-2);
+  }
+
+  .delegate-log-row {
+    padding: var(--space-3);
+    border-radius: var(--radius-sm);
+    background: var(--glass-1-bg);
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: var(--space-3);
+    align-items: center;
+  }
+
+  .delegate-log-row.kind-approved {
+    border-left: 3px solid var(--status-success);
+  }
+
+  .delegate-log-row.kind-denied {
+    border-left: 3px solid var(--status-error);
+  }
+
+  .delegate-log-summary {
+    font-size: 13px;
+    color: var(--t-1);
+  }
+
+  .delegate-log-meta {
+    font-size: 11px;
+    color: var(--t-2);
+  }
+
+  .feedback-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+
+  .feedback-form textarea.input {
+    width: 100%;
+    min-height: 80px;
+    padding: var(--space-2);
+    border-radius: var(--radius-sm);
+    background: var(--glass-1-bg);
+    border: 1px solid var(--border-1, transparent);
+    color: var(--t-1);
   }
 }
