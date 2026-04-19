@@ -231,6 +231,27 @@ export interface BladeToastPayload {
 export interface ShortcutRegistrationFailedPayload {
   shortcut: string;
   error: string;
+  /** Phase 4 Plan 04-01 (D-94) additive — optional human-readable shortcut name. */
+  name?: string;
+  /** Phase 4 Plan 04-01 (D-94) additive — list of candidates tried before the
+   *  emit fired (either fallbacks that also failed, or all three on a full failure). */
+  attempted?: string[];
+  /** Phase 4 Plan 04-01 (D-94) additive — the shortcut that ultimately
+   *  registered; present on `severity: "warning"` only. */
+  fallback_used?: string;
+  /** Phase 4 Plan 04-01 (D-94) additive — `"warning"` means a fallback
+   *  succeeded (surface a non-fatal toast); `"error"` means every candidate
+   *  failed (surface a stranded-state card). Undefined on Phase 3 emits —
+   *  treat as `"error"` for back-compat. */
+  severity?: 'error' | 'warning';
+}
+
+/** Phase 4 Plan 04-01 (D-114) — cross-window route request.
+ *  HUD right-click menu / Phase 7 admin surfaces emit via `emit_route_request`;
+ *  main's `useRouter` subscribes and calls `openRoute(route_id)` after
+ *  validating against the ALL_ROUTES whitelist. */
+export interface BladeRouteRequestPayload {
+  route_id: string;
 }
 
 /** Mirrors src-tauri/src/ghost_mode.rs GhostMeetingState — exact shape pending

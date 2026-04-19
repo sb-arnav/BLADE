@@ -84,6 +84,7 @@ export const BLADE_EVENTS = {
   GODMODE_UPDATE: 'godmode_update',
   PROACTIVE_NUDGE: 'proactive_nudge',
   SHORTCUT_REGISTRATION_FAILED: 'shortcut_registration_failed',
+  BLADE_ROUTE_REQUEST: 'blade_route_request',
 
   // ───── Ghost (LIVE — ghost_mode.rs) ──────────────────────────────────────
   GHOST_MEETING_STATE: 'ghost_meeting_state',
