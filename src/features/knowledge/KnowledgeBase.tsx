@@ -15,7 +15,7 @@
 // @see .planning/REQUIREMENTS.md §KNOW-01
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Dialog, GlassPanel, Input } from '@/design-system/primitives';
+import { Button, Dialog, EmptyState, GlassPanel, Input } from '@/design-system/primitives';
 import { usePrefs } from '@/hooks/usePrefs';
 import { useRouterCtx } from '@/windows/main/useRouter';
 import {
@@ -224,9 +224,10 @@ export function KnowledgeBase() {
         <section className="knowledge-recent-section">
           <h3 className="knowledge-search-group-heading">Recent entries</h3>
           {recent.length === 0 ? (
-            <p className="knowledge-placeholder-hint">
-              No knowledge entries yet. Capture something via chat or the tools surface.
-            </p>
+            <EmptyState
+              label="No matches"
+              description="Try a broader query or a different source."
+            />
           ) : (
             <div className="knowledge-recent-list">
               {recent.map((e) => (

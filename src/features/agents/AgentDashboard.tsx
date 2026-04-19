@@ -15,7 +15,7 @@
 // @see .planning/REQUIREMENTS.md §AGENT-01
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Badge, Button, GlassPanel, GlassSpinner, Pill } from '@/design-system/primitives';
+import { Badge, Button, EmptyState, GlassPanel, GlassSpinner, Pill } from '@/design-system/primitives';
 import { usePrefs } from '@/hooks/usePrefs';
 import { useToast } from '@/lib/context/ToastContext';
 import { useRouterCtx } from '@/windows/main/useRouter';
@@ -279,9 +279,12 @@ export function AgentDashboard() {
           <GlassSpinner size={28} label="Loading agents" />
         </div>
       ) : totalVisible === 0 ? (
-        <div className="agents-empty-state">
-          No agents running. Use <code>agent_spawn</code> or the Agent Factory route to create one.
-        </div>
+        <EmptyState
+          label="No agents yet"
+          description="Spawn one from the agent factory."
+          actionLabel="Open factory"
+          onAction={() => openRoute('agent-factory')}
+        />
       ) : (
         GROUP_ORDER.map((group) => {
           const items = grouped[group] ?? [];

@@ -23,7 +23,7 @@
 // @see .planning/REQUIREMENTS.md §IDEN-06
 
 import { useCallback, useState } from 'react';
-import { Button, Dialog, GlassPanel, GlassSpinner, Pill } from '@/design-system/primitives';
+import { Button, Dialog, EmptyState, GlassPanel, GlassSpinner, Pill } from '@/design-system/primitives';
 import { useToast } from '@/lib/context/ToastContext';
 import {
   contextAssemble,
@@ -152,6 +152,13 @@ export function ContextEngineView() {
           {assembleBusy ? <GlassSpinner size={14} label="Assembling context" /> : null}
         </div>
       </section>
+
+      {!assembled && !assembleBusy ? (
+        <EmptyState
+          label="No context blocks"
+          description="Context blocks populate as BLADE learns about your patterns."
+        />
+      ) : null}
 
       {assembled ? (
         <section className="context-card" data-testid="context-assemble-output">

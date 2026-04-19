@@ -25,7 +25,7 @@
 // @see .planning/REQUIREMENTS.md §LIFE-09
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Dialog, GlassPanel, GlassSpinner, Input } from '@/design-system/primitives';
+import { Button, Dialog, EmptyState, GlassPanel, GlassSpinner, Input } from '@/design-system/primitives';
 import { useToast } from '@/lib/context/ToastContext';
 import {
   accountabilityCheckin,
@@ -322,9 +322,10 @@ export function AccountabilityView() {
               Today&rsquo;s actions ({dailyActions.length})
             </p>
             {dailyActions.length === 0 ? (
-              <p className="life-placeholder-hint" style={{ textAlign: 'left' }}>
-                No daily actions for today.
-              </p>
+              <EmptyState
+                label="No accountability events"
+                description="Commitments show here as you make them."
+              />
             ) : (
               <div>
                 {dailyActions.map((a) => (

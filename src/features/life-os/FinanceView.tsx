@@ -23,7 +23,7 @@
 // @see .planning/phases/06-life-os-identity/06-PATTERNS.md §5 (CSV recipe)
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { GlassPanel, Button, Dialog, Input, GlassSpinner } from '@/design-system/primitives';
+import { GlassPanel, Button, Dialog, EmptyState, Input, GlassSpinner } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import { usePrefs } from '@/hooks/usePrefs';
 import {
@@ -469,9 +469,12 @@ export function FinanceView() {
                 Transactions · last 90 days
               </h3>
               {transactions.length === 0 ? (
-                <div className="life-empty">
-                  No transactions in range. Use "Import CSV" to load history.
-                </div>
+                <EmptyState
+                  label="No transactions yet"
+                  description="Import a CSV to start tracking."
+                  actionLabel="Import CSV"
+                  onAction={() => void handleImportCsv()}
+                />
               ) : (
                 <div className="finance-tx-list">
                   {transactions.map((tx) => {

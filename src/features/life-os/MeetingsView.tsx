@@ -8,7 +8,7 @@
 // @see src/features/life-os/MeetingDetail.tsx
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { GlassPanel, Button, Dialog, Input, GlassSpinner } from '@/design-system/primitives';
+import { GlassPanel, Button, Dialog, EmptyState, Input, GlassSpinner } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import {
   meetingList,
@@ -206,11 +206,10 @@ export function MeetingsView() {
                 <GlassSpinner size={20} label="Loading meetings" />
               </div>
             ) : visibleMeetings.length === 0 ? (
-              <div className="life-empty" style={{ margin: 'var(--s-2)' }}>
-                {searchResults
-                  ? 'No matches. Try a different query.'
-                  : 'No meetings yet. Meetings are ingested via meeting_process.'}
-              </div>
+              <EmptyState
+                label="No meetings"
+                description="Upcoming meetings will appear here."
+              />
             ) : (
               visibleMeetings.map((m) => (
                 <button

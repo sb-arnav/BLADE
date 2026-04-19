@@ -18,7 +18,7 @@
 // @see .planning/REQUIREMENTS.md §LIFE-06
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Dialog, GlassPanel, GlassSpinner, Input } from '@/design-system/primitives';
+import { Button, Dialog, EmptyState, GlassPanel, GlassSpinner, Input } from '@/design-system/primitives';
 import { useToast } from '@/lib/context/ToastContext';
 import {
   socialAddContact,
@@ -299,9 +299,10 @@ export function SocialGraphView() {
           )}
 
           {!listLoading && !listError && contacts.length === 0 && (
-            <p className="life-placeholder-hint">
-              No contacts yet. Add your first contact.
-            </p>
+            <EmptyState
+              label="No contacts yet"
+              description="Contacts are derived from chat + email + calendar."
+            />
           )}
 
           {contacts.map((c) => (

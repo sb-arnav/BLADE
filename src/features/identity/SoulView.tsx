@@ -24,9 +24,10 @@
 // @see src/lib/tauri/identity.ts (soul_* + character_* + user_profile wrappers)
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Dialog, GlassPanel, GlassSpinner } from '@/design-system/primitives';
+import { Button, Dialog, EmptyState, GlassPanel, GlassSpinner } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import { usePrefs } from '@/hooks/usePrefs';
+import { useRouterCtx } from '@/windows/main/useRouter';
 import {
   bladeGetSoul,
   getCharacterBible,
@@ -361,11 +362,16 @@ interface BibleTabProps {
 }
 
 function BibleTab({ bible, bladeSoul, onEdit }: BibleTabProps) {
+  const router = useRouterCtx();
   if (!bible) {
     return (
-      <div className="identity-empty" data-testid="soul-bible-empty">
-        No bible content yet. Hit "Refresh Bible" above to consolidate the first pass.
-      </div>
+      <EmptyState
+        label="No identity document"
+        description="Populate from Settings → Personality or the DNA route."
+        actionLabel="Open DNA"
+        onAction={() => router.openRoute('dna')}
+        testId="soul-bible-empty"
+      />
     );
   }
 

@@ -15,7 +15,7 @@
 // @see src/lib/tauri/identity.ts (negotiation_* wrappers)
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Dialog, GlassPanel, GlassSpinner, Input } from '@/design-system/primitives';
+import { Button, Dialog, EmptyState, GlassPanel, GlassSpinner, Input } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import {
   negotiationAnalyze,
@@ -205,9 +205,10 @@ function DebateTab() {
           </div>
         )}
         {!loading && sessions.length === 0 && !error && (
-          <div style={{ padding: 'var(--s-3)', color: 'var(--t-3)', fontSize: 12 }}>
-            No past debates yet.
-          </div>
+          <EmptyState
+            label="No negotiations"
+            description="Negotiation traces log here when BLADE delegates."
+          />
         )}
         {sessions.map((s) => (
           <button
