@@ -24,6 +24,11 @@ import {
 import { DEFAULT_ROUTE_ID } from '@/lib/router';
 import { ROUTE_MAP } from '@/windows/main/router';
 import { usePrefs } from '@/hooks/usePrefs';
+// Phase 4 Plan 04-06 (D-114, D-116) — cross-window navigation consumer.
+// Rust `emit_route_request` (Plan 04-01) + HUD right-click menu emit
+// BLADE_ROUTE_REQUEST with `{route_id}`; main-side forwards to openRoute.
+import { BLADE_EVENTS, useTauriEvent } from '@/lib/events';
+import type { BladeRouteRequestPayload } from '@/lib/events';
 
 export interface RouterContextValue {
   routeId: string;
@@ -102,6 +107,18 @@ export function RouterProvider({ children }: { children: ReactNode }) {
   const value = useMemo<RouterContextValue>(
     () => ({ routeId, openRoute, back, forward, canBack, canForward }),
     [routeId, openRoute, back, forward, canBack, canForward],
+  );
+
+  // Phase 4 Plan 04-06 (D-114, D-116) — cross-window navigation hint.
+  // HUD right-click menu (Plan 04-05) + Rust `emit_route_request` (Plan 04-01)
+  // publish BLADE_ROUTE_REQUEST with a validated route_id. openRoute's own
+  // T-02-05-02 guard (ROUTE_MAP.has) drops unknown ids silently, so the
+  // cross-window surface can't poison router state.
+  useTauriEvent<BladeRouteRequestPayload>(
+    BLADE_EVENTS.BLADE_ROUTE_REQUEST,
+    (e) => {
+      openRoute(e.payload.route_id);
+    },
   );
 
   return createElement(Ctx.Provider, { value }, children);
