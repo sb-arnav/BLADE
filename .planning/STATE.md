@@ -2,23 +2,23 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: "02-onboarding-shell"
-status: awaiting-operator-smoke-checkpoints
-last_updated: "2026-04-18T21:40:00.000Z"
+current_phase: "03-dashboard-chat-settings"
+status: awaiting-mac-operator-smoke-checkpoints
+last_updated: "2026-04-19T00:00:00.000Z"
 progress:
   total_phases: 10
   completed_phases: 1
-  total_plans: 18
-  completed_plans: 16
-  percent: 60
+  total_plans: 25
+  completed_plans: 22
+  percent: 70
 ---
 
 # STATE — BLADE Skin Rebuild (V1)
 
 **Project:** BLADE Skin Rebuild V1
-**Current Phase:** 02-onboarding-shell (7/7 plans substrate shipped; Plan 02-07 awaits operator smoke + Phase 1 Plan 01-09 WCAG checkpoint still open)
-**Status:** Phases 1 + 2 SUBSTRATE COMPLETE — ~55 commits landed across both phases, npm run verify:all passes all 5 automated gates, npx tsc clean. 2 deferred operator checkpoints queued for next desktop session.
-**Last Updated:** 2026-04-18 21:40 UTC
+**Current Phase:** 03-dashboard-chat-settings (7/7 plans substrate shipped; 3 deferred operator checkpoints)
+**Status:** Phases 1 + 2 + 3 SUBSTRATE COMPLETE — ~80 commits across three phases. `npm run verify:all` 6/6 green (added verify:chat-rgba as D-70 regression gate). `npx tsc --noEmit` clean. All checkpoints will be closed in one Mac session per user strategy (brother's Mac).
+**Last Updated:** 2026-04-19
 
 ---
 
@@ -32,18 +32,18 @@ progress:
 
 ## Current Position
 
-Phase: 02 — SUBSTRATE COMPLETE (operator smoke + WCAG checkpoints pending)
-Plan: 16 of 18 shipped (Phase 0 + Phase 1 substrate + Phase 2 substrate); 01-09 Task 4 WCAG + 02-07 Task 2 smoke deferred
-**Phase:** 2 — Onboarding + Main Shell
-**Plan:** 02-07 automated specs complete; operator-smoke checkpoint owned by operator (desktop session required)
-**Phase Status:** 95% — all 7 plans code-complete; needs Playwright run + manual onboarding walk-through + 5-wallpaper WCAG backstop
+Phase: 03 — SUBSTRATE COMPLETE (Mac operator smoke deferred)
+Plan: 22 of 25 shipped (Phase 0 + Phase 1 + Phase 2 + Phase 3 substrates); 3 checkpoints open: 01-09 WCAG + 02-07 operator smoke + 03-07 Mac smoke (inc. cargo check on libclang host). All three closed in one Mac session.
+**Phase:** 3 — Dashboard + Chat + Settings
+**Plan:** 03-07 automated specs complete (4 new Playwright specs + verify-chat-rgba.sh); operator-smoke checkpoint owned by operator
+**Phase Status:** 95% — all 7 plans code-complete; DASH-01..08 + CHAT-01..10 + SET-01..10 + WIRE-01..06 closed
 **Overall Progress:**
 
 ```
 [Phase 0] Pre-Rebuild Audit    ████████████████████  100% COMPLETE (b26a965)
 [Phase 1] Foundation           ███████████████████░   95% SUBSTRATE SHIPPED (WCAG checkpoint pending)
 [Phase 2] Onboarding + Shell   ███████████████████░   95% SUBSTRATE SHIPPED (operator smoke pending)
-[Phase 3] Dashboard+Chat+Set   ░░░░░░░░░░░░░░░░░░░░  Not started
+[Phase 3] Dashboard+Chat+Set   ███████████████████░   95% SUBSTRATE SHIPPED (Mac smoke + cargo check pending)
 [Phase 4] Overlay Windows      ░░░░░░░░░░░░░░░░░░░░  Not started
 [Phase 5] Agents + Knowledge   ░░░░░░░░░░░░░░░░░░░░  Not started
 [Phase 6] Life OS + Identity   ░░░░░░░░░░░░░░░░░░░░  Not started
