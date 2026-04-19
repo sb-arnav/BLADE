@@ -29,6 +29,7 @@ import {
 import { RouterProvider, useRouterCtx } from './useRouter';
 import { useGlobalShortcuts } from './useGlobalShortcuts';
 import { useOnboardingGate } from './useOnboardingGate';
+import { ShortcutHelp } from './ShortcutHelp';
 import { ROUTE_MAP } from './router';
 import { DEFAULT_ROUTE_ID } from '@/lib/router';
 import { OnboardingFlow } from '@/features/onboarding';
@@ -53,13 +54,17 @@ export function MainShell() {
 function ShellContent() {
   const gate = useOnboardingGate();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const openPalette = useCallback(() => setPaletteOpen(true), []);
   const closePalette = useCallback(() => setPaletteOpen(false), []);
+  // Phase 9 Plan 09-05 (D-222) — ⌘? shortcut help panel.
+  const openShortcutHelp = useCallback(() => setShortcutHelpOpen(true), []);
+  const closeShortcutHelp = useCallback(() => setShortcutHelpOpen(false), []);
 
   // Must be mounted INSIDE RouterProvider — the hook calls useRouterCtx.
   // T-02-06-06 accepted: shortcuts still fire in the onboarding branch, but
   // the route tree isn't mounted so only the prefs write takes effect.
-  useGlobalShortcuts({ openPalette });
+  useGlobalShortcuts({ openPalette, openShortcutHelp });
 
   if (gate.status === 'checking') {
     return (
@@ -101,6 +106,7 @@ function ShellContent() {
       </div>
       <GlobalOverlays />
       <CommandPalette open={paletteOpen} onClose={closePalette} />
+      <ShortcutHelp open={shortcutHelpOpen} onClose={closeShortcutHelp} />
     </div>
   );
 }
