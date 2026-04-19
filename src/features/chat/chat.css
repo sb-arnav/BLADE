@@ -103,28 +103,56 @@
   flex: 1;
 }
 
-/* ── Reasoning / thinking section (Plan 03-04 target) ─────────────────────── */
-/* Selectors shipped Day-1 so Plan 03-04's component addition is a pure
- * markup addition — no CSS churn. */
+/* ── Reasoning / thinking section (D-72 / CHAT-08) ────────────────────────── */
+/* Native <details>/<summary>; Plan 03-04 ships the markup in
+ * src/features/chat/ReasoningThinking.tsx + MessageBubble.tsx. Selector
+ * layout was shipped by Plan 03-03; this plan promotes the rules to the
+ * full D-72 visual (uppercase summary, ▸/▾ markers, left-rule block).    */
 
 .chat-thinking-details {
   margin-bottom: var(--s-2);
 }
 
-.chat-thinking-details > summary {
+.chat-thinking-summary {
+  cursor: pointer;
+  color: var(--t-3);
+  font-family: var(--font-body);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  list-style: none;
+  padding: 2px 0;
+}
+
+.chat-thinking-summary::-webkit-details-marker {
+  display: none;
+}
+
+.chat-thinking-summary::before {
+  content: '▸ ';
+  display: inline-block;
+  transition: transform 200ms ease-out;
+}
+
+.chat-thinking-details[open] .chat-thinking-summary::before {
+  content: '▾ ';
+}
+
+/* Backwards-compat alias in case the raw <summary> is used without the
+ * summary class (keeps Plan 03-03 subtree selectors valid). */
+.chat-thinking-details > summary:not(.chat-thinking-summary) {
   cursor: pointer;
   color: var(--t-3);
   font-size: 13px;
   list-style: none;
 }
-
 .chat-thinking-details > summary::-webkit-details-marker {
   display: none;
 }
 
 .chat-thinking {
   margin-top: var(--s-1);
-  padding: var(--s-2);
+  padding: var(--s-2) var(--s-3) 0 var(--s-3);
   border-left: 2px solid var(--line);
   color: var(--t-3);
   font-size: 13px;
