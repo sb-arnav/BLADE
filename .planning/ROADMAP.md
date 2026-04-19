@@ -225,7 +225,14 @@ Plans:
   3. Every top-level route is wrapped in an error boundary; a simulated error shows a recovery affordance (retry / reset / report), never an unhandled crash.
   4. `⌘?` opens the shortcut help panel; every route has at least its primary shortcut documented and functional.
   5. WCAG AA 4.5:1 contrast confirmed on all 5 representative wallpapers across all 59 routes; Voice Orb sustains 60fps on integrated GPU through all 4 phase transitions.
-**Plans**: TBD
+**Plans**: 6 plans
+Plans:
+- [ ] 09-01-PLAN.md — Wave 1: Rust backfill (hive_reject_decision + dna_set_identity + delegate_feedback) + 3 wrappers + 3 frontend wiring edits (POL-09..10 — closes Phase 8 deferrals)
+- [ ] 09-02-PLAN.md — Wave 2: ErrorBoundary + EmptyState primitives + MainShell wrap + empty-state sweep (17 files: agents + knowledge + life-os + identity) (POL-02, POL-03)
+- [ ] 09-03-PLAN.md — Wave 2: A11y sweep — prefers-reduced-motion override + ARIA icon-only buttons + Dialog focus audit + keyboard nav audit (POL-06..08)
+- [ ] 09-04-PLAN.md — Wave 2: Motion audit + motion-entrance.css + ListSkeleton primitive + empty-state sweep (20 files: body + hive + dev-tools + admin) + consistency audit (POL-01, POL-02, POL-05, POL-10)
+- [ ] 09-05-PLAN.md — Wave 3: ⌘? shortcut help panel + 3 perf Playwright specs + verify-html-entries.mjs --prod flag + build log (POL-01, POL-04, POL-05)
+- [ ] 09-06-PLAN.md — Wave 4: 2 Playwright specs (a11y + error-boundary) + 4 verify scripts + CHANGELOG.md + Mac-smoke M-41..M-46 operator checkpoint (all POL)
 **UI hint**: yes
 
 ---
