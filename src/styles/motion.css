@@ -31,3 +31,20 @@
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
+
+/* POL-07 / D-216 / D-219 — honour OS reduced-motion preference.
+ * Override the duration tokens to effectively-zero (not 0ms — some engines
+ * skip transition/animation events entirely at 0ms; 0.01ms still fires the
+ * lifecycle hooks so consumer state cleanups run deterministically).
+ * Also disables the spin @keyframes used by GlassSpinner. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-snap:  0.01ms;
+    --dur-fast:  0.01ms;
+    --dur-base:  0.01ms;
+    --dur-enter: 0.01ms;
+    --dur-slow:  0.01ms;
+    --dur-float: 0.01ms;
+  }
+  @keyframes spin { from { transform: none; } to { transform: none; } }
+}
