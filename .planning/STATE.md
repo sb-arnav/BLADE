@@ -2,22 +2,22 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: "08-body-hive"
-status: awaiting-mac-operator-smoke-checkpoints
-last_updated: "2026-04-19T20:00:00.000Z"
+current_phase: "09-polish"
+status: v1-substrate-complete-awaiting-mac-smoke
+last_updated: "2026-04-19T22:00:00.000Z"
 progress:
   total_phases: 10
-  completed_phases: 1
-  total_plans: 58
-  completed_plans: 57
-  percent: 99
+  completed_phases: 10
+  total_plans: 64
+  completed_plans: 64
+  percent: 100
 ---
 
 # STATE — BLADE Skin Rebuild (V1)
 
 **Project:** BLADE Skin Rebuild V1
-**Current Phase:** 03-dashboard-chat-settings (7/7 plans substrate shipped; 3 deferred operator checkpoints)
-**Status:** Phases 1 + 2 + 3 SUBSTRATE COMPLETE — ~80 commits across three phases. `npm run verify:all` 6/6 green (added verify:chat-rgba as D-70 regression gate). `npx tsc --noEmit` clean. All checkpoints will be closed in one Mac session per user strategy (brother's Mac).
+**Current Phase:** 09-polish COMPLETE — V1 substrate fully shipped
+**Status:** ALL 10 PHASES COMPLETE — ~165 commits, 64 plans, `npm run verify:all` 18/18 green, `npx tsc --noEmit` clean. Single Mac operator session (brother) closes all deferred checkpoints: M-WCAG + M-01..M-46 via `.planning/HANDOFF-TO-MAC.md`. On operator "approved, ship it" → 1.0.0 cutover sequence executes.
 **Last Updated:** 2026-04-19
 
 ---
