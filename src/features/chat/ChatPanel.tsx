@@ -2,9 +2,11 @@
 //
 // Structure:
 //   <section.chat-panel data-status={status}>
-//     <header.chat-header> [title] [routing pill] [Plan 03-04: compacting indicator]
-//     <MessageList />      (committed messages + live streaming bubble)
-//     [Plan 03-04: <ToolApprovalDialog/>]
+//     <header.chat-header>  [title] [routing pill]
+//     <CompactingIndicator/>  (absolute top-right; appears only when ratio > 0.65)
+//     <MessageList />         (committed messages + live streaming bubble)
+//     <ToolApprovalDialog />  (renders portal-style via Dialog primitive when
+//                              a tool_approval_needed event is pending)
 //     <InputBar />
 //   </section>
 //
@@ -19,11 +21,13 @@
 // call useChatCtx() safely.
 //
 // @see .planning/phases/03-dashboard-chat-settings/03-CONTEXT.md §D-67..D-73
-// @see .planning/phases/03-dashboard-chat-settings/03-PATTERNS.md §3,§5
+// @see .planning/phases/03-dashboard-chat-settings/03-PATTERNS.md §3,§4,§5,§6
 
 import { Pill } from '@/design-system/primitives';
+import { CompactingIndicator } from './CompactingIndicator';
 import { InputBar } from './InputBar';
 import { MessageList } from './MessageList';
+import { ToolApprovalDialog } from './ToolApprovalDialog';
 import { useChatCtx } from './useChat';
 
 export function ChatPanel() {
@@ -40,10 +44,10 @@ export function ChatPanel() {
         ) : (
           <Pill>—</Pill>
         )}
-        {/* Plan 03-04 slot: <CompactingIndicator /> absolute-positioned above the pill */}
       </header>
+      <CompactingIndicator />
       <MessageList />
-      {/* Plan 03-04 slot: <ToolApprovalDialog /> */}
+      <ToolApprovalDialog />
       <InputBar />
     </section>
   );

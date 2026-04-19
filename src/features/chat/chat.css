@@ -182,3 +182,95 @@
   0%, 100% { opacity: 0.85; }
   50%      { opacity: 1.00; }
 }
+
+/* ── Tool approval dialog (D-71 / CHAT-04 / CHAT-07) ───────────────────────── */
+/* Dialog body layout. The native <dialog> scrim + focus trap come free from
+ * the Dialog primitive (src/design-system/primitives/Dialog.tsx). Buttons
+ * gain a 500ms countdown bar overlay while `data-countdown="on"` is set by
+ * ToolApprovalDialog.tsx — the bar is a pseudo-element driven by the
+ * `countdownFill` keyframe.
+ *
+ * D-70 invariant: zero GPU blur layers anywhere in this file. The Dialog
+ * scrim comes from <dialog>::backdrop rules in primitives.css — outside
+ * the chat.css grep target. */
+
+.tool-approval {
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-4);
+}
+
+.tool-approval-title {
+  margin: 0;
+  color: var(--t-1);
+  font-family: var(--font-display);
+  font-size: 18px;
+  letter-spacing: -0.01em;
+}
+
+.tool-approval-title code {
+  font-family: var(--font-mono);
+  background: var(--g-fill);
+  padding: 2px 6px;
+  border-radius: 6px;
+  color: var(--t-1);
+}
+
+.tool-approval-args {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--g-fill-weak);
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  max-height: 200px;
+  overflow: auto;
+  margin: 0;
+  color: var(--t-2);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.tool-approval-context {
+  color: var(--t-2);
+  font-size: 13px;
+  margin: 0;
+  font-family: var(--font-body);
+}
+
+.tool-approval-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-2);
+}
+
+.tool-approval-actions button[data-countdown="on"] {
+  position: relative;
+  overflow: hidden;
+}
+
+.tool-approval-actions button[data-countdown="on"]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04));
+  transform-origin: left;
+  animation: countdownFill 500ms linear forwards;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Alias `compactPulse` keyframe (Plan 03-04 canonical name) so downstream
+ * grep-asserted rules + any future refactors that bind to either name work.
+ * The active binding is still `chatCompactPulse` above to preserve Plan 03-03
+ * CSS contract. */
+@keyframes compactPulse {
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 1.00; }
+}
+
+@keyframes countdownFill {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
