@@ -24,7 +24,7 @@
 // @see src-tauri/src/security_monitor.rs:928 security_overview (SC-4 source)
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { GlassPanel, Button, Pill, GlassSpinner } from '@/design-system/primitives';
+import { GlassPanel, Button, Pill, GlassSpinner, EmptyState } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import { usePrefs } from '@/hooks/usePrefs';
 import { securityOverview } from '@/lib/tauri/admin';
@@ -184,7 +184,14 @@ export function SecurityDashboard() {
       </div>
 
       {activeTab === 'alerts' ? (
-        <SecurityAlertsTab overview={overview} />
+        !loading && overview && activeAlerts === 0 ? (
+          <EmptyState
+            label="No security alerts"
+            description="BLADE runs background scans periodically."
+          />
+        ) : (
+          <SecurityAlertsTab overview={overview} />
+        )
       ) : activeTab === 'scans' ? (
         <SecurityScansTab />
       ) : activeTab === 'policies' ? (

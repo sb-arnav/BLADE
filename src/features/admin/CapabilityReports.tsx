@@ -28,7 +28,7 @@
 // @see .planning/phases/07-dev-tools-admin/07-CONTEXT.md §D-182
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { GlassPanel, Button, Dialog, Input, Pill, GlassSpinner } from '@/design-system/primitives';
+import { GlassPanel, Button, Dialog, Input, Pill, GlassSpinner, EmptyState } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import {
   evolutionGetLevel,
@@ -443,7 +443,10 @@ export function CapabilityReports() {
           <div className="admin-section">
             <h3 className="admin-section-title">Suggestions</h3>
             {suggestions.length === 0 ? (
-              <div className="admin-empty">No pending suggestions.</div>
+              <EmptyState
+                label="No capability reports"
+                description="Reports appear when BLADE detects a gap."
+              />
             ) : (
               <div className="capability-list">
                 {suggestions.map((s) => (

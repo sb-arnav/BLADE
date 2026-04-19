@@ -12,7 +12,7 @@
 // @see .planning/REQUIREMENTS.md §BODY-05
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, GlassPanel, GlassSpinner, Input } from '@/design-system/primitives';
+import { Button, GlassPanel, GlassSpinner, Input, EmptyState } from '@/design-system/primitives';
 import { usePrefs } from '@/hooks/usePrefs';
 import { useToast } from '@/lib/context';
 import {
@@ -154,7 +154,11 @@ function IdentityTab() {
       )}
       {text !== null && !editing && (
         <>
-          <pre className="dna-text">{text || '(empty)'}</pre>
+          {text ? (
+            <pre className="dna-text">{text}</pre>
+          ) : (
+            <EmptyState label="Empty identity document" />
+          )}
           <div className="dna-actions">
             <Button variant="secondary" onClick={startEdit} data-testid="dna-identity-edit">
               Edit
@@ -233,7 +237,15 @@ function DnaTextTab({
           <span>Reading {label}…</span>
         </div>
       )}
-      {text !== null && <pre className="dna-text">{text || `(no ${label} recorded)`}</pre>}
+      {text !== null && (
+        text ? (
+          <pre className="dna-text">{text}</pre>
+        ) : (
+          <EmptyState
+            label={label === 'goals' ? 'No goals yet' : 'No patterns logged'}
+          />
+        )
+      )}
       <div className="dna-actions">
         <Button variant="ghost" onClick={reload}>
           Refresh

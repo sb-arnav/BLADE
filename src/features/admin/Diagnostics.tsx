@@ -13,7 +13,8 @@
 // @see src/lib/tauri/admin.ts (supervisor*, trace*, authority*, deep_scan*, config*)
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Dialog, GlassPanel, GlassSpinner, Input } from '@/design-system/primitives';
+import { Button, Dialog, GlassPanel, GlassSpinner, Input, EmptyState } from '@/design-system/primitives';
+import { ListSkeleton } from '@/design-system/primitives/ListSkeleton';
 import { useToast } from '@/lib/context';
 import { usePrefs } from '@/hooks/usePrefs';
 import {
@@ -113,7 +114,8 @@ export function Diagnostics() {
             </Button>
           </div>
           {healthError && <p className="admin-empty">Error: {healthError}</p>}
-          <div className="admin-health-grid" data-testid="supervisor-health-grid">
+          {healthLoading && !health && <ListSkeleton rows={4} rowHeight={72} />}
+          <div className="admin-health-grid list-entrance" data-testid="supervisor-health-grid">
             {(health ?? []).map((svc) => (
               <div
                 key={svc.name}
@@ -650,7 +652,12 @@ function DeepScanTab() {
       {result ? (
         <pre className="diagnostics-config-pre">{JSON.stringify(result, null, 2)}</pre>
       ) : (
-        <p className="admin-empty">No deep-scan results yet. Click Run now to scan.</p>
+        <EmptyState
+          label="No diagnostics"
+          description="Run deep scan to populate."
+          actionLabel="Run deep scan"
+          onAction={() => void runNow()}
+        />
       )}
     </section>
   );

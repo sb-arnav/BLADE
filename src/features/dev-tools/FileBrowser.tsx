@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { homeDir } from '@tauri-apps/api/path';
-import { GlassPanel, Button, Dialog, Input } from '@/design-system/primitives';
+import { GlassPanel, Button, Dialog, Input, EmptyState } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import {
   fileTree,
@@ -591,9 +591,10 @@ export function FileBrowser() {
               </div>
             ))}
             {!projectsLoading && projects.length === 0 && (
-              <div className="dev-placeholder-hint">
-                No indexed projects yet. Click "Index new" to add one.
-              </div>
+              <EmptyState
+                label="Empty directory"
+                description='No indexed projects yet. Click "Index new" to add one.'
+              />
             )}
           </div>
         </>

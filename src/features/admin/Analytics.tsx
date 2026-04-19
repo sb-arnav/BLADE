@@ -22,7 +22,7 @@
 //      dbTrackEvent, dbPruneAnalytics wrappers)
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { GlassPanel, Button, Dialog, Input, GlassSpinner } from '@/design-system/primitives';
+import { GlassPanel, Button, Dialog, Input, GlassSpinner, EmptyState } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import {
   dbAnalyticsSummary,
@@ -247,7 +247,10 @@ export function Analytics() {
               Last 24 hours · {events.length} event{events.length === 1 ? '' : 's'}
             </p>
             {events.length === 0 ? (
-              <div className="admin-empty">No events in the last 24 hours.</div>
+              <EmptyState
+                label="No analytics yet"
+                description="Events appear as BLADE tracks activity."
+              />
             ) : (
               <div className="analytics-events-feed" data-testid="analytics-events-feed">
                 {events.map((ev) => (

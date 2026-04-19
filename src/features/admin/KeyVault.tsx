@@ -16,8 +16,9 @@
 // @see .planning/phases/07-dev-tools-admin/07-CONTEXT.md §D-185
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Dialog, GlassPanel, Input, Pill } from '@/design-system/primitives';
+import { Button, Dialog, GlassPanel, Input, Pill, EmptyState } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
+import { useRouterCtx } from '@/windows/main/useRouter';
 import { getAllProviderKeys, storeProviderKey } from '@/lib/tauri/admin';
 import './admin.css';
 import './admin-rich-b.css';
@@ -88,6 +89,7 @@ function normalise(raw: unknown): KeyRow[] {
 }
 
 export function KeyVault() {
+  const router = useRouterCtx();
   const [rows, setRows] = useState<KeyRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [storeOpen, setStoreOpen] = useState(false);
@@ -148,7 +150,12 @@ export function KeyVault() {
               </div>
             ))}
             {rows && rows.length === 0 && (
-              <p className="admin-empty">No provider keys recorded yet.</p>
+              <EmptyState
+                label="No API keys stored"
+                description="Configure provider keys in Settings → Providers."
+                actionLabel="Open settings"
+                onAction={() => router.openRoute('settings-providers')}
+              />
             )}
           </div>
         </section>

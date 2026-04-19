@@ -13,7 +13,7 @@
 // @see src/lib/tauri/admin.ts (temporal* + exmem*)
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, GlassPanel, GlassSpinner, Input } from '@/design-system/primitives';
+import { Button, GlassPanel, GlassSpinner, Input, EmptyState } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import { usePrefs } from '@/hooks/usePrefs';
 import {
@@ -195,7 +195,10 @@ function RecallTab() {
       {result ? (
         <div className="temporal-recall-card">{result}</div>
       ) : (
-        <p className="admin-empty">Click Recall to summarise the last window.</p>
+        <EmptyState
+          label="No activity yet"
+          description="Timeline populates as BLADE observes."
+        />
       )}
     </section>
   );

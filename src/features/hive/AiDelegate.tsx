@@ -10,7 +10,7 @@
 // @see .planning/REQUIREMENTS.md §HIVE-06
 
 import { useEffect, useState } from 'react';
-import { Button, Dialog, GlassPanel, GlassSpinner, Pill } from '@/design-system/primitives';
+import { Button, Dialog, GlassPanel, GlassSpinner, Pill, EmptyState } from '@/design-system/primitives';
 import { usePrefs } from '@/hooks/usePrefs';
 import { useToast } from '@/lib/context';
 import { BLADE_EVENTS, useTauriEvent } from '@/lib/events';
@@ -211,10 +211,7 @@ export function AiDelegate() {
           Live ring buffer (max {MAX_LOG}) of AI_DELEGATE_APPROVED / DENIED events.
         </p>
         {log.length === 0 ? (
-          <p style={{ color: 'var(--t-2)', fontSize: 13, marginTop: 'var(--space-3)' }}>
-            No delegate decisions yet. Trigger a tool-use approval in Chat to
-            populate this log.
-          </p>
+          <EmptyState label="No delegate decisions recorded" />
         ) : (
           <div className="delegate-log" style={{ marginTop: 'var(--space-2)' }}>
             {log.map((entry, i) => {

@@ -12,7 +12,8 @@
 // @see .planning/REQUIREMENTS.md §HIVE-04
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Dialog, GlassPanel, Pill } from '@/design-system/primitives';
+import { Button, Dialog, GlassPanel, Pill, EmptyState } from '@/design-system/primitives';
+import { ListSkeleton } from '@/design-system/primitives/ListSkeleton';
 import { usePrefs } from '@/hooks/usePrefs';
 import { useToast } from '@/lib/context';
 import { BLADE_EVENTS, useTauriEvent } from '@/lib/events';
@@ -65,6 +66,7 @@ export function ApprovalQueue() {
   const [batchBusy, setBatchBusy] = useState(false);
   const [busyRow, setBusyRow] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [initialLoading, setInitialLoading] = useState(true);
 
   const expandedId = (prefs['hive.approval.expandedId'] as string | undefined) ?? '';
 
@@ -79,7 +81,8 @@ export function ApprovalQueue() {
         }));
         setRows(flat);
       })
-      .catch((e) => setLoadError(String(e)));
+      .catch((e) => setLoadError(String(e)))
+      .finally(() => setInitialLoading(false));
   }, []);
 
   useEffect(() => {
@@ -233,12 +236,13 @@ export function ApprovalQueue() {
         </span>
       </GlassPanel>
 
-      {visibleRows.length === 0 ? (
-        <GlassPanel>
-          <p style={{ color: 'var(--t-2)', fontSize: 13 }}>
-            No pending decisions. The queue updates live when hive events fire.
-          </p>
-        </GlassPanel>
+      {initialLoading ? (
+        <ListSkeleton rows={4} />
+      ) : visibleRows.length === 0 ? (
+        <EmptyState
+          label="Nothing to approve"
+          description="All caught up."
+        />
       ) : (
         visibleRows.map((r, i) => {
           const { summary, detail } = renderDecision(r.decision);
