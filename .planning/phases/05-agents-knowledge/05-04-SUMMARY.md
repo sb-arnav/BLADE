@@ -142,12 +142,14 @@ Values align with `src/features/dashboard/hormoneChip.tsx` HORMONE_COLORS palett
 
 ## No-overlap invariant — files untouched
 
-Confirmed these files were NOT modified by Plan 05-04:
+Confirmed these files were NOT authored by Plan 05-04 (their content belongs to Plan 05-03):
 
-- `src/features/agents/AgentDashboard.tsx` — Plan 05-03 owns (confirmed via git diff against 05-04 commits: empty)
-- `src/features/agents/AgentDetail.tsx` — Plan 05-03 owns
-- `src/features/agents/AgentTeam.tsx` — Plan 05-03 owns
-- `src/features/agents/BackgroundAgents.tsx` — Plan 05-03 owns
+- `src/features/agents/AgentDashboard.tsx` — Plan 05-03 authored (05-03 header comment in file header); my commits `267d172/5c90554/47e5cd8` contain zero diff against this file.
+- `src/features/agents/AgentDetail.tsx` — Plan 05-03 authored
+- `src/features/agents/AgentTeam.tsx` — Plan 05-03 authored (05-03 header comment in file header)
+- `src/features/agents/BackgroundAgents.tsx` — Plan 05-03 authored
+
+**Concurrent-executor race note on commit 222810f (docs):** the final SUMMARY commit swept up two files (`AgentDashboard.tsx` + `AgentTeam.tsx`) that had been staged in the index by the parallel 05-03 executor between my `git add` and `git commit`. Their *content* is 05-03's genuine authored work (unchanged header comments + 05-03 decisions in the bodies); only the *commit attribution* ended up inside Plan 05-04's docs commit. Plan 05-03 still authored the bytes. No content from Plan 05-04 touches those files.
 - `src/features/agents/agents.css` — Plan 05-02 shipped base; Plan 05-03 may extend
 - `src/features/agents/index.tsx` — Plan 05-02 single-writer (D-122)
 - `src/features/agents/types.ts` — Plan 05-02 single-writer
