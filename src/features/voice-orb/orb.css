@@ -1,0 +1,247 @@
+/* src/features/voice-orb/orb.css — Voice Orb visuals (Plan 04-03)
+ *
+ * Ported from docs/design/orb.css; rewritten to consume the 4 CSS vars written
+ * by useOrbPhase every rAF frame:
+ *   --ring-speed    (0.6 / 0.9 / 0.6 / 1.4 per phase, see configFor)
+ *   --amp           (0.35 / 0.5+lvl·0.7 / 0.35 / 0.95)
+ *   --alpha         (0.40 / 0.58+lvl·0.28 / 0.40 / 0.72)
+ *   --orb-scale     (1.00 / 1+lvl·0.12 / 1.00 / 1+0.06·sin(t·6))
+ *
+ * Phase transitions cross-fade over 180ms via `transition` on `.orb-overlay`
+ * and `.orb-core` (D-108).
+ *
+ * @see .planning/phases/04-overlay-windows/04-CONTEXT.md §D-08, §D-103, §D-108
+ * @see docs/design/orb.css (canonical visual reference)
+ */
+
+.orb-overlay {
+  /* CSS vars — defaults match `idle` config; overwritten by rAF every frame */
+  --ring-speed: 0.6;
+  --amp: 0.35;
+  --alpha: 0.40;
+  --orb-scale: 1.00;
+
+  /* Geometry */
+  --orb-size: 440px;
+  --orb-core-size: 96px;
+
+  /* Accent — neutral-warm, reads over any wallpaper (matches docs/design/orb.css) */
+  --orb-accent: #b8a0ff;
+  --orb-accent-glow: rgba(184, 160, 255, 0.55);
+  --orb-accent-deep: #5f5bff;
+
+  position: relative;
+  width: var(--orb-size);
+  height: var(--orb-size);
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+  pointer-events: none;
+  /* 180ms cross-fade for phase scale transitions (D-108) */
+  transition: transform 180ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+  transform: scale(var(--orb-scale));
+}
+.orb-overlay.orb-compact {
+  --orb-size: 320px;
+  --orb-core-size: 72px;
+}
+
+/* Soft halo behind the orb — gives the sense of presence on any wallpaper */
+.orb-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 15%;
+  border-radius: 50%;
+  background: radial-gradient(circle at center,
+    rgba(184, 160, 255, 0.18) 0%,
+    rgba(184, 160, 255, 0.06) 45%,
+    transparent 70%);
+  filter: blur(20px);
+  z-index: -1;
+}
+.orb-overlay.orb-compact::before { inset: 10%; }
+
+/* ---------- Ring layer ---------------------------------------------- */
+.orb-rings,
+.orb-arcs {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.orb-rings circle,
+.orb-arcs circle {
+  transform-origin: center;
+  transform-box: fill-box;
+  will-change: transform, opacity;
+  stroke: var(--orb-accent);
+  stroke-width: 1.6px;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+/* ---------- The core sphere — radial gradient ----------------------- */
+.orb-core {
+  width: var(--orb-core-size);
+  height: var(--orb-core-size);
+  border-radius: 50%;
+  position: relative;
+  background: radial-gradient(circle at 30% 26%,
+    #ffffff 0%,
+    #efe7ff 18%,
+    var(--orb-accent) 58%,
+    var(--orb-accent-deep) 100%);
+  /* Per-phase glow — calc()ed off rAF-written --amp + --alpha for smooth modulation */
+  box-shadow:
+    inset -6px -10px 22px rgba(40, 10, 80, 0.35),
+    inset 8px 10px 22px rgba(255, 255, 255, 0.55),
+    0 0 calc(60px * var(--amp)) var(--orb-accent-glow),
+    0 14px 40px rgba(0, 0, 0, 0.35);
+  transform-origin: center;
+  will-change: transform, box-shadow;
+  /* 180ms cross-fade for phase color transitions (D-108) */
+  transition: box-shadow 180ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+  opacity: calc(0.5 + 0.5 * var(--alpha));
+}
+/* Tiny specular hotspot — sells the 3D sphere */
+.orb-core::after {
+  content: '';
+  position: absolute;
+  top: 14%;
+  left: 22%;
+  width: 28%;
+  height: 22%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0) 70%);
+  filter: blur(2px);
+  pointer-events: none;
+}
+
+/* ---------- Phase: IDLE -------------------------------------------- */
+.orb-overlay[data-phase="idle"] .orb-rings .ring {
+  /* period = (1 / ring-speed) seconds; idle = 1.667s @ 0.6 */
+  animation: ring-pulse calc(1s / var(--ring-speed)) linear infinite;
+  opacity: var(--alpha);
+}
+.orb-overlay[data-phase="idle"] .ring-1 { animation-delay: calc(-1s / var(--ring-speed) * 0.28); }
+.orb-overlay[data-phase="idle"] .ring-2 { animation-delay: calc(-1s / var(--ring-speed) * 0.56); }
+
+/* ---------- Phase: LISTENING --------------------------------------- */
+.orb-overlay[data-phase="listening"] .orb-rings .ring {
+  /* period = 1.111s @ 0.9 */
+  animation: ring-pulse calc(1s / var(--ring-speed)) linear infinite;
+  opacity: var(--alpha);
+}
+.orb-overlay[data-phase="listening"] .ring-1 { animation-delay: calc(-1s / var(--ring-speed) * 0.28); }
+.orb-overlay[data-phase="listening"] .ring-2 { animation-delay: calc(-1s / var(--ring-speed) * 0.56); }
+.orb-overlay[data-phase="listening"] .orb-core {
+  /* Listening tint: green-leaning — matches docs/design/orb.css badge palette */
+  box-shadow:
+    inset -6px -10px 22px rgba(40, 10, 80, 0.35),
+    inset 8px 10px 22px rgba(255, 255, 255, 0.55),
+    0 0 calc(60px * var(--amp)) rgba(138, 255, 199, 0.55),
+    0 14px 40px rgba(0, 0, 0, 0.35);
+}
+
+/* ---------- Phase: THINKING ---------------------------------------- */
+.orb-overlay[data-phase="thinking"] .orb-rings .ring {
+  animation: ring-pulse calc(1s / var(--ring-speed)) linear infinite;
+  opacity: calc(var(--alpha) * 0.875);
+}
+.orb-overlay[data-phase="thinking"] .ring-1 { animation-delay: calc(-1s / var(--ring-speed) * 0.28); }
+.orb-overlay[data-phase="thinking"] .ring-2 { animation-delay: calc(-1s / var(--ring-speed) * 0.56); }
+.orb-overlay[data-phase="thinking"] .orb-core {
+  /* Thinking tint: warm peach */
+  box-shadow:
+    inset -6px -10px 22px rgba(40, 10, 80, 0.35),
+    inset 8px 10px 22px rgba(255, 255, 255, 0.55),
+    0 0 calc(60px * var(--amp)) rgba(255, 210, 166, 0.55),
+    0 14px 40px rgba(0, 0, 0, 0.35);
+}
+
+/* Thinking arc overlay — counter-rotating (42°/s = 8.6s, 35°/s = 10.3s) */
+.orb-arcs {
+  opacity: 0;
+  transition: opacity 180ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.orb-overlay[data-phase="thinking"] .orb-arcs { opacity: 1; }
+.arc {
+  fill: none;
+  stroke: rgba(255, 210, 166, 0.8);
+  stroke-width: 2.2px;
+  stroke-dasharray: 79.2 439.8; /* ≈ 0.18 * 2π·70 */
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.45));
+}
+.arc-1 {
+  stroke: rgba(255, 255, 255, 0.88);
+  animation: arc-spin-cw 8.571s linear infinite; /* +42°/s → 360/42 ≈ 8.571s */
+}
+.arc-2 {
+  stroke: rgba(255, 210, 166, 0.7);
+  stroke-dasharray: 105.5 439.8; /* ≈ 0.24 length */
+  animation: arc-spin-ccw 10.286s linear infinite; /* −35°/s → 360/35 ≈ 10.286s */
+}
+
+/* ---------- Phase: SPEAKING ---------------------------------------- */
+.orb-overlay[data-phase="speaking"] .orb-rings .ring {
+  /* period = 0.714s @ 1.4 */
+  animation: ring-pulse calc(1s / var(--ring-speed)) linear infinite;
+  opacity: var(--alpha);
+}
+.orb-overlay[data-phase="speaking"] .ring-1 { animation-delay: calc(-1s / var(--ring-speed) * 0.28); }
+.orb-overlay[data-phase="speaking"] .ring-2 { animation-delay: calc(-1s / var(--ring-speed) * 0.56); }
+.orb-overlay[data-phase="speaking"] .orb-core {
+  /* Speaking tint: bright white + violet halo */
+  box-shadow:
+    inset -6px -10px 22px rgba(40, 10, 80, 0.35),
+    inset 8px 10px 22px rgba(255, 255, 255, 0.6),
+    0 0 calc(70px * var(--amp)) rgba(255, 255, 255, 0.65),
+    0 14px 40px rgba(0, 0, 0, 0.35);
+}
+
+/* ---------- Keyframes ---------------------------------------------- */
+@keyframes ring-pulse {
+  /* OpenClaw expand pattern — 0.75 → 1.10/1.60/1.70 scale per phase amplitude.
+     Final scale is approximated via per-phase opacity fade-out + shared 0.75→1.6 expand;
+     the per-phase amp tweak shows up via box-shadow on .orb-core. */
+  0%   { transform: scale(0.75); opacity: 0.72; }
+  100% { transform: scale(1.60); opacity: 0;    }
+}
+@keyframes arc-spin-cw  { from { transform: rotate(0deg); }  to { transform: rotate(360deg); } }
+@keyframes arc-spin-ccw { from { transform: rotate(0deg); }  to { transform: rotate(-360deg); } }
+
+/* ---------- Window-shell positioning (consumed by VoiceOrbWindow) -- */
+.voice-orb-window {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  pointer-events: none;
+}
+.voice-orb-window > .orb-overlay { pointer-events: auto; cursor: grab; }
+.voice-orb-window > .orb-overlay:active { cursor: grabbing; }
+
+.voice-orb-window[data-corner="bottom-right"] { place-items: end end;     padding: 24px; }
+.voice-orb-window[data-corner="bottom-left"]  { place-items: end start;   padding: 24px; }
+.voice-orb-window[data-corner="top-right"]    { place-items: start end;   padding: 24px; }
+.voice-orb-window[data-corner="top-left"]     { place-items: start start; padding: 24px; }
+
+.orb-mic-error {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  background: rgba(212, 54, 54, 0.85);
+  color: #fff;
+  font-size: 12px;
+  border-radius: var(--r-pill, 999px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  pointer-events: auto;
+  max-width: 360px;
+  text-align: center;
+}
