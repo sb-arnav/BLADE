@@ -23,8 +23,7 @@
 // @see .planning/REQUIREMENTS.md §BODY-02
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Dialog, GlassPanel, GlassSpinner, Input, Pill, EmptyState } from '@/design-system/primitives';
-import { ListSkeleton } from '@/design-system/primitives/ListSkeleton';
+import { Button, Dialog, GlassPanel, GlassSpinner, Input, Pill, EmptyState, ListSkeleton } from '@/design-system/primitives';
 import { usePrefs } from '@/hooks/usePrefs';
 import { useToast } from '@/lib/context';
 import { useRouterCtx } from '@/windows/main/useRouter';

@@ -33,8 +33,7 @@
 // @see src-tauri/src/decision_gate.rs:376 get_decision_log (SC-3 source)
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { GlassPanel, Button, Dialog, Input, Pill, EmptyState } from '@/design-system/primitives';
-import { ListSkeleton } from '@/design-system/primitives/ListSkeleton';
+import { GlassPanel, Button, Dialog, Input, Pill, EmptyState, ListSkeleton } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import { usePrefs } from '@/hooks/usePrefs';
 import {

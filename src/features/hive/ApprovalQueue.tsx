@@ -12,8 +12,7 @@
 // @see .planning/REQUIREMENTS.md §HIVE-04
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Dialog, GlassPanel, Pill, EmptyState } from '@/design-system/primitives';
-import { ListSkeleton } from '@/design-system/primitives/ListSkeleton';
+import { Button, Dialog, GlassPanel, Pill, EmptyState, ListSkeleton } from '@/design-system/primitives';
 import { usePrefs } from '@/hooks/usePrefs';
 import { useToast } from '@/lib/context';
 import { BLADE_EVENTS, useTauriEvent } from '@/lib/events';
