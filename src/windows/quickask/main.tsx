@@ -1,12 +1,14 @@
-// QuickAsk window bootstrap — Phase 1 foundation
-import '@/styles/index.css';  // Design tokens + Tailwind + glass + typography (FOUND-01)
-// No performance.mark (P-01 applies to Main only).
+// QuickAsk window bootstrap — Phase 4 Plan 04-02.
+// Replaces the Phase 1 placeholder with the full QuickAskWindow (QUICK-01..07).
+//
+// Import order matters: global styles first (tokens, glass, layout, motion),
+// feature CSS second so feature-scoped selectors can reference the token
+// variables declared in :root.
+import '@/styles/index.css';
+import '@/features/quickask/quickask.css';
 import { createRoot } from 'react-dom/client';
+import { QuickAskWindow } from '@/features/quickask';
 
 const el = document.getElementById('root');
 if (!el) throw new Error('[quickask] no #root');
-createRoot(el).render(
-  <div style={{ padding: 16, fontSize: 13, color: '#ccc' }}>
-    BLADE QuickAsk — Phase 1 bootstrap
-  </div>
-);
+createRoot(el).render(<QuickAskWindow />);
