@@ -1,0 +1,650 @@
+/* src/features/identity/identity-rich-a.css
+ *
+ * Plan 06-05 scoped additions — Soul, Persona, CharacterBible, Negotiation.
+ * Appended to the base identity.css via an explicit import in each route file.
+ * Never replaces identity.css. Downstream Plan 06-06 introduces
+ * identity-rich-b.css for the remaining identity surfaces.
+ *
+ * @see .planning/phases/06-life-os-identity/06-CONTEXT.md §D-153..§D-156, §D-164
+ * @see .planning/phases/06-life-os-identity/06-PATTERNS.md §3, §4, §7
+ */
+
+@layer features {
+  /* ───────────────────────────────────────────────────────────────────────
+     Shared identity-section (SoulView + CharacterBible section cards)
+     ──────────────────────────────────────────────────────────────────── */
+  .identity-section {
+    padding: var(--s-3);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    margin-bottom: var(--s-2);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+  }
+
+  .identity-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--s-2);
+  }
+
+  .identity-section-title {
+    color: var(--t-2);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0;
+  }
+
+  .identity-section-content {
+    color: var(--t-1);
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    margin: 0;
+  }
+
+  .identity-section-content--empty {
+    color: var(--t-3);
+    font-style: italic;
+  }
+
+  /* ───────────────────────────────────────────────────────────────────────
+     Soul state card — 3-stat grid at top of SoulView
+     ──────────────────────────────────────────────────────────────────── */
+  .identity-state-card {
+    padding: var(--s-3);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--s-2);
+    margin-bottom: var(--s-3);
+  }
+
+  .identity-state-card-stat {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+  }
+
+  .identity-state-card-stat-label {
+    color: var(--t-3);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .identity-state-card-stat-value {
+    color: var(--t-1);
+    font-size: 20px;
+    font-family: var(--font-mono);
+  }
+
+  /* ───────────────────────────────────────────────────────────────────────
+     Honest deferral card (D-155 — trait evolution log deferred to Phase 9)
+     ──────────────────────────────────────────────────────────────────── */
+  .identity-deferred-card {
+    padding: var(--s-3);
+    background: rgba(255, 210, 166, 0.05);
+    border: 1px dashed rgba(255, 210, 166, 0.24);
+    border-radius: var(--r-md);
+    color: var(--t-2);
+    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    align-items: flex-start;
+  }
+
+  .identity-deferred-card p {
+    margin: 0;
+  }
+
+  .identity-deferred-card strong {
+    color: var(--t-1);
+  }
+
+  /* ───────────────────────────────────────────────────────────────────────
+     Edit-with-Dialog embellishments (used by EditSectionDialog)
+     ──────────────────────────────────────────────────────────────────── */
+  .identity-edit-dialog-title {
+    font-family: var(--font-display);
+    font-size: 18px;
+    margin: 0 0 var(--s-3) 0;
+    color: var(--t-1);
+  }
+
+  .identity-edit-dialog-actions {
+    display: flex;
+    gap: var(--s-2);
+    justify-content: flex-end;
+    margin-top: var(--s-3);
+  }
+
+  /* ───────────────────────────────────────────────────────────────────────
+     Actions row (top-of-surface button cluster)
+     ──────────────────────────────────────────────────────────────────── */
+  .identity-actions-row {
+    display: flex;
+    gap: var(--s-2);
+    flex-wrap: wrap;
+    margin-bottom: var(--s-3);
+  }
+
+  .identity-surface-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--s-3);
+    margin-bottom: var(--s-3);
+  }
+
+  .identity-surface-title {
+    font-family: var(--font-display);
+    font-size: 22px;
+    color: var(--t-1);
+    margin: 0;
+  }
+
+  .identity-surface-sub {
+    color: var(--t-3);
+    font-size: 12px;
+    margin: 0;
+  }
+
+  /* Lists + rows (preferences, snapshots, etc.) */
+  .identity-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+  }
+
+  .identity-list-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--s-2);
+    padding: var(--s-2) var(--s-3);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+  }
+
+  .identity-list-row-primary {
+    color: var(--t-1);
+    font-size: 13px;
+  }
+
+  .identity-list-row-secondary {
+    color: var(--t-3);
+    font-size: 12px;
+    font-family: var(--font-mono);
+  }
+
+  /* Empty state */
+  .identity-empty {
+    padding: var(--s-4);
+    text-align: center;
+    color: var(--t-3);
+    font-size: 13px;
+    border: 1px dashed var(--line);
+    border-radius: var(--r-md);
+  }
+
+  /* ───────────────────────────────────────────────────────────────────────
+     Persona trait cards (Plan 06-05 Task 2)
+     ──────────────────────────────────────────────────────────────────── */
+  .persona-trait-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--s-2);
+  }
+
+  .persona-trait-card {
+    padding: var(--s-3);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    cursor: pointer;
+    transition: border-color 160ms var(--ease-out);
+  }
+
+  .persona-trait-card:hover {
+    border-color: var(--line-strong);
+  }
+
+  .persona-trait-card[data-expanded="true"] {
+    border-color: var(--line-strong);
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .persona-trait-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--s-2);
+  }
+
+  .persona-trait-name {
+    color: var(--t-1);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .persona-trait-score-numeric {
+    color: var(--t-2);
+    font-size: 12px;
+    font-family: var(--font-mono);
+  }
+
+  .persona-trait-score-bar {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: var(--r-pill);
+    overflow: hidden;
+  }
+
+  .persona-trait-score-fill {
+    height: 100%;
+    background: var(--status-running);
+    transition: width 180ms var(--ease-out);
+  }
+
+  .persona-trait-evidence {
+    color: var(--t-3);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .persona-trait-evidence-list {
+    margin: 0;
+    padding-left: var(--s-3);
+    color: var(--t-3);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .persona-trait-meta {
+    color: var(--t-4);
+    font-size: 11px;
+    font-family: var(--font-mono);
+  }
+
+  .persona-trait-actions {
+    display: flex;
+    gap: var(--s-2);
+    justify-content: flex-end;
+  }
+
+  /* Relationship bars */
+  .persona-relationship-bar-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    margin-bottom: var(--s-2);
+  }
+
+  .persona-relationship-bar-label {
+    display: flex;
+    justify-content: space-between;
+    color: var(--t-2);
+    font-size: 12px;
+  }
+
+  .persona-relationship-bar {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: var(--r-pill);
+    overflow: hidden;
+  }
+
+  .persona-relationship-bar-fill {
+    height: 100%;
+    background: var(--status-running);
+    transition: width 180ms var(--ease-out);
+  }
+
+  /* User Model dossier */
+  .persona-model-dossier {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--s-2);
+  }
+
+  .persona-model-field {
+    padding: var(--s-3);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+  }
+
+  .persona-model-field-label {
+    color: var(--t-3);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .persona-model-field-value {
+    color: var(--t-1);
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+
+  .persona-model-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-1);
+  }
+
+  .persona-model-expertise-row {
+    display: flex;
+    justify-content: space-between;
+    color: var(--t-1);
+    font-size: 12px;
+    font-family: var(--font-mono);
+  }
+
+  /* People grid */
+  .persona-people-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--s-2);
+  }
+
+  .persona-person-card {
+    padding: var(--s-3);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+  }
+
+  .persona-person-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--s-2);
+  }
+
+  .persona-person-name {
+    color: var(--t-1);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .persona-person-relationship {
+    color: var(--t-3);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .persona-person-result {
+    padding: var(--s-2);
+    background: rgba(255, 255, 255, 0.04);
+    border-left: 3px solid var(--status-running);
+    border-radius: var(--r-sm);
+    color: var(--t-2);
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+
+  .persona-upsert-form {
+    padding: var(--s-3);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--s-2);
+    margin-bottom: var(--s-3);
+  }
+
+  /* Trait score edit dialog (custom inline dialog with slider) */
+  .persona-trait-edit-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    margin-bottom: var(--s-2);
+  }
+
+  .persona-trait-edit-field-label {
+    color: var(--t-2);
+    font-size: 12px;
+  }
+
+  .persona-trait-edit-slider {
+    width: 100%;
+    accent-color: var(--status-running);
+  }
+
+  /* ───────────────────────────────────────────────────────────────────────
+     Character bible content (Plan 06-05 Task 2)
+     ──────────────────────────────────────────────────────────────────── */
+  .character-bible-content {
+    padding: var(--s-4);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    white-space: pre-wrap;
+    color: var(--t-1);
+    font-size: 14px;
+    line-height: 1.6;
+    max-height: 520px;
+    overflow-y: auto;
+    margin-bottom: var(--s-3);
+  }
+
+  /* ───────────────────────────────────────────────────────────────────────
+     Negotiation 4-tab surface (Plan 06-05 Task 3)
+     ──────────────────────────────────────────────────────────────────── */
+  .negotiation-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: var(--s-3);
+    min-height: 420px;
+  }
+
+  .negotiation-sidebar {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    overflow-y: auto;
+    max-height: 560px;
+  }
+
+  .negotiation-sidebar-header {
+    padding: var(--s-2) var(--s-3);
+    color: var(--t-3);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .negotiation-debate-row {
+    padding: var(--s-2) var(--s-3);
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .negotiation-debate-row:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .negotiation-debate-row[data-selected="true"] {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .negotiation-debate-row-topic {
+    color: var(--t-1);
+    font-size: 13px;
+  }
+
+  .negotiation-debate-row-meta {
+    color: var(--t-3);
+    font-size: 11px;
+    font-family: var(--font-mono);
+  }
+
+  .negotiation-main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+  }
+
+  .negotiation-rounds {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    padding: var(--s-2);
+    max-height: 360px;
+    overflow-y: auto;
+  }
+
+  .negotiation-round {
+    padding: var(--s-2) var(--s-3);
+    border-radius: var(--r-md);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .negotiation-round[data-role="user"] {
+    background: rgba(138, 255, 199, 0.06);
+    border: 1px solid rgba(138, 255, 199, 0.2);
+    color: var(--t-1);
+  }
+
+  .negotiation-round[data-role="blade"] {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    color: var(--t-1);
+  }
+
+  .negotiation-round[data-role="coaching"] {
+    background: rgba(255, 210, 166, 0.05);
+    border: 1px dashed rgba(255, 210, 166, 0.24);
+    color: var(--t-2);
+    font-style: italic;
+  }
+
+  .negotiation-round-role {
+    color: var(--t-3);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: var(--s-1);
+  }
+
+  .negotiation-compose {
+    display: flex;
+    gap: var(--s-2);
+    padding: var(--s-2);
+  }
+
+  .negotiation-compose-input {
+    flex: 1;
+  }
+
+  .negotiation-start-form {
+    padding: var(--s-3);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+  }
+
+  .negotiation-tools-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: var(--s-3);
+  }
+
+  .negotiation-tool-card {
+    padding: var(--s-3);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+  }
+
+  .negotiation-tool-title {
+    color: var(--t-1);
+    font-size: 13px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .negotiation-tool-desc {
+    color: var(--t-3);
+    font-size: 11px;
+    margin: 0;
+  }
+
+  .negotiation-tool-result {
+    padding: var(--s-2);
+    background: rgba(255, 255, 255, 0.04);
+    border-left: 3px solid var(--status-running);
+    border-radius: var(--r-sm);
+    color: var(--t-1);
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+
+  .negotiation-scenario-card {
+    padding: var(--s-3);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+  }
+
+  .negotiation-scenario-title {
+    color: var(--t-1);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .negotiation-scenario-meta {
+    color: var(--t-3);
+    font-size: 11px;
+  }
+
+  .negotiation-analyze-result {
+    padding: var(--s-3);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    color: var(--t-1);
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    margin-top: var(--s-3);
+  }
+}
