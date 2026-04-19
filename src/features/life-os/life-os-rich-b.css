@@ -337,4 +337,294 @@
     gap: var(--s-2);
     align-items: center;
   }
+
+  /* ═══════════════ EmotionalIntelView (D-151) ══════════════════════════ */
+
+  .emotional-intel-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+  }
+
+  .emotional-intel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2);
+    padding-bottom: var(--s-3);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .emotional-intel-header h2 {
+    font-family: var(--font-display);
+    font-size: 20px;
+    color: var(--t-1);
+    margin: 0;
+  }
+
+  .emotion-current-card {
+    padding: var(--s-4);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-left-width: 4px;
+    border-radius: var(--r-md);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--s-3);
+    align-items: center;
+  }
+
+  .emotion-current-card[data-sentiment='positive'] {
+    border-left-color: var(--status-success);
+  }
+  .emotion-current-card[data-sentiment='neutral'] {
+    border-left-color: var(--status-running);
+  }
+  .emotion-current-card[data-sentiment='negative'] {
+    border-left-color: var(--status-error);
+  }
+  .emotion-current-card[data-sentiment='unknown'] {
+    border-left-color: var(--status-idle);
+  }
+
+  .emotion-label {
+    color: var(--t-1);
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 600;
+    text-transform: capitalize;
+  }
+
+  .emotion-meta {
+    color: var(--t-3);
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    text-align: right;
+  }
+
+  .emotion-sparkline {
+    display: flex;
+    gap: 2px;
+    padding: var(--s-2);
+    font-size: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    min-height: 42px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .emotion-sparkline-empty {
+    color: var(--t-3);
+    font-size: 12px;
+    font-style: italic;
+  }
+
+  .emotion-readings-list {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    overflow: hidden;
+  }
+
+  .emotion-reading-row {
+    display: grid;
+    grid-template-columns: 80px 120px 60px 1fr;
+    gap: var(--s-2);
+    padding: var(--s-1) var(--s-2);
+    font-size: 12px;
+    color: var(--t-2);
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .emotion-reading-row:last-child {
+    border-bottom: none;
+  }
+
+  .emotion-context-panel {
+    padding: var(--s-3);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    font-size: 13px;
+    color: var(--t-2);
+    white-space: pre-wrap;
+    line-height: 1.5;
+  }
+
+  /* ═══════════════ AccountabilityView (D-152) ═════════════════════════ */
+
+  .accountability-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+  }
+
+  .accountability-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2);
+    padding-bottom: var(--s-3);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .accountability-header h2 {
+    font-family: var(--font-display);
+    font-size: 20px;
+    color: var(--t-1);
+    margin: 0;
+  }
+
+  .accountability-header-actions {
+    display: flex;
+    gap: var(--s-1);
+  }
+
+  .accountability-daily-banner {
+    padding: var(--s-3);
+    background: rgba(138, 255, 199, 0.06);
+    border: 1px solid rgba(138, 255, 199, 0.2);
+    border-radius: var(--r-md);
+    color: var(--t-2);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .accountability-daily-banner-title {
+    color: var(--t-1);
+    font-weight: 500;
+    margin-bottom: var(--s-1);
+  }
+
+  .daily-action-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: var(--s-2);
+    align-items: center;
+    padding: var(--s-2) var(--s-3);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    margin-bottom: var(--s-1);
+    color: var(--t-1);
+    font-size: 13px;
+  }
+
+  .daily-action-row[data-completed='true'] {
+    opacity: 0.55;
+  }
+
+  .daily-action-row[data-completed='true'] .daily-action-title {
+    text-decoration: line-through;
+  }
+
+  .daily-action-checkbox {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: var(--status-success);
+  }
+
+  .daily-action-energy {
+    color: var(--t-3);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .objective-card {
+    padding: var(--s-3);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    margin-bottom: var(--s-2);
+  }
+
+  .objective-card-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-2);
+  }
+
+  .objective-card-title {
+    color: var(--t-1);
+    font-size: 14px;
+    font-weight: 500;
+    margin: 0;
+  }
+
+  .objective-card-timeframe {
+    color: var(--t-3);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .objective-card-desc {
+    color: var(--t-2);
+    font-size: 12px;
+    margin: 0;
+  }
+
+  .kr-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: var(--s-2);
+    align-items: center;
+    padding: var(--s-1) 0;
+    font-size: 12px;
+    color: var(--t-2);
+  }
+
+  .kr-label {
+    color: var(--t-1);
+  }
+
+  .kr-value {
+    font-family: var(--font-mono);
+    color: var(--t-2);
+  }
+
+  .kr-progress-bar {
+    grid-column: 1 / -1;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: var(--r-pill);
+    overflow: hidden;
+    margin-top: 2px;
+  }
+
+  .kr-progress-fill {
+    height: 100%;
+    background: var(--status-running);
+    transition: width 180ms var(--ease-out);
+  }
+
+  .objective-progress-summary {
+    color: var(--t-3);
+    font-size: 11px;
+    padding-top: var(--s-1);
+    border-top: 1px solid var(--line);
+  }
+
+  .accountability-report-result {
+    padding: var(--s-3);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    color: var(--t-1);
+    font-size: 13px;
+    white-space: pre-wrap;
+    line-height: 1.5;
+  }
 }
