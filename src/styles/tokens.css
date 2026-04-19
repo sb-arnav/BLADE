@@ -52,6 +52,14 @@
   --a-warn: #ffc48a;
   --a-hot:  #ff9ab0;
 
+  /* Agent + Swarm step status colors (Phase 5 Plan 05-02 addition).
+     Used by src/features/agents/agents.css .agent-card[data-status] modifiers
+     and by Plan 05-04 SwarmDAG node fills. */
+  --status-idle:    rgba(255, 255, 255, 0.30);
+  --status-running: #8affc7;
+  --status-success: #a6ffd2;
+  --status-error:   #ff6b6b;
+
   /* Radii — RECOVERY_LOG §B.12 proto.css values (tighter / HIG-aligned) */
   --r-xs:   8px;
   --r-sm:  10px;   /* was 12 in shared.css — proto wins */

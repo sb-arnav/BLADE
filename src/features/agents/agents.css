@@ -1,0 +1,59 @@
+/* src/features/agents/agents.css — Phase 5 Plan 05-02 shared base
+   Plans 05-03 and 05-04 EXTEND (append) this file via additional @layer features
+   rules; never replace.
+   @see .planning/phases/05-agents-knowledge/05-PATTERNS.md §10
+   @see .planning/phases/05-agents-knowledge/05-CONTEXT.md §D-132 */
+
+@layer features {
+  .agents-surface {
+    padding: var(--s-4);
+    height: 100%;
+    overflow-y: auto;
+  }
+
+  .agents-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-2);
+    padding: var(--s-6);
+    text-align: center;
+  }
+
+  .agents-placeholder h2 {
+    font-family: var(--font-display);
+    font-size: 20px;
+    margin: 0;
+    color: var(--t-1);
+  }
+
+  .agents-placeholder-hint {
+    color: var(--t-3);
+    font-size: 14px;
+    margin: 0;
+  }
+
+  /* Agent card — used by AgentDashboard + AgentTeam + BackgroundAgents in 05-03.
+     rgba bg + no backdrop-filter: these cards nest inside a GlassPanel tier, so
+     they must NOT stack another blur layer (D-07 + D-70). */
+  .agent-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    transition: border-color 180ms var(--ease-out);
+  }
+
+  .agent-card:hover {
+    border-color: var(--line-strong);
+  }
+
+  .agent-card[data-status="running"]  { border-left: 3px solid var(--status-running); }
+  .agent-card[data-status="idle"]     { border-left: 3px solid var(--status-idle); }
+  .agent-card[data-status="complete"] { border-left: 3px solid var(--status-success); }
+  .agent-card[data-status="failed"]   { border-left: 3px solid var(--status-error); }
+}
