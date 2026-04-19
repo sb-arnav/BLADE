@@ -784,6 +784,7 @@ pub fn run() {
             wake_word::wake_word_start,
             wake_word::wake_word_stop,
             wake_word::wake_word_status,
+            wake_word::set_wake_word_enabled,
             voice_global::start_voice_conversation,
             voice_global::stop_voice_conversation,
             voice_global::voice_conversation_active,
@@ -1132,6 +1133,8 @@ pub fn run() {
             overlay_manager::overlay_hide_hud,
             overlay_manager::overlay_update_hud,
             overlay_manager::overlay_show_notification,
+            overlay_manager::emit_route_request,
+            overlay_manager::get_primary_safe_area_insets,
             // People Graph -- relationship memory and reply style intelligence
             people_graph::people_list,
             people_graph::people_get,
