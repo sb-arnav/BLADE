@@ -83,6 +83,13 @@ export * as knowledge from './knowledge';
 export * as lifeOs from './life_os';
 export * as identity from './identity';
 
+// Phase 7 additions — Dev Tools + Admin cluster wrappers (Plan 07-02, D-166).
+// Mirror the Phase 5/6 namespace pattern. Per-route files in Plans 07-03..06
+// may also import named wrappers directly from `@/lib/tauri/dev_tools` or
+// `@/lib/tauri/admin` — both paths resolve to the same module.
+export * as devTools from './dev_tools';
+export * as admin from './admin';
+
 // Events convenience re-export (D-38-evt, D-38-hook). Raw `listen`/`invoke`
 // are intentionally NOT re-exported here — the wrapped surfaces (useTauriEvent,
 // invokeTyped) are the only permitted escape hatches per D-13.
