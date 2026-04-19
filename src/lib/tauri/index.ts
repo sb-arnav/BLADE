@@ -96,6 +96,7 @@ export * as admin from './admin';
 // may also import named wrappers directly from `@/lib/tauri/body` or
 // `@/lib/tauri/hive` — both paths resolve to the same module.
 export * as body from './body';
+export * as hive from './hive';
 
 // Events convenience re-export (D-38-evt, D-38-hook). Raw `listen`/`invoke`
 // are intentionally NOT re-exported here — the wrapped surfaces (useTauriEvent,
