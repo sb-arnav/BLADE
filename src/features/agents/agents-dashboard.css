@@ -1,0 +1,433 @@
+/* src/features/agents/agents-dashboard.css — Phase 5 Plan 05-03 scoped partial
+   Companion to the Plan 05-02 base (agents.css). Each updated component in this
+   plan (AgentDashboard, AgentTeam, BackgroundAgents, AgentDetail) imports BOTH
+   agents.css + agents-dashboard.css so cluster-base classes (`.agent-card` etc)
+   remain authoritative while the plan-specific rules below layer on top.
+
+   D-132 cluster CSS discipline — rules live under `@layer features` so
+   specificity stays predictable against Tailwind utilities (D-23 layer order).
+   D-07 + D-70 blur cap — every inner surface uses rgba fills, never
+   backdrop-filter, since the parent GlassPanel tier already consumed the budget.
+
+   @see .planning/phases/05-agents-knowledge/05-PATTERNS.md §2, §10
+   @see .planning/phases/05-agents-knowledge/05-CONTEXT.md §D-132, §D-07, §D-70 */
+
+@layer features {
+  /* ═══════════════ AgentDashboard + AgentTeam shared layout ════════════════ */
+
+  .agents-filter-row {
+    display: flex;
+    gap: var(--s-2);
+    padding: var(--s-2) 0;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .agents-filter-pill {
+    padding: var(--s-1) var(--s-3);
+    border-radius: var(--r-pill);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    cursor: pointer;
+    color: var(--t-2);
+    font-family: var(--font-body);
+    font-size: 13px;
+    transition:
+      background 140ms var(--ease-out),
+      border-color 140ms var(--ease-out),
+      color 140ms var(--ease-out);
+  }
+
+  .agents-filter-pill:hover {
+    border-color: var(--line-strong);
+    color: var(--t-1);
+  }
+
+  .agents-filter-pill[data-active='true'] {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.22);
+    color: var(--t-1);
+  }
+
+  .agents-header-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-3);
+    padding-bottom: var(--s-3);
+    border-bottom: 1px solid var(--line);
+    margin-bottom: var(--s-3);
+  }
+
+  .agents-header-title {
+    font-family: var(--font-display);
+    font-size: 22px;
+    color: var(--t-1);
+    margin: 0;
+  }
+
+  .agents-header-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    color: var(--t-3);
+    font-size: 13px;
+  }
+
+  .agents-available-chip-row {
+    display: flex;
+    gap: var(--s-1);
+    flex-wrap: wrap;
+  }
+
+  .agents-group {
+    margin-bottom: var(--s-5);
+  }
+
+  .agents-group-heading {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--t-3);
+    margin-bottom: var(--s-2);
+    font-family: var(--font-mono);
+  }
+
+  .agents-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--s-2);
+  }
+
+  /* Per-card text treatments (scoped to .agent-card content). */
+  .agent-card-task {
+    color: var(--t-2);
+    font-size: 13px;
+    line-height: 1.4;
+    margin: 0;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+  }
+
+  .agent-card-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2);
+    font-size: 11px;
+    color: var(--t-3);
+    font-family: var(--font-mono);
+  }
+
+  .agent-card-role {
+    color: var(--t-1);
+    font-family: var(--font-display);
+    font-size: 13px;
+    letter-spacing: 0.01em;
+  }
+
+  .agent-card-actions {
+    display: flex;
+    gap: var(--s-1);
+    justify-content: flex-end;
+  }
+
+  .agents-empty-state {
+    padding: var(--s-6);
+    text-align: center;
+    color: var(--t-3);
+    font-size: 14px;
+    border: 1px dashed var(--line);
+    border-radius: var(--r-md);
+  }
+
+  .agents-loading-wrap {
+    display: flex;
+    justify-content: center;
+    padding: var(--s-8);
+  }
+
+  .agents-error-pill {
+    color: var(--status-error);
+    font-size: 12px;
+    font-family: var(--font-mono);
+  }
+
+  /* AgentTeam role description block */
+  .agents-role-description {
+    color: var(--t-3);
+    font-size: 12px;
+    margin: calc(var(--s-1) * -1) 0 var(--s-2) 0;
+  }
+
+  /* ═══════════════ BackgroundAgents two-pane layout ═══════════════════════ */
+
+  .agents-background-layout {
+    display: grid;
+    grid-template-columns: minmax(260px, 40%) 1fr;
+    gap: var(--s-3);
+    height: 100%;
+  }
+
+  .agents-background-left {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: var(--s-1);
+  }
+
+  .agents-background-right {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .agents-background-spawn {
+    display: grid;
+    grid-template-columns: minmax(140px, 200px) 1fr auto;
+    gap: var(--s-2);
+    align-items: center;
+    padding: var(--s-2);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+  }
+
+  .agents-background-spawn select {
+    background: rgba(0, 0, 0, 0.22);
+    color: var(--t-1);
+    border: 1px solid var(--g-edge-mid);
+    border-radius: var(--r-md);
+    padding: var(--s-2) var(--s-3);
+    font-family: var(--font-body);
+    font-size: 14px;
+  }
+
+  .agent-card[data-selected='true'] {
+    border-color: rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.07);
+    cursor: pointer;
+  }
+
+  .agent-card[data-selectable='true'] {
+    cursor: pointer;
+  }
+
+  .agents-output-block {
+    background: rgba(0, 0, 0, 0.30);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-3);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--t-2);
+    white-space: pre-wrap;
+    overflow-y: auto;
+    max-height: calc(100vh - 240px);
+    min-height: 120px;
+  }
+
+  .agents-detail-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-3);
+  }
+
+  .agents-detail-actions {
+    display: flex;
+    gap: var(--s-1);
+  }
+
+  .agents-confirm-dialog {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+    min-width: 320px;
+  }
+
+  .agents-confirm-dialog h3 {
+    margin: 0;
+    font-family: var(--font-display);
+    color: var(--t-1);
+    font-size: 18px;
+  }
+
+  .agents-confirm-dialog p {
+    margin: 0;
+    color: var(--t-2);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .agents-confirm-dialog-actions {
+    display: flex;
+    gap: var(--s-2);
+    justify-content: flex-end;
+  }
+
+  /* ═══════════════ AgentDetail 3-column layout + timeline ══════════════════ */
+
+  .agent-detail-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: var(--s-3);
+    height: 100%;
+    min-height: 0;
+  }
+
+  .agent-detail-summary {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: var(--s-1);
+  }
+
+  .agent-detail-summary-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+  }
+
+  .agent-detail-summary-task {
+    color: var(--t-2);
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .agent-detail-timeline {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-2);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 0;
+  }
+
+  .agent-detail-timeline-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-2);
+    padding: 0 var(--s-2) var(--s-2) var(--s-2);
+    border-bottom: 1px solid var(--line);
+    margin-bottom: var(--s-2);
+  }
+
+  .agent-detail-timeline-header-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 14px;
+    color: var(--t-1);
+  }
+
+  .agent-detail-timeline-header-count {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--t-3);
+  }
+
+  .agent-detail-timeline-empty {
+    padding: var(--s-5) var(--s-3);
+    text-align: center;
+    color: var(--t-3);
+    font-size: 13px;
+  }
+
+  .agent-timeline-row {
+    display: grid;
+    grid-template-columns: 80px 160px 1fr;
+    gap: var(--s-2);
+    padding: var(--s-1) var(--s-2);
+    font-size: 12px;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    transition: background 120ms var(--ease-out);
+    align-items: center;
+  }
+
+  .agent-timeline-row:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .agent-timeline-row[data-expanded='true'] {
+    background: rgba(255, 255, 255, 0.06);
+    align-items: start;
+  }
+
+  .agent-timeline-row-ts {
+    color: var(--t-3);
+    font-family: var(--font-mono);
+  }
+
+  .agent-timeline-row-event {
+    color: var(--t-2);
+    font-family: var(--font-mono);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .agent-timeline-row-preview {
+    color: var(--t-1);
+    font-family: var(--font-mono);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .agent-timeline-row[data-expanded='true'] .agent-timeline-row-preview {
+    white-space: pre-wrap;
+    overflow: auto;
+    max-height: 220px;
+  }
+
+  /* Status-derived row tints — purely visual cues; uses token palette. */
+  .agent-timeline-row[data-event='agent_step_failed'] {
+    background: rgba(255, 107, 107, 0.08);
+  }
+  .agent-timeline-row[data-event='agent_step_completed'] {
+    background: rgba(166, 255, 210, 0.06);
+  }
+  .agent-timeline-row[data-event='agent_step_retrying'],
+  .agent-timeline-row[data-event='agent_step_tool_fallback'],
+  .agent-timeline-row[data-event='agent_step_provider_fallback'] {
+    background: rgba(255, 210, 166, 0.05);
+  }
+
+  .agent-detail-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-2);
+    padding: var(--s-10);
+    text-align: center;
+    color: var(--t-3);
+  }
+
+  .agent-detail-empty h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 18px;
+    color: var(--t-2);
+  }
+}
