@@ -1,27 +1,27 @@
 // src/features/body/DNA.tsx — BODY-05.
 //
-// Plan 08-03 Task 2: real implementation.
-//
 // 4 pill tabs: Identity / Goals / Patterns / Query — active tab persisted via
 // prefs['body.dna.activeDoc'] (default 'identity').
 //
-// Identity/Goals/Patterns tabs display read-only text via dna_get_* commands
-// in <pre>. Identity tab also exposes an "Edit" textarea with a "Copy edits"
-// button that writes to clipboard — honest deferral card explains the absence
-// of dna_set_* backend commands (D-203).
+// Identity tab Save persists via dnaSetIdentity (Plan 09-01 closed D-203 gap).
+// Goals/Patterns display read-only text via dna_get_* commands.
+// Query tab: <Input> + "Ask" button calls dnaQuery(query) and renders result.
 //
-// Query tab: <Input> + "Ask" button calls dnaQuery(query) and renders the
-// result in a GlassPanel. Empty state before first query.
-//
+// @see .planning/phases/09-polish/09-01-PLAN.md (dna_set_identity backfill)
 // @see .planning/phases/08-body-hive/08-03-PLAN.md Task 2
-// @see .planning/phases/08-body-hive/08-CONTEXT.md §D-203
 // @see .planning/REQUIREMENTS.md §BODY-05
 
 import { useCallback, useEffect, useState } from 'react';
 import { Button, GlassPanel, GlassSpinner, Input } from '@/design-system/primitives';
 import { usePrefs } from '@/hooks/usePrefs';
 import { useToast } from '@/lib/context';
-import { dnaGetGoals, dnaGetIdentity, dnaGetPatterns, dnaQuery } from '@/lib/tauri/body';
+import {
+  dnaGetGoals,
+  dnaGetIdentity,
+  dnaGetPatterns,
+  dnaQuery,
+  dnaSetIdentity,
+} from '@/lib/tauri/body';
 import './body.css';
 
 type DnaTab = 'identity' | 'goals' | 'patterns' | 'query';
@@ -101,6 +101,7 @@ function IdentityTab() {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const reload = useCallback(async () => {
     try {
@@ -121,20 +122,24 @@ function IdentityTab() {
     setEditing(true);
   };
 
-  const copyDraft = async () => {
+  const saveDraft = async () => {
+    setSaving(true);
     try {
-      await navigator.clipboard.writeText(draft);
+      await dnaSetIdentity({ content: draft });
+      setText(draft); // reflect committed state
+      setEditing(false);
       toast.show({
         type: 'success',
-        title: 'Copied to clipboard',
-        message: 'Paste into dna.md manually (direct write deferred to Phase 9).',
+        title: 'Identity saved',
       });
     } catch (e) {
       toast.show({
         type: 'error',
-        title: 'Clipboard copy failed',
+        title: 'Save failed',
         message: typeof e === 'string' ? e : String(e),
       });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -167,26 +172,28 @@ function IdentityTab() {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             rows={14}
+            disabled={saving}
             data-testid="dna-identity-textarea"
           />
           <div className="dna-actions">
-            <Button variant="primary" onClick={copyDraft} data-testid="dna-identity-copy">
-              Copy proposed edits
+            <Button
+              variant="primary"
+              onClick={saveDraft}
+              disabled={saving}
+              data-testid="dna-identity-save"
+            >
+              {saving ? 'Saving…' : 'Save'}
             </Button>
-            <Button variant="ghost" onClick={() => setEditing(false)}>
+            <Button
+              variant="ghost"
+              onClick={() => setEditing(false)}
+              disabled={saving}
+            >
               Cancel
             </Button>
           </div>
         </>
       )}
-      <GlassPanel tier={2} className="dna-deferral">
-        <strong>Direct write deferred (Phase 9).</strong>
-        <p>
-          No <code>dna_set_identity</code> backend command exists yet. Identity
-          edits are copied to the clipboard for manual paste into your dna.md;
-          you can also propose changes to the Brain via the Query tab.
-        </p>
-      </GlassPanel>
     </section>
   );
 }
