@@ -1,0 +1,135 @@
+/* src/features/hive/hive.css — Hive cluster scoped styles.
+ *
+ * Plan 08-02 seeds base classes; Plan 08-04 will use them verbatim (per
+ * 08-PATTERNS §9). All rules wrapped in @layer features-hive per D-210.
+ *
+ * @see .planning/phases/08-body-hive/08-PATTERNS.md §9
+ * @see .planning/phases/08-body-hive/08-CONTEXT.md §D-210
+ */
+
+@layer features-hive {
+  /* ── HiveMesh (HIVE-01) ───────────────────────────────────────────── */
+  .hive-mesh {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+
+  .hive-hero {
+    padding: var(--space-4);
+  }
+
+  .tentacle-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--space-3);
+  }
+
+  .tentacle-card {
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--glass-1-bg);
+    border: 1px solid transparent;
+    cursor: pointer;
+    text-align: left;
+    transition: transform 200ms ease, border-color 200ms ease;
+  }
+
+  .tentacle-card:hover {
+    transform: translateY(-1px);
+  }
+
+  .tentacle-card.status-active {
+    border-color: var(--status-success);
+  }
+
+  .tentacle-card.status-dormant {
+    opacity: 0.6;
+    border-color: var(--status-idle);
+  }
+
+  .tentacle-card.status-error {
+    border-color: var(--status-error);
+    background: rgba(239, 68, 68, 0.08);
+  }
+
+  .tentacle-card.status-disconnected {
+    border-color: var(--status-idle);
+    opacity: 0.75;
+  }
+
+  .tentacle-platform {
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .tentacle-status {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .tentacle-head {
+    font-size: 12px;
+  }
+
+  .tentacle-reports {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  /* ── TentacleDetail (HIVE-02) ─────────────────────────────────────── */
+  .tentacle-detail {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+
+  /* ── AutonomyControls (HIVE-03) ───────────────────────────────────── */
+  .autonomy-controls {
+    padding: var(--space-4);
+  }
+
+  .autonomy-matrix {
+    display: grid;
+    grid-template-columns: 160px repeat(6, 1fr);
+    gap: 2px;
+  }
+
+  .autonomy-matrix input[type='range'] {
+    width: 100%;
+  }
+
+  /* ── ApprovalQueue (HIVE-04) ──────────────────────────────────────── */
+  .approval-queue {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
+
+  .decision-type {
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+  }
+
+  .decision-details {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--glass-1-bg);
+    padding: var(--space-2);
+    border-radius: var(--radius-sm);
+    max-height: 200px;
+    overflow: auto;
+  }
+
+  .decision-actions {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  /* ── AiDelegate (HIVE-06) ─────────────────────────────────────────── */
+  .ai-delegate {
+    padding: var(--space-4);
+  }
+}
