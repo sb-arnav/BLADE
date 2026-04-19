@@ -12,11 +12,15 @@
     "verify:emit-policy": "node scripts/verify-emit-policy.mjs",
     "verify:contrast": "node scripts/audit-contrast.mjs",
     "verify:chat-rgba": "bash scripts/verify-chat-rgba.sh",
-    "verify:all": "npm run verify:entries && npm run verify:no-raw-tauri && npm run verify:migration-ledger && npm run verify:emit-policy && npm run verify:contrast && npm run verify:chat-rgba",
+    "verify:ghost-no-cursor": "bash scripts/verify-ghost-no-cursor.sh",
+    "verify:orb-rgba": "bash scripts/verify-orb-rgba.sh",
+    "verify:hud-chip-count": "bash scripts/verify-hud-chip-count.sh",
+    "verify:all": "npm run verify:entries && npm run verify:no-raw-tauri && npm run verify:migration-ledger && npm run verify:emit-policy && npm run verify:contrast && npm run verify:chat-rgba && npm run verify:ghost-no-cursor && npm run verify:orb-rgba && npm run verify:hud-chip-count",
     "lint": "eslint src",
     "test:e2e": "playwright test",
     "test:e2e:phase2": "playwright test tests/e2e/onboarding-boot.spec.ts tests/e2e/shell.spec.ts",
     "test:e2e:phase3": "playwright test tests/e2e/chat-stream.spec.ts tests/e2e/chat-tool-approval.spec.ts tests/e2e/dashboard-paint.spec.ts tests/e2e/settings-provider.spec.ts",
+    "test:e2e:phase4": "playwright test tests/e2e/quickask-bridge.spec.ts tests/e2e/voice-orb-phases.spec.ts tests/e2e/ghost-overlay-headline.spec.ts tests/e2e/hud-bar-render.spec.ts tests/e2e/shortcut-fallback.spec.ts",
     "release:prepare-updater": "node .github/scripts/prepare-tauri-release-config.mjs"
   },
   "devDependencies": {
