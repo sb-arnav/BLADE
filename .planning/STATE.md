@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: "03-dashboard-chat-settings"
+current_phase: "04-overlay-windows"
 status: awaiting-mac-operator-smoke-checkpoints
-last_updated: "2026-04-19T00:00:00.000Z"
+last_updated: "2026-04-19T04:00:00.000Z"
 progress:
   total_phases: 10
   completed_phases: 1
-  total_plans: 25
-  completed_plans: 22
-  percent: 70
+  total_plans: 32
+  completed_plans: 29
+  percent: 80
 ---
 
 # STATE — BLADE Skin Rebuild (V1)
@@ -32,11 +32,11 @@ progress:
 
 ## Current Position
 
-Phase: 03 — SUBSTRATE COMPLETE (Mac operator smoke deferred)
-Plan: 22 of 25 shipped (Phase 0 + Phase 1 + Phase 2 + Phase 3 substrates); 3 checkpoints open: 01-09 WCAG + 02-07 operator smoke + 03-07 Mac smoke (inc. cargo check on libclang host). All three closed in one Mac session.
-**Phase:** 3 — Dashboard + Chat + Settings
-**Plan:** 03-07 automated specs complete (4 new Playwright specs + verify-chat-rgba.sh); operator-smoke checkpoint owned by operator
-**Phase Status:** 95% — all 7 plans code-complete; DASH-01..08 + CHAT-01..10 + SET-01..10 + WIRE-01..06 closed
+Phase: 04 — SUBSTRATE COMPLETE (Mac operator smoke deferred)
+Plan: 29 of 32 shipped (Phase 0..4 substrates); checkpoints bundled: 01-09 WCAG + 02-07 smoke + 03-07 smoke + 04-07 M-01..M-13 Mac session + cargo check. All closed in ONE Mac session per brother's-Mac strategy.
+**Phase:** 4 — Overlay Windows (QuickAsk + Voice Orb + Ghost + HUD)
+**Plan:** 04-07 automated (5 Playwright specs + 3 new bash guards); Mac operator smoke deferred (M-01..M-13)
+**Phase Status:** 95% — all 7 plans code-complete; QUICK-01..07 + ORB-01..08 + GHOST-01..08 + HUD-01..05 + WIRE-07 closed
 **Overall Progress:**
 
 ```
@@ -44,13 +44,15 @@ Plan: 22 of 25 shipped (Phase 0 + Phase 1 + Phase 2 + Phase 3 substrates); 3 che
 [Phase 1] Foundation           ███████████████████░   95% SUBSTRATE SHIPPED (WCAG checkpoint pending)
 [Phase 2] Onboarding + Shell   ███████████████████░   95% SUBSTRATE SHIPPED (operator smoke pending)
 [Phase 3] Dashboard+Chat+Set   ███████████████████░   95% SUBSTRATE SHIPPED (Mac smoke + cargo check pending)
-[Phase 4] Overlay Windows      ░░░░░░░░░░░░░░░░░░░░  Not started
+[Phase 4] Overlay Windows      ███████████████████░   95% SUBSTRATE SHIPPED (M-01..M-13 Mac smoke pending)
 [Phase 5] Agents + Knowledge   ░░░░░░░░░░░░░░░░░░░░  Not started
 [Phase 6] Life OS + Identity   ░░░░░░░░░░░░░░░░░░░░  Not started
 [Phase 7] Dev Tools + Admin    ░░░░░░░░░░░░░░░░░░░░  Not started
 [Phase 8] Body + Hive          ░░░░░░░░░░░░░░░░░░░░  Not started
 [Phase 9] Polish Pass          ░░░░░░░░░░░░░░░░░░░░  Not started
 ```
+
+Verify:all is now 9 gates (entries + no-raw-tauri + migration-ledger + emit-policy + contrast + chat-rgba + ghost-no-cursor + orb-rgba + hud-chip-count).
 
 ---
 
