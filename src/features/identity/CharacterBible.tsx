@@ -14,7 +14,7 @@
 // @see src/lib/tauri/identity.ts (character_* wrappers)
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Dialog, GlassPanel, GlassSpinner } from '@/design-system/primitives';
+import { Button, Dialog, EmptyState, GlassPanel, GlassSpinner } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import { useRouterCtx } from '@/windows/main/useRouter';
 import {
@@ -165,6 +165,13 @@ export function CharacterBible() {
         <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--s-6)' }}>
           <GlassSpinner />
         </div>
+      )}
+
+      {!loading && !bible && !error && (
+        <EmptyState
+          label="No traits yet"
+          description="Traits evolve from chat feedback (thumbs up/down)."
+        />
       )}
 
       {error && (

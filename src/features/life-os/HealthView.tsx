@@ -12,7 +12,7 @@
 // @see src/lib/tauri/life_os.ts (healthGetToday, healthGetStats, ...)
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { GlassPanel, Button, GlassSpinner, Dialog, Input } from '@/design-system/primitives';
+import { GlassPanel, Button, EmptyState, GlassSpinner, Dialog, Input } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import { usePrefs } from '@/hooks/usePrefs';
 import {
@@ -368,7 +368,10 @@ export function HealthView() {
           <div className="health-insights" data-testid="health-insights">
             <h3 className="health-insights-title">Insights</h3>
             {insights.length === 0 ? (
-              <div className="life-empty">Log more days to generate personalised insights.</div>
+              <EmptyState
+                label="No health data"
+                description="BLADE will populate this as it observes your activity."
+              />
             ) : (
               <ul className="health-insights-list">
                 {insights.map((it, idx) => (

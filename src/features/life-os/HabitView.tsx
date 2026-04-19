@@ -8,7 +8,7 @@
 // @see src/lib/tauri/life_os.ts (habit* wrappers)
 
 import { useCallback, useEffect, useState } from 'react';
-import { GlassPanel, Button, Dialog, Input, GlassSpinner } from '@/design-system/primitives';
+import { GlassPanel, Button, Dialog, EmptyState, Input, GlassSpinner } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import {
   habitGetToday,
@@ -300,7 +300,12 @@ export function HabitView() {
           </form>
 
           {library.length === 0 ? (
-            <div className="life-empty">No habits yet. Create one above or use Suggest design.</div>
+            <EmptyState
+              label="No habits yet"
+              description="Add one to build your streak."
+              actionLabel="Add habit"
+              onAction={() => document.getElementById('habit-add-name')?.focus()}
+            />
           ) : (
             <div className="habits-grid">
               {library.map((habit) => (

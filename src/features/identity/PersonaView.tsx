@@ -16,7 +16,7 @@
 // @see src/lib/tauri/identity.ts
 
 import { useCallback, useEffect, useState } from 'react';
-import { Badge, Button, Dialog, GlassPanel, GlassSpinner, Input, Pill } from '@/design-system/primitives';
+import { Badge, Button, Dialog, EmptyState, GlassPanel, GlassSpinner, Input, Pill } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import { useRouterCtx } from '@/windows/main/useRouter';
 import { usePrefs } from '@/hooks/usePrefs';
@@ -183,10 +183,10 @@ function TraitsTab() {
       )}
 
       {!loading && traits.length === 0 && !error && (
-        <div className="identity-empty">
-          No traits tracked yet. Send a few chat messages + click thumbs-up/down for BLADE
-          to derive traits via reaction → apply_reaction_to_traits.
-        </div>
+        <EmptyState
+          label="No persona data"
+          description="Persona derives from your chat style + preferences."
+        />
       )}
 
       {traits.length > 0 && (

@@ -17,7 +17,7 @@
 // @see .planning/REQUIREMENTS.md §LIFE-07
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, GlassPanel, GlassSpinner, Input } from '@/design-system/primitives';
+import { Button, EmptyState, GlassPanel, GlassSpinner, Input } from '@/design-system/primitives';
 import { useToast } from '@/lib/context/ToastContext';
 import {
   learningGetPredictions,
@@ -173,9 +173,10 @@ export function PredictionsView() {
             <p className="life-placeholder-hint">Error: {loadError}</p>
           )}
           {!loading && !loadError && pending.length === 0 && (
-            <p className="life-placeholder-hint" style={{ textAlign: 'left' }}>
-              No pending predictions. Click &ldquo;Generate now&rdquo; to run inference.
-            </p>
+            <EmptyState
+              label="No predictions yet"
+              description="BLADE will surface patterns as it learns."
+            />
           )}
           {!loading && pending.length > 0 && (
             <div className="predictions-list">

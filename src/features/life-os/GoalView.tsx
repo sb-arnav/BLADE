@@ -8,7 +8,7 @@
 // @see src/lib/tauri/life_os.ts (goal* wrappers)
 
 import { useCallback, useEffect, useState } from 'react';
-import { GlassPanel, Button, Dialog, Input, GlassSpinner } from '@/design-system/primitives';
+import { GlassPanel, Button, Dialog, EmptyState, Input, GlassSpinner } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import {
   goalList,
@@ -240,7 +240,12 @@ export function GoalView() {
           <GlassSpinner size={28} label="Loading goals" />
         </div>
       ) : goals.length === 0 ? (
-        <div className="life-empty">No goals yet. Create one above.</div>
+        <EmptyState
+          label="No goals yet"
+          description="Add one to start tracking progress."
+          actionLabel="Add goal"
+          onAction={() => document.getElementById('goal-add-title')?.focus()}
+        />
       ) : (
         <div className="goals-grid">
           {goals.map((g) => (

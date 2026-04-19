@@ -22,7 +22,7 @@
 // @see .planning/REQUIREMENTS.md §LIFE-08
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Dialog, GlassPanel, GlassSpinner } from '@/design-system/primitives';
+import { Button, Dialog, EmptyState, GlassPanel, GlassSpinner } from '@/design-system/primitives';
 import { useToast } from '@/lib/context/ToastContext';
 import {
   emotionAnalyzePatterns,
@@ -228,9 +228,10 @@ export function EmotionalIntelView() {
           <section>
             <p className="social-section-label">Readings ({readings.length})</p>
             {readings.length === 0 ? (
-              <p className="life-placeholder-hint" style={{ textAlign: 'left' }}>
-                No readings in the recent window.
-              </p>
+              <EmptyState
+                label="No insights yet"
+                description="BLADE needs more observation to surface emotional patterns."
+              />
             ) : (
               <div className="emotion-readings-list">
                 {readings.map((r, idx) => {

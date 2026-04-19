@@ -28,6 +28,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Button,
   Dialog,
+  EmptyState,
   GlassPanel,
   GlassSpinner,
   Input,
@@ -769,9 +770,10 @@ export function SidecarView() {
             <GlassSpinner size={18} label="Loading devices" />
           </div>
         ) : deviceRows.length === 0 ? (
-          <div className="sidecar-device-empty">
-            No sidecar devices registered. Add one above.
-          </div>
+          <EmptyState
+            label="No sidecar data"
+            description="The sidecar shows peripheral context from tools + memory."
+          />
         ) : (
           deviceRows.map((device) => {
             const status = normalizeStatus(device.status);

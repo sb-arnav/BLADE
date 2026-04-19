@@ -22,10 +22,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
   Dialog,
+  EmptyState,
   GlassPanel,
   GlassSpinner,
   Pill,
 } from '@/design-system/primitives';
+import { useRouterCtx } from '@/windows/main/useRouter';
 import {
   swarmCancel,
   swarmGet,
@@ -49,6 +51,7 @@ import './agents-dag-pack.css';
 
 export function SwarmView() {
   const toast = useToast();
+  const { openRoute } = useRouterCtx();
   const [swarms, setSwarms] = useState<Swarm[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedSwarm, setSelectedSwarm] = useState<Swarm | null>(null);
@@ -211,12 +214,12 @@ export function SwarmView() {
               {err}
             </div>
           ) : sidebarList.length === 0 ? (
-            <div className="swarm-sidebar-empty">
-              <p>No swarms yet.</p>
-              <p className="swarm-hint">
-                Swarms are orchestrated by <code>swarm_create</code>.
-              </p>
-            </div>
+            <EmptyState
+              label="No swarm runs"
+              description="Start a swarm from the agent factory."
+              actionLabel="Open factory"
+              onAction={() => openRoute('agent-factory')}
+            />
           ) : (
             <ul className="swarm-sidebar-list">
               {sidebarList.map((s) => (

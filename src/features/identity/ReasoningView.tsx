@@ -17,7 +17,7 @@
 // @see .planning/REQUIREMENTS.md §IDEN-05
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, GlassPanel, GlassSpinner, Pill } from '@/design-system/primitives';
+import { Button, EmptyState, GlassPanel, GlassSpinner, Pill } from '@/design-system/primitives';
 import { useToast } from '@/lib/context/ToastContext';
 import {
   reasoningDecompose,
@@ -303,7 +303,10 @@ export function ReasoningView() {
             <GlassSpinner size={18} label="Loading traces" />
           </div>
         ) : traces.length === 0 ? (
-          <div className="reasoning-empty">No reasoning traces yet — run "Think" to record one.</div>
+          <EmptyState
+            label="No reasoning traces"
+            description="BLADE logs reasoning across chat + agent work."
+          />
         ) : (
           <div className="reasoning-traces-list">
             {traces.map((trace) => {

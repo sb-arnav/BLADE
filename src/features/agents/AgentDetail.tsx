@@ -21,6 +21,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
   Dialog,
+  EmptyState,
   GlassPanel,
   GlassSpinner,
   Pill,
@@ -301,9 +302,10 @@ export function AgentDetail() {
             </span>
           </div>
           {timeline.rows.length === 0 ? (
-            <div className="agent-detail-timeline-empty">
-              Waiting for events… live as the agent emits.
-            </div>
+            <EmptyState
+              label="No events yet"
+              description="Timeline emits in real time as the agent works."
+            />
           ) : (
             timeline.rows.map((row) => {
               const isOpen = expanded.has(row.seq);

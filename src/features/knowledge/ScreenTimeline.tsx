@@ -17,8 +17,9 @@
 // @see .planning/REQUIREMENTS.md §KNOW-04
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Dialog, GlassPanel, Input } from '@/design-system/primitives';
+import { Button, Dialog, EmptyState, GlassPanel, Input } from '@/design-system/primitives';
 import { usePrefs } from '@/hooks/usePrefs';
+import { useRouterCtx } from '@/windows/main/useRouter';
 import {
   timelineGetScreenshot,
   timelineGetStatsCmd,
@@ -49,6 +50,7 @@ function formatTs(ts: number | undefined | null): string {
 
 export function ScreenTimeline() {
   const { prefs, setPref } = usePrefs();
+  const { openRoute } = useRouterCtx();
   const autoLoadLatest =
     typeof prefs['screenTimeline.autoLoadLatest'] === 'boolean'
       ? (prefs['screenTimeline.autoLoadLatest'] as boolean)
@@ -208,7 +210,12 @@ export function ScreenTimeline() {
           data-testid="screen-timeline-search-results"
         >
           {searchResults.length === 0 && !searchLoading && (
-            <div className="screen-timeline-empty">No matches for this query.</div>
+            <EmptyState
+              label="Total Recall not running"
+              description="Enable Total Recall from settings to start capturing."
+              actionLabel="Open settings"
+              onAction={() => openRoute('settings-privacy')}
+            />
           )}
           {searchResults.map((entry) => (
             <button
