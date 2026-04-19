@@ -235,6 +235,13 @@ pub async fn execute_next_step(
                             active_tool = Some(fb_tool.to_string());
                             active_args = Some(fb_args);
                             tool_fallback_used = true;
+                            // Phase 3 WIRE-05 (Plan 03-01, D-64): blade_agent_event family
+                            // (here: agent_step_tool_fallback / agent_step_provider_fallback /
+                            // agent_step_partial / agent_step_completed / agent_step_failed)
+                            // uses emit_to("main", ...) per D-14 — verified by grep in
+                            // Plan 03-01 Task 2c. Phase 5 wires the UI consumer.
+                            // No broadcast `app.emit("blade_agent_event"...)` calls exist
+                            // in this file (executor.rs uses semantic event names instead).
                             let _ = app.emit_to("main", "agent_step_tool_fallback",
                                 serde_json::json!({
                                     "agent_id": &agent_id,

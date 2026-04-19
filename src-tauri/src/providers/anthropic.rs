@@ -342,6 +342,25 @@ pub async fn stream_text_with_thinking(
                                 if delta_type == "thinking_delta" {
                                     if let Some(text) = json["delta"]["thinking"].as_str() {
                                         let _ = app.emit_to("main", "chat_thinking", text);
+                                        // Phase 3 WIRE-04 (Plan 03-01, D-64): parallel-emit
+                                        // tagged thinking chunk so the chat thinking section
+                                        // (D-72 collapsible details) can group chunks by
+                                        // message_id. Legacy `chat_thinking` above kept for
+                                        // backward compat.
+                                        //
+                                        // message_id is propagated from
+                                        // commands.rs::send_message_stream via the
+                                        // BLADE_CURRENT_MSG_ID env var (Phase 3 simplification
+                                        // per D-64; Phase 4 wires a proper context channel).
+                                        // Per-chunk uuid fallback is safe — frontend groups
+                                        // by id but does not enforce uniqueness (consumers
+                                        // see N small thinking blocks instead of 1 grouped).
+                                        let thinking_msg_id = std::env::var("BLADE_CURRENT_MSG_ID")
+                                            .unwrap_or_else(|_| uuid::Uuid::new_v4().to_string());
+                                        let _ = app.emit_to("main", "blade_thinking_chunk", serde_json::json!({
+                                            "chunk": text,
+                                            "message_id": thinking_msg_id,
+                                        }));
                                     }
                                 } else if delta_type == "text_delta" {
                                     if let Some(text) = json["delta"]["text"].as_str() {
