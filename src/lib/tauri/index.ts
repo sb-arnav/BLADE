@@ -70,6 +70,13 @@ export {
   iotSpotifyNext,
 } from './iot';
 
+// Phase 5 additions — Agents + Knowledge cluster wrappers (Plan 05-02, D-118).
+// Exposed as namespace re-exports so per-route files in 05-03..06 can import
+// either via the barrel (`import { agents } from '@/lib/tauri'`) or directly
+// from `@/lib/tauri/agents`. Both paths resolve to the same module.
+export * as agents from './agents';
+export * as knowledge from './knowledge';
+
 // Events convenience re-export (D-38-evt, D-38-hook). Raw `listen`/`invoke`
 // are intentionally NOT re-exported here — the wrapped surfaces (useTauriEvent,
 // invokeTyped) are the only permitted escape hatches per D-13.
