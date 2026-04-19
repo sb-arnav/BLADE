@@ -132,6 +132,35 @@ export const BLADE_EVENTS = {
   GOAL_COMPLETED:         'goal_completed',         // goal_engine.rs:623 — emitted when pursue loop reaches verification success
   BLADE_DEBATE_UPDATE:    'blade_debate_update',    // negotiation_engine.rs:519 — streaming per-round during async debate
   BLADE_REASONING_STEP:   'blade_reasoning_step',   // reasoning_engine.rs:645,667 — streaming per-step during multi-step reasoning
+
+  // ───── Phase 7 — Dev Tools + Admin lifecycle (Plan 07-01 audit additions) ─
+  // All 8 emits below are emit_to("main", ...) calls from either streaming
+  // long-running loops OR scheduled background tasks — NOT simple
+  // request-response. Phase 7 consumers (WebAutomation, CapabilityReports,
+  // Diagnostics, SecurityDashboard) benefit from subscribing vs polling.
+  // Constant values mirror the Rust emit strings verbatim; the grep audit
+  // confirmed every site at the file:line annotation below. Phase 7 consumers
+  // MUST subscribe via useTauriEvent per D-13 / D-38-hook.
+  //
+  // Notes on events considered but rejected:
+  // - workflow_run_started / workflow_run_completed / integration_status_changed
+  //   DO NOT exist in Rust (D-167 audit). Phase 7 plans that referenced these
+  //   speculative names fall back to polling on action completion, per the
+  //   "if constant exists" guard in Plan 07-03 + 07-06.
+  // - browser_agent_event (speculative name in Plan 07-04) — real emit is
+  //   browser_agent_step; Plan 07-04 should subscribe to BROWSER_AGENT_STEP.
+  // - blade_workflow_notification (workflow_builder.rs:466) — fires inside a
+  //   workflow's "notify" node (user-facing toast), NOT workflow lifecycle;
+  //   duplicates the blade_toast/blade_notification surface. Not useful for
+  //   WorkflowBuilder status; skipped.
+  BROWSER_AGENT_STEP:    'browser_agent_step',    // browser_agent.rs:268,284 — streaming per-step during browser_agent_loop (DEV-06 WebAutomation)
+  BLADE_EVOLVING:        'blade_evolving',        // immune_system.rs:31,45,78,85,97 — multi-step capability-resolution status (Admin CapabilityReports)
+  BLADE_AUTO_UPGRADED:   'blade_auto_upgraded',   // evolution.rs:792 — scheduled evolution loop auto-install notification (Admin CapabilityReports)
+  EVOLUTION_SUGGESTION:  'evolution_suggestion',  // evolution.rs:800,945 — scheduled evolution-loop suggestion (Admin CapabilityReports)
+  BLADE_LEVELED_UP:      'blade_leveled_up',      // evolution.rs:812 — background evolution level-up milestone (Admin CapabilityReports)
+  SERVICE_CRASHED:       'service_crashed',       // supervisor.rs:144 — background watchdog when a managed service crashes (Admin Diagnostics + SecurityDashboard)
+  SERVICE_DEAD:          'service_dead',          // supervisor.rs:156 — background watchdog after MAX_RESTARTS crashes (Admin Diagnostics + SecurityDashboard)
+  WATCHER_ALERT:         'watcher_alert',         // watcher.rs:212 — background URL-watcher change detection (Admin SecurityDashboard / Reports)
 } as const;
 
 /** Literal union of every string in BLADE_EVENTS. */
