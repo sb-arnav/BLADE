@@ -105,6 +105,17 @@ export const BLADE_EVENTS = {
   AGENT_OUTPUT: 'agent_output',
   AGENT_COMPLETED: 'agent_completed',
   AGENT_EVENT: 'agent_event',
+
+  // ───── Agent step events (executor.rs fine-grained lifecycle — Phase 5 consumer) ─
+  // Plan 05-01 (D-121, D-125) — closes the gap between 4 shipped constants and
+  // the 10-subscriber surface AgentDetail needs (D-129). Values match the Rust
+  // emit strings verbatim at `src-tauri/src/agents/executor.rs` line offsets.
+  AGENT_STEP_RETRYING:          'agent_step_retrying',          // executor.rs:177
+  AGENT_STEP_TOOL_FALLBACK:     'agent_step_tool_fallback',     // executor.rs:243
+  AGENT_STEP_PROVIDER_FALLBACK: 'agent_step_provider_fallback', // executor.rs:267
+  AGENT_STEP_PARTIAL:           'agent_step_partial',           // executor.rs:314
+  AGENT_STEP_COMPLETED:         'agent_step_completed',         // executor.rs:335
+  AGENT_STEP_FAILED:            'agent_step_failed',            // executor.rs:349
 } as const;
 
 /** Literal union of every string in BLADE_EVENTS. */
