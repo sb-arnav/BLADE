@@ -24,7 +24,7 @@
 //      setReportWebhook, getReportWebhook)
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { GlassPanel, Button, Dialog, Input, GlassSpinner } from '@/design-system/primitives';
+import { GlassPanel, Button, Dialog, Input, GlassSpinner, EmptyState } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import {
   getReports,
@@ -257,7 +257,10 @@ export function Reports() {
           <GlassSpinner size={28} label="Loading reports" />
         </div>
       ) : reports.length === 0 ? (
-        <div className="admin-empty">No reports yet. Use "Log gap" or wait for the backend to detect one.</div>
+        <EmptyState
+          label="No reports filed"
+          description="Capability gaps emit reports automatically."
+        />
       ) : (
         <div className="reports-layout">
           <div className="reports-list" data-testid="reports-list">

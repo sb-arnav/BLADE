@@ -10,7 +10,7 @@
 // @see .planning/REQUIREMENTS.md §HIVE-02
 
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Dialog, GlassPanel, Input, Pill } from '@/design-system/primitives';
+import { Button, Dialog, GlassPanel, Input, Pill, EmptyState } from '@/design-system/primitives';
 import { usePrefs } from '@/hooks/usePrefs';
 import { useToast } from '@/lib/context';
 import { BLADE_EVENTS, useTauriEvent } from '@/lib/events';
@@ -289,9 +289,7 @@ export function TentacleDetail() {
         <GlassPanel className="tentacle-reports">
           <h3 style={{ margin: 0 }}>Reports ({filteredReports.length})</h3>
           {filteredReports.length === 0 ? (
-            <p style={{ color: 'var(--t-2)', fontSize: 13 }}>
-              No reports yet for this tentacle.
-            </p>
+            <EmptyState label="No reports from this tentacle" />
           ) : (
             <ul className="tentacle-report-list">
               {filteredReports.map((r) => (

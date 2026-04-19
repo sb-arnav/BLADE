@@ -11,7 +11,8 @@
 // @see .planning/REQUIREMENTS.md §HIVE-01
 
 import { useEffect, useState } from 'react';
-import { Button, Dialog, GlassPanel, Pill } from '@/design-system/primitives';
+import { Button, Dialog, GlassPanel, Pill, EmptyState } from '@/design-system/primitives';
+import { ListSkeleton } from '@/design-system/primitives/ListSkeleton';
 import { usePrefs } from '@/hooks/usePrefs';
 import { useToast } from '@/lib/context';
 import { BLADE_EVENTS, useTauriEvent } from '@/lib/events';
@@ -23,7 +24,7 @@ import type {
   HiveTickPayload,
   TentacleErrorPayload,
 } from '@/lib/events';
-import { hiveGetStatus, hiveSetAutonomy } from '@/lib/tauri/hive';
+import { hiveGetStatus, hiveSetAutonomy, hiveStart } from '@/lib/tauri/hive';
 import type { Decision, HiveStatus, TentacleSummary } from '@/lib/tauri/hive';
 import { useRouterCtx } from '@/windows/main/useRouter';
 import './hive.css';
@@ -188,7 +189,30 @@ export function HiveMesh() {
   if (!status) {
     return (
       <GlassPanel className="hive-mesh" data-testid="hive-mesh-root">
-        <p>Loading hive…</p>
+        <ListSkeleton rows={5} />
+      </GlassPanel>
+    );
+  }
+
+  if (tentacles.length === 0) {
+    return (
+      <GlassPanel className="hive-mesh" data-testid="hive-mesh-root">
+        <EmptyState
+          label="Hive not running"
+          description="Start the hive to spawn tentacles and collect signals."
+          actionLabel="Start hive"
+          onAction={() => {
+            hiveStart()
+              .then(setStatus)
+              .catch((err) =>
+                toast.show({
+                  type: 'error',
+                  title: 'Failed to start hive',
+                  message: String(err),
+                }),
+              );
+          }}
+        />
       </GlassPanel>
     );
   }
@@ -253,7 +277,7 @@ export function HiveMesh() {
         </span>
       </GlassPanel>
 
-      <div className="tentacle-grid" data-testid="tentacle-grid">
+      <div className="tentacle-grid list-entrance" data-testid="tentacle-grid">
         {filtered.map((t) => (
           <button
             key={t.id}

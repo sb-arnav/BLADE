@@ -33,7 +33,8 @@
 // @see src-tauri/src/decision_gate.rs:376 get_decision_log (SC-3 source)
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { GlassPanel, Button, Dialog, Input, GlassSpinner, Pill } from '@/design-system/primitives';
+import { GlassPanel, Button, Dialog, Input, Pill, EmptyState } from '@/design-system/primitives';
+import { ListSkeleton } from '@/design-system/primitives/ListSkeleton';
 import { useToast } from '@/lib/context';
 import { usePrefs } from '@/hooks/usePrefs';
 import {
@@ -268,9 +269,7 @@ export function DecisionLog() {
       </div>
 
       {loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--s-6)' }}>
-          <GlassSpinner size={28} label="Loading decision log" />
-        </div>
+        <ListSkeleton rows={5} />
       ) : activeTab === 'decisions' ? (
         <>
           {/* Evaluate panel */}
@@ -362,7 +361,10 @@ export function DecisionLog() {
           {/* Decisions list */}
           <h3 className="admin-section-title">Recent decisions</h3>
           {decisions.length === 0 ? (
-            <div className="admin-empty">No decisions logged yet.</div>
+            <EmptyState
+              label="No decisions logged"
+              description="The decision gate logs entries as BLADE acts."
+            />
           ) : (
             <div className="decision-list">
               {decisions.map((d) => {

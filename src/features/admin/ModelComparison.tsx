@@ -13,7 +13,7 @@
 // @see .planning/phases/07-dev-tools-admin/07-CONTEXT.md §D-185
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Dialog, GlassPanel, Input, Pill } from '@/design-system/primitives';
+import { Button, Dialog, GlassPanel, Input, Pill, EmptyState } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import {
   getTaskRouting,
@@ -125,6 +125,12 @@ export function ModelComparison() {
         </section>
 
         <section className="diagnostics-section">
+          {Object.keys(latency).length === 0 && (
+            <EmptyState
+              label="No comparisons yet"
+              description="Run a prompt on multiple models to compare."
+            />
+          )}
           <div className="model-comparison-table">
             {rows.map((row) => (
               <div

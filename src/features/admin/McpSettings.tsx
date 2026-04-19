@@ -17,7 +17,7 @@
 // @see .planning/phases/07-dev-tools-admin/07-PATTERNS.md §4
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Dialog, GlassPanel, Input, Pill } from '@/design-system/primitives';
+import { Button, Dialog, GlassPanel, Input, Pill, EmptyState } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import {
   classifyMcpTool,
@@ -187,7 +187,12 @@ export function McpSettings() {
               );
             })}
             {servers && servers.length === 0 && (
-              <p className="admin-empty">No MCP servers yet. Click Add server or Install from catalog.</p>
+              <EmptyState
+                label="No MCP servers"
+                description="Add one to start wiring tools."
+                actionLabel="Add server"
+                onAction={() => setAddOpen(true)}
+              />
             )}
           </div>
         </section>

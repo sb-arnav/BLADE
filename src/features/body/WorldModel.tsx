@@ -18,7 +18,7 @@
 // @see .planning/REQUIREMENTS.md §BODY-06
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Dialog, GlassPanel, GlassSpinner } from '@/design-system/primitives';
+import { Button, Dialog, GlassPanel, GlassSpinner, EmptyState } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import { BLADE_EVENTS, useTauriEvent } from '@/lib/events';
 import { worldGetState, worldGetSummary, worldRefresh } from '@/lib/tauri/body';
@@ -263,7 +263,7 @@ export function WorldModel() {
 
 function GitTab({ state }: { state: WorldState }) {
   if (state.git_repos.length === 0) {
-    return <p className="body-system-detail-empty">No git repos detected.</p>;
+    return <EmptyState label="No git repos" />;
   }
   return (
     <table className="world-table" data-testid="world-git-table">
@@ -298,7 +298,7 @@ function GitTab({ state }: { state: WorldState }) {
 function ProcessesTab({ state }: { state: WorldState }) {
   const rows = [...state.running_processes].slice(0, 20);
   if (rows.length === 0) {
-    return <p className="body-system-detail-empty">No processes reported.</p>;
+    return <EmptyState label="No processes" />;
   }
   return (
     <table className="world-table" data-testid="world-processes-table">
@@ -324,7 +324,7 @@ function ProcessesTab({ state }: { state: WorldState }) {
 
 function PortsTab({ state }: { state: WorldState }) {
   if (state.open_ports.length === 0) {
-    return <p className="body-system-detail-empty">No open ports.</p>;
+    return <EmptyState label="No open ports" />;
   }
   return (
     <table className="world-table" data-testid="world-ports-table">
@@ -350,7 +350,7 @@ function PortsTab({ state }: { state: WorldState }) {
 
 function FileChangesTab({ state }: { state: WorldState }) {
   if (state.recent_file_changes.length === 0) {
-    return <p className="body-system-detail-empty">No recent file changes.</p>;
+    return <EmptyState label="No recent changes" />;
   }
   return (
     <table className="world-table" data-testid="world-changes-table">
@@ -378,9 +378,7 @@ function FileChangesTab({ state }: { state: WorldState }) {
 
 function TodosTab({ state }: { state: WorldState }) {
   if (state.pending_todos.length === 0) {
-    return (
-      <p className="body-system-detail-empty">No pending TODOs in the scanned tree.</p>
-    );
+    return <EmptyState label="No pending todos" />;
   }
   return (
     <ul className="world-todos-list" data-testid="world-todos-list">

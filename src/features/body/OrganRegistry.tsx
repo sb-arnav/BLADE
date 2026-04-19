@@ -16,7 +16,8 @@
 // @see .planning/REQUIREMENTS.md §BODY-04
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Dialog, GlassPanel, GlassSpinner, Pill } from '@/design-system/primitives';
+import { Button, Dialog, GlassPanel, GlassSpinner, Pill, EmptyState } from '@/design-system/primitives';
+import { ListSkeleton } from '@/design-system/primitives/ListSkeleton';
 import { useToast } from '@/lib/context';
 import { organGetRegistry, organGetRoster, organSetAutonomy } from '@/lib/tauri/body';
 import type { OrganCapability, OrganStatus } from '@/lib/tauri/body';
@@ -177,15 +178,10 @@ export function OrganRegistry() {
         </GlassPanel>
       )}
 
-      {loading && !organs && (
-        <div className="body-map-loading">
-          <GlassSpinner />
-          <span>Reading organ registry…</span>
-        </div>
-      )}
+      {loading && !organs && <ListSkeleton rows={5} rowHeight={72} />}
 
       {organs && organs.length > 0 && (
-        <ul className="organ-list">
+        <ul className="organ-list list-entrance">
           {organs.map((org) => {
             const isOpen = expanded.has(org.name);
             return (
@@ -281,7 +277,7 @@ export function OrganRegistry() {
       )}
 
       {organs && organs.length === 0 && !loading && (
-        <p className="body-system-detail-empty">No organs registered.</p>
+        <EmptyState label="No organs registered" />
       )}
 
       <Dialog

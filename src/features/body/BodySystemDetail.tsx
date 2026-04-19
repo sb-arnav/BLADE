@@ -23,7 +23,8 @@
 // @see .planning/REQUIREMENTS.md §BODY-02
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Dialog, GlassPanel, GlassSpinner, Input, Pill } from '@/design-system/primitives';
+import { Button, Dialog, GlassPanel, GlassSpinner, Input, Pill, EmptyState } from '@/design-system/primitives';
+import { ListSkeleton } from '@/design-system/primitives/ListSkeleton';
 import { usePrefs } from '@/hooks/usePrefs';
 import { useToast } from '@/lib/context';
 import { useRouterCtx } from '@/windows/main/useRouter';
@@ -185,18 +186,13 @@ function ModulesTab({
   onPickRelated: (system: string) => void;
 }) {
   if (loading) {
-    return (
-      <div className="body-system-detail-loading">
-        <GlassSpinner />
-        <span>Loading modules…</span>
-      </div>
-    );
+    return <ListSkeleton rows={5} />;
   }
   if (!modules || modules.length === 0) {
-    return <p className="body-system-detail-empty">No modules registered for this system.</p>;
+    return <EmptyState label="No modules registered" description="This body system has no modules registered." />;
   }
   return (
-    <ul className="body-module-list" data-testid="body-module-list">
+    <ul className="body-module-list list-entrance" data-testid="body-module-list">
       {modules.map((m) => (
         <li
           key={m.module}
@@ -238,9 +234,9 @@ function VitalsTab({
   if (system === 'identity') return <IdentityVitals toast={toast} />;
   if (system === 'skeleton') return <SkeletonVitals />;
   return (
-    <p className="body-system-detail-empty" data-testid="body-system-vitals-empty">
-      No per-system vitals available for {system}. Phase 9 polish may add bespoke drill-ins.
-    </p>
+    <div data-testid="body-system-vitals-empty">
+      <EmptyState label="No vitals for this system" />
+    </div>
   );
 }
 

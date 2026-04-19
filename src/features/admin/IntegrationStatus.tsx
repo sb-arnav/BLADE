@@ -16,8 +16,9 @@
 // @see src/lib/tauri/admin.ts (integration* + mcpGetServers + mcpServerHealth)
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Dialog, GlassPanel, GlassSpinner, Pill } from '@/design-system/primitives';
+import { Button, Dialog, GlassPanel, GlassSpinner, Pill, EmptyState } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
+import { useRouterCtx } from '@/windows/main/useRouter';
 import {
   integrationGetState,
   integrationPollNow,
@@ -85,6 +86,7 @@ function formatTimestamp(ts?: number): string {
 }
 
 export function IntegrationStatus() {
+  const router = useRouterCtx();
   const [state, setState] = useState<IntegrationState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [enabled, setEnabled] = useState<Record<string, boolean>>({
@@ -299,7 +301,12 @@ export function IntegrationStatus() {
               );
             })}
             {mcpServers && mcpServers.length === 0 && (
-              <p className="admin-empty">No MCP servers configured.</p>
+              <EmptyState
+                label="No integrations configured"
+                description="Connect from Settings → Integrations."
+                actionLabel="Open settings"
+                onAction={() => router.openRoute('settings-iot')}
+              />
             )}
           </div>
         </section>
