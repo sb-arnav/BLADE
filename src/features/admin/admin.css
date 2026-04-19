@@ -1,0 +1,107 @@
+/* src/features/admin/admin.css — Plan 07-02 shared base
+   Plans 07-05 and 07-06 EXTEND this file via scoped partial CSS files
+   (admin-rich-a.css, admin-rich-b.css); never replace.
+   @see .planning/phases/07-dev-tools-admin/07-PATTERNS.md §9
+   @see .planning/phases/07-dev-tools-admin/07-CONTEXT.md §D-191 */
+
+@layer features {
+  .admin-surface {
+    padding: var(--s-4);
+    height: 100%;
+    overflow-y: auto;
+  }
+
+  .admin-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-2);
+    padding: var(--s-6);
+    text-align: center;
+  }
+
+  .admin-placeholder h2 {
+    font-family: var(--font-display);
+    font-size: 20px;
+    margin: 0;
+    color: var(--t-1);
+  }
+
+  .admin-placeholder-hint {
+    color: var(--t-3);
+    font-size: 14px;
+    margin: 0;
+  }
+
+  .admin-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+  }
+
+  .admin-card[data-status="running"]  { border-left: 3px solid var(--status-running); }
+  .admin-card[data-status="complete"] { border-left: 3px solid var(--status-success); }
+  .admin-card[data-status="failed"]   { border-left: 3px solid var(--status-error); }
+  .admin-card[data-status="idle"],
+  .admin-card:not([data-status])      { border-left: 3px solid var(--status-idle); }
+
+  .admin-card-title { font-weight: 600; font-size: 14px; color: var(--t-1); }
+  .admin-card-meta { color: var(--t-2); font-size: 12px; }
+  .admin-card-secondary { color: var(--t-3); font-size: 11px; }
+
+  .admin-health-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--s-2);
+  }
+
+  .admin-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--s-2);
+  }
+
+  .admin-tabs {
+    display: flex;
+    gap: var(--s-1);
+    padding: var(--s-2) 0;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: var(--s-3);
+  }
+
+  .admin-tab-pill {
+    padding: var(--s-1) var(--s-2);
+    border-radius: var(--r-pill);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 140ms var(--ease-out);
+    color: var(--t-2);
+  }
+
+  .admin-tab-pill[data-active="true"] {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.22);
+    color: var(--t-1);
+  }
+
+  /* Danger zone (pentest, sysadmin dangerous ops, mcp remove) — D-183 */
+  .danger-banner {
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid var(--status-error);
+    border-radius: var(--r-md);
+    padding: var(--s-2);
+    color: var(--status-error);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-size: 12px;
+    margin-bottom: var(--s-2);
+  }
+}
