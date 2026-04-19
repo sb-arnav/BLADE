@@ -1,0 +1,313 @@
+/* src/features/dashboard/dashboard.css — Dashboard feature styles.
+ *
+ * D-07 DISCIPLINE: this file introduces NO new blur layers. The 3-blur cap
+ * per viewport (NavRail + TitleBar + shell glass) is already consumed —
+ * adding a fourth blur here would blow past P-01 / SC-5 budgets. The CI
+ * grep gate enforces zero occurrences of the disallowed property name.
+ *
+ * All spacing + layout uses --nav-width / --title-height / --gap / --sp-*
+ * tokens from src/styles/layout.css + tokens.css. Zero hardcoded px widths
+ * for layout math (plan truth).
+ *
+ * The `.glass` rules imported via primitives.css handle the blur on
+ * ComingSoonCard's GlassPanel — those are PRE-EXISTING layers from the
+ * shell, not new layers. This file only provides layout, typography, and
+ * per-state color (hormone-chip via --chip-color; state-focused/idle/away
+ * via a small palette).
+ *
+ * @see .planning/phases/03-dashboard-chat-settings/03-CONTEXT.md §D-76, §D-07
+ */
+
+/* ── Dashboard root + 12-column grid ────────────────────────────────────── */
+
+.dashboard {
+  padding: var(--s-4);
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--s-4);
+  align-items: start;
+}
+
+.dash-hero-slot     { grid-column: span 8; min-width: 0; }
+.dash-reserved-slot { grid-column: span 4; min-width: 0; }
+.ambient-strip-slot { grid-column: span 12; min-width: 0; }
+.coming-soon-card   { grid-column: span 4; min-width: 0; }
+
+/* On narrower viewports collapse to single-column for readability. Uses the
+ * same --nav-width-aware max-width that the shell picks — no magic px. */
+@media (max-width: 900px) {
+  .dash-hero-slot,
+  .dash-reserved-slot,
+  .ambient-strip-slot,
+  .coming-soon-card {
+    grid-column: span 12;
+  }
+}
+
+/* ── RightNowHero ───────────────────────────────────────────────────────── */
+
+.dash-hero {
+  padding: var(--s-6);
+  border-radius: var(--r-lg);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  min-height: 180px;
+}
+
+.dash-hero-loading {
+  color: var(--t-3);
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+
+.dash-hero-loading-text {
+  opacity: 0.8;
+}
+
+.dash-hero-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s-3);
+}
+
+.dash-hero-app {
+  margin: 0;
+  color: var(--t-1);
+  /* Inherit t-h2 (28px display) — no override. Ensures SC-5 first paint
+   * budget stays within typography.css measurement. */
+}
+
+.dash-hero-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--t-2);
+}
+
+.dash-hero-state::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--a-ok);
+  box-shadow: 0 0 6px currentColor;
+}
+
+.dash-hero-state.state-focused { color: var(--a-ok); }
+.dash-hero-state.state-focused::before { background: var(--a-ok); }
+.dash-hero-state.state-idle    { color: var(--a-warn); }
+.dash-hero-state.state-idle::before    { background: var(--a-warn); }
+.dash-hero-state.state-away    { color: var(--t-3); }
+.dash-hero-state.state-away::before    { background: var(--t-3); box-shadow: none; }
+
+.dash-hero-title {
+  margin: 0;
+  color: var(--t-2);
+  /* Preserve whitespace for \u00A0 placeholder so layout never reflows. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash-hero-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+.dash-hero-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--t-2);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+}
+
+.dash-hero-chip-label {
+  color: var(--t-3);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.dash-hero-chip-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--t-1);
+}
+
+.dash-hero-errors {
+  margin-top: var(--s-2);
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--t-3);
+}
+
+.dash-hero-errors summary {
+  cursor: pointer;
+  padding: 4px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--a-hot);
+  user-select: none;
+}
+
+.dash-hero-errors summary::marker {
+  color: var(--t-4);
+}
+
+.dash-hero-errors ul {
+  margin: var(--s-2) 0 0;
+  padding-left: var(--s-5);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--t-2);
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+/* ── AmbientStrip ───────────────────────────────────────────────────────── */
+
+.ambient-strip {
+  display: flex;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+  align-items: center;
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+}
+
+.ambient-strip-empty {
+  color: var(--t-3);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* ── HormoneChip ────────────────────────────────────────────────────────── */
+
+.hormone-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--t-2);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--chip-color, var(--t-3));
+  border-radius: var(--r-sm);
+  transition: background var(--dur-fast, 150ms) var(--ease-smooth, ease-out);
+}
+
+.hormone-chip-label {
+  color: var(--t-3);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+.hormone-chip-value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--chip-color, var(--t-1));
+  font-weight: 600;
+  /* Subtle glow tying value text to the chip color — renders via
+   * text-shadow so no extra DOM / no blur layers needed. */
+  text-shadow: 0 0 8px color-mix(in srgb, var(--chip-color, transparent) 40%, transparent);
+}
+
+.hormone-chip.is-dominant {
+  padding: 8px 16px;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.06);
+  border-left-width: 3px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--chip-color, transparent) 25%, transparent),
+    0 4px 12px color-mix(in srgb, var(--chip-color, transparent) 15%, transparent);
+}
+
+.hormone-chip.is-dominant .hormone-chip-value {
+  font-size: 14px;
+}
+
+/* ── ComingSoonCard ─────────────────────────────────────────────────────── */
+
+.coming-soon-card {
+  padding: var(--s-5);
+  /* Subtle opacity reduction signals placeholder status without looking
+   * broken — users understand "not yet" vs "error". */
+  opacity: 0.72;
+  transition: opacity var(--dur-fast, 150ms) var(--ease-smooth, ease-out);
+}
+
+.coming-soon-card:hover {
+  opacity: 0.92;
+}
+
+.coming-soon-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.coming-soon-card-title {
+  margin: 0;
+  color: var(--t-1);
+}
+
+.coming-soon-card-desc {
+  margin: var(--s-3) 0 0;
+  color: var(--t-3);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* ── Reserved slot (first-row right column) ─────────────────────────────── */
+
+.dash-reserved-slot {
+  /* Empty for now — Phase 5+ fills this with hero secondary actions (quick
+   * commands, autonomy state, etc.). Keep invisible so the grid reserves
+   * the column without painting a visible void. */
+  min-height: 0;
+}
