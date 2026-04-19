@@ -11,10 +11,12 @@
     "verify:migration-ledger": "node scripts/verify-migration-ledger.mjs",
     "verify:emit-policy": "node scripts/verify-emit-policy.mjs",
     "verify:contrast": "node scripts/audit-contrast.mjs",
-    "verify:all": "npm run verify:entries && npm run verify:no-raw-tauri && npm run verify:migration-ledger && npm run verify:emit-policy && npm run verify:contrast",
+    "verify:chat-rgba": "bash scripts/verify-chat-rgba.sh",
+    "verify:all": "npm run verify:entries && npm run verify:no-raw-tauri && npm run verify:migration-ledger && npm run verify:emit-policy && npm run verify:contrast && npm run verify:chat-rgba",
     "lint": "eslint src",
     "test:e2e": "playwright test",
     "test:e2e:phase2": "playwright test tests/e2e/onboarding-boot.spec.ts tests/e2e/shell.spec.ts",
+    "test:e2e:phase3": "playwright test tests/e2e/chat-stream.spec.ts tests/e2e/chat-tool-approval.spec.ts tests/e2e/dashboard-paint.spec.ts tests/e2e/settings-provider.spec.ts",
     "release:prepare-updater": "node .github/scripts/prepare-tauri-release-config.mjs"
   },
   "devDependencies": {
