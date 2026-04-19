@@ -90,6 +90,9 @@ export const BLADE_EVENTS = {
   GHOST_MEETING_STATE: 'ghost_meeting_state',
   GHOST_MEETING_ENDED: 'ghost_meeting_ended',
   GHOST_SUGGESTION_READY_TO_SPEAK: 'ghost_suggestion_ready_to_speak',
+  /** Phase 4 Plan 04-04 (D-112) — Ctrl+G shortcut emit, Rust src-tauri/src/lib.rs:326.
+   *  Toggles GhostOverlayWindow card visibility; payload is `{}` (treated as null). */
+  GHOST_TOGGLE_CARD: 'ghost_toggle_card',
 
   // ───── Agents (LIVE emit; Phase 5 consumers) ─────────────────────────────
   BLADE_AGENT_EVENT: 'blade_agent_event',     // WIRE-05 emit exists; UI in Phase 5
