@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: "04-overlay-windows"
+current_phase: "05-agents-knowledge"
 status: awaiting-mac-operator-smoke-checkpoints
-last_updated: "2026-04-19T04:00:00.000Z"
+last_updated: "2026-04-19T08:00:00.000Z"
 progress:
   total_phases: 10
   completed_phases: 1
-  total_plans: 32
-  completed_plans: 29
-  percent: 80
+  total_plans: 39
+  completed_plans: 36
+  percent: 88
 ---
 
 # STATE — BLADE Skin Rebuild (V1)
