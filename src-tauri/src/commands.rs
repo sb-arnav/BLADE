@@ -837,7 +837,7 @@ pub(crate) async fn send_message_stream_inline(
     let mut system_prompt = brain::build_system_prompt_for_model(
         &tool_snapshot,
         &last_user_text,
-        Some(vector_store.inner()),
+        Some(&vector_store),
         &config.provider,
         &config.model,
         messages.len(),
@@ -1472,7 +1472,7 @@ pub(crate) async fn send_message_stream_inline(
             let user_text = last_user_text.clone();
             // Use clean_content for downstream processing so tags don't pollute memory
             let assistant_text = clean_content.clone();
-            let store_clone = vector_store.inner().clone();
+            let store_clone = vector_store.clone();
             // Collect tool names used in this loop for skill pattern recording
             let tools_used: Vec<String> = conversation.iter().filter_map(|m| {
                 if let crate::providers::ConversationMessage::Tool { tool_name, is_error, .. } = m {
