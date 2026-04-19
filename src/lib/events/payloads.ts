@@ -346,3 +346,161 @@ export interface AgentOutputPayload {
   output: string;
   [k: string]: unknown;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 6 Plan 06-01 additions — Life OS + Identity lifecycle payloads.
+//
+// Every interface below matches the exact JSON shape emitted by a scheduled
+// Rust loop or a streaming Rust command (NOT simple request-response).
+// Phase 6 consumers (HealthView, EmotionalIntelView, AccountabilityView,
+// PredictionsView, HabitView, GoalView, NegotiationView, ReasoningView)
+// subscribe via `useTauriEvent<TPayload>(BLADE_EVENTS.XXX, …)`.
+//
+// Every interface carries `[k: string]: unknown` per D-38-payload accepted
+// drift risk. Field names mirror Rust `#[serde]` output verbatim (snake_case).
+//
+// @see src-tauri/src/health_tracker.rs:416,450,469
+// @see src-tauri/src/health_guardian.rs:150,160,180
+// @see src-tauri/src/emotional_intelligence.rs:753
+// @see src-tauri/src/accountability.rs:755,777
+// @see src-tauri/src/prediction_engine.rs:589
+// @see src-tauri/src/habit_engine.rs:760
+// @see src-tauri/src/goal_engine.rs:389,403,623,810,975
+// @see src-tauri/src/negotiation_engine.rs:519
+// @see src-tauri/src/reasoning_engine.rs:645,667
+// ---------------------------------------------------------------------------
+
+/** Mirrors Rust emit at `src-tauri/src/health_tracker.rs:416,450,469`
+ *  (blade_health_nudge). Scheduled nudges emitted by `start_health_nudge_loop`. */
+export interface BladeHealthNudgePayload {
+  type: 'missing_log' | 'poor_sleep_alert' | 'low_energy_day' | string;
+  message: string;
+  sleep_hours?: number;
+  energy?: number;
+  mood?: number;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/health_guardian.rs:150,160,180`
+ *  (health_break_reminder). Scheduled break-reminder loop. */
+export interface HealthBreakReminderPayload {
+  urgency: 'warning' | 'critical' | 'wind_down' | string;
+  streak_minutes: number;
+  message: string;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/emotional_intelligence.rs:753`
+ *  (blade_emotion_detected). Fires only on significant valence shifts. */
+export interface BladeEmotionDetectedPayload {
+  emotion: string;
+  valence: number;
+  arousal: number;
+  confidence: number;
+  signals?: unknown;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/accountability.rs:755,777`
+ *  (accountability_nudge). Scheduled check-in + behind-KR alerts. */
+export interface AccountabilityNudgePayload {
+  type: 'checkin' | 'objective_behind' | string;
+  message: string;
+  objective_id?: string;
+  objective_title?: string;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/prediction_engine.rs:589`
+ *  (blade_prediction). High-confidence (>0.75) predictions emitted during
+ *  background generation. Full Prediction struct mirror. */
+export interface BladePredictionPayload {
+  id: string;
+  prediction_type: string; // "resource_needed" | "task_due" | "pattern_alert" | "suggestion" | "reminder"
+  title: string;
+  description: string;
+  action?: string;
+  confidence: number;
+  time_window: string;     // "now" | "next_hour" | "today" | "this_week"
+  was_helpful?: boolean | null;
+  created_at: number;
+  shown_at?: number | null;
+  accepted: boolean;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/habit_engine.rs:760`
+ *  (blade_habit_reminder). Scheduled habit reminder loop. */
+export interface BladeHabitReminderPayload {
+  id: string;
+  name: string;
+  category?: string;
+  streak?: number;
+  target_time?: string;
+  cue?: string;
+  reward?: string;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/goal_engine.rs:810,975`
+ *  (goal_progress). Emitted during async `goal_pursue_now` loop. */
+export interface GoalProgressPayload {
+  id: string;
+  title: string;
+  status: string;
+  attempts: number;
+  subtasks_done: number;
+  subtasks_total: number;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/goal_engine.rs:389,403`
+ *  (goal_subtask_update). Per-subtask streaming during pursue. */
+export interface GoalSubtaskUpdatePayload {
+  goal_id: string;
+  subtask_description: string;
+  result: string;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/goal_engine.rs:623`
+ *  (goal_completed). Fires when pursue loop verification succeeds. */
+export interface GoalCompletedPayload {
+  id: string;
+  title: string;
+  result: string;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/negotiation_engine.rs:519`
+ *  (blade_debate_update). Streaming per-round during async debate. Shape of
+ *  `round` mirrors `DebateRound` struct at negotiation_engine.rs; left loose
+ *  here per D-38-payload. */
+export interface BladeDebateUpdatePayload {
+  session_id: string;
+  round_num: number;
+  round: {
+    user_argument?: string;
+    opponent_argument?: string;
+    blade_coaching?: string;
+    [k: string]: unknown;
+  };
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/reasoning_engine.rs:645,667`
+ *  (blade_reasoning_step). Streaming per-step progress during multi-step
+ *  reasoning; payload shape = `StepEvent { trace_id, step: ReasoningStep }`. */
+export interface BladeReasoningStepPayload {
+  trace_id: string;
+  step: {
+    step_num: number;
+    thought: string;
+    confidence: number;
+    step_type: string; // "decompose" | "analyze" | "hypothesize" | "verify" | "conclude"
+    critiques: string[];
+    revised?: string | null;
+    [k: string]: unknown;
+  };
+  [k: string]: unknown;
+}
