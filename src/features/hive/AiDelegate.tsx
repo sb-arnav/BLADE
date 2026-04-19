@@ -2,11 +2,11 @@
 //
 // Delegate review surface: aiDelegateCheck hero + Introduce button +
 // local ring buffer of AI_DELEGATE_APPROVED/DENIED events with per-entry
-// feedback Dialog (client-side prefs write — backend delegate_feedback
-// absent per D-205).
+// feedback Dialog that persists via backend delegate_feedback (Plan 09-01
+// closed D-205 gap). Prefs ring buffer remains as short-term session echo.
 //
+// @see .planning/phases/09-polish/09-01-PLAN.md (delegate_feedback backfill)
 // @see .planning/phases/08-body-hive/08-04-PLAN.md (Task 2)
-// @see .planning/phases/08-body-hive/08-CONTEXT.md §D-205
 // @see .planning/REQUIREMENTS.md §HIVE-06
 
 import { useEffect, useState } from 'react';
@@ -14,7 +14,7 @@ import { Button, Dialog, GlassPanel, GlassSpinner, Pill } from '@/design-system/
 import { usePrefs } from '@/hooks/usePrefs';
 import { useToast } from '@/lib/context';
 import { BLADE_EVENTS, useTauriEvent } from '@/lib/events';
-import { aiDelegateCheck, aiDelegateIntroduce } from '@/lib/tauri/hive';
+import { aiDelegateCheck, aiDelegateIntroduce, delegateFeedback } from '@/lib/tauri/hive';
 import type { AiDelegateInfo } from '@/lib/tauri/hive';
 import './hive.css';
 
@@ -61,6 +61,7 @@ export function AiDelegate() {
   const [feedbackFor, setFeedbackFor] = useState<number | null>(null);
   const [feedbackCorrect, setFeedbackCorrect] = useState(true);
   const [feedbackNote, setFeedbackNote] = useState('');
+  const [feedbackBusy, setFeedbackBusy] = useState(false);
 
   useEffect(() => {
     aiDelegateCheck().then(setInfo).catch((e) => setLoadError(String(e)));
@@ -112,26 +113,47 @@ export function AiDelegate() {
     setFeedbackNote('');
   };
 
-  const saveFeedback = () => {
+  const saveFeedback = async () => {
     if (feedbackFor === null) return;
     const entry = log[feedbackFor];
     if (!entry) return;
-    const key = `hive.aiDelegate.feedback.${entry.at}`;
-    setPref(
-      key,
-      JSON.stringify({
-        kind: entry.kind,
-        was_correct: feedbackCorrect,
-        note: feedbackNote,
-        tool_name: summarizePayload(entry.payload).toolName,
-      }),
-    );
-    toast.show({
-      type: 'info',
-      title: 'Feedback saved locally',
-      message: 'Backend delegate_feedback not yet wired (Phase 9)',
-    });
-    setFeedbackFor(null);
+    const summary = summarizePayload(entry.payload);
+    // decision_id fallback chain: explicit payload id → tool+timestamp composite.
+    const decisionId =
+      (typeof entry.payload.decision_id === 'string' && entry.payload.decision_id) ||
+      (typeof entry.payload.id === 'string' && entry.payload.id) ||
+      `${summary.toolName}-${entry.at}`;
+    setFeedbackBusy(true);
+    try {
+      await delegateFeedback({
+        decisionId,
+        wasCorrect: feedbackCorrect,
+        note: feedbackNote.trim() ? feedbackNote.trim() : undefined,
+      });
+      // Keep the prefs ring buffer as a short-term session echo of feedback
+      // history (backend persists long-term).
+      const key = `hive.aiDelegate.feedback.${entry.at}`;
+      setPref(
+        key,
+        JSON.stringify({
+          kind: entry.kind,
+          was_correct: feedbackCorrect,
+          note: feedbackNote,
+          tool_name: summary.toolName,
+        }),
+      );
+      toast.show({ type: 'success', title: 'Feedback recorded' });
+      setFeedbackFor(null);
+    } catch (err) {
+      toast.show({
+        type: 'error',
+        title: 'Save failed',
+        message: String(err),
+      });
+      // Leave dialog open so the operator can retry.
+    } finally {
+      setFeedbackBusy(false);
+    }
   };
 
   if (loadError) {
@@ -228,13 +250,13 @@ export function AiDelegate() {
 
       <Dialog
         open={feedbackFor !== null}
-        onClose={() => setFeedbackFor(null)}
+        onClose={() => !feedbackBusy && setFeedbackFor(null)}
         ariaLabel="Delegate feedback"
       >
         <h3 style={{ margin: 0 }}>Delegate feedback</h3>
         <p style={{ color: 'var(--t-2)', fontSize: 13, marginTop: 'var(--space-2)' }}>
-          Saved locally to prefs only — backend <code>delegate_feedback</code>{' '}
-          is not yet wired (Phase 9 polish).
+          Feedback is persisted via <code>delegate_feedback</code> to the
+          delegate audit log; a local echo stays in prefs for the session.
         </p>
         <div className="feedback-form">
           <label style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', fontSize: 13 }}>
@@ -257,8 +279,10 @@ export function AiDelegate() {
           </label>
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end', marginTop: 'var(--space-3)' }}>
-          <Button variant="ghost" onClick={() => setFeedbackFor(null)}>Cancel</Button>
-          <Button variant="primary" onClick={saveFeedback}>Save</Button>
+          <Button variant="ghost" onClick={() => setFeedbackFor(null)} disabled={feedbackBusy}>Cancel</Button>
+          <Button variant="primary" onClick={saveFeedback} disabled={feedbackBusy}>
+            {feedbackBusy ? 'Saving…' : 'Save'}
+          </Button>
         </div>
       </Dialog>
     </div>

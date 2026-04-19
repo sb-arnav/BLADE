@@ -1,14 +1,14 @@
 // src/features/hive/ApprovalQueue.tsx — HIVE-04 (SC-4 falsifier).
 //
-// Pending decisions queue. Derives rows from hiveGetStatus().recent_decisions
-// (V1 — head-scoped queues require Rust surface tweak, deferred to Phase 9).
-// Per-row Approve (hiveApproveDecision), client-side Dismiss (backend reject
-// absent), batch-approve-low-risk (Reply, confidence > 0.8) Dialog-gated.
-// Subscribes HIVE_PENDING_DECISIONS / HIVE_ESCALATE / HIVE_ACTION_DEFERRED.
+// Pending decisions queue. Derives rows from hiveGetStatus().recent_decisions.
+// Per-row Approve (hiveApproveDecision), Reject (hiveRejectDecision — Plan
+// 09-01 closed D-205 backend gap), batch-approve-low-risk (Reply, confidence
+// > 0.8) Dialog-gated. Subscribes HIVE_PENDING_DECISIONS / HIVE_ESCALATE /
+// HIVE_ACTION_DEFERRED.
 //
+// @see .planning/phases/09-polish/09-01-PLAN.md (Reject backfill)
 // @see .planning/phases/08-body-hive/08-04-PLAN.md (Task 3)
 // @see .planning/phases/08-body-hive/08-PATTERNS.md §5
-// @see .planning/phases/08-body-hive/08-CONTEXT.md §D-205
 // @see .planning/REQUIREMENTS.md §HIVE-04
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -17,7 +17,7 @@ import { usePrefs } from '@/hooks/usePrefs';
 import { useToast } from '@/lib/context';
 import { BLADE_EVENTS, useTauriEvent } from '@/lib/events';
 import type { HiveEscalatePayload } from '@/lib/events';
-import { hiveApproveDecision, hiveGetStatus } from '@/lib/tauri/hive';
+import { hiveApproveDecision, hiveGetStatus, hiveRejectDecision } from '@/lib/tauri/hive';
 import type { Decision } from '@/lib/tauri/hive';
 import './hive.css';
 
@@ -143,13 +143,27 @@ export function ApprovalQueue() {
     }
   };
 
-  const dismiss = (r: PendingRow) => {
-    setDismissed((prev) => new Set(prev).add(r.id));
-    toast.show({
-      type: 'info',
-      title: 'Dismissed locally',
-      message: 'Backend hive_reject_decision not yet wired (Phase 9)',
-    });
+  const reject = async (r: PendingRow) => {
+    setBusyRow(r.id);
+    try {
+      await hiveRejectDecision({
+        headId: r.headId,
+        decisionIndex: r.decisionIndex,
+      });
+      toast.show({ type: 'success', title: 'Rejected' });
+      // Optimistic local removal; next HIVE_PENDING_DECISIONS event will
+      // reconcile with backend truth.
+      setDismissed((prev) => new Set(prev).add(r.id));
+      refresh();
+    } catch (err) {
+      toast.show({
+        type: 'error',
+        title: 'Reject failed',
+        message: String(err),
+      });
+    } finally {
+      setBusyRow(null);
+    }
   };
 
   const toggleExpand = (id: string) => {
@@ -283,10 +297,11 @@ export function ApprovalQueue() {
                 </Button>
                 <Button
                   variant="ghost"
-                  onClick={() => dismiss(r)}
-                  data-testid={`dismiss-${i}`}
+                  onClick={() => reject(r)}
+                  disabled={busyRow === r.id}
+                  data-testid={`reject-${i}`}
                 >
-                  Dismiss
+                  {busyRow === r.id ? '…' : 'Reject'}
                 </Button>
               </div>
             </div>
