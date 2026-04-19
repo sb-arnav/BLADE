@@ -265,40 +265,60 @@ fn parse_shortcut(s: &str) -> Option<Shortcut> {
 }
 
 /// Register all global shortcuts from config. Call on startup and after config change.
+///
+/// Phase 4 Plan 04-01 (D-94): extended with platform-aware fallback chain.
+/// Each shortcut (Quick Ask, Voice) tries, in order:
+///   1. The user-configured shortcut (from BladeConfig).
+///   2. A platform-default fallback (avoids CJK-IME / system-menu collisions).
+///   3. A universal fallback (uncommon enough to survive most setups).
+///
+/// - Fallback succeeds  → emit `shortcut_registration_failed` with
+///                        `severity: "warning"` + `fallback_used` so the
+///                        user sees a toast ("Shortcut fell back to …").
+/// - All candidates fail → emit with `severity: "error"` + full `attempted`
+///                        list so Settings can surface the stranded state.
+///
+/// The payload extension is additive — Phase 3 subscribers that only read
+/// `{shortcut, error}` keep working (D-94).
 fn register_all_shortcuts(app: &tauri::AppHandle) {
     let config = crate::config::load_config();
 
-    // Quick Ask shortcut (default: Ctrl+Space — Alt+Space conflicts with Windows system menu)
-    let qa_shortcut = parse_shortcut(&config.quick_ask_shortcut)
-        .unwrap_or_else(|| Shortcut::new(Some(Modifiers::CONTROL), Code::Space));
-    let qa_handle = app.clone();
-    if let Err(e) = app.global_shortcut().on_shortcut(qa_shortcut, move |_app, _sc, _ev| {
-        toggle_quickask(&qa_handle);
-    }) {
-        log::error!("Failed to register Quick Ask shortcut '{}': {}", config.quick_ask_shortcut, e);
-        let _ = app.emit_to("main", "shortcut_registration_failed", serde_json::json!({
-            "shortcut": &config.quick_ask_shortcut,
-            "name": "Quick Ask",
-            "error": e.to_string()
-        }));
-    }
+    // Platform-default fallback sequence.
+    // macOS avoids Alt+Space (CJK IME collision per P-09 / RECOVERY_LOG §1.4);
+    // Windows/Linux prefer Alt+Space (natural alt-menu replacement).
+    #[cfg(target_os = "macos")]
+    let quick_ask_platform_fallback: &str = "Cmd+Option+Space";
+    #[cfg(not(target_os = "macos"))]
+    let quick_ask_platform_fallback: &str = "Alt+Space";
+    let quick_ask_universal_fallback: &str = "Ctrl+Shift+Space";
 
-    // Voice input shortcut (default: Ctrl+Shift+B — Ctrl+Shift+V conflicts with paste-without-formatting)
-    let voice_sc = parse_shortcut(&config.voice_shortcut)
-        .unwrap_or_else(|| Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyB));
-    let voice_handle = app.clone();
-    if let Err(e) = app.global_shortcut().on_shortcut(voice_sc, move |_app, _sc, _ev| {
-        voice_global::toggle_voice_input(&voice_handle);
-    }) {
-        log::error!("Failed to register Voice shortcut '{}': {}", config.voice_shortcut, e);
-        let _ = app.emit_to("main", "shortcut_registration_failed", serde_json::json!({
-            "shortcut": &config.voice_shortcut,
-            "name": "Voice Input",
-            "error": e.to_string()
-        }));
-    }
+    // Voice: Ctrl+Shift+V collides with paste-without-formatting on some IMEs;
+    // Alt+Shift+V is the safer default fallback.
+    #[cfg(target_os = "macos")]
+    let voice_platform_fallback: &str = "Cmd+Option+V";
+    #[cfg(not(target_os = "macos"))]
+    let voice_platform_fallback: &str = "Alt+Shift+V";
+    let voice_universal_fallback: &str = "Ctrl+Shift+V";
 
-    // Ghost response card toggle: Ctrl+G
+    // --- Quick Ask shortcut --- (fallback chain per D-94)
+    try_register_shortcut_chain(
+        app,
+        "Quick Ask",
+        &config.quick_ask_shortcut,
+        &[quick_ask_platform_fallback, quick_ask_universal_fallback],
+        ShortcutTarget::QuickAsk,
+    );
+
+    // --- Voice Input shortcut --- (same chain model)
+    try_register_shortcut_chain(
+        app,
+        "Voice Input",
+        &config.voice_shortcut,
+        &[voice_platform_fallback, voice_universal_fallback],
+        ShortcutTarget::VoiceInput,
+    );
+
+    // --- Ghost response card toggle: Ctrl+G --- (no fallback — single-try warn-on-fail)
     // Emits ghost_toggle_card to the HUD and ghost overlay windows.
     let ghost_handle = app.clone();
     let ghost_sc = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyG);
@@ -307,6 +327,112 @@ fn register_all_shortcuts(app: &tauri::AppHandle) {
     }) {
         log::warn!("Failed to register Ctrl+G ghost shortcut: {}", e);
     }
+}
+
+/// Which built-in action a shortcut maps to. Selected at registration time so
+/// each closure can own an `AppHandle` clone without the caller needing
+/// to pass a boxed handler fn (dyn-closures hit lifetime/Send bounds with the
+/// tauri_plugin_global_shortcut API).
+#[derive(Clone, Copy)]
+enum ShortcutTarget {
+    QuickAsk,
+    VoiceInput,
+}
+
+/// Phase 4 Plan 04-01 (D-94): iterate over [configured, ...fallbacks] until one
+/// succeeds, emitting a structured `shortcut_registration_failed` warning when
+/// a fallback is used and an error when all candidates fail.
+fn try_register_shortcut_chain(
+    app: &tauri::AppHandle,
+    name: &str,
+    configured: &str,
+    fallbacks: &[&str],
+    target: ShortcutTarget,
+) {
+    let candidates: Vec<&str> = std::iter::once(configured)
+        .chain(fallbacks.iter().copied())
+        .collect();
+    let mut attempted: Vec<String> = Vec::new();
+
+    for (idx, candidate) in candidates.iter().enumerate() {
+        let Some(shortcut) = parse_shortcut(candidate) else {
+            log::warn!("[shortcut] {} unparseable candidate: {}", name, candidate);
+            attempted.push((*candidate).to_string());
+            continue;
+        };
+
+        let handler_app = app.clone();
+        let register_result = match target {
+            ShortcutTarget::QuickAsk => app
+                .global_shortcut()
+                .on_shortcut(shortcut, move |_app, _sc, _ev| {
+                    toggle_quickask(&handler_app);
+                }),
+            ShortcutTarget::VoiceInput => app
+                .global_shortcut()
+                .on_shortcut(shortcut, move |_app, _sc, _ev| {
+                    voice_global::toggle_voice_input(&handler_app);
+                }),
+        };
+
+        match register_result {
+            Ok(_) => {
+                if idx > 0 {
+                    log::warn!(
+                        "[shortcut] {} configured '{}' failed; fell back to '{}'",
+                        name,
+                        configured,
+                        candidate
+                    );
+                    let _ = app.emit_to(
+                        "main",
+                        "shortcut_registration_failed",
+                        serde_json::json!({
+                            "shortcut": configured,
+                            "name": name,
+                            "error": format!(
+                                "'{}' unavailable — fell back to '{}'",
+                                configured, candidate
+                            ),
+                            "attempted": attempted,
+                            "fallback_used": *candidate,
+                            "severity": "warning",
+                        }),
+                    );
+                } else {
+                    log::info!("[shortcut] {} registered '{}'", name, candidate);
+                }
+                return;
+            }
+            Err(e) => {
+                log::warn!(
+                    "[shortcut] {} register '{}' failed: {}",
+                    name,
+                    candidate,
+                    e
+                );
+                attempted.push((*candidate).to_string());
+            }
+        }
+    }
+
+    // All candidates failed — fatal for this shortcut binding.
+    log::error!(
+        "[shortcut] {} exhausted all candidates ({:?}); no binding active",
+        name,
+        attempted
+    );
+    let _ = app.emit_to(
+        "main",
+        "shortcut_registration_failed",
+        serde_json::json!({
+            "shortcut": configured,
+            "name": name,
+            "error": "All shortcut candidates failed to register",
+            "attempted": attempted,
+            "severity": "error",
+        }),
+    );
 }
 
 /// Tauri command: update a specific shortcut and re-register all shortcuts.

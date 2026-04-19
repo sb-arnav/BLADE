@@ -220,3 +220,21 @@ export function resetOnboarding(): Promise<void> {
 export function debugConfig(): Promise<Record<string, unknown>> {
   return invokeTyped<Record<string, unknown>>('debug_config');
 }
+
+// ---------------------------------------------------------------------------
+// Phase 4 Plan 04-01 additions — wake-word runtime toggle (D-95).
+// ---------------------------------------------------------------------------
+
+/**
+ * @see src-tauri/src/wake_word.rs `pub async fn set_wake_word_enabled(app, enabled: bool) -> Result<(), String>`
+ *
+ * Runtime toggle — saves `wake_word_enabled` to config AND starts/stops the
+ * background listener in a single invoke. Consumed by the Phase 3 Voice
+ * settings pane (Plan 03-06 D-84) and Phase 4 UI surfaces that expose a live
+ * wake-word toggle (HUD right-click menu, Voice Orb settings sheet).
+ *
+ * @param enabled `true` to persist+start, `false` to persist+stop.
+ */
+export function setWakeWordEnabled(enabled: boolean): Promise<void> {
+  return invokeTyped<void, { enabled: boolean }>('set_wake_word_enabled', { enabled });
+}
