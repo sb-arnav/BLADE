@@ -7,10 +7,13 @@
 //     requestAnimationFrame drives React commits during streaming. Commit count
 //     ≤ refresh rate regardless of emit cadence. Falsifiable by Plan 03-07
 //     chat-stream.spec.ts.
-//   • D-69 — ChatProvider mounts at the route level (inside the lazy
-//     ChatPanelRoute wrapper), not at MainShell. Route change unmounts the
-//     provider → all event subscriptions tear down cleanly → P-06 listener
-//     leak prevention preserved.
+//   • D-69 — ChatProvider originally mounted at the route level (inside the
+//     lazy ChatPanelRoute wrapper). Phase 4 Plan 04-06 (D-116) HOISTS the
+//     provider up to MainShell so the QuickAskBridge can inject bridged
+//     user-turns via `injectUserMessage` regardless of the currently-active
+//     route. Route changes no longer unmount the provider — but the event
+//     subscriptions are still deduped (P-06) because useTauriEvent has a
+//     single listen() per mount and MainShell mounts exactly once per session.
 //
 // The provider subscribes to 9 BLADE_EVENTS:
 //   BLADE_MESSAGE_START / CHAT_TOKEN / BLADE_THINKING_CHUNK / CHAT_DONE /
@@ -78,6 +81,19 @@ export interface ChatStateValue {
   cancel: () => Promise<void>;
   approveTool: (approvalId: string) => Promise<void>;
   denyTool: (approvalId: string) => Promise<void>;
+  /**
+   * Phase 4 Plan 04-06 (D-102/D-116) — retroactive user-turn injection.
+   *
+   * Appends a user message to `messages[]` WITHOUT invoking
+   * `sendMessageStream`. The Rust side already kicked off streaming from
+   * `quickask_submit` (Plan 04-01, D-93) — this action exists solely to
+   * sync the main-window chat history UI with the bridged conversation so
+   * the user sees their own turn alongside the assistant reply when they
+   * expand `/chat` after submitting from QuickAsk.
+   *
+   * Called by QuickAskBridge (Plan 04-06) on BLADE_QUICKASK_BRIDGED.
+   */
+  injectUserMessage: (m: { id: string; content: string }) => void;
 }
 
 const Ctx = createContext<ChatStateValue | null>(null);
@@ -302,6 +318,22 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // ── Phase 4 Plan 04-06 (D-102/D-116) — retroactive user-turn injection ────
+  // The Rust side (commands.rs::quickask_submit, Plan 04-01 D-93) already
+  // kicked off streaming before the main-window UI knew about the query.
+  // This action syncs the user's turn into the history array so the chat
+  // panel shows the full conversation when the user pops /chat open.
+  // Does NOT call sendMessageStream — the backend stream is already live.
+  const injectUserMessage = useCallback(
+    (m: { id: string; content: string }) => {
+      setMessages((prev) => [
+        ...prev,
+        { id: m.id, role: 'user', content: m.content, createdAt: Date.now() },
+      ]);
+    },
+    [],
+  );
+
   const value: ChatStateValue = {
     messages,
     status,
@@ -315,6 +347,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     cancel,
     approveTool,
     denyTool,
+    injectUserMessage,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
@@ -328,7 +361,7 @@ export function useChatCtx(): ChatStateValue {
   const v = useContext(Ctx);
   if (!v) {
     throw new Error(
-      'useChatCtx must be used inside <ChatProvider> — mounted by src/features/chat/index.tsx ChatPanelRoute.',
+      'useChatCtx must be used inside <ChatProvider> — mounted by src/windows/main/MainShell.tsx (Phase 4 D-116 hoist).',
     );
   }
   return v;

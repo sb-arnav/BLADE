@@ -32,12 +32,20 @@ import { useOnboardingGate } from './useOnboardingGate';
 import { ROUTE_MAP } from './router';
 import { DEFAULT_ROUTE_ID } from '@/lib/router';
 import { OnboardingFlow } from '@/features/onboarding';
+// Phase 4 Plan 04-06 (D-116) — hoist ChatProvider from the chat route up to
+// MainShell so the QuickAskBridge can inject user-turns via injectUserMessage
+// regardless of the currently-active route. QuickAskBridge subscribes to
+// BLADE_QUICKASK_BRIDGED and is a zero-DOM event bridge.
+import { ChatProvider, QuickAskBridge } from '@/features/chat';
 
 export function MainShell() {
   return (
     <RouterProvider>
-      <BackendToastBridge />
-      <ShellContent />
+      <ChatProvider>
+        <BackendToastBridge />
+        <QuickAskBridge />
+        <ShellContent />
+      </ChatProvider>
     </RouterProvider>
   );
 }
