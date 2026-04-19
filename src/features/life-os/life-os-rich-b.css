@@ -1,0 +1,340 @@
+/* src/features/life-os/life-os-rich-b.css — Plan 06-04 scoped partial.
+   Companion to the Plan 06-02 base (life-os.css). Each route file in this
+   plan (SocialGraphView, PredictionsView, EmotionalIntelView, AccountabilityView)
+   imports BOTH life-os.css + life-os-rich-b.css — cluster-base classes
+   (`.life-surface`, `.life-card`, `.life-tab-pill`) remain authoritative while
+   the rules below layer the 4 route-specific surfaces on top.
+
+   Parallel with Plan 06-03's life-os-rich-a.css — disjoint class names so the
+   two rich partials never collide (06-03 owns HealthView/FinanceView/GoalView/
+   HabitView/MeetingsView; 06-04 owns the surfaces below).
+
+   D-132 cluster CSS discipline — rules live under `@layer features` so
+   specificity stays predictable against Tailwind utilities (D-23 layer order).
+   D-07 + D-70 blur cap — every inner surface uses rgba fills, never
+   backdrop-filter, since the parent GlassPanel tier already consumed the budget.
+
+   @see .planning/phases/06-life-os-identity/06-PATTERNS.md §7, §10
+   @see .planning/phases/06-life-os-identity/06-CONTEXT.md §D-149..D-152 */
+
+@layer features {
+  /* ═══════════════ SocialGraphView (D-149) ══════════════════════════════ */
+
+  .social-graph-layout {
+    display: grid;
+    grid-template-columns: minmax(320px, 40%) 1fr;
+    gap: var(--s-3);
+    height: 100%;
+    min-height: 0;
+  }
+
+  .social-graph-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2);
+    padding-bottom: var(--s-3);
+    border-bottom: 1px solid var(--line);
+    margin-bottom: var(--s-3);
+  }
+
+  .social-graph-header h2 {
+    font-family: var(--font-display);
+    font-size: 20px;
+    color: var(--t-1);
+    margin: 0;
+  }
+
+  .social-contacts-pane {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  .social-search-row {
+    display: flex;
+    gap: var(--s-2);
+    padding-bottom: var(--s-2);
+  }
+
+  .contact-card {
+    padding: var(--s-2) var(--s-3);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    transition:
+      background 140ms var(--ease-out),
+      border-color 140ms var(--ease-out);
+  }
+
+  .contact-card:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--line-strong);
+  }
+
+  .contact-card[data-selected='true'] {
+    background: rgba(255, 255, 255, 0.09);
+    border-color: rgba(255, 255, 255, 0.24);
+  }
+
+  .contact-card-name {
+    color: var(--t-1);
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .contact-card-meta {
+    color: var(--t-3);
+    font-size: 11px;
+    display: flex;
+    gap: var(--s-2);
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .contact-card-chip {
+    padding: 1px 6px;
+    border-radius: var(--r-pill);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--line);
+    color: var(--t-2);
+    font-size: 10px;
+  }
+
+  .social-detail-pane {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-3);
+    overflow-y: auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+  }
+
+  .social-detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2);
+    border-bottom: 1px solid var(--line);
+    padding-bottom: var(--s-2);
+  }
+
+  .social-detail-title {
+    font-family: var(--font-display);
+    font-size: 18px;
+    color: var(--t-1);
+    margin: 0;
+  }
+
+  .social-detail-actions {
+    display: flex;
+    gap: var(--s-1);
+  }
+
+  .social-detail-empty {
+    color: var(--t-3);
+    font-size: 13px;
+    text-align: center;
+    padding: var(--s-8) var(--s-3);
+  }
+
+  .social-section-label {
+    color: var(--t-3);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0 0 var(--s-1) 0;
+  }
+
+  .social-interactions-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+  }
+
+  .social-interaction-row {
+    display: grid;
+    grid-template-columns: 90px 80px 1fr auto;
+    gap: var(--s-2);
+    align-items: center;
+    padding: var(--s-1) var(--s-2);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    font-size: 12px;
+    color: var(--t-2);
+  }
+
+  .social-insights-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    padding-left: var(--s-3);
+  }
+
+  .social-log-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    padding: var(--s-2);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+  }
+
+  .social-log-textarea {
+    width: 100%;
+    min-height: 72px;
+    padding: var(--s-2);
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    color: var(--t-1);
+    font-family: inherit;
+    font-size: 13px;
+    resize: vertical;
+  }
+
+  .social-log-textarea:focus {
+    outline: none;
+    border-color: var(--line-strong);
+  }
+
+  /* ═══════════════ PredictionsView (D-150) ══════════════════════════════ */
+
+  .predictions-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+  }
+
+  .predictions-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2);
+    padding-bottom: var(--s-3);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .predictions-header h2 {
+    font-family: var(--font-display);
+    font-size: 20px;
+    color: var(--t-1);
+    margin: 0;
+  }
+
+  .predictions-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--s-2);
+  }
+
+  .prediction-card {
+    padding: var(--s-3);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+  }
+
+  .prediction-card[data-status='accepted'] {
+    border-left: 3px solid var(--status-success);
+  }
+
+  .prediction-card[data-status='dismissed'] {
+    opacity: 0.55;
+    border-left: 3px solid var(--status-idle);
+  }
+
+  .prediction-card[data-status='pending'] {
+    border-left: 3px solid var(--status-running);
+  }
+
+  .prediction-title {
+    color: var(--t-1);
+    font-size: 14px;
+    font-weight: 500;
+    margin: 0;
+  }
+
+  .prediction-desc {
+    color: var(--t-2);
+    font-size: 12px;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  .prediction-meta {
+    display: flex;
+    gap: var(--s-2);
+    align-items: center;
+    color: var(--t-3);
+    font-size: 11px;
+  }
+
+  .prediction-confidence-bar {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: var(--r-pill);
+    overflow: hidden;
+  }
+
+  .prediction-confidence-fill {
+    height: 100%;
+    background: var(--status-running);
+    transition: width 160ms var(--ease-out);
+  }
+
+  .prediction-actions {
+    display: flex;
+    gap: var(--s-1);
+  }
+
+  .predictions-patterns-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+  }
+
+  .predictions-pattern-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--s-2);
+    align-items: center;
+    padding: var(--s-2);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    font-size: 12px;
+    color: var(--t-2);
+  }
+
+  .predictions-contextual-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    padding: var(--s-3);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+  }
+
+  .predictions-contextual-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--s-2);
+    align-items: center;
+  }
+}
