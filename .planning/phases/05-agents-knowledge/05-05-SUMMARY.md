@@ -249,6 +249,22 @@ All three were declared in Plan 05-01 D-133 and the existing usePrefs.ts
   AgentTeam, BackgroundAgents}.tsx`, `src/features/agents/agents-dashboard.css`
 - **Commit:** no commit — debris was cleaned before staging for Task 3.
 
+**3. [Race note] Concurrent-executor race on final SUMMARY commit `3944030`**
+- **Found during:** post-commit `git show --stat`.
+- **Issue:** The `docs(05-05)` summary commit ended up sweeping
+  `src/features/agents/BackgroundAgents.tsx` (413 lines) into its stat —
+  that file is owned by Plan 05-03. Plan 05-04 hit the same race on its
+  `222810f` summary commit (see commit `21501dc` which documents it).
+- **Analysis:** `git diff 3944030..HEAD -- src/features/agents/BackgroundAgents.tsx`
+  returns empty — the content swept is unchanged from the Plan 05-03
+  executor's authored work (the file starts with the 05-03 header comment
+  and contains the 05-03 hook `useAgentTimeline` consumer pattern from
+  commit `2668417`). Only the *commit attribution* landed inside Plan
+  05-05's docs commit; the bytes themselves are 05-03's.
+- **Fix:** none required — the bytes match what 05-03 will commit under
+  its own SUMMARY. No content from Plan 05-05 touches that file. Flagged
+  here for the Phase 5 retrospective.
+
 No Rule 2 completeness fixes needed beyond the plan's own must-haves list;
 no Rule 4 architectural decisions required; no authentication gates
 encountered (pure frontend work).
