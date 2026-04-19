@@ -13,12 +13,15 @@
 //
 // Registered dev route ids (all gated on import.meta.env.DEV via the
 // `devRoutes` spread below; definitions live in src/features/dev/index.tsx):
-//   - primitives       (Phase 1)
-//   - wrapper-smoke    (Phase 1)
-//   - diagnostics-dev  (Phase 1)
-//   - dev-voice-orb    (Phase 4 Plan 04-07 — SC-2 isolation)
-//   - dev-ghost        (Phase 4 Plan 04-07 — SC-3 / D-10 isolation)
-//   - dev-hud          (Phase 4 Plan 04-07 — SC-4 isolation)
+//   - primitives           (Phase 1)
+//   - wrapper-smoke        (Phase 1)
+//   - diagnostics-dev      (Phase 1)
+//   - dev-voice-orb        (Phase 4 Plan 04-07 — SC-2 isolation)
+//   - dev-ghost            (Phase 4 Plan 04-07 — SC-3 / D-10 isolation)
+//   - dev-hud              (Phase 4 Plan 04-07 — SC-4 isolation)
+//   - dev-agent-detail     (Phase 5 Plan 05-07 — SC-2 real-time timeline)
+//   - dev-swarm-view       (Phase 5 Plan 05-07 — SC-1 DAG render)
+//   - dev-knowledge-base   (Phase 5 Plan 05-07 — SC-4 D-138 grouped search)
 //
 // @see .planning/phases/01-foundation/01-CONTEXT.md §D-40, §D-40-palette
 // @see .planning/phases/04-overlay-windows/04-07-PLAN.md (dev-voice-orb, dev-ghost, dev-hud)
