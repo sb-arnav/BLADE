@@ -35,11 +35,18 @@
 //   - dev-security-dashboard  → ./SecurityDashboardDev   (SC-4 hero + 4 tabs + pentest danger)
 //   - dev-mcp-settings        → ./McpSettingsDev         (ADMIN-09 CRUD + tool trust)
 //
+// Phase 8 Plan 08-05 adds 3 more isolation routes for the body + hive
+// Playwright specs (same passthrough pattern; test shim mocks the invokes):
+//   - dev-body-map        → ./BodyMapDev        (SC-1 BodyMap grid + drill-in)
+//   - dev-hive-mesh       → ./HiveMeshDev       (SC-3 tentacle grid + autonomy Dialog)
+//   - dev-approval-queue  → ./ApprovalQueueDev  (SC-4 approve fires hive_approve_decision)
+//
 // @see .planning/phases/01-foundation/01-CONTEXT.md §D-21, §D-30, §D-40-palette
 // @see .planning/phases/04-overlay-windows/04-07-PLAN.md Sub-task 1f
 // @see .planning/phases/05-agents-knowledge/05-07-PLAN.md Task 1
 // @see .planning/phases/06-life-os-identity/06-07-PLAN.md Task 1
 // @see .planning/phases/07-dev-tools-admin/07-07-PLAN.md Task 1
+// @see .planning/phases/08-body-hive/08-05-PLAN.md Task 3
 
 import { lazy } from 'react';
 import type { RouteDefinition } from '@/lib/router';
@@ -94,6 +101,15 @@ const SecurityDashboardDev = lazy(() =>
 );
 const McpSettingsDev = lazy(() =>
   import('./McpSettingsDev').then((m) => ({ default: m.McpSettingsDev })),
+);
+const BodyMapDev = lazy(() =>
+  import('./BodyMapDev').then((m) => ({ default: m.BodyMapDev })),
+);
+const HiveMeshDev = lazy(() =>
+  import('./HiveMeshDev').then((m) => ({ default: m.HiveMeshDev })),
+);
+const ApprovalQueueDev = lazy(() =>
+  import('./ApprovalQueueDev').then((m) => ({ default: m.ApprovalQueueDev })),
 );
 
 export const routes: RouteDefinition[] = [
@@ -249,5 +265,32 @@ export const routes: RouteDefinition[] = [
     phase: 7,
     paletteHidden: true,
     description: 'DEV: McpSettings isolation (ADMIN-09 CRUD + tool trust)',
+  },
+  {
+    id: 'dev-body-map',
+    label: 'DEV: BodyMap',
+    section: 'dev',
+    component: BodyMapDev,
+    phase: 8,
+    paletteHidden: true,
+    description: 'DEV: BodyMap isolation (SC-1 grid + drill-in)',
+  },
+  {
+    id: 'dev-hive-mesh',
+    label: 'DEV: HiveMesh',
+    section: 'dev',
+    component: HiveMeshDev,
+    phase: 8,
+    paletteHidden: true,
+    description: 'DEV: HiveMesh isolation (SC-3 tentacle grid + autonomy Dialog)',
+  },
+  {
+    id: 'dev-approval-queue',
+    label: 'DEV: ApprovalQueue',
+    section: 'dev',
+    component: ApprovalQueueDev,
+    phase: 8,
+    paletteHidden: true,
+    description: 'DEV: ApprovalQueue isolation (SC-4 approve fires hive_approve_decision)',
   },
 ];
