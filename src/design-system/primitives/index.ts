@@ -7,3 +7,5 @@ export { Badge } from './Badge';
 export { GlassSpinner } from './GlassSpinner';
 export { Dialog } from './Dialog';
 export { ComingSoonSkeleton } from './ComingSoonSkeleton';
+export { ErrorBoundary } from './ErrorBoundary';
+export { EmptyState } from './EmptyState';
