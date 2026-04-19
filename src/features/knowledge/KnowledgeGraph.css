@@ -1,0 +1,161 @@
+/* src/features/knowledge/KnowledgeGraph.css — Phase 5 Plan 05-05 (D-132).
+   Scoped to the knowledge-graph surface; uses rgba bg + var(--line) edges
+   per D-70 (inside the tier-1 GlassPanel already). */
+
+@layer features {
+  .knowledge-graph-header {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    padding: 0 var(--s-2) var(--s-2);
+    border-bottom: 1px solid var(--line);
+    margin-bottom: var(--s-3);
+  }
+
+  .knowledge-graph-header h2 {
+    font-family: var(--font-display);
+    font-size: 18px;
+    margin: 0;
+    color: var(--t-1);
+    flex: 1;
+  }
+
+  .knowledge-graph-stats {
+    display: flex;
+    gap: var(--s-3);
+    font-size: 12px;
+    color: var(--t-3);
+  }
+
+  .knowledge-graph-root {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: var(--s-3);
+    height: calc(100% - 56px);
+  }
+  .knowledge-graph-root.collapsed {
+    grid-template-columns: 1fr;
+  }
+
+  .knowledge-graph-canvas {
+    background: rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .knowledge-graph-loading,
+  .knowledge-graph-error,
+  .knowledge-graph-empty {
+    color: var(--t-3);
+    padding: var(--s-4);
+    font-size: 13px;
+    text-align: center;
+    max-width: 400px;
+  }
+
+  .knowledge-graph-error {
+    color: var(--status-error);
+  }
+
+  .knowledge-graph-node {
+    fill: rgba(138, 255, 199, 0.7);
+    stroke: rgba(255, 255, 255, 0.28);
+    stroke-width: 1;
+    transition: fill 140ms var(--ease-out);
+  }
+  .knowledge-graph-node-group:hover .knowledge-graph-node {
+    fill: rgba(255, 210, 166, 0.9);
+  }
+  .knowledge-graph-node[data-selected='true'] {
+    stroke: #fff;
+    stroke-width: 2;
+  }
+  .knowledge-graph-node[data-cluster='true'] {
+    fill: rgba(200, 224, 255, 0.8);
+  }
+
+  .knowledge-graph-cluster-badge {
+    fill: rgba(0, 0, 0, 0.85);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    pointer-events: none;
+  }
+
+  .knowledge-graph-tooltip-bg {
+    fill: rgba(10, 10, 12, 0.92);
+    stroke: var(--line-strong);
+    stroke-width: 1;
+  }
+  .knowledge-graph-tooltip-title {
+    fill: var(--t-1);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .knowledge-graph-tooltip-meta {
+    fill: var(--t-3);
+    font-size: 10px;
+  }
+  .knowledge-graph-tooltip-preview {
+    fill: var(--t-2);
+    font-size: 10px;
+  }
+
+  .knowledge-graph-sidebar {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-3);
+    overflow-y: auto;
+  }
+
+  .knowledge-graph-sidebar-card h3 {
+    font-family: var(--font-display);
+    font-size: 16px;
+    margin: 0 0 var(--s-2) 0;
+    color: var(--t-1);
+  }
+
+  .knowledge-graph-sidebar-meta {
+    font-size: 11px;
+    color: var(--t-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: var(--s-1);
+  }
+
+  .knowledge-graph-sidebar-desc {
+    font-size: 13px;
+    color: var(--t-2);
+    margin: var(--s-2) 0;
+    line-height: 1.5;
+  }
+
+  .knowledge-graph-sidebar-sources {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+  }
+  .knowledge-graph-sidebar-sources li {
+    font-size: 12px;
+    color: var(--t-2);
+    padding: var(--s-1) var(--s-2);
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: var(--r-xs);
+    word-break: break-all;
+  }
+
+  .knowledge-graph-sidebar-empty {
+    color: var(--t-3);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+}
