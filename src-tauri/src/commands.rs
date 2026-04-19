@@ -26,6 +26,66 @@ static CHAT_CANCEL: AtomicBool = AtomicBool::new(false);
 static CHAT_INFLIGHT: AtomicBool = AtomicBool::new(false);
 
 // ---------------------------------------------------------------------------
+// Phase 4 Plan 04-01 (D-93, D-100): streaming-window registry.
+//
+// `send_message_stream_inline` is the shared streaming pipeline used by both
+// `send_message_stream` (main-only emits) and `quickask_submit` (parallel
+// emits to both "main" AND "quickask"). The list of windows is stored in a
+// process-global RwLock and consulted by the `emit_stream_event` helper on
+// every user-visible stream emit (chat_token / chat_done / blade_message_start
+// / blade_thinking_chunk / chat_ack / blade_planning / blade_notification /
+// blade_routing_switched / ai_delegate_* / chat_routing / blade_token_ratio /
+// chat_cancelled). Semantic background-task emits (brain_grew,
+// capability_gap_detected, response_improved) stay main-only intentionally —
+// those are not part of the user-visible stream contract.
+//
+// Serialization is preserved by CHAT_INFLIGHT: only one streaming session may
+// execute at a time, so the RwLock swap is race-free in practice.
+// ---------------------------------------------------------------------------
+static STREAMING_EMIT_WINDOWS: std::sync::OnceLock<std::sync::RwLock<Vec<String>>> =
+    std::sync::OnceLock::new();
+
+fn streaming_emit_windows() -> &'static std::sync::RwLock<Vec<String>> {
+    STREAMING_EMIT_WINDOWS.get_or_init(|| std::sync::RwLock::new(vec!["main".to_string()]))
+}
+
+fn set_streaming_emit_windows(windows: &[&str]) {
+    if let Ok(mut w) = streaming_emit_windows().write() {
+        *w = windows.iter().map(|s| s.to_string()).collect();
+    }
+}
+
+fn reset_streaming_emit_windows() {
+    if let Ok(mut w) = streaming_emit_windows().write() {
+        *w = vec!["main".to_string()];
+    }
+}
+
+/// Emit a user-visible stream event to every window currently registered in
+/// `STREAMING_EMIT_WINDOWS`. Falls back to "main" if the lock is poisoned.
+///
+/// Used by `send_message_stream_inline` in place of every `app.emit_to("main", ...)`
+/// site that is part of the user-visible stream contract (D-93, D-100).
+pub(crate) fn emit_stream_event<S, P>(app: &tauri::AppHandle, event: S, payload: P)
+where
+    S: AsRef<str>,
+    P: serde::Serialize + Clone,
+{
+    let event = event.as_ref();
+    match streaming_emit_windows().read() {
+        Ok(w) => {
+            for label in w.iter() {
+                let _ = app.emit_to(label.as_str(), event, payload.clone());
+            }
+        }
+        Err(_) => {
+            // Poisoned lock — fall back to main so the user still sees the stream.
+            let _ = app.emit_to("main", event, payload);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Phase 4: Self-healing circuit breaker + exponential backoff
 // ---------------------------------------------------------------------------
 
@@ -304,7 +364,7 @@ async fn try_free_model_fallback(
 
         if key.is_empty() && *provider != "ollama" { continue; }
 
-        let _ = app.emit_to("main", "blade_notification", serde_json::json!({
+        emit_stream_event(app, "blade_notification", serde_json::json!({
             "type": "info",
             "message": format!("Rate limited on {} — switching to {} ({}) for this request.",
                 config.provider, provider, model)
@@ -313,7 +373,7 @@ async fn try_free_model_fallback(
 
         match providers::complete_turn(provider, &key, model, conversation, tools, None).await {
             Ok(t) => {
-                let _ = app.emit_to("main", "blade_routing_switched", serde_json::json!({
+                emit_stream_event(app, "blade_routing_switched", serde_json::json!({
                     "from_provider": &config.provider,
                     "from_model": &config.model,
                     "to_provider": provider,
@@ -555,6 +615,11 @@ fn find_similar_files(filename: &str, search_dir: &str) -> Vec<String> {
     matches
 }
 
+/// Phase 4 Plan 04-01 (D-93): #[tauri::command] entry point.
+///
+/// Thin wrapper around `send_message_stream_inline` that preserves the Phase 3
+/// main-only emit contract (back-compat: `emit_windows = &["main"]`). Every
+/// user-visible stream event routes to the main window as before.
 #[tauri::command]
 pub async fn send_message_stream(
     app: tauri::AppHandle,
@@ -563,10 +628,55 @@ pub async fn send_message_stream(
     vector_store: tauri::State<'_, crate::embeddings::SharedVectorStore>,
     messages: Vec<ChatMessage>,
 ) -> Result<(), String> {
+    send_message_stream_inline(
+        app,
+        state.inner().clone(),
+        approvals.inner().clone(),
+        vector_store.inner().clone(),
+        messages,
+        &["main"],
+    )
+    .await
+}
+
+/// Phase 4 Plan 04-01 (D-93, D-100): extracted streaming pipeline.
+///
+/// `emit_windows` is the list of window labels that user-visible stream events
+/// (chat_token / chat_done / blade_message_start / etc.) should be emitted to.
+/// The list is stashed in `STREAMING_EMIT_WINDOWS` for the duration of this
+/// call and consulted by `emit_stream_event` at every emit site.
+///
+/// - `send_message_stream` calls this with `&["main"]` — Phase 3 contract.
+/// - `quickask_submit` calls this with `&["main", "quickask"]` so the QuickAsk
+///   popup sees the live stream alongside the main chat panel.
+///
+/// Semantic background-task emits (brain_grew, capability_gap_detected,
+/// response_improved) remain hard-coded to "main" — they are not part of the
+/// user-visible stream contract.
+pub(crate) async fn send_message_stream_inline(
+    app: tauri::AppHandle,
+    state: SharedMcpManager,
+    approvals: ApprovalMap,
+    vector_store: crate::embeddings::SharedVectorStore,
+    messages: Vec<ChatMessage>,
+    emit_windows: &[&str],
+) -> Result<(), String> {
     // Concurrency guard — prevent interleaved responses from rapid-fire messages
     if CHAT_INFLIGHT.swap(true, Ordering::SeqCst) {
         return Err("Already processing a message. Wait for the current response to finish, or cancel it first.".to_string());
     }
+    // Stash the current stream's emit-window list so `emit_stream_event` picks
+    // up the right set for every emit site in this invocation.
+    set_streaming_emit_windows(emit_windows);
+
+    // Drop guard: ensure emit-windows reset when this function exits (any path).
+    struct EmitWindowsGuard;
+    impl Drop for EmitWindowsGuard {
+        fn drop(&mut self) {
+            reset_streaming_emit_windows();
+        }
+    }
+    let _emit_windows_guard = EmitWindowsGuard;
     // Drop guard: clear inflight flag when this function exits (any path)
     struct InflightGuard;
     impl Drop for InflightGuard {
@@ -660,7 +770,7 @@ pub async fn send_message_stream(
         _                => 32_768,
     };
     let token_ratio = (rough_tokens as f64 / context_window as f64).min(1.0);
-    let _ = app.emit_to("main", "blade_token_ratio", serde_json::json!({
+    emit_stream_event(&app, "blade_token_ratio", serde_json::json!({
         "ratio": token_ratio,
         "tokens_used": rough_tokens,
         "context_window": context_window,
@@ -668,7 +778,7 @@ pub async fn send_message_stream(
 
     // Emit routing decision so the UI can show which model/provider is active for this request
     let hive_active = !crate::hive::get_hive_digest().is_empty();
-    let _ = app.emit_to("main", "chat_routing", serde_json::json!({
+    emit_stream_event(&app, "chat_routing", serde_json::json!({
         "provider": &config.provider,
         "model": &config.model,
         "hive_active": hive_active,
@@ -709,7 +819,7 @@ pub async fn send_message_stream(
         tokio::spawn(async move {
             match providers::stream_fast_acknowledgment(&ack_msg, &ack_config).await {
                 Ok(ack) if !ack.is_empty() => {
-                    let _ = ack_app.emit_to("main", "chat_ack", ack);
+                    emit_stream_event(&ack_app, "chat_ack", ack);
                 }
                 _ => {}
             }
@@ -754,7 +864,7 @@ pub async fn send_message_stream(
         let needs_reasoning = is_reasoning_query(&last_user_text);
         if needs_reasoning && last_user_text.split_whitespace().count() > 5 {
             let _ = app.emit("blade_status", "thinking");
-            let _ = app.emit_to("main", "blade_planning", serde_json::json!({
+            emit_stream_event(&app, "blade_planning", serde_json::json!({
                 "query": crate::safe_slice(&last_user_text, 120),
                 "mode": "deep_reasoning",
             }));
@@ -771,7 +881,7 @@ pub async fn send_message_stream(
                     // before the reasoning-engine streaming loop. Tags chat_thinking +
                     // chat_token chunks for the lifetime of this assistant turn.
                     let msg_id = uuid::Uuid::new_v4().to_string();
-                    let _ = app.emit_to("main", "blade_message_start", serde_json::json!({
+                    emit_stream_event(&app, "blade_message_start", serde_json::json!({
                         "message_id": &msg_id,
                         "role": "assistant",
                     }));
@@ -784,10 +894,10 @@ pub async fn send_message_stream(
                     // Stream the final answer as chat tokens
                     let answer = &trace.final_answer;
                     for word in answer.split_whitespace() {
-                        let _ = app.emit_to("main", "chat_token", format!("{} ", word));
+                        emit_stream_event(&app, "chat_token", format!("{} ", word));
                         tokio::task::yield_now().await;
                     }
-                    let _ = app.emit_to("main", "chat_done", ());
+                    emit_stream_event(&app, "chat_done", ());
                     let _ = app.emit("blade_status", "idle");
 
                     // Record the reasoning for solution memory
@@ -820,7 +930,7 @@ pub async fn send_message_stream(
     {
         let plan_score = count_task_steps(&last_user_text);
         if plan_score >= 3 {
-            let _ = app.emit_to("main", "blade_planning", serde_json::json!({
+            emit_stream_event(&app, "blade_planning", serde_json::json!({
                 "query": crate::safe_slice(&last_user_text, 120),
                 "step_count": plan_score,
             }));
@@ -1102,8 +1212,8 @@ pub async fn send_message_stream(
     for iteration in 0..12 {
         // Check cancellation before each iteration
         if CHAT_CANCEL.load(Ordering::SeqCst) {
-            let _ = app.emit_to("main", "chat_cancelled", ());
-            let _ = app.emit_to("main", "chat_done", ());
+            emit_stream_event(&app, "chat_cancelled", ());
+            emit_stream_event(&app, "chat_done", ());
             let _ = app.emit("blade_status", "idle");
             return Ok(());
         }
@@ -1131,7 +1241,7 @@ pub async fn send_message_stream(
                     ErrorRecovery::TruncateAndRetry => {
                         // Smart compress then retry
                         let _ = app.emit("blade_status", "processing");
-                        let _ = app.emit_to("main", "blade_notification", serde_json::json!({
+                        emit_stream_event(&app, "blade_notification", serde_json::json!({
                             "type": "info", "message": "Context too long — compressing conversation and retrying"
                         }));
                         compress_conversation_smart(
@@ -1159,7 +1269,7 @@ pub async fn send_message_stream(
                     ErrorRecovery::SwitchModelAndRetry => {
                         let fallback = safe_fallback_model(&config.provider).to_string();
                         let _ = app.emit("blade_status", "processing");
-                        let _ = app.emit_to("main", "blade_notification", serde_json::json!({
+                        emit_stream_event(&app, "blade_notification", serde_json::json!({
                             "type": "info",
                             "message": format!("Model '{}' not available — retrying with {}", config.model, fallback)
                         }));
@@ -1203,7 +1313,7 @@ pub async fn send_message_stream(
                         } else {
                             // No free model available — fall back to waiting
                             let wait = backoff_secs(secs, "rate_limit");
-                            let _ = app.emit_to("main", "blade_notification", serde_json::json!({
+                            emit_stream_event(&app, "blade_notification", serde_json::json!({
                                 "type": "info",
                                 "message": format!("Rate limited on {}. Retrying in {}s.", config.provider, wait)
                             }));
@@ -1229,7 +1339,7 @@ pub async fn send_message_stream(
                             return Err("Server overload circuit breaker tripped — provider is consistently unavailable. Try again later or switch providers.".to_string());
                         }
                         let wait = backoff_secs(5, "overloaded");
-                        let _ = app.emit_to("main", "blade_notification", serde_json::json!({
+                        emit_stream_event(&app, "blade_notification", serde_json::json!({
                             "type": "info", "message": format!("Server overloaded — retrying in {}s", wait)
                         }));
                         tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
@@ -1258,7 +1368,7 @@ pub async fn send_message_stream(
                                     let fb_model = crate::router::suggest_model(&fb_prov, &crate::router::TaskType::Complex)
                                         .unwrap_or_else(|| config.model.clone());
                                     let _ = app.emit("blade_status", "processing");
-                                    let _ = app.emit_to("main", "blade_notification", serde_json::json!({
+                                    emit_stream_event(&app, "blade_notification", serde_json::json!({
                                         "type": "info",
                                         "message": format!("Switching to {} (fallback)", fb_prov)
                                     }));
@@ -1300,7 +1410,7 @@ pub async fn send_message_stream(
             // the assistant turn streams. Reset thinking-chunk tagging via env var
             // (D-64 — providers/anthropic.rs reads BLADE_CURRENT_MSG_ID for WIRE-04).
             let msg_id = uuid::Uuid::new_v4().to_string();
-            let _ = app.emit_to("main", "blade_message_start", serde_json::json!({
+            emit_stream_event(&app, "blade_message_start", serde_json::json!({
                 "message_id": &msg_id,
                 "role": "assistant",
             }));
@@ -1329,7 +1439,7 @@ pub async fn send_message_stream(
                     buf.push(ch);
                     // Emit on natural boundaries: space, newline, or every 6 chars
                     if ch == ' ' || ch == '\n' || buf.len() >= 6 {
-                        let _ = app.emit_to("main", "chat_token", buf.clone());
+                        emit_stream_event(&app, "chat_token", buf.clone());
                         buf.clear();
                         // Yield to the async runtime so the IPC channel flushes this chunk
                         // before the next one — this produces a real streaming feel.
@@ -1337,14 +1447,14 @@ pub async fn send_message_stream(
                     }
                 }
                 if !buf.is_empty() {
-                    let _ = app.emit_to("main", "chat_token", buf);
+                    emit_stream_event(&app, "chat_token", buf);
                 }
             } else {
                 // AI returned an empty response after tool calls — emit a brief fallback
                 // so the user doesn't see a blank assistant bubble.
-                let _ = app.emit_to("main", "chat_token", "Done.".to_string());
+                emit_stream_event(&app, "chat_token", "Done.".to_string());
             }
-            let _ = app.emit_to("main", "chat_done", ());
+            emit_stream_event(&app, "chat_done", ());
             let _ = app.emit("blade_status", "idle");
 
             // Complete prefrontal working memory so follow-up messages
@@ -1661,7 +1771,7 @@ pub async fn send_message_stream(
                     ).await;
                     match decision {
                         crate::ai_delegate::DelegateDecision::Approved { reasoning } => {
-                            let _ = app.emit_to("main", "ai_delegate_approved", serde_json::json!({
+                            emit_stream_event(&app, "ai_delegate_approved", serde_json::json!({
                                 "tool": &tool_call.name,
                                 "delegate": &delegate,
                                 "reasoning": reasoning,
@@ -1669,7 +1779,7 @@ pub async fn send_message_stream(
                             true
                         }
                         crate::ai_delegate::DelegateDecision::Denied { reasoning } => {
-                            let _ = app.emit_to("main", "ai_delegate_denied", serde_json::json!({
+                            emit_stream_event(&app, "ai_delegate_denied", serde_json::json!({
                                 "tool": &tool_call.name,
                                 "delegate": &delegate,
                                 "reasoning": reasoning,
@@ -1933,8 +2043,8 @@ pub async fn send_message_stream(
     // Check cancel flag before firing the final summary call —
     // the user may have hit stop during the last tool iteration.
     if CHAT_CANCEL.load(Ordering::SeqCst) {
-        let _ = app.emit_to("main", "chat_cancelled", ());
-        let _ = app.emit_to("main", "chat_done", ());
+        emit_stream_event(&app, "chat_cancelled", ());
+        emit_stream_event(&app, "chat_done", ());
         let _ = app.emit("blade_status", "idle");
         return Ok(());
     }
@@ -2546,39 +2656,112 @@ pub async fn get_wallpaper_path() -> Result<String, String> {
     Err("Unsupported platform".to_string())
 }
 
-// ── QuickAsk Bridge (Phase 3 WIRE-01 stub) ─────────────────────────────────────
+// ── QuickAsk Bridge (Phase 3 WIRE-01 / Phase 4 full bridge D-93) ───────────────
 
-/// WIRE-01 — Phase 3 stub.
-/// QuickAsk window calls this with a typed/transcribed query; we emit
-/// `blade_quickask_bridged` to the main window so it can open the chat
-/// panel with the bridged conversation. Phase 4 will fill in the actual
-/// provider call + history persistence; Phase 3 ships the stub so the
-/// frontend bridge plumbing can be wired and tested end-to-end.
+/// WIRE-01 — Phase 3 stub → Phase 4 full bridge (D-93, D-100, Plan 04-01).
+///
+/// QuickAsk window calls this with a typed/transcribed query; we:
+///   1. Emit `blade_quickask_bridged` to the main window — main inserts the
+///      user turn into `useChat().messages` optimistically (Plan 04-06
+///      QuickAskBridge consumer).
+///   2. Emit `blade_message_start` to BOTH "main" AND "quickask" so both
+///      windows render the "assistant is thinking" state. The QuickAsk popup
+///      sees the live stream inline; main sees the conversation appended.
+///   3. Stash the `message_id` in BLADE_CURRENT_MSG_ID so
+///      providers/anthropic.rs can tag `blade_thinking_chunk` with it
+///      (Phase 3 D-64 continuation).
+///   4. Spawn `send_message_stream_inline` with `emit_windows = ["main",
+///      "quickask"]` — every user-visible stream event (chat_token /
+///      chat_done / etc.) reaches both surfaces. Provider errors surface as a
+///      `blade_notification` toast on the main window.
+///
+/// Serialization: `send_message_stream_inline` holds CHAT_INFLIGHT for the
+/// duration of the stream, so concurrent quickask submissions while a chat is
+/// in flight will return "Already processing a message." — acceptable UX.
 ///
 /// @see .planning/RECOVERY_LOG.md §1.1 (bridge contract)
 /// @see .planning/phases/03-dashboard-chat-settings/03-CONTEXT.md §D-64
+/// @see .planning/phases/04-overlay-windows/04-CONTEXT.md §D-93, §D-100
 #[tauri::command]
 pub async fn quickask_submit(
     app: tauri::AppHandle,
+    state: tauri::State<'_, SharedMcpManager>,
+    approvals: tauri::State<'_, ApprovalMap>,
+    vector_store: tauri::State<'_, crate::embeddings::SharedVectorStore>,
     query: String,
     mode: String,            // "text" | "voice"
     source_window: String,   // typically "quickask"
 ) -> Result<(), String> {
     let conversation_id = uuid::Uuid::new_v4().to_string();
+    let message_id = uuid::Uuid::new_v4().to_string();
+    let user_message_id = uuid::Uuid::new_v4().to_string();
     let timestamp = chrono::Utc::now().timestamp_millis();
     log::info!(
-        "[quickask] submit from window={} mode={} query_len={} conv_id={}",
-        source_window, mode, query.len(), conversation_id,
+        "[quickask] submit from window={} mode={} query_len={} conv_id={} msg_id={}",
+        source_window,
+        mode,
+        query.len(),
+        conversation_id,
+        message_id,
     );
 
-    // Phase 3 stub emit — bridge contract per RECOVERY_LOG.md §1.1.
-    // `response` is empty in Phase 3; Phase 4 fills it once provider call lands.
+    // 1. Bridge event — main inserts the user turn optimistically (Plan 04-06).
     let _ = app.emit_to("main", "blade_quickask_bridged", serde_json::json!({
         "query": query,
         "response": "",
         "conversation_id": conversation_id,
         "mode": mode,
         "timestamp": timestamp,
+        "message_id": message_id,
+        "user_message_id": user_message_id,
+        "source_window": source_window,
     }));
+
+    // 2. blade_message_start to BOTH windows (D-93 step 4).
+    //    QuickAsk renders the live stream inline; main appends the assistant turn.
+    let _ = app.emit_to("main", "blade_message_start", serde_json::json!({
+        "message_id": &message_id,
+        "role": "assistant",
+    }));
+    let _ = app.emit_to("quickask", "blade_message_start", serde_json::json!({
+        "message_id": &message_id,
+        "role": "assistant",
+    }));
+
+    // 3. Stash msg_id for providers/anthropic.rs thinking-chunk tagging (D-64).
+    std::env::set_var("BLADE_CURRENT_MSG_ID", &message_id);
+
+    // 4. Build the single-turn user message — quickask is stateless per submit.
+    let messages = vec![ChatMessage {
+        role: "user".to_string(),
+        content: query.clone(),
+        image_base64: None,
+    }];
+
+    // 5. Spawn the streaming pipeline with dual-window emit (D-93, D-100).
+    let app_clone = app.clone();
+    let state_clone = state.inner().clone();
+    let approvals_clone = approvals.inner().clone();
+    let vector_store_clone = vector_store.inner().clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = send_message_stream_inline(
+            app_clone.clone(),
+            state_clone,
+            approvals_clone,
+            vector_store_clone,
+            messages,
+            &["main", "quickask"],
+        )
+        .await
+        {
+            log::warn!("[quickask] stream error: {}", e);
+            let _ = app_clone.emit_to("main", "blade_notification", serde_json::json!({
+                "type": "error",
+                "message": format!("Quick ask failed: {}", crate::safe_slice(&e, 200)),
+            }));
+        }
+    });
+
+    // Frontend (D-101) handles auto-hide after chat_done; nothing more to do here.
     Ok(())
 }
