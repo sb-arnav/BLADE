@@ -604,3 +604,113 @@ export interface WatcherAlertPayload {
   timestamp: number;
   [k: string]: unknown;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 8 Plan 08-01 additions — Body + Hive lifecycle payloads.
+//
+// Every interface below matches a Rust emit site confirmed by grep audit at
+// .planning/phases/08-body-hive/08-CONTEXT.md §code_context. Field names
+// mirror Rust `serde_json::json!` / struct keys verbatim (snake_case).
+//
+// Every interface carries `[k: string]: unknown` per D-38-payload accepted
+// drift risk.
+//
+// @see src-tauri/src/hive.rs:2304,2509,2530,2600,2603,2686,2723,2763,2780,2813
+// @see src-tauri/src/world_model.rs:869
+// ---------------------------------------------------------------------------
+
+/** Mirrors Rust emit at `src-tauri/src/hive.rs:2600` (hive_tick).
+ *  Fires every 30s on hive tick cadence; HiveMesh subscribes to refresh
+ *  status indicators without full reload (D-204). */
+export interface HiveTickPayload {
+  running: boolean;
+  last_tick: number;
+  total_reports_processed: number;
+  total_actions_taken: number;
+  pending_decisions: number;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/hive.rs:2723,2780` (hive_action).
+ *  Fires when the hive executes an action (reply/post/create/etc.); HiveMesh
+ *  + ApprovalQueue subscribe for toast + optimistic queue removal (D-204, D-205). */
+export interface HiveActionPayload {
+  action: string;
+  platform: string;
+  head_id?: string;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/hive.rs:2813` (hive_escalate).
+ *  Fires when hive needs user decision; ApprovalQueue subscribes + surfaces
+ *  a cross-window toast (D-205). */
+export interface HiveEscalatePayload {
+  reason: string;
+  context: string;
+  head_id?: string;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/hive.rs:2686` (hive_inform).
+ *  Fires when hive surfaces informational content to the user; HiveMesh
+ *  subscribes for non-blocking info toast (D-204). */
+export interface HiveInformPayload {
+  summary: string;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/hive.rs:2603` (hive_pending_decisions).
+ *  Fires when the pending-decisions count changes on any head; ApprovalQueue
+ *  subscribes to refresh its queue view (D-205). */
+export interface HivePendingDecisionsPayload {
+  count: number;
+  head_id?: string;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/hive.rs:2509` (hive_ci_failure).
+ *  Fires on CI failure detection; HiveMesh subscribes for alert toast (D-204). */
+export interface HiveCiFailurePayload {
+  repo?: string;
+  branch?: string;
+  error?: string;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/hive.rs:2530` (hive_auto_fix_started).
+ *  Fires when the auto-fix pipeline kicks off after a detected CI failure;
+ *  HiveMesh subscribes for pipeline status toast (D-204). */
+export interface HiveAutoFixStartedPayload {
+  pipeline_id?: string;
+  repo?: string;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/hive.rs:2763` (hive_action_deferred).
+ *  Fires when hive defers an action (awaiting approval or downgraded autonomy);
+ *  ApprovalQueue subscribes to insert deferred entries (D-205). */
+export interface HiveActionDeferredPayload {
+  action: string;
+  platform: string;
+  reason?: string;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/hive.rs:2304` (tentacle_error).
+ *  Fires when a tentacle enters Error status; HiveMesh + TentacleDetail
+ *  subscribe to update status chip + surface error context (D-204). */
+export interface TentacleErrorPayload {
+  tentacle_id: string;
+  platform: string;
+  error: string;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/world_model.rs:869` (world_state_updated).
+ *  Fires on background world-model refresh loop; WorldModel subscribes to
+ *  pull fresh snapshot without manual refresh click (D-203). Rust emits a
+ *  short summary string (world_get_summary()); payload kept generic. */
+export interface WorldStateUpdatedPayload {
+  summary?: string;
+  [k: string]: unknown;
+}
