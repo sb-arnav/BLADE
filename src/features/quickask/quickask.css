@@ -1,0 +1,115 @@
+/* src/features/quickask/quickask.css — QuickAsk window scoped styles
+ *
+ * Blur discipline:
+ *   - .quickask (text mode) uses blur(20px) — within the D-07 tier-1 cap.
+ *   - .qa-voice (voice mode) uses blur(48px) — the D-18 documented
+ *     exception. This is the ONE place in the codebase allowed to exceed
+ *     the 20/12/8px ceiling. Do NOT copy this value anywhere else; the
+ *     exception is window-specific (source: docs/design/quickask-voice.html).
+ *
+ * Tauri 2 ships modern WebViews (WebView2 on Windows, WKWebView on macOS,
+ * WebKitGTK on Linux) — all support the standard `backdrop-filter` without
+ * the `-webkit-` prefix. The unprefixed property is used here to keep
+ * exactly 2 backdrop-filter declarations (one per mode) and simplify the
+ * verification grep. See .planning/phases/04-overlay-windows/04-02-PLAN.md
+ * verification step 7.
+ *
+ * @see .planning/phases/04-overlay-windows/04-CONTEXT.md §D-07, §D-18, §D-98
+ */
+
+/* D-18 documented exception — blur(48px) on .qa-voice ONLY. Do not use elsewhere. */
+
+/* ── Shell (shared by both modes) ─────────────────────────────────────── */
+.quickask {
+  position: relative;
+  padding: 12px 16px;
+  margin: 12px;
+  background: var(--g-fill);
+  border: 1px solid var(--g-edge-mid);
+  backdrop-filter: blur(20px) saturate(160%);
+  border-radius: var(--r-lg);
+  color: var(--t-1);
+  font-family: var(--font-body);
+  box-shadow: var(--g-rim), var(--g-shadow-md);
+}
+.quickask[data-mode='text'] { min-height: 64px; }
+.quickask[data-mode='voice'] {
+  /* Voice mode uses a transparent shell so the inner .qa-voice card owns
+   * the glass treatment (single-layer rule for the D-18 blur exception). */
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+/* ── Text mode ───────────────────────────────────────────────────────── */
+.quickask-text {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.quickask-response {
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--t-1);
+  white-space: pre-wrap;
+  min-height: 20px;
+}
+
+.quickask-history {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.quickask-history button {
+  font: inherit;
+  text-align: left;
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--g-fill-weak);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  color: var(--t-2);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.quickask-history button:hover {
+  background: var(--g-fill);
+  color: var(--t-1);
+}
+.quickask-history button:focus-visible {
+  outline: 2px solid var(--a-cool);
+  outline-offset: 2px;
+}
+
+/* ── Voice mode — D-18 EXCEPTION: blur(48px) is intentional, sole layer ── */
+.qa-voice {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 28px 32px 24px;
+  margin: 12px;
+  background: linear-gradient(180deg, rgba(10, 8, 20, 0.62) 0%, rgba(10, 8, 20, 0.52) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(48px) saturate(200%);
+  border-radius: 24px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 30px 60px rgba(0, 0, 0, 0.45);
+}
+.qa-voice-hint {
+  font-size: 12px;
+  color: var(--t-3);
+  margin: 0;
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
