@@ -13,8 +13,7 @@
 // @see src/lib/tauri/admin.ts (supervisor*, trace*, authority*, deep_scan*, config*)
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Dialog, GlassPanel, GlassSpinner, Input, EmptyState } from '@/design-system/primitives';
-import { ListSkeleton } from '@/design-system/primitives/ListSkeleton';
+import { Button, Dialog, GlassPanel, GlassSpinner, Input, EmptyState, ListSkeleton } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import { usePrefs } from '@/hooks/usePrefs';
 import {

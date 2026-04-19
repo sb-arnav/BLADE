@@ -16,8 +16,7 @@
 // @see .planning/REQUIREMENTS.md §BODY-04
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Dialog, GlassPanel, GlassSpinner, Pill, EmptyState } from '@/design-system/primitives';
-import { ListSkeleton } from '@/design-system/primitives/ListSkeleton';
+import { Button, Dialog, GlassPanel, GlassSpinner, Pill, EmptyState, ListSkeleton } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import { organGetRegistry, organGetRoster, organSetAutonomy } from '@/lib/tauri/body';
 import type { OrganCapability, OrganStatus } from '@/lib/tauri/body';

@@ -9,9 +9,10 @@
 // wait without interrupting (non-blocking). prefers-reduced-motion disables
 // the shimmer (see primitives.css .list-skeleton-row @media rule).
 //
-// Barrel export is deferred to Plan 09-06 per D-229 (Wave 2 disjoint-files
-// invariant — Plan 09-02 owns index.ts in Wave 2). Consumers in Plan 09-04
-// import directly: `import { ListSkeleton } from '@/design-system/primitives/ListSkeleton';`
+// Barrel export landed in Plan 09-06 Task 3b (D-229 closure); Plan 09-04
+// Wave 2 shipped direct imports to preserve the disjoint-files invariant,
+// then Plan 09-06 Wave 4 added the barrel re-export + rewrote every
+// consumer to `import { ListSkeleton } from '@/design-system/primitives';`.
 //
 // @see .planning/phases/09-polish/09-PATTERNS.md §3
 // @see .planning/phases/09-polish/09-CONTEXT.md §D-220
