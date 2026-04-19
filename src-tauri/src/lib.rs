@@ -448,6 +448,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::send_message_stream,
             commands::cancel_chat,
+            commands::quickask_submit,   // WIRE-01 stub — Phase 3 Plan 03-01
             roles::roles_list,
             roles::roles_get_active,
             roles::roles_set_active,

@@ -579,6 +579,13 @@ pub async fn send_message_stream(
     // Reset cancel flag at the start of every new request
     CHAT_CANCEL.store(false, Ordering::SeqCst);
 
+    // Phase 3 WIRE-03 (Plan 03-01, D-64): tracks the current assistant turn's
+    // message_id so the same id can be set in BLADE_CURRENT_MSG_ID env var below
+    // for `blade_thinking_chunk` tagging in providers/anthropic.rs (WIRE-04).
+    // Reset on each new turn (first emit before token loop).
+    #[allow(unused_assignments)]
+    let mut current_message_id: Option<String> = None;
+
     let _ = app.emit("blade_status", "processing");
 
     let mut config = load_config();
@@ -614,27 +621,50 @@ pub async fn send_message_stream(
     // Context-length aware routing: if conversation is already very long,
     // switch to a long-context model rather than hitting a context-overflow error later.
     // Gemini Flash (1M tokens) is the safest bet for huge contexts at low cost.
-    {
-        let rough_tokens = messages.iter().map(|m| {
-            m.content.len() / 4 + m.image_base64.as_ref().map(|_| 2000).unwrap_or(0)
-        }).sum::<usize>();
-        if rough_tokens > 80_000 && config.base_url.is_none() && config.provider != "openrouter" && config.provider != "ollama" {
-            // Long conversation — route to long-context model if available.
-            // Skip when base_url is set or on OpenRouter/Ollama: we don't know what
-            // models that endpoint supports and the user chose their model deliberately.
-            let gemini_key = crate::config::get_provider_key("gemini");
-            if !gemini_key.is_empty() && config.provider != "gemini" {
-                config.provider = "gemini".to_string();
-                config.api_key = gemini_key;
-                config.model = "gemini-2.0-flash".to_string();
-            } else if config.provider == "anthropic" {
-                // Stay on Anthropic but use the higher-context Sonnet, not Haiku
-                if config.model.contains("haiku") {
-                    config.model = "claude-sonnet-4-20250514".to_string();
-                }
+    //
+    // Phase 3 WIRE-06 (Plan 03-01, D-64): rough_tokens is hoisted OUT of this scope
+    // so it can also feed the `blade_token_ratio` emit immediately below the routing
+    // logic. The routing logic is unchanged.
+    let rough_tokens: usize = messages.iter().map(|m| {
+        m.content.len() / 4 + m.image_base64.as_ref().map(|_| 2000).unwrap_or(0)
+    }).sum::<usize>();
+    if rough_tokens > 80_000 && config.base_url.is_none() && config.provider != "openrouter" && config.provider != "ollama" {
+        // Long conversation — route to long-context model if available.
+        // Skip when base_url is set or on OpenRouter/Ollama: we don't know what
+        // models that endpoint supports and the user chose their model deliberately.
+        let gemini_key = crate::config::get_provider_key("gemini");
+        if !gemini_key.is_empty() && config.provider != "gemini" {
+            config.provider = "gemini".to_string();
+            config.api_key = gemini_key;
+            config.model = "gemini-2.0-flash".to_string();
+        } else if config.provider == "anthropic" {
+            // Stay on Anthropic but use the higher-context Sonnet, not Haiku
+            if config.model.contains("haiku") {
+                config.model = "claude-sonnet-4-20250514".to_string();
             }
         }
     }
+
+    // Phase 3 WIRE-06 (Plan 03-01): emit `blade_token_ratio` so the chat compacting
+    // indicator (D-73) can render at ratio > 0.65. Single emit per send_message_stream
+    // call (NOT per token) — see threat T-03-01-04 (DoS analysis).
+    //
+    // Context window per provider/model — kept inline for the 5 known providers;
+    // expand later when provider/model registry is centralized (deferred per D-66).
+    let context_window: usize = match (config.provider.as_str(), config.model.as_str()) {
+        ("anthropic", _) => 200_000,
+        ("openai", _)    => 128_000,
+        ("gemini", _)    => 1_000_000,
+        ("groq", _)      => 131_072,
+        ("ollama", _)    => 8_192,
+        _                => 32_768,
+    };
+    let token_ratio = (rough_tokens as f64 / context_window as f64).min(1.0);
+    let _ = app.emit_to("main", "blade_token_ratio", serde_json::json!({
+        "ratio": token_ratio,
+        "tokens_used": rough_tokens,
+        "context_window": context_window,
+    }));
 
     // Emit routing decision so the UI can show which model/provider is active for this request
     let hive_active = !crate::hive::get_hive_digest().is_empty();
@@ -737,6 +767,20 @@ pub async fn send_message_stream(
                 app.clone(),
             ).await {
                 Ok(trace) => {
+                    // Phase 3 WIRE-03 (Plan 03-01): emit blade_message_start once
+                    // before the reasoning-engine streaming loop. Tags chat_thinking +
+                    // chat_token chunks for the lifetime of this assistant turn.
+                    let msg_id = uuid::Uuid::new_v4().to_string();
+                    let _ = app.emit_to("main", "blade_message_start", serde_json::json!({
+                        "message_id": &msg_id,
+                        "role": "assistant",
+                    }));
+                    // Phase 3 WIRE-04 sidecar: expose msg_id via env var so
+                    // providers/anthropic.rs can tag blade_thinking_chunk with it
+                    // (best-effort fallback per D-64; Phase 4 wires a real channel).
+                    std::env::set_var("BLADE_CURRENT_MSG_ID", &msg_id);
+                    current_message_id = Some(msg_id);
+
                     // Stream the final answer as chat tokens
                     let answer = &trace.final_answer;
                     for word in answer.split_whitespace() {
@@ -1252,6 +1296,17 @@ pub async fn send_message_stream(
         });
 
         if turn.tool_calls.is_empty() {
+            // Phase 3 WIRE-03 (Plan 03-01): emit blade_message_start once before
+            // the assistant turn streams. Reset thinking-chunk tagging via env var
+            // (D-64 — providers/anthropic.rs reads BLADE_CURRENT_MSG_ID for WIRE-04).
+            let msg_id = uuid::Uuid::new_v4().to_string();
+            let _ = app.emit_to("main", "blade_message_start", serde_json::json!({
+                "message_id": &msg_id,
+                "role": "assistant",
+            }));
+            std::env::set_var("BLADE_CURRENT_MSG_ID", &msg_id);
+            current_message_id = Some(msg_id);
+
             // Extract and execute semantic action tags before emitting to frontend.
             // clean_content has [ACTION:...] tags stripped; actions are dispatched async.
             let (clean_content, parsed_actions) = crate::action_tags::extract_actions(&turn.content);
@@ -2489,4 +2544,41 @@ pub async fn get_wallpaper_path() -> Result<String, String> {
     }
     #[allow(unreachable_code)]
     Err("Unsupported platform".to_string())
+}
+
+// ── QuickAsk Bridge (Phase 3 WIRE-01 stub) ─────────────────────────────────────
+
+/// WIRE-01 — Phase 3 stub.
+/// QuickAsk window calls this with a typed/transcribed query; we emit
+/// `blade_quickask_bridged` to the main window so it can open the chat
+/// panel with the bridged conversation. Phase 4 will fill in the actual
+/// provider call + history persistence; Phase 3 ships the stub so the
+/// frontend bridge plumbing can be wired and tested end-to-end.
+///
+/// @see .planning/RECOVERY_LOG.md §1.1 (bridge contract)
+/// @see .planning/phases/03-dashboard-chat-settings/03-CONTEXT.md §D-64
+#[tauri::command]
+pub async fn quickask_submit(
+    app: tauri::AppHandle,
+    query: String,
+    mode: String,            // "text" | "voice"
+    source_window: String,   // typically "quickask"
+) -> Result<(), String> {
+    let conversation_id = uuid::Uuid::new_v4().to_string();
+    let timestamp = chrono::Utc::now().timestamp_millis();
+    log::info!(
+        "[quickask] submit from window={} mode={} query_len={} conv_id={}",
+        source_window, mode, query.len(), conversation_id,
+    );
+
+    // Phase 3 stub emit — bridge contract per RECOVERY_LOG.md §1.1.
+    // `response` is empty in Phase 3; Phase 4 fills it once provider call lands.
+    let _ = app.emit_to("main", "blade_quickask_bridged", serde_json::json!({
+        "query": query,
+        "response": "",
+        "conversation_id": conversation_id,
+        "mode": mode,
+        "timestamp": timestamp,
+    }));
+    Ok(())
 }
