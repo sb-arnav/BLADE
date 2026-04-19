@@ -496,6 +496,17 @@ pub fn dna_get_identity() -> String {
     get_identity()
 }
 
+/// Write the user's identity to persona.md under the blade config dir.
+/// Plan 09-01 closes Phase 8 D-203 deferral.
+///
+/// Uses write_blade_file which creates parent dir + sets 0o600 mode on Unix.
+/// Identity is a single fixed filename (persona.md) — no path traversal vector.
+#[tauri::command]
+pub fn dna_set_identity(content: String) -> Result<(), String> {
+    let persona_path = blade_config_dir().join("persona.md");
+    crate::config::write_blade_file(&persona_path, &content)
+}
+
 #[tauri::command]
 pub fn dna_get_goals() -> String {
     get_goals()

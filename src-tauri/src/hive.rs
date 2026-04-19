@@ -3334,6 +3334,28 @@ pub fn hive_approve_decision(
     approve_decision(&head_id, decision_index)
 }
 
+/// Reject a pending decision — removes it from the head's queue without
+/// executing the action. Plan 09-01 closes Phase 8 D-205 deferral.
+///
+/// Semantics: drop the decision on the floor. NO downstream dispatch.
+#[tauri::command]
+pub fn hive_reject_decision(
+    head_id: String,
+    decision_index: usize,
+) -> Result<(), String> {
+    let mut hive = hive_lock().lock().unwrap_or_else(|e| e.into_inner());
+    let head = hive
+        .heads
+        .get_mut(&head_id)
+        .ok_or_else(|| format!("Unknown head: {}", head_id))?;
+    if decision_index >= head.pending_decisions.len() {
+        return Err(format!("Decision index {} out of range", decision_index));
+    }
+    // Drop on the floor — reject = remove without execution.
+    let _rejected = head.pending_decisions.remove(decision_index);
+    Ok(())
+}
+
 #[tauri::command]
 pub fn hive_set_autonomy(level: f32) -> Result<(), String> {
     set_autonomy(level);
