@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# scripts/verify-feature-cluster-routes.sh — Phase 5 + Phase 6 + Phase 7 regression guard.
+# scripts/verify-feature-cluster-routes.sh — Phase 5 + 6 + 7 + 8 regression guard.
 #
 # Asserts that the agents + knowledge + life-os + identity + dev-tools + admin
-# cluster feature indexes lazy-import real per-route components (NOT
-# ComingSoonSkeleton stubs), and that every Phase 5 + Phase 6 + Phase 7
-# per-route file exists on disk. Catches accidental reversion to skeletons or
-# route-file deletion on future refactors (D-122 / D-143 / D-170 single-writer
-# + D-120 / D-141 / D-168 real surface invariants).
+# + body + hive cluster feature indexes lazy-import real per-route components
+# (NOT ComingSoonSkeleton stubs), and that every Phase 5 + 6 + 7 + 8 per-route
+# file exists on disk. Catches accidental reversion to skeletons or route-file
+# deletion on future refactors (D-122 / D-143 / D-170 / D-199 single-writer +
+# D-120 / D-141 / D-168 / D-197 real surface invariants).
 #
-# Runtime: ~80ms (a few greps + existence checks).
+# Runtime: ~100ms (a few greps + existence checks).
 #
 # @see .planning/phases/05-agents-knowledge/05-CONTEXT.md §D-120, §D-122
 # @see .planning/phases/05-agents-knowledge/05-07-PLAN.md Task 2
@@ -16,6 +16,8 @@
 # @see .planning/phases/06-life-os-identity/06-07-PLAN.md Task 2
 # @see .planning/phases/07-dev-tools-admin/07-CONTEXT.md §D-168, §D-170
 # @see .planning/phases/07-dev-tools-admin/07-07-PLAN.md Task 2
+# @see .planning/phases/08-body-hive/08-CONTEXT.md §D-197, §D-199
+# @see .planning/phases/08-body-hive/08-05-PLAN.md Task 2
 
 set -euo pipefail
 
@@ -25,8 +27,10 @@ LIFEOS_INDEX="src/features/life-os/index.tsx"
 IDENTITY_INDEX="src/features/identity/index.tsx"
 DEVTOOLS_INDEX="src/features/dev-tools/index.tsx"
 ADMIN_INDEX="src/features/admin/index.tsx"
+BODY_INDEX="src/features/body/index.tsx"
+HIVE_INDEX="src/features/hive/index.tsx"
 
-for idx in "$AGENTS_INDEX" "$KNOWLEDGE_INDEX" "$LIFEOS_INDEX" "$IDENTITY_INDEX" "$DEVTOOLS_INDEX" "$ADMIN_INDEX"; do
+for idx in "$AGENTS_INDEX" "$KNOWLEDGE_INDEX" "$LIFEOS_INDEX" "$IDENTITY_INDEX" "$DEVTOOLS_INDEX" "$ADMIN_INDEX" "$BODY_INDEX" "$HIVE_INDEX"; do
   if [ ! -f "$idx" ]; then
     echo "[verify-feature-cluster-routes] ERROR: cluster index file missing: $idx" >&2
     exit 2
@@ -35,13 +39,13 @@ done
 
 ERRORS=0
 
-for f in "$AGENTS_INDEX" "$KNOWLEDGE_INDEX" "$LIFEOS_INDEX" "$IDENTITY_INDEX" "$DEVTOOLS_INDEX" "$ADMIN_INDEX"; do
+for f in "$AGENTS_INDEX" "$KNOWLEDGE_INDEX" "$LIFEOS_INDEX" "$IDENTITY_INDEX" "$DEVTOOLS_INDEX" "$ADMIN_INDEX" "$BODY_INDEX" "$HIVE_INDEX"; do
   # D-120 / D-168: cluster indexes ship real lazy imports; ComingSoonSkeleton
   # must be gone. Strip // line comments before grepping so header prose
   # mentioning the class name doesn't false-positive.
   if sed 's|//.*$||' "$f" | grep -q 'ComingSoonSkeleton'; then
     echo "[verify-feature-cluster-routes] ERROR: $f still references ComingSoonSkeleton in code" >&2
-    echo "  Phase 5/6/7 replaced skeletons with real lazy imports (D-120, D-141, D-168)." >&2
+    echo "  Phase 5/6/7/8 replaced skeletons with real lazy imports (D-120, D-141, D-168, D-197)." >&2
     ERRORS=$((ERRORS + 1))
   fi
   # Must use React.lazy for per-route component imports.
@@ -206,9 +210,55 @@ for name in "${ADMIN_FILES[@]}"; do
   fi
 done
 
+# ─────────────────────────────────────────────────────────────────────
+# Per-route file existence — 6 body + 5 hive routes (D-210 layout).
+# Phase 8 ships 6+5 real per-route files owned exclusively by each plan's
+# lane (Plan 08-03 owns body/, Plan 08-04 owns hive/). Plan 08-02 is the
+# sole writer of the two cluster index.tsx files (D-199). Placeholder
+# reversion on any file would fail this guard.
+# ─────────────────────────────────────────────────────────────────────
+BODY_FILES=(
+  "BodyMap"
+  "BodySystemDetail"
+  "HormoneBus"
+  "OrganRegistry"
+  "DNA"
+  "WorldModel"
+)
+for name in "${BODY_FILES[@]}"; do
+  path="src/features/body/${name}.tsx"
+  if [ ! -f "$path" ]; then
+    echo "[verify-feature-cluster-routes] ERROR: missing $path" >&2
+    echo "  Required by Phase 8 Plan 08-03 (D-210)." >&2
+    ERRORS=$((ERRORS + 1))
+  elif ! grep -q "export function $name" "$path" && ! grep -q "export const $name" "$path"; then
+    echo "[verify-feature-cluster-routes] ERROR: $path does not export named component \`$name\`" >&2
+    ERRORS=$((ERRORS + 1))
+  fi
+done
+
+HIVE_FILES=(
+  "HiveMesh"
+  "TentacleDetail"
+  "AutonomyControls"
+  "ApprovalQueue"
+  "AiDelegate"
+)
+for name in "${HIVE_FILES[@]}"; do
+  path="src/features/hive/${name}.tsx"
+  if [ ! -f "$path" ]; then
+    echo "[verify-feature-cluster-routes] ERROR: missing $path" >&2
+    echo "  Required by Phase 8 Plan 08-04 (D-210)." >&2
+    ERRORS=$((ERRORS + 1))
+  elif ! grep -q "export function $name" "$path" && ! grep -q "export const $name" "$path"; then
+    echo "[verify-feature-cluster-routes] ERROR: $path does not export named component \`$name\`" >&2
+    ERRORS=$((ERRORS + 1))
+  fi
+done
+
 if [ "$ERRORS" -gt 0 ]; then
   echo "[verify-feature-cluster-routes] FAIL — $ERRORS error(s) above" >&2
   exit 1
 fi
 
-echo "[verify-feature-cluster-routes] OK — all 55 Phase 5+6+7 routes present; clusters wired via lazy imports."
+echo "[verify-feature-cluster-routes] OK — all 66 Phase 5+6+7+8 routes present; clusters wired via lazy imports."
