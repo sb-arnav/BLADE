@@ -45,9 +45,11 @@ function shortcutMatches(def: string, e: KeyboardEvent): boolean {
 
 interface UseGlobalShortcutsArgs {
   openPalette: () => void;
+  /** Phase 9 Plan 09-05 (D-222) — ⌘? shortcut help handler. */
+  openShortcutHelp: () => void;
 }
 
-export function useGlobalShortcuts({ openPalette }: UseGlobalShortcutsArgs) {
+export function useGlobalShortcuts({ openPalette, openShortcutHelp }: UseGlobalShortcutsArgs) {
   const { openRoute, back, forward } = useRouterCtx();
 
   useEffect(() => {
@@ -60,6 +62,16 @@ export function useGlobalShortcuts({ openPalette }: UseGlobalShortcutsArgs) {
       if (mod && (e.key === 'k' || e.key === 'K')) {
         e.preventDefault();
         openPalette();
+        return;
+      }
+
+      // Phase 9 Plan 09-05 (D-222) — ⌘? shortcut help panel.
+      // On US-QWERTY the `?` key is Shift+/, so some OSes report e.key === '?'
+      // and others report e.key === '/' with shiftKey true. Handle both.
+      // Also allowed inside editable targets so the help panel is always reachable.
+      if (mod && e.shiftKey && (e.key === '?' || e.key === '/')) {
+        e.preventDefault();
+        openShortcutHelp();
         return;
       }
 
@@ -107,5 +119,5 @@ export function useGlobalShortcuts({ openPalette }: UseGlobalShortcutsArgs) {
 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [openPalette, openRoute, back, forward]);
+  }, [openPalette, openShortcutHelp, openRoute, back, forward]);
 }
