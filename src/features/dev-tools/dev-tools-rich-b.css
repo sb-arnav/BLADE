@@ -1,0 +1,588 @@
+/* src/features/dev-tools/dev-tools-rich-b.css — Plan 07-04 scoped partial
+   Extends dev-tools.css with per-route layout partials for WebAutomation,
+   EmailAssistant, DocumentGenerator, CodeSandbox, ComputerUse.
+   Uses the same token names (--s-*, --r-*, --status-*) as dev-tools.css.
+   @see .planning/phases/07-dev-tools-admin/07-04-PLAN.md
+   @see .planning/phases/07-dev-tools-admin/07-PATTERNS.md §9 */
+
+@layer features {
+  /* ══════════════════════════════════════════════════════════════════════
+     WebAutomation (DEV-06) — split layout: left inputs, right live trace.
+     ══════════════════════════════════════════════════════════════════════ */
+  .web-automation-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s-2);
+  }
+
+  .web-automation-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2);
+    padding: var(--s-2);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .web-automation-status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    padding: 2px var(--s-2);
+    border-radius: var(--r-pill);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--t-2);
+  }
+
+  .web-automation-status-chip[data-connected="true"] {
+    border-color: var(--status-success);
+    color: var(--status-success);
+  }
+
+  .web-automation-status-chip[data-connected="false"] {
+    border-color: var(--status-error);
+    color: var(--status-error);
+  }
+
+  .web-automation-trace {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    max-height: 420px;
+    overflow-y: auto;
+    padding: var(--s-1);
+  }
+
+  .web-automation-step-row {
+    padding: var(--s-2);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    font-size: 12px;
+    color: var(--t-2);
+    font-family: var(--font-mono);
+    white-space: pre-wrap;
+  }
+
+  .web-automation-step-row[data-final="true"] {
+    border-left: 3px solid var(--status-success);
+  }
+
+  .web-automation-step-row[data-error="true"] {
+    border-left: 3px solid var(--status-error);
+  }
+
+  .web-automation-screenshot img {
+    width: 100%;
+    border-radius: var(--r-md);
+    border: 1px solid var(--line);
+    display: block;
+  }
+
+  .web-automation-textarea,
+  .web-automation-selector-input {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    color: var(--t-1);
+    padding: var(--s-2);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    outline: none;
+    resize: vertical;
+  }
+
+  .web-automation-textarea:focus,
+  .web-automation-selector-input:focus {
+    border-color: rgba(255, 255, 255, 0.24);
+  }
+
+  .web-automation-inline-row {
+    display: flex;
+    gap: var(--s-1);
+    align-items: center;
+    margin-top: var(--s-2);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     EmailAssistant (DEV-07) — two-column with edit + learn.
+     ══════════════════════════════════════════════════════════════════════ */
+  .email-assistant-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s-2);
+    margin-top: var(--s-2);
+  }
+
+  .email-assistant-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+  }
+
+  .email-assistant-textarea {
+    width: 100%;
+    min-height: 120px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    color: var(--t-1);
+    padding: var(--s-2);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    outline: none;
+    resize: vertical;
+  }
+
+  .email-assistant-draft-output {
+    white-space: pre-wrap;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: rgba(0, 0, 0, 0.25);
+    padding: var(--s-2);
+    border-radius: var(--r-md);
+    border: 1px solid var(--line);
+    max-height: 260px;
+    overflow-y: auto;
+    color: var(--t-1);
+  }
+
+  .email-assistant-batch-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    margin-top: var(--s-2);
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .email-assistant-batch-item {
+    padding: var(--s-2);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    font-size: 12px;
+  }
+
+  .email-assistant-parsed-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px var(--s-2);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+    font-size: 11px;
+    color: var(--t-3);
+    font-family: var(--font-mono);
+  }
+
+  .email-assistant-parsed-chip[data-valid="true"] {
+    border-color: var(--status-success);
+    color: var(--status-success);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     DocumentGenerator (DEV-08) — sidebar list + 3-mode main tab.
+     ══════════════════════════════════════════════════════════════════════ */
+  .doc-generator-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: var(--s-2);
+    height: calc(100vh - 200px);
+  }
+
+  .doc-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    padding: var(--s-2);
+    background: rgba(0, 0, 0, 0.18);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    overflow-y: auto;
+  }
+
+  .doc-sidebar-topbar {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    padding-bottom: var(--s-2);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .doc-sidebar-row {
+    padding: var(--s-2);
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-1);
+  }
+
+  .doc-sidebar-row:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .doc-sidebar-row[data-selected="true"] {
+    background: rgba(255, 255, 255, 0.08);
+    border-left: 3px solid var(--status-running);
+  }
+
+  .doc-sidebar-row-title {
+    font-size: 13px;
+    color: var(--t-1);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+
+  .doc-sidebar-row-meta {
+    font-size: 11px;
+    color: var(--t-3);
+  }
+
+  .doc-main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    overflow-y: auto;
+  }
+
+  .doc-output-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-3);
+    font-size: 13px;
+    color: var(--t-1);
+    white-space: pre-wrap;
+    font-family: var(--font-sans);
+    line-height: 1.6;
+    max-height: 520px;
+    overflow-y: auto;
+  }
+
+  .doc-checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: var(--s-1);
+    font-size: 12px;
+    color: var(--t-2);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     CodeSandbox (DEV-09) — code editor + dual output + history sidebar.
+     ══════════════════════════════════════════════════════════════════════ */
+  .code-sandbox-layout {
+    display: grid;
+    grid-template-columns: 1fr 260px;
+    gap: var(--s-2);
+  }
+
+  .code-sandbox-main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+  }
+
+  .code-sandbox-lang-row {
+    display: flex;
+    gap: var(--s-1);
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .code-sandbox-textarea {
+    width: 100%;
+    min-height: 240px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    color: var(--t-1);
+    padding: var(--s-2);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    outline: none;
+    resize: vertical;
+    white-space: pre;
+  }
+
+  .code-sandbox-action-row {
+    display: flex;
+    gap: var(--s-1);
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .code-sandbox-output-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s-2);
+    margin-top: var(--s-2);
+  }
+
+  .code-sandbox-output-pane {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+  }
+
+  .code-sandbox-output-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--t-3);
+  }
+
+  .code-sandbox-output-pane pre {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    padding: var(--s-2);
+    border-radius: var(--r-md);
+    overflow: auto;
+    max-height: 260px;
+    white-space: pre-wrap;
+    color: var(--t-1);
+    border: 1px solid var(--line);
+    margin: 0;
+  }
+
+  .code-sandbox-output-pane[data-status="complete"] pre {
+    border-left: 3px solid var(--status-success);
+  }
+
+  .code-sandbox-output-pane[data-status="failed"] pre {
+    border-left: 3px solid var(--status-error);
+  }
+
+  .code-sandbox-exit-chip {
+    display: inline-flex;
+    padding: 2px var(--s-2);
+    border-radius: var(--r-pill);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--line);
+    font-size: 11px;
+    font-family: var(--font-mono);
+  }
+
+  .code-sandbox-exit-chip[data-ok="true"] {
+    border-color: var(--status-success);
+    color: var(--status-success);
+  }
+
+  .code-sandbox-exit-chip[data-ok="false"] {
+    border-color: var(--status-error);
+    color: var(--status-error);
+  }
+
+  .code-sandbox-history {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    padding: var(--s-2);
+    background: rgba(0, 0, 0, 0.18);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    overflow-y: auto;
+    max-height: 520px;
+  }
+
+  .code-sandbox-history-row {
+    padding: var(--s-1) var(--s-2);
+    border-radius: var(--r-sm);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    cursor: pointer;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--s-1);
+  }
+
+  .code-sandbox-history-row:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     ComputerUse (DEV-10) — task card + screenshot pane + 2-tab sub-panels.
+     ══════════════════════════════════════════════════════════════════════ */
+  .computer-use-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s-2);
+  }
+
+  .computer-use-task-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    padding: var(--s-3);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+  }
+
+  .computer-use-task-card[data-running="true"] {
+    border-left: 3px solid var(--status-running);
+  }
+
+  .computer-use-task-card[data-running="false"] {
+    border-left: 3px solid var(--status-idle);
+  }
+
+  .computer-use-screenshot {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    padding: var(--s-2);
+    background: rgba(0, 0, 0, 0.18);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+  }
+
+  .computer-use-screenshot img {
+    width: 100%;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--line);
+    display: block;
+  }
+
+  .computer-use-textarea {
+    width: 100%;
+    min-height: 100px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    color: var(--t-1);
+    padding: var(--s-2);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    outline: none;
+    resize: vertical;
+  }
+
+  .computer-use-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    padding: var(--s-2);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+  }
+
+  .computer-use-section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--t-3);
+  }
+
+  .computer-use-inline-form {
+    display: flex;
+    gap: var(--s-1);
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .computer-use-inline-label {
+    font-size: 12px;
+    color: var(--t-2);
+    min-width: 80px;
+  }
+
+  .computer-use-uia-snapshot {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-2);
+    max-height: 320px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    color: var(--t-1);
+  }
+
+  .computer-use-uia-element {
+    padding: var(--s-1) var(--s-2);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    font-size: 12px;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    gap: var(--s-1);
+  }
+
+  .computer-use-uia-element:hover {
+    background: rgba(255, 255, 255, 0.07);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     Shared dialog / danger styling for Plan 07-04 destructive confirms.
+     ══════════════════════════════════════════════════════════════════════ */
+  .devtools-b-danger-banner {
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid var(--status-error);
+    border-radius: var(--r-md);
+    padding: var(--s-2);
+    color: var(--status-error);
+    font-weight: 600;
+    font-size: 12px;
+    margin-bottom: var(--s-2);
+  }
+
+  .devtools-b-dialog-actions {
+    display: flex;
+    gap: var(--s-1);
+    justify-content: flex-end;
+    margin-top: var(--s-2);
+  }
+
+  .devtools-b-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--s-1);
+  }
+
+  .devtools-b-section-header h3 {
+    font-family: var(--font-display);
+    font-size: 14px;
+    margin: 0;
+    color: var(--t-1);
+  }
+
+  .devtools-b-radio-row {
+    display: flex;
+    gap: var(--s-1);
+    align-items: center;
+  }
+
+  .devtools-b-radio-pill {
+    padding: var(--s-1) var(--s-2);
+    border-radius: var(--r-pill);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--t-2);
+  }
+
+  .devtools-b-radio-pill[data-active="true"] {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.22);
+    color: var(--t-1);
+  }
+}
