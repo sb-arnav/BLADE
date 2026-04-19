@@ -14,6 +14,7 @@
 import { invokeTyped } from './_base';
 import type { BladeConfig } from '@/types/config';
 import type { ProviderKeyList } from '@/types/provider';
+import type { TaskRouting } from '@/types/routing';
 
 /** @see src-tauri/src/commands.rs:1899 `pub fn get_config() -> BladeConfig` */
 export function getConfig(): Promise<BladeConfig> {
@@ -152,4 +153,70 @@ export function setConfig(args: {
     quick_ask_shortcut: args.quickAskShortcut,
     voice_shortcut: args.voiceShortcut,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3 additions — task routing, generic field save, persona reset, debug.
+// All snake_case at the IPC boundary (D-38, P-04 prevention). Names verified
+// against src-tauri/src/lib.rs:463-467 (registered handlers).
+// ---------------------------------------------------------------------------
+
+/**
+ * @see src-tauri/src/config.rs:713 `pub fn get_task_routing() -> TaskRouting`
+ *
+ * Returns the per-task-type provider routing (code/vision/fast/creative/
+ * fallback). Each field is null when unset (Rust Option::None → JSON null).
+ * D-83 Routing pane (Plan 03-06) consumes this for the routing grid.
+ */
+export function getTaskRouting(): Promise<TaskRouting> {
+  return invokeTyped<TaskRouting>('get_task_routing');
+}
+
+/**
+ * @see src-tauri/src/config.rs:719
+ *   `pub fn set_task_routing(routing: TaskRouting) -> Result<(), String>`
+ *
+ * Replaces the routing block wholesale. Pass the existing TaskRouting with the
+ * single field updated; the Rust side does not merge — the whole struct is
+ * persisted.
+ */
+export function setTaskRouting(routing: TaskRouting): Promise<void> {
+  return invokeTyped<void, { routing: TaskRouting }>('set_task_routing', { routing });
+}
+
+/**
+ * @see src-tauri/src/config.rs:728
+ *   `pub fn save_config_field(key: String, value: String) -> Result<(), String>`
+ *
+ * Generic single-field save — the Voice pane (D-84) and IoT pane (D-87) use
+ * this for `voice_shortcut`, `wake_word`, `ha_base_url`, `ha_token`, etc. Key
+ * names match BladeConfig field names (snake_case).
+ */
+export function saveConfigField(key: string, value: string): Promise<void> {
+  return invokeTyped<void, { key: string; value: string }>(
+    'save_config_field',
+    { key, value },
+  );
+}
+
+/**
+ * @see src-tauri/src/commands.rs:1989 `pub fn reset_onboarding() -> Result<(), String>`
+ *
+ * Wipes `persona_onboarding_complete` so the next MainShell mount routes the
+ * user back to the persona-onboarding step. D-85 Personality pane (Plan 03-06)
+ * exposes this behind a confirmation dialog.
+ */
+export function resetOnboarding(): Promise<void> {
+  return invokeTyped<void>('reset_onboarding');
+}
+
+/**
+ * @see src-tauri/src/commands.rs:1969 `pub fn debug_config() -> serde_json::Value`
+ *
+ * Returns the raw config blob (including non-typed fields not surfaced on
+ * BladeConfig). Used by D-89 Diagnostics Entry pane (Plan 03-06) for the
+ * developer config dump.
+ */
+export function debugConfig(): Promise<Record<string, unknown>> {
+  return invokeTyped<Record<string, unknown>>('debug_config');
 }

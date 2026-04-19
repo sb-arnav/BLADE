@@ -35,6 +35,41 @@ export {
 export { deepScanStart, deepScanResults, deepScanSummary } from './deepscan';
 export { minimizeWindow, closeWindow, toggleMaximize } from './window';
 
+// Phase 3 additions — chat tool-approval, history, quickask bridge,
+// task routing + persona reset + generic config field save, perception
+// (DASH-01), homeostasis (DASH-02), iot (SET-07).
+export {
+  respondToolApproval,
+  historyListConversations,
+  historyLoadConversation,
+  historyDeleteConversation,
+  quickaskSubmit,
+} from './chat';
+
+export {
+  getTaskRouting,
+  setTaskRouting,
+  saveConfigField,
+  resetOnboarding,
+  debugConfig,
+} from './config';
+
+export { perceptionGetLatest, perceptionUpdate } from './perception';
+export {
+  homeostasisGet,
+  homeostasisGetDirective,
+  homeostasisGetCircadian,
+} from './homeostasis';
+export {
+  iotListEntities,
+  iotGetState,
+  iotCallService,
+  iotSetState,
+  iotSpotifyNowPlaying,
+  iotSpotifyPlayPause,
+  iotSpotifyNext,
+} from './iot';
+
 // Events convenience re-export (D-38-evt, D-38-hook). Raw `listen`/`invoke`
 // are intentionally NOT re-exported here — the wrapped surfaces (useTauriEvent,
 // invokeTyped) are the only permitted escape hatches per D-13.
