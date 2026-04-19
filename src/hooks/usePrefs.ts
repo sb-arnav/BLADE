@@ -75,6 +75,17 @@ export interface Prefs {
   'identity.activeTab'?: string;
   /** Last-expanded trait id in PersonaView (deep-link reset on nav). */
   'identity.persona.expandedTrait'?: string;
+  // ───── Phase 7 (Plan 07-01, D-192) ─────
+  /** Dev Tools active tab (WorkflowBuilder tabs, ComputerUse tabs, DocumentGenerator mode). */
+  'devTools.activeTab'?: string;
+  /** Terminal current working directory memory — persisted so reopening lands you where you left off. */
+  'devTools.terminal.cwd'?: string;
+  /** FileBrowser expanded folder paths — newline-joined string (single-blob discipline D-12). */
+  'devTools.fileBrowser.expandedPaths'?: string;
+  /** Admin active tab (SecurityDashboard tabs, Diagnostics tabs, CapabilityReports sections). */
+  'admin.activeTab'?: string;
+  /** Last-expanded alert id in SecurityDashboard (scroll-restore-ish deep-link). */
+  'admin.security.expandedAlert'?: string;
   /** Forward-compat — other dotted keys accepted as string | number | boolean. */
   [k: string]: string | number | boolean | undefined;
 }
