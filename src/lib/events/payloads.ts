@@ -504,3 +504,103 @@ export interface BladeReasoningStepPayload {
   };
   [k: string]: unknown;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 7 Plan 07-01 additions — Dev Tools + Admin lifecycle payloads.
+//
+// Every interface below matches a Rust emit_to("main", ...) call from either
+// a streaming loop or a scheduled background task (NOT request-response).
+// Phase 7 consumers subscribe via `useTauriEvent<TPayload>(BLADE_EVENTS.XXX, …)`.
+//
+// Every interface carries `[k: string]: unknown` per D-38-payload accepted
+// drift risk. Field names mirror Rust `serde_json::json!` keys verbatim.
+//
+// @see src-tauri/src/browser_agent.rs:268,284
+// @see src-tauri/src/immune_system.rs:31,45,78,85,97
+// @see src-tauri/src/evolution.rs:792,800,812,945
+// @see src-tauri/src/supervisor.rs:144,156
+// @see src-tauri/src/watcher.rs:212
+// ---------------------------------------------------------------------------
+
+/** Mirrors Rust emit at `src-tauri/src/browser_agent.rs:268,284`
+ *  (browser_agent_step). Streaming per-step during `browser_agent_loop`.
+ *  On the final step, `done: true` and `result` carries the summary. */
+export interface BrowserAgentStepPayload {
+  step: number;
+  action: string;
+  result: string;
+  screenshot_b64?: string | null;
+  done: boolean;
+  is_error?: boolean;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/immune_system.rs:31,45,78,85,97`
+ *  (blade_evolving). Multi-step capability-resolution status ticker;
+ *  `status` transitions roughly: searching → installing|forging → forged|failed. */
+export interface BladeEvolvingPayload {
+  capability: string;
+  status: 'searching' | 'installing' | 'forging' | 'forged' | 'failed' | string;
+  solution?: string;
+  tool_name?: string;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/evolution.rs:792`
+ *  (blade_auto_upgraded). Scheduled evolution loop auto-install notification. */
+export interface BladeAutoUpgradedPayload {
+  installed: string[];
+  message: string;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/evolution.rs:800,945`
+ *  (evolution_suggestion). Scheduled evolution-loop suggestion record; full
+ *  Suggestion struct mirror (shape loose per D-38-payload accepted drift). */
+export interface EvolutionSuggestionPayload {
+  id?: string;
+  category?: string;
+  title?: string;
+  description?: string;
+  severity?: string;
+  created_at?: number;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/evolution.rs:812`
+ *  (blade_leveled_up). Background evolution level-up milestone. */
+export interface BladeLeveledUpPayload {
+  level: number;
+  score: number;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/supervisor.rs:144`
+ *  (service_crashed). Background watchdog when a managed service crashes. */
+export interface ServiceCrashedPayload {
+  service: string;
+  crash_count: number;
+  error: string;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/supervisor.rs:156`
+ *  (service_dead). Emitted after MAX_RESTARTS crashes; service permanently
+ *  dead until manual restart. */
+export interface ServiceDeadPayload {
+  service: string;
+  crash_count: number;
+  [k: string]: unknown;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/watcher.rs:212`
+ *  (watcher_alert). Background URL-watcher change detection; SecurityDashboard
+ *  + Reports consume for autonomous monitoring feed. */
+export interface WatcherAlertPayload {
+  watcher_id: string;
+  url: string;
+  label: string;
+  summary: string;
+  timestamp: number;
+  [k: string]: unknown;
+}
