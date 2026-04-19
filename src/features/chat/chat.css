@@ -1,0 +1,156 @@
+/* src/features/chat/chat.css — Phase 3 chat surface styles.
+ *
+ * Rendering discipline (D-70 / SC-5 guardrail):
+ *   - Chat bubbles MUST use solid rgba() fills. Blur layers are forbidden in
+ *     this file. The GPU-layer budget (3 layers per viewport per D-07) is
+ *     already consumed by the dashboard hero + ambient strip + nav rail;
+ *     adding blur per bubble during a stream blows past the cap and
+ *     collapses first paint.
+ *   - Grep-asserted by Plan 03-07 spec + npm run verify:all hook.
+ *
+ * Tokens: all spacing (--s-N), radii (--r-N), text opacities (--t-N), glass
+ * fills (--g-fill / --g-edge-N) and accents (--a-warn) are sourced from
+ * src/styles/tokens.css. No hardcoded hex values.
+ *
+ * @see .planning/phases/03-dashboard-chat-settings/03-CONTEXT.md §D-70
+ */
+
+/* ── Panel shell ──────────────────────────────────────────────────────────── */
+
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  position: relative;   /* anchor for CompactingIndicator (Plan 03-04 slot) */
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  justify-content: space-between;
+}
+
+.chat-title {
+  margin: 0;
+  color: var(--t-1);
+}
+
+/* ── Message list ─────────────────────────────────────────────────────────── */
+
+.chat-message-list {
+  flex: 1;
+  min-height: 0;                 /* allow flex child to scroll — fixes overflow trap */
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding-right: var(--s-2);
+  scrollbar-gutter: stable;
+}
+
+/* ── Bubbles (D-70 — rgba fills only, blur layers forbidden) ──────────────── */
+
+.chat-bubble {
+  max-width: 720px;
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--g-edge-mid);
+  background: var(--g-fill);
+  color: var(--t-1);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.chat-bubble .chat-content {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+
+.chat-bubble-user {
+  align-self: flex-end;
+  background: var(--g-fill-strong);
+  border-color: var(--g-edge-hi);
+}
+
+.chat-bubble-assistant {
+  align-self: flex-start;
+  background: var(--g-fill);
+}
+
+.chat-bubble-streaming {
+  animation: chatBubblePulse 1.6s ease-in-out infinite;
+}
+
+@keyframes chatBubblePulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.92; }
+}
+
+/* ── Input bar ────────────────────────────────────────────────────────────── */
+
+.chat-input-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.chat-input-bar > .input {
+  flex: 1;
+}
+
+/* ── Reasoning / thinking section (Plan 03-04 target) ─────────────────────── */
+/* Selectors shipped Day-1 so Plan 03-04's component addition is a pure
+ * markup addition — no CSS churn. */
+
+.chat-thinking-details {
+  margin-bottom: var(--s-2);
+}
+
+.chat-thinking-details > summary {
+  cursor: pointer;
+  color: var(--t-3);
+  font-size: 13px;
+  list-style: none;
+}
+
+.chat-thinking-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.chat-thinking {
+  margin-top: var(--s-1);
+  padding: var(--s-2);
+  border-left: 2px solid var(--line);
+  color: var(--t-3);
+  font-size: 13px;
+  white-space: pre-wrap;
+  font-family: var(--font-body);
+}
+
+/* ── Compacting indicator (Plan 03-04 target) ─────────────────────────────── */
+/* D-73: pill appears when tokenRatio.ratio > 0.65 AND status != 'idle'.
+ * Component lives in Plan 03-04; selectors shipped here for layout stability. */
+
+.chat-compacting {
+  position: absolute;
+  top: var(--s-3);
+  right: var(--s-4);
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 210, 166, 0.18);   /* matches --a-warm tint (no alpha token yet) */
+  border: 1px solid rgba(255, 210, 166, 0.32);
+  color: var(--a-warn);
+  font-family: var(--font-body);
+  font-size: 12px;
+  animation: chatCompactPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes chatCompactPulse {
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 1.00; }
+}
