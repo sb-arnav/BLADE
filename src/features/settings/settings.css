@@ -1,0 +1,225 @@
+/* src/features/settings/settings.css — Phase 3 Plan 03-06 (D-79).
+ *
+ * Tabbed Settings shell layout (220px left nav + 1fr right pane) and pane
+ * typography. Composes against design-tokens (tokens.css, layout.css) — no
+ * magic pixel widths or hex colors.
+ *
+ * D-07 cap: ZERO backdrop-filter layers in this file. Dashboard already claims
+ * the 3-per-viewport budget (hero + ambient + nav rail). Settings is rendered
+ * INSIDE MainShell's existing GlassPanel so the parent provides the backdrop
+ * treatment; this sheet only paints flat surfaces.
+ *
+ * @see .planning/phases/03-dashboard-chat-settings/03-CONTEXT.md §D-07, §D-79
+ * @see .planning/phases/03-dashboard-chat-settings/03-PATTERNS.md §9
+ */
+
+.settings-shell {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: var(--sp-4);
+  height: 100%;
+  padding: var(--sp-4);
+  box-sizing: border-box;
+}
+
+.settings-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  padding-right: var(--sp-2);
+  min-height: 0;
+}
+
+.settings-tab {
+  background: transparent;
+  border: 0;
+  padding: 8px 12px;
+  text-align: left;
+  border-radius: var(--r-card);
+  color: var(--t-2);
+  cursor: pointer;
+  font: inherit;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.settings-tab:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--t-1);
+}
+
+.settings-tab:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.4);
+  outline-offset: 2px;
+}
+
+.settings-tab.is-active {
+  background: rgba(255, 255, 255, 0.10);
+  color: var(--t-1);
+  border-left: 2px solid #fff;
+  padding-left: 10px;
+}
+
+.settings-pane {
+  overflow-y: auto;
+  padding: var(--sp-2);
+  min-height: 0;
+}
+
+.settings-pane h2,
+.settings-pane h3 {
+  color: var(--t-1);
+  margin: 0 0 var(--sp-2) 0;
+}
+
+.settings-pane p {
+  color: var(--t-2);
+  line-height: 1.5;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+
+.settings-section-title {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--t-3);
+  margin: 0 0 var(--sp-2) 0;
+}
+
+.settings-grid {
+  display: grid;
+  gap: var(--sp-3);
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-field label,
+.settings-field-label {
+  font-size: 13px;
+  color: var(--t-2);
+}
+
+.settings-field select,
+.settings-field .input {
+  width: 100%;
+}
+
+.settings-actions {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+  justify-content: flex-end;
+}
+
+.settings-actions.left {
+  justify-content: flex-start;
+}
+
+.provider-tagline {
+  color: var(--t-3);
+  font-size: 13px;
+  margin: 4px 0;
+}
+
+.settings-notice {
+  color: var(--t-3);
+  font-size: 13px;
+  padding: var(--sp-2);
+  border-radius: var(--r-card);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.settings-notice.warn {
+  border-color: rgba(255, 200, 120, 0.28);
+  color: rgba(255, 210, 166, 0.95);
+}
+
+.settings-readout {
+  display: grid;
+  grid-template-columns: minmax(140px, auto) 1fr;
+  column-gap: var(--sp-3);
+  row-gap: 6px;
+  font-size: 13px;
+}
+
+.settings-readout dt {
+  color: var(--t-3);
+}
+
+.settings-readout dd {
+  color: var(--t-1);
+  margin: 0;
+}
+
+.settings-inline-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--sp-2);
+  align-items: end;
+}
+
+.settings-routing-grid {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: var(--sp-2) var(--sp-3);
+  align-items: center;
+}
+
+.settings-iot-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.settings-iot-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: var(--sp-2);
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: var(--r-card);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.settings-code {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  padding: var(--sp-2);
+  border-radius: var(--r-card);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--t-2);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.settings-link {
+  color: var(--t-1);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.settings-dialog-actions {
+  display: flex;
+  gap: var(--sp-2);
+  justify-content: flex-end;
+  margin-top: var(--sp-3);
+}
