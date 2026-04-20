@@ -21,15 +21,15 @@ All 156 v1.0 requirements (FOUND, WIN, WIRE-01..08, ONBD, SHELL, DASH, CHAT, SET
 
 ### Smart Provider Setup (PROV)
 
-- [ ] **PROV-01**: Pasting a raw cURL command into the provider form auto-extracts provider, model, `base_url`, and headers and fills the form fields
-- [ ] **PROV-02**: Pasting a JSON provider-config blob auto-extracts the same fields
-- [ ] **PROV-03**: Pasting a Python SDK snippet (e.g. `client = OpenAI(api_key=…, base_url=…)`) auto-extracts the same fields
-- [ ] **PROV-04**: Onboarding exposes a "custom config paste" affordance alongside the 6 hardcoded provider cards, accepting any of the three formats above
-- [ ] **PROV-05**: On API key save, BLADE runs one test call that retrieves model name, context window, vision support, audio support, and tool-calling support; the probe result persists in config
-- [ ] **PROV-06**: `BladeConfig` stores per-capability provider preference (`vision_provider`, `audio_provider`, `long_context_provider`, `tools_provider`) independent of the primary provider
-- [ ] **PROV-07**: When a UI surface requires vision and no vision-capable provider is configured, the surface shows a "needs vision-capable model" prompt with an "add key" CTA that opens the provider add flow — no blank dashboard card
-- [ ] **PROV-08**: Same capability-gap handling for audio-required, long-context-required, and tool-calling-required surfaces
-- [ ] **PROV-09**: `router.rs` task classification → model selection consults per-capability config and falls back through a prioritized chain on miss; it does not fail hard when the primary lacks the required capability
+- [x] **PROV-01**: Pasting a raw cURL command into the provider form auto-extracts provider, model, `base_url`, and headers and fills the form fields
+- [x] **PROV-02**: Pasting a JSON provider-config blob auto-extracts the same fields
+- [x] **PROV-03**: Pasting a Python SDK snippet (e.g. `client = OpenAI(api_key=…, base_url=…)`) auto-extracts the same fields
+- [x] **PROV-04**: Onboarding exposes a "custom config paste" affordance alongside the 6 hardcoded provider cards, accepting any of the three formats above
+- [x] **PROV-05**: On API key save, BLADE runs one test call that retrieves model name, context window, vision support, audio support, and tool-calling support; the probe result persists in config
+- [x] **PROV-06**: `BladeConfig` stores per-capability provider preference (`vision_provider`, `audio_provider`, `long_context_provider`, `tools_provider`) independent of the primary provider
+- [x] **PROV-07**: When a UI surface requires vision and no vision-capable provider is configured, the surface shows a "needs vision-capable model" prompt with an "add key" CTA that opens the provider add flow — no blank dashboard card
+- [x] **PROV-08**: Same capability-gap handling for audio-required, long-context-required, and tool-calling-required surfaces
+- [x] **PROV-09**: `router.rs` task classification → model selection consults per-capability config and falls back through a prioritized chain on miss; it does not fail hard when the primary lacks the required capability
 
 ### Smart Deep Scan (SCAN)
 
