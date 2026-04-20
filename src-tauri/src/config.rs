@@ -122,6 +122,36 @@ pub struct WindowState {
     pub height: u32,
 }
 
+// ── Phase 12 Plan 12-02 (D-65) — per-source-class privacy toggles. ─────────
+// All 8 scan source classes are ON by default so the SCAN-13 baseline is
+// reachable out of the box. User can opt out per class in Settings → Privacy.
+// Follows the 6-place config pattern (CLAUDE.md §Config field 6-place rule).
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScanClassesEnabled {
+    pub fs_repos: bool,
+    pub git_remotes: bool,
+    pub ide_workspaces: bool,
+    pub ai_sessions: bool,
+    pub shell_history: bool,
+    pub mru: bool,
+    pub bookmarks: bool,
+    pub which_sweep: bool,
+}
+
+fn default_scan_classes_enabled() -> ScanClassesEnabled {
+    ScanClassesEnabled {
+        fs_repos: true,
+        git_remotes: true,
+        ide_workspaces: true,
+        ai_sessions: true,
+        shell_history: true,
+        mru: true,
+        bookmarks: true,
+        which_sweep: true,
+    }
+}
+
 /// Config as stored on disk — api_key is NOT stored here anymore
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct DiskConfig {
@@ -230,6 +260,9 @@ struct DiskConfig {
     long_context_provider: Option<String>,
     #[serde(default)]
     tools_provider: Option<String>,
+    // Phase 12 Plan 12-02 (D-65) — per-source-class privacy toggles
+    #[serde(default = "default_scan_classes_enabled")]
+    scan_classes_enabled: ScanClassesEnabled,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -305,6 +338,7 @@ impl Default for DiskConfig {
             audio_provider: None,
             long_context_provider: None,
             tools_provider: None,
+            scan_classes_enabled: default_scan_classes_enabled(),
             api_key: None,
         }
     }
@@ -428,6 +462,10 @@ pub struct BladeConfig {
     pub long_context_provider: Option<String>,
     #[serde(default)]
     pub tools_provider: Option<String>,
+    /// Phase 12 Plan 12-02 (D-65) — per-source-class privacy toggles.
+    /// All classes default to true. User can opt-out in Settings → Privacy.
+    #[serde(default = "default_scan_classes_enabled")]
+    pub scan_classes_enabled: ScanClassesEnabled,
 }
 
 impl BladeConfig {
@@ -489,6 +527,7 @@ impl Default for BladeConfig {
             audio_provider: None,
             long_context_provider: None,
             tools_provider: None,
+            scan_classes_enabled: default_scan_classes_enabled(),
         }
     }
 }
@@ -635,6 +674,7 @@ pub fn load_config() -> BladeConfig {
         audio_provider: disk.audio_provider,
         long_context_provider: disk.long_context_provider,
         tools_provider: disk.tools_provider,
+        scan_classes_enabled: disk.scan_classes_enabled,
     }
 }
 
@@ -692,6 +732,7 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         audio_provider: config.audio_provider.clone(),
         long_context_provider: config.long_context_provider.clone(),
         tools_provider: config.tools_provider.clone(),
+        scan_classes_enabled: config.scan_classes_enabled.clone(),
         api_key: None,
     };
 
@@ -1038,5 +1079,49 @@ mod tests {
         assert!(cfg.audio_provider.is_none());
         assert!(cfg.long_context_provider.is_none());
         assert!(cfg.tools_provider.is_none());
+    }
+
+    /// Phase 12 Plan 12-02 (D-65) — ScanClassesEnabled round-trips through serde
+    /// with partial fields set to false. Guards against silent drift where a new
+    /// scan class is added but not registered in ScanClassesEnabled.
+    #[test]
+    fn test_scan_classes_roundtrip() {
+        let classes = ScanClassesEnabled {
+            fs_repos: true,
+            git_remotes: false,
+            ide_workspaces: true,
+            ai_sessions: false,
+            shell_history: true,
+            mru: true,
+            bookmarks: false,
+            which_sweep: true,
+        };
+
+        let serialized = serde_json::to_string(&classes).expect("serialize ScanClassesEnabled");
+        let loaded: ScanClassesEnabled =
+            serde_json::from_str(&serialized).expect("deserialize ScanClassesEnabled");
+
+        assert_eq!(loaded.fs_repos, true);
+        assert_eq!(loaded.git_remotes, false);
+        assert_eq!(loaded.ide_workspaces, true);
+        assert_eq!(loaded.ai_sessions, false);
+        assert_eq!(loaded.shell_history, true);
+        assert_eq!(loaded.mru, true);
+        assert_eq!(loaded.bookmarks, false);
+        assert_eq!(loaded.which_sweep, true);
+    }
+
+    /// Default ScanClassesEnabled has all 8 classes enabled — required for SCAN-13 baseline.
+    #[test]
+    fn test_scan_classes_default_all_true() {
+        let classes = default_scan_classes_enabled();
+        assert!(classes.fs_repos);
+        assert!(classes.git_remotes);
+        assert!(classes.ide_workspaces);
+        assert!(classes.ai_sessions);
+        assert!(classes.shell_history);
+        assert!(classes.mru);
+        assert!(classes.bookmarks);
+        assert!(classes.which_sweep);
     }
 }
