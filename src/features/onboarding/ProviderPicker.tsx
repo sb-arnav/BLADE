@@ -10,6 +10,10 @@ import { PROVIDERS, type ProviderDef } from './providers';
 import { Button } from '@/design-system/primitives';
 import { Steps } from './Steps';
 import type { useOnboardingState } from './useOnboardingState';
+import type { ProviderId } from '@/types/provider';
+// Phase 11 D-56: paste-any-config card rendered beneath the 6 cards.
+// The 6 cards themselves remain unchanged — this is an ADD, not a replace.
+import { ProviderPasteForm } from '@/features/providers';
 
 type State = ReturnType<typeof useOnboardingState>;
 
@@ -18,6 +22,18 @@ interface Props {
   setProvider: State['setProvider'];
   setStep: State['setStep'];
 }
+
+/** Known ProviderId set — narrows the ParsedProviderConfig.provider_guess
+ *  union ('custom' | ...) back to the 6 onboarding ProviderId values so
+ *  setProvider() accepts the result. */
+const KNOWN_PROVIDER_IDS: ReadonlySet<ProviderId> = new Set<ProviderId>([
+  'anthropic',
+  'openai',
+  'openrouter',
+  'gemini',
+  'groq',
+  'ollama',
+]);
 
 export function ProviderPicker({ state, setProvider, setStep }: Props) {
   const selected = PROVIDERS.find((p) => p.id === state.providerId) ?? PROVIDERS[0];
@@ -49,6 +65,29 @@ export function ProviderPicker({ state, setProvider, setStep }: Props) {
           />
         ))}
       </div>
+
+      {/* Phase 11 D-56 — divider + paste card below the 6-card grid. The 6
+          cards above must remain the primary affordance; paste is the
+          "or" alternative for custom endpoints (NVIDIA NIM, DeepSeek,
+          self-hosted vLLM, OpenRouter w/ specific model). */}
+      <div className="onb-divider" aria-hidden="true">
+        <span className="t-small">or</span>
+      </div>
+      <ProviderPasteForm
+        onSuccess={(parsed) => {
+          // Only advance the onboarding machine if the paste resolved to
+          // one of the 6 known ProviderId values. Custom base_url pastes
+          // pre-populate the provider via the fallback path below.
+          if (
+            parsed.provider_guess !== 'custom' &&
+            KNOWN_PROVIDER_IDS.has(parsed.provider_guess as ProviderId) &&
+            parsed.model
+          ) {
+            setProvider(parsed.provider_guess as ProviderId, parsed.model);
+          }
+          setStep('apikey');
+        }}
+      />
 
       <div className="onb-footer">
         <Button variant="primary" onClick={() => setStep('apikey')}>

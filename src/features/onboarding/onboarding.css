@@ -247,6 +247,23 @@
   margin-top: 36px;
 }
 
+/* Phase 11 D-56 — divider between the 6-provider grid and the paste card.
+ * Mirrors the `.onb-error` convention (token-only colors, single-purpose). */
+.onb-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin: var(--s-8) 0 var(--s-6);
+  color: var(--t-3);
+}
+.onb-divider::before,
+.onb-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
 /* Deep-scan ring + phase list (Step 3) */
 .scan-panel {
   display: flex;
