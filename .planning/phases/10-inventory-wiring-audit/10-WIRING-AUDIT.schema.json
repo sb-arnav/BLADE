@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blade/.planning/phases/10/wiring-audit.schema.json",
+  "type": "object",
+  "required": ["schema_version", "generated_at", "modules", "routes", "config", "not_wired_backlog", "dead_deletion_plan"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "modules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["file", "classification", "purpose", "trigger"],
+        "properties": {
+          "file":           { "type": "string", "pattern": "^src-tauri/src/" },
+          "classification": { "enum": ["ACTIVE", "WIRED-NOT-USED", "NOT-WIRED", "DEAD"] },
+          "purpose":        { "type": "string" },
+          "trigger":        { "type": "string" },
+          "ui_surface":     { "type": ["string", "null"] },
+          "commands": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "registered", "invoked_from"],
+              "properties": {
+                "name":         { "type": "string", "pattern": "^[a-z_][a-z_0-9]*::[a-z_][a-z_0-9]*$" },
+                "registered":   { "type": "string", "pattern": "^src-tauri/src/.+:[0-9]+$" },
+                "invoked_from": { "type": ["string", "null"], "pattern": "^src/.+:[0-9]+$" }
+              }
+            }
+          },
+          "internal_callers": { "type": "array", "items": { "type": "string" } },
+          "body_registry_entry": { "type": ["string", "null"] },
+          "backend_entry_points": {
+            "description": "file:line refs used by NOT-WIRED rows; omitted for ACTIVE",
+            "type": "array",
+            "items": { "type": "string", "pattern": "^src-tauri/src/.+:[0-9]+$" }
+          },
+          "reachable_paths": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "routes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "file", "classification", "section", "palette_visible"],
+        "properties": {
+          "id":               { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "file":             { "type": "string", "pattern": "^src/" },
+          "classification":   { "enum": ["ACTIVE", "ACTIVE (dev-only)", "WIRED-NOT-USED", "NOT-WIRED", "DEAD"] },
+          "section":          { "enum": ["core","agents","knowledge","life","identity","dev","admin","body","hive"] },
+          "palette_visible":  { "type": "boolean" },
+          "shortcut":         { "type": ["string","null"] },
+          "data_shape":       { "type": ["string","null"] },
+          "data_source":      { "type": "array" },
+          "flow_status":      { "enum": ["data pipes","placeholder","dead"] },
+          "reachable_paths":  { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "config": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["field", "file", "classification"],
+        "properties": {
+          "field":          { "type": "string" },
+          "file":           { "type": "string", "pattern": "^src-tauri/.+:[0-9]+$" },
+          "struct":         { "type": "string" },
+          "disk_persisted": { "type": "boolean" },
+          "classification": { "enum": ["ACTIVE","WIRED-NOT-USED","NOT-WIRED","DEAD"] },
+          "ui_surface":     { "type": ["string","null"] },
+          "control_type":   { "type": "string" }
+        }
+      }
+    },
+    "not_wired_backlog": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["item_type","identifier","backend_entry_points","phase_14_owner"],
+        "properties": {
+          "item_type":            { "enum": ["module","route","config","event"] },
+          "identifier":           { "type": "string" },
+          "backend_entry_points": { "type": "array", "items": { "type": "string", "pattern": ":[0-9]+$" }, "minItems": 1 },
+          "phase_14_owner":       { "enum": ["WIRE2","A11Y2","LOG","DENSITY","DEFERRED_V1_2"] },
+          "deferral_rationale":   { "type": ["string","null"] }
+        }
+      }
+    },
+    "dead_deletion_plan": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["identifier","callers","imports","safe_to_delete"],
+        "properties": {
+          "identifier":      { "type": "string" },
+          "callers":         { "type": "array", "items": { "type": "string" } },
+          "imports":         { "type": "array", "items": { "type": "string" } },
+          "safe_to_delete":  { "type": "boolean" },
+          "deletion_note":   { "type": "string" }
+        }
+      }
+    }
+  }
+}
