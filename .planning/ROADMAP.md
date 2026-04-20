@@ -96,7 +96,15 @@ Phase 11 and Phase 12 may run in parallel. Phase 12's scanner intelligence uses 
 
 **Notes**: The onboarding custom-paste flow and the Settings custom-paste flow share one parser module. The probe test call is idempotent and must not be retried in a loop on failure — surface the error clearly (related to tester pass fix `4ab464c`).
 
-**Plans**: TBD
+**Plans**: 6 plans
+
+Plans:
+- [ ] 11-01-PLAN.md — Wave 0 Rust paste parser + 3 format detectors + 17+ unit tests + Tauri command registration (PROV-01, PROV-02, PROV-03)
+- [ ] 11-02-PLAN.md — Wave 0 capability probe wrapper + static capability matrix + 6-place config for 5 new BladeConfig fields + round-trip test (PROV-05, PROV-06)
+- [ ] 11-03-PLAN.md — Wave 1 shared ProviderPasteForm + CapabilityPillStrip + FallbackOrderList + onboarding D-56 preservation + Settings D-57 wiring + 3 e2e specs (PROV-04, PROV-05)
+- [ ] 11-04-PLAN.md — Wave 1 router rewire: select_provider 3-tier resolution + capability-filtered fallback chain + single call-site change at commands.rs:744 + 7+ unit tests + blade_routing_capability_missing event (PROV-09)
+- [ ] 11-05-PLAN.md — Wave 1 CapabilityGap component + useCapability hook + CAPABILITY_SURFACES registry + openRoute hint extension + 8 consumer surface wires + 8 e2e specs (PROV-07, PROV-08)
+- [ ] 11-06-PLAN.md — Wave 2 verify:providers-capability gate (gate 20) + test:e2e:phase11 script + verify:all chain extension + goal-backward manual trace (PROV-01..09)
 
 **UI hint**: yes
 
