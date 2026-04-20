@@ -1,4 +1,7 @@
 pub mod fs_repos;
 pub mod git_remotes;
 pub mod mru;
-// Wave 0 Plan 12-02 adds: ide_workspaces, ai_sessions, shell_history, bookmarks, which_sweep
+pub mod ide_workspaces;
+pub mod ai_sessions;
+pub mod shell_history;
+// Task 2 adds: bookmarks, which_sweep
