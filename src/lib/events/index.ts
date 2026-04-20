@@ -59,6 +59,17 @@ export const BLADE_EVENTS = {
   BRAIN_GREW: 'brain_grew',
   CAPABILITY_GAP_DETECTED: 'capability_gap_detected',
   RESPONSE_IMPROVED: 'response_improved',
+  /** Phase 11 Plan 11-04 (D-55) — router emits when a task requires a
+   *  capability (vision / audio / long_context / tools) but none of the
+   *  user's configured providers support it. Fires ONCE per
+   *  send_message_stream call (no retry loop per 4ab464c posture).
+   *  Payload: RoutingCapabilityMissingPayload (see payloads.ts).
+   *
+   *  NOTE: This is DIFFERENT from CAPABILITY_GAP_DETECTED above (which is
+   *  a Phase-10 legacy constant for self_upgrade). Subscribers of
+   *  ROUTING_CAPABILITY_MISSING will NOT receive CAPABILITY_GAP_DETECTED
+   *  events and vice-versa — the two literals are disjoint. */
+  ROUTING_CAPABILITY_MISSING: 'blade_routing_capability_missing',
 
   // ───── Voice (LIVE — voice_global.rs + wake_word.rs) ─────────────────────
   VOICE_CONVERSATION_LISTENING: 'voice_conversation_listening',

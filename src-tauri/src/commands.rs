@@ -733,7 +733,20 @@ pub(crate) async fn send_message_stream_inline(
     // Smart routing: resolve best provider + model for this task type.
     // If the user configured e.g. "code tasks → Anthropic", this picks that provider + its key.
     // Falls back to active provider if the routed provider has no stored key.
+    //
+    // Phase 11 Plan 11-04 (D-55) — capability-aware routing.
+    // Delegates to router::select_provider which applies 3-tier resolution
+    // (base_url escape → capability hard filter → task-type soft preference
+    // → primary fallback). Returns a capability-filtered fallback chain that
+    // the downstream streaming orchestrator walks on transient errors, AND
+    // a capability_unmet signal that triggers a one-shot missing-capability
+    // event (no retry loop per 4ab464c posture).
+    //
+    // This is the SINGLE rewired call site in send_message_stream; the other
+    // 25+ background-task sites keep calling the legacy task-routing helper
+    // directly (blast-radius discipline — RESEARCH.md §Router Rewire).
     let mut use_extended_thinking = false;
+    let mut routing_chain: Vec<(String, String)> = Vec::new();
     if let Some(last_user_msg) = messages.iter().rev().find(|m| m.role == "user") {
         let has_image = last_user_msg.image_base64.is_some();
         let task = crate::router::classify_task(&last_user_msg.content, has_image);
@@ -741,10 +754,29 @@ pub(crate) async fn send_message_stream_inline(
         if task == crate::router::TaskType::Complex && config.provider == "anthropic" {
             use_extended_thinking = true;
         }
-        let (provider, api_key, model) = crate::config::resolve_provider_for_task(&config, &task);
+        let (provider, api_key, model, chain, capability_unmet) =
+            crate::router::select_provider(task.clone(), &config);
+
+        // Emit one-shot missing-capability event per 4ab464c posture — ONCE
+        // per send_message_stream call, no retry loop, graceful degrade to
+        // primary. Payload carries NO api_key / NO user-content (T-11-24).
+        if let Some(cap) = capability_unmet {
+            let _ = app.emit_to("main", "blade_routing_capability_missing", serde_json::json!({
+                "capability": cap,
+                "task_type": format!("{:?}", task),
+                "primary_provider": config.provider.clone(),
+                "primary_model": config.model.clone(),
+                "message": format!(
+                    "This task needs a {}-capable model, but none of your providers support it.",
+                    cap
+                ),
+            }));
+        }
+
         config.provider = provider;
         config.api_key = api_key;
         config.model = model;
+        routing_chain = chain;
     }
 
     // Re-check API key after routing — the router may have switched to a
@@ -1144,8 +1176,15 @@ pub(crate) async fn send_message_stream_inline(
             )
             .await
         } else {
-            providers::stream_text(
+            // Phase 11 Plan 11-04 (D-55) — pass capability-filtered chain
+            // verbatim to the streaming orchestrator. On transient errors
+            // (429/503/5xx/network) the loop walks `routing_chain` in order,
+            // guaranteeing a vision task never falls through to a non-
+            // vision-capable provider (upstream invariant enforced by
+            // router::build_capability_filtered_chain).
+            providers::fallback_chain_complete_with_override(
                 &app,
+                routing_chain.clone(),
                 &config.provider,
                 &config.api_key,
                 &config.model,
