@@ -46,3 +46,41 @@ export interface ProviderKeyList {
  * @see src-tauri/src/deep_scan.rs `DeepScanResults`
  */
 export type DeepScanResults = Record<string, unknown>;
+
+// ---------------------------------------------------------------------------
+// Phase 11 Plan 11-01 — ParsedProviderConfig
+//
+// TS mirror of the Rust `ParsedProviderConfig` struct. Returned by the
+// `parse_provider_paste` Tauri command.
+//
+// @see src-tauri/src/provider_paste_parser.rs
+// @see .planning/phases/11-smart-provider-setup/11-CONTEXT.md §D-51
+// ---------------------------------------------------------------------------
+
+/** Provider identity guessed from the paste — superset of `ProviderId` that
+ *  adds `openrouter` and `custom` (custom base_url escape hatch per D-55). */
+export type ProviderGuess =
+  | 'openai'
+  | 'anthropic'
+  | 'groq'
+  | 'gemini'
+  | 'openrouter'
+  | 'ollama'
+  | 'custom';
+
+/**
+ * Result of parsing a provider-config paste (cURL / JSON / Python-SDK).
+ *
+ * Rust `Option<String>` fields cross the IPC boundary as `string | null`.
+ * Consumers MUST treat empty values as "unknown — prompt the user" rather
+ * than silently defaulting.
+ *
+ * @see src-tauri/src/provider_paste_parser.rs `pub struct ParsedProviderConfig`
+ */
+export interface ParsedProviderConfig {
+  provider_guess: ProviderGuess;
+  base_url: string | null;
+  api_key: string | null;
+  model: string | null;
+  headers: Record<string, string>;
+}

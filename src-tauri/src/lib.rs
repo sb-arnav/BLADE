@@ -613,6 +613,7 @@ pub fn run() {
             commands::set_config,
             commands::update_init_prefs,
             commands::test_provider,
+            commands::parse_provider_paste,
             commands::mcp_add_server,
             commands::mcp_install_catalog_server,
             commands::mcp_discover_tools,
