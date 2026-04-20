@@ -41,6 +41,12 @@ import { routes as adminRoutes }      from '@/features/admin';
 import { routes as bodyRoutes }       from '@/features/body';
 import { routes as hiveRoutes }       from '@/features/hive';
 import { routes as onboardingRoutes } from '@/features/onboarding';
+// Phase 11 Plan 11-05 — capability-gap consumer surfaces reachable via
+// openRoute('voice-orb'|'meeting-ghost'|'quickask'). These are main-window
+// gate views that pair with overlay-window implementations elsewhere.
+import { routes as voiceOrbRoutes }   from '@/features/voice-orb';
+import { routes as ghostRoutes }      from '@/features/ghost';
+import { routes as quickaskRoutes }   from '@/features/quickask';
 import { routes as devRoutes }        from '@/features/dev';
 
 export const ALL_ROUTES: RouteDefinition[] = [
@@ -56,6 +62,9 @@ export const ALL_ROUTES: RouteDefinition[] = [
   ...bodyRoutes,
   ...hiveRoutes,
   ...onboardingRoutes,
+  ...voiceOrbRoutes,
+  ...ghostRoutes,
+  ...quickaskRoutes,
   ...(import.meta.env.DEV ? devRoutes : []),
 ];
 
