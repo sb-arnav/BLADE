@@ -21,6 +21,7 @@ export {
   getOnboardingStatus,
   completeOnboarding,
   testProvider,
+  parseProviderPaste,
   getAllProviderKeys,
   storeProviderKey,
   switchProvider,

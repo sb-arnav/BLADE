@@ -13,7 +13,7 @@
 
 import { invokeTyped } from './_base';
 import type { BladeConfig } from '@/types/config';
-import type { ProviderKeyList } from '@/types/provider';
+import type { ParsedProviderConfig, ProviderKeyList } from '@/types/provider';
 import type { TaskRouting } from '@/types/routing';
 
 /** @see src-tauri/src/commands.rs:1899 `pub fn get_config() -> BladeConfig` */
@@ -74,6 +74,25 @@ export function testProvider(args: {
 /** @see src-tauri/src/config.rs:605 `pub fn get_all_provider_keys() -> serde_json::Value` */
 export function getAllProviderKeys(): Promise<ProviderKeyList> {
   return invokeTyped<ProviderKeyList>('get_all_provider_keys');
+}
+
+/**
+ * Phase 11 Plan 11-01 — paste parser (D-51).
+ *
+ * @see src-tauri/src/commands.rs `pub fn parse_provider_paste(input: String) -> Result<ParsedProviderConfig, String>`
+ * @see src-tauri/src/provider_paste_parser.rs
+ *
+ * Takes a raw cURL / JSON-config / Python-SDK snippet and returns the
+ * extracted `ParsedProviderConfig`. Throws `TauriError` with a user-facing
+ * `rustMessage` when detection fails (e.g. non-LLM cURL, malformed JSON).
+ *
+ * Consumed by onboarding + Settings paste forms (Plan 11-03).
+ */
+export function parseProviderPaste(input: string): Promise<ParsedProviderConfig> {
+  return invokeTyped<ParsedProviderConfig, { input: string }>(
+    'parse_provider_paste',
+    { input },
+  );
 }
 
 /** @see src-tauri/src/config.rs:636 `pub fn store_provider_key(provider: String, api_key: String) -> Result<(), String>` */

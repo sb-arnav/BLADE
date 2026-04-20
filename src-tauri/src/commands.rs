@@ -2235,6 +2235,20 @@ pub async fn test_provider(
     providers::test_connection(&provider, &api_key, &model, base_url.as_deref()).await
 }
 
+/// Phase 11 Plan 11-01 — thin Tauri wrapper around `provider_paste_parser::parse`.
+///
+/// Parses a raw paste (cURL / JSON / Python-SDK snippet) into a structured
+/// `ParsedProviderConfig`. Pure wrapper; all logic lives in the parser module.
+///
+/// @see src-tauri/src/provider_paste_parser.rs
+/// @see .planning/phases/11-smart-provider-setup/11-01-PLAN.md
+#[tauri::command]
+pub fn parse_provider_paste(
+    input: String,
+) -> Result<crate::provider_paste_parser::ParsedProviderConfig, String> {
+    crate::provider_paste_parser::parse(&input)
+}
+
 #[tauri::command]
 pub async fn mcp_add_server(
     state: tauri::State<'_, SharedMcpManager>,
