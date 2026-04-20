@@ -1207,6 +1207,11 @@ pub fn run() {
             deep_scan::deep_scan_start,
             deep_scan::deep_scan_results,
             deep_scan::deep_scan_summary,
+            // Deep Scan profile overlay (Plan 12-03)
+            deep_scan::profile::profile_get_rendered,
+            deep_scan::profile::profile_overlay_upsert,
+            deep_scan::profile::profile_overlay_reset,
+            deep_scan::profile::scan_cancel,
             // Integration Bridge — Phase 4 MCP real-world integrations
             integration_bridge::integration_get_state,
             integration_bridge::integration_toggle,

@@ -11,6 +11,7 @@
 //! deep_scan_summary) keep their original signatures (D-66).
 
 pub mod leads;
+pub mod profile;
 pub mod queue;
 pub mod rhythm;
 pub mod scanners;
