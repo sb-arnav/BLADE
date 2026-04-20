@@ -42,6 +42,7 @@ import type {
   BladeMessageStartPayload,
   BladeThinkingChunkPayload,
   BladeTokenRatioPayload,
+  ChatErrorPayload,
   ChatRoutingPayload,
   ChatTokenPayload,
   ToolApprovalNeededPayload,
@@ -55,10 +56,12 @@ import type { ChatMessage } from '@/types/messages';
 
 export interface ChatStreamMessage {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
   thinking?: string;
   createdAt: number;
+  /** Marks the message as an error-surface rather than a normal reply. */
+  isError?: boolean;
 }
 
 export type ChatStatus =
@@ -227,6 +230,29 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setRouting(e.payload);
   });
 
+  useTauriEvent<ChatErrorPayload>(BLADE_EVENTS.CHAT_ERROR, (e) => {
+    // Surface provider failures inline so the chat never sits silent. The
+    // Rust side also emits chat_done so streaming state resets naturally.
+    const errMsg: ChatStreamMessage = {
+      id: crypto.randomUUID(),
+      role: 'system',
+      content: e.payload.message,
+      createdAt: Date.now(),
+      isError: true,
+    };
+    // Drop in-flight streaming content — the provider never produced any.
+    tokenBufRef.current = '';
+    thinkBufRef.current = '';
+    streamingContentRef.current = '';
+    thinkingContentRef.current = '';
+    currentMessageIdRef.current = null;
+    setStreamingContent('');
+    setThinkingContent('');
+    setCurrentMessageId(null);
+    setMessages((prev) => [...prev, errMsg]);
+    setStatus('error');
+  });
+
   useTauriEvent<ToolApprovalNeededPayload>(BLADE_EVENTS.TOOL_APPROVAL_NEEDED, (e) => {
     setToolApprovalRequest(e.payload);
     setStatus('awaiting_tool');
@@ -282,6 +308,27 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     try {
       await sendMessageStream(wireMsgs);
     } catch (err) {
+      // Fallback surface — Rust emits chat_error with a friendly message on
+      // most error paths (fast path + provider failures), but any path that
+      // bubbles an Err without emitting lands here. Render something visible
+      // so the chat is never silent.
+      const alreadySurfacedViaEvent = messagesRef.current.some(
+        (m) => m.role === 'system' && m.isError && Date.now() - m.createdAt < 2000,
+      );
+      if (!alreadySurfacedViaEvent) {
+        const errText =
+          err instanceof Error ? err.message : typeof err === 'string' ? err : 'Unknown error';
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: 'system',
+            content: errText,
+            createdAt: Date.now(),
+            isError: true,
+          },
+        ]);
+      }
       setStatus('error');
       if (import.meta.env.DEV) {
         // Message content intentionally NOT logged (T-03-03-05 accept).

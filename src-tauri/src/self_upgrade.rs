@@ -20,13 +20,15 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapabilityGap {
     pub description: String,
     pub category: String,    // "missing_tool", "missing_runtime", "missing_permission"
     pub suggestion: String,  // what to install
-    pub install_cmd: String, // how to install it
+    pub install_cmd: String, // how to install it — empty string means "no installer on this OS"
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,7 +39,23 @@ pub struct InstallResult {
 }
 
 /// Detect the system package manager for cross-platform install commands.
-fn pkg_install_cmd(packages_apt: &str, packages_brew: &str, packages_dnf: &str) -> String {
+/// Pass a `winget` id (or "") for Windows; empty returns empty, signalling the
+/// auto-installer should skip silently instead of piping apt/brew into cmd.exe.
+fn pkg_install_cmd(
+    packages_apt: &str,
+    packages_brew: &str,
+    packages_dnf: &str,
+    packages_winget: &str,
+) -> String {
+    if cfg!(target_os = "windows") {
+        if packages_winget.is_empty() {
+            return String::new();
+        }
+        return format!(
+            "winget install --silent --accept-package-agreements --accept-source-agreements {}",
+            packages_winget
+        );
+    }
     if cfg!(target_os = "macos") {
         return format!("brew install {}", packages_brew);
     }
@@ -54,155 +72,255 @@ fn pkg_install_cmd(packages_apt: &str, packages_brew: &str, packages_dnf: &str) 
     } else if has("zypper") {
         format!("sudo zypper install -y {}", packages_apt)
     } else {
-        format!("# Could not detect package manager. Install manually: {}", packages_apt)
+        // No package manager detected. Return empty so auto_install skips
+        // silently instead of piping a `# comment` line into sh/cmd.
+        String::new()
     }
+}
+
+// ── Install cooldown ─────────────────────────────────────────────────────────
+// Prevent the auto-install loop: the same failing bash command would detect
+// the same missing tool on every turn, flooding logs and wasting CPU.
+// One successful OR failed install attempt per tool per cooldown window.
+
+static INSTALL_COOLDOWN: Mutex<Option<HashMap<String, Instant>>> = Mutex::new(None);
+const COOLDOWN_SECS: u64 = 60 * 60; // 1 hour
+
+fn cooldown_check_and_mark(key: &str) -> bool {
+    let mut guard = match INSTALL_COOLDOWN.lock() {
+        Ok(g) => g,
+        Err(_) => return true, // poisoned lock — don't block, just proceed
+    };
+    let map = guard.get_or_insert_with(HashMap::new);
+    let now = Instant::now();
+
+    // Purge stale entries opportunistically to keep the map small.
+    map.retain(|_, when| now.duration_since(*when) < Duration::from_secs(COOLDOWN_SECS));
+
+    if let Some(when) = map.get(key) {
+        if now.duration_since(*when) < Duration::from_secs(COOLDOWN_SECS) {
+            return false; // still cooling down — skip
+        }
+    }
+    map.insert(key.to_string(), now);
+    true
 }
 
 /// Catalog mapping what BLADE can't do → what to install (cross-platform)
 pub fn capability_catalog() -> HashMap<&'static str, CapabilityGap> {
     let mut map = HashMap::new();
 
-    // Development tools — cross-platform installers
+    // Development tools — cross-platform installers.
+    // Each call lists (apt, brew, dnf, winget). Empty winget id → no Windows
+    // installer defined; pkg_install_cmd returns "" and auto_install no-ops.
+    let node_cmd = if cfg!(target_os = "windows") {
+        "winget install --silent --accept-package-agreements --accept-source-agreements OpenJS.NodeJS".to_string()
+    } else if cfg!(target_os = "macos") {
+        "brew install node".to_string()
+    } else {
+        "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash && source ~/.bashrc && nvm install node".to_string()
+    };
     map.insert("node", CapabilityGap {
         description: "Node.js not found".to_string(),
         category: "missing_runtime".to_string(),
-        suggestion: "Install Node.js via nvm".to_string(),
-        install_cmd: if cfg!(target_os = "macos") {
-            "brew install node".to_string()
-        } else {
-            "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash && source ~/.bashrc && nvm install node".to_string()
-        },
+        suggestion: "Install Node.js".to_string(),
+        install_cmd: node_cmd,
     });
     map.insert("python3", CapabilityGap {
         description: "Python3 not found".to_string(),
         category: "missing_runtime".to_string(),
         suggestion: "Install Python3".to_string(),
-        install_cmd: pkg_install_cmd("python3 python3-pip", "python3", "python3 python3-pip"),
+        install_cmd: pkg_install_cmd("python3 python3-pip", "python3", "python3 python3-pip", "Python.Python.3.12"),
     });
+    let rust_cmd = if cfg!(target_os = "windows") {
+        "winget install --silent --accept-package-agreements --accept-source-agreements Rustlang.Rustup".to_string()
+    } else {
+        "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y".to_string()
+    };
     map.insert("rust", CapabilityGap {
         description: "Rust not found".to_string(),
         category: "missing_runtime".to_string(),
         suggestion: "Install Rust via rustup".to_string(),
-        install_cmd: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y".to_string(),
+        install_cmd: rust_cmd,
     });
+    let docker_cmd = if cfg!(target_os = "windows") {
+        "winget install --silent --accept-package-agreements --accept-source-agreements Docker.DockerDesktop".to_string()
+    } else if cfg!(target_os = "macos") {
+        "brew install --cask docker".to_string()
+    } else {
+        "curl -fsSL https://get.docker.com | sh".to_string()
+    };
     map.insert("docker", CapabilityGap {
         description: "Docker not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install Docker".to_string(),
-        install_cmd: if cfg!(target_os = "macos") {
-            "brew install --cask docker".to_string()
-        } else {
-            "curl -fsSL https://get.docker.com | sh".to_string()
-        },
+        install_cmd: docker_cmd,
     });
     map.insert("git", CapabilityGap {
         description: "Git not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install git".to_string(),
-        install_cmd: pkg_install_cmd("git", "git", "git"),
+        install_cmd: pkg_install_cmd("git", "git", "git", "Git.Git"),
     });
     map.insert("ffmpeg", CapabilityGap {
         description: "FFmpeg not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install FFmpeg for media processing".to_string(),
-        install_cmd: pkg_install_cmd("ffmpeg", "ffmpeg", "ffmpeg"),
+        install_cmd: pkg_install_cmd("ffmpeg", "ffmpeg", "ffmpeg", "Gyan.FFmpeg"),
     });
+    // npm/pip global installs: only offered when the relevant runtime exists.
+    // No runtime → empty cmd → auto_install skips. This prevents the node/npm
+    // bootstrap loop on fresh Windows boxes where npm itself isn't on PATH.
+    let claude_cmd = if which_exists("npm") {
+        "npm install -g @anthropic-ai/claude-code".to_string()
+    } else {
+        String::new()
+    };
     map.insert("claude", CapabilityGap {
         description: "Claude Code CLI not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install Claude Code CLI for autonomous coding agents".to_string(),
-        install_cmd: "npm install -g @anthropic-ai/claude-code".to_string(),
+        install_cmd: claude_cmd,
     });
+    let aider_cmd = if which_exists("pip") || which_exists("pip3") {
+        "pip install aider-chat".to_string()
+    } else {
+        String::new()
+    };
     map.insert("aider", CapabilityGap {
         description: "Aider AI coding assistant not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install Aider for pair programming".to_string(),
-        install_cmd: "pip install aider-chat".to_string(),
+        install_cmd: aider_cmd,
     });
     map.insert("jq", CapabilityGap {
         description: "jq (JSON processor) not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install jq for JSON processing".to_string(),
-        install_cmd: pkg_install_cmd("jq", "jq", "jq"),
+        install_cmd: pkg_install_cmd("jq", "jq", "jq", "jqlang.jq"),
     });
     map.insert("ripgrep", CapabilityGap {
         description: "ripgrep not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install ripgrep for fast file search".to_string(),
-        install_cmd: pkg_install_cmd("ripgrep", "ripgrep", "ripgrep"),
+        install_cmd: pkg_install_cmd("ripgrep", "ripgrep", "ripgrep", "BurntSushi.ripgrep.MSVC"),
     });
     map.insert("fd", CapabilityGap {
         description: "fd (find) not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install fd for fast file finding".to_string(),
-        install_cmd: pkg_install_cmd("fd-find", "fd", "fd-find"),
+        install_cmd: pkg_install_cmd("fd-find", "fd", "fd-find", "sharkdp.fd"),
     });
     map.insert("bat", CapabilityGap {
         description: "bat (better cat) not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install bat for syntax-highlighted file viewing".to_string(),
-        install_cmd: pkg_install_cmd("bat", "bat", "bat"),
+        install_cmd: pkg_install_cmd("bat", "bat", "bat", "sharkdp.bat"),
     });
     map.insert("go", CapabilityGap {
         description: "Go not installed".to_string(),
         category: "missing_runtime".to_string(),
         suggestion: "Install Go programming language".to_string(),
-        install_cmd: pkg_install_cmd("golang-go", "go", "golang"),
+        install_cmd: pkg_install_cmd("golang-go", "go", "golang", "GoLang.Go"),
     });
     map.insert("htop", CapabilityGap {
         description: "htop not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install htop for process monitoring".to_string(),
-        install_cmd: pkg_install_cmd("htop", "htop", "htop"),
+        // No native Windows htop; btop has a winget id, leave as no-op on Win.
+        install_cmd: pkg_install_cmd("htop", "htop", "htop", ""),
     });
     map.insert("tmux", CapabilityGap {
         description: "tmux not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install tmux for terminal multiplexing".to_string(),
-        install_cmd: pkg_install_cmd("tmux", "tmux", "tmux"),
+        // tmux doesn't run natively on Windows.
+        install_cmd: pkg_install_cmd("tmux", "tmux", "tmux", ""),
     });
 
     map
 }
 
-/// Detect missing tool from a failed command output
-pub fn detect_missing_tool(stderr: &str, command: &str) -> Option<CapabilityGap> {
-    let catalog = capability_catalog();
+fn which_exists(cmd: &str) -> bool {
+    let finder = if cfg!(target_os = "windows") { "where" } else { "which" };
+    std::process::Command::new(finder)
+        .arg(cmd)
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
 
-    // Check "command not found" patterns
+/// Detect missing tool from a failed command output.
+///
+/// Deliberately strict: only fires when stderr clearly says "command not
+/// found" AND the first token of the command matches a catalog entry. The
+/// old loose behaviour ("any catalog tool name appearing in stderr") caused
+/// spurious installs (e.g. `cargo build` stderr mentioning "fd" triggered
+/// fd-find installs).
+pub fn detect_missing_tool(stderr: &str, command: &str) -> Option<CapabilityGap> {
     let not_found_patterns = [
         "command not found",
-        "not found",
-        "No such file or directory",
-        "is not recognized",
-        "cannot find",
+        "is not recognized as an internal or external command",
+        ": not found",               // busybox / alpine sh
+        "No such file or directory", // only when paired with first-token match below
     ];
-
-    let looks_like_missing = not_found_patterns.iter().any(|p| stderr.contains(p) || command.contains(p));
+    let looks_like_missing = not_found_patterns.iter().any(|p| stderr.contains(p));
     if !looks_like_missing {
         return None;
     }
 
-    // Try to extract the missing binary from the command
-    let first_word = command.split_whitespace().next().unwrap_or("");
-    if let Some(gap) = catalog.get(first_word) {
-        return Some(gap.clone());
+    // Only match on the actual command the user tried to run. Don't scan
+    // stderr for other tool names — that was the source of false positives.
+    let first_word = command
+        .split_whitespace()
+        .next()
+        .unwrap_or("")
+        .trim_start_matches("./")
+        .trim_end_matches(".exe");
+    if first_word.is_empty() {
+        return None;
     }
 
-    // Check stderr for the tool name
-    for (tool, gap) in &catalog {
-        if stderr.contains(tool) || command.contains(tool) {
-            return Some(gap.clone());
-        }
-    }
-
-    None
+    let catalog = capability_catalog();
+    catalog.get(first_word).cloned()
 }
 
 /// Auto-install a missing tool. Returns (success, output).
-/// Only runs apt/pip/npm — never touches system-critical paths.
+/// Only runs apt/pip/npm/winget — never touches system-critical paths.
 pub async fn auto_install(gap: &CapabilityGap) -> InstallResult {
-    let cmd = &gap.install_cmd;
+    let cmd = gap.install_cmd.trim();
+
+    // No installer defined for this platform → skip silently. Previously the
+    // catalog emitted sh-style `# comment …` strings on Windows, which got
+    // piped into cmd.exe and flooded logs with "'#' is not recognized".
+    if cmd.is_empty() {
+        log::debug!(
+            "[self-upgrade] Skip: no installer for '{}' on this platform",
+            gap.suggestion
+        );
+        return InstallResult {
+            tool: gap.suggestion.clone(),
+            success: false,
+            output: String::from("No installer configured for this platform."),
+        };
+    }
+
+    // Cooldown gate: don't retry the same tool within the cooldown window.
+    // Key on the first catalog keyword + platform so repeated bash failures
+    // for the same missing tool stop spamming the installer.
+    let cooldown_key = format!("{}|{}", gap.suggestion, std::env::consts::OS);
+    if !cooldown_check_and_mark(&cooldown_key) {
+        log::debug!(
+            "[self-upgrade] Cooldown: already attempted '{}' recently, skipping",
+            gap.suggestion
+        );
+        return InstallResult {
+            tool: gap.suggestion.clone(),
+            success: false,
+            output: String::from("Skipped: recent install attempt still cooling down."),
+        };
+    }
+
     log::info!("[self-upgrade] Installing: {}", gap.suggestion);
 
     #[cfg(target_os = "windows")]

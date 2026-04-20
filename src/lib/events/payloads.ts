@@ -28,6 +28,12 @@ export interface ChatRoutingPayload {
   hive_active: boolean;
 }
 
+export interface ChatErrorPayload {
+  provider: string;
+  model: string;
+  message: string;
+}
+
 export type BladeStatusPayload = 'processing' | 'thinking' | 'idle' | 'error';
 
 export interface BladePlanningPayload {

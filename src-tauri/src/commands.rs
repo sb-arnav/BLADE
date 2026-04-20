@@ -426,6 +426,30 @@ fn is_reasoning_query(query: &str) -> bool {
 
 /// NOSE: sanitize user input before it reaches the brain.
 /// Strips null bytes, excessive whitespace, caps length, removes control chars.
+/// Translate a raw provider error string into a human-readable chat error.
+/// Preserves the original text as a trailing hint so a user can still report
+/// the full payload if they need to.
+fn friendly_stream_error(err: &str, provider: &str, model: &str) -> String {
+    let lower = err.to_ascii_lowercase();
+    let prefix = if lower.contains("401") || lower.contains("unauthorized") || lower.contains("invalid api key") {
+        format!("Your {} API key was rejected. Re-enter it in Settings → Providers.", provider)
+    } else if lower.contains("404") && (lower.contains("model") || lower.contains("not found")) {
+        format!(
+            "Model \"{}\" isn't available on {}. Open Settings → Providers and pick a different model.",
+            model, provider
+        )
+    } else if lower.contains("429") || lower.contains("rate limit") || lower.contains("too many requests") {
+        format!("{} is rate-limiting this key. Wait a moment or switch providers.", provider)
+    } else if lower.contains("timeout") || lower.contains("timed out") {
+        format!("{} took too long to respond. Try again or switch providers.", provider)
+    } else if lower.contains("connection") && (lower.contains("refused") || lower.contains("reset")) {
+        "Could not reach the provider. Check your network.".to_string()
+    } else {
+        format!("{} request failed.", provider)
+    };
+    format!("{} ({})", prefix, crate::safe_slice(err, 240))
+}
+
 fn sanitize_input(input: &str) -> String {
     const MAX_INPUT_CHARS: usize = 100_000;
 
@@ -1192,6 +1216,19 @@ pub(crate) async fn send_message_stream_inline(
                 });
             }
         } else {
+            // Fast-path streaming failed. Surface the error as a chat message
+            // instead of leaving the user with an invisible dead chat. Also
+            // emit chat_done so the UI unsticks from the streaming state if
+            // the provider didn't manage to emit it itself.
+            if let Err(ref msg) = result {
+                let pretty = friendly_stream_error(msg, &config.provider, &config.model);
+                emit_stream_event(&app, "chat_error", serde_json::json!({
+                    "provider": &config.provider,
+                    "model": &config.model,
+                    "message": pretty,
+                }));
+                emit_stream_event(&app, "chat_done", ());
+            }
             let _ = app.emit("blade_status", "error");
         }
         return result;
