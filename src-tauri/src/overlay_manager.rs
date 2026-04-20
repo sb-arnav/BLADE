@@ -370,6 +370,17 @@ pub fn get_primary_safe_area_insets(_app: tauri::AppHandle) -> serde_json::Value
         // upper bound covers MBP 14"/16" (2021+) and MBA 13"/15" (2022+).
         return serde_json::json!({ "top": 37, "bottom": 0, "left": 0, "right": 0 });
     }
+    // Non-macOS fallback — rustc flags the code after `return` above as
+    // unreachable on macOS, but it IS reached on every other target. The
+    // previous #[allow(unreachable_code)] was attached to the macro
+    // invocation (not the expression) and warned as misplaced.
+    #[cfg(not(target_os = "macos"))]
+    {
+        return serde_json::json!({ "top": 0, "bottom": 0, "left": 0, "right": 0 });
+    }
+    #[cfg(target_os = "macos")]
     #[allow(unreachable_code)]
-    serde_json::json!({ "top": 0, "bottom": 0, "left": 0, "right": 0 })
+    {
+        serde_json::json!({ "top": 0, "bottom": 0, "left": 0, "right": 0 })
+    }
 }

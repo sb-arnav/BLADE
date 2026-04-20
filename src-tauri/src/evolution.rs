@@ -14,7 +14,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 /// One entry in the built-in MCP catalog.
 struct CatalogEntry {

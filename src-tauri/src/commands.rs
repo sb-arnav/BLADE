@@ -692,8 +692,11 @@ pub(crate) async fn send_message_stream_inline(
     // message_id so the same id can be set in BLADE_CURRENT_MSG_ID env var below
     // for `blade_thinking_chunk` tagging in providers/anthropic.rs (WIRE-04).
     // Reset on each new turn (first emit before token loop).
-    #[allow(unused_assignments)]
-    let mut current_message_id: Option<String> = None;
+    // Prefix with `_` so downstream assignments don't trip unused-variable:
+    // the binding is kept in scope as a thread-local handoff target via the
+    // BLADE_CURRENT_MSG_ID env-var fallback (D-64). Consumers read the env,
+    // not this local — the local exists to document intent.
+    let mut _current_message_id: Option<String> = None;
 
     let _ = app.emit("blade_status", "processing");
 
@@ -888,7 +891,7 @@ pub(crate) async fn send_message_stream_inline(
                     // providers/anthropic.rs can tag blade_thinking_chunk with it
                     // (best-effort fallback per D-64; Phase 4 wires a real channel).
                     std::env::set_var("BLADE_CURRENT_MSG_ID", &msg_id);
-                    current_message_id = Some(msg_id);
+                    _current_message_id = Some(msg_id);
 
                     // Stream the final answer as chat tokens
                     let answer = &trace.final_answer;
@@ -1414,7 +1417,7 @@ pub(crate) async fn send_message_stream_inline(
                 "role": "assistant",
             }));
             std::env::set_var("BLADE_CURRENT_MSG_ID", &msg_id);
-            current_message_id = Some(msg_id);
+            _current_message_id = Some(msg_id);
 
             // Extract and execute semantic action tags before emitting to frontend.
             // clean_content has [ACTION:...] tags stripped; actions are dispatched async.
