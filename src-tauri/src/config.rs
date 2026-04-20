@@ -32,6 +32,78 @@ pub struct TaskRouting {
     pub fallback: Option<String>,
 }
 
+// ---------------------------------------------------------------------------
+// Phase 11 Plan 11-02 (D-52, D-53) — capability probe result metadata.
+//
+// ProbeStatus classifies the outcome of a single idempotent capability probe.
+// ProviderCapabilityRecord carries the capability flags (derived from the
+// static matrix in capability_probe.rs) plus the probe timestamp. Records are
+// persisted on BladeConfig.provider_capabilities and surfaced in the UI so
+// the user knows which providers the app has confirmed working.
+//
+// @see src-tauri/src/capability_probe.rs
+// @see .planning/phases/11-smart-provider-setup/11-CONTEXT.md §D-52
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub enum ProbeStatus {
+    #[default]
+    NotProbed,
+    Active,
+    InvalidKey,
+    ModelNotFound,
+    RateLimitedButValid,
+    ProviderDown,
+    NetworkError,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ProviderCapabilityRecord {
+    pub provider: String,
+    pub model: String,
+    pub context_window: u32,
+    pub vision: bool,
+    pub audio: bool,
+    pub tool_calling: bool,
+    pub long_context: bool,
+    pub last_probed: chrono::DateTime<chrono::Utc>,
+    #[serde(default)]
+    pub probe_status: ProbeStatus,
+}
+
+// ---------------------------------------------------------------------------
+// Phase 11 Plan 11-02 — test-only keyring override seam.
+//
+// Used by router + probe unit tests (Plan 11-04) to deterministically mock
+// `get_provider_key` without touching the real OS keyring. Production builds
+// never compile this; the `#[cfg(test)]` gate excludes it from release
+// artifacts by compiler contract.
+//
+// Usage:
+//     config::test_set_keyring_override("anthropic", "sk-ant-fake");
+//     let k = config::get_provider_key("anthropic");
+//     assert_eq!(k, "sk-ant-fake");
+//     config::test_clear_keyring_overrides();
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+thread_local! {
+    static TEST_KEYRING_OVERRIDES: std::cell::RefCell<std::collections::HashMap<String, String>>
+        = std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+#[cfg(test)]
+pub fn test_set_keyring_override(provider: &str, key: &str) {
+    TEST_KEYRING_OVERRIDES.with(|o| {
+        o.borrow_mut().insert(provider.to_string(), key.to_string());
+    });
+}
+
+#[cfg(test)]
+pub fn test_clear_keyring_overrides() {
+    TEST_KEYRING_OVERRIDES.with(|o| o.borrow_mut().clear());
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SavedMcpServerConfig {
     pub name: String,
@@ -145,6 +217,19 @@ struct DiskConfig {
     /// HIVE global autonomy level: 0.0 = always ask, 1.0 = fully autonomous
     #[serde(default = "default_hive_autonomy")]
     hive_autonomy: f32,
+    // Phase 11 Plan 11-02 — probe-driven capability metadata + per-capability
+    // provider slots (D-53). Each has `#[serde(default)]` for backward compat
+    // with older config files that predate Phase 11.
+    #[serde(default)]
+    provider_capabilities: std::collections::HashMap<String, ProviderCapabilityRecord>,
+    #[serde(default)]
+    vision_provider: Option<String>,
+    #[serde(default)]
+    audio_provider: Option<String>,
+    #[serde(default)]
+    long_context_provider: Option<String>,
+    #[serde(default)]
+    tools_provider: Option<String>,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -215,6 +300,11 @@ impl Default for DiskConfig {
             ghost_auto_reply: false,
             hive_enabled: false,
             hive_autonomy: 0.3,
+            provider_capabilities: std::collections::HashMap::new(),
+            vision_provider: None,
+            audio_provider: None,
+            long_context_provider: None,
+            tools_provider: None,
             api_key: None,
         }
     }
@@ -323,6 +413,21 @@ pub struct BladeConfig {
     /// HIVE global autonomy level: 0.0 = always ask, 1.0 = fully autonomous
     #[serde(default = "default_hive_autonomy")]
     pub hive_autonomy: f32,
+    // Phase 11 Plan 11-02 (D-52, D-53) — probe-driven capability metadata + 4
+    // per-capability provider slots. `provider_capabilities` stores the latest
+    // ProviderCapabilityRecord per provider name; the 4 Option<String> slots
+    // hold "provider/model" strings chosen either by auto-populate (first
+    // capable provider fills a None slot) or explicit user override.
+    #[serde(default)]
+    pub provider_capabilities: std::collections::HashMap<String, ProviderCapabilityRecord>,
+    #[serde(default)]
+    pub vision_provider: Option<String>,
+    #[serde(default)]
+    pub audio_provider: Option<String>,
+    #[serde(default)]
+    pub long_context_provider: Option<String>,
+    #[serde(default)]
+    pub tools_provider: Option<String>,
 }
 
 impl BladeConfig {
@@ -379,6 +484,11 @@ impl Default for BladeConfig {
             ghost_auto_reply: false,
             hive_enabled: false,
             hive_autonomy: 0.3,
+            provider_capabilities: std::collections::HashMap::new(),
+            vision_provider: None,
+            audio_provider: None,
+            long_context_provider: None,
+            tools_provider: None,
         }
     }
 }
@@ -408,7 +518,19 @@ fn get_api_key_from_keyring(provider: &str) -> String {
 
 /// Retrieve the stored API key for any provider. Returns empty string if none.
 /// Used by modules that need to probe available providers (e.g. fast-ack routing).
+///
+/// Phase 11 Plan 11-02 — in `#[cfg(test)]` builds, callers can pre-seed
+/// `TEST_KEYRING_OVERRIDES` via `test_set_keyring_override(provider, key)` to
+/// deterministically bypass the real OS keyring. Production builds never
+/// compile the override branch (gated behind `#[cfg(test)]`).
 pub(crate) fn get_provider_key(provider: &str) -> String {
+    #[cfg(test)]
+    {
+        let override_val = TEST_KEYRING_OVERRIDES.with(|o| o.borrow().get(provider).cloned());
+        if let Some(k) = override_val {
+            return k;
+        }
+    }
     get_api_key_from_keyring(provider)
 }
 
@@ -508,6 +630,11 @@ pub fn load_config() -> BladeConfig {
         ghost_auto_reply: disk.ghost_auto_reply,
         hive_enabled: disk.hive_enabled,
         hive_autonomy: disk.hive_autonomy,
+        provider_capabilities: disk.provider_capabilities,
+        vision_provider: disk.vision_provider,
+        audio_provider: disk.audio_provider,
+        long_context_provider: disk.long_context_provider,
+        tools_provider: disk.tools_provider,
     }
 }
 
@@ -560,6 +687,11 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         ghost_auto_reply: config.ghost_auto_reply,
         hive_enabled: config.hive_enabled,
         hive_autonomy: config.hive_autonomy,
+        provider_capabilities: config.provider_capabilities.clone(),
+        vision_provider: config.vision_provider.clone(),
+        audio_provider: config.audio_provider.clone(),
+        long_context_provider: config.long_context_provider.clone(),
+        tools_provider: config.tools_provider.clone(),
         api_key: None,
     };
 
@@ -820,4 +952,91 @@ pub fn write_blade_file(path: &PathBuf, contents: &str) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Phase 11 Plan 11-02 — unit tests (config round-trip + keyring seam).
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Round-trip `BladeConfig` through serde_json and assert all 5 new
+    /// Phase 11 fields persist. Serde is the same codec `save_disk_config`
+    /// uses, so this exercises the same keys the keyring-coupled on-disk
+    /// path would — without requiring a live OS keyring.
+    #[test]
+    fn phase11_fields_round_trip() {
+        let mut cfg = BladeConfig::default();
+        cfg.vision_provider = Some("anthropic/claude-sonnet-4".to_string());
+        cfg.audio_provider = Some("openai/gpt-4o-audio-preview".to_string());
+        cfg.long_context_provider = Some("gemini/gemini-1.5-pro".to_string());
+        cfg.tools_provider = Some("anthropic/claude-sonnet-4".to_string());
+
+        let rec = ProviderCapabilityRecord {
+            provider: "anthropic".to_string(),
+            model: "claude-sonnet-4".to_string(),
+            context_window: 200_000,
+            vision: true,
+            audio: false,
+            tool_calling: true,
+            long_context: true,
+            last_probed: chrono::Utc::now(),
+            probe_status: ProbeStatus::Active,
+        };
+        cfg.provider_capabilities
+            .insert("anthropic".to_string(), rec.clone());
+
+        let serialized = serde_json::to_string(&cfg).expect("serialize BladeConfig");
+        let loaded: BladeConfig = serde_json::from_str(&serialized).expect("deserialize BladeConfig");
+
+        assert_eq!(loaded.vision_provider, cfg.vision_provider);
+        assert_eq!(loaded.audio_provider, cfg.audio_provider);
+        assert_eq!(loaded.long_context_provider, cfg.long_context_provider);
+        assert_eq!(loaded.tools_provider, cfg.tools_provider);
+        assert_eq!(
+            loaded.provider_capabilities.get("anthropic"),
+            cfg.provider_capabilities.get("anthropic"),
+            "ProviderCapabilityRecord must round-trip byte-for-byte"
+        );
+    }
+
+    /// The `#[cfg(test)]` keyring-override seam short-circuits `get_provider_key`
+    /// so router + probe unit tests (Plan 11-04) can inject deterministic keys
+    /// without touching the real OS keyring. Clearing the seam restores the
+    /// real-keyring code path.
+    #[test]
+    fn keyring_override_seam_returns_overridden_value() {
+        // Use a per-test unique provider name so sibling tests running on the
+        // same thread-local state don't collide (thread_local is scoped to the
+        // test-runner thread but cargo-test uses one thread per test by default).
+        let slot = "anthropic_probe_seam_test";
+        test_clear_keyring_overrides();
+        test_set_keyring_override(slot, "sk-ant-fake-test-key");
+        let k = get_provider_key(slot);
+        assert_eq!(
+            k, "sk-ant-fake-test-key",
+            "override must take precedence over real keyring"
+        );
+        test_clear_keyring_overrides();
+        let cleared = get_provider_key(slot);
+        assert_ne!(
+            cleared, "sk-ant-fake-test-key",
+            "override must be cleared — fall-through to real keyring"
+        );
+    }
+
+    /// Defaults for the 5 Phase 11 fields match the spec: empty HashMap +
+    /// four None Options. Guards against silent drift where a future edit
+    /// adds a non-None default that would leak an unintended provider hint.
+    #[test]
+    fn phase11_defaults_are_empty_or_none() {
+        let cfg = BladeConfig::default();
+        assert!(cfg.provider_capabilities.is_empty());
+        assert!(cfg.vision_provider.is_none());
+        assert!(cfg.audio_provider.is_none());
+        assert!(cfg.long_context_provider.is_none());
+        assert!(cfg.tools_provider.is_none());
+    }
 }
