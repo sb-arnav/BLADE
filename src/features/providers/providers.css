@@ -1,0 +1,211 @@
+/* src/features/providers/providers.css — Phase 11 Plan 11-03.
+ *
+ * Feature-local styles for ProviderPasteForm, CapabilityPillStrip,
+ * FallbackOrderList. Token-only — no raw px, no raw colors. All values
+ * resolve to var(--s-*) / var(--t-*) / var(--a-*) / var(--g-*) from
+ * src/styles/tokens.css (D-05 + D-11 + UI-SPEC Verification Targets 4+5).
+ *
+ * @see .planning/phases/11-smart-provider-setup/11-UI-SPEC.md
+ *      Surface A, Surface B, Surface D, Copywriting Contract
+ */
+
+/* -----------------------------------------------------------------------
+ * ProviderPasteForm — shared paste card layout
+ * --------------------------------------------------------------------- */
+.paste-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.paste-form__heading {
+  margin: 0;
+}
+
+.paste-form__subhead {
+  margin: 0;
+  color: var(--t-2);
+}
+
+.paste-form__textarea {
+  font-family: var(--font-mono);
+  width: 100%;
+  min-height: 120px;
+  max-height: 320px;
+  resize: vertical;
+}
+
+.paste-form__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+
+.paste-form__examples-link {
+  color: var(--t-2);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.paste-form__examples-link:focus-visible {
+  outline: 2px solid var(--a-cool);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.paste-form__examples-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  background: var(--g-fill-weak);
+  border: 1px solid var(--g-edge-lo);
+  border-radius: 8px;
+}
+
+.paste-form__badge {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  background: var(--g-fill);
+  border: 1px solid var(--g-edge-lo);
+  border-radius: 10px;
+  margin-top: var(--s-3);
+}
+
+.paste-form__badge-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+.paste-form__badge-url {
+  color: var(--t-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.paste-form__pill-strip {
+  margin-top: var(--s-3);
+}
+
+.paste-form__status {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  color: var(--t-2);
+}
+
+.paste-form__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* -----------------------------------------------------------------------
+ * CapabilityPillStrip — 4 capability pills + optional re-probe
+ * --------------------------------------------------------------------- */
+.capability-strip {
+  display: flex;
+  gap: var(--s-1);
+  flex-wrap: wrap;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  align-items: center;
+}
+
+.capability-strip__item {
+  display: inline-flex;
+}
+
+/* -----------------------------------------------------------------------
+ * FallbackOrderList — drag-to-reorder list + toggle
+ * --------------------------------------------------------------------- */
+.fallback-order-section {
+  margin-top: var(--s-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.fallback-order-section__heading {
+  margin: 0;
+}
+
+.fallback-order-section__helper {
+  margin: 0;
+  color: var(--t-2);
+}
+
+.fallback-order-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.fallback-order-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  border-top: 2px solid transparent;
+  transition: opacity var(--dur-fast) var(--ease-smooth);
+}
+
+.fallback-order-row[data-drop-target='true'] {
+  border-top-color: var(--a-cool);
+}
+
+.fallback-order-row[data-dragging='true'] {
+  opacity: 0.4;
+}
+
+.fallback-order-row__handle {
+  color: var(--t-3);
+  cursor: grab;
+  user-select: none;
+}
+
+.fallback-order-row__handle:active {
+  cursor: grabbing;
+}
+
+.fallback-order-row__label {
+  color: var(--t-1);
+}
+
+.fallback-order-row__meta {
+  color: var(--t-3);
+}
+
+.fallback-order-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+  color: var(--t-2);
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fallback-order-row {
+    transition: none;
+  }
+}

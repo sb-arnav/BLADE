@@ -24,6 +24,8 @@ import { Button, Card, Input, Pill } from '@/design-system/primitives';
 import { PROVIDERS } from '@/features/onboarding/providers';
 import {
   getAllProviderKeys,
+  probeProviderCapabilities,
+  saveConfigField,
   storeProviderKey,
   switchProvider,
   testProvider,
@@ -31,7 +33,18 @@ import {
 } from '@/lib/tauri';
 import { useToast } from '@/lib/context';
 import { useConfig } from '@/lib/context';
-import type { ProviderKeyList } from '@/types/provider';
+import type {
+  ProviderCapabilityRecord,
+  ProviderKeyList,
+} from '@/types/provider';
+// Phase 11 D-57: three additions — paste form at top, per-row capability
+// pill strip + re-probe button, fallback-order drag list at bottom. The
+// existing per-card Test/Save flow remains unchanged.
+import {
+  CapabilityPillStrip,
+  FallbackOrderList,
+  ProviderPasteForm,
+} from '@/features/providers';
 
 function errMessage(e: unknown): string {
   if (e instanceof TauriError) return e.rustMessage || e.message;
@@ -40,11 +53,27 @@ function errMessage(e: unknown): string {
 
 export function ProvidersPane() {
   const { show } = useToast();
-  const { reload } = useConfig();
+  const { config, reload } = useConfig();
   const [keys, setKeys] = useState<ProviderKeyList | null>(null);
   const [pending, setPending] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<Record<string, 'test' | 'save' | null>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Phase 11 D-52 — per-row re-probe busy state. null = idle, provider id
+  // = probe currently in flight for that row.
+  const [reprobing, setReprobing] = useState<string | null>(null);
+  // Phase 11 D-57 — toggle controlled here so the consumer owns the
+  // auto-populate logic (FallbackOrderList is presentational).
+  const [useAllProviders, setUseAllProviders] = useState<boolean>(false);
+
+  // BladeConfig carries provider_capabilities + fallback_providers as
+  // optional fields (typed via the permissive index signature on
+  // src/types/config.ts). Narrow to the expected shapes here.
+  const providerCapabilities =
+    (config.provider_capabilities as
+      | Record<string, ProviderCapabilityRecord>
+      | undefined) ?? {};
+  const fallbackProviders =
+    (config.fallback_providers as string[] | undefined) ?? [];
 
   const refresh = () => {
     getAllProviderKeys()
@@ -114,10 +143,91 @@ export function ProvidersPane() {
     );
   }
 
+  /**
+   * Phase 11 D-52 — re-probe a provider's capabilities. The Rust command
+   * `probe_provider_capabilities` accepts `api_key: Option<String>` (Plan
+   * 11-02 Task 3) — when we OMIT the `apiKey` field here, Rust falls back
+   * to `config::get_provider_key(provider)` which reads the OS keyring.
+   * This keeps the key off the TS boundary for re-probe flows (T-11-32
+   * threat register entry). Do NOT pass an empty string for apiKey —
+   * Rust treats empty as invalid and errors out.
+   */
+  const handleReprobe = async (providerId: string) => {
+    setReprobing(providerId);
+    try {
+      const existing = providerCapabilities[providerId];
+      const model = existing?.model ?? '';
+      const record = await probeProviderCapabilities({
+        provider: providerId,
+        model,
+        // apiKey intentionally omitted — Rust reads from keyring.
+      });
+      const merged = { ...providerCapabilities, [providerId]: record };
+      await saveConfigField('provider_capabilities', JSON.stringify(merged));
+      await reload();
+      show({ type: 'success', title: 'Re-probe complete', message: `${providerId} capabilities updated.` });
+    } catch (e) {
+      show({ type: 'error', title: 'Re-probe failed', message: errMessage(e) });
+    } finally {
+      setReprobing(null);
+    }
+  };
+
+  /** Phase 11 D-57 — persist new fallback order. */
+  const handleFallbackChange = async (newOrder: string[]) => {
+    try {
+      await saveConfigField('fallback_providers', JSON.stringify(newOrder));
+      await reload();
+    } catch (e) {
+      show({ type: 'error', title: 'Save failed', message: errMessage(e) });
+    }
+  };
+
+  /** Phase 11 D-57 — "Use all providers with keys" toggle. When flipped
+   *  on, auto-populates the fallback list with every provider that has a
+   *  stored key, alphabetically. Turning it off does NOT clear the list —
+   *  user's manual order persists per UI-SPEC Surface B. */
+  const handleToggleUseAll = async (checked: boolean) => {
+    setUseAllProviders(checked);
+    if (checked) {
+      const withKeys = keys.providers
+        .filter((p) => p.has_key)
+        .map((p) => p.provider)
+        .sort();
+      await handleFallbackChange(withKeys);
+    }
+  };
+
   return (
     <div className="settings-section">
       <h2>Providers</h2>
       <p>Configure your API keys. Keys are stored in your OS keyring — BLADE only sees them at invoke time.</p>
+
+      {/* Phase 11 D-56 — paste card at the top of the pane. Plan 11-05
+          Task 2 will wrap this mount in a ref'd div so routeHint.needs
+          can scroll + focus the textarea. This plan leaves the form as a
+          bare JSX child for a clean div-wrap target. */}
+      <ProviderPasteForm
+        onSuccess={async (parsed) => {
+          if (
+            parsed.api_key &&
+            parsed.provider_guess !== 'custom'
+          ) {
+            try {
+              await storeProviderKey(parsed.provider_guess, parsed.api_key);
+              refresh();
+              await reload();
+              show({
+                type: 'success',
+                title: 'Saved',
+                message: `${parsed.provider_guess} key stored from paste.`,
+              });
+            } catch (e) {
+              show({ type: 'error', title: 'Save failed', message: errMessage(e) });
+            }
+          }
+        }}
+      />
 
       <div className="settings-grid">
         {PROVIDERS.map((p) => {
@@ -126,6 +236,7 @@ export function ProvidersPane() {
           const isActive = stored?.is_active ?? false;
           const pendingValue = pending[p.id] ?? '';
           const currentBusy = busy[p.id];
+          const record = providerCapabilities[p.id] ?? null;
 
           return (
             <Card key={p.id}>
@@ -144,6 +255,24 @@ export function ProvidersPane() {
                   <Pill>No key needed (local)</Pill>
                 )}
               </div>
+
+              {/* Phase 11 D-52 — capability pill strip + re-probe button.
+                  Only renders when a key is stored (can't probe without one). */}
+              {hasKey ? (
+                <div style={{ marginBottom: 'var(--s-3)' }}>
+                  <CapabilityPillStrip
+                    provider={p.id}
+                    record={record}
+                    onReprobe={() => handleReprobe(p.id)}
+                    busy={reprobing === p.id}
+                  />
+                  {!record ? (
+                    <p className="t-small" style={{ color: 'var(--t-3)', marginTop: 'var(--s-1)' }}>
+                      Click ↻ to probe capabilities.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
 
               <Input
                 type="password"
@@ -190,6 +319,18 @@ export function ProvidersPane() {
           );
         })}
       </div>
+
+      {/* Phase 11 D-57 — fallback-order drag list. Reorder persists to
+          config.fallback_providers via saveConfigField. The "Use all
+          providers with keys" toggle is controlled here; flipping it on
+          auto-populates with every provider that has a stored key. */}
+      <FallbackOrderList
+        providers={fallbackProviders}
+        capabilityRecords={providerCapabilities}
+        onChange={handleFallbackChange}
+        useAll={useAllProviders}
+        onToggleUseAll={handleToggleUseAll}
+      />
     </div>
   );
 }
