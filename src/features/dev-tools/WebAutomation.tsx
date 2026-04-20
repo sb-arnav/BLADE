@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { GlassPanel, Button } from '@/design-system/primitives';
 import { usePrefs } from '@/hooks/usePrefs';
 import { useToast } from '@/lib/context/ToastContext';
+import { CapabilityGap, useCapability } from '@/features/providers';
 import { BLADE_EVENTS, useTauriEvent } from '@/lib/events';
 import type { BrowserAgentStepPayload } from '@/lib/events/payloads';
 import {
@@ -44,7 +45,21 @@ interface TraceStep {
 const TAB_PREFIX = 'web:';
 const MAX_TRACE_ROWS = 200;
 
+// Phase 11 Plan 11-05 (PROV-08) — capability wrapper. Web automation runs a
+// tool-calling agent loop; gate the surface on `tools` capability.
 export function WebAutomation() {
+  const { hasCapability: hasTools } = useCapability('tools');
+  if (!hasTools) {
+    return (
+      <div style={{ padding: 'var(--s-6)' }} data-testid="web-automation-root">
+        <CapabilityGap capability="tools" surfaceLabel="Web automation" />
+      </div>
+    );
+  }
+  return <WebAutomationBody />;
+}
+
+function WebAutomationBody() {
   const { prefs, setPref } = usePrefs();
   const toast = useToast();
 

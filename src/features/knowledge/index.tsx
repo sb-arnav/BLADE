@@ -30,4 +30,8 @@ export const routes: RouteDefinition[] = [
   { id: 'daily-log',             label: 'Daily Log',             section: 'knowledge', component: DailyLog,             phase: 5 },
   { id: 'conversation-insights', label: 'Conversation Insights', section: 'knowledge', component: ConversationInsights, phase: 5 },
   { id: 'codebase-explorer',     label: 'Codebase Explorer',     section: 'knowledge', component: CodebaseExplorer,     phase: 5 },
+  // Phase 11 Plan 11-05 — long-context capability-gap alias route. KnowledgeBase
+  // surfaces the same Capabilities banner whether entered via 'knowledge-base'
+  // or 'knowledge-full-repo'; CAPABILITY_SURFACES references the latter id.
+  { id: 'knowledge-full-repo',   label: 'Full-repo Indexing',    section: 'knowledge', component: KnowledgeBase,        phase: 11, paletteHidden: true },
 ];

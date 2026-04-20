@@ -1,4 +1,4 @@
-// src/features/settings/panes/ProvidersPane.tsx — SET-01 (D-81).
+// src/features/settings/panes/ProvidersPane.tsx — SET-01 (D-81) + Phase 11 D-52/D-56/D-57.
 //
 // Reuses the PROVIDERS registry from src/features/onboarding/providers.ts
 // verbatim (D-81 — no duplication). 6 cards, each with:
@@ -8,17 +8,23 @@
 //   • Test connection button → testProvider()
 //   • Save & switch button → storeProviderKey + switchProvider
 //
+// Phase 11 additions:
+//   • D-56 paste card at top (ProviderPasteForm from Plan 11-03) inside a
+//     div-wrap ref (Plan 11-05) so routeHint.needs deep-link focuses the textarea.
+//   • D-52 per-row capability pill strip + re-probe button (re-probe OMITS
+//     apiKey — Rust reads from keyring per Plan 11-02 Option<String> contract).
+//   • D-57 fallback-order drag list at bottom + "Use all providers with keys"
+//     toggle.
+//
 // Failure path: TauriError caught, message surfaced via toast (rustMessage).
 // Pending key cleared from component state immediately after successful save
 // (T-03-06-02 mitigation — no localStorage persistence).
 //
 // @see .planning/phases/03-dashboard-chat-settings/03-CONTEXT.md §D-81
-// @see .planning/phases/03-dashboard-chat-settings/03-PATTERNS.md §10
-// @see src-tauri/src/commands.rs:2025 test_provider
-// @see src-tauri/src/config.rs:636 store_provider_key
-// @see src-tauri/src/config.rs:645 switch_provider
+// @see .planning/phases/11-smart-provider-setup/11-CONTEXT.md §D-52 §D-56 §D-57
+// @see .planning/phases/11-smart-provider-setup/11-UI-SPEC.md §Surface B
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { Button, Card, Input, Pill } from '@/design-system/primitives';
 import { PROVIDERS } from '@/features/onboarding/providers';
@@ -33,6 +39,7 @@ import {
 } from '@/lib/tauri';
 import { useToast } from '@/lib/context';
 import { useConfig } from '@/lib/context';
+import { useRouterCtx } from '@/windows/main/useRouter';
 import type {
   ProviderCapabilityRecord,
   ProviderKeyList,
@@ -54,6 +61,9 @@ function errMessage(e: unknown): string {
 export function ProvidersPane() {
   const { show } = useToast();
   const { config, reload } = useConfig();
+  // Phase 11 Plan 11-05 — consume routeHint?.needs for deep-link focus.
+  const { routeHint } = useRouterCtx();
+  const pasteFormWrapRef = useRef<HTMLDivElement>(null);
   const [keys, setKeys] = useState<ProviderKeyList | null>(null);
   const [pending, setPending] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<Record<string, 'test' | 'save' | null>>({});
@@ -84,6 +94,33 @@ export function ProvidersPane() {
   useEffect(() => {
     refresh();
   }, []);
+
+  // Phase 11 Plan 11-05 — deep-link scroll-focus. When ProvidersPane is opened
+  // via openRoute('settings-providers', { needs: <cap> }), scroll the paste
+  // form wrapper into view and focus its descendant textarea (aria-label
+  // "Provider config paste input"). 2×rAF waits for the pane layout to settle
+  // (UI-SPEC §Surface C accessibility). The textarea is provided by the
+  // ProviderPasteForm component mounted inside pasteFormWrapRef below.
+  useEffect(() => {
+    if (!routeHint?.needs) return;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const target = pasteFormWrapRef.current;
+        if (!target) return;
+        const prefersReducedMotion =
+          typeof window !== 'undefined' &&
+          window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+        target.scrollIntoView({
+          behavior: prefersReducedMotion ? 'auto' : 'smooth',
+          block: 'center',
+        });
+        const ta = target.querySelector<HTMLTextAreaElement>(
+          'textarea[aria-label="Provider config paste input"]',
+        );
+        ta?.focus();
+      });
+    });
+  }, [routeHint]);
 
   const handleTest = async (providerId: string, defaultModel: string) => {
     const apiKey = pending[providerId] ?? '';
@@ -203,31 +240,43 @@ export function ProvidersPane() {
       <h2>Providers</h2>
       <p>Configure your API keys. Keys are stored in your OS keyring — BLADE only sees them at invoke time.</p>
 
-      {/* Phase 11 D-56 — paste card at the top of the pane. Plan 11-05
-          Task 2 will wrap this mount in a ref'd div so routeHint.needs
-          can scroll + focus the textarea. This plan leaves the form as a
-          bare JSX child for a clean div-wrap target. */}
-      <ProviderPasteForm
-        onSuccess={async (parsed) => {
-          if (
-            parsed.api_key &&
-            parsed.provider_guess !== 'custom'
-          ) {
-            try {
-              await storeProviderKey(parsed.provider_guess, parsed.api_key);
-              refresh();
-              await reload();
-              show({
-                type: 'success',
-                title: 'Saved',
-                message: `${parsed.provider_guess} key stored from paste.`,
-              });
-            } catch (e) {
-              show({ type: 'error', title: 'Save failed', message: errMessage(e) });
+      {/* Phase 11 Plan 11-05 — sr-only live-region announcement for deep-link
+          arrival. Screen readers hear "Paste your provider config to add
+          {capability} support." when routeHint.needs is set. */}
+      {routeHint?.needs && (
+        <div className="sr-only" role="status" aria-live="polite">
+          Paste your provider config to add {routeHint.needs} support.
+        </div>
+      )}
+
+      {/* Phase 11 D-56 — paste card at top of pane. Wrapped in a div ref so
+          Plan 11-05's routeHint.needs deep-link can scrollIntoView + focus the
+          textarea inside ProviderPasteForm (aria-label "Provider config paste
+          input"). The div-wrap pattern keeps ProviderPasteForm props stable
+          (onSuccess?, defaultValue? only — no textareaRef prop). */}
+      <div ref={pasteFormWrapRef} data-testid="provider-paste-form-wrap">
+        <ProviderPasteForm
+          onSuccess={async (parsed) => {
+            if (
+              parsed.api_key &&
+              parsed.provider_guess !== 'custom'
+            ) {
+              try {
+                await storeProviderKey(parsed.provider_guess, parsed.api_key);
+                refresh();
+                await reload();
+                show({
+                  type: 'success',
+                  title: 'Saved',
+                  message: `${parsed.provider_guess} key stored from paste.`,
+                });
+              } catch (e) {
+                show({ type: 'error', title: 'Save failed', message: errMessage(e) });
+              }
             }
-          }
-        }}
-      />
+          }}
+        />
+      </div>
 
       <div className="settings-grid">
         {PROVIDERS.map((p) => {
