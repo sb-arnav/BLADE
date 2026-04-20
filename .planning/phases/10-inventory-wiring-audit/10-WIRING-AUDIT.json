@@ -7063,6 +7063,46 @@
       "reachable_paths": [
         "invokeTyped('world_get_state') -> src-tauri/src/world_model.rs:1019"
       ]
+    },
+    {
+      "file": "src-tauri/src/provider_paste_parser.rs",
+      "classification": "ACTIVE",
+      "purpose": "Shared Phase 11 paste parser — detects cURL / JSON-config / Python-SDK snippets and returns a unified ParsedProviderConfig (provider + model + base_url + api_key + headers)",
+      "trigger": "#[tauri::command] parse_provider_paste (onboarding + Settings paste flows)",
+      "ui_surface": "src/features/providers/ProviderPasteForm.tsx",
+      "commands": [
+        {
+          "name": "provider_paste_parser::parse_provider_paste",
+          "registered": "src-tauri/src/provider_paste_parser.rs:1",
+          "invoked_from": "src/lib/tauri/config.ts:97"
+        }
+      ],
+      "internal_callers": [],
+      "body_registry_entry": null,
+      "reachable_paths": [
+        "invokeTyped('parse_provider_paste') -> src-tauri/src/provider_paste_parser.rs"
+      ]
+    },
+    {
+      "file": "src-tauri/src/capability_probe.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 11 capability probe — wraps providers::test_connection with a static capability-matrix lookup to populate ProviderCapabilityRecord (vision / audio / tool_calling / long_context) on key save. Idempotent, single-shot per key save (4ab464c posture).",
+      "trigger": "#[tauri::command] probe_provider_capabilities (Settings save + onboarding save)",
+      "ui_surface": "src/features/providers/CapabilityPillStrip.tsx",
+      "commands": [
+        {
+          "name": "capability_probe::probe_provider_capabilities",
+          "registered": "src-tauri/src/capability_probe.rs:1",
+          "invoked_from": "src/lib/tauri/config.ts:132"
+        }
+      ],
+      "internal_callers": [
+        "src-tauri/src/commands.rs:744"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": [
+        "invokeTyped('probe_provider_capabilities') -> src-tauri/src/capability_probe.rs"
+      ]
     }
   ],
   "routes": [
@@ -9153,6 +9193,61 @@
         }
       ],
       "flow_status": "data pipes"
+    },
+    {
+      "id": "quickask",
+      "file": "src/features/quickask/index.tsx",
+      "classification": "ACTIVE",
+      "section": "core",
+      "palette_visible": false,
+      "shortcut": null,
+      "data_shape": "main-window QuickAsk route gated on vision capability (PROV-07)",
+      "data_source": [],
+      "flow_status": "data pipes"
+    },
+    {
+      "id": "voice-orb",
+      "file": "src/features/voice-orb/index.tsx",
+      "classification": "ACTIVE",
+      "section": "core",
+      "palette_visible": false,
+      "shortcut": null,
+      "data_shape": "main-window VoiceOrb route gated on audio capability (PROV-08)",
+      "data_source": [],
+      "flow_status": "data pipes"
+    },
+    {
+      "id": "meeting-ghost",
+      "file": "src/features/ghost/index.tsx",
+      "classification": "ACTIVE",
+      "section": "core",
+      "palette_visible": false,
+      "shortcut": null,
+      "data_shape": "main-window MeetingGhost route gated on audio capability (PROV-08)",
+      "data_source": [],
+      "flow_status": "data pipes"
+    },
+    {
+      "id": "agents-swarm",
+      "file": "src/features/agents/index.tsx",
+      "classification": "ACTIVE",
+      "section": "agents",
+      "palette_visible": false,
+      "shortcut": null,
+      "data_shape": "Alias for SwarmView gated on tool-calling capability (PROV-08)",
+      "data_source": [],
+      "flow_status": "data pipes"
+    },
+    {
+      "id": "knowledge-full-repo",
+      "file": "src/features/knowledge/index.tsx",
+      "classification": "ACTIVE",
+      "section": "knowledge",
+      "palette_visible": false,
+      "shortcut": null,
+      "data_shape": "Full-repo indexing view gated on long-context capability (PROV-08)",
+      "data_source": [],
+      "flow_status": "data pipes"
     }
   ],
   "config": [
@@ -10485,6 +10580,51 @@
       "disk_persisted": false,
       "ui_surface": null,
       "control_type": "AtomicBool"
+    },
+    {
+      "field": "BladeConfig.provider_capabilities",
+      "file": "src-tauri/src/config.rs:422",
+      "classification": "ACTIVE",
+      "struct": "BladeConfig",
+      "disk_persisted": true,
+      "ui_surface": "src/features/providers/CapabilityPillStrip.tsx",
+      "control_type": "map"
+    },
+    {
+      "field": "BladeConfig.vision_provider",
+      "file": "src-tauri/src/config.rs:424",
+      "classification": "ACTIVE",
+      "struct": "BladeConfig",
+      "disk_persisted": true,
+      "ui_surface": "src/features/settings/panes/ProvidersPane.tsx",
+      "control_type": "optional-string"
+    },
+    {
+      "field": "BladeConfig.audio_provider",
+      "file": "src-tauri/src/config.rs:426",
+      "classification": "ACTIVE",
+      "struct": "BladeConfig",
+      "disk_persisted": true,
+      "ui_surface": "src/features/settings/panes/ProvidersPane.tsx",
+      "control_type": "optional-string"
+    },
+    {
+      "field": "BladeConfig.long_context_provider",
+      "file": "src-tauri/src/config.rs:428",
+      "classification": "ACTIVE",
+      "struct": "BladeConfig",
+      "disk_persisted": true,
+      "ui_surface": "src/features/settings/panes/ProvidersPane.tsx",
+      "control_type": "optional-string"
+    },
+    {
+      "field": "BladeConfig.tools_provider",
+      "file": "src-tauri/src/config.rs:430",
+      "classification": "ACTIVE",
+      "struct": "BladeConfig",
+      "disk_persisted": true,
+      "ui_surface": "src/features/settings/panes/ProvidersPane.tsx",
+      "control_type": "optional-string"
     }
   ],
   "not_wired_backlog": [
