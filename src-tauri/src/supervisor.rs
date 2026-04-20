@@ -182,7 +182,6 @@ where
 /// Reset the AtomicBool guard for a service so it can be restarted.
 /// Each service uses a different static AtomicBool — we dispatch by name.
 fn reset_service_guard(name: &str) {
-    use std::sync::atomic::Ordering;
     match name {
         "learning_engine" => {
             // learning_engine uses a static inside start_learning_engine
