@@ -13,11 +13,11 @@ All 156 v1.0 requirements (FOUND, WIN, WIRE-01..08, ONBD, SHELL, DASH, CHAT, SET
 
 ### Inventory & Wiring Audit (AUDIT)
 
-- [ ] **AUDIT-01**: `WIRING-AUDIT.md` catalogs every Rust module under `src-tauri/src/` with purpose, trigger, UI surface reference, and classification — one of `ACTIVE`, `WIRED-NOT-USED`, `NOT-WIRED`, `DEAD`
-- [ ] **AUDIT-02**: Every route registered in `src/lib/router.ts` is classified in `WIRING-AUDIT.md` with data shape, data source, and flow status (data pipes / placeholder / dead)
-- [ ] **AUDIT-03**: Every field in `BladeConfig` (and its sibling config structs) is listed with the UI surface that exposes it, the control type, and discoverability path
-- [ ] **AUDIT-04**: NOT-WIRED items form a structured backlog with file:line references for each backend entry point, consumable by Phase 14 wiring work
-- [ ] **AUDIT-05**: DEAD items list carries a deletion plan noting import cycles + callers, so Phase 14 removal does not break the build
+- [x] **AUDIT-01**: `WIRING-AUDIT.md` catalogs every Rust module under `src-tauri/src/` with purpose, trigger, UI surface reference, and classification — one of `ACTIVE`, `WIRED-NOT-USED`, `NOT-WIRED`, `DEAD`
+- [x] **AUDIT-02**: Every route registered in `src/lib/router.ts` is classified in `WIRING-AUDIT.md` with data shape, data source, and flow status (data pipes / placeholder / dead)
+- [x] **AUDIT-03**: Every field in `BladeConfig` (and its sibling config structs) is listed with the UI surface that exposes it, the control type, and discoverability path
+- [x] **AUDIT-04**: NOT-WIRED items form a structured backlog with file:line references for each backend entry point, consumable by Phase 14 wiring work
+- [x] **AUDIT-05**: DEAD items list carries a deletion plan noting import cycles + callers, so Phase 14 removal does not break the build
 
 ### Smart Provider Setup (PROV)
 
