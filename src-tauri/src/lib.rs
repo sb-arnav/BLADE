@@ -87,6 +87,7 @@ mod mcp_fs_server;
 mod memory;
 mod permissions;
 mod plugins;
+mod provider_paste_parser;
 mod providers;
 mod rag;
 mod reports;
