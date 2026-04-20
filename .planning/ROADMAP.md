@@ -68,7 +68,12 @@ Phase 11 and Phase 12 may run in parallel. Phase 12's scanner intelligence uses 
 
 **Notes**: No code changes in this phase. The audit is a planning input. If gaps surface between the audit and the tester pass fixes already on master, note them in the audit's cross-reference section.
 
-**Plans**: TBD (generated via `/gsd-plan-phase 10`)
+**Plans**:
+- [ ] 10-01-PLAN.md — Wave 0: verify:wiring-audit-shape script + JSON Schema + package.json wiring (AUDIT-04, AUDIT-05)
+- [ ] 10-02-PLAN.md — Wave 1: Subagent A (Rust module classifier) → 10-MODULES.yaml (AUDIT-01, AUDIT-04, AUDIT-05)
+- [ ] 10-03-PLAN.md — Wave 1: Subagent B (route + command-palette mapper) → 10-ROUTES.yaml (AUDIT-02)
+- [ ] 10-04-PLAN.md — Wave 1: Subagent C (config surface catalog) → 10-CONFIG.yaml (AUDIT-03)
+- [ ] 10-05-PLAN.md — Wave 2: Synthesis → 10-WIRING-AUDIT.{md,json}, Appendix A/B, cleanup (AUDIT-01..05)
 
 **UI hint**: no
 
@@ -193,7 +198,7 @@ Phase 11 and Phase 12 may run in parallel. Phase 12's scanner intelligence uses 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 10. Inventory & Wiring Audit | 0/TBD | Not started | — |
+| 10. Inventory & Wiring Audit | 0/5 | Not started | — |
 | 11. Smart Provider Setup | 0/TBD | Not started | — |
 | 12. Smart Deep Scan | 0/TBD | Not started | — |
 | 13. Self-Configuring Ecosystem | 0/TBD | Not started | — |
