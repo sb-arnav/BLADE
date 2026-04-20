@@ -35,6 +35,7 @@
 | background-agents | src.bak/components/BackgroundAgentsPanel.tsx | src/features/agents/BackgroundAgents.tsx | agents | 5 | Pending | – |  |
 | swarm-view | src.bak/components/SwarmView.tsx | src/features/agents/Swarm.tsx | agents | 5 | Pending | – |  |
 | task-agents | src.bak/components/ManagedAgentPanel.tsx | src/features/agents/TaskAgents.tsx | agents | 5 | Pending | – |  |
+| agents-swarm | N/A (new — Phase 11 Plan 11-05 capability-gap surface) | src/features/agents/SwarmView.tsx | agents | 11 | Pending | – | PROV-08 tools capability; palette-hidden route (useCapability gate) |
 | body-map | N/A (new — Phase 8 body visualization) | src/features/body/BodyMap.tsx | body | 8 | Pending | – |  |
 | body-system-detail | N/A (new — Phase 8 body visualization) | src/features/body/BodySystemDetail.tsx | body | 8 | Pending | – |  |
 | dna | N/A (new — Phase 8 body visualization) | src/features/body/DNA.tsx | body | 8 | Pending | – |  |
@@ -61,6 +62,9 @@
 | settings-iot | src.bak/components/IntegrationHub.tsx | src/features/settings/panes/IoTPane.tsx | core | 3 | Shipped | settings-integrations | SET-07 (renamed from settings-integrations per D-79) |
 | settings-privacy | N/A (new — D-79 + ROADMAP SET-08) | src/features/settings/panes/PrivacyPane.tsx | core | 3 | Shipped | – | SET-08 |
 | settings-diagnostics | N/A (new — D-79 + ROADMAP SET-09) | src/features/settings/panes/DiagnosticsEntryPane.tsx | core | 3 | Shipped | – | SET-09 — DEV opens diagnostics-dev; PROD shows Phase 7 admin notice |
+| quickask | N/A (new — Phase 11 Plan 11-05 capability-gap surface) | src/features/quickask/QuickAskView.tsx | core | 11 | Pending | – | PROV-07 vision capability; palette-hidden main-window route (useCapability gate). Existing `quickask` Tauri window unchanged. |
+| voice-orb | N/A (new — Phase 11 Plan 11-05 capability-gap surface) | src/features/voice-orb/VoiceOrbView.tsx | core | 11 | Pending | – | PROV-08 audio capability; palette-hidden main-window route (useCapability gate). Existing voice orb overlay window unchanged. |
+| meeting-ghost | N/A (new — Phase 11 Plan 11-05 capability-gap surface) | src/features/ghost/MeetingGhostView.tsx | core | 11 | Pending | – | PROV-08 audio capability; palette-hidden main-window route (useCapability gate). Existing ghost overlay window unchanged. |
 | diagnostics-dev | src.bak/components/Diagnostics.tsx | src/features/dev/Diagnostics.tsx | dev | 1 | Shipped | – | DEV-only listener counter + perf marks; palette-hidden |
 | primitives | N/A (new — dev showcase) | src/features/dev/Primitives.tsx | dev | 1 | Shipped | – | DEV-only showcase; palette-hidden |
 | wrapper-smoke | N/A (new — P-04 harness) | src/features/dev/WrapperSmoke.tsx | dev | 1 | Shipped | – | DEV-only P-04 harness; palette-hidden |
@@ -107,8 +111,8 @@
 
 ## Totals
 
-- **Routes tracked:** 82
-- **Pending:** 79
+- **Routes tracked:** 86
+- **Pending:** 83
 - **Shipped:** 3
 - **Deferred:** 0
 - **Source:** 13 feature clusters under `src/features/` (`admin`, `agents`, `body`, `chat`, `dashboard`, `dev`, `dev-tools`, `hive`, `identity`, `knowledge`, `life-os`, `onboarding`, `settings`)
