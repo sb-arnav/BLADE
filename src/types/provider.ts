@@ -130,3 +130,48 @@ export interface ProviderCapabilityRecord {
   last_probed: string;
   probe_status: ProbeStatus;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 12 Plan 12-03 — Profile overlay types.
+//
+// TS mirrors of the Rust types in src-tauri/src/deep_scan/profile.rs.
+// Used by ProfileView (Plan 12-04) and the four profile Tauri wrappers below.
+//
+// @see src-tauri/src/deep_scan/profile.rs
+// @see .planning/phases/12-smart-deep-scan/12-CONTEXT.md §D-62
+// ---------------------------------------------------------------------------
+
+export type OverlayAction = 'edit' | 'hide' | 'delete' | 'add';
+
+export interface RhythmSignal {
+  kind: string;
+  data: unknown;
+}
+
+export interface LlmEnrichments {
+  account_narrative: string | null;
+  rhythm_narrative: string | null;
+  enriched_at: number | null;
+}
+
+export interface RenderedRow {
+  row_id: string;
+  row_kind: string;
+  fields: Record<string, unknown>;
+  source_scanner: string;
+  orphaned: boolean;
+  edited: boolean;
+  overlay_action: OverlayAction | null;
+}
+
+export interface ProfileView {
+  repos: RenderedRow[];
+  accounts: RenderedRow[];
+  mru_files: RenderedRow[];
+  tools: RenderedRow[];
+  ides: RenderedRow[];
+  bookmarks: RenderedRow[];
+  rhythm_signals: RhythmSignal[];
+  llm_enrichments: LlmEnrichments | null;
+  scanned_at: number | null;
+}

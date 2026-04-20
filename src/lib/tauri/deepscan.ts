@@ -33,3 +33,34 @@ export function deepScanResults(): Promise<DeepScanResults | null> {
 export function deepScanSummary(): Promise<string> {
   return invokeTyped<string>('deep_scan_summary');
 }
+
+// ── Phase 12 Plan 12-03 — Profile overlay wrappers ───────────────────────────
+
+import type { ProfileView, OverlayAction } from '@/types/provider';
+
+/** @see src-tauri/src/deep_scan/profile.rs `pub async fn profile_get_rendered()` */
+export function profileGetRendered(): Promise<ProfileView> {
+  return invokeTyped<ProfileView>('profile_get_rendered');
+}
+
+/** @see src-tauri/src/deep_scan/profile.rs `pub async fn profile_overlay_upsert(...)` */
+export function profileOverlayUpsert(
+  rowId: string,
+  action: OverlayAction,
+  fields?: Record<string, unknown>,
+): Promise<void> {
+  return invokeTyped<void, { row_id: string; action: OverlayAction; fields: Record<string, unknown> | null }>(
+    'profile_overlay_upsert',
+    { row_id: rowId, action, fields: fields ?? null },
+  );
+}
+
+/** @see src-tauri/src/deep_scan/profile.rs `pub async fn profile_overlay_reset(row_id: String)` */
+export function profileOverlayReset(rowId: string): Promise<void> {
+  return invokeTyped<void, { row_id: string }>('profile_overlay_reset', { row_id: rowId });
+}
+
+/** @see src-tauri/src/deep_scan/queue.rs SCAN_CANCEL — halts drain loop at next lead boundary */
+export function scanCancel(): Promise<void> {
+  return invokeTyped<void>('scan_cancel');
+}
