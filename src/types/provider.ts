@@ -84,3 +84,49 @@ export interface ParsedProviderConfig {
   model: string | null;
   headers: Record<string, string>;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 11 Plan 11-02 — capability probe result.
+//
+// TS mirror of Rust `ProbeStatus` + `ProviderCapabilityRecord` types defined
+// in src-tauri/src/config.rs near the TaskRouting struct. Returned by the
+// `probe_provider_capabilities` Tauri command.
+//
+// @see src-tauri/src/config.rs
+// @see .planning/phases/11-smart-provider-setup/11-CONTEXT.md §D-52 + §D-53
+// ---------------------------------------------------------------------------
+
+/** Outcome of a single capability probe — mirrors Rust `ProbeStatus` enum.
+ *  `RateLimitedButValid` means the key is real but upstream is busy —
+ *  UI should show a warning pill, not a red error. */
+export type ProbeStatus =
+  | 'NotProbed'
+  | 'Active'
+  | 'InvalidKey'
+  | 'ModelNotFound'
+  | 'RateLimitedButValid'
+  | 'ProviderDown'
+  | 'NetworkError';
+
+/**
+ * Result of a capability probe — persists on BladeConfig.provider_capabilities
+ * and feeds the Settings capability-pill row.
+ *
+ * `long_context` is derived from `context_window >= 100_000` in Rust; the
+ * frontend treats it as authoritative.
+ *
+ * @see src-tauri/src/config.rs `pub struct ProviderCapabilityRecord`
+ */
+export interface ProviderCapabilityRecord {
+  provider: string;
+  model: string;
+  context_window: number;
+  vision: boolean;
+  audio: boolean;
+  tool_calling: boolean;
+  long_context: boolean;
+  /** ISO-8601 / RFC 3339 timestamp — Rust `chrono::DateTime<Utc>`
+   *  serializes this way. */
+  last_probed: string;
+  probe_status: ProbeStatus;
+}

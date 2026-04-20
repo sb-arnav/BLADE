@@ -2249,6 +2249,37 @@ pub fn parse_provider_paste(
     crate::provider_paste_parser::parse(&input)
 }
 
+/// Phase 11 Plan 11-02 — thin async Tauri wrapper around capability_probe.
+///
+/// The `api_key` argument is OPTIONAL. When `None`, Rust falls back to
+/// `config::get_provider_key(&provider)` so the re-probe UX (Plan 11-03)
+/// doesn't need to round-trip the key through the TS/Rust boundary twice.
+/// When the TS side has a key in hand (e.g. from a fresh paste-form submit),
+/// it passes `Some(key)` and the keyring lookup is skipped.
+///
+/// Security posture: keys never log; providers::test_connection strips keys
+/// from its error messages. Ollama is the only provider allowed with an
+/// empty key (local-only, no auth).
+///
+/// @see src-tauri/src/capability_probe.rs
+/// @see .planning/phases/11-smart-provider-setup/11-02-PLAN.md
+#[tauri::command]
+pub async fn probe_provider_capabilities(
+    provider: String,
+    api_key: Option<String>,
+    model: String,
+    base_url: Option<String>,
+) -> Result<crate::config::ProviderCapabilityRecord, String> {
+    let key = api_key.unwrap_or_else(|| crate::config::get_provider_key(&provider));
+    if key.is_empty() && provider != "ollama" {
+        return Err(format!(
+            "No API key for provider '{}' — save a key first or pass apiKey explicitly.",
+            provider
+        ));
+    }
+    crate::capability_probe::probe(&provider, &key, &model, base_url.as_deref()).await
+}
+
 #[tauri::command]
 pub async fn mcp_add_server(
     state: tauri::State<'_, SharedMcpManager>,
