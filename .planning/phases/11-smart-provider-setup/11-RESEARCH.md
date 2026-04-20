@@ -1350,32 +1350,32 @@ export function CapabilityGap({ capability, surfaceLabel }: { capability: Capabi
 | A8 | `blade_routing_capability_missing` event name doesn't collide with existing `capability_gap_detected` | §Event | Confirmed by grep — different subsystem. Dual-docs in registry recommended |
 | A9 | `once_cell` crate is NOT in tree — need to verify before using in sample code | §Code Examples | If not in tree, use `std::sync::LazyLock` (Rust 1.80+). Plan 11-01 should verify before writing parser. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **OpenAI-compatible custom endpoints — detect `/chat/completions` path pattern?**
    - What we know: sample C7 (localhost vLLM) already works via hostname heuristic + OpenAI-compat path.
    - What's unclear: NVIDIA NIM uses `/v1/chat/completions` but at `integrate.api.nvidia.com`; Azure uses `{resource}.openai.azure.com/openai/deployments/{deployment}/chat/completions`.
-   - Recommendation: parser captures base_url as-is; router lets `complete_turn` route through openai-compat path when `base_url.is_some()`. No additional logic needed.
+   - RESOLVED: parser captures base_url as-is; router lets `complete_turn` route through openai-compat path when `base_url.is_some()`. No additional logic needed.
 
 2. **Ollama key detection — should parser set `api_key: ""` or omit?**
    - What we know: Ollama doesn't need a key; current `get_all_provider_keys` considers `!key.is_empty() || prov == "ollama"` as "has key".
    - What's unclear: if user pastes a localhost curl without auth header, is `api_key: ""` the right default?
-   - Recommendation: Yes — `api_key: ""` for Ollama. Downstream `config.is_empty() && config.provider != "ollama"` guard in `send_message_stream` already handles this.
+   - RESOLVED: Yes — `api_key: ""` for Ollama. Downstream `config.is_empty() && config.provider != "ollama"` guard in `send_message_stream` already handles this.
 
 3. **Capability matrix maintenance cadence**
    - What we know: matrix is in Rust; updates need code change + rebuild.
    - What's unclear: How often do model/capability flags change? Quarterly feels right; weekly is excessive.
-   - Recommendation: Phase 11 ships the matrix. Model additions to matrix are treated as normal bugfix commits, not separate releases. v1.2 considers dynamic ingest from OpenRouter `/v1/models` as a nice-to-have.
+   - RESOLVED: Phase 11 ships the matrix. Model additions to matrix are treated as normal bugfix commits, not separate releases. v1.2 considers dynamic ingest from OpenRouter `/v1/models` as a nice-to-have.
 
 4. **Error panel reuse across Surface A + Surface B**
    - What we know: UI-SPEC locks `.onb-error` class usage across both surfaces.
    - What's unclear: `.onb-error` lives in `src/features/onboarding/onboarding.css`; using it in Settings implies CSS import from Settings pane into onboarding feature (cross-feature dep).
-   - Recommendation: at Plan 11-03 execution, move `.onb-error` + `.onb-ok` classes to a shared CSS file (e.g. `src/features/providers/paste-form.css`) and import from both feature panes. Surfaces at the planner for approval before execution.
+   - RESOLVED: at Plan 11-03 execution, move `.onb-error` + `.onb-ok` classes to a shared CSS file (e.g. `src/features/providers/paste-form.css`) and import from both feature panes. Surfaces at the planner for approval before execution.
 
 5. **Auto-populate on probe: match behavior for `fallback_providers`**
    - What we know: D-52 auto-populates capability slots on first probe IFF slot is `None`.
    - What's unclear: does probe also auto-append to `fallback_providers`? CONTEXT.md is silent.
-   - Recommendation: NO auto-append. `fallback_providers` is user-explicit (D-57 drag UI); silently adding entries violates the "don't overwrite user choice" principle even more than capability slots (user more likely to have an intentional chain order).
+   - RESOLVED: NO auto-append. `fallback_providers` is user-explicit (D-57 drag UI); silently adding entries violates the "don't overwrite user choice" principle even more than capability slots (user more likely to have an intentional chain order).
 
 ## Security Domain
 
