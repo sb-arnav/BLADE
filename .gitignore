@@ -35,3 +35,6 @@ docs/apple-research/fonts/*.dmg
 .claude/settings.local.json
 vendor/
 test-results/
+
+# Windows NTFS Alternate Data Streams (Mark-of-the-Web metadata) — not portable to NTFS checkouts
+*:Zone.Identifier
