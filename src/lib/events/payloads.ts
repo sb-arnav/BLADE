@@ -55,6 +55,24 @@ export interface BladeRoutingSwitchedPayload {
   reason: string;
 }
 
+/** Phase 11 Plan 11-04 (D-55) — router emits when a task requires a
+ *  capability (vision / audio / long_context / tools) but none of the
+ *  user's configured providers support it.
+ *
+ *  Shape matches the serde_json::json!() emit site in
+ *  src-tauri/src/commands.rs::send_message_stream. Emitted ONCE per
+ *  send_message_stream call (4ab464c posture: no retry loop); graceful
+ *  degrade means the request still runs on the user's primary provider
+ *  after the event fires. No api_key / no user-content carried
+ *  (T-11-24 information-disclosure threat mitigated). */
+export interface RoutingCapabilityMissingPayload {
+  capability: 'vision' | 'audio' | 'long_context' | 'tools';
+  task_type: string;
+  primary_provider: string;
+  primary_model: string;
+  message: string;
+}
+
 export type ChatThinkingPayload = string;
 export type ChatThinkingDonePayload = null;
 
