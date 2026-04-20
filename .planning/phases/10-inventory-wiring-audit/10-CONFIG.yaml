@@ -1,0 +1,1420 @@
+config:
+  # ============================================================
+  # BladeConfig fields (runtime/in-memory, 43 pub fields)
+  # Source: src-tauri/src/config.rs:225-326
+  # ============================================================
+  - field: BladeConfig.provider
+    file: src-tauri/src/config.rs:226
+    struct: BladeConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/ProvidersPane.tsx
+    control_type: string
+    default: "gemini"
+    discoverability_path:
+      - "Settings > Providers > Select provider"
+      - "Onboarding > Pick provider"
+    notes: "Active provider id; switched via switch_provider command. Also read by resolve_provider_for_task router."
+  - field: BladeConfig.api_key
+    file: src-tauri/src/config.rs:227
+    struct: BladeConfig
+    disk_persisted: false
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/ProvidersPane.tsx
+    control_type: string
+    default: ""
+    discoverability_path:
+      - "Settings > Providers > Enter API key"
+    notes: "Keyring-sourced at load_config(). Not disk-persisted by design — stored in OS keyring (service=blade-ai, key=<provider>). BladeConfig-only field; DiskConfig has a legacy api_key with skip_serializing used for one-shot migration only. Intentional divergence, NOT a 6-place rule gap."
+  - field: BladeConfig.model
+    file: src-tauri/src/config.rs:228
+    struct: BladeConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/ModelsPane.tsx
+    control_type: string
+    default: "gemini-2.0-flash"
+    discoverability_path:
+      - "Settings > Models > Model dropdown"
+    notes: "Active model per-provider. Swapped via switchProvider."
+  - field: BladeConfig.onboarded
+    file: src-tauri/src/config.rs:229
+    struct: BladeConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/onboarding
+    control_type: bool
+    default: "false"
+    discoverability_path:
+      - "First-run onboarding > Finalize"
+    notes: "Flipped once at onboarding completion. Gates OnboardingShell render."
+  - field: BladeConfig.mcp_servers
+    file: src-tauri/src/config.rs:231
+    struct: BladeConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/ProvidersPane.tsx
+    control_type: list
+    default: "[]"
+    discoverability_path:
+      - "Settings > MCP servers (via MCP admin route)"
+    notes: "Persisted MCP server config list; loaded into mcp.rs at startup."
+  - field: BladeConfig.window_state
+    file: src-tauri/src/config.rs:233
+    struct: BladeConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: null
+    control_type: map
+    default: "null"
+    discoverability_path: []
+    notes: "Auto-persisted window geometry via update_window_state; no user-facing control (intentional — runtime state, not user preference)."
+  - field: BladeConfig.token_efficient
+    file: src-tauri/src/config.rs:235
+    struct: BladeConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/ModelsPane.tsx
+    control_type: bool
+    default: "false"
+    discoverability_path:
+      - "Settings > Models > Token-efficient toggle"
+    notes: "Compacts system prompts and tool schemas."
+  - field: BladeConfig.user_name
+    file: src-tauri/src/config.rs:237
+    struct: BladeConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/PersonalityPane.tsx
+    control_type: string
+    default: ""
+    discoverability_path:
+      - "Settings > Personality > Your name"
+    notes: "Surfaced in brain.rs system prompt builder."
+  - field: BladeConfig.work_mode
+    file: src-tauri/src/config.rs:239
+    struct: BladeConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/PersonalityPane.tsx
+    control_type: string
+    default: ""
+    discoverability_path:
+      - "Settings > Personality > Work mode"
+    notes: "User's work context description for brain system prompt."
+  - field: BladeConfig.response_style
+    file: src-tauri/src/config.rs:241
+    struct: BladeConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/PersonalityPane.tsx
+    control_type: string
+    default: ""
+    discoverability_path:
+      - "Settings > Personality > Response style"
+    notes: "Preferred response tone/format; injected into system prompt."
+  - field: BladeConfig.blade_email
+    file: src-tauri/src/config.rs:243
+    struct: BladeConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/PersonalityPane.tsx
+    control_type: string
+    default: ""
+    discoverability_path:
+      - "Settings > Personality > BLADE email"
+    notes: "Optional email for BLADE identity; used in integration_bridge for SMTP/notifications."
+  - field: BladeConfig.base_url
+    file: src-tauri/src/config.rs:245
+    struct: BladeConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/onboarding
+    control_type: string
+    default: "null"
+    discoverability_path:
+      - "Onboarding > Custom provider > Base URL paste"
+    notes: "Custom OpenAI-compatible endpoint URL. Settings Providers pane does not directly expose this — set during onboarding or by set_api_key_for_provider."
+  - field: BladeConfig.god_mode
+    file: src-tauri/src/config.rs:247
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: bool
+    default: "false"
+    discoverability_path: []
+    notes: "No direct Settings toggle for bool; god_mode_tier is the user-facing control. This bool is derived from tier in backend. Candidate for cleanup or surface via dedicated toggle in Phase 14."
+  - field: BladeConfig.god_mode_tier
+    file: src-tauri/src/config.rs:249
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: enum
+    default: "normal"
+    discoverability_path: []
+    notes: "Values: normal|intermediate|extreme. Drives godmode.rs ambient intelligence tier. No Settings surface — user cannot toggle. Phase 14 candidate for exposure."
+  - field: BladeConfig.voice_mode
+    file: src-tauri/src/config.rs:251
+    struct: BladeConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/VoicePane.tsx
+    control_type: enum
+    default: "off"
+    discoverability_path:
+      - "Settings > Voice > Voice mode"
+    notes: "off|push-to-talk|conversational."
+  - field: BladeConfig.obsidian_vault_path
+    file: src-tauri/src/config.rs:253
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: string
+    default: ""
+    discoverability_path: []
+    notes: "Read by knowledge/obsidian bridges. save_config_field allow-list includes it (config.rs:737) but no current Settings pane exposes a chooser. Phase 14 Knowledge/Integrations candidate."
+  - field: BladeConfig.tts_voice
+    file: src-tauri/src/config.rs:255
+    struct: BladeConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/VoicePane.tsx
+    control_type: string
+    default: "system"
+    discoverability_path:
+      - "Settings > Voice > TTS voice"
+    notes: "OS TTS voice name."
+  - field: BladeConfig.quick_ask_shortcut
+    file: src-tauri/src/config.rs:257
+    struct: BladeConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/VoicePane.tsx
+    control_type: string
+    default: "Ctrl+Space"
+    discoverability_path:
+      - "Settings > Voice > QuickAsk shortcut"
+    notes: "Global shortcut registered via tauri-plugin-global-shortcut."
+  - field: BladeConfig.voice_shortcut
+    file: src-tauri/src/config.rs:259
+    struct: BladeConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/VoicePane.tsx
+    control_type: string
+    default: "Ctrl+Shift+B"
+    discoverability_path:
+      - "Settings > Voice > Voice shortcut"
+    notes: "Global shortcut for push-to-talk voice."
+  - field: BladeConfig.screen_timeline_enabled
+    file: src-tauri/src/config.rs:261
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: bool
+    default: "false"
+    discoverability_path: []
+    notes: "Gates screen_timeline.rs capture loop. Writable via save_config_field allow-list (config.rs:739). No Privacy/Perception pane toggle found. Phase 14 LOG/DENSITY candidate."
+  - field: BladeConfig.timeline_capture_interval
+    file: src-tauri/src/config.rs:263
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: number
+    default: "30"
+    discoverability_path: []
+    notes: "Seconds between Total Recall screenshots. Writable via save_config_field. No UI slider/input. Phase 14 candidate."
+  - field: BladeConfig.timeline_retention_days
+    file: src-tauri/src/config.rs:265
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: number
+    default: "14"
+    discoverability_path: []
+    notes: "Days of Total Recall retention. Writable via save_config_field. No UI exposure. Phase 14 candidate."
+  - field: BladeConfig.wake_word_enabled
+    file: src-tauri/src/config.rs:267
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: src/features/settings/panes/VoicePane.tsx
+    control_type: bool
+    default: "false"
+    discoverability_path: []
+    notes: "VoicePane SHOWS the state (config.wake_word_enabled) but has NO setter (neither set_config nor save_config_field accept it). Toggle UI is disabled/read-only per pane comments. Phase 14 PROV/WIRE2 candidate to add setter."
+  - field: BladeConfig.wake_word_phrase
+    file: src-tauri/src/config.rs:269
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: string
+    default: "hey blade"
+    discoverability_path: []
+    notes: "Wake-word phrase fed to wake_word.rs. No UI exposure. Phase 14 candidate."
+  - field: BladeConfig.wake_word_sensitivity
+    file: src-tauri/src/config.rs:271
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: number
+    default: "3"
+    discoverability_path: []
+    notes: "u8 1-5 sensitivity. No UI slider. Phase 14 candidate."
+  - field: BladeConfig.active_role
+    file: src-tauri/src/config.rs:273
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: string
+    default: "engineering"
+    discoverability_path: []
+    notes: "Active persona role; read by persona_engine.rs and brain.rs. No Settings pane exposes this selector. Phase 14 Personality pane candidate."
+  - field: BladeConfig.blade_source_path
+    file: src-tauri/src/config.rs:275
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: string
+    default: ""
+    discoverability_path: []
+    notes: "Used by self_upgrade.rs to locate BLADE source checkout. save_config_field allow-list includes it (config.rs:731). No UI picker. Phase 14 Admin/DevTools candidate."
+  - field: BladeConfig.trusted_ai_delegate
+    file: src-tauri/src/config.rs:277
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: enum
+    default: ""
+    discoverability_path: []
+    notes: "claude-code|none|empty. Used by background_agent.rs to spawn Claude Code/Aider workers. save_config_field allow-list (config.rs:736). No Admin surface yet. Phase 14 candidate."
+  - field: BladeConfig.blade_dedicated_monitor
+    file: src-tauri/src/config.rs:279
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: number
+    default: "-1"
+    discoverability_path: []
+    notes: "Monitor index for HUD placement. No UI monitor-picker. Phase 14 HUD settings candidate."
+  - field: BladeConfig.task_routing
+    file: src-tauri/src/config.rs:281
+    struct: BladeConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/RoutingPane.tsx
+    control_type: map
+    default: "{code:null,vision:null,fast:null,creative:null,fallback:null}"
+    discoverability_path:
+      - "Settings > Routing > Per-task provider"
+    notes: "Per-task provider override; resolved in resolve_provider_for_task."
+  - field: BladeConfig.background_ai_enabled
+    file: src-tauri/src/config.rs:283
+    struct: BladeConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: null
+    control_type: bool
+    default: "true"
+    discoverability_path: []
+    notes: "Toggled via toggle_background_ai command (config.rs:758). Auto-disabled on 402 credits-exhausted errors. Candidate for explicit Settings surface in Phase 14 (currently only accessible through chat or auto-disable)."
+  - field: BladeConfig.persona_onboarding_complete
+    file: src-tauri/src/config.rs:285
+    struct: BladeConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/PersonalityPane.tsx
+    control_type: bool
+    default: "false"
+    discoverability_path:
+      - "Settings > Personality > Redo persona (reset)"
+    notes: "Reset by PersonalityPane via useResetOnboarding hook."
+  - field: BladeConfig.fallback_providers
+    file: src-tauri/src/config.rs:289
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: list
+    default: "[]"
+    discoverability_path: []
+    notes: "Ordered providers tried on 429/503/5xx. Read by providers/mod.rs fallback chain. No Settings UI for ordering. Phase 11 PROV-09 capability-aware routing candidate."
+  - field: BladeConfig.use_local_whisper
+    file: src-tauri/src/config.rs:292
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: bool
+    default: "false"
+    discoverability_path: []
+    notes: "Gates whisper_local.rs (feature-gated local-whisper). No Settings toggle; also requires rebuild with --features local-whisper. Phase 14 candidate."
+  - field: BladeConfig.whisper_model
+    file: src-tauri/src/config.rs:295
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: enum
+    default: "tiny.en"
+    discoverability_path: []
+    notes: "tiny.en|base.en|small.en for local whisper. No UI. Phase 14 Voice pane candidate."
+  - field: BladeConfig.last_deep_scan
+    file: src-tauri/src/config.rs:298
+    struct: BladeConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: null
+    control_type: number
+    default: "0"
+    discoverability_path: []
+    notes: "Unix timestamp, auto-updated by deep_scan.rs on completion. No user control (intentional — runtime state)."
+  - field: BladeConfig.integration_polling_enabled
+    file: src-tauri/src/config.rs:301
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: bool
+    default: "false"
+    discoverability_path: []
+    notes: "Gates integration_bridge.rs Gmail/Calendar/Slack/GitHub polling. No Settings toggle. Phase 13 ECOSYS candidate."
+  - field: BladeConfig.tts_speed
+    file: src-tauri/src/config.rs:304
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: number
+    default: "1.0"
+    discoverability_path: []
+    notes: "TTS playback multiplier 0.5..2.0. No UI slider. Phase 14 Voice pane candidate."
+  - field: BladeConfig.ha_base_url
+    file: src-tauri/src/config.rs:307
+    struct: BladeConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/IoTPane.tsx
+    control_type: string
+    default: ""
+    discoverability_path:
+      - "Settings > IoT > Home Assistant base URL"
+    notes: "Saved via save_config_field('ha_base_url', ...) allow-list (config.rs:737)."
+  - field: BladeConfig.audio_capture_enabled
+    file: src-tauri/src/config.rs:310
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: bool
+    default: "false"
+    discoverability_path: []
+    notes: "Always-on audio capture toggle; read by audio_timeline.rs. No Privacy/Perception pane toggle. Phase 14 candidate."
+  - field: BladeConfig.ghost_mode_enabled
+    file: src-tauri/src/config.rs:313
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: bool
+    default: "false"
+    discoverability_path: []
+    notes: "Gates ghost_mode.rs overlay enrollment. No Settings toggle. Ghost route exists in routes but no config-side Settings binding. Phase 14 candidate."
+  - field: BladeConfig.ghost_mode_position
+    file: src-tauri/src/config.rs:316
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: enum
+    default: "bottom-right"
+    discoverability_path: []
+    notes: "bottom-right|bottom-left|top-right|top-left. No position picker. Phase 14 candidate."
+  - field: BladeConfig.ghost_auto_reply
+    file: src-tauri/src/config.rs:319
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: bool
+    default: "false"
+    discoverability_path: []
+    notes: "Auto-type suggested reply into chat. Per v1.1 observe-only guardrail this stays disabled; Phase 14 may expose toggle but default-off by policy (M-03)."
+  - field: BladeConfig.hive_enabled
+    file: src-tauri/src/config.rs:322
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: bool
+    default: "false"
+    discoverability_path: []
+    notes: "Opt-in HIVE distributed mesh. No Settings toggle. Phase 14 HIVE/Admin candidate."
+  - field: BladeConfig.hive_autonomy
+    file: src-tauri/src/config.rs:325
+    struct: BladeConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: number
+    default: "0.3"
+    discoverability_path: []
+    notes: "0.0-1.0 autonomy level. No Settings slider. Phase 14 candidate if hive_enabled is surfaced."
+
+  # ============================================================
+  # DiskConfig fields (on-disk serialized form, 44 private fields)
+  # Source: src-tauri/src/config.rs:55-151
+  # Fields mirror BladeConfig (sans api_key which is keyring-sourced)
+  # plus one legacy api_key (skip_serializing) for one-shot migration.
+  # ============================================================
+  - field: DiskConfig.provider
+    file: src-tauri/src/config.rs:56
+    struct: DiskConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/ProvidersPane.tsx
+    control_type: string
+    default: "gemini"
+    discoverability_path:
+      - "Settings > Providers > Select provider"
+    notes: "Mirror of BladeConfig.provider; serialized to config.json."
+  - field: DiskConfig.model
+    file: src-tauri/src/config.rs:57
+    struct: DiskConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/ModelsPane.tsx
+    control_type: string
+    default: "gemini-2.0-flash"
+    discoverability_path:
+      - "Settings > Models > Model dropdown"
+    notes: "Mirror of BladeConfig.model."
+  - field: DiskConfig.onboarded
+    file: src-tauri/src/config.rs:58
+    struct: DiskConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/onboarding
+    control_type: bool
+    default: "false"
+    discoverability_path:
+      - "First-run onboarding > Finalize"
+    notes: "Mirror of BladeConfig.onboarded."
+  - field: DiskConfig.mcp_servers
+    file: src-tauri/src/config.rs:60
+    struct: DiskConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/ProvidersPane.tsx
+    control_type: list
+    default: "[]"
+    discoverability_path:
+      - "Settings > MCP servers (admin route)"
+    notes: "Mirror of BladeConfig.mcp_servers."
+  - field: DiskConfig.window_state
+    file: src-tauri/src/config.rs:62
+    struct: DiskConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: null
+    control_type: map
+    default: "null"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.window_state; auto-persisted."
+  - field: DiskConfig.token_efficient
+    file: src-tauri/src/config.rs:64
+    struct: DiskConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/ModelsPane.tsx
+    control_type: bool
+    default: "false"
+    discoverability_path:
+      - "Settings > Models > Token-efficient"
+    notes: "Mirror of BladeConfig.token_efficient."
+  - field: DiskConfig.user_name
+    file: src-tauri/src/config.rs:66
+    struct: DiskConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/PersonalityPane.tsx
+    control_type: string
+    default: ""
+    discoverability_path:
+      - "Settings > Personality > Your name"
+    notes: "Mirror of BladeConfig.user_name."
+  - field: DiskConfig.work_mode
+    file: src-tauri/src/config.rs:68
+    struct: DiskConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/PersonalityPane.tsx
+    control_type: string
+    default: ""
+    discoverability_path:
+      - "Settings > Personality > Work mode"
+    notes: "Mirror of BladeConfig.work_mode."
+  - field: DiskConfig.response_style
+    file: src-tauri/src/config.rs:70
+    struct: DiskConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/PersonalityPane.tsx
+    control_type: string
+    default: ""
+    discoverability_path:
+      - "Settings > Personality > Response style"
+    notes: "Mirror of BladeConfig.response_style."
+  - field: DiskConfig.blade_email
+    file: src-tauri/src/config.rs:72
+    struct: DiskConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/PersonalityPane.tsx
+    control_type: string
+    default: ""
+    discoverability_path:
+      - "Settings > Personality > BLADE email"
+    notes: "Mirror of BladeConfig.blade_email."
+  - field: DiskConfig.base_url
+    file: src-tauri/src/config.rs:74
+    struct: DiskConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/onboarding
+    control_type: string
+    default: "null"
+    discoverability_path:
+      - "Onboarding > Custom provider > Base URL"
+    notes: "Mirror of BladeConfig.base_url."
+  - field: DiskConfig.god_mode
+    file: src-tauri/src/config.rs:76
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: bool
+    default: "false"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.god_mode; no Settings toggle. Phase 14 candidate."
+  - field: DiskConfig.god_mode_tier
+    file: src-tauri/src/config.rs:78
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: enum
+    default: "normal"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.god_mode_tier; no Settings surface. Phase 14 candidate."
+  - field: DiskConfig.voice_mode
+    file: src-tauri/src/config.rs:80
+    struct: DiskConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/VoicePane.tsx
+    control_type: enum
+    default: "off"
+    discoverability_path:
+      - "Settings > Voice > Voice mode"
+    notes: "Mirror of BladeConfig.voice_mode."
+  - field: DiskConfig.obsidian_vault_path
+    file: src-tauri/src/config.rs:82
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: string
+    default: ""
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.obsidian_vault_path; save_config_field allow-listed but no UI picker."
+  - field: DiskConfig.tts_voice
+    file: src-tauri/src/config.rs:84
+    struct: DiskConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/VoicePane.tsx
+    control_type: string
+    default: "system"
+    discoverability_path:
+      - "Settings > Voice > TTS voice"
+    notes: "Mirror of BladeConfig.tts_voice."
+  - field: DiskConfig.quick_ask_shortcut
+    file: src-tauri/src/config.rs:86
+    struct: DiskConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/VoicePane.tsx
+    control_type: string
+    default: "Ctrl+Space"
+    discoverability_path:
+      - "Settings > Voice > QuickAsk shortcut"
+    notes: "Mirror of BladeConfig.quick_ask_shortcut."
+  - field: DiskConfig.voice_shortcut
+    file: src-tauri/src/config.rs:88
+    struct: DiskConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/VoicePane.tsx
+    control_type: string
+    default: "Ctrl+Shift+B"
+    discoverability_path:
+      - "Settings > Voice > Voice shortcut"
+    notes: "Mirror of BladeConfig.voice_shortcut."
+  - field: DiskConfig.screen_timeline_enabled
+    file: src-tauri/src/config.rs:90
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: bool
+    default: "false"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.screen_timeline_enabled; no UI exposure."
+  - field: DiskConfig.timeline_capture_interval
+    file: src-tauri/src/config.rs:92
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: number
+    default: "30"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.timeline_capture_interval."
+  - field: DiskConfig.timeline_retention_days
+    file: src-tauri/src/config.rs:94
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: number
+    default: "14"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.timeline_retention_days."
+  - field: DiskConfig.wake_word_enabled
+    file: src-tauri/src/config.rs:96
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: src/features/settings/panes/VoicePane.tsx
+    control_type: bool
+    default: "false"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.wake_word_enabled; VoicePane reads it but no setter exists."
+  - field: DiskConfig.wake_word_phrase
+    file: src-tauri/src/config.rs:98
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: string
+    default: "hey blade"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.wake_word_phrase."
+  - field: DiskConfig.wake_word_sensitivity
+    file: src-tauri/src/config.rs:100
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: number
+    default: "3"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.wake_word_sensitivity."
+  - field: DiskConfig.active_role
+    file: src-tauri/src/config.rs:102
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: string
+    default: "engineering"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.active_role."
+  - field: DiskConfig.blade_source_path
+    file: src-tauri/src/config.rs:104
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: string
+    default: ""
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.blade_source_path; save_config_field allow-listed."
+  - field: DiskConfig.trusted_ai_delegate
+    file: src-tauri/src/config.rs:106
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: enum
+    default: ""
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.trusted_ai_delegate."
+  - field: DiskConfig.blade_dedicated_monitor
+    file: src-tauri/src/config.rs:108
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: number
+    default: "-1"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.blade_dedicated_monitor."
+  - field: DiskConfig.task_routing
+    file: src-tauri/src/config.rs:110
+    struct: DiskConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/RoutingPane.tsx
+    control_type: map
+    default: "{code:null,vision:null,fast:null,creative:null,fallback:null}"
+    discoverability_path:
+      - "Settings > Routing"
+    notes: "Mirror of BladeConfig.task_routing."
+  - field: DiskConfig.background_ai_enabled
+    file: src-tauri/src/config.rs:112
+    struct: DiskConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: null
+    control_type: bool
+    default: "true"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.background_ai_enabled; toggled via toggle_background_ai command."
+  - field: DiskConfig.persona_onboarding_complete
+    file: src-tauri/src/config.rs:114
+    struct: DiskConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/PersonalityPane.tsx
+    control_type: bool
+    default: "false"
+    discoverability_path:
+      - "Settings > Personality > Redo persona"
+    notes: "Mirror of BladeConfig.persona_onboarding_complete."
+  - field: DiskConfig.fallback_providers
+    file: src-tauri/src/config.rs:118
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: list
+    default: "[]"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.fallback_providers."
+  - field: DiskConfig.use_local_whisper
+    file: src-tauri/src/config.rs:120
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: bool
+    default: "false"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.use_local_whisper."
+  - field: DiskConfig.whisper_model
+    file: src-tauri/src/config.rs:122
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: enum
+    default: "tiny.en"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.whisper_model."
+  - field: DiskConfig.last_deep_scan
+    file: src-tauri/src/config.rs:125
+    struct: DiskConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: null
+    control_type: number
+    default: "0"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.last_deep_scan; runtime state."
+  - field: DiskConfig.integration_polling_enabled
+    file: src-tauri/src/config.rs:128
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: bool
+    default: "false"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.integration_polling_enabled."
+  - field: DiskConfig.tts_speed
+    file: src-tauri/src/config.rs:130
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: number
+    default: "1.0"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.tts_speed."
+  - field: DiskConfig.ha_base_url
+    file: src-tauri/src/config.rs:133
+    struct: DiskConfig
+    disk_persisted: true
+    classification: ACTIVE
+    ui_surface: src/features/settings/panes/IoTPane.tsx
+    control_type: string
+    default: ""
+    discoverability_path:
+      - "Settings > IoT"
+    notes: "Mirror of BladeConfig.ha_base_url."
+  - field: DiskConfig.audio_capture_enabled
+    file: src-tauri/src/config.rs:135
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: bool
+    default: "false"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.audio_capture_enabled."
+  - field: DiskConfig.ghost_mode_enabled
+    file: src-tauri/src/config.rs:137
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: bool
+    default: "false"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.ghost_mode_enabled."
+  - field: DiskConfig.ghost_mode_position
+    file: src-tauri/src/config.rs:139
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: enum
+    default: "bottom-right"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.ghost_mode_position."
+  - field: DiskConfig.ghost_auto_reply
+    file: src-tauri/src/config.rs:141
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: bool
+    default: "false"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.ghost_auto_reply."
+  - field: DiskConfig.hive_enabled
+    file: src-tauri/src/config.rs:144
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: bool
+    default: "false"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.hive_enabled."
+  - field: DiskConfig.hive_autonomy
+    file: src-tauri/src/config.rs:147
+    struct: DiskConfig
+    disk_persisted: true
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    control_type: number
+    default: "0.3"
+    discoverability_path: []
+    notes: "Mirror of BladeConfig.hive_autonomy."
+  - field: DiskConfig.api_key
+    file: src-tauri/src/config.rs:150
+    struct: DiskConfig
+    disk_persisted: false
+    classification: DEAD
+    ui_surface: null
+    control_type: string
+    default: "null"
+    discoverability_path: []
+    notes: "Legacy field with #[serde(default, skip_serializing)] — only read during load_config() to migrate plaintext keys into the keyring, then cleared. Never written. Kept for backwards compatibility; once telemetry confirms no users still have plaintext config.json, this field can be removed in Phase 14."
+
+statics:
+  # ============================================================
+  # AtomicBool statics (34 matches across 28 modules)
+  # Discovered via: static\s+[A-Z_]+\s*:\s*AtomicBool
+  # Each is a module-local runtime toggle (ACTIVE internal unless noted)
+  # ============================================================
+  - name: HABIT_REMINDER_ACTIVE
+    file: src-tauri/src/habit_engine.rs:734
+    type: AtomicBool
+    default: "false"
+    toggled_by: "habit_engine::start_habit_reminder (habit_engine.rs)"
+    read_by: "habit_engine internal reminder dispatcher"
+    classification: "ACTIVE (internal)"
+    notes: "Guards against duplicate habit-reminder spawns."
+  - name: TTS_ACTIVE
+    file: src-tauri/src/tts.rs:139
+    type: AtomicBool
+    default: "false"
+    toggled_by: "tts::speak / tts::stop"
+    read_by: "tts module playback / voice_global interrupt logic"
+    classification: "ACTIVE (internal)"
+    notes: "Tracks TTS playback so voice loop knows when to duck."
+  - name: HUD_VISIBLE
+    file: src-tauri/src/overlay_manager.rs:17
+    type: AtomicBool
+    default: "false"
+    toggled_by: "overlay_manager::show_hud / hide_hud"
+    read_by: "overlay_manager + HUD toggle commands"
+    classification: "ACTIVE (internal)"
+    notes: "Mirrors HUD window visibility."
+  - name: CAUSAL_ENGINE_RUNNING
+    file: src-tauri/src/causal_graph.rs:605
+    type: AtomicBool
+    default: "false"
+    toggled_by: "causal_graph::start_engine"
+    read_by: "causal_graph loop"
+    classification: "ACTIVE (internal)"
+    notes: "Singleton guard for causal analysis loop."
+  - name: MONITOR_RUNNING
+    file: src-tauri/src/sidecar.rs:367
+    type: AtomicBool
+    default: "false"
+    toggled_by: "sidecar::start_monitor"
+    read_by: "sidecar monitor loop"
+    classification: "ACTIVE (internal)"
+    notes: "Sidecar monitor singleton guard."
+  - name: SERVER_RUNNING
+    file: src-tauri/src/sidecar.rs:385
+    type: AtomicBool
+    default: "false"
+    toggled_by: "sidecar::start_server"
+    read_by: "sidecar server accept loop"
+    classification: "ACTIVE (internal)"
+    notes: "Sidecar server singleton guard."
+  - name: ACCOUNTABILITY_ACTIVE
+    file: src-tauri/src/accountability.rs:795
+    type: AtomicBool
+    default: "false"
+    toggled_by: "accountability::start_check_in_loop"
+    read_by: "accountability loop"
+    classification: "ACTIVE (internal)"
+    notes: "Singleton for accountability check-in loop."
+  - name: IS_RECORDING
+    file: src-tauri/src/voice_global.rs:31
+    type: AtomicBool
+    default: "false"
+    toggled_by: "voice_global::start_recording / stop_recording"
+    read_by: "voice_global PTT pipeline"
+    classification: "ACTIVE (internal)"
+    notes: "Push-to-talk recording state."
+  - name: TTS_INTERRUPT
+    file: src-tauri/src/voice_global.rs:35
+    type: AtomicBool
+    default: "false"
+    toggled_by: "voice_global::interrupt_tts (user input detected)"
+    read_by: "tts.rs playback loop"
+    classification: "ACTIVE (internal)"
+    notes: "Signals TTS to stop when user starts speaking."
+  - name: CONV_ACTIVE
+    file: src-tauri/src/voice_global.rs:38
+    type: AtomicBool
+    default: "false"
+    toggled_by: "voice_global::start_conversation / end_conversation"
+    read_by: "voice_global conversational loop"
+    classification: "ACTIVE (internal)"
+    notes: "Conversational voice mode on/off state."
+  - name: WAKE_ACTIVE
+    file: src-tauri/src/wake_word.rs:80
+    type: AtomicBool
+    default: "false"
+    toggled_by: "wake_word::start_wake_listener"
+    read_by: "wake_word audio frame loop"
+    classification: "ACTIVE (internal)"
+    notes: "Always-on wake-word detection guard."
+  - name: ENGINE_RUNNING
+    file: src-tauri/src/goal_engine.rs:10
+    type: AtomicBool
+    default: "false"
+    toggled_by: "goal_engine::start"
+    read_by: "goal_engine loop"
+    classification: "ACTIVE (internal)"
+    notes: "Goal engine singleton."
+  - name: RESEARCH_RUNNING
+    file: src-tauri/src/autonomous_research.rs:12
+    type: AtomicBool
+    default: "false"
+    toggled_by: "autonomous_research::start"
+    read_by: "autonomous_research loop"
+    classification: "ACTIVE (internal)"
+    notes: "Autonomous research loop guard."
+  - name: WATCHER_RUNNING
+    file: src-tauri/src/tentacles/terminal_watch.rs:19
+    type: AtomicBool
+    default: "false"
+    toggled_by: "tentacles::terminal_watch::start"
+    read_by: "terminal_watch loop"
+    classification: "ACTIVE (internal)"
+    notes: "Terminal watcher singleton."
+  - name: HYPOTHALAMUS_RUNNING
+    file: src-tauri/src/homeostasis.rs:94
+    type: AtomicBool
+    default: "false"
+    toggled_by: "homeostasis::start_hypothalamus"
+    read_by: "homeostasis loop"
+    classification: "ACTIVE (internal)"
+    notes: "Hypothalamus homeostasis loop guard."
+  - name: TAILING_ACTIVE
+    file: src-tauri/src/tentacles/log_monitor.rs:26
+    type: AtomicBool
+    default: "false"
+    toggled_by: "tentacles::log_monitor::start_tail"
+    read_by: "log_monitor tail loop"
+    classification: "ACTIVE (internal)"
+    notes: "Log-monitor tail singleton."
+  - name: FS_WATCHER_RUNNING
+    file: src-tauri/src/tentacles/filesystem_watch.rs:22
+    type: AtomicBool
+    default: "false"
+    toggled_by: "tentacles::filesystem_watch::start"
+    read_by: "filesystem_watch notify loop"
+    classification: "ACTIVE (internal)"
+    notes: "Filesystem watcher singleton."
+  - name: DREAM_MONITOR_RUNNING
+    file: src-tauri/src/dream_mode.rs:12
+    type: AtomicBool
+    default: "false"
+    toggled_by: "dream_mode::start_monitor"
+    read_by: "dream_mode idle-detector loop"
+    classification: "ACTIVE (internal)"
+    notes: "Dream-mode idle monitor guard."
+  - name: DREAMING
+    file: src-tauri/src/dream_mode.rs:13
+    type: AtomicBool
+    default: "false"
+    toggled_by: "dream_mode::begin_dream / end_dream"
+    read_by: "dream_mode consolidation dispatcher"
+    classification: "ACTIVE (internal)"
+    notes: "In-dream state (suppresses interruptions)."
+  - name: SCANNING
+    file: src-tauri/src/file_indexer.rs:22
+    type: AtomicBool
+    default: "false"
+    toggled_by: "file_indexer::scan"
+    read_by: "file_indexer scan entrypoint"
+    classification: "ACTIVE (internal)"
+    notes: "Index scan singleton guard."
+  - name: STARTED
+    file: src-tauri/src/file_indexer.rs:404
+    type: AtomicBool
+    default: "false"
+    toggled_by: "file_indexer::start_background_indexer"
+    read_by: "file_indexer background task"
+    classification: "ACTIVE (internal)"
+    notes: "Function-local static — background indexer one-shot init."
+  - name: GHOST_ACTIVE
+    file: src-tauri/src/ghost_mode.rs:42
+    type: AtomicBool
+    default: "false"
+    toggled_by: "ghost_mode::start / stop"
+    read_by: "ghost_mode overlay dispatcher"
+    classification: "ACTIVE (internal)"
+    notes: "Ghost Mode on/off."
+  - name: MONITOR_ACTIVE
+    file: src-tauri/src/activity_monitor.rs:23
+    type: AtomicBool
+    default: "false"
+    toggled_by: "activity_monitor::start"
+    read_by: "activity_monitor loop"
+    classification: "ACTIVE (internal)"
+    notes: "Activity monitor singleton guard."
+  - name: WEEKLY_UPDATE_RUNNING
+    file: src-tauri/src/persona_engine.rs:571
+    type: AtomicBool
+    default: "false"
+    toggled_by: "persona_engine::weekly_update"
+    read_by: "persona_engine cron"
+    classification: "ACTIVE (internal)"
+    notes: "Prevents concurrent weekly persona updates."
+  - name: ENGINE_RUNNING
+    file: src-tauri/src/proactive_engine.rs:21
+    type: AtomicBool
+    default: "false"
+    toggled_by: "proactive_engine::start"
+    read_by: "proactive_engine signal loop"
+    classification: "ACTIVE (internal)"
+    notes: "Note: same symbol name as goal_engine::ENGINE_RUNNING — module-scoped so no collision."
+  - name: LEARNING_ACTIVE
+    file: src-tauri/src/learning_engine.rs:985
+    type: AtomicBool
+    default: "false"
+    toggled_by: "learning_engine::start"
+    read_by: "learning_engine loop"
+    classification: "ACTIVE (internal)"
+    notes: "Function-local static — learning engine singleton."
+  - name: AUDIO_CAPTURE_ACTIVE
+    file: src-tauri/src/audio_timeline.rs:21
+    type: AtomicBool
+    default: "false"
+    toggled_by: "audio_timeline::start_capture / stop_capture"
+    read_by: "audio_timeline capture loop"
+    classification: "ACTIVE (internal)"
+    notes: "Always-on audio capture toggle; paired with BladeConfig.audio_capture_enabled."
+  - name: NUDGE_ACTIVE
+    file: src-tauri/src/health_tracker.rs:407
+    type: AtomicBool
+    default: "false"
+    toggled_by: "health_tracker::push_nudge"
+    read_by: "health_tracker nudge dispatcher"
+    classification: "ACTIVE (internal)"
+    notes: "Debounces health nudges."
+  - name: MONITOR_RUNNING
+    file: src-tauri/src/health_guardian.rs:36
+    type: AtomicBool
+    default: "false"
+    toggled_by: "health_guardian::start_monitor"
+    read_by: "health_guardian loop"
+    classification: "ACTIVE (internal)"
+    notes: "Note: same symbol name as sidecar::MONITOR_RUNNING — module-scoped so no collision."
+  - name: DESCRIBE_NEXT_FRAME
+    file: src-tauri/src/screen_timeline.rs:21
+    type: AtomicBool
+    default: "true"
+    toggled_by: "screen_timeline::request_description / consumed in describe loop"
+    read_by: "screen_timeline loop"
+    classification: "ACTIVE (internal)"
+    notes: "Defaults to true so the first captured frame is described; rearm from command to force description on next frame."
+  - name: CHAT_CANCEL
+    file: src-tauri/src/commands.rs:24
+    type: AtomicBool
+    default: "false"
+    toggled_by: "commands::cancel_chat (#[tauri::command])"
+    read_by: "commands::send_message_stream main loop"
+    classification: ACTIVE
+    notes: "User-reachable via cancel_chat command (invoked from Chat UI). Load-bearing for streaming cancel UX."
+  - name: CHAT_INFLIGHT
+    file: src-tauri/src/commands.rs:25
+    type: AtomicBool
+    default: "false"
+    toggled_by: "commands::send_message_stream (enter/exit)"
+    read_by: "commands::send_message_stream entry guard"
+    classification: "ACTIVE (internal)"
+    notes: "Serializes chat turns to prevent overlap."
+  - name: LOOP_RUNNING
+    file: src-tauri/src/perception_fusion.rs:58
+    type: AtomicBool
+    default: "false"
+    toggled_by: "perception_fusion::start_fusion"
+    read_by: "perception_fusion loop"
+    classification: "ACTIVE (internal)"
+    notes: "Perception fusion singleton guard."
+  - name: SCHEDULER_RUNNING
+    file: src-tauri/src/workflow_builder.rs:19
+    type: AtomicBool
+    default: "false"
+    toggled_by: "workflow_builder::start_scheduler"
+    read_by: "workflow_builder scheduler loop"
+    classification: "ACTIVE (internal)"
+    notes: "Workflow scheduler singleton guard."
+
+env_vars:
+  # ============================================================
+  # std::env::var() call sites (16 matches across 10 modules)
+  # Discovered via: std::env::var\(|env::var\(
+  # Each is an undocumented config surface (no Settings UI).
+  # ============================================================
+  - name: COMPUTERNAME
+    file: src-tauri/src/sidecar.rs:550
+    read_by: "sidecar::hostname (Windows host identification)"
+    classification: "ACTIVE (internal)"
+    ui_surface: null
+    notes: "OS-provided; no user control needed. Windows host name for sidecar identification."
+  - name: HOSTNAME
+    file: src-tauri/src/sidecar.rs:551
+    read_by: "sidecar::hostname (fallback after COMPUTERNAME)"
+    classification: "ACTIVE (internal)"
+    ui_surface: null
+    notes: "OS-provided fallback on non-Windows. Standard env."
+  - name: TEMP
+    file: src-tauri/src/background_agent.rs:165
+    read_by: "background_agent::workspace_root (Windows temp dir)"
+    classification: "ACTIVE (internal)"
+    ui_surface: null
+    notes: "OS temp directory for background agent workspace. Standard env."
+  - name: BLADE_CURRENT_MSG_ID
+    file: src-tauri/src/providers/anthropic.rs:358
+    read_by: "providers::anthropic::stream_completion (thinking-block message id tag)"
+    classification: WIRED-NOT-USED
+    ui_surface: null
+    notes: "BLADE-specific env var. Used to tag thinking-block events with the current message id, but BLADE never sets this env var in-process (verified). Either set externally (developer debug) or dead-read. Phase 14 candidate: either wire to inline context or remove."
+  - name: TEMP
+    file: src-tauri/src/hive.rs:1285
+    read_by: "hive::workspace_root (Windows temp)"
+    classification: "ACTIVE (internal)"
+    ui_surface: null
+    notes: "OS temp directory for HIVE agent workspace."
+  - name: LOCALAPPDATA
+    file: src-tauri/src/notification_listener.rs:134
+    read_by: "notification_listener::windows_notification_history_path"
+    classification: "ACTIVE (internal)"
+    ui_surface: null
+    notes: "OS-provided Windows local appdata for reading notification history."
+  - name: HOME
+    file: src-tauri/src/notification_listener.rs:335
+    read_by: "notification_listener::macos_notification_path"
+    classification: "ACTIVE (internal)"
+    ui_surface: null
+    notes: "Unix HOME for macOS notification db path."
+  - name: TEMP
+    file: src-tauri/src/cron.rs:496
+    read_by: "cron::default_cwd (Windows temp for scheduled task fallback)"
+    classification: "ACTIVE (internal)"
+    ui_surface: null
+    notes: "OS temp fallback."
+  - name: HISTFILE
+    file: src-tauri/src/deep_scan.rs:489
+    read_by: "deep_scan::zsh_history_path"
+    classification: "ACTIVE (internal)"
+    ui_surface: null
+    notes: "Zsh history file path for shell-history deep scan. User-respecting — uses existing shell env."
+  - name: USERNAME
+    file: src-tauri/src/persona_engine.rs:771
+    read_by: "persona_engine::detect_os_username (Windows)"
+    classification: "ACTIVE (internal)"
+    ui_surface: null
+    notes: "OS-provided Windows username."
+  - name: USER
+    file: src-tauri/src/persona_engine.rs:772
+    read_by: "persona_engine::detect_os_username (Unix fallback)"
+    classification: "ACTIVE (internal)"
+    ui_surface: null
+    notes: "OS-provided Unix username."
+  - name: HOME
+    file: src-tauri/src/world_model.rs:176
+    read_by: "world_model::home_dir (primary)"
+    classification: "ACTIVE (internal)"
+    ui_surface: null
+    notes: "Used to locate user home for world-model scans."
+  - name: USERPROFILE
+    file: src-tauri/src/world_model.rs:177
+    read_by: "world_model::home_dir (Windows fallback)"
+    classification: "ACTIVE (internal)"
+    ui_surface: null
+    notes: "Windows home fallback."
+  - name: HOME
+    file: src-tauri/src/world_model.rs:565
+    read_by: "world_model::resolve_user_paths (duplicate home-dir lookup)"
+    classification: "ACTIVE (internal)"
+    ui_surface: null
+    notes: "Second call site in world_model for path resolution."
+  - name: USERPROFILE
+    file: src-tauri/src/world_model.rs:566
+    read_by: "world_model::resolve_user_paths (Windows fallback duplicate)"
+    classification: "ACTIVE (internal)"
+    ui_surface: null
+    notes: "Second Windows home fallback."
+  - name: "<dynamic env_key>"
+    file: src-tauri/src/runtimes.rs:509
+    read_by: "runtimes::resolve_runtime_path (reads a runtime-configured env var name)"
+    classification: "ACTIVE (internal)"
+    ui_surface: null
+    notes: "Meta-read: takes an env_key parameter and reads whatever env var name the caller supplies. Used by runtimes.rs to let tentacles/MCP servers locate tool binaries via user-specified env vars. Classification = internal dispatcher, not a fixed var name."
+
+cargo_features:
+  # ============================================================
+  # Cargo feature flags (1 entry in src-tauri/Cargo.toml [features])
+  # Discovered by reading Cargo.toml [features] block.
+  # ============================================================
+  - name: local-whisper
+    file: src-tauri/Cargo.toml:62
+    default_enabled: false
+    gated_modules:
+      - src-tauri/src/whisper_local.rs
+      - src-tauri/src/ghost_mode.rs
+    classification: NOT-WIRED
+    notes: "No Settings toggle — requires rebuild with --features local-whisper. Paired with BladeConfig.use_local_whisper runtime flag. Documented in CLAUDE.md (build-time requirement: LLVM/libclang for whisper-rs-sys). Phase 14 candidate: either surface a build-time capability notice in Settings Voice pane or remove if cloud Whisper is sufficient."
+
+keyring_secrets:
+  # ============================================================
+  # Keyring-stored secrets (storage location only; NEVER values)
+  # Discovered via: keyring::Entry::new|Entry::new\(
+  # ============================================================
+  - service: "blade-ai"
+    key: "<provider>"
+    file: src-tauri/src/config.rs:404
+    storage_location: keyring
+    notes: "Provider API keys. get_api_key_from_keyring looks up key by provider name (anthropic|openai|openrouter|gemini|groq|ollama|custom). Storage location only; value never read in audit."
+  - service: "blade-ai"
+    key: "<provider>"
+    file: src-tauri/src/config.rs:419
+    storage_location: keyring
+    notes: "Write counterpart in set_api_key_in_keyring; same per-provider service/key pattern."
+  - service: "blade-ai"
+    key: "openai"
+    file: src-tauri/src/tts.rs:299
+    storage_location: keyring
+    notes: "OpenAI API key read by TTS for OpenAI TTS backend. Shares the same keyring slot as ProvidersPane's OpenAI entry (intentional)."
+  - service: "blade-ai"
+    key: "groq-whisper"
+    file: src-tauri/src/voice.rs:139
+    storage_location: keyring
+    notes: "Optional dedicated key for Groq Whisper transcription. If absent, voice.rs falls back to 'groq' key."
+  - service: "blade-ai"
+    key: "groq"
+    file: src-tauri/src/voice.rs:144
+    storage_location: keyring
+    notes: "Groq API key fallback when groq-whisper key absent."
+  - service: "blade-ai"
+    key: "groq-whisper"
+    file: src-tauri/src/voice.rs:216
+    storage_location: keyring
+    notes: "Second voice.rs read site for groq-whisper (separate code path — local-whisper feature-gated branch)."
+  - service: "blade-ai"
+    key: "groq"
+    file: src-tauri/src/voice.rs:221
+    storage_location: keyring
+    notes: "Second voice.rs read site for groq key."
+  - service: "blade-ai"
+    key: "encryption-key"
+    file: src-tauri/src/crypto.rs:21
+    storage_location: keyring
+    notes: "AES-GCM encryption key for sensitive local artifacts (memory, decision logs). Generated once on first run; never shown to user. Cannot be rotated from UI in v1.1."
+  - service: "blade-ai"
+    key: "telegram_bot_token"
+    file: src-tauri/src/telegram.rs:110
+    storage_location: keyring
+    notes: "Telegram bot token read site (get). No Settings UI for Telegram in v1.1 — likely WIRED-NOT-USED at tentacle level; Phase 13 ECOSYS or Phase 14 WIRE2 candidate."
+  - service: "blade-ai"
+    key: "telegram_bot_token"
+    file: src-tauri/src/telegram.rs:117
+    storage_location: keyring
+    notes: "Telegram bot token write site (set)."
+  - service: "blade-ai"
+    key: "telegram_bot_token"
+    file: src-tauri/src/telegram.rs:124
+    storage_location: keyring
+    notes: "Telegram bot token delete site (clear)."
+  - service: "blade-ai"
+    key: "discord_webhook_url"
+    file: src-tauri/src/discord.rs:22
+    storage_location: keyring
+    notes: "Discord webhook URL read site. No Settings UI for Discord in v1.1 — Phase 13 ECOSYS or Phase 14 WIRE2 candidate."
+  - service: "blade-ai"
+    key: "discord_webhook_url"
+    file: src-tauri/src/discord.rs:29
+    storage_location: keyring
+    notes: "Discord webhook URL write site."
+  - service: "blade-ai"
+    key: "discord_webhook_url"
+    file: src-tauri/src/discord.rs:36
+    storage_location: keyring
+    notes: "Discord webhook URL delete site."
