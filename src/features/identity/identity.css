@@ -82,4 +82,56 @@
     font-size: 13px;
     resize: vertical;
   }
+
+  /* ── Phase 12 Plan 12-04 — Profile surface additive rules ── */
+
+  /* Scan-summary bar */
+  .scan-summary-bar { margin-bottom: var(--s-4); }
+
+  /* Live-tail log panel */
+  .scan-log-body {
+    max-height: 200px;
+    overflow-y: auto;
+    background: rgba(0, 0, 0, 0.24);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    padding: var(--s-2);
+  }
+  .scan-log-line {
+    display: grid;
+    grid-template-columns: 72px 96px 1fr;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .scan-log-ts  { color: var(--t-3); }
+  .scan-log-tag-fs_mru, .scan-log-tag-mru   { color: var(--a-warm); }
+  .scan-log-tag-git_remotes                  { color: var(--a-cool); }
+  .scan-log-tag-ide_workspaces,
+  .scan-log-tag-ai_sessions                  { color: var(--a-ok); }
+  .scan-log-tag-shell_history,
+  .scan-log-tag-which_sweep,
+  .scan-log-tag-bookmarks                    { color: var(--t-2); }
+  .scan-log-tag-llm_enrich                   { color: var(--a-cool); }
+  .scan-log-msg { color: var(--t-1); overflow: hidden; text-overflow: ellipsis; }
+
+  /* Profile table */
+  .profile-table-row { height: var(--s-10); /* 40px */ }
+  .profile-table-row:focus { outline: 2px solid var(--a-cool); outline-offset: -2px; }
+  .profile-table-row-orphaned { color: var(--t-3); }
+
+  /* Rhythm heatmap */
+  .rhythm-heatmap {
+    display: grid;
+    grid-template-columns: repeat(24, 20px);
+    grid-template-rows: repeat(7, 20px);
+    gap: 2px;  /* exception: sub-s-1, justified by 24-col overflow constraint */
+  }
+  .rhythm-cell { width: 20px; height: 20px; border-radius: 2px; }
+
+  /* Source pill focus ring */
+  .identity-tab-pill:focus-visible { outline: 2px solid var(--a-cool); outline-offset: 2px; }
 }
