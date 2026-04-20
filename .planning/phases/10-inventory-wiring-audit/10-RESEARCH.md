@@ -579,7 +579,7 @@ Canonical schema Phase 14/15 scripts can lock against. Uses JSON Schema Draft 20
 
 **Verification-first discipline:** 4 of 5 assumptions above have live verify-gate enforcement (`verify:no-raw-tauri`, `verify-emit-policy`, `verify-phase{5..8}-rust-surface`). If the audit phase runs AFTER `npm run verify:all` passes, A1-A4 are HIGH-confidence. Recommend planner add "run `npm run verify:all` as a phase precondition" before the subagent dispatch.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 ### Q1: Should the audit re-classify commands that the tester-pass `4ab464c` commit silenced (e.g. self_upgrade loop tools)?
 
