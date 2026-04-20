@@ -86,6 +86,7 @@ pub fn resolve_provider_model(
 /// Detect whether an error string represents a transient provider failure
 /// (rate limit, service unavailable, server error) that warrants trying a
 /// fallback provider.
+#[allow(dead_code)]
 fn is_fallback_eligible_error(err: &str) -> bool {
     let lower = err.to_ascii_lowercase();
     lower.contains("429")
@@ -595,6 +596,7 @@ pub async fn test_connection(provider: &str, api_key: &str, model: &str, base_ur
 /// On a transient error (429/503/5xx) the function probes each provider listed
 /// in `config.fallback_providers` in order and returns the first successful
 /// response.  `model` may include a "provider/" prefix.
+#[allow(dead_code)]
 pub async fn fallback_chain_complete(
     model: &str,
     messages: &[ConversationMessage],
@@ -654,6 +656,7 @@ pub async fn fallback_chain_complete(
 /// On a transient error (429/503/5xx) the function probes each provider listed
 /// in `config.fallback_providers` in order and returns the first successful
 /// stream.  `model` may include a "provider/" prefix.
+#[allow(dead_code)]
 pub async fn fallback_chain_stream(
     app: &tauri::AppHandle,
     model: &str,

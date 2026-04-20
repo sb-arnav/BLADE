@@ -181,7 +181,8 @@ fn check_cli_tools(capability: &str) -> Option<String> {
     for (keywords, tool_name) in tools {
         if keywords.iter().any(|k| cap_lower.contains(k)) {
             // Check if the tool is actually installed
-            let _check = std::process::Command::new("which")
+            #[cfg(not(target_os = "windows"))]
+            let check = std::process::Command::new("which")
                 .arg(tool_name)
                 .output();
 
