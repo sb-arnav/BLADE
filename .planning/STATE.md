@@ -1,170 +1,135 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-current_phase: "09-polish"
-status: v1-substrate-complete-awaiting-mac-smoke
-last_updated: "2026-04-19T22:00:00.000Z"
+milestone: v1.1
+milestone_name: functionality-wiring-accessibility
+current_phase: "10-inventory-wiring-audit"
+status: defining-requirements
+last_updated: "2026-04-20T11:08:49.000Z"
 progress:
-  total_phases: 10
-  completed_phases: 10
-  total_plans: 64
-  completed_plans: 64
-  percent: 100
+  total_phases: 6
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
-# STATE — BLADE Skin Rebuild (V1)
+# STATE — BLADE v1.1 (Functionality, Wiring, Accessibility)
 
-**Project:** BLADE Skin Rebuild V1
-**Current Phase:** 09-polish COMPLETE — V1 substrate fully shipped
-**Status:** ALL 10 PHASES COMPLETE — ~165 commits, 64 plans, `npm run verify:all` 18/18 green, `npx tsc --noEmit` clean. Single Mac operator session (brother) closes all deferred checkpoints: M-WCAG + M-01..M-46 via `.planning/HANDOFF-TO-MAC.md`. On operator "approved, ship it" → 1.0.0 cutover sequence executes.
-**Last Updated:** 2026-04-19
+**Project:** BLADE — Desktop JARVIS
+**Current Milestone:** v1.1 — Make BLADE actually work as the thing it already is
+**Current Phase:** Not started (defining requirements)
+**Status:** Defining requirements — v1.1 milestone initialized from locked shape (`.planning/notes/v1-1-milestone-shape.md`)
+**Last Updated:** 2026-04-20
 
 ---
 
 ## Project Reference
 
-**Core Value:** Every surface the user touches is coherent, Liquid-Glass-native, and wired end-to-end. No orphan screens, no dead buttons, no stringly-typed invokes that silently fail.
+**Core Value:** BLADE works out of the box. A first-time user pastes a key, the deep scan surfaces their actual environment, observer-class tentacles auto-enable, every backend capability is reachable, and the user can always see what BLADE is doing.
 
-**Current Focus:** Phase 1 Foundation — CONTEXT.md captured, ready for planning
+**Current Focus:** Milestone v1.1 — wiring audit first, then provider setup + deep scan + ecosystem + wiring/a11y + density polish. 6 phases, continuing phase numbering from v1.0 (phases 10..15).
 
 ---
 
 ## Current Position
 
-Phase: 04 — SUBSTRATE COMPLETE (Mac operator smoke deferred)
-Plan: 29 of 32 shipped (Phase 0..4 substrates); checkpoints bundled: 01-09 WCAG + 02-07 smoke + 03-07 smoke + 04-07 M-01..M-13 Mac session + cargo check. All closed in ONE Mac session per brother's-Mac strategy.
-**Phase:** 4 — Overlay Windows (QuickAsk + Voice Orb + Ghost + HUD)
-**Plan:** 04-07 automated (5 Playwright specs + 3 new bash guards); Mac operator smoke deferred (M-01..M-13)
-**Phase Status:** 95% — all 7 plans code-complete; QUICK-01..07 + ORB-01..08 + GHOST-01..08 + HUD-01..05 + WIRE-07 closed
-**Overall Progress:**
-
-```
-[Phase 0] Pre-Rebuild Audit    ████████████████████  100% COMPLETE (b26a965)
-[Phase 1] Foundation           ███████████████████░   95% SUBSTRATE SHIPPED (WCAG checkpoint pending)
-[Phase 2] Onboarding + Shell   ███████████████████░   95% SUBSTRATE SHIPPED (operator smoke pending)
-[Phase 3] Dashboard+Chat+Set   ███████████████████░   95% SUBSTRATE SHIPPED (Mac smoke + cargo check pending)
-[Phase 4] Overlay Windows      ███████████████████░   95% SUBSTRATE SHIPPED (M-01..M-13 Mac smoke pending)
-[Phase 5] Agents + Knowledge   ░░░░░░░░░░░░░░░░░░░░  Not started
-[Phase 6] Life OS + Identity   ░░░░░░░░░░░░░░░░░░░░  Not started
-[Phase 7] Dev Tools + Admin    ░░░░░░░░░░░░░░░░░░░░  Not started
-[Phase 8] Body + Hive          ░░░░░░░░░░░░░░░░░░░░  Not started
-[Phase 9] Polish Pass          ░░░░░░░░░░░░░░░░░░░░  Not started
-```
-
-Verify:all is now 9 gates (entries + no-raw-tauri + migration-ledger + emit-policy + contrast + chat-rgba + ghost-no-cursor + orb-rgba + hud-chip-count).
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-20 — Milestone v1.1 started from locked shape
 
 ---
 
-## Performance Metrics
+## v1.1 Roadmap Preview
 
-| Metric | Target | Current |
-|--------|--------|---------|
-| Requirements mapped | 156/156 | 156/156 ✓ |
-| Phases complete | 10 | 1 (Phase 0) |
-| Routes rebuilt | 59 | 82 stubs (all ComingSoonSkeleton) |
-| Typed wrapper coverage | 764 commands | 6 shipped (getConfig/saveConfig/getOnboardingStatus/completeOnboarding/sendMessageStream/cancelChat) |
-| HTML entries created | 5 | 5 ✓ (index/quickask/overlay/hud/ghost_overlay) |
-| Primitives shipped | 8 + skeleton | 9 ✓ |
-| Design tokens | 6 CSS files | 6 ✓ (tokens/glass/motion/layout/typography/index) |
-| WOFF2 self-hosted | 8 files | 8 ✓ (Syne/Bricolage/Fraunces/JetBrains × 2 weights) |
-| WIRE-08 refactor sites | 142 single-window | 268 emit_to() calls across 66 Rust files |
-| Verify scripts | 6 | 6 ✓ (all pass in npm run verify:all) |
+```
+[Phase 10] Inventory & Wiring Audit       ░░░░░░░░░░░░░░░░░░░░  Not started
+[Phase 11] Smart Provider Setup           ░░░░░░░░░░░░░░░░░░░░  Not started
+[Phase 12] Smart Deep Scan                ░░░░░░░░░░░░░░░░░░░░  Not started
+[Phase 13] Self-Configuring Ecosystem     ░░░░░░░░░░░░░░░░░░░░  Not started
+[Phase 14] Wiring & Accessibility Pass    ░░░░░░░░░░░░░░░░░░░░  Not started
+[Phase 15] Density + Polish               ░░░░░░░░░░░░░░░░░░░░  Not started
+```
+
+Sequencing: Phase 10 → (Phase 11 ∥ Phase 12) → Phase 13 → Phase 14 → Phase 15.
+Phase 12 has a soft data dependency on Phase 11 (the scanner uses capability-aware routing for its LLM calls) but can begin planning in parallel.
 
 ---
 
 ## Accumulated Context
 
-### Key Decisions Locked
+### v1.0 Substrate (inherited — treat as given)
 
-- D-01: Self-built 8 primitives, no shadcn/Radix
-- D-02: CSS-only motion, no Framer Motion
-- D-03: Hand-written Tauri wrappers in `src/lib/tauri/`
-- D-04: `useChat` hook + ConfigContext, no Zustand
-- D-05: Custom route registry, no React Router
-- D-06: window-vibrancy for window chrome; CSS backdrop-filter for in-DOM panels
-- D-07: Max 3 backdrop-filter per viewport; blur caps 20/12/8px
-- D-08: OpenClaw animation math applied verbatim to VoiceOrb
-- D-09: Ghost Mode `.content_protected(true)` at creation time; no cursor CSS
-- D-10: Ghost card format ≤6-word headline, 1-2 bullets, ≤60 chars/line
-- D-11: QuickAsk → Main bridge via `quickask_submit` invoke → `blade_quickask_bridged` event
-- D-12: Single `blade_prefs_v1` localStorage blob; `usePrefs()` hook reads once
-- D-13: `useTauriEvent` hook is the only permitted event subscription pattern
-- D-14: `emit_to(window_label, ...)` for single-window; `emit_all` for cross-window only
-- D-15: No light theme; single Liquid Glass dark treatment
-- D-16: Token compaction at ratio > 0.65; frontend shows `blade_token_ratio` indicator
-- D-17: src.bak is dead reference — backend + prototypes are canonical audit sources (Phase 0 confirmed)
-- D-18: QuickAsk-voice uses blur(48px) — intentional override; sole backdrop-filter layer on that screen
-- D-19: homeostasis emits `homeostasis_update` (not `hormone_update`) — rename WIRE-02 deferred to Phase 3
-- D-20..D-45: Phase 1 Foundation implementation decisions (26 decisions) — see `.planning/phases/01-foundation/01-CONTEXT.md`. Key ones:
-  - D-20 props-variant primitive API with strict string unions
-  - D-22 token files split by concern (tokens/glass/motion/layout.css)
-  - D-23 CSS vars source of truth; Tailwind @theme bridges via var()
-  - D-24 self-hosted WOFF2 fonts
-  - D-26 hybrid nuke: rm -rf src/ then rebuild 5 windows + 59 RouteDefinition stubs with ComingSoonSkeleton
-  - D-27 migration ledger enforcement = CI script + checklist doc (no reviewer-required PR gate)
-  - D-29..D-34 gate verification methods (performance.mark, /wrapper-smoke route, verify-entries.mjs, Playwright, contrast audit, ESLint custom rule)
-  - D-35..D-45 directory + wrapper + event + route registry + config/prefs + HTML entry + WIRE-08 regression details
+- 178+ Rust modules, 764 `#[tauri::command]`s, 73 event emitters operational
+- 10 tentacles, 4 heads, 10 hormones, 12 body systems, body_registry wired
+- 5 windows boot (main / quickask / overlay / hud / ghost_overlay); no Rust panics at startup
+- Design tokens, 9 primitives, typed Tauri wrapper, `useTauriEvent`, `BLADE_EVENTS` registry, custom router, `usePrefs`, `ConfigContext` — all shipped
+- Chat streaming + tool calls + ghost + orb + quickask + HUD all reachable via their windows
+- 18 verify gates green; `npx tsc --noEmit` clean; ~165 commits landed across 10 phases
+- Tester pass commits (`4ab464c`, `90d72aa`, `580175f`) already on master — Phase 10 audit assumes them
 
-### Phase Gate Requirements (Phase 1 must pass ALL of these)
+### v1.0 Key Decisions (still in force)
 
-- **P-01**: Dashboard first paint ≤ 200ms on integrated GPU; max 3 backdrop-filter per viewport
-- **P-02**: QuickAsk → Main bridge documented (from RECOVERY_LOG.md); contract explicit before QuickAsk phase
-- **P-03**: Migration ledger tracking all 59 routes; no route removed before replacement ships
-- **P-04**: Typed wrapper smoke-tested; snake_case arg keys confirmed at Rust entry point
-- **P-05**: All 5 HTML files created Day 1; CI check validates Vite input/HTML file alignment
-- **P-06**: `useTauriEvent` hook built before any component; listener leak test passing
+D-01..D-45 remain locked. See `.planning/phases/01-foundation/01-CONTEXT.md` for full list. Highlights:
 
-### Backend Wiring Gaps (WIRE category)
+- D-01 Self-built 8 primitives, no shadcn/Radix
+- D-02 CSS-only motion, no Framer Motion
+- D-03 Hand-written Tauri wrappers in `src/lib/tauri/`
+- D-04 `useChat` hook + ConfigContext, no Zustand
+- D-05 Custom route registry, no React Router
+- D-07 Max 3 backdrop-filter per viewport; blur caps 20/12/8px
+- D-09 Ghost Mode `.content_protected(true)` at creation
+- D-13 `useTauriEvent` hook is the only permitted event subscription pattern
+- D-14 `emit_to(window_label, ...)` for single-window; `emit_all` for cross-window only
 
-| Gap | Location | Phase |
-|-----|----------|-------|
-| `quickask_submit` command | `commands.rs` | Phase 3 (stub) + Phase 4 (test) |
-| `hormone_update` event | `homeostasis.rs` | Phase 3 |
-| `blade_message_start` event | `commands.rs` | Phase 3 |
-| `blade_thinking_chunk` event | `commands.rs` | Phase 3 |
-| `blade_agent_event` event | `swarm.rs` / `agents/executor.rs` | Phase 3 (emit) + Phase 5 (consume) |
-| `blade_token_ratio` event | `commands.rs` | Phase 3 |
-| VAD in `audio_timeline.rs` | `audio_timeline.rs` | Phase 4 |
-| `emit_all` audit + refactor | Rust codebase-wide | Phase 1 |
+### v1.1 Decisions (locked 2026-04-20)
+
+- **M-01** v1.1 = wiring + smart defaults + a11y, NOT a new-feature milestone
+- **M-02** 6-phase shape locked from /gsd-explore; flesh-out only, no silent revision
+- **M-03** Ecosystem phase observe-only (no acting tentacles in v1.1)
+- **M-04** JARVIS push-to-talk deferred to v1.2+
+- **M-05** Phase numbering continues from v1.0 (v1.1 = phases 10..15)
+- **M-06** Capability-aware routing in Phase 11; Phase 12 consumes it
+- **M-07** Activity log strip is load-bearing (lives in Phase 14, not Phase 15)
+
+### v1.0 Open Checkpoints (track separately, do not gate v1.1)
+
+- Mac smoke M-01..M-46 — single Mac operator session planned per `.planning/HANDOFF-TO-MAC.md`
+- Plan 01-09 WCAG checkpoint — operator-owned, requires Mac desktop environment
+- WIRE-08 `cargo check` full build — unverifiable in this sandbox (libspa-sys libclang)
+
+### v1.1 Input Artifacts
+
+- `.planning/notes/v1-1-milestone-shape.md` — **authoritative** shape (6 phases, sequencing, falsifiable success criteria) — locked 2026-04-20
+- `.planning/notes/v2-vision-tentacles.md` — destination vision, not v1.1 scope
+- `.planning/research/questions.md` — Q1 browser-harness open (decision deadline: before v1.2 JARVIS phase plan)
+- Tester pass output: chat silent-fail fix (`4ab464c`), self_upgrade loop stopped, log spam silenced
 
 ### Active Todos
 
-- [x] Audit all `emit_all` calls in `src-tauri/src/` — DONE (00-EMIT-AUDIT.md, 247 sites classified)
-- [x] Document backend contracts (commands, events, WIRE gaps) — DONE (00-BACKEND-EXTRACT.md)
-- [x] Map all 11 prototypes to flow contracts — DONE (00-PROTO-FLOW.md)
-- [x] Create `.planning/RECOVERY_LOG.md` — DONE (Plan 00-02, b26a965, 1178 lines)
-- [x] Phase 1 CONTEXT gathered — DONE (2026-04-18, 01-CONTEXT.md + 01-DISCUSSION-LOG.md)
-- [x] Run `/gsd-plan-phase 1` — DONE (2026-04-18, 9 plans in 4 waves, checker iter 3/3 PASSED)
-- [x] Run `/gsd-execute-phase 1` substrate — DONE (2026-04-18, 9 plans, 35 commits)
-- [ ] Operator WCAG checkpoint (01-09 Task 4) — requires npm install, tauri dev, 5-wallpaper screenshots, playwright e2e, tauri build + verify:html
-- [ ] Phase 1 completion commit — depends on WCAG checkpoint passing
+- [ ] Write REQUIREMENTS.md for v1.1 (REQ-IDs derived from locked shape)
+- [ ] Write ROADMAP.md for v1.1 (phases 10..15 with success criteria)
+- [ ] Commit milestone initialization (PROJECT.md + STATE.md + REQUIREMENTS.md + ROADMAP.md)
+- [ ] `/gsd-discuss-phase 10` — start Phase 10 (Inventory & Wiring Audit)
 
 ### Blockers
 
-None for code. Final checkpoint for Phase 1 is operator-owned (cannot be automated from within the sandbox).
-
-- **WIRE-08 cargo check** — unverifiable in this sandbox (libspa-sys requires libclang which is not installed). Code is semantically correct but operator must run `cd src-tauri && cargo check` on a libclang-enabled environment to confirm zero `error[E…]`.
-- **`save_config` wrapper** — Plan 01-05 shipped the wrapper but `save_config` in `src-tauri/src/config.rs:514` is an INTERNAL helper, not `#[tauri::command]`. First runtime call will return TauriError(kind='not_found'). Fix in Phase 2 or Plan 09 follow-up: add `#[tauri::command] pub fn save_config_cmd(...)` in Rust and register it in lib.rs generate_handler!.
+None for v1.1 planning. Mac smoke checkpoints from v1.0 remain operator-owned and tracked separately.
 
 ---
 
 ## Session Continuity
 
-**Last session:** 2026-04-18 — `/gsd-execute-phase 1` executed full substrate. 35 commits landed across 9 plans in 4 waves. Operator-approved nuke ran, 5 HTML entries + 5 bootstraps shipped, 6 CSS files with blur caps + 8 self-hosted WOFF2 fonts, typed Tauri base + 6 wrappers, BLADE_EVENTS catalog + useTauriEvent hook, 9 primitives, custom Router + ConfigContext + 82 ComingSoonSkeleton route stubs, migration ledger seeded, WIRE-08 refactor converted 142+ single-window emit sites to emit_to(...) across 66 Rust files, 6 verify scripts + no-raw-tauri ESLint rule + 3 DEV surfaces + Playwright listener-leak spec + CI workflow. `npm run verify:all` all pass, `npx tsc --noEmit` clean.
-**Next action:** Operator runs Plan 01-09 WCAG checkpoint: `npm install && npx playwright install chromium` → `npm run tauri dev` (verify all 5 windows launch) → open DevTools, read `[perf] boot-to-first-paint:` (target ≤200ms) → navigate to /primitives, screenshot over 5 wallpapers, save to `.planning/phases/01-foundation/wcag-screenshots/` → `npm run test:e2e` → `npm run tauri build && npm run verify:html-entries`. On pass, commit phase completion.
+**Last session:** 2026-04-20 — /gsd-explore locked v1.1 shape, committed (`580175f`). v2+ vision captured separately (`90d72aa`). Tester pass fixes landed (`4ab464c`).
+**Next action:** `/gsd-discuss-phase 10 ${GSD_WS}` — gather context for Phase 10 Inventory & Wiring Audit. Audit outputs WIRING-AUDIT.md which feeds Phase 14 backlog.
 **Context cliff notes:**
 
-- Backend is complete (178 Rust modules, 764 commands); this project is frontend + WIRE-08 refactor
-- All 5 HTML entries now present — Rust no longer panics on overlay/hud/ghost_overlay window creation
-- WIRE-01: `quickask_submit` command + `blade_quickask_bridged` event still missing from Rust — Phase 3 stub
-- WIRE-02: `homeostasis_update` event rename to `hormone_update` — Phase 3
-- WIRE-08: DONE in Phase 1 (66 Rust files, 268 emit_to calls, 60 cross-window sites preserved)
-- 156 requirements, 10 phases mapped in ROADMAP.md; Foundation (FOUND-01..08) + WIRE-08 + WIN-01..09 closed by Plan 01 substrate (P-08 WCAG manual checkpoint pending)
-- Phase 0 artifacts: `.planning/RECOVERY_LOG.md`, `.planning/phases/00-pre-rebuild-audit/`
-- Phase 1 artifacts: `.planning/phases/01-foundation/01-{01..09}-SUMMARY.md`, `.planning/migration-ledger.md`, `scripts/{seed-migration-ledger,verify-*,audit-contrast}.mjs + verify-no-raw-tauri.sh`, `eslint-rules/no-raw-tauri.js`, `playwright.config.ts` + `tests/e2e/listener-leak.spec.ts`
-- `src.bak/` untouched (297 files) — migration ledger cross-reference
+- v1.0 is substrate-complete; v1.1 turns it into something a first-time user can actually use
+- 6 phases: audit → provider + scan (parallel) → ecosystem → wiring+a11y → density+polish
+- Observe-only guardrail on all auto-enabled tentacles in Phase 13
+- Activity log strip in Phase 14 is the trust surface for "is BLADE doing anything?"
+- Phases 5..9 from v1.0 shipped their respective clusters; v1.1 Wiring pass (Phase 14) addresses the gaps those clusters left behind
 
 ---
 
-*State initialized: 2026-04-17 | Last updated: 2026-04-18 (Phase 1 substrate shipped, awaiting WCAG checkpoint)*
+*State initialized: 2026-04-17 | v1.1 kickoff: 2026-04-20 (milestone shape locked, requirements/roadmap next)*
