@@ -1212,6 +1212,8 @@ pub fn run() {
             deep_scan::profile::profile_overlay_upsert,
             deep_scan::profile::profile_overlay_reset,
             deep_scan::profile::scan_cancel,
+            // Deep Scan privacy config (Plan 12-04, D-65)
+            config::set_scan_classes_enabled,
             // Integration Bridge — Phase 4 MCP real-world integrations
             integration_bridge::integration_get_state,
             integration_bridge::integration_toggle,

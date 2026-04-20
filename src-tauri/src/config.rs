@@ -803,6 +803,34 @@ pub fn get_all_provider_keys() -> serde_json::Value {
     })
 }
 
+/// Phase 12 Plan 12-04 (D-65) — Update which scan source classes are enabled.
+/// Called by the Settings → Privacy Deep Scan section toggles.
+/// Each toggle change fires this with the full updated ScanClassesEnabled struct.
+#[tauri::command]
+pub fn set_scan_classes_enabled(
+    fs_repos: bool,
+    git_remotes: bool,
+    ide_workspaces: bool,
+    ai_sessions: bool,
+    shell_history: bool,
+    mru: bool,
+    bookmarks: bool,
+    which_sweep: bool,
+) -> Result<(), String> {
+    let mut config = load_config();
+    config.scan_classes_enabled = ScanClassesEnabled {
+        fs_repos,
+        git_remotes,
+        ide_workspaces,
+        ai_sessions,
+        shell_history,
+        mru,
+        bookmarks,
+        which_sweep,
+    };
+    save_config(&config)
+}
+
 /// Store a key for any provider without switching to it.
 /// Use this to pre-load all your keys without changing the active provider.
 #[tauri::command]

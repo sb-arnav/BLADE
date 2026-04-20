@@ -64,3 +64,21 @@ export function profileOverlayReset(rowId: string): Promise<void> {
 export function scanCancel(): Promise<void> {
   return invokeTyped<void>('scan_cancel');
 }
+
+// ── Phase 12 Plan 12-04 — Privacy config wrapper ─────────────────────────────
+
+export interface ScanClassesEnabled {
+  fs_repos: boolean;
+  git_remotes: boolean;
+  ide_workspaces: boolean;
+  ai_sessions: boolean;
+  shell_history: boolean;
+  mru: boolean;
+  bookmarks: boolean;
+  which_sweep: boolean;
+}
+
+/** @see src-tauri/src/config.rs `pub fn set_scan_classes_enabled(...)` */
+export function setScanClassesEnabled(classes: ScanClassesEnabled): Promise<void> {
+  return invokeTyped<void, Record<string, unknown>>('set_scan_classes_enabled', classes as unknown as Record<string, unknown>);
+}
