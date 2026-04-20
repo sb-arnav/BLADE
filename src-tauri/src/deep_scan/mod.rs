@@ -12,6 +12,7 @@
 
 pub mod leads;
 pub mod queue;
+pub mod rhythm;
 pub mod scanners;
 
 use std::collections::HashMap;
@@ -304,14 +305,56 @@ fn process_lead(lead: &Lead, _app: &tauri::AppHandle) -> (RowBatch, Vec<Lead>, S
             (RowBatch { repo_rows: vec![], accounts: vec![], mru_files: files }, vec![], msg)
         }
         LeadKind::ShellHistoryScan => {
-            // Shell history seed lead — treat as FsRepoWalk on the path
-            let (rows, follow_ups) = scanners::fs_repos::run(lead);
-            let msg = format!("shell_history lead: found {} repos", rows.len());
-            (RowBatch { repo_rows: rows, accounts: vec![], mru_files: vec![] }, follow_ups, msg)
+            // Shell history scanner: extracts tool invocations + cd-target PathHint follow-ups
+            let classes = crate::config::load_config().scan_classes_enabled;
+            if !classes.shell_history {
+                return (RowBatch::empty(), vec![], "shell_history: disabled by scan_classes_enabled".to_string());
+            }
+            let (_tool_rows, follow_ups) = scanners::shell_history::run(lead);
+            let msg = format!("shell_history: {} follow-up leads", follow_ups.len());
+            // tool_rows go into legacy results; follow-ups drive further scanning
+            (RowBatch::empty(), follow_ups, msg)
+        }
+        LeadKind::IdeWorkspaceRead => {
+            let classes = crate::config::load_config().scan_classes_enabled;
+            if !classes.ide_workspaces {
+                return (RowBatch::empty(), vec![], "ide_workspaces: disabled by scan_classes_enabled".to_string());
+            }
+            let (_ide_rows, follow_ups) = scanners::ide_workspaces::run(lead);
+            let msg = format!("ide_workspaces: {} follow-up leads", follow_ups.len());
+            (RowBatch::empty(), follow_ups, msg)
+        }
+        LeadKind::AiSessionRead => {
+            let classes = crate::config::load_config().scan_classes_enabled;
+            if !classes.ai_sessions {
+                return (RowBatch::empty(), vec![], "ai_sessions: disabled by scan_classes_enabled".to_string());
+            }
+            let (_ai_rows, follow_ups) = scanners::ai_sessions::run(lead);
+            // Also collect SSH config accounts
+            let ssh_accounts = scanners::ai_sessions::scan_ssh_config();
+            let msg = format!("ai_sessions: {} follow-up leads, {} ssh accounts", follow_ups.len(), ssh_accounts.len());
+            (RowBatch { repo_rows: vec![], accounts: ssh_accounts, mru_files: vec![] }, follow_ups, msg)
+        }
+        LeadKind::BookmarkRead => {
+            let classes = crate::config::load_config().scan_classes_enabled;
+            if !classes.bookmarks {
+                return (RowBatch::empty(), vec![], "bookmarks: disabled by scan_classes_enabled".to_string());
+            }
+            let _bookmark_rows = scanners::bookmarks::run(lead);
+            let msg = format!("bookmarks: scanned");
+            (RowBatch::empty(), vec![], msg)
+        }
+        LeadKind::WhichSweep => {
+            let classes = crate::config::load_config().scan_classes_enabled;
+            if !classes.which_sweep {
+                return (RowBatch::empty(), vec![], "which_sweep: disabled by scan_classes_enabled".to_string());
+            }
+            let _tool_rows = scanners::which_sweep::run();
+            let msg = format!("which_sweep: scanned {} tools", _tool_rows.len());
+            (RowBatch::empty(), vec![], msg)
         }
         _ => {
-            // Plan 12-02 adds remaining scanners
-            (RowBatch::empty(), vec![], format!("{}: stub (plan 12-02)", lead.kind_str()))
+            (RowBatch::empty(), vec![], format!("{}: unhandled lead kind", lead.kind_str()))
         }
     }
 }
@@ -374,6 +417,9 @@ pub async fn deep_scan_start(app: tauri::AppHandle) -> Result<DeepScanResults, S
             }
         }
     }
+
+    // Compute rhythm signals from cross-scanner data (after drain, before legacy)
+    results.rhythm_signals = rhythm::compute(&results);
 
     // Run the legacy parallel scanners for backward compat (installed_apps, ides, etc.)
     let legacy = run_legacy_scanners().await;
