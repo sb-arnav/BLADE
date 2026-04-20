@@ -46,6 +46,7 @@ mod agents;
 mod automation;
 mod brain;
 mod browser_native;
+mod capability_probe;
 mod character;
 mod clipboard;
 mod commands;
