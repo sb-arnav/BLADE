@@ -46,15 +46,13 @@ test.describe('CapabilityGap — long_context on ChatView', () => {
     // Inject a synthesized long user turn into chat state by typing + sending.
     // The InputBar submits via sendMessageStream which we've mocked to no-op;
     // messagesRef will capture the user turn and the estimator will spike.
-    const input = page.locator('textarea').first();
+    const input = page.locator('input[aria-label="Message input"]');
     await input.waitFor({ timeout: 3000 });
     // 600 chars / 4 / 100 = 1.5 ratio → banner shows.
     const longText = 'x'.repeat(600);
     await input.fill(longText);
-    await input.press('Control+Enter').catch(async () => {
-      // Fallback: submit via the button.
-      await page.getByRole('button', { name: /send/i }).first().click();
-    });
+    // Enter (no modifier) submits — see src/features/chat/InputBar.tsx onKeyDown.
+    await input.press('Enter');
 
     const gap = page.locator('[data-testid="capability-gap-long_context"]');
     await expect(gap).toBeVisible({ timeout: 5000 });
