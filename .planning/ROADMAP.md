@@ -1,309 +1,262 @@
-# ROADMAP — BLADE Skin Rebuild (V1)
+# ROADMAP — BLADE v1.1 (Functionality, Wiring, Accessibility)
 
-**Project:** BLADE Skin Rebuild V1
-**Created:** 2026-04-17
-**Granularity:** Standard (10 phases derived from requirements + build-order DAG)
-**Coverage:** 156/156 requirements mapped
+**Project:** BLADE — Desktop JARVIS
+**Active milestone:** v1.1 (started 2026-04-20)
+**Granularity:** Standard (6 phases derived from `notes/v1-1-milestone-shape.md`)
+**Coverage:** v1.1 — 61/61 requirements mapped | v1.0 — 156/156 requirements shipped
+**Numbering:** continues from v1.0 (phases 10..15)
 
 ---
 
-## Phase Dependency Diagram
+## Phase Dependency Diagram (v1.1)
 
 ```
-Phase 0: Pre-Rebuild Audit
-        |
-        v
-Phase 1: Foundation ──────────────────────────────────────────────────────────────────────┐
-        |                                                                                  |
-        v                                                                                  |
-Phase 2: Onboarding + Main Shell                                                          |
-        |                                                                                  |
-        v                                                                                  |
-Phase 3: Dashboard + Chat + Settings (parallel workstreams + Rust events)                 |
-        |                                                                                  |
-        v                                                                                  |
-Phase 4: Overlay Windows (QuickAsk, Voice Orb, Ghost, HUD — parallel)                    |
-        |                                                                                  |
-        v                                                                                  |
-Phase 5: Agents + Knowledge (parallel) ─────────────────────────────────────┐             |
-Phase 6: Life OS + Identity (parallel) ──────────────────────────────────── ┤ (parallel)  |
-Phase 7: Dev Tools + Admin (parallel) ──────────────────────────────────────┘             |
-        |                                                                                  |
-        v                                                                                  |
-Phase 8: Body Visualization + Hive Mesh                                                   |
-        |                                                                                  |
-        v                                                                                  |
-Phase 9: Polish Pass ◄─────────────────────────────────────────────────────────────────────
+Phase 10: Inventory & Wiring Audit  (foundation — feeds every subsequent phase)
+        │
+        ▼
+  ┌─────┴─────┐
+  │           │
+Phase 11   Phase 12            parallel-eligible
+Smart      Smart Deep Scan     (Phase 12 consumes Phase 11's
+Provider   (parallel)           capability-aware routing when
+Setup      │                    calling LLMs for lead-following)
+  │        │
+  └─────┬──┘
+        ▼
+Phase 13: Self-Configuring Ecosystem   (consumes Phase 12's scan profile)
+        │
+        ▼
+Phase 14: Wiring & Accessibility Pass   (consumes Phase 10 audit + Phase 13 tentacles)
+        │
+        ▼
+Phase 15: Density + Polish              (consumes everything)
 ```
 
-**Arrows:** "→" means "must complete before". Phases 5, 6, 7 are parallel to each other; all require Phase 4 to complete; all must complete before Phase 8.
+Phase 10 must complete before any other v1.1 phase starts — the audit produces the backlog Phase 14 consumes and the reachability contract Phase 15 verifies.
+
+Phase 11 and Phase 12 may run in parallel. Phase 12's scanner intelligence uses Phase 11's capability-aware routing when classifying discovered signals with an LLM; this is a soft data dependency resolvable at the integration point, not a blocker on starting Phase 12 planning.
 
 ---
 
-## Phases
+## Phases (v1.1)
 
-- [x] **Phase 0: Pre-Rebuild Audit** — No-code reading pass: QuickAsk bridge, orb patterns, event listeners, onboarding wiring. Output: RECOVERY_LOG.md. Gate: Arnav reviews before Phase 1. COMPLETE 2026-04-18 (b26a965)
-- [ ] **Phase 1: Foundation** — Design tokens, 8 primitives, typed Tauri wrapper, event hook, route registry, 5 HTML entries, migration ledger, P-01..P-06 gate checks.
-- [ ] **Phase 2: Onboarding + Main Shell** — 3 onboarding screens wired to backend; main shell (TitleBar, Nav, CommandPalette, ToastContext, GlobalOverlays).
-- [ ] **Phase 3: Dashboard + Chat + Settings** — Three parallel workstreams; adds 6 missing Rust events.
-- [ ] **Phase 4: Overlay Windows** — QuickAsk (bridge verified), Voice Orb (OpenClaw math), Ghost Mode (content-protected), HUD bar — all 4 parallel.
-- [ ] **Phase 5: Agents + Knowledge** — 10+10 requirements; each cluster wires its own lib/tauri/ module.
-- [ ] **Phase 6: Life OS + Identity** — 10+9 requirements; each cluster wires its own lib/tauri/ module.
-- [ ] **Phase 7: Dev Tools + Admin** — 11+10 requirements; each cluster wires its own lib/tauri/ module.
-- [ ] **Phase 8: Body Visualization + Hive Mesh** — 7+6 requirements; hormone bus, tentacle autonomy controls, decision approval queue.
-- [ ] **Phase 9: Polish Pass** — Motion audit, a11y, empty states, error boundaries, skeletons, cross-route consistency, prod build verification, perf budget.
+- [ ] **Phase 10: Inventory & Wiring Audit** — Classify every Rust module + every route + every config field. Output `WIRING-AUDIT.md`; feeds Phase 14 backlog.
+- [ ] **Phase 11: Smart Provider Setup** — Custom config paste (cURL/JSON/Python), key validation probe, per-capability routing, capability-gap empty states with upgrade CTAs.
+- [ ] **Phase 12: Smart Deep Scan** — Replace dumb 12-scanner sweep with lead-following scanner (8 source classes), streaming, structured editable profile.
+- [ ] **Phase 13: Self-Configuring Ecosystem** — Scan-result-driven auto-enable of observer-class tentacles; observe-only guardrail; Settings rationale + one-click disable.
+- [ ] **Phase 14: Wiring & Accessibility Pass** — Close NOT-WIRED gaps, remove/fix WIRED-NOT-USED dead UI, a11y sweep 2, persistent Activity Log strip.
+- [ ] **Phase 15: Density + Polish** — Spacing audit, card gaps, background-image dominance, top-bar hierarchy, empty-state copy rewrite across all 50+ routes.
 
 ---
 
-## Phase Details
+## Phase Details (v1.1)
 
-### Phase 0: Pre-Rebuild Audit
-**Goal**: Every implicit contract in the old frontend is documented before a line of new code is written.
-**Depends on**: Nothing
-**Requirements**: None (no-code audit phase; outputs unlock Phase 1)
+### Phase 10: Inventory & Wiring Audit
+
+**Goal**: Produce a structured `WIRING-AUDIT.md` that classifies every Rust module, every UI route, and every config field so Phase 11–15 work is evidence-driven rather than intuition-driven.
+
+**Depends on**: Nothing (v1.1 entry point; assumes v1.0 substrate)
+
+**Requirements**: AUDIT-01, AUDIT-02, AUDIT-03, AUDIT-04, AUDIT-05
+
 **Success Criteria** (what must be TRUE):
-  1. `RECOVERY_LOG.md` exists in `.planning/` with explicit QuickAsk → Main bridge contract (invoke name, event name, payload shape, conversation persistence path) derived from `src-tauri/src/commands.rs` + `docs/design/quickask.html`.
-  2. Voice Orb state machine documented — which Rust events (`voice_conversation_*`, `wake_word_detected`, etc.) drive each of the 4 phase states — derived from `src-tauri/src/voice_global.rs`, `src-tauri/src/wake_word.rs`, and `docs/design/voice-orb-states.html` (OpenClaw math locked via D-08; see PRIOR_ART.md).
-  3. All Rust event emitters catalogued — every `emit_all` / `emit_to` site in `src-tauri/src/` with event name and payload type — forming the subscription surface for Phase 1's `useTauriEvent`.
-  4. Onboarding backend wiring documented — `get_onboarding_status`, `complete_onboarding`, and `deep_scan_*` call sequence and payloads — derived from `src-tauri/src/commands.rs` + the 3 onboarding prototype screens.
-  5. `emit_all` audit complete — every `app.emit_all(...)` classified as cross-window (keep) or single-window (convert to `emit_to`); proposed `emit_to(label, ...)` replacement inline for every single-window row.
-**Plans**: 2 plans
-- [x] 00-01-PLAN.md — Wave 1: 3 parallel extractions (backend contracts, emit_all classification, prototype flow map) — COMPLETE 2026-04-18 (c6957a1)
-- [x] 00-02-PLAN.md — Wave 2: synthesize `.planning/RECOVERY_LOG.md` + patch ROADMAP/STATE + commit audit bundle — COMPLETE 2026-04-18 (b26a965)
+1. `.planning/phases/10-inventory-wiring-audit/WIRING-AUDIT.md` exists and classifies every file under `src-tauri/src/` as ACTIVE / WIRED-NOT-USED / NOT-WIRED / DEAD with purpose + trigger + UI-surface reference per row.
+2. Every route registered in `src/lib/router.ts` is listed in the audit with data shape, data source, and flow status.
+3. Every field in `BladeConfig` (and sibling config structs) is catalogued with the UI surface that exposes it, control type, and discoverability path; fields with no surface are flagged NOT-WIRED.
+4. NOT-WIRED backlog section is structured (file:line references per backend entry point) and is consumable verbatim by Phase 14 planning.
+5. DEAD items list includes a deletion plan that cross-checks callers + imports so Phase 14 removal does not break the build.
+
+**Notes**: No code changes in this phase. The audit is a planning input. If gaps surface between the audit and the tester pass fixes already on master, note them in the audit's cross-reference section.
+
+**Plans**: TBD (generated via `/gsd-plan-phase 10`)
+
 **UI hint**: no
 
 ---
 
-### Phase 1: Foundation
-**Goal**: The build compiles, the 5 HTML entries exist, the design system is locked, the typed wrapper discipline is in place, and P-01 through P-06 are explicitly verified — so every subsequent phase builds on a stable base.
-**Depends on**: Phase 0
-**Requirements**: FOUND-01, FOUND-02, FOUND-03, FOUND-04, FOUND-05, FOUND-06, FOUND-07, FOUND-08, FOUND-09, FOUND-10, FOUND-11, WIN-01, WIN-02, WIN-03, WIN-04, WIN-05, WIN-06, WIN-07, WIN-08, WIN-09, WIRE-08
-**Success Criteria** (what must be TRUE):
-  1. `npm run tauri dev` succeeds; all 5 windows launch without Rust panics; `overlay.html`, `hud.html`, and `ghost_overlay.html` exist and are served. (Addresses P-05.)
-  2. `npm run tauri build` produces `dist/` with all 5 HTML files present; CI assertion passes. (Addresses P-18, P-19.)
-  3. `useTauriEvent("test_event", handler)` mounts and unmounts cleanly; navigating Chat → Dashboard × 5 in dev shows exactly 1 event consumed per backend emission. (Addresses P-06.)
-  4. Dashboard first paint measured ≤ 200ms on integrated GPU via `about:tracing`; max 3 active `backdrop-filter` elements confirmed by visual layer audit. (Addresses P-01.)
-  5. Every wrapper in `src/lib/tauri/` has a smoke-test log confirming snake_case args reach Rust correctly; `invokeTyped` used in all stubs. (Addresses P-04.)
-  6. `.planning/migration-ledger.md` lists all 59 routes from `src.bak/` with status, target component, and destination phase. (Addresses P-03.)
-  7. WCAG 4.5:1 contrast verified on 5 representative macOS wallpapers using the tokens from `src/styles/tokens.css`. (Addresses P-08.)
-**Notes**: Gate checks P-01..P-06 are explicit pass/fail, not best-effort. Phase does not close until all 7 criteria are verified.
-**Plans**: 9 plans
-Plans:
-- [ ] 01-01-PLAN.md — Nuke src/ + 5 HTML entries + 5 window bootstraps (WIN-01..07, P-05 gate setup)
-- [ ] 01-02-PLAN.md — Design tokens + glass/motion/layout + typography + self-hosted WOFF2 fonts (FOUND-01, P-01 cap)
-- [ ] 01-03-PLAN.md — invokeTyped base + TauriError + BladeConfig/ChatMessage types (FOUND-03, P-04 prevention)
-- [ ] 01-04-PLAN.md — 8 primitives + ComingSoonSkeleton + primitives.css (FOUND-02, D-07 cap enforcement)
-- [ ] 01-05-PLAN.md — config.ts + chat.ts typed wrappers with Rust JSDoc cites (FOUND-04)
-- [ ] 01-06-PLAN.md — BLADE_EVENTS registry + useTauriEvent hook + payload types (FOUND-05, FOUND-06, P-06 prevention)
-- [ ] 01-07-PLAN.md — RouteDefinition + 13 feature index stubs (~81 routes) + router aggregator + usePrefs + ConfigContext (FOUND-07..10)
-- [ ] 01-08-PLAN.md — Migration ledger seed script + WIRE-08 emit_all → emit_to refactor (FOUND-11, WIRE-08)
-- [ ] 01-09-PLAN.md — 6 verify scripts + ESLint rule + 3 dev surfaces + Playwright harness + CI wiring + P-08 WCAG checkpoint (WIN-09, all gate verification)
-**UI hint**: yes
+### Phase 11: Smart Provider Setup
 
----
+**Goal**: Onboarding and Settings → Providers stop locking users into the 6 hardcoded provider cards. Paste any config, probe the actual model, route by capability.
 
-### Phase 2: Onboarding + Main Shell
-**Goal**: A first-time user can complete onboarding and land in a functional main shell; returning users skip onboarding and land on the default dashboard route.
-**Depends on**: Phase 1
-**Requirements**: ONBD-01, ONBD-02, ONBD-03, ONBD-04, ONBD-05, ONBD-06, SHELL-01, SHELL-02, SHELL-03, SHELL-04, SHELL-05, SHELL-06, SHELL-07
+**Depends on**: Phase 10
+
+**Requirements**: PROV-01, PROV-02, PROV-03, PROV-04, PROV-05, PROV-06, PROV-07, PROV-08, PROV-09
+
 **Success Criteria** (what must be TRUE):
-  1. A fresh app launch (empty config) shows the Provider Picker screen; selecting Anthropic + entering a valid API key + completing deep scan advances to the main shell without errors.
-  2. A returning user (onboarding complete) boots directly to the default route; onboarding is never shown again unless re-triggered from Settings.
-  3. `⌘K` / `Ctrl+K` opens the Command Palette; typing a route name fuzzy-filters entries; `Enter` navigates; `Esc` closes. No App.tsx edits required for a route to appear in the palette.
-  4. A backend event arrives while the app is running and a toast notification appears and auto-dismisses without blocking interaction.
-  5. `App.tsx` (or its equivalent shell component) is under 300 lines; shell responsibilities are delegated to composed hooks and components.
+1. Pasting a raw OpenAI / Anthropic / Groq cURL command into the provider form auto-extracts provider + model + `base_url` + headers and fills the form — verified across 3 representative cURL snippets.
+2. Pasting a JSON config blob OR a Python SDK snippet produces the same auto-fill behavior.
+3. Saving a new API key triggers one test call that retrieves and persists model name, context window, vision / audio / tool-calling support; the probe result is visible in the provider row.
+4. Adding a key with no vision support causes vision-needing UI surfaces (e.g. screen-aware views) to show "needs vision-capable model" prompt with an "add key" CTA that opens the provider add flow — verified on ≥2 vision-consuming surfaces. Same behavior for audio, long-context, and tool-calling capability gaps.
+5. `router.rs` routing consults per-capability config; a task classified as requiring vision routes to `vision_provider` with fallback chain, not to the primary provider when primary lacks vision — verified by unit test + manual trace.
+
+**Notes**: The onboarding custom-paste flow and the Settings custom-paste flow share one parser module. The probe test call is idempotent and must not be retried in a loop on failure — surface the error clearly (related to tester pass fix `4ab464c`).
+
 **Plans**: TBD
+
 **UI hint**: yes
 
 ---
 
-### Phase 3: Dashboard + Chat + Settings
-**Goal**: The three highest-traffic user surfaces — the ambient home view, the conversational AI, and configuration — are all functional, wired end-to-end, and performant.
-**Depends on**: Phase 2
-**Requirements**: DASH-01, DASH-02, DASH-03, DASH-04, DASH-05, DASH-06, DASH-07, DASH-08, CHAT-01, CHAT-02, CHAT-03, CHAT-04, CHAT-05, CHAT-06, CHAT-07, CHAT-08, CHAT-09, CHAT-10, SET-01, SET-02, SET-03, SET-04, SET-05, SET-06, SET-07, SET-08, SET-09, SET-10, WIRE-01, WIRE-02, WIRE-03, WIRE-04, WIRE-05, WIRE-06
+### Phase 12: Smart Deep Scan
+
+**Goal**: Replace the dumb 12-scanner sweep (which surfaced 1 repo on Arnav's cold install) with a lead-following scanner that reads 8 source classes intelligently, streams progress to the activity log, and outputs a structured editable profile.
+
+**Depends on**: Phase 10 (hard); Phase 11 (soft — capability-aware routing for LLM-assisted classification of discovered signals)
+
+**Requirements**: SCAN-01, SCAN-02, SCAN-03, SCAN-04, SCAN-05, SCAN-06, SCAN-07, SCAN-08, SCAN-09, SCAN-10, SCAN-11, SCAN-12, SCAN-13
+
 **Success Criteria** (what must be TRUE):
-  1. Dashboard shows a live "Right Now" hero sourced from `perception_fusion`; the ambient strip at the bottom reflects the current hormone state emitted by `homeostasis.rs` (WIRE-02 verified live).
-  2. Chat streams a full response without App-level re-renders; React Profiler shows ≤ 16ms render time during 50-token/sec streaming; tool calls render inline with approval dialog (500ms button delay enforced).
-  3. A reasoning-capable model produces a collapsible "thinking" section in chat; the "compacting…" indicator appears when token ratio exceeds 0.65 (WIRE-04, WIRE-06 verified).
-  4. Settings saves a provider API key; the key persists after app restart; the routing grid reflects updated provider config.
-  5. Dashboard first paint remains ≤ 200ms with chat panel open (chat message bubbles confirmed as rgba solid, not backdrop-filter).
-**Notes**: WIRE-01 (quickask_submit) is partially scoped here as the Rust command stub; the full bridge test happens in Phase 4. WIRE-05 (blade_agent_event) is the Rust-side emit; the consuming UI is Phase 5.
+1. Cold-install scan on Arnav's machine surfaces ≥10 repos (up from 1), ≥5 accounts, ≥3 daily-rhythm signals, ≥3 IDE/AI tool signals — measured against a documented baseline run.
+2. Scanner executes all 8 source classes (filesystem repo walk, git remotes, IDE workspaces, AI session history, shell history, filesystem MRU, browser bookmarks, CLI/app `which` sweep) and each produces ≥1 structured row in the profile on Arnav's machine.
+3. Scanner builds its own todo list at start — highest-priority leads (recent-edited repos, active sessions) run first, breadth fills in after; todo order is visible in the activity log stream.
+4. Scan streams progress in real time to the activity log strip (LOG-01 wires Phase 14; during Phase 12 a simple log tail is sufficient, and the strip integration completes in Phase 14).
+5. Profile page renders the structured scan output; every row shows source origin; user edits round-trip through save → restart → reload.
+
+**Notes**: Soft dependency on Phase 11 — if Phase 11 lands first, Phase 12 uses `vision_provider` / `long_context_provider` for richer signal classification; if Phase 12 starts first, it falls back to primary provider. Scan must never write to external services.
+
 **Plans**: TBD
+
 **UI hint**: yes
 
 ---
 
-### Phase 4: Overlay Windows
-**Goal**: All four overlay/secondary windows — QuickAsk, Voice Orb, Ghost Mode, and HUD bar — are functional, performant, correctly isolated from the main window, and pass their critical behavioral tests.
-**Depends on**: Phase 3
-**Requirements**: QUICK-01, QUICK-02, QUICK-03, QUICK-04, QUICK-05, QUICK-06, QUICK-07, ORB-01, ORB-02, ORB-03, ORB-04, ORB-05, ORB-06, ORB-07, ORB-08, GHOST-01, GHOST-02, GHOST-03, GHOST-04, GHOST-05, GHOST-06, GHOST-07, GHOST-08, HUD-01, HUD-02, HUD-03, HUD-04, HUD-05, WIRE-07
+### Phase 13: Self-Configuring Ecosystem (observe-only)
+
+**Goal**: Phase 12 scan results silently activate observer-class tentacles. Watching, not editing. No destructive surprises on cold install.
+
+**Depends on**: Phase 12
+
+**Requirements**: ECOSYS-01, ECOSYS-02, ECOSYS-03, ECOSYS-04, ECOSYS-05, ECOSYS-06, ECOSYS-07, ECOSYS-08, ECOSYS-09, ECOSYS-10
+
 **Success Criteria** (what must be TRUE):
-  1. QuickAsk submits a message via `Alt+Space` (or configured shortcut), streams a result, and the submitted conversation appears in the main window's history drawer after `blade_quickask_bridged` fires — no manual action required. (P-02 bridge verified.)
-  2. Voice Orb transitions through all 4 phase states (Idle → Listening → Thinking → Speaking) smoothly at 60fps on integrated Intel GPU; OpenClaw math constants verified in rAF loop.
-  3. Ghost overlay window is NOT visible in OBS screen capture on macOS; Esc closes it; no cursor CSS present on any ghost element; Linux shows explicit content-protection warning before activation.
-  4. HUD bar window appears on launch; displays live god-mode tier + hormone dominant state; click opens main window; right-click shows mini menu.
-  5. QuickAsk shortcut does not conflict with CJK IME on macOS; shortcut registration failure is logged and falls back gracefully. (P-09 verified.)
-**Notes**: WIRE-07 (VAD in audio_timeline.rs) is required for Ghost Mode meeting detection and Voice Orb audio sampling; it ships in this phase with the consuming surfaces.
+1. Cold install on Arnav's machine + Phase 12 scan → ≥5 observer tentacles auto-enable (repo-watcher, Slack monitor, deploy-monitor, PR-watcher, session bridge, calendar-monitor where credentials / CLI / config detected).
+2. Every auto-enabled tentacle appears in Settings with a per-row rationale ("Auto-enabled because deep scan found …") and a one-click disable toggle; disabled state persists across restart.
+3. Observe-only guardrail: a runtime check (not just policy) rejects any outbound action attempted by an auto-enabled tentacle during v1.1 — verified by a test that calls a tentacle's write-path and asserts it is blocked with a clear error.
+4. Auto-enablement is idempotent — re-running scan does not duplicate tentacles or re-enable ones the user disabled.
+5. Every observer tentacle emits an activity-log row for each observation (read / poll / event received) so Phase 14's log strip has live data to surface.
+
+**Notes**: The runtime guardrail is load-bearing — it is the difference between "safe smart default" and "scary surprise". Implement the guard as a central policy check rather than per-tentacle, so v1.2 acting-capability work removes one check in one place.
+
 **Plans**: TBD
+
 **UI hint**: yes
 
 ---
 
-### Phase 5: Agents + Knowledge
-**Goal**: The Agents and Knowledge clusters are fully routable with no 404s; each surface is wired to its backend commands and receives live event updates; lower-priority sub-views ship as clearly-labeled skeleton states.
-**Depends on**: Phase 4
-**Requirements**: AGENT-01, AGENT-02, AGENT-03, AGENT-04, AGENT-05, AGENT-06, AGENT-07, AGENT-08, AGENT-09, AGENT-10, KNOW-01, KNOW-02, KNOW-03, KNOW-04, KNOW-05, KNOW-06, KNOW-07, KNOW-08, KNOW-09, KNOW-10
+### Phase 14: Wiring & Accessibility Pass
+
+**Goal**: Close every NOT-WIRED gap from the Phase 10 audit, remove every WIRED-NOT-USED dead UI, re-pass a11y on the new surfaces, and ship the persistent Activity Log strip that turns background activity into a trust surface.
+
+**Depends on**: Phase 10 (audit backlog), Phase 13 (ecosystem data to wire)
+
+**Requirements**: WIRE2-01, WIRE2-02, WIRE2-03, WIRE2-04, WIRE2-05, WIRE2-06, A11Y2-01, A11Y2-02, A11Y2-03, A11Y2-04, A11Y2-05, A11Y2-06, LOG-01, LOG-02, LOG-03, LOG-04, LOG-05
+
 **Success Criteria** (what must be TRUE):
-  1. Navigating to any Agents route (AgentDashboard, AgentDetail, SwarmView, etc.) produces a rendered surface with no 404 fallback; SwarmView renders a DAG from `swarm_*` commands.
-  2. AgentDetail timeline receives `blade_agent_event` emissions and appends steps in real time without page refresh.
-  3. Navigating to any Knowledge route (KnowledgeBase, KnowledgeGraphView, ScreenTimeline, etc.) produces a rendered surface; ScreenTimeline shows at least one screenshot if Total Recall has run.
-  4. KnowledgeBase search returns results from `embeddings_*` + `memory_*` commands; result groups are labelled (web / memory / tools).
-  5. Both clusters are registered in `src/lib/router.ts` via their own `index.ts` feature exports; no App.tsx edit was needed to add them.
+1. Post-phase WIRING-AUDIT.md re-run reports NOT-WIRED count = 0 OR every remaining NOT-WIRED row carries a documented "deferred to v1.2" rationale with sign-off reference.
+2. Dashboard cards bind to real data from Phase 12 scan profile + Phase 13 tentacles — a cold-install screenshot shows populated cards, not "No data" placeholder text.
+3. Activity Log strip mounts in main shell and remains visible across routes; every cross-module action in v1.1 emits a log event, verified by a script that asserts no backend action completes without a corresponding emission (acceptance threshold: 100% for Phase 13 tentacles, ≥95% elsewhere with flagged exceptions).
+4. `npm run verify:all` gains 2 new scripts — `verify:feature-reachability` (asserts every backend module reachable from route registry or command palette) and `verify:a11y-pass-2` (asserts no icon-only buttons without labels, no dialogs without focus traps, no unguarded animations) — both green.
+5. Click on any activity log entry opens a drawer with full payload + reasoning + outcome; last N entries persist across app restart.
+
+**Notes**: Phase 14 is the largest phase (17 requirements across 3 sub-categories). Expect 3–5 parallel workstreams: (a) wire NOT-WIRED backends, (b) remove WIRED-NOT-USED dead UI, (c) a11y sweep on new surfaces, (d) activity log implementation (strip + drawer + event emission + filter). Sub-streams (a), (b), (d) can proceed in parallel; (c) runs after each of them closes a surface.
+
 **Plans**: TBD
+
 **UI hint**: yes
 
 ---
 
-### Phase 6: Life OS + Identity
-**Goal**: The Life OS and Identity clusters are fully routable with no 404s; each surface is wired to its backend commands; lower-priority sub-views ship as clearly-labeled skeleton states.
-**Depends on**: Phase 4
-**Requirements**: LIFE-01, LIFE-02, LIFE-03, LIFE-04, LIFE-05, LIFE-06, LIFE-07, LIFE-08, LIFE-09, LIFE-10, IDEN-01, IDEN-02, IDEN-03, IDEN-04, IDEN-05, IDEN-06, IDEN-07, IDEN-08, IDEN-09
+### Phase 15: Density + Polish
+
+**Goal**: Now that content exists (Phases 11–14), make the surface feel intentional. Spacing ladder, card gaps, background-image dominance, top-bar hierarchy, empty-state copy.
+
+**Depends on**: Phase 14
+
+**Requirements**: DENSITY-01, DENSITY-02, DENSITY-03, DENSITY-04, DENSITY-05, DENSITY-06, DENSITY-07
+
 **Success Criteria** (what must be TRUE):
-  1. Navigating to any Life OS route (HealthView, FinanceView, GoalView, HabitView, etc.) produces a rendered surface with no 404 fallback; streak counters read from `streak_*` commands.
-  2. FinanceView displays a spending overview loaded via `financial_*` commands; CSV import affordance is present and triggers the correct invoke.
-  3. Navigating to any Identity route (SoulView, PersonaView, CharacterBible, etc.) produces a rendered surface; SoulView displays loaded identity document content.
-  4. CharacterBible shows the trait evolution log from `character.rs` feedback data; thumbs-up/down from Chat round-trips to visible trait updates.
-  5. Both clusters are registered via their own feature `index.ts` exports; no App.tsx edit was required.
+1. UI review across all 50+ routes reports 0 padding violations against the documented spacing ladder; verification script asserts spacing tokens are used exclusively (no hardcoded px).
+2. Every empty state has either real content (populated by Phase 12+13 data) or a CTA + expected-timeline copy — e.g. *"BLADE is still learning — give me 24h"* not *"No recent decisions"*.
+3. Dashboard hero pulls ≥3 live signals from scan profile + ecosystem tentacles + perception state — verified on cold-install screenshot.
+4. Background-image dominance audit: content takes visual priority over ambient imagery on all 5 representative wallpapers; contrast + eye-path pass documented.
+5. Top bar hierarchy pass: primary actions, activity-log strip, status chips, user/settings affordances have clear visual priority order; no overstuff; fits at 1280px minimum width.
+
+**Notes**: Regressions in v1.0 verify gates (contrast, chat-rgba, ghost-no-cursor, orb-rgba, hud-chip-count, etc.) fail the phase. Polish means no regressions, not just new wins.
+
 **Plans**: TBD
+
 **UI hint**: yes
 
 ---
 
-### Phase 7: Dev Tools + Admin
-**Goal**: The Dev Tools and Admin clusters are fully routable with no 404s; each surface is wired to its backend commands; lower-priority sub-views ship as clearly-labeled skeleton states.
-**Depends on**: Phase 4
-**Requirements**: DEV-01, DEV-02, DEV-03, DEV-04, DEV-05, DEV-06, DEV-07, DEV-08, DEV-09, DEV-10, DEV-11, ADMIN-01, ADMIN-02, ADMIN-03, ADMIN-04, ADMIN-05, ADMIN-06, ADMIN-07, ADMIN-08, ADMIN-09, ADMIN-10
-**Success Criteria** (what must be TRUE):
-  1. Navigating to any Dev Tools route (Terminal, FileBrowser, GitPanel, WebAutomation, etc.) produces a rendered surface with no 404 fallback; Terminal routes bash through `native_tools.rs` and returns output.
-  2. WebAutomation accepts a goal, calls `browser_agent_*` commands, and displays live screen feedback.
-  3. Navigating to any Admin route (Analytics, SecurityDashboard, Diagnostics, etc.) produces a rendered surface; DecisionLog reads decision-gate history from `decision_gate_*` commands.
-  4. SecurityDashboard surfaces active alerts from `security_monitor.rs`; the Diagnostics view shows module health for all running background tasks.
-  5. Both clusters registered via their own feature `index.ts` exports; no App.tsx edit was required.
-**Plans**: TBD
-**UI hint**: yes
-
----
-
-### Phase 8: Body Visualization + Hive Mesh
-**Goal**: The Body and Hive clusters surface the backend's unique body-registry and tentacle architecture in UI for the first time; all views are routable and wired to live data; the hormone bus emits in real time to the Body hormone dashboard.
-**Depends on**: Phase 5, Phase 6, Phase 7
-**Requirements**: BODY-01, BODY-02, BODY-03, BODY-04, BODY-05, BODY-06, BODY-07, HIVE-01, HIVE-02, HIVE-03, HIVE-04, HIVE-05, HIVE-06
-**Success Criteria** (what must be TRUE):
-  1. BodyMap route renders an interactive visualization of 12 body systems loaded from `body_registry.rs`; clicking a system drills into BodySystemDetail without error.
-  2. The hormone dashboard displays all 10 hormone values and updates in real time when `hormone_update` events arrive from `homeostasis.rs` (WIRE-02 flowing into this surface).
-  3. Hive landing shows all 10 tentacles (github, slack, email, calendar, discord, linear, cloud, log, terminal, filesystem) with live autonomy indicators; per-tentacle autonomy slider saves via `hive_*` commands.
-  4. The decision approval queue displays pending approvals from all tentacles; a user can approve or reject an individual decision; the action is confirmed by BLADE's response.
-  5. Both clusters registered via their own feature `index.ts` exports; no App.tsx edit was required.
-**Plans**: 5 plans
-Plans:
-- [ ] 08-01-PLAN.md — Wave 1: 10 hive+world event constants + 5 body/hive prefs keys (BODY-01,02,03,05,06 + HIVE-01..04)
-- [ ] 08-02-PLAN.md — Wave 1: body.ts + hive.ts wrappers (~33 funcs) + 2 index.tsx rewrites + 11 placeholder files + CSS + types (BODY-01..07 + HIVE-01..06)
-- [ ] 08-03-PLAN.md — Wave 2: 6 Body routes — BodyMap (SC-1), BodySystemDetail, HormoneBus (SC-2), OrganRegistry, DNA, WorldModel (BODY-01..07)
-- [ ] 08-04-PLAN.md — Wave 2: 5 Hive routes — HiveMesh (SC-3), TentacleDetail, AutonomyControls, ApprovalQueue (SC-4), AiDelegate (HIVE-01..06)
-- [ ] 08-05-PLAN.md — Wave 3: 4 Playwright specs + verify:phase8-rust + extended verify:feature-cluster-routes + 3 dev routes + Mac smoke M-35..M-40
-**UI hint**: yes
-
----
-
-### Phase 9: Polish Pass
-**Goal**: Every surface the user can reach is coherent, visually consistent, accessible, resilient to errors, and verified in a prod build — realizing the core value of the entire project.
-**Depends on**: Phase 8
-**Requirements**: POL-01, POL-02, POL-03, POL-04, POL-05, POL-06, POL-07, POL-08, POL-09, POL-10
-**Success Criteria** (what must be TRUE):
-  1. Every route mounts without error in `npm run tauri build` prod output; all 5 windows open; no orphan screens or 404 fallbacks anywhere.
-  2. Every surface has an empty state with a clear call to action; no data-driven view shows a blank white area when its data source returns empty.
-  3. Every top-level route is wrapped in an error boundary; a simulated error shows a recovery affordance (retry / reset / report), never an unhandled crash.
-  4. `⌘?` opens the shortcut help panel; every route has at least its primary shortcut documented and functional.
-  5. WCAG AA 4.5:1 contrast confirmed on all 5 representative wallpapers across all 59 routes; Voice Orb sustains 60fps on integrated GPU through all 4 phase transitions.
-**Plans**: 6 plans
-Plans:
-- [ ] 09-01-PLAN.md — Wave 1: Rust backfill (hive_reject_decision + dna_set_identity + delegate_feedback) + 3 wrappers + 3 frontend wiring edits (POL-09..10 — closes Phase 8 deferrals)
-- [ ] 09-02-PLAN.md — Wave 2: ErrorBoundary + EmptyState primitives + MainShell wrap + empty-state sweep (17 files: agents + knowledge + life-os + identity) (POL-02, POL-03)
-- [ ] 09-03-PLAN.md — Wave 2: A11y sweep — prefers-reduced-motion override + ARIA icon-only buttons + Dialog focus audit + keyboard nav audit (POL-06..08)
-- [ ] 09-04-PLAN.md — Wave 2: Motion audit + motion-entrance.css + ListSkeleton primitive + empty-state sweep (20 files: body + hive + dev-tools + admin) + consistency audit (POL-01, POL-02, POL-05, POL-10)
-- [ ] 09-05-PLAN.md — Wave 3: ⌘? shortcut help panel + 3 perf Playwright specs + verify-html-entries.mjs --prod flag + build log (POL-01, POL-04, POL-05)
-- [ ] 09-06-PLAN.md — Wave 4: 2 Playwright specs (a11y + error-boundary) + 4 verify scripts + CHANGELOG.md + Mac-smoke M-41..M-46 operator checkpoint (all POL)
-**UI hint**: yes
-
----
-
-## Progress Table
+## Progress Table (v1.1)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 0. Pre-Rebuild Audit | 2/2 | Complete | 2026-04-18 (b26a965) |
-| 1. Foundation | 0/TBD | Not started | - |
-| 2. Onboarding + Main Shell | 0/TBD | Not started | - |
-| 3. Dashboard + Chat + Settings | 0/TBD | Not started | - |
-| 4. Overlay Windows | 0/TBD | Not started | - |
-| 5. Agents + Knowledge | 0/TBD | Not started | - |
-| 6. Life OS + Identity | 0/TBD | Not started | - |
-| 7. Dev Tools + Admin | 0/TBD | Not started | - |
-| 8. Body Visualization + Hive Mesh | 0/TBD | Not started | - |
-| 9. Polish Pass | 0/TBD | Not started | - |
+| 10. Inventory & Wiring Audit | 0/TBD | Not started | — |
+| 11. Smart Provider Setup | 0/TBD | Not started | — |
+| 12. Smart Deep Scan | 0/TBD | Not started | — |
+| 13. Self-Configuring Ecosystem | 0/TBD | Not started | — |
+| 14. Wiring & Accessibility Pass | 0/TBD | Not started | — |
+| 15. Density + Polish | 0/TBD | Not started | — |
 
 ---
 
-## Coverage Verification
+## Coverage Verification (v1.1)
 
-**Total v1 requirements: 156**
-**Mapped: 156/156**
+**Total v1.1 requirements: 61**
+**Mapped: 61/61** ✓
 
 | Category | Count | Phase |
 |----------|-------|-------|
-| FOUND-01..11 | 11 | Phase 1 |
-| WIN-01..09 | 9 | Phase 1 |
-| WIRE-08 | 1 | Phase 1 |
-| ONBD-01..06 | 6 | Phase 2 |
-| SHELL-01..07 | 7 | Phase 2 |
-| DASH-01..08 | 8 | Phase 3 |
-| CHAT-01..10 | 10 | Phase 3 |
-| SET-01..10 | 10 | Phase 3 |
-| WIRE-01..06 | 6 | Phase 3 |
-| QUICK-01..07 | 7 | Phase 4 |
-| ORB-01..08 | 8 | Phase 4 |
-| GHOST-01..08 | 8 | Phase 4 |
-| HUD-01..05 | 5 | Phase 4 |
-| WIRE-07 | 1 | Phase 4 |
-| AGENT-01..10 | 10 | Phase 5 |
-| KNOW-01..10 | 10 | Phase 5 |
-| LIFE-01..10 | 10 | Phase 6 |
-| IDEN-01..09 | 9 | Phase 6 |
-| DEV-01..11 | 11 | Phase 7 |
-| ADMIN-01..10 | 10 | Phase 7 |
-| BODY-01..07 | 7 | Phase 8 |
-| HIVE-01..06 | 6 | Phase 8 |
-| POL-01..10 | 10 | Phase 9 |
-| **Total** | **156** | ✓ |
+| AUDIT-01..05 | 5 | Phase 10 |
+| PROV-01..09 | 9 | Phase 11 |
+| SCAN-01..13 | 13 | Phase 12 |
+| ECOSYS-01..10 | 10 | Phase 13 |
+| WIRE2-01..06 | 6 | Phase 14 |
+| A11Y2-01..06 | 6 | Phase 14 |
+| LOG-01..05 | 5 | Phase 14 |
+| DENSITY-01..07 | 7 | Phase 15 |
+| **Total** | **61** | ✓ |
 
 ---
 
-## WIRE Requirement Placement Rationale
+## Shape Doc Mapping
 
-| WIRE-ID | Backend Gap | Consuming Surface | Phase |
-|---------|-------------|-------------------|-------|
-| WIRE-01 | `quickask_submit` command | QuickAsk bridge | Phase 3 (Rust stub) + Phase 4 (bridge test) |
-| WIRE-02 | `hormone_update` event | Dashboard ambient strip + Body hormone dashboard | Phase 3 (Dashboard) |
-| WIRE-03 | `blade_message_start` event | Chat streaming state machine | Phase 3 |
-| WIRE-04 | `blade_thinking_chunk` event | Chat collapsible thinking section | Phase 3 |
-| WIRE-05 | `blade_agent_event` event | AgentDetail timeline | Phase 3 (Rust emit) — consumed Phase 5 |
-| WIRE-06 | `blade_token_ratio` event | Chat "compacting…" indicator | Phase 3 |
-| WIRE-07 | VAD in `audio_timeline.rs` | Ghost Mode + Voice Orb | Phase 4 |
-| WIRE-08 | `emit_all` audit | All windows (event routing policy) | Phase 1 (Foundation) |
+The locked shape in `.planning/notes/v1-1-milestone-shape.md` uses internal phase numbers 0–5. They map 1:1 to the global roadmap phase numbers:
 
-**Note on WIRE-01:** The `quickask_submit` Rust command is stubbed and the `blade_quickask_bridged` event is wired during Phase 3 (when the chat backend infrastructure is built). The end-to-end bridge verification test (conversation appears in main history) is the Phase 4 gate check, since the QuickAsk window does not exist until Phase 4.
+| Shape doc | Global roadmap | Name |
+|-----------|----------------|------|
+| Phase 0 | Phase 10 | Inventory & Wiring Audit |
+| Phase 1 | Phase 11 | Smart Provider Setup |
+| Phase 2 | Phase 12 | Smart Deep Scan |
+| Phase 3 | Phase 13 | Self-Configuring Ecosystem |
+| Phase 4 | Phase 14 | Wiring & Accessibility Pass |
+| Phase 5 | Phase 15 | Density + Polish |
+
+Any reference to "Phase N" in the shape doc means "global Phase (N+10)" here.
 
 ---
 
-*Roadmap created: 2026-04-17*
-*Last updated: 2026-04-17 after initial creation*
+## v1.0 History (shipped)
+
+v1.0 — Skin Rebuild — completed 2026-04-19 (~165 commits, 64 plans, 18 verify gates green). Mac smoke checkpoints (M-01..M-46) and WCAG screenshots tracked separately in `.planning/HANDOFF-TO-MAC.md`.
+
+| Phase | Name | Status |
+|-------|------|--------|
+| 0 | Pre-Rebuild Audit | Complete (b26a965) |
+| 1 | Foundation | Substrate shipped, WCAG checkpoint operator-owned |
+| 2 | Onboarding + Main Shell | Substrate shipped, operator smoke pending |
+| 3 | Dashboard + Chat + Settings | Substrate shipped, Mac smoke + cargo check pending |
+| 4 | Overlay Windows (QuickAsk + Orb + Ghost + HUD) | Substrate shipped, M-01..M-13 pending |
+| 5 | Agents + Knowledge | Complete |
+| 6 | Life OS + Identity | Complete |
+| 7 | Dev Tools + Admin | Complete |
+| 8 | Body + Hive | Complete |
+| 9 | Polish Pass | Complete |
+
+Phase directories for v1.0 remain at `.planning/phases/00-*` through `.planning/phases/09-*`. v1.1 creates new directories at `10-*` through `15-*`.
+
+---
+
+*Roadmap created: 2026-04-17 (v1.0). v1.1 added: 2026-04-20 from locked shape in `.planning/notes/v1-1-milestone-shape.md`.*
