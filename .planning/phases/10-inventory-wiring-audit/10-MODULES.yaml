@@ -2,18 +2,18 @@ modules:
   - file: src-tauri/src/accountability.rs
     classification: ACTIVE
     purpose: "Tracks objectives, key results, and daily actions. BLADE doesn't just store"
-    trigger: "#[tauri::command] accountability_daily_plan (+ others)"
-    ui_surface: "src/lib/tauri/life_os.ts:1321"
+    trigger: "#[tauri::command] accountability_create_objective (+ others)"
+    ui_surface: "src/lib/tauri/life_os.ts:1291"
     commands:
       - name: accountability::accountability_get_objectives
         registered: "src-tauri/src/accountability.rs:867"
         invoked_from: null
       - name: accountability::accountability_create_objective
         registered: "src-tauri/src/accountability.rs:875"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/life_os.ts:1291"
       - name: accountability::accountability_update_kr
         registered: "src-tauri/src/accountability.rs:885"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/life_os.ts:1310"
       - name: accountability::accountability_daily_plan
         registered: "src-tauri/src/accountability.rs:890"
         invoked_from: "src/lib/tauri/life_os.ts:1321"
@@ -22,7 +22,7 @@ modules:
         invoked_from: "src/lib/tauri/life_os.ts:1326"
       - name: accountability::accountability_checkin
         registered: "src-tauri/src/accountability.rs:901"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/life_os.ts:1342"
       - name: accountability::accountability_progress_report
         registered: "src-tauri/src/accountability.rs:912"
         invoked_from: "src/lib/tauri/life_os.ts:1359"
@@ -33,7 +33,7 @@ modules:
       - "src-tauri/src/brain.rs:1000"
     body_registry_entry: "accountability"
     reachable_paths:
-      - "invokeTyped('accountability_daily_plan') -> src-tauri/src/accountability.rs:890"
+      - "invokeTyped('accountability_create_objective') -> src-tauri/src/accountability.rs:875"
     notes: ""
   - file: src-tauri/src/action_tags.rs
     classification: ACTIVE
@@ -74,7 +74,7 @@ modules:
         invoked_from: "src/lib/tauri/agents.ts:182"
       - name: agent_commands::agent_create_desktop
         registered: "src-tauri/src/agent_commands.rs:296"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/agents.ts:194"
       - name: agent_commands::agent_list
         registered: "src-tauri/src/agent_commands.rs:2606"
         invoked_from: "src/lib/tauri/agents.ts:209"
@@ -92,7 +92,7 @@ modules:
         invoked_from: "src/lib/tauri/agents.ts:241"
       - name: agent_commands::agent_respond_desktop_action
         registered: "src-tauri/src/agent_commands.rs:2713"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/agents.ts:253"
     internal_callers:
       - "src-tauri/src/swarm_commands.rs:110"
     body_registry_entry: "agent_commands"
@@ -288,7 +288,7 @@ modules:
         invoked_from: "src/lib/tauri/admin.ts:1161"
       - name: authority_engine::authority_delegate
         registered: "src-tauri/src/authority_engine.rs:638"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/admin.ts:1175"
       - name: authority_engine::authority_route_and_run
         registered: "src-tauri/src/authority_engine.rs:647"
         invoked_from: "src/lib/tauri/admin.ts:1190"
@@ -325,22 +325,22 @@ modules:
   - file: src-tauri/src/auto_reply.rs
     classification: ACTIVE
     purpose: "BLADE Auto-Reply — drafts responses in your style when someone messages you."
-    trigger: "#[tauri::command] auto_reply_draft_batch (+ others)"
-    ui_surface: "src/lib/tauri/dev_tools.ts:893"
+    trigger: "#[tauri::command] auto_reply_draft (+ others)"
+    ui_surface: "src/lib/tauri/dev_tools.ts:858"
     commands:
       - name: auto_reply::auto_reply_draft
         registered: "src-tauri/src/auto_reply.rs:224"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/dev_tools.ts:858"
       - name: auto_reply::auto_reply_learn_from_edit
         registered: "src-tauri/src/auto_reply.rs:242"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/dev_tools.ts:878"
       - name: auto_reply::auto_reply_draft_batch
         registered: "src-tauri/src/auto_reply.rs:276"
         invoked_from: "src/lib/tauri/dev_tools.ts:893"
     internal_callers: []
     body_registry_entry: "auto_reply"
     reachable_paths:
-      - "invokeTyped('auto_reply_draft_batch') -> src-tauri/src/auto_reply.rs:276"
+      - "invokeTyped('auto_reply_draft') -> src-tauri/src/auto_reply.rs:224"
     notes: ""
   - file: src-tauri/src/automation.rs
     classification: ACTIVE
@@ -365,16 +365,16 @@ modules:
         invoked_from: "src/lib/tauri/dev_tools.ts:1062"
       - name: automation::auto_mouse_click
         registered: "src-tauri/src/automation.rs:96"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/dev_tools.ts:1074"
       - name: automation::auto_mouse_click_relative
         registered: "src-tauri/src/automation.rs:123"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/dev_tools.ts:1089"
       - name: automation::auto_mouse_double_click
         registered: "src-tauri/src/automation.rs:153"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/dev_tools.ts:1104"
       - name: automation::auto_mouse_drag
         registered: "src-tauri/src/automation.rs:183"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/dev_tools.ts:1120"
       - name: automation::auto_open_url
         registered: "src-tauri/src/automation.rs:219"
         invoked_from: "src/lib/tauri/dev_tools.ts:1147"
@@ -447,12 +447,12 @@ modules:
   - file: src-tauri/src/background_agent.rs
     classification: ACTIVE
     purpose: "BLADE BACKGROUND AGENT SPAWNER"
-    trigger: "#[tauri::command] agent_list_background (+ others)"
-    ui_surface: "src/lib/tauri/agents.ts:281"
+    trigger: "#[tauri::command] agent_spawn (+ others)"
+    ui_surface: "src/lib/tauri/agents.ts:273"
     commands:
       - name: background_agent::agent_spawn
         registered: "src-tauri/src/background_agent.rs:153"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/agents.ts:273"
       - name: background_agent::agent_list_background
         registered: "src-tauri/src/background_agent.rs:378"
         invoked_from: "src/lib/tauri/agents.ts:281"
@@ -485,7 +485,7 @@ modules:
       - "src-tauri/src/native_tools.rs:1771"
     body_registry_entry: "background_agent"
     reachable_paths:
-      - "invokeTyped('agent_list_background') -> src-tauri/src/background_agent.rs:378"
+      - "invokeTyped('agent_spawn') -> src-tauri/src/background_agent.rs:153"
     notes: ""
   - file: src-tauri/src/body_registry.rs
     classification: ACTIVE
@@ -591,7 +591,7 @@ modules:
         invoked_from: "src/lib/tauri/dev_tools.ts:823"
       - name: browser_native::web_action
         registered: "src-tauri/src/browser_native.rs:537"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/dev_tools.ts:807"
     internal_callers:
       - "src-tauri/src/browser_agent.rs:205"
       - "src-tauri/src/browser_agent.rs:51"
@@ -678,16 +678,16 @@ modules:
         invoked_from: "src/lib/tauri/identity.ts:347"
       - name: character::update_character_section
         registered: "src-tauri/src/character.rs:300"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/identity.ts:359"
       - name: character::blade_get_soul
         registered: "src-tauri/src/character.rs:451"
         invoked_from: "src/lib/tauri/identity.ts:339"
       - name: character::apply_reaction_to_traits
         registered: "src-tauri/src/character.rs:465"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/identity.ts:375"
       - name: character::delegate_feedback
         registered: "src-tauri/src/character.rs:588"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/hive.ts:246"
     internal_callers:
       - "src-tauri/src/brain.rs:1137"
       - "src-tauri/src/brain.rs:524"
@@ -743,25 +743,25 @@ modules:
   - file: src-tauri/src/code_sandbox.rs
     classification: ACTIVE
     purpose: "BLADE Code Sandbox — safely execute code snippets in multiple languages."
-    trigger: "#[tauri::command] sandbox_run_explain (+ others)"
-    ui_surface: "src/lib/tauri/dev_tools.ts:655"
+    trigger: "#[tauri::command] sandbox_run (+ others)"
+    ui_surface: "src/lib/tauri/dev_tools.ts:640"
     commands:
       - name: code_sandbox::sandbox_run
         registered: "src-tauri/src/code_sandbox.rs:696"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/dev_tools.ts:640"
       - name: code_sandbox::sandbox_run_explain
         registered: "src-tauri/src/code_sandbox.rs:707"
         invoked_from: "src/lib/tauri/dev_tools.ts:655"
       - name: code_sandbox::sandbox_fix_and_run
         registered: "src-tauri/src/code_sandbox.rs:716"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/dev_tools.ts:671"
       - name: code_sandbox::sandbox_detect_language
         registered: "src-tauri/src/code_sandbox.rs:727"
         invoked_from: "src/lib/tauri/dev_tools.ts:686"
     internal_callers: []
     body_registry_entry: "code_sandbox"
     reachable_paths:
-      - "invokeTyped('sandbox_run_explain') -> src-tauri/src/code_sandbox.rs:707"
+      - "invokeTyped('sandbox_run') -> src-tauri/src/code_sandbox.rs:696"
     notes: ""
   - file: src-tauri/src/commands.rs
     classification: ACTIVE
@@ -783,19 +783,19 @@ modules:
         invoked_from: null
       - name: commands::reset_onboarding
         registered: "src-tauri/src/commands.rs:2138"
-        invoked_from: "src/lib/tauri/config.ts:210"
+        invoked_from: "src/lib/tauri/admin.ts:734"
       - name: commands::set_config
         registered: "src-tauri/src/commands.rs:2148"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/admin.ts:676"
       - name: commands::toggle_god_mode
         registered: "src-tauri/src/commands.rs:2194"
         invoked_from: null
       - name: commands::update_init_prefs
         registered: "src-tauri/src/commands.rs:2212"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/admin.ts:711"
       - name: commands::test_provider
         registered: "src-tauri/src/commands.rs:2229"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/admin.ts:641"
       - name: commands::mcp_add_server
         registered: "src-tauri/src/commands.rs:2239"
         invoked_from: "src/lib/tauri/admin.ts:541"
@@ -825,16 +825,16 @@ modules:
         invoked_from: null
       - name: commands::respond_tool_approval
         registered: "src-tauri/src/commands.rs:2375"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/chat.ts:54"
       - name: commands::history_delete_conversation
         registered: "src-tauri/src/commands.rs:2392"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/chat.ts:87"
       - name: commands::history_list_conversations
         registered: "src-tauri/src/commands.rs:2397"
         invoked_from: "src/lib/tauri/chat.ts:68"
       - name: commands::history_load_conversation
         registered: "src-tauri/src/commands.rs:2402"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/chat.ts:76"
       - name: commands::history_save_conversation
         registered: "src-tauri/src/commands.rs:2407"
         invoked_from: null
@@ -846,7 +846,7 @@ modules:
         invoked_from: null
       - name: commands::get_onboarding_status
         registered: "src-tauri/src/commands.rs:2523"
-        invoked_from: "src/lib/tauri/config.ts:38"
+        invoked_from: "src/lib/tauri/_base.ts:63"
       - name: commands::complete_onboarding
         registered: "src-tauri/src/commands.rs:2536"
         invoked_from: "src/lib/tauri/config.ts:43"
@@ -855,7 +855,7 @@ modules:
         invoked_from: null
       - name: commands::quickask_submit
         registered: "src-tauri/src/commands.rs:2725"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/chat.ts:106"
     internal_callers:
       - "src-tauri/src/agent_commands.rs:5"
       - "src-tauri/src/autoskills.rs:172"
@@ -869,12 +869,12 @@ modules:
   - file: src-tauri/src/computer_use.rs
     classification: ACTIVE
     purpose: "Computer Use — Blade's ability to operate the computer autonomously."
-    trigger: "#[tauri::command] computer_use_stop (+ others)"
-    ui_surface: "src/lib/tauri/dev_tools.ts:1000"
+    trigger: "#[tauri::command] computer_use_task (+ others)"
+    ui_surface: "src/lib/tauri/dev_tools.ts:986"
     commands:
       - name: computer_use::computer_use_task
         registered: "src-tauri/src/computer_use.rs:56"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/dev_tools.ts:986"
       - name: computer_use::computer_use_stop
         registered: "src-tauri/src/computer_use.rs:340"
         invoked_from: "src/lib/tauri/dev_tools.ts:1000"
@@ -885,29 +885,29 @@ modules:
       - "src-tauri/src/native_tools.rs:1565"
     body_registry_entry: "computer_use"
     reachable_paths:
-      - "invokeTyped('computer_use_stop') -> src-tauri/src/computer_use.rs:340"
+      - "invokeTyped('computer_use_task') -> src-tauri/src/computer_use.rs:56"
     notes: ""
   - file: src-tauri/src/config.rs
     classification: ACTIVE
     purpose: "Per-task-type provider routing. "
     trigger: "#[tauri::command] get_all_provider_keys (+ others)"
-    ui_surface: "src/lib/tauri/config.ts:76"
+    ui_surface: "src/lib/tauri/admin.ts:1660"
     commands:
       - name: config::get_all_provider_keys
         registered: "src-tauri/src/config.rs:605"
-        invoked_from: "src/lib/tauri/config.ts:76"
+        invoked_from: "src/lib/tauri/admin.ts:1660"
       - name: config::store_provider_key
         registered: "src-tauri/src/config.rs:636"
-        invoked_from: "src/lib/tauri/admin.ts:1671"
+        invoked_from: "src/lib/tauri/_base.ts:68"
       - name: config::switch_provider
         registered: "src-tauri/src/config.rs:645"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/config.ts:89"
       - name: config::get_task_routing
         registered: "src-tauri/src/config.rs:713"
-        invoked_from: "src/lib/tauri/config.ts:172"
+        invoked_from: "src/lib/tauri/admin.ts:1699"
       - name: config::set_task_routing
         registered: "src-tauri/src/config.rs:719"
-        invoked_from: "src/lib/tauri/config.ts:184"
+        invoked_from: "src/lib/tauri/admin.ts:1707"
       - name: config::save_config_field
         registered: "src-tauri/src/config.rs:728"
         invoked_from: "src/lib/tauri/admin.ts:1718"
@@ -974,12 +974,12 @@ modules:
   - file: src-tauri/src/context_engine.rs
     classification: ACTIVE
     purpose: "CONTEXT ENGINE — Smart RAG backbone for BLADE."
-    trigger: "#[tauri::command] context_score_chunk (+ others)"
-    ui_surface: "src/lib/tauri/identity.ts:807"
+    trigger: "#[tauri::command] context_assemble (+ others)"
+    ui_surface: "src/lib/tauri/identity.ts:792"
     commands:
       - name: context_engine::context_assemble
         registered: "src-tauri/src/context_engine.rs:631"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/identity.ts:792"
       - name: context_engine::context_score_chunk
         registered: "src-tauri/src/context_engine.rs:658"
         invoked_from: "src/lib/tauri/identity.ts:807"
@@ -990,17 +990,17 @@ modules:
       - "src-tauri/src/commands.rs:878"
     body_registry_entry: "context_engine"
     reachable_paths:
-      - "invokeTyped('context_score_chunk') -> src-tauri/src/context_engine.rs:658"
+      - "invokeTyped('context_assemble') -> src-tauri/src/context_engine.rs:631"
     notes: ""
   - file: src-tauri/src/cron.rs
     classification: ACTIVE
     purpose: "BLADE CRON — Autonomous Scheduled Tasks"
-    trigger: "#[tauri::command] cron_list (+ others)"
-    ui_surface: "src/lib/tauri/dev_tools.ts:1440"
+    trigger: "#[tauri::command] cron_add (+ others)"
+    ui_surface: "src/lib/tauri/dev_tools.ts:1417"
     commands:
       - name: cron::cron_add
         registered: "src-tauri/src/cron.rs:300"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/dev_tools.ts:1417"
       - name: cron::cron_list
         registered: "src-tauri/src/cron.rs:336"
         invoked_from: "src/lib/tauri/dev_tools.ts:1440"
@@ -1018,7 +1018,7 @@ modules:
       - "src-tauri/src/native_tools.rs:1856"
     body_registry_entry: "cron"
     reachable_paths:
-      - "invokeTyped('cron_list') -> src-tauri/src/cron.rs:336"
+      - "invokeTyped('cron_add') -> src-tauri/src/cron.rs:300"
     notes: ""
   - file: src-tauri/src/crypto.rs
     classification: ACTIVE
@@ -1133,7 +1133,7 @@ modules:
         invoked_from: "src/lib/tauri/knowledge.ts:341"
       - name: db_commands::db_add_template
         registered: "src-tauri/src/db_commands.rs:386"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/knowledge.ts:350"
       - name: db_commands::db_delete_template
         registered: "src-tauri/src/db_commands.rs:411"
         invoked_from: "src/lib/tauri/knowledge.ts:358"
@@ -1241,7 +1241,7 @@ modules:
         invoked_from: "src/lib/tauri/admin.ts:1107"
       - name: decision_gate::decision_evaluate
         registered: "src-tauri/src/decision_gate.rs:414"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/admin.ts:1123"
     internal_callers:
       - "src-tauri/src/auto_fix.rs:860"
       - "src-tauri/src/auto_fix.rs:873"
@@ -1256,17 +1256,17 @@ modules:
     classification: ACTIVE
     purpose: "Deep System Discovery — scans the user's machine on first run to build"
     trigger: "#[tauri::command] deep_scan_start (+ others)"
-    ui_surface: "src/lib/tauri/deepscan.ts:24"
+    ui_surface: "src/lib/tauri/admin.ts:1462"
     commands:
       - name: deep_scan::deep_scan_start
         registered: "src-tauri/src/deep_scan.rs:1322"
-        invoked_from: "src/lib/tauri/deepscan.ts:24"
+        invoked_from: "src/lib/tauri/admin.ts:1462"
       - name: deep_scan::deep_scan_results
         registered: "src-tauri/src/deep_scan.rs:1426"
-        invoked_from: "src/lib/tauri/deepscan.ts:29"
+        invoked_from: "src/lib/tauri/admin.ts:1470"
       - name: deep_scan::deep_scan_summary
         registered: "src-tauri/src/deep_scan.rs:1432"
-        invoked_from: "src/lib/tauri/deepscan.ts:34"
+        invoked_from: "src/lib/tauri/admin.ts:1478"
     internal_callers:
       - "src-tauri/src/brain.rs:542"
       - "src-tauri/src/hive.rs:718"
@@ -1390,32 +1390,32 @@ modules:
     classification: ACTIVE
     purpose: "BLADE Document Intelligence"
     trigger: "#[tauri::command] doc_ingest (+ others)"
-    ui_surface: "src/lib/tauri/knowledge.ts:757"
+    ui_surface: "src/lib/tauri/dev_tools.ts:907"
     commands:
       - name: document_intelligence::doc_ingest
         registered: "src-tauri/src/document_intelligence.rs:791"
-        invoked_from: "src/lib/tauri/knowledge.ts:757"
+        invoked_from: "src/lib/tauri/dev_tools.ts:907"
       - name: document_intelligence::doc_search
         registered: "src-tauri/src/document_intelligence.rs:796"
-        invoked_from: "src/lib/tauri/knowledge.ts:762"
+        invoked_from: "src/lib/tauri/dev_tools.ts:915"
       - name: document_intelligence::doc_get
         registered: "src-tauri/src/document_intelligence.rs:802"
-        invoked_from: "src/lib/tauri/knowledge.ts:770"
+        invoked_from: "src/lib/tauri/dev_tools.ts:923"
       - name: document_intelligence::doc_list
         registered: "src-tauri/src/document_intelligence.rs:816"
-        invoked_from: "src/lib/tauri/knowledge.ts:778"
+        invoked_from: "src/lib/tauri/dev_tools.ts:931"
       - name: document_intelligence::doc_delete
         registered: "src-tauri/src/document_intelligence.rs:822"
-        invoked_from: "src/lib/tauri/knowledge.ts:783"
+        invoked_from: "src/lib/tauri/dev_tools.ts:939"
       - name: document_intelligence::doc_answer_question
         registered: "src-tauri/src/document_intelligence.rs:828"
-        invoked_from: "src/lib/tauri/knowledge.ts:794"
+        invoked_from: "src/lib/tauri/dev_tools.ts:950"
       - name: document_intelligence::doc_cross_synthesis
         registered: "src-tauri/src/document_intelligence.rs:836"
-        invoked_from: "src/lib/tauri/knowledge.ts:805"
+        invoked_from: "src/lib/tauri/dev_tools.ts:961"
       - name: document_intelligence::doc_generate_study_notes
         registered: "src-tauri/src/document_intelligence.rs:841"
-        invoked_from: "src/lib/tauri/knowledge.ts:810"
+        invoked_from: "src/lib/tauri/dev_tools.ts:969"
     internal_callers:
       - "src-tauri/src/brain.rs:1034"
       - "src-tauri/src/skeleton.rs:35"
@@ -1518,13 +1518,13 @@ modules:
         invoked_from: "src/lib/tauri/admin.ts:1016"
       - name: evolution::evolution_install_suggestion
         registered: "src-tauri/src/evolution.rs:1032"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/admin.ts:1028"
       - name: evolution::evolution_run_now
         registered: "src-tauri/src/evolution.rs:1107"
         invoked_from: "src/lib/tauri/admin.ts:1043"
       - name: evolution::evolution_log_capability_gap
         registered: "src-tauri/src/evolution.rs:1115"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/admin.ts:1054"
     internal_callers:
       - "src-tauri/src/godmode.rs:281"
       - "src-tauri/src/immune_system.rs:37"
@@ -1535,12 +1535,12 @@ modules:
   - file: src-tauri/src/execution_memory.rs
     classification: ACTIVE
     purpose: "BLADE EXECUTION MEMORY — every shell command BLADE has ever run, stored forever."
-    trigger: "#[tauri::command] exmem_search (+ others)"
-    ui_surface: "src/lib/tauri/admin.ts:1439"
+    trigger: "#[tauri::command] exmem_record (+ others)"
+    ui_surface: "src/lib/tauri/admin.ts:1414"
     commands:
       - name: execution_memory::exmem_record
         registered: "src-tauri/src/execution_memory.rs:266"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/admin.ts:1414"
       - name: execution_memory::exmem_search
         registered: "src-tauri/src/execution_memory.rs:280"
         invoked_from: "src/lib/tauri/admin.ts:1439"
@@ -1555,7 +1555,7 @@ modules:
       - "src-tauri/src/native_tools.rs:2344"
     body_registry_entry: "execution_memory"
     reachable_paths:
-      - "invokeTyped('exmem_search') -> src-tauri/src/execution_memory.rs:280"
+      - "invokeTyped('exmem_record') -> src-tauri/src/execution_memory.rs:266"
     notes: ""
   - file: src-tauri/src/file_indexer.rs
     classification: ACTIVE
@@ -1568,7 +1568,7 @@ modules:
         invoked_from: "src/lib/tauri/dev_tools.ts:489"
       - name: file_indexer::file_index_search
         registered: "src-tauri/src/file_indexer.rs:436"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/dev_tools.ts:501"
       - name: file_indexer::file_index_recent
         registered: "src-tauri/src/file_indexer.rs:441"
         invoked_from: "src/lib/tauri/dev_tools.ts:519"
@@ -1617,15 +1617,15 @@ modules:
   - file: src-tauri/src/financial_brain.rs
     classification: ACTIVE
     purpose: "BLADE Financial Brain — Personal Finance Intelligence"
-    trigger: "#[tauri::command] finance_delete_transaction (+ others)"
-    ui_surface: "src/lib/tauri/life_os.ts:620"
+    trigger: "#[tauri::command] finance_add_transaction (+ others)"
+    ui_surface: "src/lib/tauri/life_os.ts:586"
     commands:
       - name: financial_brain::finance_add_transaction
         registered: "src-tauri/src/financial_brain.rs:708"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/life_os.ts:586"
       - name: financial_brain::finance_get_transactions
         registered: "src-tauri/src/financial_brain.rs:730"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/life_os.ts:608"
       - name: financial_brain::finance_delete_transaction
         registered: "src-tauri/src/financial_brain.rs:740"
         invoked_from: "src/lib/tauri/life_os.ts:620"
@@ -1640,13 +1640,13 @@ modules:
         invoked_from: "src/lib/tauri/life_os.ts:643"
       - name: financial_brain::finance_create_goal
         registered: "src-tauri/src/financial_brain.rs:763"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/life_os.ts:657"
       - name: financial_brain::finance_update_goal
         registered: "src-tauri/src/financial_brain.rs:774"
         invoked_from: "src/lib/tauri/life_os.ts:673"
       - name: financial_brain::finance_investment_suggestions
         registered: "src-tauri/src/financial_brain.rs:779"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/life_os.ts:688"
       - name: financial_brain::finance_budget_recommendation
         registered: "src-tauri/src/financial_brain.rs:787"
         invoked_from: "src/lib/tauri/life_os.ts:696"
@@ -1670,7 +1670,7 @@ modules:
       - "src-tauri/src/skeleton.rs:28"
     body_registry_entry: "financial_brain"
     reachable_paths:
-      - "invokeTyped('finance_delete_transaction') -> src-tauri/src/financial_brain.rs:740"
+      - "invokeTyped('finance_add_transaction') -> src-tauri/src/financial_brain.rs:708"
     notes: ""
   - file: src-tauri/src/ghost_mode.rs
     classification: NOT-WIRED
@@ -1726,12 +1726,12 @@ modules:
   - file: src-tauri/src/goal_engine.rs
     classification: ACTIVE
     purpose: "Autonomous AGI goal pursuit. Goals never fail — they change strategy."
-    trigger: "#[tauri::command] goal_list (+ others)"
-    ui_surface: "src/lib/tauri/life_os.ts:768"
+    trigger: "#[tauri::command] goal_add (+ others)"
+    ui_surface: "src/lib/tauri/life_os.ts:755"
     commands:
       - name: goal_engine::goal_add
         registered: "src-tauri/src/goal_engine.rs:839"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/life_os.ts:755"
       - name: goal_engine::goal_list
         registered: "src-tauri/src/goal_engine.rs:869"
         invoked_from: "src/lib/tauri/life_os.ts:768"
@@ -1753,7 +1753,7 @@ modules:
       - "src-tauri/src/proactive_engine.rs:312"
     body_registry_entry: "goal_engine"
     reachable_paths:
-      - "invokeTyped('goal_list') -> src-tauri/src/goal_engine.rs:869"
+      - "invokeTyped('goal_add') -> src-tauri/src/goal_engine.rs:839"
     notes: ""
   - file: src-tauri/src/godmode.rs
     classification: NOT-WIRED
@@ -1785,12 +1785,12 @@ modules:
   - file: src-tauri/src/habit_engine.rs
     classification: ACTIVE
     purpose: "BLADE Habit Engine — Streak Tracking, Friction Analysis & Smart Reminders"
-    trigger: "#[tauri::command] habit_list (+ others)"
-    ui_surface: "src/lib/tauri/life_os.ts:846"
+    trigger: "#[tauri::command] habit_create (+ others)"
+    ui_surface: "src/lib/tauri/life_os.ts:819"
     commands:
       - name: habit_engine::habit_create
         registered: "src-tauri/src/habit_engine.rs:769"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/life_os.ts:819"
       - name: habit_engine::habit_list
         registered: "src-tauri/src/habit_engine.rs:799"
         invoked_from: "src/lib/tauri/life_os.ts:846"
@@ -1799,7 +1799,7 @@ modules:
         invoked_from: "src/lib/tauri/life_os.ts:853"
       - name: habit_engine::habit_complete
         registered: "src-tauri/src/habit_engine.rs:809"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/life_os.ts:866"
       - name: habit_engine::habit_skip
         registered: "src-tauri/src/habit_engine.rs:820"
         invoked_from: "src/lib/tauri/life_os.ts:886"
@@ -1823,7 +1823,7 @@ modules:
       - "src-tauri/src/skeleton.rs:30"
     body_registry_entry: "habit_engine"
     reachable_paths:
-      - "invokeTyped('habit_list') -> src-tauri/src/habit_engine.rs:799"
+      - "invokeTyped('habit_create') -> src-tauri/src/habit_engine.rs:769"
     notes: ""
   - file: src-tauri/src/health.rs
     classification: ACTIVE
@@ -1944,16 +1944,16 @@ modules:
         invoked_from: "src/lib/tauri/hive.ts:155"
       - name: hive::hive_spawn_tentacle
         registered: "src-tauri/src/hive.rs:3316"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/hive.ts:181"
       - name: hive::hive_get_reports
         registered: "src-tauri/src/hive.rs:3324"
         invoked_from: "src/lib/tauri/hive.ts:195"
       - name: hive::hive_approve_decision
         registered: "src-tauri/src/hive.rs:3329"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/hive.ts:209"
       - name: hive::hive_reject_decision
         registered: "src-tauri/src/hive.rs:3341"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/hive.ts:227"
       - name: hive::hive_set_autonomy
         registered: "src-tauri/src/hive.rs:3359"
         invoked_from: "src/lib/tauri/hive.ts:264"
@@ -1978,7 +1978,7 @@ modules:
         invoked_from: "src/lib/tauri/homeostasis.ts:23"
       - name: homeostasis::homeostasis_get_directive
         registered: "src-tauri/src/homeostasis.rs:847"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/homeostasis.ts:36"
       - name: homeostasis::homeostasis_get_circadian
         registered: "src-tauri/src/homeostasis.rs:855"
         invoked_from: "src/lib/tauri/homeostasis.ts:51"
@@ -1996,20 +1996,20 @@ modules:
       - "invokeTyped('homeostasis_get') -> src-tauri/src/homeostasis.rs:842"
     notes: ""
   - file: src-tauri/src/immune_system.rs
-    classification: NOT-WIRED
+    classification: ACTIVE
     purpose: "IMMUNE SYSTEM — BLADE's self-evolution coordinator."
-    trigger: "#[tauri::command] immune_resolve_gap — registered but no invokeTyped consumer"
-    ui_surface: null
+    trigger: "#[tauri::command] immune_resolve_gap (+ others)"
+    ui_surface: "src/lib/tauri/admin.ts:1075"
     commands:
       - name: immune_system::immune_resolve_gap
         registered: "src-tauri/src/immune_system.rs:221"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/admin.ts:1075"
     internal_callers:
       - "src-tauri/src/commands.rs:1958"
     body_registry_entry: "immune_system"
-    backend_entry_points:
-      - "src-tauri/src/immune_system.rs:221"
-    notes: "Module is structurally live (internal callers + body_registry) but its OUTWARD Tauri commands are unwired — surface in Phase 14 backlog"
+    reachable_paths:
+      - "invokeTyped('immune_resolve_gap') -> src-tauri/src/immune_system.rs:221"
+    notes: ""
   - file: src-tauri/src/indexer.rs
     classification: ACTIVE
     purpose: "BLADE CODEBASE INDEXER — persistent living knowledge graph of every project."
@@ -2077,7 +2077,7 @@ modules:
         invoked_from: "src/lib/tauri/iot.ts:35"
       - name: iot_bridge::iot_get_state
         registered: "src-tauri/src/iot_bridge.rs:478"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/iot.ts:43"
       - name: iot_bridge::iot_call_service
         registered: "src-tauri/src/iot_bridge.rs:486"
         invoked_from: null
@@ -2154,13 +2154,13 @@ modules:
         invoked_from: "src/lib/tauri/identity.ts:943"
       - name: kali::kali_analyze_ctf
         registered: "src-tauri/src/kali.rs:1104"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/identity.ts:959"
       - name: kali::kali_explain_exploit
         registered: "src-tauri/src/kali.rs:1125"
         invoked_from: "src/lib/tauri/identity.ts:975"
       - name: kali::kali_generate_payload
         registered: "src-tauri/src/kali.rs:1130"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/identity.ts:986"
       - name: kali::kali_check_tools
         registered: "src-tauri/src/kali.rs:1138"
         invoked_from: null
@@ -2174,21 +2174,21 @@ modules:
   - file: src-tauri/src/knowledge_graph.rs
     classification: ACTIVE
     purpose: "KNOWLEDGE GRAPH — BLADE's semantic concept network."
-    trigger: "#[tauri::command] graph_search_nodes (+ others)"
-    ui_surface: "src/lib/tauri/knowledge.ts:429"
+    trigger: "#[tauri::command] graph_add_node (+ others)"
+    ui_surface: "src/lib/tauri/knowledge.ts:414"
     commands:
       - name: knowledge_graph::graph_add_node
         registered: "src-tauri/src/knowledge_graph.rs:857"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/knowledge.ts:414"
       - name: knowledge_graph::graph_search_nodes
         registered: "src-tauri/src/knowledge_graph.rs:880"
         invoked_from: "src/lib/tauri/knowledge.ts:429"
       - name: knowledge_graph::graph_traverse
         registered: "src-tauri/src/knowledge_graph.rs:885"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/knowledge.ts:441"
       - name: knowledge_graph::graph_find_path
         registered: "src-tauri/src/knowledge_graph.rs:894"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/knowledge.ts:452"
       - name: knowledge_graph::graph_extract_from_text
         registered: "src-tauri/src/knowledge_graph.rs:899"
         invoked_from: "src/lib/tauri/knowledge.ts:460"
@@ -2209,7 +2209,7 @@ modules:
       - "src-tauri/src/evolution.rs:1092"
     body_registry_entry: "knowledge_graph"
     reachable_paths:
-      - "invokeTyped('graph_search_nodes') -> src-tauri/src/knowledge_graph.rs:880"
+      - "invokeTyped('graph_add_node') -> src-tauri/src/knowledge_graph.rs:857"
     notes: ""
   - file: src-tauri/src/learning_engine.rs
     classification: ACTIVE
@@ -2257,19 +2257,19 @@ modules:
       - "cargo binary -> main.rs -> blade_lib::run()"
     notes: "Cargo binary entry point"
   - file: src-tauri/src/managed_agents.rs
-    classification: NOT-WIRED
+    classification: ACTIVE
     purpose: "Module managed_agents"
-    trigger: "#[tauri::command] run_managed_agent — registered but no invokeTyped consumer"
-    ui_surface: null
+    trigger: "#[tauri::command] run_managed_agent (+ others)"
+    ui_surface: "src/lib/tauri/agents.ts:511"
     commands:
       - name: managed_agents::run_managed_agent
         registered: "src-tauri/src/managed_agents.rs:24"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/agents.ts:511"
     internal_callers: []
     body_registry_entry: "managed_agents"
-    backend_entry_points:
-      - "src-tauri/src/managed_agents.rs:24"
-    notes: "Module is in body_registry but its OUTWARD Tauri commands are unwired — surface in Phase 14 backlog"
+    reachable_paths:
+      - "invokeTyped('run_managed_agent') -> src-tauri/src/managed_agents.rs:24"
+    notes: ""
   - file: src-tauri/src/mcp.rs
     classification: ACTIVE
     purpose: "How often (seconds) the background health monitor checks for dead servers. "
@@ -2319,12 +2319,12 @@ modules:
   - file: src-tauri/src/meeting_intelligence.rs
     classification: ACTIVE
     purpose: "BLADE Meeting Intelligence"
-    trigger: "#[tauri::command] meeting_get (+ others)"
-    ui_surface: "src/lib/tauri/life_os.ts:957"
+    trigger: "#[tauri::command] meeting_process (+ others)"
+    ui_surface: "src/lib/tauri/life_os.ts:944"
     commands:
       - name: meeting_intelligence::meeting_process
         registered: "src-tauri/src/meeting_intelligence.rs:755"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/life_os.ts:944"
       - name: meeting_intelligence::meeting_get
         registered: "src-tauri/src/meeting_intelligence.rs:766"
         invoked_from: "src/lib/tauri/life_os.ts:957"
@@ -2342,10 +2342,10 @@ modules:
         invoked_from: null
       - name: meeting_intelligence::meeting_complete_action
         registered: "src-tauri/src/meeting_intelligence.rs:806"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/life_os.ts:994"
       - name: meeting_intelligence::meeting_follow_up_email
         registered: "src-tauri/src/meeting_intelligence.rs:811"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/life_os.ts:1008"
       - name: meeting_intelligence::meeting_compare
         registered: "src-tauri/src/meeting_intelligence.rs:816"
         invoked_from: "src/lib/tauri/life_os.ts:1019"
@@ -2357,7 +2357,7 @@ modules:
       - "src-tauri/src/skeleton.rs:26"
     body_registry_entry: "meeting_intelligence"
     reachable_paths:
-      - "invokeTyped('meeting_get') -> src-tauri/src/meeting_intelligence.rs:766"
+      - "invokeTyped('meeting_process') -> src-tauri/src/meeting_intelligence.rs:755"
     notes: ""
   - file: src-tauri/src/memory.rs
     classification: ACTIVE
@@ -2407,7 +2407,7 @@ modules:
         invoked_from: "src/lib/tauri/knowledge.ts:506"
       - name: memory_palace::memory_add_manual
         registered: "src-tauri/src/memory_palace.rs:807"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/knowledge.ts:519"
       - name: memory_palace::memory_delete
         registered: "src-tauri/src/memory_palace.rs:841"
         invoked_from: "src/lib/tauri/knowledge.ts:532"
@@ -2508,36 +2508,36 @@ modules:
   - file: src-tauri/src/negotiation_engine.rs
     classification: ACTIVE
     purpose: "BLADE Negotiation Engine — Debate Coach + Negotiation Assistant"
-    trigger: "#[tauri::command] negotiation_conclude (+ others)"
-    ui_surface: "src/lib/tauri/identity.ts:638"
+    trigger: "#[tauri::command] negotiation_build_argument (+ others)"
+    ui_surface: "src/lib/tauri/identity.ts:565"
     commands:
       - name: negotiation_engine::negotiation_build_argument
         registered: "src-tauri/src/negotiation_engine.rs:873"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/identity.ts:565"
       - name: negotiation_engine::negotiation_steelman
         registered: "src-tauri/src/negotiation_engine.rs:883"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/identity.ts:583"
       - name: negotiation_engine::negotiation_find_common_ground
         registered: "src-tauri/src/negotiation_engine.rs:892"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/identity.ts:598"
       - name: negotiation_engine::negotiation_start_debate
         registered: "src-tauri/src/negotiation_engine.rs:905"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/identity.ts:612"
       - name: negotiation_engine::negotiation_round
         registered: "src-tauri/src/negotiation_engine.rs:913"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/identity.ts:627"
       - name: negotiation_engine::negotiation_conclude
         registered: "src-tauri/src/negotiation_engine.rs:922"
         invoked_from: "src/lib/tauri/identity.ts:638"
       - name: negotiation_engine::negotiation_analyze
         registered: "src-tauri/src/negotiation_engine.rs:927"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/identity.ts:652"
       - name: negotiation_engine::negotiation_roleplay
         registered: "src-tauri/src/negotiation_engine.rs:936"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/identity.ts:670"
       - name: negotiation_engine::negotiation_critique_move
         registered: "src-tauri/src/negotiation_engine.rs:944"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/identity.ts:684"
       - name: negotiation_engine::negotiation_get_debates
         registered: "src-tauri/src/negotiation_engine.rs:952"
         invoked_from: "src/lib/tauri/identity.ts:695"
@@ -2548,7 +2548,7 @@ modules:
       - "src-tauri/src/skeleton.rs:29"
     body_registry_entry: "negotiation_engine"
     reachable_paths:
-      - "invokeTyped('negotiation_conclude') -> src-tauri/src/negotiation_engine.rs:922"
+      - "invokeTyped('negotiation_build_argument') -> src-tauri/src/negotiation_engine.rs:873"
     notes: ""
   - file: src-tauri/src/notification_listener.rs
     classification: NOT-WIRED
@@ -2615,10 +2615,10 @@ modules:
         invoked_from: "src/lib/tauri/body.ts:253"
       - name: organ::organ_set_autonomy
         registered: "src-tauri/src/organ.rs:372"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/body.ts:268"
       - name: organ::organ_get_autonomy
         registered: "src-tauri/src/organ.rs:381"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/body.ts:284"
     internal_callers:
       - "src-tauri/src/brain_planner.rs:55"
       - "src-tauri/src/joints.rs:263"
@@ -2759,13 +2759,13 @@ modules:
         invoked_from: "src/lib/tauri/identity.ts:442"
       - name: persona_engine::persona_update_trait
         registered: "src-tauri/src/persona_engine.rs:1224"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/identity.ts:454"
       - name: persona_engine::persona_analyze_now
         registered: "src-tauri/src/persona_engine.rs:1232"
         invoked_from: "src/lib/tauri/identity.ts:470"
       - name: persona_engine::persona_record_outcome
         registered: "src-tauri/src/persona_engine.rs:1261"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/identity.ts:481"
       - name: persona_engine::get_user_model
         registered: "src-tauri/src/persona_engine.rs:1268"
         invoked_from: "src/lib/tauri/identity.ts:498"
@@ -2777,10 +2777,10 @@ modules:
         invoked_from: "src/lib/tauri/identity.ts:514"
       - name: persona_engine::update_expertise
         registered: "src-tauri/src/persona_engine.rs:1297"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/identity.ts:526"
       - name: persona_engine::persona_estimate_mood
         registered: "src-tauri/src/persona_engine.rs:1304"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/identity.ts:542"
     internal_callers:
       - "src-tauri/src/activity_monitor.rs:228"
       - "src-tauri/src/activity_monitor.rs:236"
@@ -3145,18 +3145,18 @@ modules:
   - file: src-tauri/src/reasoning_engine.rs
     classification: ACTIVE
     purpose: "BLADE System 2 — true multi-step reasoning."
-    trigger: "#[tauri::command] reasoning_decompose (+ others)"
-    ui_surface: "src/lib/tauri/identity.ts:738"
+    trigger: "#[tauri::command] reasoning_think (+ others)"
+    ui_surface: "src/lib/tauri/identity.ts:723"
     commands:
       - name: reasoning_engine::reasoning_think
         registered: "src-tauri/src/reasoning_engine.rs:764"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/identity.ts:723"
       - name: reasoning_engine::reasoning_decompose
         registered: "src-tauri/src/reasoning_engine.rs:777"
         invoked_from: "src/lib/tauri/identity.ts:738"
       - name: reasoning_engine::reasoning_test_hypothesis
         registered: "src-tauri/src/reasoning_engine.rs:783"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/identity.ts:749"
       - name: reasoning_engine::reasoning_socratic
         registered: "src-tauri/src/reasoning_engine.rs:792"
         invoked_from: null
@@ -3168,7 +3168,7 @@ modules:
       - "src-tauri/src/skeleton.rs:44"
     body_registry_entry: "reasoning_engine"
     reachable_paths:
-      - "invokeTyped('reasoning_decompose') -> src-tauri/src/reasoning_engine.rs:777"
+      - "invokeTyped('reasoning_think') -> src-tauri/src/reasoning_engine.rs:764"
     notes: ""
   - file: src-tauri/src/reminders.rs
     classification: ACTIVE
@@ -3181,7 +3181,7 @@ modules:
         invoked_from: "src/lib/tauri/dev_tools.ts:1298"
       - name: reminders::reminder_add_natural
         registered: "src-tauri/src/reminders.rs:342"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/dev_tools.ts:1314"
       - name: reminders::reminder_list
         registered: "src-tauri/src/reminders.rs:354"
         invoked_from: "src/lib/tauri/dev_tools.ts:1329"
@@ -3203,12 +3203,12 @@ modules:
   - file: src-tauri/src/reports.rs
     classification: ACTIVE
     purpose: "Capability gap detection, local storage, webhook delivery, and self-improvement missions. "
-    trigger: "#[tauri::command] get_reports (+ others)"
-    ui_surface: "src/lib/tauri/admin.ts:873"
+    trigger: "#[tauri::command] report_gap (+ others)"
+    ui_surface: "src/lib/tauri/admin.ts:846"
     commands:
       - name: reports::report_gap
         registered: "src-tauri/src/reports.rs:258"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/admin.ts:846"
       - name: reports::get_reports
         registered: "src-tauri/src/reports.rs:297"
         invoked_from: "src/lib/tauri/admin.ts:873"
@@ -3224,7 +3224,7 @@ modules:
     internal_callers: []
     body_registry_entry: "reports"
     reachable_paths:
-      - "invokeTyped('get_reports') -> src-tauri/src/reports.rs:297"
+      - "invokeTyped('report_gap') -> src-tauri/src/reports.rs:258"
     notes: ""
   - file: src-tauri/src/reproductive.rs
     classification: ACTIVE
@@ -3237,7 +3237,7 @@ modules:
         invoked_from: "src/lib/tauri/body.ts:449"
       - name: reproductive::reproductive_spawn
         registered: "src-tauri/src/reproductive.rs:222"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/body.ts:464"
     internal_callers:
       - "src-tauri/src/hive.rs:2582"
       - "src-tauri/src/hive.rs:2800"
@@ -3489,7 +3489,7 @@ modules:
         invoked_from: "src/lib/tauri/knowledge.ts:609"
       - name: screen_timeline_commands::timeline_browse_cmd
         registered: "src-tauri/src/screen_timeline_commands.rs:25"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/knowledge.ts:624"
       - name: screen_timeline_commands::timeline_get_screenshot
         registered: "src-tauri/src/screen_timeline_commands.rs:35"
         invoked_from: "src/lib/tauri/knowledge.ts:635"
@@ -3501,7 +3501,7 @@ modules:
         invoked_from: "src/lib/tauri/knowledge.ts:648"
       - name: screen_timeline_commands::timeline_set_config
         registered: "src-tauri/src/screen_timeline_commands.rs:69"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/knowledge.ts:660"
       - name: screen_timeline_commands::timeline_get_stats_cmd
         registered: "src-tauri/src/screen_timeline_commands.rs:99"
         invoked_from: "src/lib/tauri/knowledge.ts:672"
@@ -3510,10 +3510,10 @@ modules:
         invoked_from: "src/lib/tauri/knowledge.ts:677"
       - name: screen_timeline_commands::timeline_search_everything
         registered: "src-tauri/src/screen_timeline_commands.rs:118"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/knowledge.ts:688"
       - name: screen_timeline_commands::timeline_get_audio
         registered: "src-tauri/src/screen_timeline_commands.rs:134"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/knowledge.ts:705"
       - name: screen_timeline_commands::timeline_meeting_summary
         registered: "src-tauri/src/screen_timeline_commands.rs:153"
         invoked_from: "src/lib/tauri/knowledge.ts:722"
@@ -3593,18 +3593,18 @@ modules:
   - file: src-tauri/src/self_critique.rs
     classification: ACTIVE
     purpose: "SELF-CRITIQUE ENGINE — BLADE's build-roast-rebuild cycle."
-    trigger: "#[tauri::command] self_critique_history (+ others)"
-    ui_surface: "src/lib/tauri/admin.ts:1750"
+    trigger: "#[tauri::command] self_critique_response (+ others)"
+    ui_surface: "src/lib/tauri/admin.ts:1736"
     commands:
       - name: self_critique::self_critique_response
         registered: "src-tauri/src/self_critique.rs:567"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/admin.ts:1736"
       - name: self_critique::self_critique_history
         registered: "src-tauri/src/self_critique.rs:576"
         invoked_from: "src/lib/tauri/admin.ts:1750"
       - name: self_critique::self_critique_deep_roast
         registered: "src-tauri/src/self_critique.rs:583"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/admin.ts:1761"
       - name: self_critique::self_critique_weekly_meta
         registered: "src-tauri/src/self_critique.rs:592"
         invoked_from: "src/lib/tauri/admin.ts:1775"
@@ -3614,17 +3614,17 @@ modules:
       - "src-tauri/src/skeleton.rs:43"
     body_registry_entry: "self_critique"
     reachable_paths:
-      - "invokeTyped('self_critique_history') -> src-tauri/src/self_critique.rs:576"
+      - "invokeTyped('self_critique_response') -> src-tauri/src/self_critique.rs:567"
     notes: ""
   - file: src-tauri/src/self_upgrade.rs
     classification: ACTIVE
     purpose: "BLADE SELF-UPGRADE ENGINE"
-    trigger: "#[tauri::command] pentest_check_auth (+ others)"
-    ui_surface: "src/lib/tauri/admin.ts:962"
+    trigger: "#[tauri::command] pentest_authorize (+ others)"
+    ui_surface: "src/lib/tauri/admin.ts:946"
     commands:
       - name: self_upgrade::pentest_authorize
         registered: "src-tauri/src/self_upgrade.rs:535"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/admin.ts:946"
       - name: self_upgrade::pentest_check_auth
         registered: "src-tauri/src/self_upgrade.rs:579"
         invoked_from: "src/lib/tauri/admin.ts:962"
@@ -3654,7 +3654,7 @@ modules:
       - "src-tauri/src/native_tools.rs:2365"
     body_registry_entry: "self_upgrade"
     reachable_paths:
-      - "invokeTyped('pentest_check_auth') -> src-tauri/src/self_upgrade.rs:579"
+      - "invokeTyped('pentest_authorize') -> src-tauri/src/self_upgrade.rs:535"
     notes: ""
   - file: src-tauri/src/session_handoff.rs
     classification: NOT-WIRED
@@ -3717,7 +3717,7 @@ modules:
         invoked_from: "src/lib/tauri/identity.ts:824"
       - name: sidecar::sidecar_register_device
         registered: "src-tauri/src/sidecar.rs:649"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/identity.ts:836"
       - name: sidecar::sidecar_remove_device
         registered: "src-tauri/src/sidecar.rs:658"
         invoked_from: "src/lib/tauri/identity.ts:844"
@@ -3726,7 +3726,7 @@ modules:
         invoked_from: "src/lib/tauri/identity.ts:852"
       - name: sidecar::sidecar_run_command
         registered: "src-tauri/src/sidecar.rs:668"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/identity.ts:863"
       - name: sidecar::sidecar_run_all
         registered: "src-tauri/src/sidecar.rs:678"
         invoked_from: "src/lib/tauri/identity.ts:875"
@@ -3782,12 +3782,12 @@ modules:
   - file: src-tauri/src/social_graph.rs
     classification: ACTIVE
     purpose: "BLADE Social Graph — Personal CRM with Emotional Intelligence"
-    trigger: "#[tauri::command] social_get_contact (+ others)"
-    ui_surface: "src/lib/tauri/life_os.ts:1074"
+    trigger: "#[tauri::command] social_add_contact (+ others)"
+    ui_surface: "src/lib/tauri/life_os.ts:1050"
     commands:
       - name: social_graph::social_add_contact
         registered: "src-tauri/src/social_graph.rs:769"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/life_os.ts:1050"
       - name: social_graph::social_get_contact
         registered: "src-tauri/src/social_graph.rs:797"
         invoked_from: "src/lib/tauri/life_os.ts:1074"
@@ -3805,13 +3805,13 @@ modules:
         invoked_from: "src/lib/tauri/life_os.ts:1103"
       - name: social_graph::social_log_interaction
         registered: "src-tauri/src/social_graph.rs:827"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/life_os.ts:1118"
       - name: social_graph::social_get_interactions
         registered: "src-tauri/src/social_graph.rs:845"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/life_os.ts:1144"
       - name: social_graph::social_analyze_interaction
         registered: "src-tauri/src/social_graph.rs:851"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/life_os.ts:1158"
       - name: social_graph::social_get_insights
         registered: "src-tauri/src/social_graph.rs:860"
         invoked_from: "src/lib/tauri/life_os.ts:1166"
@@ -3823,7 +3823,7 @@ modules:
       - "src-tauri/src/skeleton.rs:27"
     body_registry_entry: "social_graph"
     reachable_paths:
-      - "invokeTyped('social_get_contact') -> src-tauri/src/social_graph.rs:797"
+      - "invokeTyped('social_add_contact') -> src-tauri/src/social_graph.rs:769"
     notes: ""
   - file: src-tauri/src/soul_commands.rs
     classification: ACTIVE
@@ -3842,7 +3842,7 @@ modules:
         invoked_from: "src/lib/tauri/identity.ts:401"
       - name: soul_commands::soul_update_bible_section
         registered: "src-tauri/src/soul_commands.rs:179"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/identity.ts:412"
       - name: soul_commands::soul_refresh_bible
         registered: "src-tauri/src/soul_commands.rs:185"
         invoked_from: "src/lib/tauri/identity.ts:423"
@@ -3866,7 +3866,7 @@ modules:
         invoked_from: "src/lib/tauri/life_os.ts:1380"
       - name: streak_stats::streak_record_activity
         registered: "src-tauri/src/streak_stats.rs:311"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/life_os.ts:1391"
       - name: streak_stats::streak_get_display
         registered: "src-tauri/src/streak_stats.rs:318"
         invoked_from: "src/lib/tauri/life_os.ts:1402"
@@ -3940,13 +3940,13 @@ modules:
         invoked_from: "src/lib/tauri/agents.ts:377"
       - name: swarm_commands::swarm_write_scratchpad
         registered: "src-tauri/src/swarm_commands.rs:581"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/agents.ts:389"
       - name: swarm_commands::swarm_write_scratchpad_entry
         registered: "src-tauri/src/swarm_commands.rs:590"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/agents.ts:406"
       - name: swarm_commands::swarm_read_scratchpad
         registered: "src-tauri/src/swarm_commands.rs:610"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/agents.ts:425"
       - name: swarm_commands::swarm_get_progress
         registered: "src-tauri/src/swarm_commands.rs:618"
         invoked_from: "src/lib/tauri/agents.ts:436"
@@ -3982,7 +3982,7 @@ modules:
         invoked_from: "src/lib/tauri/admin.ts:1324"
       - name: symbolic::symbolic_add_policy
         registered: "src-tauri/src/symbolic.rs:380"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/admin.ts:1338"
       - name: symbolic::symbolic_verify_plan
         registered: "src-tauri/src/symbolic.rs:407"
         invoked_from: "src/lib/tauri/admin.ts:1355"
@@ -4005,7 +4005,7 @@ modules:
         invoked_from: "src/lib/tauri/admin.ts:1527"
       - name: sysadmin::sysadmin_dry_run_edit
         registered: "src-tauri/src/sysadmin.rs:619"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/admin.ts:1539"
       - name: sysadmin::sysadmin_dry_run_command
         registered: "src-tauri/src/sysadmin.rs:624"
         invoked_from: "src/lib/tauri/admin.ts:1554"
@@ -4023,7 +4023,7 @@ modules:
         invoked_from: "src/lib/tauri/admin.ts:1592"
       - name: sysadmin::sysadmin_sudo_exec
         registered: "src-tauri/src/sysadmin.rs:649"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/admin.ts:1604"
     internal_callers:
       - "src-tauri/src/native_tools.rs:1153"
       - "src-tauri/src/native_tools.rs:1163"
@@ -4138,7 +4138,7 @@ modules:
         invoked_from: "src/lib/tauri/admin.ts:1385"
       - name: temporal_intel::temporal_meeting_prep
         registered: "src-tauri/src/temporal_intel.rs:722"
-        invoked_from: "src/lib/tauri/life_os.ts:1496"
+        invoked_from: "src/lib/tauri/admin.ts:1393"
     internal_callers:
       - "src-tauri/src/skeleton.rs:36"
     body_registry_entry: "temporal_intel"
@@ -4593,15 +4593,15 @@ modules:
   - file: src-tauri/src/typed_memory.rs
     classification: ACTIVE
     purpose: "TYPED MEMORY — Omi-inspired structured memory categories for BLADE."
-    trigger: "#[tauri::command] memory_get_all_typed (+ others)"
-    ui_surface: "src/lib/tauri/knowledge.ts:587"
+    trigger: "#[tauri::command] memory_store_typed (+ others)"
+    ui_surface: "src/lib/tauri/knowledge.ts:560"
     commands:
       - name: typed_memory::memory_store_typed
         registered: "src-tauri/src/typed_memory.rs:545"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/knowledge.ts:560"
       - name: typed_memory::memory_recall_category
         registered: "src-tauri/src/typed_memory.rs:558"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/knowledge.ts:579"
       - name: typed_memory::memory_get_all_typed
         registered: "src-tauri/src/typed_memory.rs:568"
         invoked_from: "src/lib/tauri/knowledge.ts:587"
@@ -4619,20 +4619,20 @@ modules:
       - "src-tauri/src/hive.rs:2432"
     body_registry_entry: "typed_memory"
     reachable_paths:
-      - "invokeTyped('memory_get_all_typed') -> src-tauri/src/typed_memory.rs:568"
+      - "invokeTyped('memory_store_typed') -> src-tauri/src/typed_memory.rs:545"
     notes: ""
   - file: src-tauri/src/ui_automation.rs
     classification: ACTIVE
     purpose: "Module ui_automation"
-    trigger: "#[tauri::command] uia_click_element (+ others)"
-    ui_surface: "src/lib/tauri/dev_tools.ts:1235"
+    trigger: "#[tauri::command] uia_get_active_window_snapshot (+ others)"
+    ui_surface: "src/lib/tauri/dev_tools.ts:1202"
     commands:
       - name: ui_automation::uia_get_active_window_snapshot
         registered: "src-tauri/src/ui_automation.rs:54"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/dev_tools.ts:1202"
       - name: ui_automation::uia_describe_active_window
         registered: "src-tauri/src/ui_automation.rs:62"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/dev_tools.ts:1220"
       - name: ui_automation::uia_click_element
         registered: "src-tauri/src/ui_automation.rs:71"
         invoked_from: "src/lib/tauri/dev_tools.ts:1235"
@@ -4647,13 +4647,13 @@ modules:
         invoked_from: "src/lib/tauri/dev_tools.ts:1262"
       - name: ui_automation::uia_wait_for_element
         registered: "src-tauri/src/ui_automation.rs:129"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/dev_tools.ts:1276"
       - name: ui_automation::uia_get_active_window_snapshot
         registered: "src-tauri/src/ui_automation.rs:520"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/dev_tools.ts:1202"
       - name: ui_automation::uia_describe_active_window
         registered: "src-tauri/src/ui_automation.rs:528"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/dev_tools.ts:1220"
       - name: ui_automation::uia_click_element
         registered: "src-tauri/src/ui_automation.rs:537"
         invoked_from: "src/lib/tauri/dev_tools.ts:1235"
@@ -4668,7 +4668,7 @@ modules:
         invoked_from: "src/lib/tauri/dev_tools.ts:1262"
       - name: ui_automation::uia_wait_for_element
         registered: "src-tauri/src/ui_automation.rs:557"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/dev_tools.ts:1276"
     internal_callers:
       - "src-tauri/src/native_tools.rs:3349"
       - "src-tauri/src/native_tools.rs:3361"
@@ -4677,7 +4677,7 @@ modules:
       - "src-tauri/src/native_tools.rs:3379"
     body_registry_entry: "ui_automation"
     reachable_paths:
-      - "invokeTyped('uia_click_element') -> src-tauri/src/ui_automation.rs:71"
+      - "invokeTyped('uia_get_active_window_snapshot') -> src-tauri/src/ui_automation.rs:54"
     notes: ""
   - file: src-tauri/src/urinary.rs
     classification: ACTIVE
@@ -4858,12 +4858,12 @@ modules:
   - file: src-tauri/src/watcher.rs
     classification: ACTIVE
     purpose: "BLADE Resource Watcher — ambient intelligence for the web."
-    trigger: "#[tauri::command] watcher_list_all (+ others)"
-    ui_surface: "src/lib/tauri/dev_tools.ts:1378"
+    trigger: "#[tauri::command] watcher_add (+ others)"
+    ui_surface: "src/lib/tauri/dev_tools.ts:1363"
     commands:
       - name: watcher::watcher_add
         registered: "src-tauri/src/watcher.rs:290"
-        invoked_from: null
+        invoked_from: "src/lib/tauri/dev_tools.ts:1363"
       - name: watcher::watcher_list_all
         registered: "src-tauri/src/watcher.rs:313"
         invoked_from: "src/lib/tauri/dev_tools.ts:1378"
@@ -4877,7 +4877,7 @@ modules:
       - "src-tauri/src/native_tools.rs:1383"
     body_registry_entry: "watcher"
     reachable_paths:
-      - "invokeTyped('watcher_list_all') -> src-tauri/src/watcher.rs:313"
+      - "invokeTyped('watcher_add') -> src-tauri/src/watcher.rs:290"
     notes: ""
   - file: src-tauri/src/whisper_local.rs
     classification: NOT-WIRED
