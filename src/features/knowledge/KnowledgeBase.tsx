@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Dialog, EmptyState, GlassPanel, Input } from '@/design-system/primitives';
 import { usePrefs } from '@/hooks/usePrefs';
 import { useRouterCtx } from '@/windows/main/useRouter';
+import { CapabilityGap, useCapability } from '@/features/providers';
 import {
   dbGetKnowledge,
   dbListKnowledge,
@@ -46,6 +47,10 @@ function slicePreview(s: string | undefined | null): string {
 export function KnowledgeBase() {
   const { prefs, setPref } = usePrefs();
   const { openRoute } = useRouterCtx();
+  // Phase 11 Plan 11-05 (PROV-08) — full-repo indexing path requires a
+  // long-context-capable model. Surface the banner above the search bar
+  // when absent; search itself (memory / timeline) remains usable.
+  const { hasCapability: hasLongCtx } = useCapability('long_context');
   const lastQueryInitial =
     typeof prefs['knowledge.lastTab'] === 'string' ? (prefs['knowledge.lastTab'] as string) : '';
   const [query, setQuery] = useState(lastQueryInitial);
@@ -200,6 +205,9 @@ export function KnowledgeBase() {
 
   return (
     <GlassPanel tier={1} className="knowledge-surface" data-testid="knowledge-base-root">
+      {!hasLongCtx && (
+        <CapabilityGap capability="long_context" surfaceLabel="Full-repo indexing" />
+      )}
       <form className="knowledge-search-bar" onSubmit={onSubmit} role="search">
         <Input
           ref={inputRef}

@@ -44,12 +44,27 @@ import type {
   SwarmProgressPayload,
 } from '@/lib/events';
 import { useToast } from '@/lib/context';
+import { CapabilityGap, useCapability } from '@/features/providers';
 import { SwarmDAG } from './SwarmDAG';
 import './agents.css';
 import './SwarmDAG.css';
 import './agents-dag-pack.css';
 
+// Phase 11 Plan 11-05 (PROV-08) — capability wrapper. Gate on tool-calling
+// BEFORE the inner body mounts its full hook payload (rules-of-hooks clean).
 export function SwarmView() {
+  const { hasCapability: hasTools } = useCapability('tools');
+  if (!hasTools) {
+    return (
+      <div style={{ padding: 'var(--s-6)' }} data-testid="swarm-view-root">
+        <CapabilityGap capability="tools" surfaceLabel="Multi-agent swarm" />
+      </div>
+    );
+  }
+  return <SwarmViewBody />;
+}
+
+function SwarmViewBody() {
   const toast = useToast();
   const { openRoute } = useRouterCtx();
   const [swarms, setSwarms] = useState<Swarm[]>([]);

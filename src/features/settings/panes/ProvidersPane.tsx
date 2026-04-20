@@ -18,7 +18,7 @@
 // @see src-tauri/src/config.rs:636 store_provider_key
 // @see src-tauri/src/config.rs:645 switch_provider
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { Button, Card, Input, Pill } from '@/design-system/primitives';
 import { PROVIDERS } from '@/features/onboarding/providers';
@@ -31,6 +31,7 @@ import {
 } from '@/lib/tauri';
 import { useToast } from '@/lib/context';
 import { useConfig } from '@/lib/context';
+import { useRouterCtx } from '@/windows/main/useRouter';
 import type { ProviderKeyList } from '@/types/provider';
 
 function errMessage(e: unknown): string {
@@ -41,6 +42,9 @@ function errMessage(e: unknown): string {
 export function ProvidersPane() {
   const { show } = useToast();
   const { reload } = useConfig();
+  // Phase 11 Plan 11-05 — consume routeHint?.needs for deep-link focus.
+  const { routeHint } = useRouterCtx();
+  const pasteFormWrapRef = useRef<HTMLDivElement>(null);
   const [keys, setKeys] = useState<ProviderKeyList | null>(null);
   const [pending, setPending] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<Record<string, 'test' | 'save' | null>>({});
@@ -55,6 +59,34 @@ export function ProvidersPane() {
   useEffect(() => {
     refresh();
   }, []);
+
+  // Phase 11 Plan 11-05 — deep-link scroll-focus. When ProvidersPane is opened
+  // via openRoute('settings-providers', { needs: <cap> }), scroll the paste
+  // form wrapper into view and focus its descendant textarea (aria-label
+  // "Provider config paste input"). 2×rAF waits for the pane layout to settle
+  // (UI-SPEC §Surface C accessibility). Gracefully no-ops when the textarea
+  // doesn't exist yet (Plan 11-03 adds ProviderPasteForm to this pane in a
+  // parallel wave; the effect becomes active once that lands).
+  useEffect(() => {
+    if (!routeHint?.needs) return;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const target = pasteFormWrapRef.current;
+        if (!target) return;
+        const prefersReducedMotion =
+          typeof window !== 'undefined' &&
+          window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+        target.scrollIntoView({
+          behavior: prefersReducedMotion ? 'auto' : 'smooth',
+          block: 'center',
+        });
+        const ta = target.querySelector<HTMLTextAreaElement>(
+          'textarea[aria-label="Provider config paste input"]',
+        );
+        ta?.focus();
+      });
+    });
+  }, [routeHint]);
 
   const handleTest = async (providerId: string, defaultModel: string) => {
     const apiKey = pending[providerId] ?? '';
@@ -118,6 +150,42 @@ export function ProvidersPane() {
     <div className="settings-section">
       <h2>Providers</h2>
       <p>Configure your API keys. Keys are stored in your OS keyring — BLADE only sees them at invoke time.</p>
+
+      {/* Phase 11 Plan 11-05 — sr-only live-region announcement for deep-link
+          arrival. Screen readers hear "Paste your provider config to add
+          {capability} support." when routeHint.needs is set. */}
+      {routeHint?.needs && (
+        <div className="sr-only" role="status" aria-live="polite">
+          Paste your provider config to add {routeHint.needs} support.
+        </div>
+      )}
+
+      {/* Phase 11 Plan 11-05 — div-wrap ref for ProviderPasteForm focus. Plan
+          11-03 (wave-1 sibling) mounts the full <ProviderPasteForm/> inside
+          this wrapper and replaces the minimal textarea stub below. The stub
+          exists so the deep-link focus path has a valid target both before
+          and after 11-03 lands; aria-label matches the committed contract
+          "Provider config paste input" (UI-SPEC §Surface A + §Surface B). */}
+      <div ref={pasteFormWrapRef} data-testid="provider-paste-form-wrap">
+        <textarea
+          aria-label="Provider config paste input"
+          className="provider-paste-stub"
+          placeholder="Paste cURL, JSON, or Python SDK config…"
+          rows={3}
+          style={{
+            width: '100%',
+            padding: 'var(--s-3)',
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--t-border)',
+            borderRadius: 'var(--radius-2)',
+            color: 'var(--t-1)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 13,
+            resize: 'vertical',
+            marginBottom: 'var(--s-4)',
+          }}
+        />
+      </div>
 
       <div className="settings-grid">
         {PROVIDERS.map((p) => {

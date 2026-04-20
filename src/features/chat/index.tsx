@@ -34,9 +34,17 @@ export type {
 // Phase 4 Plan 04-06 — cross-window bridge consumer (mounted in MainShell).
 export { QuickAskBridge } from './QuickAskBridge';
 
-const ChatPanelRoute = lazy(async () => {
-  const { ChatPanel } = await import('./ChatPanel');
-  return { default: ChatPanel };
+// Phase 11 Plan 11-05 — long-context capability-gap wrapper. Consumers can
+// import this directly in e2e tests or dev-isolation routes.
+export { ChatView } from './ChatView';
+export { ChatPanel } from './ChatPanel';
+
+// Phase 11 Plan 11-05 — route mounts ChatView (consumer-site long-context
+// capability-gap wrapper around ChatPanel). useChat.tsx is untouched; the
+// capability wiring lives at this consumer only (committed Option B).
+const ChatRoute = lazy(async () => {
+  const { ChatView } = await import('./ChatView');
+  return { default: ChatView };
 });
 
 export const routes: RouteDefinition[] = [
@@ -44,7 +52,7 @@ export const routes: RouteDefinition[] = [
     id: 'chat',
     label: 'Chat',
     section: 'core',
-    component: ChatPanelRoute,
+    component: ChatRoute,
     phase: 3,
     shortcut: 'Mod+/',
     description: 'Conversational AI',
