@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Dialog, EmptyState, GlassPanel, Input } from '@/design-system/primitives';
 import { usePrefs } from '@/hooks/usePrefs';
 import { useRouterCtx } from '@/windows/main/useRouter';
+import { CapabilityGap, useCapability } from '@/features/providers';
 import {
   timelineGetScreenshot,
   timelineGetStatsCmd,
@@ -48,7 +49,22 @@ function formatTs(ts: number | undefined | null): string {
   return new Date(ts * 1000).toLocaleString();
 }
 
+// Phase 11 Plan 11-05 (PROV-07) — wrapper that guards on vision capability
+// BEFORE the inner body mounts its full hook payload. Putting the guard here
+// keeps rules-of-hooks clean (no conditional hooks in ScreenTimelineBody).
 export function ScreenTimeline() {
+  const { hasCapability: hasVision } = useCapability('vision');
+  if (!hasVision) {
+    return (
+      <div style={{ padding: 'var(--s-6)' }} data-testid="screen-timeline-root">
+        <CapabilityGap capability="vision" surfaceLabel="Screen Timeline" />
+      </div>
+    );
+  }
+  return <ScreenTimelineBody />;
+}
+
+function ScreenTimelineBody() {
   const { prefs, setPref } = usePrefs();
   const { openRoute } = useRouterCtx();
   const autoLoadLatest =

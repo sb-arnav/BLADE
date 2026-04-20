@@ -30,4 +30,8 @@ export const routes: RouteDefinition[] = [
   { id: 'task-agents',       label: 'Task Agents',       section: 'agents', component: TaskAgents,       phase: 5 },
   { id: 'swarm-view',        label: 'Swarm',             section: 'agents', component: SwarmView,        phase: 5 },
   { id: 'agent-pixel-world', label: 'Pixel World',       section: 'agents', component: AgentPixelWorld,  phase: 5 },
+  // Phase 11 Plan 11-05 — tools capability-gap alias route. SwarmView surfaces
+  // CapabilityGap when no tool-calling model is configured; CAPABILITY_SURFACES
+  // references this alias so openRoute('agents-swarm') lands in the same place.
+  { id: 'agents-swarm',      label: 'Multi-agent Swarm', section: 'agents', component: SwarmView,        phase: 11, paletteHidden: true },
 ];
