@@ -86,6 +86,18 @@
   animation: chatBubblePulse 1.6s ease-in-out infinite;
 }
 
+/* System/error bubble: visible but not alarming. Non-dismissible so the user
+   always sees what went wrong (e.g. wrong model, bad key, rate limit). */
+.chat-bubble-system {
+  align-self: stretch;
+  max-width: 100%;
+  background: color-mix(in oklab, var(--g-fill), #b83c3c 18%);
+  border-color: color-mix(in oklab, var(--g-edge-hi), #b83c3c 30%);
+  color: var(--t-1);
+  font-size: 13px;
+  opacity: 0.95;
+}
+
 @keyframes chatBubblePulse {
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.92; }

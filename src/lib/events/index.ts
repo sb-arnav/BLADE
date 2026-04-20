@@ -34,6 +34,7 @@ export const BLADE_EVENTS = {
   CHAT_ACK: 'chat_ack',
   CHAT_ROUTING: 'chat_routing',
   CHAT_CANCELLED: 'chat_cancelled',
+  CHAT_ERROR: 'chat_error',
   CHAT_THINKING: 'chat_thinking',
   CHAT_THINKING_DONE: 'chat_thinking_done',
   BLADE_STATUS: 'blade_status',

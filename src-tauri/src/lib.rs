@@ -183,6 +183,7 @@ pub(crate) fn strip_json_fences(s: &str) -> &str {
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
 use tauri_plugin_log::{Target, TargetKind};
+use log::LevelFilter;
 
 pub(crate) fn toggle_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -558,6 +559,20 @@ pub fn run() {
                         file_name: Some("blade".into()),
                     }),
                 ])
+                // Default to Info; debug builds otherwise inherit Trace and
+                // flood stdout with fastembed/tokenizers char-by-char TRACE logs.
+                .level(LevelFilter::Info)
+                // Silence known-noisy dependencies regardless of build profile.
+                // `tokenizers` emits per-character normalizer TRACE; `keyring`
+                // emits a DEBUG entry per credential read (many per chat turn);
+                // `reqwest::retry` TRACEs every request's retry decision.
+                .level_for("tokenizers", LevelFilter::Warn)
+                .level_for("keyring", LevelFilter::Warn)
+                .level_for("reqwest", LevelFilter::Warn)
+                .level_for("hyper", LevelFilter::Warn)
+                .level_for("hyper_util", LevelFilter::Warn)
+                .level_for("rustls", LevelFilter::Warn)
+                .level_for("h2", LevelFilter::Warn)
                 .build(),
         )
         // --- State ---
