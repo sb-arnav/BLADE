@@ -45,6 +45,7 @@ pub struct OrganStatus {
 }
 
 /// Result of an organ query — structured data for Brain to interpret.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrganQueryResult {
     /// Whether the query succeeded

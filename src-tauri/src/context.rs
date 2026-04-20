@@ -6,6 +6,7 @@ pub struct WindowContext {
     pub window_title: String,
 }
 
+#[cfg(target_os = "windows")]
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct WindowListEntry {
     #[serde(rename = "ProcessName")]

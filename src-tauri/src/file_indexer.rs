@@ -106,6 +106,7 @@ pub fn ensure_table() {
 
 fn scan_directories() -> Vec<PathBuf> {
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+    #[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(unused_mut))]
     let mut dirs = vec![
         home.join("Downloads"),
         home.join("Documents"),

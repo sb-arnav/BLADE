@@ -249,6 +249,7 @@ pub async fn update_conversation_block(user_msg: &str, assistant_msg: &str) -> R
 // ── Fact extraction from conversations ───────────────────────────────────────
 
 /// A single extracted fact: a piece of knowledge worth storing persistently.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Fact {
     pub text: String,
