@@ -13,7 +13,11 @@
 
 import { invokeTyped } from './_base';
 import type { BladeConfig } from '@/types/config';
-import type { ParsedProviderConfig, ProviderKeyList } from '@/types/provider';
+import type {
+  ParsedProviderConfig,
+  ProviderCapabilityRecord,
+  ProviderKeyList,
+} from '@/types/provider';
 import type { TaskRouting } from '@/types/routing';
 
 /** @see src-tauri/src/commands.rs:1899 `pub fn get_config() -> BladeConfig` */
@@ -93,6 +97,44 @@ export function parseProviderPaste(input: string): Promise<ParsedProviderConfig>
     'parse_provider_paste',
     { input },
   );
+}
+
+/**
+ * Phase 11 Plan 11-02 — probe a provider's capabilities via ONE idempotent
+ * HTTP call to the provider's API (wraps `providers::test_connection`).
+ *
+ * `apiKey` is OPTIONAL: when omitted, Rust falls back to the OS keyring
+ * (via `config::get_provider_key`). Callers with a freshly-entered key
+ * (paste-form submit) should pass it explicitly; re-probe flows (Settings
+ * row refresh) should omit it to avoid round-tripping the key through TS.
+ *
+ * Returns a `ProviderCapabilityRecord` with capability flags pulled from
+ * the static matrix keyed by `provider + model`. Throws `TauriError` with
+ * a user-facing `rustMessage` on auth/network/404/5xx errors — no retry.
+ *
+ * @see src-tauri/src/commands.rs `pub async fn probe_provider_capabilities(...)`
+ * @see src-tauri/src/capability_probe.rs
+ */
+export function probeProviderCapabilities(args: {
+  provider: string;
+  apiKey?: string;
+  model: string;
+  baseUrl?: string;
+}): Promise<ProviderCapabilityRecord> {
+  return invokeTyped<
+    ProviderCapabilityRecord,
+    {
+      provider: string;
+      api_key?: string;
+      model: string;
+      base_url?: string;
+    }
+  >('probe_provider_capabilities', {
+    provider: args.provider,
+    api_key: args.apiKey,
+    model: args.model,
+    base_url: args.baseUrl,
+  });
 }
 
 /** @see src-tauri/src/config.rs:636 `pub fn store_provider_key(provider: String, api_key: String) -> Result<(), String>` */

@@ -22,6 +22,7 @@ export {
   completeOnboarding,
   testProvider,
   parseProviderPaste,
+  probeProviderCapabilities,
   getAllProviderKeys,
   storeProviderKey,
   switchProvider,
