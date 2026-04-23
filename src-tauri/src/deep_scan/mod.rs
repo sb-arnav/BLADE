@@ -10,6 +10,7 @@
 //! The three existing Tauri commands (deep_scan_start, deep_scan_results,
 //! deep_scan_summary) keep their original signatures (D-66).
 
+pub mod enrichment;
 pub mod leads;
 pub mod profile;
 pub mod queue;
@@ -437,6 +438,21 @@ pub async fn deep_scan_start(app: tauri::AppHandle) -> Result<DeepScanResults, S
     results.docker = legacy.docker;
     results.browser_bookmarks = legacy.browser_bookmarks;
 
+    // Emit the legacy phase names so DEEP_SCAN_PHASES compat gate passes (D-64).
+    // These are additive progress ticks that let the onboarding ring advance
+    // as legacy scanners complete — same event names the old scanner emitted.
+    let elapsed = scan_start.elapsed().as_millis() as u64;
+    let fc = found_count(&results);
+    emit_progress(&app, "installed_apps", fc, None, None, None, Some(0), initial_queue_depth, elapsed);
+    emit_progress(&app, "git_repos",      fc, None, None, None, Some(0), initial_queue_depth, elapsed);
+    emit_progress(&app, "ides",           fc, None, None, None, Some(0), initial_queue_depth, elapsed);
+    emit_progress(&app, "ai_tools",       fc, None, None, None, Some(0), initial_queue_depth, elapsed);
+    emit_progress(&app, "wsl_distros",    fc, None, None, None, Some(0), initial_queue_depth, elapsed);
+    emit_progress(&app, "ssh_keys",       fc, None, None, None, Some(0), initial_queue_depth, elapsed);
+    emit_progress(&app, "package_managers", fc, None, None, None, Some(0), initial_queue_depth, elapsed);
+    emit_progress(&app, "docker",         fc, None, None, None, Some(0), initial_queue_depth, elapsed);
+    emit_progress(&app, "bookmarks",      fc, None, None, None, Some(0), initial_queue_depth, elapsed);
+
     emit_progress(
         &app,
         "complete",
@@ -446,6 +462,14 @@ pub async fn deep_scan_start(app: tauri::AppHandle) -> Result<DeepScanResults, S
         initial_queue_depth,
         scan_start.elapsed().as_millis() as u64,
     );
+
+    // LLM enrichment — non-blocking narrative calls (D-61).
+    // Scan result is valid with or without enrichment; enrichment is best-effort.
+    {
+        let cfg = crate::config::load_config();
+        let enrichments = enrichment::enrich_profile(&results, &cfg).await;
+        results.llm_enrichments = Some(enrichments);
+    }
 
     if let Err(e) = save_results(&results) {
         log::warn!("deep_scan: failed to save results: {}", e);
