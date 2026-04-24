@@ -444,8 +444,8 @@ export function CapabilityReports() {
             <h3 className="admin-section-title">Suggestions</h3>
             {suggestions.length === 0 ? (
               <EmptyState
-                label="No capability reports"
-                description="Reports appear when BLADE detects a gap."
+                label="BLADE is still learning your capability needs"
+                description="Reports will appear once BLADE detects a gap — give me 24h."
               />
             ) : (
               <div className="capability-list">

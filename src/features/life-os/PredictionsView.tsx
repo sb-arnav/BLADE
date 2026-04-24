@@ -174,8 +174,8 @@ export function PredictionsView() {
           )}
           {!loading && !loadError && pending.length === 0 && (
             <EmptyState
-              label="No predictions yet"
-              description="BLADE will surface patterns as it learns."
+              label="BLADE is still learning your patterns"
+              description="Predictions will appear after 24h of observed activity — give me a day."
             />
           )}
           {!loading && pending.length > 0 && (
