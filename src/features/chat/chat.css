@@ -55,7 +55,7 @@
 
 .chat-bubble {
   max-width: 720px;
-  padding: 10px 14px;
+  padding: var(--s-3) var(--s-4);
   border-radius: var(--r-md);
   border: 1px solid var(--g-edge-mid);
   background: var(--g-fill);
@@ -234,7 +234,7 @@
   font-family: var(--font-mono);
   font-size: 12px;
   background: var(--g-fill-weak);
-  padding: 10px 12px;
+  padding: var(--s-3) var(--s-3);
   border-radius: var(--r-md);
   max-height: 200px;
   overflow: auto;

@@ -50,15 +50,35 @@ The following hardcoded values are allowed because they are sub-token (< 4px) or
 - `padding: 0` — explicit zero (intent-signalling)
 - `padding: 1px`, `padding: 2px`, `padding: 3px` — sub-token pixel polish
 - `padding: 0 0`, `padding: 0 1px`, `padding: 0 2px`, `padding: 0 6px`, `padding: 0 10px`, `padding: 0 12px` — zero-vertical scrollbar / traffic-light corridors
+- `margin: -1px` — the canonical sr-only visually-hidden technique (paired with `width:1px`, `height:1px`, `clip:rect(0,0,0,0)`, `overflow:hidden`). Documented accessibility pattern, see `src/features/providers/providers.css:.paste-form__sr-only`
+- `padding: 2px 0`, `padding: 4px 0`, `margin: 2px 0 0` — sub-token vertical + zero horizontal for tight table cells, `.*-sub` corrective top margins, and list-item micro-padding
 
 ### Chip / pill / badge / status — allowed only on matching selectors
 
-The following combined-axis values are allowed ONLY when the surrounding selector matches `/\.(chip|pill|badge|status|tlight|titlebar-traffic|tlight-|hormone-chip|dash-hero-state|dash-hero-chip|titlebar-status|titlebar-hint|coming-soon-card|voice-orb-window)/`:
+The following combined-axis values are allowed ONLY when the surrounding selector matches the chip-selector regex. The regex recognises:
 
-- `padding: 2px 6px`
-- `padding: 1px 4px`, `padding: 1px 6px`
+1. **Word-start** selectors beginning `.chip`, `.pill`, `.badge`, `.status`, `.tlight`, `.titlebar-traffic`, `.tlight-`
+2. **Hyphen-suffix naming convention**: any selector ending with `-chip`, `-pill`, `-badge`, or `-outcome` — e.g. `.report-source-chip`, `.goal-priority-pill`, `.contact-card-chip`, `.decision-row-outcome`
+3. **Specific named selectors** (historical + documented single-use exceptions):
+   - `.hormone-chip`, `.dash-hero-state`, `.dash-hero-chip`
+   - `.titlebar-status`, `.titlebar-hint`
+   - `.coming-soon-card`, `.voice-orb-window`
+   - `.navrail-tip` — navrail tooltip chip
+   - `.palette-row-kbd` — command palette keyboard hint kbd chip
+   - `.overlay-stub` — pill-styled global-overlay indicator stubs
+   - `.orb-mic-error` — pill-shaped error banner (already allowlisted in verify-orb-rgba)
+   - `.ghost-idle .kbd` — keyboard hint chip inside ghost idle pill
+   - `.swarm-hint code`, `.deferred-card code`, `.tool-approval-title code` — pill-shaped inline kbd replacements in prose
+   - `.chat-compacting` — per in-file comment, a pill indicator
+   - `.health-unit-toggle-btn` — pill-like segmented-control button
+
+Allowed combined-axis padding values (chip whitelist):
+
+- `padding: 2px 6px`, `padding: 2px 8px`
+- `padding: 1px 4px`, `padding: 1px 5px`, `padding: 1px 6px`
 - `padding: 3px 10px`
 - `padding: 4px 10px`, `padding: 4px 12px`
+- `padding: 5px 10px`
 - `padding: 6px 10px`, `padding: 6px 12px`
 - `padding: 8px 12px`, `padding: 8px 14px`, `padding: 8px 16px`
 - `padding: 10px 12px`, `padding: 10px 14px`

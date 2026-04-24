@@ -148,7 +148,7 @@
     color: var(--t-1);
     cursor: pointer;
     text-align: left;
-    padding: 2px 4px;
+    padding: var(--s-1) var(--s-1);
     border-radius: 3px;
   }
   .file-tree-toggle:hover, .file-tree-file:hover {

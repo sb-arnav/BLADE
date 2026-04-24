@@ -259,7 +259,7 @@
     margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--s-1);
   }
 
   .body-vitals-stats li {
@@ -283,7 +283,7 @@
     margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--s-1);
     font-size: 12px;
   }
 
@@ -297,7 +297,7 @@
   .body-vitals-chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: var(--s-1);
   }
 
   .body-events-table {
@@ -320,7 +320,7 @@
   .body-dialog-label {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--s-1);
     font-size: 12px;
     margin-top: var(--space-2);
   }
@@ -756,7 +756,7 @@
     padding: var(--space-3);
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--s-1);
     font-size: 12px;
     opacity: 0.9;
   }
@@ -823,7 +823,7 @@
     padding: var(--space-3);
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--s-2);
   }
 
   .world-hero-label {

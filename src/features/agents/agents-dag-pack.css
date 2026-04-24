@@ -152,7 +152,7 @@
   .factory-agent-meta {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--s-2);
     font-family: var(--font-mono);
     font-size: 11px;
     color: var(--t-3);
@@ -359,7 +359,7 @@
   .tasks-kind-radio {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--s-2);
     font-size: 12px;
     color: var(--t-2);
     cursor: pointer;
@@ -598,7 +598,7 @@
     cursor: pointer;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--s-1);
     transition: background 120ms var(--ease-out), border-color 120ms var(--ease-out);
   }
 
@@ -679,7 +679,7 @@
   .swarm-pane-title {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--s-1);
     min-width: 0;
   }
 

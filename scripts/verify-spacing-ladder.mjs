@@ -81,6 +81,20 @@ const VALUE_WHITELIST = new Set([
   '0 6px',
   '0 10px',
   '0 12px',
+  // Accessibility / sub-token structural patterns.
+  // `margin: -1px` — the canonical visually-hidden sr-only technique
+  // (paired with width/height: 1px; clip: rect(0,0,0,0); overflow: hidden).
+  // See src/features/providers/providers.css:.paste-form__sr-only.
+  '-1px',
+  // Sub-label corrective micro-margin — 2px top, zero sides/bottom.
+  // Appears on `.body-*-sub`, `.hormone-bus-sub`, `.organ-registry-sub`,
+  // `.dna-sub`, `.world-model-sub`. All values are sub-token (< 4px) so
+  // belong in the sub-token policy, mirroring the bare `2px` whitelist.
+  '2px 0 0',
+  // Sub-token vertical / zero-horizontal for tight table cells + lists.
+  // All values are sub-token (< 4px vertical) + zero horizontal.
+  '2px 0',
+  '4px 0',
 ]);
 
 // Chip / pill micro-padding values — allowed ONLY on matching selectors.
@@ -99,10 +113,55 @@ const CHIP_WHITELIST_VALUES = new Set([
   '2px 6px',
   '1px 4px',
   '1px 6px',
+  '2px 8px',  // life-os goal-priority-pill (hyphenated pill selector)
+  '1px 5px',  // ghost-idle .kbd micro-chip for keyboard hint
+  '5px 10px', // navrail-tip tooltip chip (sits between `4px 10px` and `6px 10px`)
 ]);
 
-const CHIP_SELECTOR_RE =
-  /\.(chip|pill|badge|status|tlight|titlebar-traffic|tlight-|hormone-chip|dash-hero-state|dash-hero-chip|titlebar-status|titlebar-hint|coming-soon-card|voice-orb-window)/;
+// Chip / pill / badge / status selectors — hyphen-suffix chip naming convention
+// (`.report-source-chip`, `.goal-priority-pill`, `.contact-card-chip`, etc.)
+// is recognised in addition to the bare chip/pill/badge/status word-boundary.
+// The regex matches either:
+//   (a) selector begins `.chip|.pill|.badge|.status|...` (word-start)
+//   (b) selector contains `-chip`, `-pill`, `-badge`, `-status-chip`, `-outcome`
+//       — the hyphen-suffix naming convention documented in SPACING-LADDER.md
+//       §Chip / pill / badge / status.
+// Specific named exceptions listed explicitly after the bare-word alternation
+// to preserve compatibility with prior-whitelist consumers + document intent.
+const CHIP_SELECTOR_RE = new RegExp(
+  [
+    // (a) word-start chip/pill/badge/status patterns
+    '\\.(chip|pill|badge|status|tlight|titlebar-traffic|tlight-)',
+    // (b) hyphen-suffix chip/pill/badge naming convention
+    '|-chip(\\b|[\\s.,{>+~:])',
+    '|-pill(\\b|[\\s.,{>+~:])',
+    '|-badge(\\b|[\\s.,{>+~:])',
+    // Decision-log outcome pill variant
+    '|-outcome(\\b|[\\s.,{>+~:])',
+    // Specific named selectors (historical + documented exceptions)
+    '|\\.(hormone-chip|dash-hero-state|dash-hero-chip|titlebar-status|titlebar-hint|coming-soon-card|voice-orb-window)',
+    // Navrail tooltip — chip-like floating tip
+    '|\\.navrail-tip',
+    // Command palette keyboard hint (kbd inside palette-row-kbd)
+    '|\\.palette-row-kbd',
+    // Global overlay chrome stubs — pill-styled overlay indicators
+    '|\\.overlay-stub',
+    // Orb mic-error toast — pill-shaped error banner
+    '|\\.orb-mic-error',
+    // Ghost overlay keyboard hint — kbd chip inside `.ghost-idle`
+    '|\\.ghost-idle\\s+\\.kbd',
+    // Swarm hint inline code — pill-shaped kbd replacement for prose
+    '|\\.swarm-hint\\s+code',
+    // Deferred-card inline code — pill-shaped kbd replacement
+    '|\\.deferred-card\\s+code',
+    // Tool-approval inline code — pill-shaped kbd replacement in dialog
+    '|\\.tool-approval-title\\s+code',
+    // Chat compacting indicator — comment labels it "pill"
+    '|\\.chat-compacting',
+    // Health unit toggle button — pill-like segmented control
+    '|\\.health-unit-toggle-btn',
+  ].join('')
+);
 
 // Scrollbar / traffic-light — any scrollbar pseudo or tlight selector gets
 // a blanket pass on small pixel padding (the token ladder is the wrong tool
