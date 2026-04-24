@@ -215,7 +215,7 @@ Plans:
 - [x] 15-02-PLAN.md — Wave 1: Top-bar hierarchy (4-tier) + 1280px responsive guardrails + Playwright spec (DENSITY-04)
 - [x] 15-03-PLAN.md — Wave 1: Empty-state copy rewrite sweep across 29 feature files (DENSITY-05)
 - [x] 15-04-PLAN.md — Wave 1: Dashboard hero live signals (scan + ecosystem + perception) + glass-fill tokenization + cold-install spec (DENSITY-02, DENSITY-03, DENSITY-07)
-- [ ] 15-05-PLAN.md — Wave 2: Route sweep tokenization + 5-wallpaper human verification checkpoint (DENSITY-01, DENSITY-02, DENSITY-03, DENSITY-06)
+- [x] 15-05-PLAN.md — Wave 2: Route sweep tokenization + 5-wallpaper human verification checkpoint (DENSITY-01, DENSITY-02, DENSITY-03, DENSITY-06)
 
 **UI hint**: yes
 
