@@ -152,6 +152,26 @@ fn default_scan_classes_enabled() -> ScanClassesEnabled {
     }
 }
 
+// ── Phase 13 Plan 13-01 — Ecosystem tentacle persistence ─────────────────────
+// TentacleRecord tracks the lifecycle of each auto-enabled observer tentacle.
+// enabled_at == 0 → never registered (first-time registration sets enabled_at = now_secs()).
+// enabled_at > 0 && enabled == false → user explicitly disabled; auto_enable_from_scan
+// must NOT re-enable (ECOSYS-08).
+// Follows 6-place config pattern (CLAUDE.md §Config field 6-place rule).
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TentacleRecord {
+    pub id: String,            // "repo_watcher" | "slack_monitor" | "deploy_monitor" | "pr_watcher" | "session_bridge" | "calendar_monitor"
+    pub enabled: bool,
+    pub rationale: String,     // "Auto-enabled because deep scan found 14 repos"
+    pub enabled_at: i64,       // Unix timestamp of first auto-enable; 0 = never registered
+    #[serde(default)]
+    pub trigger_detail: String, // human-readable evidence for Settings display
+}
+
+fn default_ecosystem_tentacles() -> Vec<TentacleRecord> { vec![] }
+fn default_ecosystem_observe_only() -> bool { true }
+
 /// Config as stored on disk — api_key is NOT stored here anymore
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct DiskConfig {
@@ -263,6 +283,11 @@ struct DiskConfig {
     // Phase 12 Plan 12-02 (D-65) — per-source-class privacy toggles
     #[serde(default = "default_scan_classes_enabled")]
     scan_classes_enabled: ScanClassesEnabled,
+    // Phase 13 Plan 13-01 — ecosystem tentacle state + guardrail flag
+    #[serde(default = "default_ecosystem_tentacles")]
+    ecosystem_tentacles: Vec<TentacleRecord>,
+    #[serde(default = "default_ecosystem_observe_only")]
+    ecosystem_observe_only: bool,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -339,6 +364,8 @@ impl Default for DiskConfig {
             long_context_provider: None,
             tools_provider: None,
             scan_classes_enabled: default_scan_classes_enabled(),
+            ecosystem_tentacles: vec![],
+            ecosystem_observe_only: true,
             api_key: None,
         }
     }
@@ -466,6 +493,11 @@ pub struct BladeConfig {
     /// All classes default to true. User can opt-out in Settings → Privacy.
     #[serde(default = "default_scan_classes_enabled")]
     pub scan_classes_enabled: ScanClassesEnabled,
+    // Phase 13 Plan 13-01
+    #[serde(default = "default_ecosystem_tentacles")]
+    pub ecosystem_tentacles: Vec<TentacleRecord>,
+    #[serde(default = "default_ecosystem_observe_only")]
+    pub ecosystem_observe_only: bool,
 }
 
 impl BladeConfig {
@@ -528,6 +560,8 @@ impl Default for BladeConfig {
             long_context_provider: None,
             tools_provider: None,
             scan_classes_enabled: default_scan_classes_enabled(),
+            ecosystem_tentacles: vec![],
+            ecosystem_observe_only: true,
         }
     }
 }
@@ -675,6 +709,8 @@ pub fn load_config() -> BladeConfig {
         long_context_provider: disk.long_context_provider,
         tools_provider: disk.tools_provider,
         scan_classes_enabled: disk.scan_classes_enabled,
+        ecosystem_tentacles: disk.ecosystem_tentacles,
+        ecosystem_observe_only: disk.ecosystem_observe_only,
     }
 }
 
@@ -733,6 +769,8 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         long_context_provider: config.long_context_provider.clone(),
         tools_provider: config.tools_provider.clone(),
         scan_classes_enabled: config.scan_classes_enabled.clone(),
+        ecosystem_tentacles: config.ecosystem_tentacles.clone(),
+        ecosystem_observe_only: config.ecosystem_observe_only,
         api_key: None,
     };
 
