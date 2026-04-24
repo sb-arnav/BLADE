@@ -484,6 +484,15 @@ pub async fn deep_scan_start(app: tauri::AppHandle) -> Result<DeepScanResults, S
         }
     }
 
+    // Phase 13 Plan 13-01: auto-enable ecosystem tentacles from scan results (ECOSYS-01..06)
+    {
+        let ecosystem_results = results.clone();
+        let ecosystem_app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            crate::ecosystem::auto_enable_from_scan(&ecosystem_app, &ecosystem_results).await;
+        });
+    }
+
     // Seed knowledge graph (non-blocking)
     let rc = results.clone();
     tokio::task::spawn_blocking(move || seed_knowledge_graph(&rc));

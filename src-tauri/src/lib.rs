@@ -154,6 +154,7 @@ mod hive;
 mod auto_fix;
 mod tentacles;
 mod agent_factory;
+mod ecosystem;
 
 use chrono::Timelike;
 use std::sync::Arc;
@@ -1422,6 +1423,11 @@ pub fn run() {
             agent_factory::factory_pause_agent,
             agent_factory::factory_delete_agent,
             commands::get_wallpaper_path,
+            // Ecosystem — Phase 13 Plan 13-01 observer tentacles
+            ecosystem::ecosystem_list_tentacles,
+            ecosystem::ecosystem_toggle_tentacle,
+            ecosystem::ecosystem_observe_only_check,
+            ecosystem::ecosystem_run_auto_enable,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
