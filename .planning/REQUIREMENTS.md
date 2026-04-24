@@ -74,8 +74,10 @@ All 156 v1.0 requirements (FOUND, WIN, WIRE-01..08, ONBD, SHELL, DASH, CHAT, SET
 ### Wiring Pass (WIRE2)
 
 - [ ] **WIRE2-01**: Every NOT-WIRED backend module from WIRING-AUDIT.md has a UI surface added in Phase 14 (route / dashboard card / Settings tab / command-palette entry) OR an explicit "deferred to v1.2" rationale logged in the audit
-- [ ] **WIRE2-02**: Dashboard cards bind to real data from Phase 12 scan profile and Phase 13 auto-enabled tentacles — no placeholder text when the backing data exists
-- [ ] **WIRE2-03**: Every WIRED-NOT-USED UI surface either gets its trigger fixed or is removed; no dead UI survives v1.1
+- [x] **WIRE2-02
+**: Dashboard cards bind to real data from Phase 12 scan profile and Phase 13 auto-enabled tentacles — no placeholder text when the backing data exists
+- [x] **WIRE2-03
+**: Every WIRED-NOT-USED UI surface either gets its trigger fixed or is removed; no dead UI survives v1.1
 - [ ] **WIRE2-04**: Every newly-wired surface gets a command-palette entry (⌘K) so keyboard discovery matches visual discovery
 - [ ] **WIRE2-05**: Post-phase re-run of WIRING-AUDIT.md reports NOT-WIRED count = 0 OR every remaining item carries a documented "deferred to v1.2" rationale
 - [ ] **WIRE2-06**: `npm run verify:all` gains a feature-reachability script that crawls the route registry + command palette and asserts every backend module has at least one reachable invocation path
