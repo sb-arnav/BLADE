@@ -43,6 +43,7 @@
     "test:e2e:phase11": "playwright test tests/e2e/onboarding-paste-card.spec.ts tests/e2e/settings-providers-pane.spec.ts tests/e2e/fallback-order-drag.spec.ts tests/e2e/capability-gap-vision-screen-timeline.spec.ts tests/e2e/capability-gap-vision-quickask.spec.ts tests/e2e/capability-gap-audio-voice-orb.spec.ts tests/e2e/capability-gap-audio-meeting-ghost.spec.ts tests/e2e/capability-gap-longctx-chat.spec.ts tests/e2e/capability-gap-longctx-knowledge.spec.ts tests/e2e/capability-gap-tools-swarm.spec.ts tests/e2e/capability-gap-tools-web-automation.spec.ts",
     "test:e2e:phase12": "playwright test tests/e2e/profile-tabs.spec.ts tests/e2e/profile-edit-roundtrip.spec.ts tests/e2e/profile-live-tail.spec.ts tests/e2e/settings-privacy-scan-classes.spec.ts",
     "test:e2e:phase13": "playwright test tests/e2e/settings-ecosystem-tentacles.spec.ts tests/e2e/settings-ecosystem-disable-persists.spec.ts",
+    "test:e2e:phase14": "playwright test tests/e2e/phase14/",
     "release:prepare-updater": "node .github/scripts/prepare-tauri-release-config.mjs"
   },
   "devDependencies": {

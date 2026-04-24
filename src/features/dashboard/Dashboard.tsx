@@ -20,7 +20,9 @@
 
 import { RightNowHero } from './RightNowHero';
 import { AmbientStrip } from './AmbientStrip';
-import { ComingSoonCard } from './ComingSoonCard';
+import { TentacleSignalsCard } from './TentacleSignalsCard';
+import { CalendarCard } from './CalendarCard';
+import { IntegrationsCard } from './IntegrationsCard';
 
 export function Dashboard() {
   return (
@@ -33,21 +35,9 @@ export function Dashboard() {
         <div className="ambient-strip-slot">
           <AmbientStrip />
         </div>
-        <ComingSoonCard
-          title="Hive signals"
-          phase={5}
-          description="Tentacle reports + autonomy queue"
-        />
-        <ComingSoonCard
-          title="Calendar"
-          phase={6}
-          description="Today's events + reminders"
-        />
-        <ComingSoonCard
-          title="Integrations"
-          phase={7}
-          description="Connected services + status"
-        />
+        <TentacleSignalsCard />
+        <CalendarCard />
+        <IntegrationsCard />
       </div>
     </div>
   );
