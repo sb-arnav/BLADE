@@ -61,12 +61,14 @@ All 156 v1.0 requirements (FOUND, WIN, WIRE-01..08, ONBD, SHELL, DASH, CHAT, SET
 **: If active Cursor / Claude Code sessions detected, session-context bridge tentacle auto-enables
 - [x] **ECOSYS-06
 **: If Calendar API credentials detected, calendar-monitor tentacle auto-enables (read-only)
-- [ ] **ECOSYS-07**: Settings page lists every auto-enabled tentacle with its trigger rationale (e.g. "Auto-enabled because deep scan found 14 repos") and a one-click disable toggle
+- [x] **ECOSYS-07
+**: Settings page lists every auto-enabled tentacle with its trigger rationale (e.g. "Auto-enabled because deep scan found 14 repos") and a one-click disable toggle
 - [x] **ECOSYS-08
 **: Disabling an auto-enabled tentacle persists across restarts; the tentacle does not re-enable unless the user explicitly opts in
 - [x] **ECOSYS-09
 **: Hard observe-only guardrail — no auto-enabled tentacle performs any outbound action (reply/post/deploy/modify external state) in v1.1; enforced by a runtime check, not policy. Acting capability requires explicit Settings-side enablement even when credentials are present.
-- [ ] **ECOSYS-10**: Cold install on Arnav's machine + Phase 12 scan produces ≥5 auto-enabled observer tentacles, all listed in Settings with rationale, all toggleable
+- [x] **ECOSYS-10
+**: Cold install on Arnav's machine + Phase 12 scan produces ≥5 auto-enabled observer tentacles, all listed in Settings with rationale, all toggleable
 
 ### Wiring Pass (WIRE2)
 
