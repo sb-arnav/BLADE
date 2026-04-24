@@ -45,7 +45,7 @@ Phase 11 and Phase 12 may run in parallel. Phase 12's scanner intelligence uses 
 - [ ] **Phase 12: Smart Deep Scan** — Replace dumb 12-scanner sweep with lead-following scanner (8 source classes), streaming, structured editable profile.
 - [ ] **Phase 13: Self-Configuring Ecosystem** — Scan-result-driven auto-enable of observer-class tentacles; observe-only guardrail; Settings rationale + one-click disable.
 - [x] **Phase 14: Wiring & Accessibility Pass** — Close NOT-WIRED gaps, remove/fix WIRED-NOT-USED dead UI, a11y sweep 2, persistent Activity Log strip. (completed 2026-04-24)
-- [ ] **Phase 15: Density + Polish** — Spacing audit, card gaps, background-image dominance, top-bar hierarchy, empty-state copy rewrite across all 50+ routes.
+- [x] **Phase 15: Density + Polish** — Spacing audit, card gaps, background-image dominance, top-bar hierarchy, empty-state copy rewrite across all 50+ routes. (completed 2026-04-24)
 
 ---
 
@@ -230,7 +230,7 @@ Plans:
 | 12. Smart Deep Scan | 0/TBD | Not started | — |
 | 13. Self-Configuring Ecosystem | 0/3 | Planned     | — |
 | 14. Wiring & Accessibility Pass | 5/5 | Complete    | 2026-04-24 |
-| 15. Density + Polish | 0/5 | Planned     | — |
+| 15. Density + Polish | 5/5 | Complete    | 2026-04-24 |
 
 ---
 

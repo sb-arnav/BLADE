@@ -108,13 +108,13 @@ All 156 v1.0 requirements (FOUND, WIN, WIRE-01..08, ONBD, SHELL, DASH, CHAT, SET
 
 ### Density + Polish (DENSITY)
 
-- [ ] **DENSITY-01**: Every card, page, and modal passes the spacing ladder audit — padding and gaps use the design-token spacing scale; 0 violations across the 50+ routes
-- [ ] **DENSITY-02**: Dashboard and cluster-landing cards use documented gap tokens; the screenshot-density problem (overlapping or crowded card edges) is resolved
-- [ ] **DENSITY-03**: Background-image dominance fix — content takes visual priority over ambient imagery; contrast + eye-path pass on the 5 representative wallpapers
-- [ ] **DENSITY-04**: Top bar hierarchy pass — primary actions, activity-log strip, status chips, and user/settings affordances have clear visual priority order with no overstuff
-- [ ] **DENSITY-05**: Every empty state has either real content (populated by Phase 12 + 13 data) or a CTA + expected-timeline copy — *"BLADE is still learning — give me 24h"* pattern, not *"No recent decisions"*
-- [ ] **DENSITY-06**: UI review across all 50+ routes reports 0 padding violations and 0 empty-state-without-CTA routes
-- [ ] **DENSITY-07**: Dashboard hero pulls ≥3 live signals from scan profile + ecosystem tentacles + perception state — not placeholder cards
+- [x] **DENSITY-01**: Every card, page, and modal passes the spacing ladder audit — padding and gaps use the design-token spacing scale; 0 violations across the 50+ routes
+- [x] **DENSITY-02**: Dashboard and cluster-landing cards use documented gap tokens; the screenshot-density problem (overlapping or crowded card edges) is resolved
+- [x] **DENSITY-03**: Background-image dominance fix — content takes visual priority over ambient imagery; contrast + eye-path pass on the 5 representative wallpapers
+- [x] **DENSITY-04**: Top bar hierarchy pass — primary actions, activity-log strip, status chips, and user/settings affordances have clear visual priority order with no overstuff
+- [x] **DENSITY-05**: Every empty state has either real content (populated by Phase 12 + 13 data) or a CTA + expected-timeline copy — *"BLADE is still learning — give me 24h"* pattern, not *"No recent decisions"*
+- [x] **DENSITY-06**: UI review across all 50+ routes reports 0 padding violations and 0 empty-state-without-CTA routes
+- [x] **DENSITY-07**: Dashboard hero pulls ≥3 live signals from scan profile + ecosystem tentacles + perception state — not placeholder cards
 
 ## v1.2+ Requirements
 
