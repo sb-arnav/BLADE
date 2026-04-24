@@ -19,6 +19,9 @@
   cursor: pointer;
   user-select: none;
   flex-shrink: 0;
+  /* Phase 15 DENSITY-04 tier 2: strip is subordinate to TitleBar brand (tier 1)
+   * but superior to filler chrome (tier 4). */
+  color: var(--t-2);
 }
 
 .activity-strip:focus-visible {
@@ -27,8 +30,11 @@
 }
 
 .activity-strip-entry {
-  font-size: var(--t-xs);
+  /* Phase 15 DENSITY-04 tier 2: subordinate to brand (tier 1, 12px/600+)
+   * but dominant vs tier 3 chrome. Spec: 12px, weight 500, color var(--t-2). */
+  font-size: 12px;
   color: var(--t-2);
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -37,7 +43,9 @@
 }
 
 .activity-strip-module {
-  font-size: var(--t-xs);
+  /* Phase 15 DENSITY-04 tier 3: module badge is chrome, not content.
+   * Spec: 10px, color var(--t-3) (but accent allowed for module-family signal). */
+  font-size: 10px;
   color: var(--accent);
   font-weight: 500;
   white-space: nowrap;
@@ -45,7 +53,8 @@
 }
 
 .activity-strip-count {
-  font-size: var(--t-xs);
+  /* Phase 15 DENSITY-04 tier 3. */
+  font-size: 10px;
   color: var(--t-3);
   white-space: nowrap;
   flex-shrink: 0;
