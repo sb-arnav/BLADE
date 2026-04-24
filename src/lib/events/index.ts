@@ -15,6 +15,10 @@
 import { useEffect, useRef } from 'react';
 import { listen, type EventCallback, type Event } from '@tauri-apps/api/event';
 
+// Re-export Tauri event types so consumers in src/ can import from @/lib/events
+// without importing directly from @tauri-apps/api/event (D-34 boundary).
+export type { Event, EventCallback };
+
 // Re-export hand-written payload interfaces.
 export type * from './payloads';
 

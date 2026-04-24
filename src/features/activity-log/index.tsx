@@ -13,8 +13,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { BLADE_EVENTS, useTauriEvent } from '@/lib/events';
-import type { Event } from '@tauri-apps/api/event';
+import { BLADE_EVENTS, useTauriEvent, type Event } from '@/lib/events';
 
 // ---------------------------------------------------------------------------
 // Types
