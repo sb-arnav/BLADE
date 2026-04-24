@@ -26,6 +26,7 @@ const PANES = {
   'settings-privacy':      lazy(() => import('./panes/PrivacyPane').then(m => ({ default: m.PrivacyPane }))),
   'settings-diagnostics':  lazy(() => import('./panes/DiagnosticsEntryPane').then(m => ({ default: m.DiagnosticsEntryPane }))),
   'settings-about':        lazy(() => import('./panes/AboutPane').then(m => ({ default: m.AboutPane }))),
+  'settings-ecosystem':    lazy(() => import('./panes/EcosystemPane').then(m => ({ default: m.EcosystemPane }))),
 } as const;
 
 type PaneId = keyof typeof PANES;
@@ -41,6 +42,7 @@ const TABS: { id: PaneId; label: string }[] = [
   { id: 'settings-privacy',     label: 'Privacy' },
   { id: 'settings-diagnostics', label: 'Diagnostics' },
   { id: 'settings-about',       label: 'About' },
+  { id: 'settings-ecosystem',   label: 'Ecosystem' },
 ];
 
 export function SettingsShell() {
