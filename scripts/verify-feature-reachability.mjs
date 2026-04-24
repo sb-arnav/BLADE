@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 // scripts/verify-feature-reachability.mjs
 //
-// Phase 14 Plan 14-01 (WIRE2-06).
-// Gate script: checks that NOT-WIRED backlog items in the wiring audit have
+// Phase 14 Plan 14-04 (WIRE2-06) — hardened production gate.
+// Checks that NOT-WIRED backlog items in 10-WIRING-AUDIT.json have
 // corresponding invokeTyped() call sites in src/lib/tauri/**/*.ts.
 //
-// In Wave 0 (Phase 14-01) this will EXIT 1 because wrappers do not exist yet.
-// That is expected — the script must exist and be runnable without throwing.
+// Flags:
+//   --verbose   Print each checked item with WIRED / MISSING / DEFERRED status
+//   --summary   Print only the counts (default when no flag given)
 //
-// Exit 0 = all NOT-WIRED items have a call site (PASS)
-// Exit 1 = one or more NOT-WIRED items are still missing call sites (FAIL)
+// Exit 0 = all WIRE2 module items have ≥1 invoke call-site (PASS)
+// Exit 1 = one or more WIRE2 module items missing call sites (FAIL)
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,6 +18,9 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
+
+const VERBOSE = process.argv.includes('--verbose');
+const SUMMARY = process.argv.includes('--summary') || !VERBOSE;
 
 // ── Load wiring audit ──────────────────────────────────────────────────────
 
@@ -30,27 +34,41 @@ try {
   process.exit(1);
 }
 
-// ── Collect NOT-WIRED items (excluding DEFERRED_V1_2) ─────────────────────
+// ── Build deferred set from not_wired_backlog ──────────────────────────────
+// The not_wired_backlog array has the canonical phase_14_owner field.
+// modules[] does NOT have phase_14_owner — must cross-reference here.
 
-const notWired = [];
-for (const mod of audit.modules ?? []) {
-  if (mod.classification !== 'NOT-WIRED') continue;
-  if (mod.phase_14_owner === 'DEFERRED_V1_2') continue;
-
-  // Collect primary command names from this module
-  const commands = (mod.commands ?? []).map((c) => {
-    // Command names are in form "module::command_name" — extract leaf
-    const parts = c.name.split('::');
-    return parts[parts.length - 1];
-  });
-
-  if (commands.length > 0) {
-    notWired.push({ file: mod.file, commands });
+const deferredFiles = new Set();
+for (const item of audit.not_wired_backlog ?? []) {
+  if (item.phase_14_owner === 'DEFERRED_V1_2') {
+    deferredFiles.add(item.identifier);
   }
 }
 
-if (notWired.length === 0) {
-  console.log('[verify:feature-reachability] No NOT-WIRED items to check — PASS');
+// ── Collect NOT-WIRED module items (excluding DEFERRED_V1_2) ─────────────
+// Use modules[] which has the full commands[] list.
+// Config items (50 of 99) are checked separately via saveConfigField pattern;
+// they are not tracked by invokeTyped call-site search.
+
+const checkItems = []; // { file, commands: string[] }
+
+for (const mod of audit.modules ?? []) {
+  if (mod.classification !== 'NOT-WIRED') continue;
+  if (deferredFiles.has(mod.file)) continue;
+
+  // Extract leaf command name from "module::command_name" format
+  const commands = (mod.commands ?? []).map((c) => {
+    const parts = (c.name ?? '').split('::');
+    return parts[parts.length - 1];
+  }).filter(Boolean);
+
+  if (commands.length > 0) {
+    checkItems.push({ file: mod.file, commands });
+  }
+}
+
+if (checkItems.length === 0) {
+  console.log('[verify:feature-reachability] No NOT-WIRED module items to check — PASS');
   process.exit(0);
 }
 
@@ -72,9 +90,13 @@ function walkDir(dir, results = []) {
 const tauriLibDir = path.join(ROOT, 'src/lib/tauri');
 const tsFiles = walkDir(tauriLibDir);
 
-// Extract all invokeTyped('command_name') call sites
+// Extract all invokeTyped('command_name') call sites.
+// Handles:
+//   invokeTyped('cmd', ...)
+//   invokeTyped<T>('cmd', ...)
+//   invokeTyped<T, U>('cmd', ...)
 const invokedCommands = new Set();
-const invokeRe = /invokeTyped\(\s*['"]([^'"]+)['"]/g;
+const invokeRe = /invokeTyped(?:<[^>]*>)?\(\s*['"]([^'"]+)['"]/g;
 for (const f of tsFiles) {
   const content = fs.readFileSync(f, 'utf8');
   let m;
@@ -86,21 +108,51 @@ for (const f of tsFiles) {
 // ── Check coverage ─────────────────────────────────────────────────────────
 
 const missing = [];
-for (const item of notWired) {
+let wiredCount = 0;
+const deferredCount = deferredFiles.size;
+
+for (const item of checkItems) {
   const uncovered = item.commands.filter((cmd) => !invokedCommands.has(cmd));
-  if (uncovered.length > 0) {
+  if (uncovered.length === 0) {
+    wiredCount++;
+    if (VERBOSE) {
+      console.log(`  WIRED    ${item.file}`);
+    }
+  } else {
     missing.push({ file: item.file, uncovered });
+    if (VERBOSE) {
+      console.log(`  MISSING  ${item.file}: ${uncovered.join(', ')}`);
+    }
   }
 }
 
+// Also print deferred items in verbose mode
+if (VERBOSE) {
+  for (const f of deferredFiles) {
+    console.log(`  DEFERRED ${f} (DEFERRED_V1_2 — excluded from check)`);
+  }
+}
+
+// ── Report ─────────────────────────────────────────────────────────────────
+
 if (missing.length === 0) {
-  console.log(`[verify:feature-reachability] All ${notWired.length} NOT-WIRED items have call sites — PASS`);
+  if (SUMMARY) {
+    console.log(
+      `[verify:feature-reachability] PASS — ${wiredCount} wired, 0 missing, ${deferredCount} deferred`
+    );
+  }
   process.exit(0);
 } else {
-  console.error(`[verify:feature-reachability] FAIL — ${missing.length} module(s) still have unwired commands:`);
-  for (const m of missing) {
-    console.error(`  ${m.file}: ${m.uncovered.join(', ')}`);
+  if (SUMMARY) {
+    console.error(
+      `[verify:feature-reachability] FAIL — ${wiredCount} wired, ${missing.length} missing, ${deferredCount} deferred`
+    );
   }
-  console.error('(Wave 0 expected — wrappers not yet created)');
+  if (!VERBOSE) {
+    // Print missing items even in summary mode so CI logs are actionable
+    for (const m of missing) {
+      console.error(`  MISSING  ${m.file}: ${m.uncovered.join(', ')}`);
+    }
+  }
   process.exit(1);
 }

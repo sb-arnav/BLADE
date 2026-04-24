@@ -238,7 +238,12 @@
   border: 1px solid var(--line);
   border-left: 2px solid var(--chip-color, var(--t-3));
   border-radius: var(--r-sm);
-  transition: background var(--dur-fast, 150ms) var(--ease-smooth, ease-out);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hormone-chip {
+    transition: background var(--dur-fast, 150ms) var(--ease-smooth, ease-out);
+  }
 }
 
 .hormone-chip-label {
@@ -279,7 +284,12 @@
   /* Subtle opacity reduction signals placeholder status without looking
    * broken — users understand "not yet" vs "error". */
   opacity: 0.72;
-  transition: opacity var(--dur-fast, 150ms) var(--ease-smooth, ease-out);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .coming-soon-card {
+    transition: opacity var(--dur-fast, 150ms) var(--ease-smooth, ease-out);
+  }
 }
 
 .coming-soon-card:hover {
