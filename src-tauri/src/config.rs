@@ -978,7 +978,30 @@ pub fn save_config_field(key: String, value: String) -> Result<(), String> {
         "screen_timeline_enabled" => {
             config.screen_timeline_enabled = value == "true";
         }
+        "audio_capture_enabled" => {
+            config.audio_capture_enabled = value == "true";
+        }
+        "wake_word_enabled" => {
+            config.wake_word_enabled = value == "true";
+        }
+        "use_local_whisper" => {
+            config.use_local_whisper = value == "true";
+        }
+        "god_mode" => {
+            config.god_mode = value == "true";
+        }
+        // String fields — Phase 14 voice + intelligence additions
+        "wake_word_phrase" => config.wake_word_phrase = value,
+        "whisper_model" => config.whisper_model = value,
+        "god_mode_tier" => config.god_mode_tier = value,
+        // Float fields
+        "tts_speed" => {
+            config.tts_speed = value.parse().map_err(|e: std::num::ParseFloatError| e.to_string())?;
+        }
         // Integer fields
+        "wake_word_sensitivity" => {
+            config.wake_word_sensitivity = value.parse().map_err(|e: std::num::ParseIntError| e.to_string())?;
+        }
         "timeline_capture_interval" => {
             config.timeline_capture_interval = value.parse().map_err(|e: std::num::ParseIntError| e.to_string())?;
         }
