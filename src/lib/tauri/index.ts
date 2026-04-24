@@ -113,6 +113,12 @@ export * as hive from './hive';
 // Phase 13 additions — Ecosystem tentacle wrappers (Plan 13-02, ECOSYS-07/08).
 export * from './ecosystem';
 
+// Phase 14 additions — Voice, Privacy, Intelligence, System wrappers (Plan 14-02, WIRE2-01/03/04).
+export * from './voice';
+export * from './privacy';
+export * from './intelligence';
+export * from './system';
+
 // Events convenience re-export (D-38-evt, D-38-hook). Raw `listen`/`invoke`
 // are intentionally NOT re-exported here — the wrapped surfaces (useTauriEvent,
 // invokeTyped) are the only permitted escape hatches per D-13.
