@@ -63,6 +63,7 @@ export function TitleBar() {
     <header
       className="titlebar"
       data-tauri-drag-region
+      data-hierarchy-tier="1"
       role="banner"
       aria-label="Window chrome"
     >
@@ -70,7 +71,11 @@ export function TitleBar() {
           close/minimize across all 3 platforms so the BLADE-native aesthetic
           stays consistent (D-15 single aesthetic). Interactive children opt
           out of drag so clicks land on the buttons. */}
-      <div className="titlebar-traffic" data-tauri-drag-region="false">
+      <div
+        className="titlebar-traffic"
+        data-tauri-drag-region="false"
+        data-hierarchy-tier="1"
+      >
         <button
           type="button"
           className="tlight tlight-close"
@@ -101,11 +106,16 @@ export function TitleBar() {
           is still draggable (no opt-out) so users can grab the middle of
           the bar to move the window. The pill opts out so future clickable
           UX (e.g. open activity panel) doesn't initiate a drag. */}
-      <div className="titlebar-title" data-tauri-drag-region>
+      <div
+        className="titlebar-title"
+        data-tauri-drag-region
+        data-hierarchy-tier="1"
+      >
         <span className="titlebar-brand">BLADE</span>
         <span
           className={`titlebar-status titlebar-status-${status}`}
           data-tauri-drag-region="false"
+          data-hierarchy-tier="2"
           aria-live="polite"
         >
           <span className="titlebar-status-dot" aria-hidden="true" />
@@ -118,6 +128,7 @@ export function TitleBar() {
       <div
         className="titlebar-hint"
         data-tauri-drag-region="false"
+        data-hierarchy-tier="3"
         aria-hidden="true"
       >
         <kbd>⌘K</kbd>
