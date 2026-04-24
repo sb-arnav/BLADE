@@ -298,7 +298,7 @@ function GitTab({ state }: { state: WorldState }) {
 function ProcessesTab({ state }: { state: WorldState }) {
   const rows = [...state.running_processes].slice(0, 20);
   if (rows.length === 0) {
-    return <EmptyState label="No processes" />;
+    return <EmptyState label="BLADE is still scanning processes" description="The process list will appear once the world model refreshes — give me a moment." />;
   }
   return (
     <table className="world-table" data-testid="world-processes-table">
@@ -350,7 +350,7 @@ function PortsTab({ state }: { state: WorldState }) {
 
 function FileChangesTab({ state }: { state: WorldState }) {
   if (state.recent_file_changes.length === 0) {
-    return <EmptyState label="No recent changes" />;
+    return <EmptyState label="No file changes observed yet" description="Recent file activity will appear once BLADE detects a write — give me a few minutes of observed work." />;
   }
   return (
     <table className="world-table" data-testid="world-changes-table">

@@ -289,7 +289,10 @@ export function TentacleDetail() {
         <GlassPanel className="tentacle-reports">
           <h3 style={{ margin: 0 }}>Reports ({filteredReports.length})</h3>
           {filteredReports.length === 0 ? (
-            <EmptyState label="No reports from this tentacle" />
+            <EmptyState
+              label="This tentacle is still learning"
+              description="Reports will appear after 24h of observed activity — give me a day."
+            />
           ) : (
             <ul className="tentacle-report-list">
               {filteredReports.map((r) => (

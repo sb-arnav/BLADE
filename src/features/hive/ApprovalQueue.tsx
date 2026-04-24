@@ -239,8 +239,8 @@ export function ApprovalQueue() {
         <ListSkeleton rows={4} />
       ) : visibleRows.length === 0 ? (
         <EmptyState
-          label="Nothing to approve"
-          description="All caught up."
+          label="Nothing to approve right now"
+          description="Decisions needing your approval will appear here as BLADE acts."
         />
       ) : (
         visibleRows.map((r, i) => {

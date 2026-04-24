@@ -169,8 +169,8 @@ export function CharacterBible() {
 
       {!loading && !bible && !error && (
         <EmptyState
-          label="No traits yet"
-          description="Traits evolve from chat feedback (thumbs up/down)."
+          label="BLADE is still learning your style"
+          description="Traits will appear after you give chat feedback (thumbs up/down) — give me a few exchanges."
         />
       )}
 

@@ -303,8 +303,8 @@ export function AgentDetail() {
           </div>
           {timeline.rows.length === 0 ? (
             <EmptyState
-              label="No events yet"
-              description="Timeline emits in real time as the agent works."
+              label="Events will appear as this agent works"
+              description="The timeline emits in real time once the agent starts — give me a moment after you spawn it."
             />
           ) : (
             timeline.rows.map((row) => {

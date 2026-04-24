@@ -233,8 +233,8 @@ export function KnowledgeBase() {
           <h3 className="knowledge-search-group-heading">Recent entries</h3>
           {recent.length === 0 ? (
             <EmptyState
-              label="No matches"
-              description="Try a broader query or a different source."
+              label="No matches for this filter"
+              description="Clear the filter to see everything, or give me a broader query — try a different source."
             />
           ) : (
             <div className="knowledge-recent-list">

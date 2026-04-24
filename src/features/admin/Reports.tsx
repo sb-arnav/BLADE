@@ -258,8 +258,8 @@ export function Reports() {
         </div>
       ) : reports.length === 0 ? (
         <EmptyState
-          label="No reports filed"
-          description="Capability gaps emit reports automatically."
+          label="BLADE is still scanning your capabilities"
+          description="Reports will appear after BLADE runs scheduled scans — give me 24h."
         />
       ) : (
         <div className="reports-layout">
