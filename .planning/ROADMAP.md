@@ -178,7 +178,14 @@ Plans:
 
 **Notes**: Phase 14 is the largest phase (17 requirements across 3 sub-categories). Expect 3–5 parallel workstreams: (a) wire NOT-WIRED backends, (b) remove WIRED-NOT-USED dead UI, (c) a11y sweep on new surfaces, (d) activity log implementation (strip + drawer + event emission + filter). Sub-streams (a), (b), (d) can proceed in parallel; (c) runs after each of them closes a surface.
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+- [ ] 14-01-PLAN.md — Wave 0: Activity log foundation (ActivityStrip + ActivityDrawer + verify scripts) (LOG-01, LOG-02, LOG-03, LOG-04, LOG-05)
+- [ ] 14-02-PLAN.md — Wave 1: Module wiring — Voice + Privacy + Intelligence + System pane additions (WIRE2-01, WIRE2-03, WIRE2-04)
+- [ ] 14-03-PLAN.md — Wave 1: Dashboard binding to live data — replace 3 ComingSoonCards (WIRE2-02, WIRE2-03)
+- [ ] 14-04-PLAN.md — Wave 1: A11y sweep + verify script hardening (WIRE2-05, WIRE2-06, A11Y2-01..A11Y2-06)
+- [ ] 14-05-PLAN.md — Wave 2: Manual verification checkpoint (WIRE2-01, WIRE2-02, WIRE2-05, WIRE2-06, A11Y2-01..A11Y2-06, LOG-01..LOG-05)
 
 **UI hint**: yes
 
@@ -215,7 +222,7 @@ Plans:
 | 11. Smart Provider Setup | 6/6 | Complete    | 2026-04-20 |
 | 12. Smart Deep Scan | 0/TBD | Not started | — |
 | 13. Self-Configuring Ecosystem | 0/3 | Planned     | — |
-| 14. Wiring & Accessibility Pass | 0/TBD | Not started | — |
+| 14. Wiring & Accessibility Pass | 0/5 | Planned | — |
 | 15. Density + Polish | 0/TBD | Not started | — |
 
 ---
