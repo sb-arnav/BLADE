@@ -38,14 +38,20 @@ import { OnboardingFlow } from '@/features/onboarding';
 // regardless of the currently-active route. QuickAskBridge subscribes to
 // BLADE_QUICKASK_BRIDGED and is a zero-DOM event bridge.
 import { ChatProvider, QuickAskBridge } from '@/features/chat';
+// Phase 14 Plan 14-01 (LOG-01, M-07) — ActivityLogProvider wraps ShellContent
+// so ActivityStrip is a descendant and has access to the log context.
+import { ActivityLogProvider } from '@/features/activity-log';
+import { ActivityStrip } from '@/features/activity-log/ActivityStrip';
 
 export function MainShell() {
   return (
     <RouterProvider>
       <ChatProvider>
-        <BackendToastBridge />
-        <QuickAskBridge />
-        <ShellContent />
+        <ActivityLogProvider>
+          <BackendToastBridge />
+          <QuickAskBridge />
+          <ShellContent />
+        </ActivityLogProvider>
       </ChatProvider>
     </RouterProvider>
   );
@@ -98,6 +104,7 @@ function ShellContent() {
   return (
     <div className="main-shell" role="application" data-gate-status="complete">
       <TitleBar />
+      <ActivityStrip />
       <div className="main-shell-body">
         <NavRail />
         <div className="main-shell-route" data-shell-route>
