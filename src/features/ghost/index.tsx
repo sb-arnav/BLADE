@@ -25,5 +25,13 @@ const MeetingGhostViewLazy = lazy(() =>
 );
 
 export const routes: RouteDefinition[] = [
-  { id: 'meeting-ghost', label: 'Meeting Ghost', section: 'core', component: MeetingGhostViewLazy, phase: 11, paletteHidden: true },
+  {
+    id: 'meeting-ghost',
+    label: 'Meeting Ghost',
+    section: 'core',
+    component: MeetingGhostViewLazy,
+    phase: 11,
+    paletteHidden: false,
+    description: 'Ghost Mode — invisible AI overlay for meetings',
+  },
 ];

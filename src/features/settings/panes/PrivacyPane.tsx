@@ -20,6 +20,7 @@ import {
   TauriError,
   deepScanStart,
   setScanClassesEnabled,
+  saveConfigField,
 } from '@/lib/tauri';
 import type { ScanClassesEnabled } from '@/lib/tauri';
 import { useConfig } from '@/lib/context';
@@ -227,6 +228,157 @@ function DeepScanPrivacySection() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// ScreenTimelineSection — Phase 14 Plan 14-02 (WIRE2-03)
+// Appended after DeepScanPrivacySection. ADDITIVE ONLY.
+// ---------------------------------------------------------------------------
+
+function ScreenTimelineSection() {
+  const { config, reload } = useConfig();
+  const { show } = useToast();
+  const [savingField, setSavingField] = useState<string | null>(null);
+
+  const enabled = Boolean(config.screen_timeline_enabled);
+  const captureInterval = Number(config.timeline_capture_interval ?? 30);
+  const retentionDays = Number(config.timeline_retention_days ?? 7);
+
+  const saveField = async (field: string, value: string) => {
+    setSavingField(field);
+    try {
+      await saveConfigField(field, value);
+      await reload();
+    } catch (e) {
+      show({ type: 'error', title: 'Save failed', message: String(e) });
+    } finally {
+      setSavingField(null);
+    }
+  };
+
+  return (
+    <Card>
+      <section aria-labelledby="screen-timeline-heading">
+        <h3 id="screen-timeline-heading">Screen Timeline</h3>
+
+        <div className="settings-field">
+          <label
+            htmlFor="screen-timeline-enabled"
+            className="settings-field-label"
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--s-2)', cursor: 'pointer' }}
+          >
+            <input
+              id="screen-timeline-enabled"
+              type="checkbox"
+              checked={enabled}
+              aria-label="Enable screen timeline"
+              aria-describedby="screen-timeline-desc"
+              disabled={savingField === 'screen_timeline_enabled'}
+              onChange={(e) => saveField('screen_timeline_enabled', String(e.target.checked))}
+              style={{ width: 16, height: 16, accentColor: 'var(--a-cool)', cursor: 'pointer' }}
+            />
+            Enable screen timeline
+          </label>
+          <p id="screen-timeline-desc" className="settings-notice" style={{ marginTop: 'var(--s-1)' }}>
+            Screenshot every N seconds for Total Recall context. Stored locally at <code>~/.blade</code>.
+          </p>
+        </div>
+
+        {enabled && (
+          <>
+            <div className="settings-field" style={{ marginTop: 'var(--s-3)' }}>
+              <label htmlFor="timeline-capture-interval" className="settings-field-label">
+                Capture interval (seconds)
+              </label>
+              <input
+                id="timeline-capture-interval"
+                type="number"
+                min={10}
+                max={300}
+                defaultValue={captureInterval}
+                aria-label="Screen capture interval in seconds"
+                disabled={savingField === 'timeline_capture_interval'}
+                onBlur={(e) => saveField('timeline_capture_interval', e.target.value)}
+                style={{ width: 100 }}
+              />
+            </div>
+          </>
+        )}
+
+        <div className="settings-field" style={{ marginTop: 'var(--s-3)' }}>
+          <label htmlFor="timeline-retention-days" className="settings-field-label">
+            Retain history (days)
+          </label>
+          <input
+            id="timeline-retention-days"
+            type="number"
+            min={1}
+            max={365}
+            defaultValue={retentionDays}
+            aria-label="Number of days to retain screen timeline history"
+            disabled={savingField === 'timeline_retention_days'}
+            onBlur={(e) => saveField('timeline_retention_days', e.target.value)}
+            style={{ width: 100 }}
+          />
+        </div>
+      </section>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// AudioCaptureSection — Phase 14 Plan 14-02 (WIRE2-03)
+// ---------------------------------------------------------------------------
+
+function AudioCaptureSection() {
+  const { config, reload } = useConfig();
+  const { show } = useToast();
+  const [savingField, setSavingField] = useState<string | null>(null);
+
+  const enabled = Boolean(config.audio_capture_enabled);
+
+  const saveField = async (field: string, value: string) => {
+    setSavingField(field);
+    try {
+      await saveConfigField(field, value);
+      await reload();
+    } catch (e) {
+      show({ type: 'error', title: 'Save failed', message: String(e) });
+    } finally {
+      setSavingField(null);
+    }
+  };
+
+  return (
+    <Card>
+      <section aria-labelledby="audio-capture-heading">
+        <h3 id="audio-capture-heading">Audio Capture</h3>
+
+        <div className="settings-field">
+          <label
+            htmlFor="audio-capture-enabled"
+            className="settings-field-label"
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--s-2)', cursor: 'pointer' }}
+          >
+            <input
+              id="audio-capture-enabled"
+              type="checkbox"
+              checked={enabled}
+              aria-label="Enable always-on audio capture"
+              aria-describedby="audio-capture-desc"
+              disabled={savingField === 'audio_capture_enabled'}
+              onChange={(e) => saveField('audio_capture_enabled', String(e.target.checked))}
+              style={{ width: 16, height: 16, accentColor: 'var(--a-cool)', cursor: 'pointer' }}
+            />
+            Enable audio capture
+          </label>
+          <p id="audio-capture-desc" className="settings-notice" style={{ marginTop: 'var(--s-1)' }}>
+            Always-on ambient audio for meeting detection and voice recall. Audio is processed locally — never uploaded.
+          </p>
+        </div>
+      </section>
+    </Card>
+  );
+}
+
 export function PrivacyPane() {
   const { show } = useToast();
   const [keys, setKeys] = useState<ProviderKeyList | null>(null);
@@ -342,6 +494,9 @@ export function PrivacyPane() {
       </Card>
 
       <DeepScanPrivacySection />
+
+      <ScreenTimelineSection />
+      <AudioCaptureSection />
 
       <Dialog
         open={confirmOpen}

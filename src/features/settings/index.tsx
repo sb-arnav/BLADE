@@ -27,6 +27,13 @@ const SettingsShell = lazy(() =>
   import('./SettingsShell').then((m) => ({ default: m.SettingsShell })),
 );
 
+// Palette-only action: locks the screen immediately then navigates back.
+// Component is never rendered as a full view — the command palette invokes it
+// via its action() callback (Phase 14 Plan 14-02, WIRE2-04).
+const LockScreenAction = lazy(() =>
+  import('./LockScreenAction').then((m) => ({ default: m.LockScreenAction })),
+);
+
 export const routes: RouteDefinition[] = [
   { id: 'settings',              label: 'Settings',    section: 'core', component: SettingsShell, phase: 3, shortcut: 'Mod+,' },
   { id: 'settings-providers',    label: 'Providers',   section: 'core', component: SettingsShell, phase: 3 },
@@ -40,4 +47,14 @@ export const routes: RouteDefinition[] = [
   { id: 'settings-diagnostics',  label: 'Diagnostics', section: 'core', component: SettingsShell, phase: 3 },
   { id: 'settings-about',        label: 'About',       section: 'core', component: SettingsShell, phase: 3 },
   { id: 'settings-ecosystem',    label: 'Ecosystem',   section: 'core', component: SettingsShell, phase: 13 },
+  // Palette-only — locks screen immediately; never rendered as a full page route
+  {
+    id: 'system-lock-screen',
+    label: 'Lock Screen',
+    section: 'core',
+    component: LockScreenAction,
+    phase: 14,
+    paletteHidden: false,
+    description: 'Lock your screen immediately',
+  },
 ];
