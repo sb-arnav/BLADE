@@ -1806,11 +1806,22 @@
       ]
     },
     {
-      "file": "src-tauri/src/deep_scan.rs",
+      "file": "src-tauri/src/deep_scan/mod.rs",
       "classification": "ACTIVE",
       "purpose": "Deep System Discovery — scans the user's machine on first run to build",
       "trigger": "#[tauri::command] deep_scan_start (+ others)",
       "ui_surface": "src/lib/tauri/admin.ts:1462",
+      "internal_callers": [
+        "src-tauri/src/brain.rs:542",
+        "src-tauri/src/hive.rs:718",
+        "src-tauri/src/hive.rs:814",
+        "src-tauri/src/persona_engine.rs:779",
+        "src-tauri/src/persona_engine.rs:792"
+      ],
+      "body_registry_entry": "deep_scan",
+      "reachable_paths": [
+        "invokeTyped('deep_scan_start') -> src-tauri/src/deep_scan.rs:1322"
+      ],
       "commands": [
         {
           "name": "deep_scan::deep_scan_start",
@@ -1827,17 +1838,6 @@
           "registered": "src-tauri/src/deep_scan.rs:1432",
           "invoked_from": "src/lib/tauri/admin.ts:1478"
         }
-      ],
-      "internal_callers": [
-        "src-tauri/src/brain.rs:542",
-        "src-tauri/src/hive.rs:718",
-        "src-tauri/src/hive.rs:814",
-        "src-tauri/src/persona_engine.rs:779",
-        "src-tauri/src/persona_engine.rs:792"
-      ],
-      "body_registry_entry": "deep_scan",
-      "reachable_paths": [
-        "invokeTyped('deep_scan_start') -> src-tauri/src/deep_scan.rs:1322"
       ]
     },
     {
@@ -7103,6 +7103,186 @@
       "reachable_paths": [
         "invokeTyped('probe_provider_capabilities') -> src-tauri/src/capability_probe.rs"
       ]
+    },
+    {
+      "file": "src-tauri/src/deep_scan/enrichment.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 12 deep_scan enrichment — enriches scan profile with additional metadata.",
+      "trigger": "internal — called by deep_scan orchestration",
+      "ui_surface": null,
+      "internal_callers": [
+        "src-tauri/src/deep_scan/mod.rs"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": []
+    },
+    {
+      "file": "src-tauri/src/deep_scan/leads.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 12 deep_scan leads — generates actionable leads from scan results.",
+      "trigger": "internal — called by deep_scan orchestration",
+      "ui_surface": null,
+      "internal_callers": [
+        "src-tauri/src/deep_scan/mod.rs"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": []
+    },
+    {
+      "file": "src-tauri/src/deep_scan/profile.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 12 deep_scan profile — ScanProfile struct + persistence.",
+      "trigger": "internal — called by deep_scan orchestration",
+      "ui_surface": null,
+      "internal_callers": [
+        "src-tauri/src/deep_scan/mod.rs"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": []
+    },
+    {
+      "file": "src-tauri/src/deep_scan/queue.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 12 deep_scan queue — scan job queue and prioritization.",
+      "trigger": "internal — called by deep_scan orchestration",
+      "ui_surface": null,
+      "internal_callers": [
+        "src-tauri/src/deep_scan/mod.rs"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": []
+    },
+    {
+      "file": "src-tauri/src/deep_scan/rhythm.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 12 deep_scan rhythm — scheduling and cadence control for scan loops.",
+      "trigger": "internal — called by deep_scan orchestration",
+      "ui_surface": null,
+      "internal_callers": [
+        "src-tauri/src/deep_scan/mod.rs"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": []
+    },
+    {
+      "file": "src-tauri/src/deep_scan/scanners/mod.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 12 deep_scan scanners module root — exports all scanner implementations.",
+      "trigger": "internal — re-exports from sub-modules",
+      "ui_surface": null,
+      "internal_callers": [
+        "src-tauri/src/deep_scan/mod.rs"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": []
+    },
+    {
+      "file": "src-tauri/src/deep_scan/scanners/ai_sessions.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 12 scanner — discovers active AI session directories and config files.",
+      "trigger": "internal — called by deep_scan scheduler",
+      "ui_surface": null,
+      "internal_callers": [
+        "src-tauri/src/deep_scan/scanners/mod.rs"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": []
+    },
+    {
+      "file": "src-tauri/src/deep_scan/scanners/bookmarks.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 12 scanner — reads browser bookmarks to build context about user interests.",
+      "trigger": "internal — called by deep_scan scheduler",
+      "ui_surface": null,
+      "internal_callers": [
+        "src-tauri/src/deep_scan/scanners/mod.rs"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": []
+    },
+    {
+      "file": "src-tauri/src/deep_scan/scanners/fs_repos.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 12 scanner — walks filesystem for local code repositories.",
+      "trigger": "internal — called by deep_scan scheduler",
+      "ui_surface": null,
+      "internal_callers": [
+        "src-tauri/src/deep_scan/scanners/mod.rs"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": []
+    },
+    {
+      "file": "src-tauri/src/deep_scan/scanners/git_remotes.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 12 scanner — extracts git remote URLs from discovered repositories.",
+      "trigger": "internal — called by deep_scan scheduler",
+      "ui_surface": null,
+      "internal_callers": [
+        "src-tauri/src/deep_scan/scanners/mod.rs"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": []
+    },
+    {
+      "file": "src-tauri/src/deep_scan/scanners/ide_workspaces.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 12 scanner — discovers IDE workspace configs (VS Code, JetBrains, etc.).",
+      "trigger": "internal — called by deep_scan scheduler",
+      "ui_surface": null,
+      "internal_callers": [
+        "src-tauri/src/deep_scan/scanners/mod.rs"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": []
+    },
+    {
+      "file": "src-tauri/src/deep_scan/scanners/mru.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 12 scanner — reads Most Recently Used file lists from OS shell.",
+      "trigger": "internal — called by deep_scan scheduler",
+      "ui_surface": null,
+      "internal_callers": [
+        "src-tauri/src/deep_scan/scanners/mod.rs"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": []
+    },
+    {
+      "file": "src-tauri/src/deep_scan/scanners/shell_history.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 12 scanner — parses shell history (.zsh_history, .bash_history) for tech stack signals.",
+      "trigger": "internal — called by deep_scan scheduler",
+      "ui_surface": null,
+      "internal_callers": [
+        "src-tauri/src/deep_scan/scanners/mod.rs"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": []
+    },
+    {
+      "file": "src-tauri/src/deep_scan/scanners/which_sweep.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 12 scanner — runs `which` sweep for CLI tools to detect installed stack.",
+      "trigger": "internal — called by deep_scan scheduler",
+      "ui_surface": null,
+      "internal_callers": [
+        "src-tauri/src/deep_scan/scanners/mod.rs"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": []
+    },
+    {
+      "file": "src-tauri/src/ecosystem.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 13 ecosystem — tentacle orchestration, emit_activity logging, observer loop management.",
+      "trigger": "#[tauri::command] ecosystem_list_tentacles (+ others)",
+      "ui_surface": "src/features/settings/panes/EcosystemPane.tsx",
+      "internal_callers": [],
+      "body_registry_entry": "ecosystem",
+      "reachable_paths": [
+        "invokeTyped('ecosystem_list_tentacles') -> src-tauri/src/ecosystem.rs"
+      ]
     }
   ],
   "routes": [
@@ -9248,6 +9428,39 @@
       "data_shape": "Full-repo indexing view gated on long-context capability (PROV-08)",
       "data_source": [],
       "flow_status": "data pipes"
+    },
+    {
+      "id": "settings-ecosystem",
+      "file": "src/features/settings/index.tsx",
+      "classification": "ACTIVE",
+      "section": "core",
+      "palette_visible": true,
+      "shortcut": null,
+      "data_shape": "EcosystemPane — tentacle enable/disable toggles, Phase 13 self-configuring ecosystem",
+      "data_source": [],
+      "flow_status": "data pipes"
+    },
+    {
+      "id": "system-lock-screen",
+      "file": "src/features/settings/index.tsx",
+      "classification": "ACTIVE",
+      "section": "core",
+      "palette_visible": true,
+      "shortcut": null,
+      "data_shape": "palette-only LockScreenAction — calls lockScreen() on mount then navigates to settings",
+      "data_source": [],
+      "flow_status": "data pipes"
+    },
+    {
+      "id": "profile",
+      "file": "src/features/identity/index.tsx",
+      "classification": "ACTIVE",
+      "section": "identity",
+      "palette_visible": true,
+      "shortcut": null,
+      "data_shape": "ProfileView — user profile from Phase 12 scan identity context",
+      "data_source": [],
+      "flow_status": "placeholder"
     }
   ],
   "config": [
@@ -10625,6 +10838,33 @@
       "disk_persisted": true,
       "ui_surface": "src/features/settings/panes/ProvidersPane.tsx",
       "control_type": "optional-string"
+    },
+    {
+      "field": "BladeConfig.scan_classes_enabled",
+      "file": "src-tauri/src/config.rs:495",
+      "struct": "BladeConfig",
+      "disk_persisted": true,
+      "classification": "ACTIVE",
+      "ui_surface": null,
+      "control_type": "complex (ScanClassesEnabled struct — per-class bool map)"
+    },
+    {
+      "field": "BladeConfig.ecosystem_tentacles",
+      "file": "src-tauri/src/config.rs:498",
+      "struct": "BladeConfig",
+      "disk_persisted": true,
+      "classification": "ACTIVE",
+      "ui_surface": "src/features/settings/panes/EcosystemPane.tsx",
+      "control_type": "complex (Vec<TentacleRecord> — managed by ecosystem.rs)"
+    },
+    {
+      "field": "BladeConfig.ecosystem_observe_only",
+      "file": "src-tauri/src/config.rs:500",
+      "struct": "BladeConfig",
+      "disk_persisted": true,
+      "classification": "ACTIVE",
+      "ui_surface": null,
+      "control_type": "boolean — guardrail M-03 (observe-only mode for v1.1)"
     }
   ],
   "not_wired_backlog": [
@@ -10636,8 +10876,8 @@
         "src-tauri/src/auto_fix.rs:955",
         "src-tauri/src/auto_fix.rs:964"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10647,8 +10887,8 @@
         "src-tauri/src/autonomous_research.rs:418",
         "src-tauri/src/autonomous_research.rs:424"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10660,8 +10900,8 @@
         "src-tauri/src/brain.rs:1850",
         "src-tauri/src/brain.rs:1855"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10673,8 +10913,8 @@
         "src-tauri/src/causal_graph.rs:777",
         "src-tauri/src/causal_graph.rs:784"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10684,8 +10924,8 @@
         "src-tauri/src/clipboard.rs:421",
         "src-tauri/src/clipboard.rs:429"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10705,8 +10945,8 @@
         "src-tauri/src/context.rs:64",
         "src-tauri/src/context.rs:405"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10715,8 +10955,8 @@
         "src-tauri/src/deeplearn.rs:35",
         "src-tauri/src/deeplearn.rs:160"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10737,8 +10977,8 @@
         "src-tauri/src/discovery.rs:62",
         "src-tauri/src/discovery.rs:689"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10748,8 +10988,8 @@
         "src-tauri/src/dream_mode.rs:516",
         "src-tauri/src/dream_mode.rs:534"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10760,8 +11000,8 @@
         "src-tauri/src/ghost_mode.rs:884",
         "src-tauri/src/ghost_mode.rs:930"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10771,8 +11011,8 @@
         "src-tauri/src/godmode.rs:130",
         "src-tauri/src/godmode.rs:139"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10781,8 +11021,8 @@
         "src-tauri/src/journal.rs:174",
         "src-tauri/src/journal.rs:180"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10790,8 +11030,8 @@
       "backend_entry_points": [
         "src-tauri/src/metacognition.rs:373"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10805,8 +11045,8 @@
         "src-tauri/src/multimodal.rs:598",
         "src-tauri/src/multimodal.rs:604"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10815,8 +11055,8 @@
         "src-tauri/src/notification_listener.rs:73",
         "src-tauri/src/notification_listener.rs:80"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10828,8 +11068,8 @@
         "src-tauri/src/obsidian.rs:213",
         "src-tauri/src/obsidian.rs:222"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10841,8 +11081,8 @@
         "src-tauri/src/plugins/registry.rs:21",
         "src-tauri/src/plugins/registry.rs:26"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10851,8 +11091,8 @@
         "src-tauri/src/prefrontal.rs:152",
         "src-tauri/src/prefrontal.rs:157"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10865,8 +11105,8 @@
         "src-tauri/src/proactive_engine.rs:858",
         "src-tauri/src/proactive_engine.rs:875"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10876,8 +11116,8 @@
         "src-tauri/src/proactive_vision.rs:506",
         "src-tauri/src/proactive_vision.rs:511"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10890,8 +11130,8 @@
         "src-tauri/src/pulse.rs:1083",
         "src-tauri/src/pulse.rs:1089"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10901,8 +11141,8 @@
         "src-tauri/src/rag.rs:78",
         "src-tauri/src/rag.rs:184"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10912,8 +11152,8 @@
         "src-tauri/src/research.rs:257",
         "src-tauri/src/research.rs:276"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10923,8 +11163,8 @@
         "src-tauri/src/roles.rs:303",
         "src-tauri/src/roles.rs:310"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10932,8 +11172,8 @@
       "backend_entry_points": [
         "src-tauri/src/router.rs:164"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10967,8 +11207,8 @@
         "src-tauri/src/runtimes.rs:5709",
         "src-tauri/src/runtimes.rs:5738"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10979,8 +11219,8 @@
         "src-tauri/src/screen.rs:194",
         "src-tauri/src/screen.rs:232"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10989,8 +11229,8 @@
         "src-tauri/src/self_code.rs:66",
         "src-tauri/src/self_code.rs:132"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11011,8 +11251,8 @@
         "src-tauri/src/show_engine.rs:246",
         "src-tauri/src/show_engine.rs:251"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11020,8 +11260,8 @@
       "backend_entry_points": [
         "src-tauri/src/social_cognition.rs:148"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11039,8 +11279,8 @@
         "src-tauri/src/system_control.rs:545",
         "src-tauri/src/system_control.rs:599"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11052,8 +11292,8 @@
         "src-tauri/src/telegram.rs:449",
         "src-tauri/src/telegram.rs:462"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11068,8 +11308,8 @@
         "src-tauri/src/tentacles/calendar_tentacle.rs:935",
         "src-tauri/src/tentacles/calendar_tentacle.rs:943"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11081,8 +11321,8 @@
         "src-tauri/src/tentacles/cloud_costs.rs:947",
         "src-tauri/src/tentacles/cloud_costs.rs:952"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11093,8 +11333,8 @@
         "src-tauri/src/tentacles/discord_deep.rs:675",
         "src-tauri/src/tentacles/discord_deep.rs:684"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11102,8 +11342,8 @@
       "backend_entry_points": [
         "src-tauri/src/tentacles/filesystem_watch.rs:653"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11119,8 +11359,8 @@
         "src-tauri/src/tentacles/github_deep.rs:1935",
         "src-tauri/src/tentacles/github_deep.rs:1945"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11131,8 +11371,8 @@
         "src-tauri/src/tentacles/linear_jira.rs:847",
         "src-tauri/src/tentacles/linear_jira.rs:852"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11144,8 +11384,8 @@
         "src-tauri/src/tentacles/log_monitor.rs:589",
         "src-tauri/src/tentacles/log_monitor.rs:594"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11155,8 +11395,8 @@
         "src-tauri/src/thread.rs:169",
         "src-tauri/src/thread.rs:179"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11177,8 +11417,8 @@
         "src-tauri/src/tts.rs:662",
         "src-tauri/src/tts.rs:690"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11189,8 +11429,8 @@
         "src-tauri/src/voice.rs:115",
         "src-tauri/src/voice.rs:199"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11204,8 +11444,8 @@
         "src-tauri/src/voice_intelligence.rs:673",
         "src-tauri/src/voice_intelligence.rs:678"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11215,8 +11455,8 @@
         "src-tauri/src/voice_local.rs:12",
         "src-tauri/src/voice_local.rs:18"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11224,8 +11464,8 @@
       "backend_entry_points": [
         "src-tauri/src/whisper_local.rs:395"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": null
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11233,8 +11473,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:247"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: No direct Settings toggle for bool; god_mode_tier is the user-facing control. This bool is derived from tier in backend. Candidate for clean"
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11242,8 +11482,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:249"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Values: normal|intermediate|extreme. Drives godmode.rs ambient intelligence tier. No Settings surface — user cannot toggle. Phase 14 candida"
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11251,8 +11491,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:253"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Read by knowledge/obsidian bridges. save_config_field allow-list includes it (config.rs:737) but no current Settings pane exposes a chooser."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11260,8 +11500,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:261"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Gates screen_timeline.rs capture loop. Writable via save_config_field allow-list (config.rs:739). No Privacy/Perception pane toggle found. P"
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11269,8 +11509,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:263"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Seconds between Total Recall screenshots. Writable via save_config_field. No UI slider/input. Phase 14 candidate."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11278,8 +11518,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:265"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Days of Total Recall retention. Writable via save_config_field. No UI exposure. Phase 14 candidate."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11287,8 +11527,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:267"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: VoicePane SHOWS the state (config.wake_word_enabled) but has NO setter (neither set_config nor save_config_field accept it). Toggle UI is di"
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11296,8 +11536,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:269"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Wake-word phrase fed to wake_word.rs. No UI exposure. Phase 14 candidate."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11305,8 +11545,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:271"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: u8 1-5 sensitivity. No UI slider. Phase 14 candidate."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11314,8 +11554,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:273"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Active persona role; read by persona_engine.rs and brain.rs. No Settings pane exposes this selector. Phase 14 Personality pane candidate."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11323,8 +11563,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:275"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Used by self_upgrade.rs to locate BLADE source checkout. save_config_field allow-list includes it (config.rs:731). No UI picker. Phase 14 Ad"
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11332,8 +11572,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:277"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: claude-code|none|empty. Used by background_agent.rs to spawn Claude Code/Aider workers. save_config_field allow-list (config.rs:736). No Adm"
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11341,8 +11581,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:279"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Monitor index for HUD placement. No UI monitor-picker. Phase 14 HUD settings candidate."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11350,8 +11590,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:289"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Ordered providers tried on 429/503/5xx. Read by providers/mod.rs fallback chain. No Settings UI for ordering. Phase 11 PROV-09 capability-aw"
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11359,8 +11599,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:292"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Gates whisper_local.rs (feature-gated local-whisper). No Settings toggle; also requires rebuild with --features local-whisper. Phase 14 cand"
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11368,8 +11608,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:295"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: tiny.en|base.en|small.en for local whisper. No UI. Phase 14 Voice pane candidate."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11377,8 +11617,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:301"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Gates integration_bridge.rs Gmail/Calendar/Slack/GitHub polling. No Settings toggle. Phase 13 ECOSYS candidate."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11386,8 +11626,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:304"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: TTS playback multiplier 0.5..2.0. No UI slider. Phase 14 Voice pane candidate."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11395,8 +11635,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:310"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Always-on audio capture toggle; read by audio_timeline.rs. No Privacy/Perception pane toggle. Phase 14 candidate."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11404,8 +11644,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:313"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Gates ghost_mode.rs overlay enrollment. No Settings toggle. Ghost route exists in routes but no config-side Settings binding. Phase 14 candi"
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11413,8 +11653,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:316"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: bottom-right|bottom-left|top-right|top-left. No position picker. Phase 14 candidate."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11422,8 +11662,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:319"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Auto-type suggested reply into chat. Per v1.1 observe-only guardrail this stays disabled; Phase 14 may expose toggle but default-off by poli"
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11431,8 +11671,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:322"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Opt-in HIVE distributed mesh. No Settings toggle. Phase 14 HIVE/Admin candidate."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11440,8 +11680,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:325"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: 0.0-1.0 autonomy level. No Settings slider. Phase 14 candidate if hive_enabled is surfaced."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11449,8 +11689,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:76"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.god_mode; no Settings toggle. Phase 14 candidate."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11458,8 +11698,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:78"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.god_mode_tier; no Settings surface. Phase 14 candidate."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11467,8 +11707,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:82"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.obsidian_vault_path; save_config_field allow-listed but no UI picker."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11476,8 +11716,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:90"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.screen_timeline_enabled; no UI exposure."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11485,8 +11725,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:92"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.timeline_capture_interval."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11494,8 +11734,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:94"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.timeline_retention_days."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11503,8 +11743,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:96"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.wake_word_enabled; VoicePane reads it but no setter exists."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11512,8 +11752,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:98"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.wake_word_phrase."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11521,8 +11761,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:100"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.wake_word_sensitivity."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11530,8 +11770,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:102"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.active_role."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11539,8 +11779,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:104"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.blade_source_path; save_config_field allow-listed."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11548,8 +11788,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:106"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.trusted_ai_delegate."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11557,8 +11797,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:108"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.blade_dedicated_monitor."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11566,8 +11806,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:118"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.fallback_providers."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11575,8 +11815,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:120"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.use_local_whisper."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11584,8 +11824,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:122"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.whisper_model."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11593,8 +11833,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:128"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.integration_polling_enabled."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11602,8 +11842,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:130"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.tts_speed."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11611,8 +11851,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:135"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.audio_capture_enabled."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11620,8 +11860,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:137"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.ghost_mode_enabled."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11629,8 +11869,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:139"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.ghost_mode_position."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11638,8 +11878,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:141"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.ghost_auto_reply."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11647,8 +11887,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:144"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.hive_enabled."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11656,8 +11896,8 @@
       "backend_entry_points": [
         "src-tauri/src/config.rs:147"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "6-place-rule gap: Mirror of BladeConfig.hive_autonomy."
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11665,8 +11905,8 @@
       "backend_entry_points": [
         "src-tauri/Cargo.toml:62"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "No Settings toggle — requires rebuild with --features local-whisper. Paired with BladeConfig.use_local_whisper runtime flag. Documented in CLAUDE.md (build-time"
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11674,8 +11914,8 @@
       "backend_entry_points": [
         "src-tauri/src/providers/anthropic.rs:358"
       ],
-      "phase_14_owner": "WIRE2",
-      "deferral_rationale": "BLADE-specific env var. Used to tag thinking-block events with the current message id, but BLADE never sets this env var in-process (verified). Either set exter"
+      "phase_14_owner": "DEFERRED_V1_2",
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     }
   ],
   "dead_deletion_plan": [
