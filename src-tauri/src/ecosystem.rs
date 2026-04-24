@@ -38,11 +38,16 @@ fn now_secs() -> i64 {
 }
 
 fn emit_activity(app: &AppHandle, module: &str, summary: &str) {
+    emit_activity_with_id(app, module, "observed", summary, None);
+}
+
+fn emit_activity_with_id(app: &AppHandle, module: &str, action: &str, summary: &str, payload_id: Option<String>) {
     let _ = app.emit_to("main", "blade_activity_log", serde_json::json!({
-        "module": module,
-        "action": "observed",
+        "module":        module,
+        "action":        action,
         "human_summary": crate::safe_slice(summary, 200),
-        "timestamp": now_secs(),
+        "payload_id":    payload_id,
+        "timestamp":     now_secs(),
     }));
 }
 
