@@ -42,7 +42,8 @@ All 156 v1.0 requirements (FOUND, WIN, WIRE-01..08, ONBD, SHELL, DASH, CHAT, SET
 - [ ] **SCAN-07**: Deep scan reads browser bookmarks (Chrome / Brave / Arc / Edge)
 - [ ] **SCAN-08**: Deep scan runs a `which` sweep over a curated list of dev CLIs and GUI apps and reports what's installed
 - [ ] **SCAN-09**: Scanner builds its own todo list at scan start; highest-priority leads (recent-edited repos, active sessions) execute first, breadth fills in after
-- [ ] **SCAN-10**: Scanner streams results live to the activity log (LOG-01) so the user sees the scan think out loud
+- [x] **SCAN-10**: Scanner streams results live to the activity log (LOG-01
+) so the user sees the scan think out loud
 - [ ] **SCAN-11**: Scan output is a structured profile document (repos, stack, accounts, people, rhythm, files), persisted and editable in-UI
 - [ ] **SCAN-12**: Scan profile edits round-trip (save → restart → reload) and source-linked rows show origin (which scanner produced them)
 - [ ] **SCAN-13**: Scan baseline on cold install — Arnav's machine — surfaces ≥10 repos, ≥5 accounts, ≥3 daily-rhythm signals, ≥3 IDE/AI tool signals
@@ -90,11 +91,16 @@ All 156 v1.0 requirements (FOUND, WIN, WIRE-01..08, ONBD, SHELL, DASH, CHAT, SET
 
 ### Activity Log (LOG)
 
-- [ ] **LOG-01**: Persistent "BLADE is doing…" activity log strip mounts in the main shell (top bar or side strip per visual pass in Phase 15), visible across routes
-- [ ] **LOG-02**: Every cross-module action emits an activity-log event with `{ module, action, human_summary, payload_id, timestamp }`; coverage verified by a script that asserts no backend action completes without a corresponding emission
-- [ ] **LOG-03**: Click on any activity log entry opens a drawer showing full payload, reasoning, and outcome
-- [ ] **LOG-04**: Activity log supports filter by module and time range; persists last N entries across restart (N defaulted in config)
-- [ ] **LOG-05**: Phase 13 auto-enabled tentacles emit log rows for every observation so the activity log is the visible trust surface for "what are these tentacles doing?"
+- [x] **LOG-01
+**: Persistent "BLADE is doing…" activity log strip mounts in the main shell (top bar or side strip per visual pass in Phase 15), visible across routes
+- [x] **LOG-02
+**: Every cross-module action emits an activity-log event with `{ module, action, human_summary, payload_id, timestamp }`; coverage verified by a script that asserts no backend action completes without a corresponding emission
+- [x] **LOG-03
+**: Click on any activity log entry opens a drawer showing full payload, reasoning, and outcome
+- [x] **LOG-04
+**: Activity log supports filter by module and time range; persists last N entries across restart (N defaulted in config)
+- [x] **LOG-05
+**: Phase 13 auto-enabled tentacles emit log rows for every observation so the activity log is the visible trust surface for "what are these tentacles doing?"
 
 ### Density + Polish (DENSITY)
 
