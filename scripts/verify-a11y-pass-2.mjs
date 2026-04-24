@@ -1,11 +1,20 @@
 #!/usr/bin/env node
 // scripts/verify-a11y-pass-2.mjs
 //
-// Phase 14 Plan 14-01 (A11Y2-06).
-// A11y gate for Phase 14 activity-log files. Checks:
-//   Rule 1: dialog elements must use Dialog primitive OR contain 'inert'
+// Phase 14 Plan 14-04 (A11Y2-06) — hardened production gate.
+// A11y gate for ALL Phase 14 surfaces. Checks:
+//   Rule 1: role="dialog" or <dialog elements must use Dialog primitive
+//           OR have inert attribute (focus trap enforcement)
 //   Rule 2: icon-only buttons must have aria-label
-//   Rule 3: CSS transitions/transforms must be inside prefers-reduced-motion block
+//   Rule 3: CSS transitions/transforms in Phase 14 CSS files must be
+//           inside @media (prefers-reduced-motion: no-preference)
+//
+// Phase 14 scope:
+//   TSX: src/features/activity-log/**/*.tsx + src/windows/main/MainShell.tsx
+//        (if it imports activity-log)
+//        + src/features/dashboard/**/*.tsx (WIRE2 dashboard additions)
+//        + src/features/settings/panes/*.tsx (Phase 14 settings additions)
+//   CSS: src/features/activity-log/**/*.css + src/features/dashboard/**/*.css
 //
 // Exit 0 = PASS (no violations)
 // Exit 1 = FAIL (violations listed)
@@ -32,12 +41,26 @@ function walkDir(dir, exts, results = []) {
   return results;
 }
 
-// Phase 14 scope: activity-log directory + any tsx file importing from it
-const activityLogDir = path.join(ROOT, 'src/features/activity-log');
-const tsxFiles = walkDir(activityLogDir, ['.tsx']);
-const cssFiles = walkDir(activityLogDir, ['.css']);
+// TSX scope: activity-log + dashboard + settings panes (all Phase 14 surfaces)
+const tsxFiles = [];
+const cssFiles = [];
 
-// Also check MainShell for ActivityStrip mount (imports from activity-log)
+// Core activity-log directory
+const activityLogDir = path.join(ROOT, 'src/features/activity-log');
+walkDir(activityLogDir, ['.tsx'], tsxFiles);
+walkDir(activityLogDir, ['.css'], cssFiles);
+
+// Dashboard (Phase 14 WIRE2 additions)
+const dashboardDir = path.join(ROOT, 'src/features/dashboard');
+walkDir(dashboardDir, ['.tsx'], tsxFiles);
+walkDir(dashboardDir, ['.css'], cssFiles);
+
+// Settings panes (Phase 14 config-control additions)
+const settingsPanesDir = path.join(ROOT, 'src/features/settings/panes');
+walkDir(settingsPanesDir, ['.tsx'], tsxFiles);
+walkDir(settingsPanesDir, ['.css'], cssFiles);
+
+// MainShell.tsx — only if it imports from activity-log
 const mainShellPath = path.join(ROOT, 'src/windows/main/MainShell.tsx');
 if (fs.existsSync(mainShellPath)) {
   const content = fs.readFileSync(mainShellPath, 'utf8');
@@ -45,6 +68,21 @@ if (fs.existsSync(mainShellPath)) {
     tsxFiles.push(mainShellPath);
   }
 }
+
+// Deduplicate
+const seenTsx = new Set();
+const uniqueTsxFiles = tsxFiles.filter((f) => {
+  if (seenTsx.has(f)) return false;
+  seenTsx.add(f);
+  return true;
+});
+
+const seenCss = new Set();
+const uniqueCssFiles = cssFiles.filter((f) => {
+  if (seenCss.has(f)) return false;
+  seenCss.add(f);
+  return true;
+});
 
 // ── Violations collector ───────────────────────────────────────────────────
 
@@ -55,12 +93,17 @@ function addViolation(rule, file, line, message) {
 }
 
 // ── Rule 1: dialog elements must use Dialog primitive OR have inert ────────
+// Any file with role="dialog" or raw <dialog element MUST either:
+//   a) Import Dialog from '@/design-system/primitives' (which uses native showModal
+//      that provides browser-native focus trap in WebView2), OR
+//   b) Have an inert attribute on background content to establish focus containment
 
-for (const f of tsxFiles) {
+for (const f of uniqueTsxFiles) {
   const lines = fs.readFileSync(f, 'utf8').split('\n');
-  const usesDialogPrimitive = lines.some((l) =>
-    l.includes("from '@/design-system/primitives'") && l.includes('Dialog')
-    || l.includes("from '@/design-system/primitives/Dialog'")
+  const usesDialogPrimitive = lines.some(
+    (l) =>
+      (l.includes("from '@/design-system/primitives'") && l.includes('Dialog')) ||
+      l.includes("from '@/design-system/primitives/Dialog'")
   );
 
   for (let i = 0; i < lines.length; i++) {
@@ -72,7 +115,7 @@ for (const f of tsxFiles) {
           'Rule 1',
           f,
           i + 1,
-          'dialog element found without Dialog primitive import or inert attribute'
+          'dialog element found without Dialog primitive import or inert attribute — focus trap required'
         );
       }
     }
@@ -80,14 +123,12 @@ for (const f of tsxFiles) {
 }
 
 // ── Rule 2: icon-only buttons must have aria-label ─────────────────────────
+// Heuristic: <button> that contains SVG and no visible text must have aria-label.
 
-for (const f of tsxFiles) {
+for (const f of uniqueTsxFiles) {
   const content = fs.readFileSync(f, 'utf8');
   const lines = content.split('\n');
 
-  // Find <button elements that contain only SVG children (no visible text)
-  // Simple heuristic: <button without aria-label that contains <svg or icon imports
-  // We look for multi-line button blocks
   let inButton = false;
   let buttonStart = 0;
   let buttonContent = '';
@@ -124,9 +165,10 @@ for (const f of tsxFiles) {
 
       if (depth <= 0) {
         // End of button block
-        const hasVisibleText = />[^<{]*[a-zA-Z][^<{]*<\//.test(buttonContent.replace(/<[^>]+>/g, ' '));
+        const hasVisibleText = />[^<{]*[a-zA-Z][^<{]*<\//.test(
+          buttonContent.replace(/<[^>]+>/g, ' ')
+        );
         const hasSvg = /<svg/.test(buttonContent);
-        // If button has SVG and no visible text and no aria-label → violation
         if (hasSvg && !hasVisibleText && !hasAriaLabel) {
           addViolation('Rule 2', f, buttonStart, 'icon-only button missing aria-label');
         }
@@ -140,8 +182,9 @@ for (const f of tsxFiles) {
 }
 
 // ── Rule 3: CSS transitions/transforms must be inside prefers-reduced-motion
+// Checks all CSS files in Phase 14 scope.
 
-for (const f of cssFiles) {
+for (const f of uniqueCssFiles) {
   const content = fs.readFileSync(f, 'utf8');
   const lines = content.split('\n');
   let insideReducedMotion = false;
@@ -165,7 +208,6 @@ for (const f of cssFiles) {
     }
 
     if (!insideReducedMotion) {
-      // Check for unconditional transition: or animation: declarations
       if (/^\s*transition\s*:/.test(line) || /^\s*animation\s*:/.test(line)) {
         addViolation(
           'Rule 3',
@@ -179,6 +221,10 @@ for (const f of cssFiles) {
 }
 
 // ── Report ─────────────────────────────────────────────────────────────────
+
+console.log(
+  `[verify:a11y-pass-2] Scanned ${uniqueTsxFiles.length} TSX files, ${uniqueCssFiles.length} CSS files across Phase 14 surfaces`
+);
 
 if (violations.length === 0) {
   console.log('[verify:a11y-pass-2] PASS — no a11y violations found');
