@@ -42,8 +42,8 @@ Phase 11 and Phase 12 may run in parallel. Phase 12's scanner intelligence uses 
 
 - [x] **Phase 10: Inventory & Wiring Audit** — Classify every Rust module + every route + every config field. Output `WIRING-AUDIT.md`; feeds Phase 14 backlog. (completed 2026-04-20)
 - [x] **Phase 11: Smart Provider Setup** — Custom config paste (cURL/JSON/Python), key validation probe, per-capability routing, capability-gap empty states with upgrade CTAs. (completed 2026-04-20)
-- [ ] **Phase 12: Smart Deep Scan** — Replace dumb 12-scanner sweep with lead-following scanner (8 source classes), streaming, structured editable profile.
-- [ ] **Phase 13: Self-Configuring Ecosystem** — Scan-result-driven auto-enable of observer-class tentacles; observe-only guardrail; Settings rationale + one-click disable.
+- [x] **Phase 12: Smart Deep Scan** — Replace dumb 12-scanner sweep with lead-following scanner (8 source classes), streaming, structured editable profile. (completed 2026-04-20)
+- [x] **Phase 13: Self-Configuring Ecosystem** — Scan-result-driven auto-enable of observer-class tentacles; observe-only guardrail; Settings rationale + one-click disable. (completed 2026-04-24)
 - [x] **Phase 14: Wiring & Accessibility Pass** — Close NOT-WIRED gaps, remove/fix WIRED-NOT-USED dead UI, a11y sweep 2, persistent Activity Log strip. (completed 2026-04-24)
 - [x] **Phase 15: Density + Polish** — Spacing audit, card gaps, background-image dominance, top-bar hierarchy, empty-state copy rewrite across all 50+ routes. (completed 2026-04-24)
 
@@ -127,7 +127,14 @@ Plans:
 
 **Notes**: Soft dependency on Phase 11 — if Phase 11 lands first, Phase 12 uses `vision_provider` / `long_context_provider` for richer signal classification; if Phase 12 starts first, it falls back to primary provider. Scan must never write to external services.
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+- [x] 12-01-PLAN.md — Wave 1: deep_scan module + Lead/Queue core + fs_repos/git_remotes/mru scanners (SCAN-01, SCAN-02, SCAN-06, SCAN-09, SCAN-10)
+- [x] 12-02-PLAN.md — Wave 2: ide_workspaces + ai_sessions + shell_history + bookmarks + which_sweep scanners + config (SCAN-03, SCAN-04, SCAN-05, SCAN-07, SCAN-08)
+- [x] 12-03-PLAN.md — Wave 3: structured profile document + persistence + source attribution (SCAN-11, SCAN-12)
+- [x] 12-04-PLAN.md — Wave 3: profile editor UI + round-trip save (SCAN-11, SCAN-12)
+- [x] 12-05-PLAN.md — Wave 4: cold-install baseline verification + activity log streaming (SCAN-10, SCAN-13)
 
 **UI hint**: yes
 
@@ -153,9 +160,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 13-01-PLAN.md — Wave 1: Rust ecosystem module (config extension, 6 probes, guardrail, 4 commands, deep_scan hook) (ECOSYS-01..06, ECOSYS-08, ECOSYS-09)
-- [ ] 13-02-PLAN.md — Wave 2: EcosystemPane UI + SettingsShell + TypeScript wrappers + 2 e2e specs (ECOSYS-07, ECOSYS-08, ECOSYS-10)
-- [ ] 13-03-PLAN.md — Wave 3: verify:ecosystem-guardrail gate + cold-install manual trace (ECOSYS-09, ECOSYS-10)
+- [x] 13-01-PLAN.md — Wave 1: Rust ecosystem module (config extension, 6 probes, guardrail, 4 commands, deep_scan hook) (ECOSYS-01..06, ECOSYS-08, ECOSYS-09)
+- [x] 13-02-PLAN.md — Wave 2: EcosystemPane UI + SettingsShell + TypeScript wrappers + 2 e2e specs (ECOSYS-07, ECOSYS-08, ECOSYS-10)
+- [x] 13-03-PLAN.md — Wave 3: verify:ecosystem-guardrail gate + cold-install manual trace (ECOSYS-09, ECOSYS-10)
 
 **UI hint**: yes
 
@@ -227,8 +234,8 @@ Plans:
 |-------|----------------|--------|-----------|
 | 10. Inventory & Wiring Audit | 5/5 | Complete    | 2026-04-20 |
 | 11. Smart Provider Setup | 6/6 | Complete    | 2026-04-20 |
-| 12. Smart Deep Scan | 0/TBD | Not started | — |
-| 13. Self-Configuring Ecosystem | 0/3 | Planned     | — |
+| 12. Smart Deep Scan | 5/5 | Complete    | 2026-04-20 |
+| 13. Self-Configuring Ecosystem | 3/3 | Complete    | 2026-04-24 |
 | 14. Wiring & Accessibility Pass | 5/5 | Complete    | 2026-04-24 |
 | 15. Density + Polish | 5/5 | Complete    | 2026-04-24 |
 
