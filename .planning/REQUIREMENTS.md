@@ -81,17 +81,17 @@ All 156 v1.0 requirements (FOUND, WIN, WIRE-01..08, ONBD, SHELL, DASH, CHAT, SET
 **: Every WIRED-NOT-USED UI surface either gets its trigger fixed or is removed; no dead UI survives v1.1
 - [x] **WIRE2-04
 **: Every newly-wired surface gets a command-palette entry (⌘K) so keyboard discovery matches visual discovery
-- [ ] **WIRE2-05**: Post-phase re-run of WIRING-AUDIT.md reports NOT-WIRED count = 0 OR every remaining item carries a documented "deferred to v1.2" rationale
-- [ ] **WIRE2-06**: `npm run verify:all` gains a feature-reachability script that crawls the route registry + command palette and asserts every backend module has at least one reachable invocation path
+- [x] **WIRE2-05**: Post-phase re-run of WIRING-AUDIT.md reports NOT-WIRED count = 0 OR every remaining item carries a documented "deferred to v1.2" rationale
+- [x] **WIRE2-06**: `npm run verify:all` gains a feature-reachability script that crawls the route registry + command palette and asserts every backend module has at least one reachable invocation path
 
 ### Accessibility Pass 2 (A11Y2)
 
-- [ ] **A11Y2-01**: Every new surface in Phase 14 passes keyboard navigation — logical tab order, all interactives focusable, visible focus ring against glass
-- [ ] **A11Y2-02**: WCAG AA 4.5:1 contrast re-verified on every new v1.1 surface against the 5 representative wallpapers used by v1.0's contrast test harness
-- [ ] **A11Y2-03**: Every new control has a screen-reader label (`aria-label` or `aria-labelledby`) — no icon-only buttons without text alternative
-- [ ] **A11Y2-04**: Every new dialog traps focus on open, restores focus to the trigger on close, and closes on Esc
-- [ ] **A11Y2-05**: New animations respect `prefers-reduced-motion` — no unconditional transitions or transforms on reduced-motion users
-- [ ] **A11Y2-06**: `npm run verify:all` gains an `a11y-pass-2` script asserting no icon-only buttons without labels, no dialogs without focus traps, no unguarded animations
+- [x] **A11Y2-01**: Every new surface in Phase 14 passes keyboard navigation — logical tab order, all interactives focusable, visible focus ring against glass
+- [x] **A11Y2-02**: WCAG AA 4.5:1 contrast re-verified on every new v1.1 surface against the 5 representative wallpapers used by v1.0's contrast test harness
+- [x] **A11Y2-03**: Every new control has a screen-reader label (`aria-label` or `aria-labelledby`) — no icon-only buttons without text alternative
+- [x] **A11Y2-04**: Every new dialog traps focus on open, restores focus to the trigger on close, and closes on Esc
+- [x] **A11Y2-05**: New animations respect `prefers-reduced-motion` — no unconditional transitions or transforms on reduced-motion users
+- [x] **A11Y2-06**: `npm run verify:all` gains an `a11y-pass-2` script asserting no icon-only buttons without labels, no dialogs without focus traps, no unguarded animations
 
 ### Activity Log (LOG)
 
