@@ -17,22 +17,22 @@
   transform: translate(-50%, -50%);
   width: 900px;
   max-width: calc(100vw - 80px);
-  padding: 56px 64px 52px;
+  padding: var(--s-12) var(--s-16) var(--s-12);
   border-radius: var(--r-2xl, 28px);
 }
 
 /* Step-pill row (reused by all 4 steps) */
 .onb-steps {
   display: flex;
-  gap: 10px;
+  gap: var(--s-3);
   align-items: center;
-  margin-bottom: 28px;
+  margin-bottom: var(--s-8);
 }
 .step-pill {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 16px 8px 10px;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-4);
   border-radius: var(--r-pill);
   background: var(--g-fill);
   color: var(--t-3);
@@ -77,8 +77,8 @@
 .brand {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-bottom: 28px;
+  gap: var(--s-4);
+  margin-bottom: var(--s-8);
 }
 .brand-mark {
   width: 52px;
@@ -111,7 +111,7 @@
   font-size: 44px;
   letter-spacing: -0.03em;
   line-height: 1.05;
-  margin-bottom: 12px;
+  margin-bottom: var(--s-3);
   color: var(--t-1);
 }
 .onb p.subtitle {
@@ -130,14 +130,14 @@
 .providers {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 14px;
-  margin-top: 34px;
+  gap: var(--s-4);
+  margin-top: var(--s-8);
 }
 .provider {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 18px 20px;
+  gap: var(--s-4);
+  padding: var(--s-5) var(--s-5);
   border-radius: var(--r-md);
   background: var(--g-fill);
   border: 1px solid var(--g-edge-lo);
@@ -207,24 +207,24 @@
 
 /* API-key field (Step 2) */
 .onb-field {
-  margin-top: 34px;
+  margin-top: var(--s-8);
 }
 .onb-label {
   display: block;
   font-size: 12px;
   color: var(--t-3);
-  margin-bottom: 8px;
+  margin-bottom: var(--s-2);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 .onb-key-row {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 10px;
+  gap: var(--s-3);
 }
 .onb-error {
-  margin-top: 14px;
-  padding: 10px 12px;
+  margin-top: var(--s-4);
+  padding: var(--s-3) var(--s-3);
   border-radius: var(--r-sm, 8px);
   background: rgba(248, 113, 113, 0.12);
   color: rgba(254, 202, 202, 0.98);
@@ -232,8 +232,8 @@
   font-size: 13px;
 }
 .onb-ok {
-  margin-top: 14px;
-  padding: 10px 12px;
+  margin-top: var(--s-4);
+  padding: var(--s-3) var(--s-3);
   border-radius: var(--r-sm, 8px);
   background: rgba(52, 211, 153, 0.12);
   color: rgba(138, 255, 199, 0.98);
@@ -243,8 +243,8 @@
 .onb-footer {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
-  margin-top: 36px;
+  gap: var(--s-3);
+  margin-top: var(--s-8);
 }
 
 /* Phase 11 D-56 — divider between the 6-provider grid and the paste card.
@@ -269,8 +269,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
-  margin-top: 40px;
+  gap: var(--s-5);
+  margin-top: var(--s-10);
 }
 .scan-ring {
   position: relative;
@@ -290,15 +290,15 @@
 .scan-phases {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 6px 18px;
+  gap: var(--s-2) var(--s-5);
   width: 100%;
   max-width: 520px;
-  margin-top: 8px;
+  margin-top: var(--s-2);
 }
 .scan-phase {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
   font-size: 13px;
   color: var(--t-3);
 }
@@ -321,13 +321,13 @@
 .persona-grid {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  margin-top: 32px;
+  gap: var(--s-5);
+  margin-top: var(--s-8);
 }
 .persona-row {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--s-2);
 }
 .persona-row label {
   font-size: 12px;

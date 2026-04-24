@@ -34,7 +34,7 @@
 .settings-tab {
   background: transparent;
   border: 0;
-  padding: 8px 12px;
+  padding: var(--s-2) var(--s-3);
   text-align: left;
   border-radius: var(--r-card);
   color: var(--t-2);
@@ -57,7 +57,7 @@
   background: rgba(255, 255, 255, 0.10);
   color: var(--t-1);
   border-left: 2px solid #fff;
-  padding-left: 10px;
+  padding-left: var(--s-3);
 }
 
 .settings-pane {
@@ -101,7 +101,7 @@
 .settings-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--s-1);
 }
 
 .settings-field label,
@@ -129,7 +129,7 @@
 .provider-tagline {
   color: var(--t-3);
   font-size: 13px;
-  margin: 4px 0;
+  margin: var(--s-1) 0;
 }
 
 .settings-notice {
@@ -150,7 +150,7 @@
   display: grid;
   grid-template-columns: minmax(140px, auto) 1fr;
   column-gap: var(--sp-3);
-  row-gap: 6px;
+  row-gap: var(--s-2);
   font-size: 13px;
 }
 
@@ -191,7 +191,7 @@
   grid-template-columns: 1fr auto auto;
   gap: var(--sp-2);
   align-items: center;
-  padding: 8px 12px;
+  padding: var(--s-2) var(--s-3);
   border-radius: var(--r-card);
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.06);

@@ -43,7 +43,7 @@
 /* Input — ported from shared.css:283-295 */
 .input {
   width: 100%;
-  padding: 14px 18px;
+  padding: var(--s-4) var(--s-5);
   font: inherit; font-family: var(--font-body); font-size: 15px; color: var(--t-1);
   background: rgba(0,0,0,0.22);
   border: 1px solid var(--g-edge-mid);

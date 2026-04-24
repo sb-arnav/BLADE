@@ -22,8 +22,8 @@
 /* ── Shell (shared by both modes) ─────────────────────────────────────── */
 .quickask {
   position: relative;
-  padding: 12px 16px;
-  margin: 12px;
+  padding: var(--s-3) var(--s-4);
+  margin: var(--s-3);
   background: var(--g-fill);
   border: 1px solid var(--g-edge-mid);
   backdrop-filter: blur(20px) saturate(160%);
@@ -46,12 +46,12 @@
 .quickask-text {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--s-3);
 }
 
 .quickask-response {
   margin-top: 2px;
-  padding-top: 10px;
+  padding-top: var(--s-3);
   border-top: 1px solid var(--line);
   font-size: 14px;
   line-height: 1.55;
@@ -66,13 +66,13 @@
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--s-1);
 }
 .quickask-history button {
   font: inherit;
   text-align: left;
   width: 100%;
-  padding: 6px 10px;
+  padding: var(--s-2) var(--s-3);
   background: var(--g-fill-weak);
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
@@ -95,9 +95,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
-  padding: 28px 32px 24px;
-  margin: 12px;
+  gap: var(--s-4);
+  padding: var(--s-6) var(--s-8) var(--s-6);
+  margin: var(--s-3);
   background: linear-gradient(180deg, rgba(10, 8, 20, 0.62) 0%, rgba(10, 8, 20, 0.52) 100%);
   border: 1px solid rgba(255, 255, 255, 0.10);
   backdrop-filter: blur(48px) saturate(200%);

@@ -393,7 +393,7 @@
     border-radius: var(--r-pill);
     font-size: 12px;
     display: inline-flex;
-    gap: 4px;
+    gap: var(--s-1);
     align-items: center;
     color: var(--t-1);
   }

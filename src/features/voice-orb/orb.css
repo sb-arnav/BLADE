@@ -234,7 +234,7 @@
   bottom: 16px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 8px 14px;
+  padding: var(--s-2) var(--s-4);
   background: rgba(212, 54, 54, 0.85);
   color: #fff;
   font-size: 12px;
