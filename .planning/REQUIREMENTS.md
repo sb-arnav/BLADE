@@ -49,15 +49,23 @@ All 156 v1.0 requirements (FOUND, WIN, WIRE-01..08, ONBD, SHELL, DASH, CHAT, SET
 
 ### Self-Configuring Ecosystem (ECOSYS)
 
-- [ ] **ECOSYS-01**: If N repos found by scan, repo-watcher tentacle auto-enables (file-change + git-activity monitoring, read-only)
-- [ ] **ECOSYS-02**: If Slack token or `~/.slack/` config detected, Slack monitor tentacle auto-enables (read-only triage, no reply capability)
-- [ ] **ECOSYS-03**: If Vercel CLI installed and auth'd, deploy-monitor tentacle auto-enables (status reads, no deploys)
-- [ ] **ECOSYS-04**: If GitHub CLI auth'd, PR-watcher tentacle auto-enables (read-only, no merges)
-- [ ] **ECOSYS-05**: If active Cursor / Claude Code sessions detected, session-context bridge tentacle auto-enables
-- [ ] **ECOSYS-06**: If Calendar API credentials detected, calendar-monitor tentacle auto-enables (read-only)
+- [x] **ECOSYS-01
+**: If N repos found by scan, repo-watcher tentacle auto-enables (file-change + git-activity monitoring, read-only)
+- [x] **ECOSYS-02
+**: If Slack token or `~/.slack/` config detected, Slack monitor tentacle auto-enables (read-only triage, no reply capability)
+- [x] **ECOSYS-03
+**: If Vercel CLI installed and auth'd, deploy-monitor tentacle auto-enables (status reads, no deploys)
+- [x] **ECOSYS-04
+**: If GitHub CLI auth'd, PR-watcher tentacle auto-enables (read-only, no merges)
+- [x] **ECOSYS-05
+**: If active Cursor / Claude Code sessions detected, session-context bridge tentacle auto-enables
+- [x] **ECOSYS-06
+**: If Calendar API credentials detected, calendar-monitor tentacle auto-enables (read-only)
 - [ ] **ECOSYS-07**: Settings page lists every auto-enabled tentacle with its trigger rationale (e.g. "Auto-enabled because deep scan found 14 repos") and a one-click disable toggle
-- [ ] **ECOSYS-08**: Disabling an auto-enabled tentacle persists across restarts; the tentacle does not re-enable unless the user explicitly opts in
-- [ ] **ECOSYS-09**: Hard observe-only guardrail — no auto-enabled tentacle performs any outbound action (reply/post/deploy/modify external state) in v1.1; enforced by a runtime check, not policy. Acting capability requires explicit Settings-side enablement even when credentials are present.
+- [x] **ECOSYS-08
+**: Disabling an auto-enabled tentacle persists across restarts; the tentacle does not re-enable unless the user explicitly opts in
+- [x] **ECOSYS-09
+**: Hard observe-only guardrail — no auto-enabled tentacle performs any outbound action (reply/post/deploy/modify external state) in v1.1; enforced by a runtime check, not policy. Acting capability requires explicit Settings-side enablement even when credentials are present.
 - [ ] **ECOSYS-10**: Cold install on Arnav's machine + Phase 12 scan produces ≥5 auto-enabled observer tentacles, all listed in Settings with rationale, all toggleable
 
 ### Wiring Pass (WIRE2)
