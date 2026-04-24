@@ -193,6 +193,11 @@ export const BLADE_EVENTS = {
   HIVE_ACTION_DEFERRED:   'hive_action_deferred',   // hive.rs:2763 — hive action deferred (ApprovalQueue HIVE-04)
   TENTACLE_ERROR:         'tentacle_error',         // hive.rs:2304 — tentacle Error status (HiveMesh + TentacleDetail)
   WORLD_STATE_UPDATED:    'world_state_updated',    // world_model.rs:869 — background world refresh (WorldModel BODY-06)
+
+  // ───── Phase 14 — Activity Log (Plan 14-01, LOG-01..05) ──────────────────
+  // Emitted by ecosystem.rs emit_activity_with_id() on every observer tick.
+  // Payload: ActivityLogEntry (see src/features/activity-log/index.tsx).
+  ACTIVITY_LOG: 'blade_activity_log',
 } as const;
 
 /** Literal union of every string in BLADE_EVENTS. */
