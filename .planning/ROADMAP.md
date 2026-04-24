@@ -150,7 +150,12 @@ Plans:
 
 **Notes**: The runtime guardrail is load-bearing — it is the difference between "safe smart default" and "scary surprise". Implement the guard as a central policy check rather than per-tentacle, so v1.2 acting-capability work removes one check in one place.
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 13-01-PLAN.md — Wave 1: Rust ecosystem module (config extension, 6 probes, guardrail, 4 commands, deep_scan hook) (ECOSYS-01..06, ECOSYS-08, ECOSYS-09)
+- [ ] 13-02-PLAN.md — Wave 2: EcosystemPane UI + SettingsShell + TypeScript wrappers + 2 e2e specs (ECOSYS-07, ECOSYS-08, ECOSYS-10)
+- [ ] 13-03-PLAN.md — Wave 3: verify:ecosystem-guardrail gate + cold-install manual trace (ECOSYS-09, ECOSYS-10)
 
 **UI hint**: yes
 
@@ -209,7 +214,7 @@ Plans:
 | 10. Inventory & Wiring Audit | 5/5 | Complete    | 2026-04-20 |
 | 11. Smart Provider Setup | 6/6 | Complete    | 2026-04-20 |
 | 12. Smart Deep Scan | 0/TBD | Not started | — |
-| 13. Self-Configuring Ecosystem | 0/TBD | Not started | — |
+| 13. Self-Configuring Ecosystem | 0/3 | Planned     | — |
 | 14. Wiring & Accessibility Pass | 0/TBD | Not started | — |
 | 15. Density + Polish | 0/TBD | Not started | — |
 
