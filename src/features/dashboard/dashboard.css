@@ -20,6 +20,19 @@
  * @see .planning/phases/03-dashboard-chat-settings/03-CONTEXT.md §D-76, §D-07
  */
 
+/* ── DENSITY-03: background-image dominance (Plan 15-04) ──────────────────
+ * Dashboard content must read cleanly over every wallpaper. Enforced rule:
+ * every content surface uses at minimum var(--g-fill-weak) (0.04 alpha)
+ * via a token, never raw rgba(255,255,255,0.03) or lower. Tier 2 cards
+ * (GlassPanel tier={2}) are the standard; tier 1 is reserved for empty-state
+ * glass primitives. Raw rgba background declarations in this file are a
+ * spacing-ladder-level violation: tokens exist so the 5-wallpaper contrast
+ * audit binds them (scripts/audit-contrast.mjs against BG_WALLPAPER).
+ *
+ * @see src/styles/tokens.css --g-fill-weak / --g-fill / --g-fill-strong
+ * @see .planning/phases/15-density-polish/15-04-PLAN.md (DENSITY-03)
+ */
+
 /* ── Dashboard root + 12-column grid ────────────────────────────────────── */
 
 .dashboard {
@@ -58,7 +71,9 @@
 .dash-hero {
   padding: var(--s-6);
   border-radius: var(--r-lg);
-  background: rgba(255, 255, 255, 0.04);
+  /* DENSITY-03: tier-2 fill ensures hero text reads cleanly over every
+   * wallpaper in the 5-wallpaper contrast audit baseline. */
+  background: var(--g-fill);
   border: 1px solid var(--line);
   display: flex;
   flex-direction: column;
@@ -105,7 +120,8 @@
   text-transform: uppercase;
   border-radius: var(--r-pill);
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.03);
+  /* DENSITY-03: tokenized — was 0.03 raw, now tier-1 weak (0.04). */
+  background: var(--g-fill-weak);
   color: var(--t-2);
 }
 
@@ -151,7 +167,8 @@
   font-family: var(--font-body);
   font-size: 12px;
   color: var(--t-2);
-  background: rgba(255, 255, 255, 0.04);
+  /* DENSITY-03: chip background uses tier-1 weak fill for contrast. */
+  background: var(--g-fill-weak);
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
 }
@@ -213,7 +230,8 @@
   align-items: center;
   padding: var(--s-3) var(--s-4);
   border-radius: var(--r-md);
-  background: rgba(255, 255, 255, 0.03);
+  /* DENSITY-03: tokenized — was 0.03 raw, now tier-1 weak (0.04). */
+  background: var(--g-fill-weak);
   border: 1px solid var(--line);
 }
 
@@ -234,7 +252,8 @@
   font-family: var(--font-body);
   font-size: 12px;
   color: var(--t-2);
-  background: rgba(255, 255, 255, 0.04);
+  /* DENSITY-03: hormone chip base — tier-1 weak fill. */
+  background: var(--g-fill-weak);
   border: 1px solid var(--line);
   border-left: 2px solid var(--chip-color, var(--t-3));
   border-radius: var(--r-sm);
@@ -267,7 +286,8 @@
 .hormone-chip.is-dominant {
   padding: 8px 16px;
   font-size: 13px;
-  background: rgba(255, 255, 255, 0.06);
+  /* DENSITY-03: dominant variant uses tier-2 fill for stronger presence. */
+  background: var(--g-fill);
   border-left-width: 3px;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--chip-color, transparent) 25%, transparent),
     0 4px 12px color-mix(in srgb, var(--chip-color, transparent) 15%, transparent);
