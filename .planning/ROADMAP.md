@@ -181,11 +181,11 @@ Plans:
 **Plans**: 5 plans
 
 Plans:
-- [ ] 14-01-PLAN.md — Wave 0: Activity log foundation (ActivityStrip + ActivityDrawer + verify scripts) (LOG-01, LOG-02, LOG-03, LOG-04, LOG-05)
-- [ ] 14-02-PLAN.md — Wave 1: Module wiring — Voice + Privacy + Intelligence + System pane additions (WIRE2-01, WIRE2-03, WIRE2-04)
-- [ ] 14-03-PLAN.md — Wave 1: Dashboard binding to live data — replace 3 ComingSoonCards (WIRE2-02, WIRE2-03)
-- [ ] 14-04-PLAN.md — Wave 1: A11y sweep + verify script hardening (WIRE2-05, WIRE2-06, A11Y2-01..A11Y2-06)
-- [ ] 14-05-PLAN.md — Wave 2: Manual verification checkpoint (WIRE2-01, WIRE2-02, WIRE2-05, WIRE2-06, A11Y2-01..A11Y2-06, LOG-01..LOG-05)
+- [x] 14-01-PLAN.md — Wave 0: Activity log foundation (ActivityStrip + ActivityDrawer + verify scripts) (LOG-01, LOG-02, LOG-03, LOG-04, LOG-05)
+- [x] 14-02-PLAN.md — Wave 1: Module wiring — Voice + Privacy + Intelligence + System pane additions (WIRE2-01, WIRE2-03, WIRE2-04)
+- [x] 14-03-PLAN.md — Wave 1: Dashboard binding to live data — replace 3 ComingSoonCards (WIRE2-02, WIRE2-03)
+- [x] 14-04-PLAN.md — Wave 1: A11y sweep + verify script hardening (WIRE2-05, WIRE2-06, A11Y2-01..A11Y2-06)
+- [x] 14-05-PLAN.md — Wave 2: Manual verification checkpoint (WIRE2-01, WIRE2-02, WIRE2-05, WIRE2-06, A11Y2-01..A11Y2-06, LOG-01..LOG-05)
 
 **UI hint**: yes
 
