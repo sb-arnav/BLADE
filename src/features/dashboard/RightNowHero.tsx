@@ -28,13 +28,65 @@
 
 import { useEffect, useState } from 'react';
 import { perceptionGetLatest, perceptionUpdate } from '@/lib/tauri/perception';
+import { ecosystemListTentacles } from '@/lib/tauri/ecosystem';
+import { deepScanResults } from '@/lib/tauri/deepscan';
 import type { PerceptionState } from '@/types/perception';
+
+// DENSITY-07 (Plan 15-04): the hero carries ≥ 3 live signals from the union of
+// three independent backends — perception_fusion (active app + user state +
+// vitals), ecosystem (enabled tentacle count), and deep_scan (repo count from
+// the scan profile). Each fetch silently degrades on error so a cold install
+// with no scan run and no tentacles enabled still renders chips with `0` /
+// `…` placeholders rather than "No data" bare negation (15-03 copy rule).
 
 export function RightNowHero() {
   const [state, setState] = useState<PerceptionState | null>(null);
+  const [tentacleCount, setTentacleCount] = useState<number | null>(null);
+  const [scanRepoCount, setScanRepoCount] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+
+    // DENSITY-07: parallel fetch of ecosystem + scan signals. These run
+    // alongside perception so the hero paints its three signals in one
+    // commit cycle. No retry loops (T-15-04-02 mitigation).
+    ecosystemListTentacles()
+      .then((t) => {
+        if (cancelled) return;
+        setTentacleCount(t.filter((x) => x.enabled).length);
+      })
+      .catch(() => {
+        /* silent degrade — chip renders `…` when tentacleCount stays null */
+      });
+
+    deepScanResults()
+      .then((r) => {
+        if (cancelled) return;
+        if (!r) {
+          // Cold install — scan has never run. 0 IS a live signal
+          // (truthful "you have 0 known repos") per DENSITY-07.
+          setScanRepoCount(0);
+          return;
+        }
+        // DeepScanResults is typed as Record<string, unknown> in the TS
+        // surface (src/types/provider.ts:48). The Rust struct exposes a
+        // `repos` array in the fs_repos scanner output, but the exact
+        // shape isn't narrowed in TS. Read defensively so a future Rust
+        // schema rename doesn't crash the hero — fall back to 0.
+        const rec = r as Record<string, unknown>;
+        const repos = rec.repos;
+        const count = Array.isArray(repos)
+          ? repos.length
+          : typeof rec.repos_found === 'number'
+            ? (rec.repos_found as number)
+            : typeof rec.repo_count === 'number'
+              ? (rec.repo_count as number)
+              : 0;
+        setScanRepoCount(count);
+      })
+      .catch(() => {
+        /* silent degrade */
+      });
 
     (async () => {
       let latest: PerceptionState | null = null;
@@ -112,7 +164,8 @@ export function RightNowHero() {
   return (
     <section className="dash-hero" aria-label="Right now">
       <header className="dash-hero-head">
-        <h2 className="dash-hero-app t-h2">{activeApp}</h2>
+        {/* DENSITY-07: live signal — active app from perception_fusion */}
+        <h2 className="dash-hero-app t-h2" data-signal="active-app">{activeApp}</h2>
         <span
           className={`dash-hero-state state-${userState}`}
           aria-label={`user state: ${userState}`}
@@ -135,6 +188,27 @@ export function RightNowHero() {
         <li className="dash-hero-chip">
           <span className="dash-hero-chip-label">Top</span>
           <span className="dash-hero-chip-value">{state.top_cpu_process || '—'}</span>
+        </li>
+        {/* DENSITY-07: live signal — repos from scan profile (deep_scan) */}
+        <li className="dash-hero-chip" data-signal="scan-repos">
+          <span className="dash-hero-chip-label">Repos</span>
+          <span className="dash-hero-chip-value">
+            {scanRepoCount === null ? '…' : scanRepoCount}
+          </span>
+        </li>
+        {/* DENSITY-07: live signal — active ecosystem tentacles */}
+        <li className="dash-hero-chip" data-signal="tentacles">
+          <span className="dash-hero-chip-label">Watching</span>
+          <span className="dash-hero-chip-value">
+            {tentacleCount === null
+              ? '…'
+              : `${tentacleCount} tentacle${tentacleCount === 1 ? '' : 's'}`}
+          </span>
+        </li>
+        {/* DENSITY-07: live signal — user state from perception (already fetched) */}
+        <li className="dash-hero-chip" data-signal="user-state">
+          <span className="dash-hero-chip-label">State</span>
+          <span className="dash-hero-chip-value">{userState}</span>
         </li>
       </ul>
       {state.visible_errors.length > 0 ? (

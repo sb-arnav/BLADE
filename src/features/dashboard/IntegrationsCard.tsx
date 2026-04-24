@@ -78,9 +78,9 @@ export function IntegrationsCard() {
               key={t.id}
               className="t-small"
               style={{
-                padding: '2px 8px',
+                padding: '2px 6px',
                 borderRadius: 'var(--r-sm)',
-                background: 'rgba(255,255,255,0.07)',
+                background: 'var(--g-fill)',
                 color: 'var(--t-2)',
                 fontSize: 12,
               }}

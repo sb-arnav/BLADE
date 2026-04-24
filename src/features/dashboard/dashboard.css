@@ -96,7 +96,7 @@
 .dash-hero-state {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--s-2);
   padding: 4px 12px;
   font-family: var(--font-body);
   font-size: 11px;
@@ -146,7 +146,7 @@
 .dash-hero-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--s-2);
   padding: 4px 10px;
   font-family: var(--font-body);
   font-size: 12px;
@@ -178,7 +178,7 @@
 
 .dash-hero-errors summary {
   cursor: pointer;
-  padding: 4px 0;
+  padding: var(--s-1) 0;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 10px;
@@ -229,7 +229,7 @@
 .hormone-chip {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
   padding: 6px 12px;
   font-family: var(--font-body);
   font-size: 12px;
