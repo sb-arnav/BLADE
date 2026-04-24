@@ -186,8 +186,8 @@ export function SecurityDashboard() {
       {activeTab === 'alerts' ? (
         !loading && overview && activeAlerts === 0 ? (
           <EmptyState
-            label="No security alerts"
-            description="BLADE runs background scans periodically."
+            label="BLADE is still scanning"
+            description="Alerts will appear once background scans complete — give me 24h."
           />
         ) : (
           <SecurityAlertsTab overview={overview} />

@@ -323,8 +323,8 @@ export function AccountabilityView() {
             </p>
             {dailyActions.length === 0 ? (
               <EmptyState
-                label="No accountability events"
-                description="Commitments show here as you make them."
+                label="BLADE is still learning your commitments"
+                description="Events will appear once you make a commitment — ask me to track one in chat."
               />
             ) : (
               <div>

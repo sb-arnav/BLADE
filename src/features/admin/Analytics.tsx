@@ -248,8 +248,8 @@ export function Analytics() {
             </p>
             {events.length === 0 ? (
               <EmptyState
-                label="No analytics yet"
-                description="Events appear as BLADE tracks activity."
+                label="BLADE is still warming up"
+                description="Events will appear after BLADE tracks activity — give me 24h."
               />
             ) : (
               <div className="analytics-events-feed" data-testid="analytics-events-feed">

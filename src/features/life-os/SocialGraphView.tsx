@@ -300,8 +300,8 @@ export function SocialGraphView() {
 
           {!listLoading && !listError && contacts.length === 0 && (
             <EmptyState
-              label="No contacts yet"
-              description="Contacts are derived from chat + email + calendar."
+              label="BLADE is still learning your network"
+              description="Contacts will appear after 24h of observed chat, email, and calendar activity — give me a day."
             />
           )}
 

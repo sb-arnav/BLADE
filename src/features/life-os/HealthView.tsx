@@ -369,8 +369,8 @@ export function HealthView() {
             <h3 className="health-insights-title">Insights</h3>
             {insights.length === 0 ? (
               <EmptyState
-                label="No health data"
-                description="BLADE will populate this as it observes your activity."
+                label="BLADE is still learning your baseline"
+                description="Insights will appear after 24h of observed activity — give me a day."
               />
             ) : (
               <ul className="health-insights-list">

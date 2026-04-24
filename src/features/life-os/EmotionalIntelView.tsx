@@ -229,8 +229,8 @@ export function EmotionalIntelView() {
             <p className="social-section-label">Readings ({readings.length})</p>
             {readings.length === 0 ? (
               <EmptyState
-                label="No insights yet"
-                description="BLADE needs more observation to surface emotional patterns."
+                label="BLADE is still learning your emotional patterns"
+                description="Insights will appear after 24h of observed activity — give me a day."
               />
             ) : (
               <div className="emotion-readings-list">

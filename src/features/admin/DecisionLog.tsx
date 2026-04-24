@@ -361,8 +361,8 @@ export function DecisionLog() {
           <h3 className="admin-section-title">Recent decisions</h3>
           {decisions.length === 0 ? (
             <EmptyState
-              label="No decisions logged"
-              description="The decision gate logs entries as BLADE acts."
+              label="BLADE is still learning when to act"
+              description="Decisions will appear after the gate starts logging — give me 24h of observed activity."
             />
           ) : (
             <div className="decision-list">
