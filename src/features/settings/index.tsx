@@ -39,4 +39,5 @@ export const routes: RouteDefinition[] = [
   { id: 'settings-privacy',      label: 'Privacy',     section: 'core', component: SettingsShell, phase: 3 },
   { id: 'settings-diagnostics',  label: 'Diagnostics', section: 'core', component: SettingsShell, phase: 3 },
   { id: 'settings-about',        label: 'About',       section: 'core', component: SettingsShell, phase: 3 },
+  { id: 'settings-ecosystem',    label: 'Ecosystem',   section: 'core', component: SettingsShell, phase: 13 },
 ];
