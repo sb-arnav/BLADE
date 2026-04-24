@@ -175,3 +175,13 @@ export interface ProfileView {
   llm_enrichments: LlmEnrichments | null;
   scanned_at: number | null;
 }
+
+// ── Phase 13 Plan 13-02 — Ecosystem tentacle record (ECOSYS-07) ──────────────
+// Fields match Rust TentacleRecord exactly (no #[serde(rename_all)] applied).
+export interface TentacleRecord {
+  id: string;
+  enabled: boolean;
+  rationale: string;
+  enabled_at: number;
+  trigger_detail: string;
+}

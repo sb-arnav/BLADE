@@ -110,6 +110,9 @@ export * as admin from './admin';
 export * as body from './body';
 export * as hive from './hive';
 
+// Phase 13 additions — Ecosystem tentacle wrappers (Plan 13-02, ECOSYS-07/08).
+export * from './ecosystem';
+
 // Events convenience re-export (D-38-evt, D-38-hook). Raw `listen`/`invoke`
 // are intentionally NOT re-exported here — the wrapped surfaces (useTauriEvent,
 // invokeTyped) are the only permitted escape hatches per D-13.
