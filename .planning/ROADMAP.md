@@ -208,7 +208,14 @@ Plans:
 
 **Notes**: Regressions in v1.0 verify gates (contrast, chat-rgba, ghost-no-cursor, orb-rgba, hud-chip-count, etc.) fail the phase. Polish means no regressions, not just new wins.
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+- [ ] 15-01-PLAN.md — Wave 0: Spacing ladder documentation + verify:spacing-ladder + verify:empty-states-copy scripts (DENSITY-01, DENSITY-05, DENSITY-06)
+- [ ] 15-02-PLAN.md — Wave 1: Top-bar hierarchy (4-tier) + 1280px responsive guardrails + Playwright spec (DENSITY-04)
+- [ ] 15-03-PLAN.md — Wave 1: Empty-state copy rewrite sweep across 29 feature files (DENSITY-05)
+- [ ] 15-04-PLAN.md — Wave 1: Dashboard hero live signals (scan + ecosystem + perception) + glass-fill tokenization + cold-install spec (DENSITY-02, DENSITY-03, DENSITY-07)
+- [ ] 15-05-PLAN.md — Wave 2: Route sweep tokenization + 5-wallpaper human verification checkpoint (DENSITY-01, DENSITY-02, DENSITY-03, DENSITY-06)
 
 **UI hint**: yes
 
@@ -223,7 +230,7 @@ Plans:
 | 12. Smart Deep Scan | 0/TBD | Not started | — |
 | 13. Self-Configuring Ecosystem | 0/3 | Planned     | — |
 | 14. Wiring & Accessibility Pass | 5/5 | Complete    | 2026-04-24 |
-| 15. Density + Polish | 0/TBD | Not started | — |
+| 15. Density + Polish | 0/5 | Planned     | — |
 
 ---
 
