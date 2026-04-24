@@ -127,8 +127,8 @@ export function ModelComparison() {
         <section className="diagnostics-section">
           {Object.keys(latency).length === 0 && (
             <EmptyState
-              label="No comparisons yet"
-              description="Run a prompt on multiple models to compare."
+              label="BLADE is still learning your routing preferences"
+              description="Latency scores will appear once you test each slot — give me a minute after clicking Test."
             />
           )}
           <div className="model-comparison-table">

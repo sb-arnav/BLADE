@@ -211,7 +211,12 @@ export function AiDelegate() {
           Live ring buffer (max {MAX_LOG}) of AI_DELEGATE_APPROVED / DENIED events.
         </p>
         {log.length === 0 ? (
-          <EmptyState label="No delegate decisions recorded" />
+          <EmptyState
+            label="BLADE is still learning your delegation preferences"
+            description="Decisions will appear once BLADE starts reviewing — introduce BLADE to the delegate to begin."
+            actionLabel={introducing ? 'Introducing…' : 'Introduce BLADE'}
+            onAction={onIntroduce}
+          />
         ) : (
           <div className="delegate-log" style={{ marginTop: 'var(--space-2)' }}>
             {log.map((entry, i) => {
