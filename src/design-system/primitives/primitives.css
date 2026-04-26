@@ -58,6 +58,46 @@
 .input:focus { border-color: var(--g-edge-hi); }
 .input.mono { font-family: var(--font-mono); font-size: 14px; letter-spacing: 0; }
 
+/* Native <select> — without this, WebView2 (Win) and WKWebView render the
+ * default OS chrome: white background + light text → invisible. This rule
+ * matches the .input look and forces the option list to a dark surface so
+ * dropdowns are readable on every platform. (#dropdown-white-bg)
+ *
+ * Note: the open dropdown list itself is rendered by the OS in some WebViews
+ * and we cannot fully style it. <option> background+color is honored on
+ * Chromium-based WebView2 (Win) and WebKit (macOS). */
+select {
+  width: 100%;
+  padding: var(--s-3) var(--s-4);
+  padding-right: var(--s-7);
+  font: inherit; font-family: var(--font-body); font-size: 14px;
+  color: var(--t-1);
+  background-color: rgba(14, 10, 28, 0.85);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--t-2) 50%),
+    linear-gradient(135deg, var(--t-2) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 12px) 50%;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  border: 1px solid var(--g-edge-mid);
+  border-radius: var(--r-md);
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-smooth);
+}
+select:hover { border-color: var(--g-edge-hi); }
+select:focus { border-color: var(--g-edge-hi); }
+select:disabled { opacity: 0.55; cursor: not-allowed; }
+select option {
+  background-color: rgb(14, 10, 28);
+  color: var(--t-1);
+}
+
 /* Pill (.chip + variants) — ported from shared.css:300-315 */
 .chip {
   display: inline-flex; align-items: center; gap: 6px;

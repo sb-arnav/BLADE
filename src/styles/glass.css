@@ -12,10 +12,16 @@
 
 .glass {
   position: relative;
-  background: linear-gradient(180deg,
-    rgba(255,255,255,0.13) 0%,
-    rgba(255,255,255,0.06) 45%,
-    rgba(255,255,255,0.04) 100%);
+  /* Card background bumped from 13/6/4% → 24/14/10% white alpha layered on
+   * a 32% dark base. With the .main-shell::before wallpaper dim, content
+   * cards are now readable on any wallpaper without the queen/face/photo
+   * bleeding through. (#wallpaper-dominance) */
+  background:
+    linear-gradient(180deg,
+      rgba(255,255,255,0.10) 0%,
+      rgba(255,255,255,0.06) 45%,
+      rgba(255,255,255,0.04) 100%),
+    rgba(14, 10, 28, 0.55);
   backdrop-filter: blur(20px) saturate(160%) brightness(1.05);
   -webkit-backdrop-filter: blur(20px) saturate(160%) brightness(1.05);
   border: 1px solid var(--g-edge-mid);

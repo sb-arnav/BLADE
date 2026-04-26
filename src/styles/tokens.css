@@ -86,14 +86,23 @@ html, body {
   padding: 0;
   /* tauri.conf.json windows[].transparent=true — wallpaper must show through.
      Liquid Glass (D-06/D-07) blurs the wallpaper via backdrop-filter on
-     individual panels. DO NOT set an opaque bg here. */
+     individual panels. DO NOT set an opaque bg here — dim layer is provided
+     by .main-shell::before so the wallpaper still reads as identity. */
   background: transparent;
   color: var(--t-1);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: -0.01em;
+  /* Lock body scroll + trackpad horizontal overscroll. Without this, a
+     two-finger horizontal swipe on a trackpad drags the entire window
+     viewport (#trackpad-overscroll). Pages scroll inside .main-shell-route. */
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: auto;
 }
+html { height: 100%; }
+body { height: 100%; }
 
 /* Scrollbar styling — default chromium bar ruins the Liquid Glass vibe.
    Thin, semi-transparent, hover-reveal track. D-07 opacity tier. */
