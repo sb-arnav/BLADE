@@ -406,18 +406,42 @@ dialog.glass:has(.palette) {
 /* ── MainShell layout (Plan 02-06) ───────────────────────────────────── */
 
 .main-shell {
+  position: relative;
   min-height: 100vh;
+  height: 100vh;
   display: grid;
   grid-template-rows: var(--title-height) 1fr;
+  isolation: isolate;
 }
+
+/* Wallpaper dim layer — stops the OS desktop image from competing with
+ * content while preserving D-06/D-07 transparency identity. The wallpaper
+ * still reads (a tinted hint of it shows through) but contrast over content
+ * is guaranteed on every wallpaper, fixing the Phase 15 "verify:contrast
+ * passed but visually unreadable" gap. (#wallpaper-dominance) */
+.main-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg,
+      rgba(8, 6, 18, 0.62) 0%,
+      rgba(8, 6, 18, 0.74) 100%);
+  pointer-events: none;
+  z-index: -1;
+}
+
 .main-shell-body {
   display: grid;
   grid-template-columns: var(--nav-width, 62px) 1fr;
   min-height: 0;
+  overflow: hidden;
 }
 .main-shell-route {
   position: relative;
   overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
   min-height: 0;
 }
 
