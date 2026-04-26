@@ -62,14 +62,18 @@
 
 .settings-pane {
   overflow-y: auto;
-  padding: var(--sp-2);
+  /* Bumped from sp-2 (8px) → sp-4 (16px). The 8px right-pane padding stacked
+   * tightly with .settings-shell's outer padding, leaving content visibly
+   * cramped against pane edges on Voice/Privacy/Personality. */
+  padding: var(--sp-4);
   min-height: 0;
 }
 
 .settings-pane h2,
 .settings-pane h3 {
   color: var(--t-1);
-  margin: 0 0 var(--sp-2) 0;
+  /* Bumped from sp-2 (8px) → sp-3 (12px) for proper heading→body separation. */
+  margin: 0 0 var(--sp-3) 0;
 }
 
 .settings-pane p {
@@ -80,8 +84,13 @@
 .settings-section {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
-  margin-bottom: var(--sp-4);
+  /* Within-section gap: sp-2 (8px) → sp-3 (12px). Each row of fields/controls
+   * inside a section now has clearer separation. */
+  gap: var(--sp-3);
+  /* Between-section margin: sp-4 (16px) → sp-6 (24px). Voice/Privacy/Personality
+   * had Capture-TTS, Shortcut, Wake-word stacked with only 16px between
+   * sections — visibly cramped. 24px gives proper section rhythm. */
+  margin-bottom: var(--sp-6);
 }
 
 .settings-section-title {
