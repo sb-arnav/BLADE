@@ -98,6 +98,56 @@ select option {
   color: var(--t-1);
 }
 
+/* Native checkbox — default OS chrome is light gray, near-invisible on dark.
+ * accent-color tints the native control to match the design's accent so it
+ * reads on dark wallpaper. (#native-form-controls) */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+}
+input[type="checkbox"]:disabled,
+input[type="radio"]:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Native range slider — default OS chrome varies wildly across platforms.
+ * accent-color tints the modern Chromium implementation; for older WebViews
+ * the explicit track + thumb rules below provide a uniform look. */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  accent-color: rgba(255, 255, 255, 0.85);
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: var(--r-pill);
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--g-edge-mid);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-smooth);
+}
+input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.1); }
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--g-edge-mid);
+  cursor: pointer;
+}
+input[type="range"]:disabled { opacity: 0.55; cursor: not-allowed; }
+
 /* Pill (.chip + variants) — ported from shared.css:300-315 */
 .chip {
   display: inline-flex; align-items: center; gap: 6px;
