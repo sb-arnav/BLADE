@@ -2,102 +2,113 @@
 
 ## What This Is
 
-BLADE is a desktop AI that lives on your machine — a "body" of 178+ Rust modules (brain, organs, tentacles, DNA, nervous and immune systems) plus a Liquid-Glass-native React skin across 5 windows and 59 routes. V1 shipped the substrate: backend is functional, frontend is rebuilt on coherent tokens, all 10 phases landed (`npm run verify:all` 18/18 green). **v1.1** turns that substrate into something that actually works for a first-time user — wiring backends that exist but aren't surfaced, replacing dumb defaults (12-scanner sweep, 6 hardcoded provider cards) with capability-aware smart defaults, closing the accessibility + activity-surface gaps the tester pass exposed.
+BLADE is a desktop AI that lives on your machine — a "body" of 178+ Rust modules (brain, organs, tentacles, DNA, nervous and immune systems) plus a Liquid-Glass-native React skin across 5 windows and 50+ routes. **v1.0** shipped the substrate. **v1.1** wired it into something a first-time user can actually use: paste-anything provider setup, lead-following deep scan, self-configuring observer-class ecosystem, end-to-end wiring + a11y, and the persistent activity-log trust surface. v1.2 starts the trust-earned acting layer.
 
 ## Core Value
 
-**BLADE works out of the box.** A first-time user pastes a key (or a cURL snippet), the deep scan surfaces their actual environment, observer-class tentacles auto-enable based on what was found, every backend capability is reachable from UI, and the user can always see what BLADE is doing. No dead UI. No invisible features. No empty dashboard.
+**BLADE works out of the box, and you can always see what it's doing.** A first-time user pastes a key (or a cURL/JSON/Python snippet), the smart deep scan reads 8 source classes intelligently, observer-class tentacles auto-enable behind a runtime guardrail, every backend capability is reachable from UI or has a documented v1.2 deferral, and the persistent activity-log strip surfaces every cross-module action with click-to-drawer reasoning.
+
+## Current State
+
+**Shipped:** v1.0 (Skin Rebuild substrate, 2026-04-19) + v1.1 (Functionality, Wiring, Accessibility, 2026-04-24, closed 2026-04-27).
+
+- 178+ Rust modules; 764+ Tauri commands; 73+ event emitters
+- 27 verify gates green; tsc --noEmit clean; 5 windows boot; design tokens locked
+- Phase 11 capability-aware routing operational; Phase 12 smart scan operational; Phase 13 observer ecosystem operational behind `OBSERVE_ONLY: AtomicBool` runtime guardrail; Phase 14 activity-log strip mounted; Phase 15 density + spacing-ladder + empty-state copy + top-bar hierarchy passed
+
+**Audit:** v1.1 closed at status `tech_debt` — no functional blockers; 11 operator-owned UAT items (cold-install screenshots, runtime persistence checks, 5-wallpaper contrast, keyboard-nav, 50-route ⌘K sweep) tracked in STATE.md `## Deferred Items` per the v1.0 Mac-smoke convention.
 
 ## Requirements
 
-### Validated
+### Validated (shipped)
 
-<!-- Shipped in v1.0 — the Skin Rebuild milestone. Consumed by v1.1. -->
+<!-- v1.0 Skin Rebuild substrate -->
 
-- ✓ Backend: 178+ Rust modules, 764 `#[tauri::command]`s, 73 event emitters
-- ✓ Backend: 10 tentacles, 4 heads, 10 hormones, 12 body systems, body_registry
-- ✓ All 5 windows boot (main / quickask / overlay / hud / ghost_overlay) — no Rust panics
-- ✓ Design tokens: glass tiers, blur caps, radii, motion curves locked in `src/styles/`
-- ✓ 9 primitives self-built (Button, Card, GlassPanel, Input, Pill, Badge, GlassSpinner, Dialog, ComingSoonSkeleton)
-- ✓ Typed Tauri wrapper base (`invokeTyped<T>`) + `useTauriEvent` hook + `BLADE_EVENTS` registry
-- ✓ Custom router + 82 route stubs + `usePrefs` + `ConfigContext`
-- ✓ Chat pipeline: streaming, tool calls, 29 `blade_*` events
-- ✓ Voice Orb (4 phase states, OpenClaw math), QuickAsk, Ghost Mode (content-protected), HUD bar
-- ✓ 18 verify gates green: entries, no-raw-tauri, migration-ledger, emit-policy, contrast, chat-rgba, ghost-no-cursor, orb-rgba, hud-chip-count + 9 playwright specs
-- ✓ 156 V1 requirements across 21 categories mapped + shipped (FOUND, WIN, WIRE-01..08, ONBD, SHELL, DASH, CHAT, SET, QUICK, ORB, GHOST, HUD, AGENT, KNOW, LIFE, IDEN, DEV, ADMIN, BODY, HIVE, POL)
+- ✓ Backend: 178+ Rust modules, 764 `#[tauri::command]`s, 73 event emitters — v1.0
+- ✓ Backend: 10 tentacles, 4 heads, 10 hormones, 12 body systems, body_registry — v1.0
+- ✓ All 5 windows boot (main / quickask / overlay / hud / ghost_overlay) — v1.0
+- ✓ Design tokens: glass tiers, blur caps, radii, motion curves locked — v1.0
+- ✓ 9 primitives self-built (Button, Card, GlassPanel, Input, Pill, Badge, GlassSpinner, Dialog, ComingSoonSkeleton) — v1.0
+- ✓ Typed Tauri wrapper base (`invokeTyped<T>`) + `useTauriEvent` hook + `BLADE_EVENTS` registry — v1.0
+- ✓ Custom router + 50+ routes + `usePrefs` + `ConfigContext` — v1.0
+- ✓ Chat pipeline: streaming, tool calls, 29 `blade_*` events — v1.0
+- ✓ Voice Orb (4 phase states, OpenClaw math), QuickAsk, Ghost Mode (content-protected), HUD bar — v1.0
+- ✓ 18 verify gates green at v1.0 — v1.0
 
-## Current Milestone: v1.1 — Functionality, Wiring, Accessibility
+<!-- v1.1 Functionality, Wiring, Accessibility -->
 
-**Goal:** Make BLADE actually work as the thing it already is — wire every backend capability to UI, replace dumb defaults with smart ones, and make the surface reachable + trustworthy.
+- ✓ AUDIT — full WIRING-AUDIT classifying every Rust module + route + config field with NOT-WIRED backlog feeding Phase 14 — v1.1
+- ✓ PROV — paste-anything provider setup (cURL/JSON/Python), capability probe persistence, 3-tier capability-aware router resolution, 8 capability-gap consumer surfaces with deep-link CTAs — v1.1 (VERIFIED PASSED)
+- ✓ SCAN — lead-following deep scan across 8 source classes; structured editable profile with round-trip persistence (SCAN-13 cold-install baseline operator-owned) — v1.1
+- ✓ ECOSYS — 6 observer-class tentacle probes (repo-watcher, Slack, deploy-monitor, PR-watcher, session bridge, calendar) with runtime OBSERVE_ONLY guardrail; per-tentacle rationale + one-click disable — v1.1
+- ✓ WIRE2 — every NOT-WIRED gap closed or documented v1.2 deferral (97 deferred-with-rationale); 3 ComingSoonCards on Dashboard replaced with live bindings; verify:feature-reachability gate — v1.1
+- ✓ A11Y2 — keyboard nav + aria-labels + focus traps + reduced-motion gates; verify:a11y-pass-2 gate — v1.1 (5-wallpaper contrast UAT operator-owned)
+- ✓ LOG — persistent ActivityStrip + ActivityDrawer + 500-entry localStorage ring buffer; emit_activity_with_id signature wired into 6 ecosystem observer loops — v1.1 (LOG-04 time-range filter advisory; runtime UAT operator-owned)
+- ✓ DENSITY — spacing-ladder gate (0 violations across 39 CSS files); 18-file empty-state copy rewrite; 4-tier top-bar hierarchy with 1280/1100 responsive guardrails; RightNowHero with 4 live-signal chips — v1.1 (5-wallpaper + cold-install + 50-route UAT operator-owned)
 
-**Anchor:** v1.1 is NOT a new-feature milestone. The substrate exists; tester pass surfaced that most of it is unwired, unreachable, or backed by defaults that make the surface feel empty (chat silently fails, deep scan finds 1 repo, dashboard pages empty, cluttered UI, unreachable options, no activity surface, non-capability-aware routing).
+### Active (v1.2 — TBD via /gsd-new-milestone)
 
-**Target features:**
-- **Inventory & Wiring Audit** — classify every Rust module + every route (ACTIVE / WIRED-NOT-USED / NOT-WIRED / DEAD); output becomes the plan input for the wiring pass
-- **Smart Provider Setup** — paste cURL/JSON/Python → auto-extract provider+model+key; validate key on save (probe capabilities); capability-aware routing with per-capability fallback prompts; "plug in better key" empty-states
-- **Smart Deep Scan** — replace 12-scanner sweep with a lead-following scanner (filesystem walk, git remotes, IDE workspaces, AI session history, shell history, MRU, bookmarks, installed CLIs); builds its own todo list; streams results to activity log; structured editable profile output
-- **Self-Configuring Ecosystem (observe-only)** — scan results silently activate observer-class tentacles (repo watcher, Slack monitor, deploy monitor, PR watcher, session bridge, calendar monitor); hard rule: observe-only in v1.1, every auto-enabled tentacle listed in Settings with rationale + one-click disable
-- **Wiring & Accessibility Pass** — close every NOT-WIRED gap from audit, fix or remove WIRED-NOT-USED dead UI, A11y sweep on new surfaces, persistent Activity Log strip ("BLADE is doing…" with click-to-drawer reasoning)
-- **Density + Polish** — spacing ladder audit, card gaps, background-image dominance fix, top-bar hierarchy pass, empty-state copy rewrite
+To be defined. Anchor candidates from v1.1 deferral pool:
 
-**Planning source of truth:** `.planning/notes/v1-1-milestone-shape.md` (locked 2026-04-20). Deviations from the 6-phase shape require explicit sign-off.
+- [ ] **JARVIS** — push-to-talk → natural-language command → cross-app action flow (consumes v1.1 wiring + ecosystem + activity log)
+- [ ] **ACT** — outbound acting capability per observer tentacle (Slack reply, Email reply, GitHub PR review comments, Calendar accept/decline, Linear ticket creation), each behind per-tentacle enablement + trust-tier escalation
+- [ ] **BROWSER** — evaluate `browser-use/browser-harness` vs current `browser_native.rs` + `browser_agent.rs` (Q1 decision; load-bearing for JARVIS)
+- [ ] **OPERATOR-UAT** — close the 11 operator-owned UAT items carried from v1.1 (cold-install screenshots, runtime persistence checks, 5-wallpaper contrast, keyboard-nav, 50-route ⌘K sweep)
+- [ ] **WIRE3** — burn down a tranche of the 97 DEFERRED_V1_2 backend modules (prioritize ones acting tentacles will consume)
 
-**v2+ vision (deferred):** `.planning/notes/v2-vision-tentacles.md`. Out of scope for v1.1: acting tentacles (reply/post/deploy), JARVIS push-to-talk demo, browser harness deep work, heads + big agent, business SDK, Hyprland integration.
-
-### Active
-
-<!-- v1.1 scope. Requirement IDs defined in REQUIREMENTS.md; rolled up here by category. -->
-
-- [ ] **AUDIT** — wiring audit artifact covering every Rust module + route with classification
-- [ ] **PROV** — smart provider setup: custom config paste, key validation, capability-aware routing, upgrade-prompt empty-states
-- [ ] **SCAN** — lead-following deep scan: 8 source classes, streaming, editable structured profile
-- [ ] **ECOSYS** — self-configuring observer tentacles: auto-enable from scan, Settings rationale + one-click disable, strict observe-only guardrail
-- [ ] **WIRE2** — wire every NOT-WIRED backend to UI; remove/fix every WIRED-NOT-USED dead UI
-- [ ] **A11Y2** — a11y pass 2 (keyboard, focus, contrast, SR labels, dialog traps, reduced-motion) on every surface added in v1.1
-- [ ] **LOG** — activity log strip: "BLADE is doing…" surface, click → drawer with payload + reasoning, event-per-cross-module-action
-- [ ] **DENSITY** — spacing/density/hierarchy/copy polish across all 50+ routes
+Final v1.2 scope locks during `/gsd-new-milestone`.
 
 ### Out of Scope
 
-Unchanged from v1.0 plus additional v1.1 exclusions:
+Unchanged across v1.0 + v1.1:
 
-- **Acting tentacles in v1.1** — observe-only is the rule. Anything that replies, posts, deploys, or modifies external state requires explicit per-tentacle enablement and ships in v1.2+. *Why: trust is earned; a first cold-install must not surprise the user with an outbound action.*
-- **JARVIS push-to-talk demo moment** — deferred to v1.2+. *Why: v1.1 builds the wiring a JARVIS demo would consume; adding it here dilutes the "make it work" anchor.*
-- **Browser harness deep integration** — research question Q1 (`browser-use/browser-harness`) stays open in `research/questions.md` until v1.2 scoping. *Why: load-bearing for JARVIS, not for v1.1's wiring pass.*
-- **Head models + Big Agent** — v2+ vision. *Why: needs multiple tentacles to be useful; heads are the v2 milestone unit.*
-- **Multi-instance / business SDK / Hyprland / Linux power-user niche** — adjacent directions logged in `v2-vision-tentacles.md`. *Why: destination, not route.*
-- All v1.0 Out of Scope entries (shadcn, Framer Motion, Zustand, React Router, light theme, backend rewrites beyond wiring gaps, mobile/web port, etc.) remain out of scope.
+- shadcn/Radix, Framer Motion, Zustand, React Router (D-01..D-05 stack decisions hold)
+- Light theme / accent picker (deferred indefinitely)
+- Mobile/web port (desktop-only by design)
+- Backend rewrite beyond wiring gaps (M-01 anchor: v1.1 was wiring, not new features; v1.2 acting work obeys the same anchor)
+- Multi-instance / business SDK (v2+ adjacent direction)
+- Hyprland compositor integration (v2+ adjacent direction)
+- Heads + Big Agent (v2+ — needs multiple acting tentacles per head to be useful)
 
 ## Context
 
-- **V1 substrate is shipped.** 10 phases, ~165 commits, 64 plans, `npm run verify:all` 18/18 green, `npx tsc --noEmit` clean. Mac smoke checkpoints (M-01..M-46) tracking separately — do not gate v1.1 start.
-- **Tester pass grounding.** v1.1 scope is evidence-backed: tester's 6 concrete breakages (silent chat failure, 1-repo scan, empty dashboard, no activity surface, cluttered UI, unreachable options, Groq+llama routing miss) are the source material for the 6 phases.
-- **The body works.** v1.1 does not rewrite backend beyond wiring gaps. Every backend capability listed under Validated is callable today; the issue is UI reachability and smart defaults, not the engine.
-- **Tester commits already landed.** `580175f docs(explore): lock v1.1 milestone shape`, `90d72aa docs(explore): capture v2+ tentacles vision + browser-harness question`, `4ab464c fix(tester-pass-1): silence log spam, stop self_upgrade loop, surface chat errors` — Phase 0 audit can assume these.
-- **Phase numbering.** v1.0 occupied phases 0..9. v1.1 continues at phase 10 and runs to phase 15 (6 phases). The locked shape's internal "Phase 0..5" names map 1:1 to global phases 10..15.
+- v1.0 substrate is shipped; v1.1 wiring is shipped. The body works *and* it's reachable.
+- 27 verify gates green (v1.0=18 + v1.1=9 new); tsc --noEmit clean; CI green on Linux/macOS/Windows.
+- Cold-install dev environment: WSL2 on Windows 11. Mac smoke (M-01..M-46) and physical-display UAT operator-owned per HANDOFF-TO-MAC.md.
+- Tester pass #1 grievances all addressed in v1.1: silent chat fail (4ab464c), 1-repo scan (Phase 12), empty dashboard (Phase 14), no activity surface (Phase 14), cluttered UI (Phase 15), unreachable options (Phase 14), Groq+llama routing miss (Phase 11).
+- Activity log is now load-bearing — every cross-module action emits to it; the strip is the trust surface for "is BLADE doing anything?"
 
 ## Constraints
 
 - **Tech stack:** unchanged. React 19 + TypeScript + Vite 7 + Tauri 2.10 + Tailwind v4. No runtime CSS-in-JS, no motion lib, no state lib beyond React primitives.
-- **Observe-only guardrail** (v1.1 hard rule): every auto-enabled tentacle from the ecosystem phase is read-only. Any outbound action (reply, post, push, deploy, modify external state) requires explicit Settings-side enablement even when credentials are present.
-- **No backend rewrites beyond wiring gaps.** v1.1 may add capabilities that close audit gaps (new commands for a NOT-WIRED module, new events for an activity log surface), but net-new organ/tentacle capabilities belong to v2+.
-- **Activity log is load-bearing.** Every cross-module action in v1.1 must emit an event consumed by the log. This is the trust surface for "is BLADE doing anything?"
-- **Performance budgets** from V1 remain: dashboard first paint ≤200ms on integrated GPU, Voice Orb 60fps through all 4 phase transitions, max 3 backdrop-filter per viewport, blur caps 20/12/8px.
-- **Verify gates extend, not replace.** v1.1 adds a11y-pass-2 + feature-reachability scripts to the existing 18 gates. Regressions in existing gates fail the phase.
+- **Observe-only guardrail (v1.1 hard rule):** every auto-enabled tentacle from the ecosystem phase is read-only via runtime `OBSERVE_ONLY: AtomicBool`. v1.2 acting work will flip this guardrail per-tentacle behind explicit user consent + trust-tier escalation, never silently.
+- **No backend rewrites beyond wiring gaps.** Net-new organ/tentacle capabilities belong to v2+. v1.2 may add per-tentacle acting paths but does not add new tentacle classes.
+- **Activity log remains load-bearing.** Every cross-module action in v1.2 must continue to emit. The strip is the v1.1 contract.
+- **Performance budgets:** Dashboard first paint ≤200ms on integrated GPU, Voice Orb 60fps through all 4 phase transitions, max 3 backdrop-filter per viewport, blur caps 20/12/8px.
+- **Verify gates extend, not replace.** v1.2 will add to the 27-gate chain; regressions in any existing gate fail the phase.
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| v1.1 = wiring + smart defaults + a11y, NOT a new-feature milestone | Tester pass exposed the substrate is unwired, not underbuilt; adding features would compound the problem | — Locked 2026-04-20 |
-| 6-phase shape locked from /gsd-explore; /gsd-new-milestone may flesh out but not revise | Prevents drift when requirements/roadmap pass re-surfaces prior debates | — Locked 2026-04-20 |
-| Ecosystem phase is observe-only in v1.1 | Auto-enabling acting tentacles on cold install violates trust; acting capability is a separate earned-trust milestone | — Locked 2026-04-20 |
-| JARVIS push-to-talk moment deferred to v1.2+ | JARVIS consumes v1.1's wiring; shipping it in v1.1 would dilute the "make it work" anchor | — Locked 2026-04-20 |
-| Phase numbering continues from v1.0 (v1.1 = phases 10..15) | Preserves global phase history; archived phases 0..9 keep their paths | — Locked 2026-04-20 |
-| Capability-aware routing lives in Phase 11 (Smart Provider Setup) | Phase 12 (Smart Deep Scan) uses Phase 11's capabilities for lead-following; sequencing flows naturally | — Locked 2026-04-20 |
-| Activity log strip is load-bearing, not polish | Tester's "background terminal noise, no trust" is the #1 UX grievance; belongs in Phase 14 (wiring + a11y), not Phase 15 (density) | — Locked 2026-04-20 |
-| `v2-vision-tentacles.md` captured verbatim, separately | Destination in view while planning the route; prevents roadmap re-argument against vision | — Locked 2026-04-20 |
-| v1.0 decisions D-01..D-45 remain in force | v1.1 does not re-litigate V1 architecture choices | — Inherited |
+| v1.0 D-01 Self-built 9 primitives, no shadcn/Radix | Liquid-Glass aesthetic + bundle size | ✓ Held through v1.1 |
+| v1.0 D-02 CSS-only motion, no Framer Motion | Bundle + reduced-motion compliance | ✓ Held |
+| v1.0 D-03 Hand-written Tauri wrappers in `src/lib/tauri/` | Type safety + audit-clean IPC | ✓ Held; v1.1 added 4 new wrapper clusters (voice/privacy/intelligence/system) |
+| v1.0 D-04 useChat + ConfigContext, no Zustand | React primitives sufficient | ✓ Held |
+| v1.0 D-05 Custom route registry, no React Router | Custom route hint + ⌘K palette parity | ✓ Held; v1.1 extended openRoute(id, hint?) + routeHint sidecar |
+| v1.0 D-07 Max 3 backdrop-filter per viewport; blur caps 20/12/8px | Integrated-GPU performance | ✓ Held |
+| v1.0 D-09 Ghost Mode `.content_protected(true)` at creation | Screen-share hostile-window leak prevention | ✓ Held |
+| v1.0 D-13 useTauriEvent hook is the only permitted event subscription pattern | Lifecycle correctness | ✓ Held; v1.1 ActivityStrip uses it for BLADE_EVENTS.ACTIVITY_LOG |
+| v1.0 D-14 emit_to(window_label, ...) for single-window; emit_all for cross-window only | Avoid event leak | ✓ Held |
+| v1.0 D-56 Onboarding preserves 6 hardcoded provider IDs alongside paste flow | Discoverability for new users | ✓ Held in Phase 11 |
+| v1.0 D-57 Settings Provider pane shares the same paste flow component | Single source of truth | ✓ Held |
+| v1.1 M-01 Wiring + smart defaults + a11y, NOT a new-feature milestone | Tester pass exposed unwired substrate; features compound the problem | ✓ Held; v1.1 added zero net-new tentacle classes |
+| v1.1 M-02 6-phase shape locked from /gsd-explore | Prevent drift during requirements/roadmap pass | ✓ Held — no shape revisions during execution |
+| v1.1 M-03 Ecosystem observe-only via runtime check | Acting tentacles on cold install violate trust | ✓ Held; OBSERVE_ONLY: AtomicBool enforces |
+| v1.1 M-04 JARVIS push-to-talk deferred to v1.2+ | v1.1 builds the wiring JARVIS consumes | ✓ Held; v1.2 candidate |
+| v1.1 M-06 Capability-aware routing in Phase 11; Phase 12 consumes it | Sequencing flows naturally | ✓ Held; soft dep resolved at integration point |
+| v1.1 M-07 Activity log strip in Phase 14 (wiring), not Phase 15 (density) | Tester's #1 UX grievance ("no trust") is wiring, not polish | ✓ Held |
+| v1.1 close: accept tech_debt (operator UAT items) and proceed | Same convention as v1.0 Mac-smoke close-out | ✓ Logged 2026-04-27 |
 
 ## Evolution
 
@@ -117,4 +128,5 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-20 — v1.1 milestone initialized (goals, constraints, 6-phase shape locked from /gsd-explore)*
+
+*Last updated: 2026-04-27 — v1.1 milestone closed (status: tech_debt; no blockers; 11 operator-owned UAT items deferred per v1.0 Mac-smoke convention). v1.2 scope to be defined via /gsd-new-milestone.*

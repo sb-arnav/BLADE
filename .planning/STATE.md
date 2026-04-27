@@ -1,138 +1,97 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: History
-current_phase: --phase
+milestone: v1.1
+milestone_name: Functionality, Wiring, Accessibility
+current_phase: closed
 status: milestone_complete
-last_updated: "2026-04-24T08:36:47.210Z"
-last_activity: 2026-04-24 -- Phase --phase execution started
+last_updated: "2026-04-27T09:15:00Z"
+last_activity: 2026-04-27 -- v1.1 milestone closed (status=tech_debt; phases 10-15 archived to milestones/v1.1-phases/)
 progress:
   total_phases: 6
   completed_phases: 6
   total_plans: 29
-  completed_plans: 24
+  completed_plans: 29
   percent: 100
 ---
 
-# STATE — BLADE v1.1 (Functionality, Wiring, Accessibility)
+# STATE — BLADE (post-v1.1)
 
 **Project:** BLADE — Desktop JARVIS
-**Current Milestone:** v1.1 — Make BLADE actually work as the thing it already is
-**Current Phase:** 15
-**Status:** Milestone complete
-**Last Updated:** 2026-04-20
+**Last shipped milestone:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27)
+**Current Focus:** Planning v1.2 (run `/gsd-new-milestone`)
+**Status:** Awaiting next milestone scope
 
 ---
 
 ## Project Reference
 
-**Core Value:** BLADE works out of the box. A first-time user pastes a key, the deep scan surfaces their actual environment, observer-class tentacles auto-enable, every backend capability is reachable, and the user can always see what BLADE is doing.
+See: `.planning/PROJECT.md` (updated 2026-04-27 at v1.1 close)
 
-**Current Focus:** Phase --phase — 15
+**Core value:** BLADE works out of the box, and you can always see what it's doing.
 
----
-
-## Current Position
-
-Phase: --phase (15) — EXECUTING
-Plan: Not started
-Status: Executing Phase --phase
-Last activity: 2026-04-24
+**v1.2 anchor candidates:** JARVIS push-to-talk, acting tentacles (per-tentacle consent + trust-tier escalation), browser-harness Q1 decision, 11 operator UAT carry-overs from v1.1, partial burn-down of 97 DEFERRED_V1_2 backend modules.
 
 ---
 
-## v1.1 Roadmap Preview
+## Recent Context
 
-```
-[Phase 10] Inventory & Wiring Audit       ░░░░░░░░░░░░░░░░░░░░  Not started
-[Phase 11] Smart Provider Setup           ░░░░░░░░░░░░░░░░░░░░  Not started
-[Phase 12] Smart Deep Scan                ░░░░░░░░░░░░░░░░░░░░  Not started
-[Phase 13] Self-Configuring Ecosystem     ░░░░░░░░░░░░░░░░░░░░  Not started
-[Phase 14] Wiring & Accessibility Pass    ░░░░░░░░░░░░░░░░░░░░  Not started
-[Phase 15] Density + Polish               ░░░░░░░░░░░░░░░░░░░░  Not started
-```
+### Shipped milestones
+- **v1.0** (2026-04-19) — Skin Rebuild substrate (10 phases, ~165 commits, 18 verify gates green); phase dirs at `.planning/phases/0[0-9]-*` (never formally archived)
+- **v1.1** (2026-04-24, closed 2026-04-27) — Functionality, Wiring, Accessibility (6 phases, 29 plans, 27 verify gates green); archived to `milestones/v1.1-{ROADMAP,REQUIREMENTS,MILESTONE-AUDIT}.md` + `milestones/v1.1-phases/`
 
-Sequencing: Phase 10 → (Phase 11 ∥ Phase 12) → Phase 13 → Phase 14 → Phase 15.
-Phase 12 has a soft data dependency on Phase 11 (the scanner uses capability-aware routing for its LLM calls) but can begin planning in parallel.
+### v1.1 Locked Decisions (still in force for v1.2 planning)
+- **M-01** Wiring + smart defaults + a11y, NOT new features — held; v1.2 acting work obeys the same anchor
+- **M-03** Observe-only guardrail (`OBSERVE_ONLY: AtomicBool`) — v1.2 will flip per-tentacle behind explicit user consent + trust escalation, never silently
+- **M-05** Phase numbering continues globally — v1.2 starts at Phase 16
+- **M-07** Activity log is load-bearing — every cross-module action in v1.2 must continue to emit
+
+### v1.0 Decisions Inherited
+D-01..D-45 + D-56/D-57 remain locked. See `PROJECT.md` Key Decisions table.
+
+### Open research questions for v1.2
+- **Q1**: `browser-use/browser-harness` vs current `browser_native.rs` + `browser_agent.rs` — decision deadline before v1.2 JARVIS phase plan (`research/questions.md`)
 
 ---
 
-## Accumulated Context
+## Deferred Items
 
-### v1.0 Substrate (inherited — treat as given)
+Items acknowledged and deferred at v1.1 milestone close on 2026-04-27 (per `milestones/v1.1-MILESTONE-AUDIT.md` status=tech_debt). All follow the v1.0 Mac-smoke convention (operator-owned, tracked separately):
 
-- 178+ Rust modules, 764 `#[tauri::command]`s, 73 event emitters operational
-- 10 tentacles, 4 heads, 10 hormones, 12 body systems, body_registry wired
-- 5 windows boot (main / quickask / overlay / hud / ghost_overlay); no Rust panics at startup
-- Design tokens, 9 primitives, typed Tauri wrapper, `useTauriEvent`, `BLADE_EVENTS` registry, custom router, `usePrefs`, `ConfigContext` — all shipped
-- Chat streaming + tool calls + ghost + orb + quickask + HUD all reachable via their windows
-- 18 verify gates green; `npx tsc --noEmit` clean; ~165 commits landed across 10 phases
-- Tester pass commits (`4ab464c`, `90d72aa`, `580175f`) already on master — Phase 10 audit assumes them
+| Category | Phase | Item | Status | Notes |
+|----------|-------|------|--------|-------|
+| uat_gaps | 14 | 14-HUMAN-UAT.md | partial | 6 pending — activity-strip cross-route persistence, drawer focus-restore, localStorage rehydrate-on-restart, cold-install Dashboard screenshot, keyboard tab-traversal, 5-wallpaper contrast |
+| uat_gaps | 15 | 15-05-UAT.md | unknown | 5 visual-UAT items — 5-wallpaper background-dominance, cold-install RightNowHero screenshot, top-bar hierarchy 1280×720, 50-route empty-state ⌘K sweep, spacing-ladder spot-check |
+| verification_gaps | 14 | 14-VERIFICATION.md | human_needed | 17/17 must-haves auto-verified; 6 UAT items pending |
+| verification_gaps | 15 | 15-VERIFICATION.md | human_needed | 5/5 SC auto-verified; 5 UAT items pending |
+| advisory | 14 | LOG-04 time-range filter | not implemented | Only module filter shipped; 500-entry ring buffer naturally caps window |
+| advisory | 11 | ROUTING_CAPABILITY_MISSING UI consumer | deferred | Toast/banner subscriber 0 src/; advisory WARN gate surfaces it |
+| backlog | 10 | 97 DEFERRED_V1_2 backend modules | catalogued | All carry `deferral_rationale` strings in 10-WIRING-AUDIT.json; v1.2 burn-down candidate |
 
-### v1.0 Key Decisions (still in force)
+### v1.0 Open Checkpoints (still operator-owned)
+- Mac smoke M-01..M-46 — `HANDOFF-TO-MAC.md`
+- Plan 01-09 WCAG checkpoint — Mac desktop environment
+- WIRE-08 full `cargo check` — WSL libspa-sys/libclang env limit; CI green
 
-D-01..D-45 remain locked. See `.planning/phases/01-foundation/01-CONTEXT.md` for full list. Highlights:
+---
 
-- D-01 Self-built 8 primitives, no shadcn/Radix
-- D-02 CSS-only motion, no Framer Motion
-- D-03 Hand-written Tauri wrappers in `src/lib/tauri/`
-- D-04 `useChat` hook + ConfigContext, no Zustand
-- D-05 Custom route registry, no React Router
-- D-07 Max 3 backdrop-filter per viewport; blur caps 20/12/8px
-- D-09 Ghost Mode `.content_protected(true)` at creation
-- D-13 `useTauriEvent` hook is the only permitted event subscription pattern
-- D-14 `emit_to(window_label, ...)` for single-window; `emit_all` for cross-window only
+## Blockers
 
-### v1.1 Decisions (locked 2026-04-20)
-
-- **M-01** v1.1 = wiring + smart defaults + a11y, NOT a new-feature milestone
-- **M-02** 6-phase shape locked from /gsd-explore; flesh-out only, no silent revision
-- **M-03** Ecosystem phase observe-only (no acting tentacles in v1.1)
-- **M-04** JARVIS push-to-talk deferred to v1.2+
-- **M-05** Phase numbering continues from v1.0 (v1.1 = phases 10..15)
-- **M-06** Capability-aware routing in Phase 11; Phase 12 consumes it
-- **M-07** Activity log strip is load-bearing (lives in Phase 14, not Phase 15)
-
-### v1.0 Open Checkpoints (track separately, do not gate v1.1)
-
-- Mac smoke M-01..M-46 — single Mac operator session planned per `.planning/HANDOFF-TO-MAC.md`
-- Plan 01-09 WCAG checkpoint — operator-owned, requires Mac desktop environment
-- WIRE-08 `cargo check` full build — unverifiable in this sandbox (libspa-sys libclang)
-
-### v1.1 Input Artifacts
-
-- `.planning/notes/v1-1-milestone-shape.md` — **authoritative** shape (6 phases, sequencing, falsifiable success criteria) — locked 2026-04-20
-- `.planning/notes/v2-vision-tentacles.md` — destination vision, not v1.1 scope
-- `.planning/research/questions.md` — Q1 browser-harness open (decision deadline: before v1.2 JARVIS phase plan)
-- Tester pass output: chat silent-fail fix (`4ab464c`), self_upgrade loop stopped, log spam silenced
-
-### Active Todos
-
-- [x] Write REQUIREMENTS.md for v1.1 (61 REQs across 8 categories) — committed in `3abcc13`
-- [x] Write ROADMAP.md for v1.1 (phases 10..15, 61/61 mapped) — committed in this session
-- [x] Commit milestone initialization (PROJECT.md + STATE.md in `6a78538`, REQUIREMENTS.md in `3abcc13`, ROADMAP.md final commit)
-- [ ] `/gsd-discuss-phase 10` — start Phase 10 (Inventory & Wiring Audit) — ready
-
-### Blockers
-
-None for v1.1 planning. Mac smoke checkpoints from v1.0 remain operator-owned and tracked separately.
+None. v1.1 closed cleanly with documented tech debt.
 
 ---
 
 ## Session Continuity
 
-**Last session:** 2026-04-24T07:42:47.730Z
-**Next action:** `/gsd-discuss-phase 10 ${GSD_WS}` — gather context for Phase 10 Inventory & Wiring Audit. Audit outputs WIRING-AUDIT.md which feeds Phase 14 backlog.
-**Context cliff notes:**
+**Last session:** 2026-04-27T09:15:00Z (v1.1 milestone close)
+**Next action:** `/clear` then `/gsd-new-milestone` to start v1.2 scoping (questioning → research → requirements → roadmap).
 
-- v1.0 is substrate-complete; v1.1 turns it into something a first-time user can actually use
-- 6 phases: audit → provider + scan (parallel) → ecosystem → wiring+a11y → density+polish
-- Observe-only guardrail on all auto-enabled tentacles in Phase 13
-- Activity log strip in Phase 14 is the trust surface for "is BLADE doing anything?"
-- Phases 5..9 from v1.0 shipped their respective clusters; v1.1 Wiring pass (Phase 14) addresses the gaps those clusters left behind
+**Context cliff notes:**
+- v1.0 + v1.1 both shipped; substrate is reachable + observable + capability-aware
+- 27 verify gates green; tsc clean
+- Phase 16+ continues global numbering
+- v1.2 acting work flips the per-tentacle observe-only guardrail with explicit consent + trust-tier escalation, never silently
+- Activity log strip is the v1.1 contract every v1.2 cross-module action must honor
 
 ---
 
-*State initialized: 2026-04-17 | v1.1 kickoff: 2026-04-20 (milestone shape locked, requirements/roadmap next)*
-
-**Planned Phase:** 15 (density-polish) — 5 plans — 2026-04-24T08:36:33.144Z
+*State updated: 2026-04-27 — v1.1 milestone closed; v1.2 scoping pending.*

@@ -1,285 +1,17 @@
-# ROADMAP — BLADE v1.1 (Functionality, Wiring, Accessibility)
+# Roadmap — BLADE
 
-**Project:** BLADE — Desktop JARVIS
-**Active milestone:** v1.1 (started 2026-04-20)
-**Granularity:** Standard (6 phases derived from `notes/v1-1-milestone-shape.md`)
-**Coverage:** v1.1 — 61/61 requirements mapped | v1.0 — 156/156 requirements shipped
-**Numbering:** continues from v1.0 (phases 10..15)
+## Milestones
 
----
-
-## Phase Dependency Diagram (v1.1)
-
-```
-Phase 10: Inventory & Wiring Audit  (foundation — feeds every subsequent phase)
-        │
-        ▼
-  ┌─────┴─────┐
-  │           │
-Phase 11   Phase 12            parallel-eligible
-Smart      Smart Deep Scan     (Phase 12 consumes Phase 11's
-Provider   (parallel)           capability-aware routing when
-Setup      │                    calling LLMs for lead-following)
-  │        │
-  └─────┬──┘
-        ▼
-Phase 13: Self-Configuring Ecosystem   (consumes Phase 12's scan profile)
-        │
-        ▼
-Phase 14: Wiring & Accessibility Pass   (consumes Phase 10 audit + Phase 13 tentacles)
-        │
-        ▼
-Phase 15: Density + Polish              (consumes everything)
-```
-
-Phase 10 must complete before any other v1.1 phase starts — the audit produces the backlog Phase 14 consumes and the reachability contract Phase 15 verifies.
-
-Phase 11 and Phase 12 may run in parallel. Phase 12's scanner intelligence uses Phase 11's capability-aware routing when classifying discovered signals with an LLM; this is a soft data dependency resolvable at the integration point, not a blocker on starting Phase 12 planning.
+- ✅ **v1.0 — Skin Rebuild** (substrate) — Phases 0–9 (shipped 2026-04-19, ~165 commits, 18 verify gates green)
+- ✅ **v1.1 — Functionality, Wiring, Accessibility** — Phases 10–15 (shipped 2026-04-24, closed 2026-04-27, 29 plans, 27 verify gates green)
+- 📋 **v1.2 — TBD** — to be planned via `/gsd-new-milestone` (deferred from v1.1: JARVIS push-to-talk demo, acting-class tentacles, browser-harness Q1 decision, plus 11 operator UAT carry-overs)
 
 ---
 
-## Phases (v1.1)
+## Phases
 
-- [x] **Phase 10: Inventory & Wiring Audit** — Classify every Rust module + every route + every config field. Output `WIRING-AUDIT.md`; feeds Phase 14 backlog. (completed 2026-04-20)
-- [x] **Phase 11: Smart Provider Setup** — Custom config paste (cURL/JSON/Python), key validation probe, per-capability routing, capability-gap empty states with upgrade CTAs. (completed 2026-04-20)
-- [x] **Phase 12: Smart Deep Scan** — Replace dumb 12-scanner sweep with lead-following scanner (8 source classes), streaming, structured editable profile. (completed 2026-04-20)
-- [x] **Phase 13: Self-Configuring Ecosystem** — Scan-result-driven auto-enable of observer-class tentacles; observe-only guardrail; Settings rationale + one-click disable. (completed 2026-04-24)
-- [x] **Phase 14: Wiring & Accessibility Pass** — Close NOT-WIRED gaps, remove/fix WIRED-NOT-USED dead UI, a11y sweep 2, persistent Activity Log strip. (completed 2026-04-24)
-- [x] **Phase 15: Density + Polish** — Spacing audit, card gaps, background-image dominance, top-bar hierarchy, empty-state copy rewrite across all 50+ routes. (completed 2026-04-24)
-
----
-
-## Phase Details (v1.1)
-
-### Phase 10: Inventory & Wiring Audit
-
-**Goal**: Produce a structured `WIRING-AUDIT.md` that classifies every Rust module, every UI route, and every config field so Phase 11–15 work is evidence-driven rather than intuition-driven.
-
-**Depends on**: Nothing (v1.1 entry point; assumes v1.0 substrate)
-
-**Requirements**: AUDIT-01, AUDIT-02, AUDIT-03, AUDIT-04, AUDIT-05
-
-**Success Criteria** (what must be TRUE):
-1. `.planning/phases/10-inventory-wiring-audit/WIRING-AUDIT.md` exists and classifies every file under `src-tauri/src/` as ACTIVE / WIRED-NOT-USED / NOT-WIRED / DEAD with purpose + trigger + UI-surface reference per row.
-2. Every route registered in `src/lib/router.ts` is listed in the audit with data shape, data source, and flow status.
-3. Every field in `BladeConfig` (and sibling config structs) is catalogued with the UI surface that exposes it, control type, and discoverability path; fields with no surface are flagged NOT-WIRED.
-4. NOT-WIRED backlog section is structured (file:line references per backend entry point) and is consumable verbatim by Phase 14 planning.
-5. DEAD items list includes a deletion plan that cross-checks callers + imports so Phase 14 removal does not break the build.
-
-**Notes**: No code changes in this phase. The audit is a planning input. If gaps surface between the audit and the tester pass fixes already on master, note them in the audit's cross-reference section.
-
-**Plans**:
-- [x] 10-01-PLAN.md — Wave 0: verify:wiring-audit-shape script + JSON Schema + package.json wiring (AUDIT-04, AUDIT-05)
-- [x] 10-02-PLAN.md — Wave 1: Subagent A (Rust module classifier) → 10-MODULES.yaml (AUDIT-01, AUDIT-04, AUDIT-05)
-- [x] 10-03-PLAN.md — Wave 1: Subagent B (route + command-palette mapper) → 10-ROUTES.yaml (AUDIT-02)
-- [x] 10-04-PLAN.md — Wave 1: Subagent C (config surface catalog) → 10-CONFIG.yaml (AUDIT-03)
-- [x] 10-05-PLAN.md — Wave 2: Synthesis → 10-WIRING-AUDIT.{md,json}, Appendix A/B, cleanup (AUDIT-01..05)
-
-**UI hint**: no
-
----
-
-### Phase 11: Smart Provider Setup
-
-**Goal**: Onboarding and Settings → Providers stop locking users into the 6 hardcoded provider cards. Paste any config, probe the actual model, route by capability.
-
-**Depends on**: Phase 10
-
-**Requirements**: PROV-01, PROV-02, PROV-03, PROV-04, PROV-05, PROV-06, PROV-07, PROV-08, PROV-09
-
-**Success Criteria** (what must be TRUE):
-1. Pasting a raw OpenAI / Anthropic / Groq cURL command into the provider form auto-extracts provider + model + `base_url` + headers and fills the form — verified across 3 representative cURL snippets.
-2. Pasting a JSON config blob OR a Python SDK snippet produces the same auto-fill behavior.
-3. Saving a new API key triggers one test call that retrieves and persists model name, context window, vision / audio / tool-calling support; the probe result is visible in the provider row.
-4. Adding a key with no vision support causes vision-needing UI surfaces (e.g. screen-aware views) to show "needs vision-capable model" prompt with an "add key" CTA that opens the provider add flow — verified on ≥2 vision-consuming surfaces. Same behavior for audio, long-context, and tool-calling capability gaps.
-5. `router.rs` routing consults per-capability config; a task classified as requiring vision routes to `vision_provider` with fallback chain, not to the primary provider when primary lacks vision — verified by unit test + manual trace.
-
-**Notes**: The onboarding custom-paste flow and the Settings custom-paste flow share one parser module. The probe test call is idempotent and must not be retried in a loop on failure — surface the error clearly (related to tester pass fix `4ab464c`).
-
-**Plans**: 6 plans
-
-Plans:
-- [x] 11-01-PLAN.md — Wave 0 Rust paste parser + 3 format detectors + 17+ unit tests + Tauri command registration (PROV-01, PROV-02, PROV-03)
-- [x] 11-02-PLAN.md — Wave 0 capability probe wrapper + static capability matrix + 6-place config for 5 new BladeConfig fields + round-trip test (PROV-05, PROV-06)
-- [x] 11-03-PLAN.md — Wave 1 shared ProviderPasteForm + CapabilityPillStrip + FallbackOrderList + onboarding D-56 preservation + Settings D-57 wiring + 3 e2e specs (PROV-04, PROV-05)
-- [x] 11-04-PLAN.md — Wave 1 router rewire: select_provider 3-tier resolution + capability-filtered fallback chain + single call-site change at commands.rs:744 + 7+ unit tests + blade_routing_capability_missing event (PROV-09)
-- [x] 11-05-PLAN.md — Wave 1 CapabilityGap component + useCapability hook + CAPABILITY_SURFACES registry + openRoute hint extension + 8 consumer surface wires + 8 e2e specs (PROV-07, PROV-08)
-- [x] 11-06-PLAN.md — Wave 2 verify:providers-capability gate (gate 20) + test:e2e:phase11 script + verify:all chain extension + goal-backward manual trace (PROV-01..09)
-
-**UI hint**: yes
-
----
-
-### Phase 12: Smart Deep Scan
-
-**Goal**: Replace the dumb 12-scanner sweep (which surfaced 1 repo on Arnav's cold install) with a lead-following scanner that reads 8 source classes intelligently, streams progress to the activity log, and outputs a structured editable profile.
-
-**Depends on**: Phase 10 (hard); Phase 11 (soft — capability-aware routing for LLM-assisted classification of discovered signals)
-
-**Requirements**: SCAN-01, SCAN-02, SCAN-03, SCAN-04, SCAN-05, SCAN-06, SCAN-07, SCAN-08, SCAN-09, SCAN-10, SCAN-11, SCAN-12, SCAN-13
-
-**Success Criteria** (what must be TRUE):
-1. Cold-install scan on Arnav's machine surfaces ≥10 repos (up from 1), ≥5 accounts, ≥3 daily-rhythm signals, ≥3 IDE/AI tool signals — measured against a documented baseline run.
-2. Scanner executes all 8 source classes (filesystem repo walk, git remotes, IDE workspaces, AI session history, shell history, filesystem MRU, browser bookmarks, CLI/app `which` sweep) and each produces ≥1 structured row in the profile on Arnav's machine.
-3. Scanner builds its own todo list at start — highest-priority leads (recent-edited repos, active sessions) run first, breadth fills in after; todo order is visible in the activity log stream.
-4. Scan streams progress in real time to the activity log strip (LOG-01 wires Phase 14; during Phase 12 a simple log tail is sufficient, and the strip integration completes in Phase 14).
-5. Profile page renders the structured scan output; every row shows source origin; user edits round-trip through save → restart → reload.
-
-**Notes**: Soft dependency on Phase 11 — if Phase 11 lands first, Phase 12 uses `vision_provider` / `long_context_provider` for richer signal classification; if Phase 12 starts first, it falls back to primary provider. Scan must never write to external services.
-
-**Plans**: 5 plans
-
-Plans:
-- [x] 12-01-PLAN.md — Wave 1: deep_scan module + Lead/Queue core + fs_repos/git_remotes/mru scanners (SCAN-01, SCAN-02, SCAN-06, SCAN-09, SCAN-10)
-- [x] 12-02-PLAN.md — Wave 2: ide_workspaces + ai_sessions + shell_history + bookmarks + which_sweep scanners + config (SCAN-03, SCAN-04, SCAN-05, SCAN-07, SCAN-08)
-- [x] 12-03-PLAN.md — Wave 3: structured profile document + persistence + source attribution (SCAN-11, SCAN-12)
-- [x] 12-04-PLAN.md — Wave 3: profile editor UI + round-trip save (SCAN-11, SCAN-12)
-- [x] 12-05-PLAN.md — Wave 4: cold-install baseline verification + activity log streaming (SCAN-10, SCAN-13)
-
-**UI hint**: yes
-
----
-
-### Phase 13: Self-Configuring Ecosystem (observe-only)
-
-**Goal**: Phase 12 scan results silently activate observer-class tentacles. Watching, not editing. No destructive surprises on cold install.
-
-**Depends on**: Phase 12
-
-**Requirements**: ECOSYS-01, ECOSYS-02, ECOSYS-03, ECOSYS-04, ECOSYS-05, ECOSYS-06, ECOSYS-07, ECOSYS-08, ECOSYS-09, ECOSYS-10
-
-**Success Criteria** (what must be TRUE):
-1. Cold install on Arnav's machine + Phase 12 scan → ≥5 observer tentacles auto-enable (repo-watcher, Slack monitor, deploy-monitor, PR-watcher, session bridge, calendar-monitor where credentials / CLI / config detected).
-2. Every auto-enabled tentacle appears in Settings with a per-row rationale ("Auto-enabled because deep scan found …") and a one-click disable toggle; disabled state persists across restart.
-3. Observe-only guardrail: a runtime check (not just policy) rejects any outbound action attempted by an auto-enabled tentacle during v1.1 — verified by a test that calls a tentacle's write-path and asserts it is blocked with a clear error.
-4. Auto-enablement is idempotent — re-running scan does not duplicate tentacles or re-enable ones the user disabled.
-5. Every observer tentacle emits an activity-log row for each observation (read / poll / event received) so Phase 14's log strip has live data to surface.
-
-**Notes**: The runtime guardrail is load-bearing — it is the difference between "safe smart default" and "scary surprise". Implement the guard as a central policy check rather than per-tentacle, so v1.2 acting-capability work removes one check in one place.
-
-**Plans**: 3 plans
-
-Plans:
-- [x] 13-01-PLAN.md — Wave 1: Rust ecosystem module (config extension, 6 probes, guardrail, 4 commands, deep_scan hook) (ECOSYS-01..06, ECOSYS-08, ECOSYS-09)
-- [x] 13-02-PLAN.md — Wave 2: EcosystemPane UI + SettingsShell + TypeScript wrappers + 2 e2e specs (ECOSYS-07, ECOSYS-08, ECOSYS-10)
-- [x] 13-03-PLAN.md — Wave 3: verify:ecosystem-guardrail gate + cold-install manual trace (ECOSYS-09, ECOSYS-10)
-
-**UI hint**: yes
-
----
-
-### Phase 14: Wiring & Accessibility Pass
-
-**Goal**: Close every NOT-WIRED gap from the Phase 10 audit, remove every WIRED-NOT-USED dead UI, re-pass a11y on the new surfaces, and ship the persistent Activity Log strip that turns background activity into a trust surface.
-
-**Depends on**: Phase 10 (audit backlog), Phase 13 (ecosystem data to wire)
-
-**Requirements**: WIRE2-01, WIRE2-02, WIRE2-03, WIRE2-04, WIRE2-05, WIRE2-06, A11Y2-01, A11Y2-02, A11Y2-03, A11Y2-04, A11Y2-05, A11Y2-06, LOG-01, LOG-02, LOG-03, LOG-04, LOG-05
-
-**Success Criteria** (what must be TRUE):
-1. Post-phase WIRING-AUDIT.md re-run reports NOT-WIRED count = 0 OR every remaining NOT-WIRED row carries a documented "deferred to v1.2" rationale with sign-off reference.
-2. Dashboard cards bind to real data from Phase 12 scan profile + Phase 13 tentacles — a cold-install screenshot shows populated cards, not "No data" placeholder text.
-3. Activity Log strip mounts in main shell and remains visible across routes; every cross-module action in v1.1 emits a log event, verified by a script that asserts no backend action completes without a corresponding emission (acceptance threshold: 100% for Phase 13 tentacles, ≥95% elsewhere with flagged exceptions).
-4. `npm run verify:all` gains 2 new scripts — `verify:feature-reachability` (asserts every backend module reachable from route registry or command palette) and `verify:a11y-pass-2` (asserts no icon-only buttons without labels, no dialogs without focus traps, no unguarded animations) — both green.
-5. Click on any activity log entry opens a drawer with full payload + reasoning + outcome; last N entries persist across app restart.
-
-**Notes**: Phase 14 is the largest phase (17 requirements across 3 sub-categories). Expect 3–5 parallel workstreams: (a) wire NOT-WIRED backends, (b) remove WIRED-NOT-USED dead UI, (c) a11y sweep on new surfaces, (d) activity log implementation (strip + drawer + event emission + filter). Sub-streams (a), (b), (d) can proceed in parallel; (c) runs after each of them closes a surface.
-
-**Plans**: 5 plans
-
-Plans:
-- [x] 14-01-PLAN.md — Wave 0: Activity log foundation (ActivityStrip + ActivityDrawer + verify scripts) (LOG-01, LOG-02, LOG-03, LOG-04, LOG-05)
-- [x] 14-02-PLAN.md — Wave 1: Module wiring — Voice + Privacy + Intelligence + System pane additions (WIRE2-01, WIRE2-03, WIRE2-04)
-- [x] 14-03-PLAN.md — Wave 1: Dashboard binding to live data — replace 3 ComingSoonCards (WIRE2-02, WIRE2-03)
-- [x] 14-04-PLAN.md — Wave 1: A11y sweep + verify script hardening (WIRE2-05, WIRE2-06, A11Y2-01..A11Y2-06)
-- [x] 14-05-PLAN.md — Wave 2: Manual verification checkpoint (WIRE2-01, WIRE2-02, WIRE2-05, WIRE2-06, A11Y2-01..A11Y2-06, LOG-01..LOG-05)
-
-**UI hint**: yes
-
----
-
-### Phase 15: Density + Polish
-
-**Goal**: Now that content exists (Phases 11–14), make the surface feel intentional. Spacing ladder, card gaps, background-image dominance, top-bar hierarchy, empty-state copy.
-
-**Depends on**: Phase 14
-
-**Requirements**: DENSITY-01, DENSITY-02, DENSITY-03, DENSITY-04, DENSITY-05, DENSITY-06, DENSITY-07
-
-**Success Criteria** (what must be TRUE):
-1. UI review across all 50+ routes reports 0 padding violations against the documented spacing ladder; verification script asserts spacing tokens are used exclusively (no hardcoded px).
-2. Every empty state has either real content (populated by Phase 12+13 data) or a CTA + expected-timeline copy — e.g. *"BLADE is still learning — give me 24h"* not *"No recent decisions"*.
-3. Dashboard hero pulls ≥3 live signals from scan profile + ecosystem tentacles + perception state — verified on cold-install screenshot.
-4. Background-image dominance audit: content takes visual priority over ambient imagery on all 5 representative wallpapers; contrast + eye-path pass documented.
-5. Top bar hierarchy pass: primary actions, activity-log strip, status chips, user/settings affordances have clear visual priority order; no overstuff; fits at 1280px minimum width.
-
-**Notes**: Regressions in v1.0 verify gates (contrast, chat-rgba, ghost-no-cursor, orb-rgba, hud-chip-count, etc.) fail the phase. Polish means no regressions, not just new wins.
-
-**Plans**: 5 plans
-
-Plans:
-- [x] 15-01-PLAN.md — Wave 0: Spacing ladder documentation + verify:spacing-ladder + verify:empty-states-copy scripts (DENSITY-01, DENSITY-05, DENSITY-06)
-- [x] 15-02-PLAN.md — Wave 1: Top-bar hierarchy (4-tier) + 1280px responsive guardrails + Playwright spec (DENSITY-04)
-- [x] 15-03-PLAN.md — Wave 1: Empty-state copy rewrite sweep across 29 feature files (DENSITY-05)
-- [x] 15-04-PLAN.md — Wave 1: Dashboard hero live signals (scan + ecosystem + perception) + glass-fill tokenization + cold-install spec (DENSITY-02, DENSITY-03, DENSITY-07)
-- [x] 15-05-PLAN.md — Wave 2: Route sweep tokenization + 5-wallpaper human verification checkpoint (DENSITY-01, DENSITY-02, DENSITY-03, DENSITY-06)
-
-**UI hint**: yes
-
----
-
-## Progress Table (v1.1)
-
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 10. Inventory & Wiring Audit | 5/5 | Complete    | 2026-04-20 |
-| 11. Smart Provider Setup | 6/6 | Complete    | 2026-04-20 |
-| 12. Smart Deep Scan | 5/5 | Complete    | 2026-04-20 |
-| 13. Self-Configuring Ecosystem | 3/3 | Complete    | 2026-04-24 |
-| 14. Wiring & Accessibility Pass | 5/5 | Complete    | 2026-04-24 |
-| 15. Density + Polish | 5/5 | Complete    | 2026-04-24 |
-
----
-
-## Coverage Verification (v1.1)
-
-**Total v1.1 requirements: 61**
-**Mapped: 61/61** ✓
-
-| Category | Count | Phase |
-|----------|-------|-------|
-| AUDIT-01..05 | 5 | Phase 10 |
-| PROV-01..09 | 9 | Phase 11 |
-| SCAN-01..13 | 13 | Phase 12 |
-| ECOSYS-01..10 | 10 | Phase 13 |
-| WIRE2-01..06 | 6 | Phase 14 |
-| A11Y2-01..06 | 6 | Phase 14 |
-| LOG-01..05 | 5 | Phase 14 |
-| DENSITY-01..07 | 7 | Phase 15 |
-| **Total** | **61** | ✓ |
-
----
-
-## Shape Doc Mapping
-
-The locked shape in `.planning/notes/v1-1-milestone-shape.md` uses internal phase numbers 0–5. They map 1:1 to the global roadmap phase numbers:
-
-| Shape doc | Global roadmap | Name |
-|-----------|----------------|------|
-| Phase 0 | Phase 10 | Inventory & Wiring Audit |
-| Phase 1 | Phase 11 | Smart Provider Setup |
-| Phase 2 | Phase 12 | Smart Deep Scan |
-| Phase 3 | Phase 13 | Self-Configuring Ecosystem |
-| Phase 4 | Phase 14 | Wiring & Accessibility Pass |
-| Phase 5 | Phase 15 | Density + Polish |
-
-Any reference to "Phase N" in the shape doc means "global Phase (N+10)" here.
-
----
-
-## v1.0 History (shipped)
-
-v1.0 — Skin Rebuild — completed 2026-04-19 (~165 commits, 64 plans, 18 verify gates green). Mac smoke checkpoints (M-01..M-46) and WCAG screenshots tracked separately in `.planning/HANDOFF-TO-MAC.md`.
+<details>
+<summary>✅ v1.0 — Skin Rebuild (Phases 0–9) — SHIPPED 2026-04-19</summary>
 
 | Phase | Name | Status |
 |-------|------|--------|
@@ -294,8 +26,53 @@ v1.0 — Skin Rebuild — completed 2026-04-19 (~165 commits, 64 plans, 18 verif
 | 8 | Body + Hive | Complete |
 | 9 | Polish Pass | Complete |
 
-Phase directories for v1.0 remain at `.planning/phases/00-*` through `.planning/phases/09-*`. v1.1 creates new directories at `10-*` through `15-*`.
+Phase directories remain at `.planning/phases/0[0-9]-*` (never formally archived). Mac smoke M-01..M-46 + WCAG 5-wallpaper checkpoint operator-owned per `HANDOFF-TO-MAC.md`.
+
+</details>
+
+<details>
+<summary>✅ v1.1 — Functionality, Wiring, Accessibility (Phases 10–15) — SHIPPED 2026-04-24</summary>
+
+| Phase | Name | Plans | Completed |
+|-------|------|-------|-----------|
+| 10 | Inventory & Wiring Audit | 5/5 | 2026-04-20 |
+| 11 | Smart Provider Setup (VERIFIED PASSED) | 6/6 | 2026-04-20 |
+| 12 | Smart Deep Scan | 5/5 | 2026-04-20 |
+| 13 | Self-Configuring Ecosystem (observe-only) | 3/3 | 2026-04-24 |
+| 14 | Wiring & Accessibility Pass (human_needed) | 5/5 | 2026-04-24 |
+| 15 | Density + Polish (human_needed) | 5/5 | 2026-04-24 |
+
+Full archive: `milestones/v1.1-ROADMAP.md` | Requirements: `milestones/v1.1-REQUIREMENTS.md` | Audit: `milestones/v1.1-MILESTONE-AUDIT.md` | Phase dirs: `milestones/v1.1-phases/`.
+
+</details>
+
+### 📋 v1.2 — Planned (next milestone)
+
+To be defined via `/gsd-new-milestone`. Carry-over candidates from v1.1 deferral pool:
+
+- **JARVIS push-to-talk demo** (M-04 deferred from v1.1)
+- **Acting tentacles** — Slack reply, Email reply, GitHub PR review, Calendar accept/decline, Linear ticket creation (M-03 observe-only guardrail flips per-tentacle)
+- **Browser harness Q1** — `browser-use/browser-harness` vs current `browser_native.rs` decision (deadline pre-v1.2 JARVIS phase plan)
+- **97 NOT-WIRED backend modules** flagged DEFERRED_V1_2 in 10-WIRING-AUDIT.json
+- **11 operator UAT items** carried from v1.1 (cold-install screenshots, runtime persistence, 5-wallpaper contrast, keyboard-nav, 50-route ⌘K sweep)
+- **LOG-04 time-range filter** in ActivityDrawer (advisory miss from Phase 14)
+- **ROUTING_CAPABILITY_MISSING UI consumer** (toast/banner — deferred from Phase 11 → 14 → v1.2)
 
 ---
 
-*Roadmap created: 2026-04-17 (v1.0). v1.1 added: 2026-04-20 from locked shape in `.planning/notes/v1-1-milestone-shape.md`.*
+## Progress
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 0..9 | v1.0 | per-phase | Complete | 2026-04-19 |
+| 10. Inventory & Wiring Audit | v1.1 | 5/5 | Complete | 2026-04-20 |
+| 11. Smart Provider Setup | v1.1 | 6/6 | Complete (VERIFIED PASSED) | 2026-04-20 |
+| 12. Smart Deep Scan | v1.1 | 5/5 | Complete | 2026-04-20 |
+| 13. Self-Configuring Ecosystem | v1.1 | 3/3 | Complete | 2026-04-24 |
+| 14. Wiring & Accessibility Pass | v1.1 | 5/5 | Complete (human_needed) | 2026-04-24 |
+| 15. Density + Polish | v1.1 | 5/5 | Complete (human_needed) | 2026-04-24 |
+| 16+ | v1.2 | TBD | Not started | — |
+
+---
+
+*v1.0 substrate shipped 2026-04-19. v1.1 closed 2026-04-27 with audit status `tech_debt` (no blockers; 11 operator-owned UAT items deferred). See `MILESTONES.md` for the historical record.*
