@@ -36,5 +36,8 @@ docs/apple-research/fonts/*.dmg
 vendor/
 test-results/
 
+# Local testing screenshots (not part of the project)
+docs/testing ss/
+
 # Windows NTFS Alternate Data Streams (Mark-of-the-Web metadata) — not portable to NTFS checkouts
 *:Zone.Identifier
