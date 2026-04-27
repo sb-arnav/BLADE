@@ -1,14 +1,18 @@
 // eslint.config.js — ESLint 9 flat config (D-34)
 //
 // Wires the project-local `blade/no-raw-tauri` rule (eslint-rules/no-raw-tauri.js)
-// as a custom plugin. No other rules are enabled in Phase 1 — Phase 9 Polish
-// Pass can layer on @typescript-eslint + react-hooks configs once the feature
-// surface stabilises. Today the only invariant we CI-enforce is D-34.
+// plus a TypeScript parser and the react-hooks / jsx-a11y plugins so inline
+// eslint-disable comments referencing their rules resolve. The rules are not
+// enabled at the config level — D-34 remains the only CI-enforced invariant —
+// but the plugins must be registered for the inline disables to validate.
 //
 // @see .planning/phases/01-foundation/01-CONTEXT.md §D-34
 // @see eslint-rules/no-raw-tauri.js
 
 import noRawTauri from './eslint-rules/no-raw-tauri.js';
+import tsParser from '@typescript-eslint/parser';
+import reactHooks from 'eslint-plugin-react-hooks';
+import jsxA11y from 'eslint-plugin-jsx-a11y';
 
 export default [
   {
@@ -28,6 +32,7 @@ export default [
   {
     files: ['src/**/*.{ts,tsx}'],
     languageOptions: {
+      parser: tsParser,
       ecmaVersion: 2024,
       sourceType: 'module',
       parserOptions: {
@@ -40,6 +45,8 @@ export default [
           'no-raw-tauri': noRawTauri,
         },
       },
+      'react-hooks': reactHooks,
+      'jsx-a11y': jsxA11y,
     },
     rules: {
       'blade/no-raw-tauri': 'error',

@@ -179,6 +179,24 @@ function loadExistingStatus(ledgerPath) {
   return statusMap;
 }
 
+// Load full hand-curated rows so re-seeding preserves bak_path / new_component
+// / note / cross_refs alongside status. Without this, any operator edit gets
+// overwritten on the next `npm run seed:ledger`, breaking the build.yml
+// migration-ledger drift gate (D-28 idempotency contract).
+function loadExistingRows(ledgerPath) {
+  if (!existsSync(ledgerPath)) return {};
+  const text = readFileSync(ledgerPath, 'utf8');
+  const rowMap = {};
+  // Capture all 8 pipe-delimited cells: id | bak | newComp | section | phase | status | cross_refs | note
+  const ROW_RE = /^\|\s*([a-z][a-z0-9-]*)\s*\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*\|\s*([A-Za-z]+)\s*\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*\|/gm;
+  for (const m of text.matchAll(ROW_RE)) {
+    const [, id, bak, newComp, , , status, crossRefs, note] = m;
+    if (!['Pending', 'Shipped', 'Deferred'].includes(status)) continue;
+    rowMap[id] = { bak, newComp, status, crossRefs, note };
+  }
+  return rowMap;
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // 4. Walk src/features/<cluster>/index.tsx, collect all routes.
 // ───────────────────────────────────────────────────────────────────────────
@@ -211,6 +229,7 @@ allRoutes.sort((a, b) => {
 // ───────────────────────────────────────────────────────────────────────────
 const ledgerPath = join(ROOT, '.planning', 'migration-ledger.md');
 const existingStatus = loadExistingStatus(ledgerPath);
+const existingRows = loadExistingRows(ledgerPath);
 
 // Preferred component file paths: stubs live in the cluster index.tsx today,
 // but the ledger records where each route's real component will live post-
@@ -245,14 +264,30 @@ const MANUAL_NOTES = {
 };
 
 const rows = allRoutes.map((r) => {
-  const bak = findBakAnalog(r.id, r.label);
-  const newComp = preferredNewComponent(r);
+  const prior = existingRows[r.id];
+  // Prefer hand-curated columns when the row already exists; only re-derive
+  // for new IDs. This keeps `npm run seed:ledger` truly idempotent so the
+  // build.yml drift gate stops firing on every re-seed.
+  const bak = prior?.bak ?? findBakAnalog(r.id, r.label);
+  const newComp = prior?.newComp ?? preferredNewComponent(r);
   const status = existingStatus[r.id] ?? 'Pending';
-  const note = MANUAL_NOTES[r.id] ?? '';
-  return `| ${r.id} | ${bak} | ${newComp} | ${r.section} | ${r.phase} | ${status} | – | ${note} |`;
+  const crossRefs = prior?.crossRefs ?? '–';
+  const note = prior?.note ?? (MANUAL_NOTES[r.id] ?? '');
+  return `| ${r.id} | ${bak} | ${newComp} | ${r.section} | ${r.phase} | ${status} | ${crossRefs} | ${note} |`;
 });
 
-const today = new Date().toISOString().slice(0, 10);
+// Preserve the existing **Seeded:** date if the ledger already exists. This
+// keeps `npm run seed:ledger` idempotent across days — required for the
+// migration-ledger CI gate (build.yml:39 runs `git diff --exit-code` after
+// re-seeding). Falls back to today only when the ledger is being created
+// fresh (no prior **Seeded:** line found).
+const SEED_DATE_RE = /\*\*Seeded:\*\*\s+(\d{4}-\d{2}-\d{2})/;
+let seededDate = null;
+if (existsSync(ledgerPath)) {
+  const match = readFileSync(ledgerPath, 'utf8').match(SEED_DATE_RE);
+  if (match) seededDate = match[1];
+}
+const today = seededDate ?? new Date().toISOString().slice(0, 10);
 const pendingCount = rows.filter((r) => r.includes('| Pending |')).length;
 const shippedCount = rows.filter((r) => r.includes('| Shipped |')).length;
 const deferredCount = rows.filter((r) => r.includes('| Deferred |')).length;
