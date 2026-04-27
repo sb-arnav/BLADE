@@ -16,6 +16,7 @@ mod execution_memory;
 mod health;
 mod indexer;
 mod self_upgrade;
+mod pentest;
 mod session_handoff;
 mod computer_use;
 mod deeplearn;
@@ -893,11 +894,11 @@ pub fn run() {
             self_upgrade::self_upgrade_install,
             self_upgrade::self_upgrade_catalog,
             self_upgrade::self_upgrade_audit,
-            self_upgrade::pentest_authorize,
-            self_upgrade::pentest_check_auth,
-            self_upgrade::pentest_revoke,
-            self_upgrade::pentest_list_auth,
-            self_upgrade::pentest_check_model_safety,
+            pentest::pentest_authorize,
+            pentest::pentest_check_auth,
+            pentest::pentest_revoke,
+            pentest::pentest_list_auth,
+            pentest::pentest_check_model_safety,
             background_agent::agent_spawn,
             background_agent::agent_list_background,
             background_agent::agent_get_background,

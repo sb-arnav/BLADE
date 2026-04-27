@@ -1716,7 +1716,7 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
                 None => return ("Missing required argument: ownership_claim".to_string(), true),
             };
             let scope_notes = args["scope_notes"].as_str().unwrap_or("").to_string();
-            match crate::self_upgrade::pentest_authorize(target, target_type, ownership_claim, scope_notes).await {
+            match crate::pentest::pentest_authorize(target, target_type, ownership_claim, scope_notes).await {
                 Ok(msg) => (msg, false),
                 Err(e) => (format!("Authorization failed: {}", e), true),
             }

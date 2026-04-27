@@ -610,12 +610,12 @@ fn build_system_prompt_inner(
 
     // ── PENTEST MODE (priority 6) ─────────────────────────────────────────────
     {
-        let active_auths = crate::self_upgrade::pentest_list_auth();
+        let active_auths = crate::pentest::pentest_list_auth();
         if !active_auths.is_empty() {
             let auth_lines: Vec<String> = active_auths.iter().map(|a| {
                 format!("- {} ({}) — {}", a.target, a.target_type, a.scope_notes)
             }).collect();
-            let (prov, _, mdl) = crate::self_upgrade::get_pentest_safe_provider();
+            let (prov, _, mdl) = crate::pentest::get_pentest_safe_provider();
             let model_note = if prov == "none" {
                 "⚠ No safe pentest provider — configure Ollama or Groq".to_string()
             } else {
