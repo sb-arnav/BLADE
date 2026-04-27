@@ -603,25 +603,62 @@ mod memory_recall_eval {
     /// Eval scenarios: (query_embedding, query_text, expected_source_id, label)
     fn scenarios() -> Vec<([f32; 4], &'static str, &'static str, &'static str)> {
         vec![
-            // Pure-vector wins (embedding axis dominates)
+            // ── Tier 1: clean axis wins (vector signal is unambiguous) ──────
             ([0.92, 0.0, 0.10, 0.0], "rust async tokio", "mem_rust_async", "rust_async_intent"),
             ([0.0, 0.0, 0.92, 0.0], "engineering standup zoom", "mem_work_standup", "work_standup_intent"),
             ([0.0, 0.92, 0.0, 0.0], "exercise routine running", "mem_personal_runs", "personal_runs_intent"),
             ([0.0, 0.0, 0.0, 0.92], "favorite italian food", "mem_food_pizza", "food_pizza_intent"),
-            // Keyword should help: query mentions the literal content tokens
+
+            // ── Tier 2: keyword should help disambiguate ────────────────────
+            // Vector signal is weak/spread; query text contains literal content tokens.
             ([0.30, 0.0, 0.30, 0.0], "Neapolitan pizza preference", "mem_food_pizza", "keyword_boost_pizza"),
             ([0.20, 0.20, 0.20, 0.20], "tokio cancellation", "mem_rust_async", "keyword_boost_async"),
+
+            // ── Tier 3: adversarial — cross-domain confusion ────────────────
+            // "morning" appears in mem_personal_runs (5K every Tuesday morning)
+            // AND mem_food_coffee (two cups before noon). Vector axis points
+            // at personal/food split; query text "tuesday riverside" is the
+            // tie-breaker only if BM25 picks up the unique tokens.
+            ([0.0, 0.50, 0.0, 0.50], "tuesday riverside park morning", "mem_personal_runs", "adversarial_morning_disambig"),
+
+            // ── Tier 4: keyword overrides misleading vector ────────────────
+            // Vector slightly favors "code" axis but the unique token "Neapolitan"
+            // appears only in mem_food_pizza. Tests that BM25 can break a tie
+            // when the embedding sends a wrong-domain signal.
+            ([0.40, 0.0, 0.20, 0.20], "Neapolitan", "mem_food_pizza", "adversarial_keyword_overrides_vector"),
+
+            // ── Tier 5: noise-only query ────────────────────────────────────
+            // Stop-words only; no vector signal. Should NOT crash; allowed to
+            // return any top-k order — measured by MRR not top-1. Expected
+            // memory is the closest-to-zero embedding; floor allows MRR=0.0
+            // for this scenario specifically (handled by accepting any rank).
+            // We pick mem_food_coffee as the "least surprising" answer — its
+            // embedding has the lowest L2 norm (0.0+0.30+0.10+0.85 → 0.91).
+            // This scenario is gate-relaxed: not asserted in the floor, but
+            // surfaced in the table for inspection.
+            ([0.0, 0.0, 0.0, 0.0], "the and from", "mem_food_coffee", "adversarial_stopwords_only"),
         ]
+    }
+
+    /// Some scenarios test edge cases where ranking is fundamentally ambiguous;
+    /// they are surfaced in the table but excluded from the floor assertion.
+    fn is_gate_relaxed(label: &str) -> bool {
+        label == "adversarial_stopwords_only"
     }
 
     #[test]
     fn evaluates_recall_quality() {
         let (_tmp, store) = build_test_store();
         let scenarios = scenarios();
-        let total = scenarios.len() as f32;
-        let mut top1 = 0;
-        let mut top3 = 0;
-        let mut rr_sum = 0.0;
+        // Floor metrics computed across gate-asserted scenarios only.
+        // Relaxed scenarios still appear in the table for inspection.
+        let asserted_total: f32 = scenarios.iter().filter(|(_, _, _, l)| !is_gate_relaxed(l)).count() as f32;
+        let total_all = scenarios.len() as f32;
+        let mut asserted_top1 = 0;
+        let mut asserted_top3 = 0;
+        let mut asserted_rr_sum = 0.0;
+        let mut all_top1 = 0;
+        let mut all_top3 = 0;
 
         println!("\n┌── Memory recall eval ──────────────────────────────────");
         for (query_emb, query_text, expected, label) in &scenarios {
@@ -629,32 +666,45 @@ mod memory_recall_eval {
             let hit1 = top1_hit(&results, expected);
             let hit3 = topk_hit(&results, expected, 3);
             let rr = reciprocal_rank(&results, expected);
-            if hit1 { top1 += 1; }
-            if hit3 { top3 += 1; }
-            rr_sum += rr;
+            if hit1 { all_top1 += 1; }
+            if hit3 { all_top3 += 1; }
+            if !is_gate_relaxed(label) {
+                if hit1 { asserted_top1 += 1; }
+                if hit3 { asserted_top3 += 1; }
+                asserted_rr_sum += rr;
+            }
             let top_ids: Vec<&str> = results.iter().take(3).map(|r| r.source_id.as_str()).collect();
+            let relax = if is_gate_relaxed(label) { " (relaxed)" } else { "" };
             println!(
-                "│ {:30} top1={} top3={} rr={:.2} → top3={:?} (want={})",
-                label, if hit1 { "✓" } else { "✗" }, if hit3 { "✓" } else { "✗" }, rr, top_ids, expected
+                "│ {:38} top1={} top3={} rr={:.2} → top3={:?} (want={}){}",
+                label, if hit1 { "✓" } else { "✗" }, if hit3 { "✓" } else { "✗" }, rr, top_ids, expected, relax
             );
         }
-        let mrr = rr_sum / total;
+        let asserted_mrr = if asserted_total > 0.0 { asserted_rr_sum / asserted_total } else { 0.0 };
         println!("├──────────────────────────────────────────────────────────");
-        println!("│ top-1: {}/{} ({:.0}%)  top-3: {}/{} ({:.0}%)  MRR: {:.3}",
-            top1, total as i32, (top1 as f32 / total) * 100.0,
-            top3, total as i32, (top3 as f32 / total) * 100.0,
-            mrr);
+        println!("│ all     — top-1: {}/{} ({:.0}%)  top-3: {}/{} ({:.0}%)",
+            all_top1, total_all as i32, (all_top1 as f32 / total_all) * 100.0,
+            all_top3, total_all as i32, (all_top3 as f32 / total_all) * 100.0);
+        println!("│ asserted (gate floors): top-1: {}/{} ({:.0}%)  top-3: {}/{} ({:.0}%)  MRR: {:.3}",
+            asserted_top1, asserted_total as i32, (asserted_top1 as f32 / asserted_total) * 100.0,
+            asserted_top3, asserted_total as i32, (asserted_top3 as f32 / asserted_total) * 100.0,
+            asserted_mrr);
         println!("└──────────────────────────────────────────────────────────\n");
 
-        // Quality gates — fail the build if recall regresses below baseline.
-        // Initial floor set generously (will tighten as the eval matures):
+        // Quality gates — fail the build if asserted-scenario recall regresses
+        // below baseline. Floors are intentionally generous; tighten as the
+        // eval corpus matures with real fastembed runs.
         // top-3 ≥ 80% (common eval target), MRR ≥ 0.6.
         assert!(
-            (top3 as f32 / total) >= 0.80,
-            "top-3 recall {}/{} below 80% floor",
-            top3, total as i32
+            (asserted_top3 as f32 / asserted_total) >= 0.80,
+            "asserted top-3 recall {}/{} below 80% floor",
+            asserted_top3, asserted_total as i32
         );
-        assert!(mrr >= 0.6, "MRR {:.3} below 0.6 floor", mrr);
+        assert!(
+            asserted_mrr >= 0.6,
+            "asserted MRR {:.3} below 0.6 floor",
+            asserted_mrr
+        );
     }
 
     #[test]
