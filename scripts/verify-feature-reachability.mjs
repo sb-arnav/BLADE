@@ -23,14 +23,30 @@ const VERBOSE = process.argv.includes('--verbose');
 const SUMMARY = process.argv.includes('--summary') || !VERBOSE;
 
 // ── Load wiring audit ──────────────────────────────────────────────────────
+// Active phase dir takes precedence; falls back to milestone archive after close.
 
-const auditPath = path.join(ROOT, '.planning/phases/10-inventory-wiring-audit/10-WIRING-AUDIT.json');
+const AUDIT_CANDIDATES = [
+  '.planning/phases/10-inventory-wiring-audit/10-WIRING-AUDIT.json',
+  '.planning/milestones/v1.1-phases/10-inventory-wiring-audit/10-WIRING-AUDIT.json',
+];
 
 let audit;
-try {
-  audit = JSON.parse(fs.readFileSync(auditPath, 'utf8'));
-} catch (e) {
-  console.error(`[verify:feature-reachability] Cannot read wiring audit: ${e.message}`);
+let auditPath;
+for (const candidate of AUDIT_CANDIDATES) {
+  const full = path.join(ROOT, candidate);
+  if (fs.existsSync(full)) {
+    auditPath = full;
+    try {
+      audit = JSON.parse(fs.readFileSync(full, 'utf8'));
+      break;
+    } catch (e) {
+      console.error(`[verify:feature-reachability] Cannot parse wiring audit at ${candidate}: ${e.message}`);
+      process.exit(1);
+    }
+  }
+}
+if (!audit) {
+  console.error(`[verify:feature-reachability] Cannot find wiring audit JSON in any of:\n  ${AUDIT_CANDIDATES.join('\n  ')}`);
   process.exit(1);
 }
 

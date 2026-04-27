@@ -10,8 +10,6 @@
 //! - Non-UTF8 output handled via String::from_utf8_lossy
 //! - No network calls
 
-use crate::deep_scan::leads::Lead;
-
 /// Re-export the shared ToolRow type from shell_history (same struct shape).
 #[derive(Debug, Clone)]
 pub struct ToolRow {

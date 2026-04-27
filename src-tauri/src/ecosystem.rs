@@ -17,6 +17,12 @@ use crate::deep_scan::leads::DeepScanResults;
 static OBSERVE_ONLY: AtomicBool = AtomicBool::new(true);
 
 /// Returns Err if guardrail is active. Call at every write-path entry.
+///
+/// v1.1 has no acting-class tentacles, so this guardrail has no production
+/// callers yet. The function is load-bearing for v1.2: every outbound write
+/// path (Slack reply, Email reply, GitHub PR review, etc.) must invoke this
+/// before performing the action. Invariants are exercised by the test suite.
+#[allow(dead_code)]
 pub fn assert_observe_only_allowed(action: &str) -> Result<(), String> {
     if OBSERVE_ONLY.load(Ordering::SeqCst) {
         return Err(format!(
