@@ -276,6 +276,10 @@ fn classify_error(err: &str) -> ProbeStatus {
 /// Invariants (tested):
 /// - `record.vision == false` → never touches `vision_provider` even if None
 /// - `config.vision_provider.is_some()` → never overwritten regardless of record
+///
+/// Production wiring through ProvidersPane probe-completion path is deferred
+/// to v1.2 per Phase 11 SUMMARY (11-02). Currently exercised by test suite only.
+#[allow(dead_code)]
 pub fn maybe_auto_populate(config: &mut BladeConfig, rec: &ProviderCapabilityRecord) {
     let prov_model = format!("{}/{}", rec.provider, rec.model);
     if rec.vision && config.vision_provider.is_none() {

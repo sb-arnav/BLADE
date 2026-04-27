@@ -26,7 +26,13 @@ import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const PHASE_DIR = join(ROOT, '.planning', 'phases', '10-inventory-wiring-audit');
+
+// Active phase dir takes precedence; falls back to milestone archive after close.
+const PHASE_DIR_CANDIDATES = [
+  join(ROOT, '.planning', 'phases', '10-inventory-wiring-audit'),
+  join(ROOT, '.planning', 'milestones', 'v1.1-phases', '10-inventory-wiring-audit'),
+];
+const PHASE_DIR = PHASE_DIR_CANDIDATES.find((d) => existsSync(join(d, '10-WIRING-AUDIT.json'))) ?? PHASE_DIR_CANDIDATES[0];
 const AUDIT_JSON = join(PHASE_DIR, '10-WIRING-AUDIT.json');
 const SCHEMA_JSON = join(PHASE_DIR, '10-WIRING-AUDIT.schema.json');
 const RUST_DIR = join(ROOT, 'src-tauri', 'src');
