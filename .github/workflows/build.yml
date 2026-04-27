@@ -90,3 +90,11 @@ jobs:
 
       - name: Rust check (catch compile errors early)
         run: cargo check --manifest-path src-tauri/Cargo.toml
+
+      - name: Memory recall eval (v1.2 quality scaffolding)
+        # First quality measurement on the memory cluster. Per the v1.2
+        # maturity audit (.planning/notes/v1-2-self-improvement-maturity.md),
+        # zero of the load-bearing self-improvement / memory modules had
+        # any tests. This is the seed eval — fixture-driven hybrid_search
+        # ranking with top-1 / top-3 / MRR metrics and floor assertions.
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib memory_recall_eval -- --nocapture

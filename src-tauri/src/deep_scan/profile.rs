@@ -416,9 +416,7 @@ pub async fn scan_cancel() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::deep_scan::leads::{
-        AccountRow, DeepScanResults, MruFileRow, RepoRow,
-    };
+    use crate::deep_scan::leads::{DeepScanResults, RepoRow};
     use tempfile::TempDir;
 
     // Helper: create a TempDir and return a path for the overlay file inside it.

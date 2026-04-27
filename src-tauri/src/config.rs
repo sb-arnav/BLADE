@@ -567,6 +567,15 @@ impl Default for BladeConfig {
 }
 
 pub fn blade_config_dir() -> PathBuf {
+    // Test/eval override — set BLADE_CONFIG_DIR to redirect all config + db
+    // operations to a temp dir without touching the real user config. Used by
+    // tests/memory_recall_eval.rs and any future eval harness. Production code
+    // never sets this; if unset we fall back to the OS config dir.
+    if let Ok(override_dir) = std::env::var("BLADE_CONFIG_DIR") {
+        let p = PathBuf::from(override_dir);
+        fs::create_dir_all(&p).ok();
+        return p;
+    }
     let config_dir = dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("blade");

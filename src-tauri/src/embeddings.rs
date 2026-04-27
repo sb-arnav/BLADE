@@ -492,3 +492,187 @@ pub async fn vector_store_size(
     let s = store.lock().map_err(|e| e.to_string())?;
     Ok(s.len())
 }
+
+// ─── Eval harness ─────────────────────────────────────────────────────────
+//
+// First quality measurement scaffolding for the memory cluster. Per the v1.2
+// maturity audit (2026-04-27), the memory pipeline shipped with zero recall
+// quality measurement. This module establishes the pattern: fixture-driven
+// scenarios, hand-crafted embeddings (skips the embedder model so it runs
+// without GPU/model-init), and explicit top-1 / top-3 / MRR metrics.
+//
+// Run with: `cargo test --lib memory_recall_eval -- --nocapture`
+//
+// Future work: replace synthetic embeddings with real fastembed runs against
+// a curated corpus of conversation fixtures, plus integration with extract_
+// conversation_facts and weekly_memory_consolidation.
+#[cfg(test)]
+mod memory_recall_eval {
+    use super::*;
+    use tempfile::TempDir;
+
+    /// Fixture entry — a fake "memory" with a hand-crafted embedding.
+    /// Embeddings here are tiny (4-dim) so each axis represents a domain:
+    /// [code, personal, work, food].
+    struct Fixture {
+        source_id: &'static str,
+        content: &'static str,
+        embedding: [f32; 4],
+    }
+
+    fn corpus() -> Vec<Fixture> {
+        vec![
+            Fixture {
+                source_id: "mem_rust_async",
+                content: "User asked how to write a tokio async loop with cancellation",
+                embedding: [0.95, 0.05, 0.20, 0.0],
+            },
+            Fixture {
+                source_id: "mem_rust_macro",
+                content: "User explained the difference between proc macros and decl macros",
+                embedding: [0.90, 0.10, 0.15, 0.0],
+            },
+            Fixture {
+                source_id: "mem_personal_birthday",
+                content: "User's birthday is March 15, mentioned planning a quiet dinner",
+                embedding: [0.0, 0.95, 0.05, 0.30],
+            },
+            Fixture {
+                source_id: "mem_personal_runs",
+                content: "User runs 5K every Tuesday morning at the riverside park",
+                embedding: [0.0, 0.85, 0.10, 0.0],
+            },
+            Fixture {
+                source_id: "mem_work_standup",
+                content: "Daily engineering standup is 9:30 AM PT, hosted on Zoom",
+                embedding: [0.10, 0.05, 0.95, 0.0],
+            },
+            Fixture {
+                source_id: "mem_work_oncall",
+                content: "User is on-call rotation for the payments service this week",
+                embedding: [0.05, 0.10, 0.90, 0.0],
+            },
+            Fixture {
+                source_id: "mem_food_pizza",
+                content: "User prefers Neapolitan pizza, dislikes deep dish",
+                embedding: [0.0, 0.20, 0.0, 0.95],
+            },
+            Fixture {
+                source_id: "mem_food_coffee",
+                content: "User drinks black coffee, no sugar, two cups before noon",
+                embedding: [0.0, 0.30, 0.10, 0.85],
+            },
+        ]
+    }
+
+    /// Set up an isolated VectorStore in a temp dir with the fixture corpus.
+    fn build_test_store() -> (TempDir, VectorStore) {
+        let temp = TempDir::new().expect("tempdir");
+        std::env::set_var("BLADE_CONFIG_DIR", temp.path());
+        let _ = crate::db::init_db();
+        let mut store = VectorStore::new();
+        for f in corpus() {
+            store.add(
+                f.content.to_string(),
+                f.embedding.to_vec(),
+                "test_fixture".to_string(),
+                f.source_id.to_string(),
+            );
+        }
+        (temp, store)
+    }
+
+    /// Reciprocal Rank: 1 / (1-indexed rank of expected source_id) or 0 if absent.
+    fn reciprocal_rank(results: &[SearchResult], expected: &str) -> f32 {
+        for (i, r) in results.iter().enumerate() {
+            if r.source_id == expected {
+                return 1.0 / ((i + 1) as f32);
+            }
+        }
+        0.0
+    }
+
+    fn top1_hit(results: &[SearchResult], expected: &str) -> bool {
+        results.first().map(|r| r.source_id == expected).unwrap_or(false)
+    }
+
+    fn topk_hit(results: &[SearchResult], expected: &str, k: usize) -> bool {
+        results.iter().take(k).any(|r| r.source_id == expected)
+    }
+
+    /// Eval scenarios: (query_embedding, query_text, expected_source_id, label)
+    fn scenarios() -> Vec<([f32; 4], &'static str, &'static str, &'static str)> {
+        vec![
+            // Pure-vector wins (embedding axis dominates)
+            ([0.92, 0.0, 0.10, 0.0], "rust async tokio", "mem_rust_async", "rust_async_intent"),
+            ([0.0, 0.0, 0.92, 0.0], "engineering standup zoom", "mem_work_standup", "work_standup_intent"),
+            ([0.0, 0.92, 0.0, 0.0], "exercise routine running", "mem_personal_runs", "personal_runs_intent"),
+            ([0.0, 0.0, 0.0, 0.92], "favorite italian food", "mem_food_pizza", "food_pizza_intent"),
+            // Keyword should help: query mentions the literal content tokens
+            ([0.30, 0.0, 0.30, 0.0], "Neapolitan pizza preference", "mem_food_pizza", "keyword_boost_pizza"),
+            ([0.20, 0.20, 0.20, 0.20], "tokio cancellation", "mem_rust_async", "keyword_boost_async"),
+        ]
+    }
+
+    #[test]
+    fn evaluates_recall_quality() {
+        let (_tmp, store) = build_test_store();
+        let scenarios = scenarios();
+        let total = scenarios.len() as f32;
+        let mut top1 = 0;
+        let mut top3 = 0;
+        let mut rr_sum = 0.0;
+
+        println!("\n┌── Memory recall eval ──────────────────────────────────");
+        for (query_emb, query_text, expected, label) in &scenarios {
+            let results = store.hybrid_search(query_emb, query_text, 5);
+            let hit1 = top1_hit(&results, expected);
+            let hit3 = topk_hit(&results, expected, 3);
+            let rr = reciprocal_rank(&results, expected);
+            if hit1 { top1 += 1; }
+            if hit3 { top3 += 1; }
+            rr_sum += rr;
+            let top_ids: Vec<&str> = results.iter().take(3).map(|r| r.source_id.as_str()).collect();
+            println!(
+                "│ {:30} top1={} top3={} rr={:.2} → top3={:?} (want={})",
+                label, if hit1 { "✓" } else { "✗" }, if hit3 { "✓" } else { "✗" }, rr, top_ids, expected
+            );
+        }
+        let mrr = rr_sum / total;
+        println!("├──────────────────────────────────────────────────────────");
+        println!("│ top-1: {}/{} ({:.0}%)  top-3: {}/{} ({:.0}%)  MRR: {:.3}",
+            top1, total as i32, (top1 as f32 / total) * 100.0,
+            top3, total as i32, (top3 as f32 / total) * 100.0,
+            mrr);
+        println!("└──────────────────────────────────────────────────────────\n");
+
+        // Quality gates — fail the build if recall regresses below baseline.
+        // Initial floor set generously (will tighten as the eval matures):
+        // top-3 ≥ 80% (common eval target), MRR ≥ 0.6.
+        assert!(
+            (top3 as f32 / total) >= 0.80,
+            "top-3 recall {}/{} below 80% floor",
+            top3, total as i32
+        );
+        assert!(mrr >= 0.6, "MRR {:.3} below 0.6 floor", mrr);
+    }
+
+    #[test]
+    fn empty_query_returns_empty() {
+        let (_tmp, store) = build_test_store();
+        let results = store.hybrid_search(&[0.0, 0.0, 0.0, 0.0], "", 5);
+        // Pure zero query may still rank entries by cosine=0 — main check is
+        // that the function doesn't panic with empty text and returns ≤ top_k.
+        assert!(results.len() <= 5);
+    }
+
+    #[test]
+    fn empty_store_returns_empty() {
+        let temp = TempDir::new().expect("tempdir");
+        std::env::set_var("BLADE_CONFIG_DIR", temp.path());
+        let _ = crate::db::init_db();
+        let store = VectorStore::new();
+        let results = store.hybrid_search(&[1.0, 0.0, 0.0, 0.0], "rust async", 5);
+        assert!(results.is_empty(), "empty store must return no results");
+    }
+}
