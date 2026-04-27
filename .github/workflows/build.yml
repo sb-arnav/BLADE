@@ -86,6 +86,8 @@ jobs:
             libpipewire-0.3-dev \
             libspa-0.2-dev \
             libclang-dev \
+            libdrm-dev \
+            libgbm-dev \
             pkg-config
 
       - name: Rust check (catch compile errors early)
