@@ -269,7 +269,7 @@ export function CodeSandbox() {
               <pre
                 style={{
                   whiteSpace: 'pre-wrap',
-                  fontFamily: 'var(--font-sans)',
+                  fontFamily: 'var(--font-body)',
                   fontSize: 13,
                   margin: 0,
                 }}

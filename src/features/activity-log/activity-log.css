@@ -2,6 +2,15 @@
  *
  * Phase 14 Plan 14-01 (LOG-01).
  * Styles for ActivityStrip and ActivityDrawer.
+ *
+ * v1.3 token rebind (2026-04-28): the original file referenced
+ * --space-N / --glass-border / --glass-fill / --accent / --radius-s / --t-xs
+ * which DO NOT EXIST in BLADE's tokens.css. Every var() resolved to nothing,
+ * collapsing every gap and padding to 0 — the drawer rendered as
+ * "All modulesClearClose" run-on text and the strip lost its dividers.
+ * Now uses canonical BLADE tokens: --s-N spacing, --g-edge-mid / --line
+ * dividers, --g-fill-weak surfaces, --a-warm accent, --r-sm radius.
+ *
  * All animations are inside @media (prefers-reduced-motion: no-preference).
  * No unconditional transitions or transforms (D-07, A11Y2-03).
  */
@@ -12,9 +21,9 @@
   display: flex;
   align-items: center;
   height: 28px;
-  padding: 0 var(--space-3);
-  gap: var(--space-2);
-  border-bottom: 1px solid var(--glass-border);
+  padding: 0 var(--s-3);
+  gap: var(--s-2);
+  border-bottom: 1px solid var(--line);
   overflow: hidden;
   cursor: pointer;
   user-select: none;
@@ -25,7 +34,7 @@
 }
 
 .activity-strip:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--a-warm);
   outline-offset: -2px;
 }
 
@@ -46,7 +55,7 @@
   /* Phase 15 DENSITY-04 tier 3: module badge is chrome, not content.
    * Spec: 10px, color var(--t-3) (but accent allowed for module-family signal). */
   font-size: 10px;
-  color: var(--accent);
+  color: var(--a-warm);
   font-weight: 500;
   white-space: nowrap;
   flex-shrink: 0;
@@ -61,7 +70,7 @@
 }
 
 .activity-strip-empty {
-  font-size: var(--t-xs);
+  font-size: 11px;
   color: var(--t-3);
   font-style: italic;
 }
@@ -72,13 +81,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-4) var(--space-4) var(--space-3);
-  border-bottom: 1px solid var(--glass-border);
-  gap: var(--space-3);
+  padding: var(--s-4) var(--s-4) var(--s-3);
+  border-bottom: 1px solid var(--line);
+  gap: var(--s-3);
 }
 
 .activity-drawer-title {
-  font-size: var(--t-base);
+  font-size: 15px;
   font-weight: 600;
   color: var(--t-1);
   margin: 0;
@@ -87,23 +96,29 @@
 .activity-drawer-controls {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--s-2);
 }
 
 .activity-drawer-filter {
-  font-size: var(--t-xs);
+  font-size: 12px;
   color: var(--t-2);
-  background: var(--glass-fill);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-s);
-  padding: var(--space-1) var(--space-2);
+  background: var(--g-fill-weak);
+  border: 1px solid var(--g-edge-mid);
+  border-radius: var(--r-sm);
+  padding: var(--s-1) var(--s-2);
   cursor: pointer;
+  font-family: var(--font-body);
+}
+
+.activity-drawer-filter:hover {
+  background: var(--g-fill);
+  color: var(--t-1);
 }
 
 .activity-drawer-list {
   list-style: none;
   margin: 0;
-  padding: var(--space-2) 0;
+  padding: var(--s-2) 0;
   max-height: 60vh;
   overflow-y: auto;
 }
@@ -111,9 +126,9 @@
 .activity-drawer-row {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  border-bottom: 1px solid var(--glass-border);
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-4);
+  border-bottom: 1px solid var(--line);
 }
 
 .activity-drawer-row:last-child {
@@ -121,24 +136,24 @@
 }
 
 .activity-drawer-module-badge {
-  font-size: var(--t-xs);
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  border-radius: var(--radius-s);
-  padding: 1px var(--space-1);
+  font-size: 11px;
+  color: var(--a-warm);
+  background: color-mix(in srgb, var(--a-warm) 12%, transparent);
+  border-radius: var(--r-sm);
+  padding: 1px var(--s-1);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .activity-drawer-action {
-  font-size: var(--t-xs);
+  font-size: 11px;
   color: var(--t-3);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .activity-drawer-summary {
-  font-size: var(--t-xs);
+  font-size: 12px;
   color: var(--t-2);
   flex: 1;
   min-width: 0;
@@ -146,20 +161,21 @@
 }
 
 .activity-drawer-timestamp {
-  font-size: var(--t-xs);
+  font-size: 11px;
   color: var(--t-3);
   white-space: nowrap;
   flex-shrink: 0;
+  font-family: var(--font-mono);
 }
 
 .activity-drawer-payload-chip {
-  font-size: var(--t-xs);
+  font-size: 11px;
   color: var(--t-3);
-  font-family: var(--font-mono, monospace);
-  background: var(--glass-fill);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-s);
-  padding: 0 var(--space-1);
+  font-family: var(--font-mono);
+  background: var(--g-fill-weak);
+  border: 1px solid var(--g-edge-mid);
+  border-radius: var(--r-sm);
+  padding: 0 var(--s-1);
   max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -168,9 +184,9 @@
 }
 
 .activity-drawer-empty {
-  padding: var(--space-6) var(--space-4);
+  padding: var(--s-6) var(--s-4);
   text-align: center;
-  font-size: var(--t-xs);
+  font-size: 12px;
   color: var(--t-3);
   font-style: italic;
 }
@@ -183,6 +199,10 @@
   }
 
   .activity-strip:hover {
-    background-color: color-mix(in srgb, var(--glass-fill) 60%, transparent);
+    background-color: var(--g-fill-weak);
+  }
+
+  .activity-drawer-filter {
+    transition: background-color 150ms ease, color 150ms ease;
   }
 }

@@ -201,7 +201,7 @@ dialog.glass::backdrop {
     rgba(255, 255, 255, 0.04) 100%
   );
   background-size: 200% 100%;
-  border-radius: var(--radius-card);
+  border-radius: var(--r-lg);
   animation: list-skeleton-shimmer 1.8s var(--ease-smooth) infinite;
 }
 @keyframes list-skeleton-shimmer {

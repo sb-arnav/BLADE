@@ -168,7 +168,7 @@ export function AiDelegate() {
   return (
     <div className="ai-delegate" data-testid="ai-delegate-root">
       <GlassPanel className="ai-delegate-hero">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s-3)', flexWrap: 'wrap' }}>
           <h2 style={{ margin: 0 }}>AI Delegate</h2>
           {info ? (
             <>
@@ -184,11 +184,11 @@ export function AiDelegate() {
           )}
         </div>
         {info?.reasoning && (
-          <p style={{ color: 'var(--t-2)', fontSize: 13, marginTop: 'var(--space-2)' }}>
+          <p style={{ color: 'var(--t-2)', fontSize: 13, marginTop: 'var(--s-2)' }}>
             {info.reasoning}
           </p>
         )}
-        <div style={{ marginTop: 'var(--space-3)', display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+        <div style={{ marginTop: 'var(--s-3)', display: 'flex', gap: 'var(--s-2)', alignItems: 'center' }}>
           <Button
             onClick={onIntroduce}
             disabled={introducing || !info?.available}
@@ -199,15 +199,15 @@ export function AiDelegate() {
           {introducing && <GlassSpinner />}
         </div>
         {introResponse && (
-          <pre className="decision-details" style={{ marginTop: 'var(--space-3)' }}>
+          <pre className="decision-details" style={{ marginTop: 'var(--s-3)' }}>
             {introResponse}
           </pre>
         )}
       </GlassPanel>
 
-      <GlassPanel style={{ padding: 'var(--space-3)' }}>
+      <GlassPanel style={{ padding: 'var(--s-3)' }}>
         <h3 style={{ margin: 0 }}>Recent delegate decisions ({log.length})</h3>
-        <p style={{ color: 'var(--t-2)', fontSize: 12, marginTop: 'var(--space-1)' }}>
+        <p style={{ color: 'var(--t-2)', fontSize: 12, marginTop: 'var(--s-1)' }}>
           Live ring buffer (max {MAX_LOG}) of AI_DELEGATE_APPROVED / DENIED events.
         </p>
         {log.length === 0 ? (
@@ -218,7 +218,7 @@ export function AiDelegate() {
             onAction={onIntroduce}
           />
         ) : (
-          <div className="delegate-log" style={{ marginTop: 'var(--space-2)' }}>
+          <div className="delegate-log" style={{ marginTop: 'var(--s-2)' }}>
             {log.map((entry, i) => {
               const s = summarizePayload(entry.payload);
               return (
@@ -256,12 +256,12 @@ export function AiDelegate() {
         ariaLabel="Delegate feedback"
       >
         <h3 style={{ margin: 0 }}>Delegate feedback</h3>
-        <p style={{ color: 'var(--t-2)', fontSize: 13, marginTop: 'var(--space-2)' }}>
+        <p style={{ color: 'var(--t-2)', fontSize: 13, marginTop: 'var(--s-2)' }}>
           Feedback is persisted via <code>delegate_feedback</code> to the
           delegate audit log; a local echo stays in prefs for the session.
         </p>
         <div className="feedback-form">
-          <label style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', fontSize: 13 }}>
+          <label style={{ display: 'flex', gap: 'var(--s-2)', alignItems: 'center', fontSize: 13 }}>
             <input
               type="checkbox"
               checked={feedbackCorrect}
@@ -269,7 +269,7 @@ export function AiDelegate() {
             />
             Delegate decision was correct
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', fontSize: 12, color: 'var(--t-2)' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s-1)', fontSize: 12, color: 'var(--t-2)' }}>
             Note (optional)
             <textarea
               className="input"
@@ -280,7 +280,7 @@ export function AiDelegate() {
             />
           </label>
         </div>
-        <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end', marginTop: 'var(--space-3)' }}>
+        <div style={{ display: 'flex', gap: 'var(--s-2)', justifyContent: 'flex-end', marginTop: 'var(--s-3)' }}>
           <Button variant="ghost" onClick={() => setFeedbackFor(null)} disabled={feedbackBusy}>Cancel</Button>
           <Button variant="primary" onClick={saveFeedback} disabled={feedbackBusy}>
             {feedbackBusy ? 'Saving…' : 'Save'}

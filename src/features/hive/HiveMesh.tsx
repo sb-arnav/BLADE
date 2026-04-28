@@ -222,7 +222,7 @@ export function HiveMesh() {
         <div className="hive-hero-grid">
           <div>
             <h2 style={{ margin: 0 }}>Hive Mesh</h2>
-            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+            <div style={{ display: 'flex', gap: 'var(--s-2)', marginTop: 'var(--s-2)' }}>
               <Pill tone={status.running ? 'free' : 'default'} dot>
                 {status.running ? 'Running' : 'Idle'}
               </Pill>
@@ -329,11 +329,11 @@ export function HiveMesh() {
         <h3 style={{ margin: 0, color: 'var(--t-1)' }}>
           Raise hive autonomy to {confirmAutonomy?.toFixed(2)}?
         </h3>
-        <p style={{ color: 'var(--t-2)', fontSize: 13, marginTop: 'var(--space-2)' }}>
+        <p style={{ color: 'var(--t-2)', fontSize: 13, marginTop: 'var(--s-2)' }}>
           Levels at 0.7 or higher let the hive take most actions without asking.
           This applies to every tentacle globally.
         </p>
-        <div className="admin-dialog-actions" style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end', marginTop: 'var(--space-3)' }}>
+        <div className="admin-dialog-actions" style={{ display: 'flex', gap: 'var(--s-2)', justifyContent: 'flex-end', marginTop: 'var(--s-3)' }}>
           <Button
             variant="ghost"
             onClick={() => {
