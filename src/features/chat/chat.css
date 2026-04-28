@@ -17,6 +17,17 @@
 
 /* ── Panel shell ──────────────────────────────────────────────────────────── */
 
+/* Route wrapper carries the height through. MainShell renders
+ * `<div data-route-id={route.id}>` between .main-shell-route (which has the
+ * grid-row 1fr) and .chat-panel (which uses height:100% to anchor the flex
+ * column with InputBar pinned to the bottom). Without this rule the wrapper
+ * div collapses to content height, .chat-panel can't fill, MessageList's
+ * flex:1 of 0 stays at 0, and InputBar lands near the top instead of the
+ * bottom (v1.1 layout retraction 2026-04-27). */
+.main-shell-route > [data-route-id="chat"] {
+  height: 100%;
+}
+
 .chat-panel {
   display: flex;
   flex-direction: column;
