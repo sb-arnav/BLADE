@@ -4,6 +4,8 @@
 
 BLADE is a JARVIS-level desktop AI agent. Tauri 2 (Rust) + React (TypeScript) + SQLite. 130+ Rust modules, 145 React components, 50+ routes. It sees your screen, hears your voice, remembers everything, controls your desktop, and acts autonomously. Local-first, zero telemetry.
 
+**Looking for a specific doc?** [`DOCS.md`](DOCS.md) is the master index — every operating file, design doc, research note, and phase plan in the repo, mapped with a one-liner.
+
 ## Build Commands
 
 ```bash
