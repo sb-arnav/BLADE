@@ -160,6 +160,26 @@ catch (e) { setError(typeof e === "string" ? e : String(e)); }
 | `streak_stats.rs` | Daily streaks + gamification |
 | `integration_bridge.rs` | Persistent MCP polling (Gmail/Calendar/Slack/GitHub) |
 
+## Verification Protocol — read this before claiming anything is "done"
+
+**The v1.1 lesson.** v1.1 closed with `27 verify gates green` and `tsc --noEmit clean`, then the operator opened the app and discovered chat doesn't render replies (40 Groq API calls hit, no UI feedback), provider page button is below the viewport with scroll locked, UI overlaps on every route, onboarding is unusable, ⌘K is off-center. **Static gates do not see runtime regressions.** This is now load-bearing rule for every BLADE phase, plan, and milestone going forward.
+
+**Static gates ≠ done.** The 27-gate `verify:all` chain is necessary but not sufficient. tsc clean, cargo check clean, file-counts gating, lints, regex-grep gates — all of them can pass while the running app is shipping rendered nothing. They prove syntax/types/structure. They prove nothing about behavior.
+
+**Required evidence before any "done / shipped / verified / phase complete / milestone closed" claim:**
+
+1. **Dev server running.** `npm run tauri dev` came up cleanly. No Rust compile errors. No runtime panic in the first 10 seconds.
+2. **Surface screenshotted.** Affected route(s) captured to `docs/testing ss/<surface>.png` (note literal space) at the project's responsive breakpoints (1280×800 + 1100×700 minimum).
+3. **Round-trip exercised.** If the change touches chat: send a message, confirm a reply renders. If it touches a form: submit it. If it touches an event handler: trigger the event and confirm the listener fires. The "happy path" must work end-to-end on the running binary.
+4. **Screenshot read back.** Use the `Read` tool on the saved PNG. Cite a one-line observation in the response (e.g. "Dashboard 1280×800: RightNowHero 4 chips visible, no overlap, ActivityStrip mounted at bottom").
+5. **Cross-viewport check on UI changes.** If you only checked one width, you only verified one width. Provider page button-below-fold was a 1100×700 bug that 1280×800 testing missed.
+
+**The Stop hook.** `.claude/hooks/uat-evidence-required.sh` is a soft warning that fires when the recent transcript contains "done"-claims paired with no UAT evidence. It does not block — but if you see its `[BLADE UAT REMINDER]` text on stderr, you are about to repeat the v1.1 mistake.
+
+**The slash command.** `/blade-uat` runs the full procedure as a checklist. Use it before any phase verification, milestone close, or PR description that says "ships X". Cheaper than re-opening a closed milestone.
+
+**Research / planning sessions are exempt.** This protocol applies to runtime/UI changes. If you're writing PROJECT.md, REQUIREMENTS.md, ROADMAP.md, or pure spec / planning docs, no UAT is needed — the soft hook will keyword-trigger but the warning is a false positive in that case.
+
 ## What NOT to Do
 
 - Don't run `cargo check` after every small edit — batch first
@@ -169,6 +189,7 @@ catch (e) { setError(typeof e === "string" ? e : String(e)); }
 - Don't add `#[tauri::command]` with a name that exists in another module
 - Don't use `grep`/`cat`/`find` in bash — use the Read/Grep/Glob tools
 - Don't hardcode model names for OpenRouter — user picks their model
+- Don't claim a phase / milestone "done" because static gates passed — see Verification Protocol above
 
 ## CI
 
