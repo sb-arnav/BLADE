@@ -46,8 +46,8 @@ export function TentacleSignalsCard() {
 
       {loading && (
         <div aria-busy="true" aria-label="Loading hive signals">
-          <div className="dash-card-skeleton" style={{ height: 14, borderRadius: 4, background: 'var(--surface-2)', marginBottom: 'var(--s-2)' }} />
-          <div className="dash-card-skeleton" style={{ height: 14, borderRadius: 4, background: 'var(--surface-2)', width: '60%' }} />
+          <div className="dash-card-skeleton" style={{ height: 14, borderRadius: 4, background: 'var(--g-fill-weak)', marginBottom: 'var(--s-2)' }} />
+          <div className="dash-card-skeleton" style={{ height: 14, borderRadius: 4, background: 'var(--g-fill-weak)', width: '60%' }} />
         </div>
       )}
 

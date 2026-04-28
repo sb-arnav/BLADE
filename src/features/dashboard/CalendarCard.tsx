@@ -56,8 +56,8 @@ export function CalendarCard() {
 
       {loading && (
         <div aria-busy="true" aria-label="Loading calendar events">
-          <div className="dash-card-skeleton" style={{ height: 14, borderRadius: 4, background: 'var(--surface-2)', marginBottom: 'var(--s-2)' }} />
-          <div className="dash-card-skeleton" style={{ height: 14, borderRadius: 4, background: 'var(--surface-2)', width: '70%' }} />
+          <div className="dash-card-skeleton" style={{ height: 14, borderRadius: 4, background: 'var(--g-fill-weak)', marginBottom: 'var(--s-2)' }} />
+          <div className="dash-card-skeleton" style={{ height: 14, borderRadius: 4, background: 'var(--g-fill-weak)', width: '70%' }} />
         </div>
       )}
 

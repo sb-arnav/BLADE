@@ -53,8 +53,8 @@ export function IntegrationsCard() {
 
       {loading && (
         <div aria-busy="true" aria-label="Loading integrations">
-          <div className="dash-card-skeleton" style={{ height: 14, borderRadius: 4, background: 'var(--surface-2)', marginBottom: 'var(--s-2)' }} />
-          <div className="dash-card-skeleton" style={{ height: 14, borderRadius: 4, background: 'var(--surface-2)', width: '50%' }} />
+          <div className="dash-card-skeleton" style={{ height: 14, borderRadius: 4, background: 'var(--g-fill-weak)', marginBottom: 'var(--s-2)' }} />
+          <div className="dash-card-skeleton" style={{ height: 14, borderRadius: 4, background: 'var(--g-fill-weak)', width: '50%' }} />
         </div>
       )}
 

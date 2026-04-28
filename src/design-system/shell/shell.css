@@ -406,7 +406,15 @@
  * center to the left (v1.1 grievance "⌘K is off-center"). The translate
  * was written assuming `left: 50%` was set, which it isn't. */
 dialog.glass:has(.palette) {
-  top: 25vh;
+  top: 12vh;
+  /* v1.3 (2026-04-28): native dialog padding was var(--s-8) = 32px (set in
+   * primitives.css L183), pushing total dialog height to .palette max-height
+   * (70vh) + 64px padding ≈ off the bottom edge when sitting at top: 25vh.
+   * Lifted to 12vh + tightened padding — palette now has ~13vh clearance
+   * from the bottom edge instead of clipping (v1.3 grievance "getting out
+   * of screen a little bit as well"). */
+  padding: var(--s-2);
+  max-height: calc(100vh - 24vh);
 }
 
 /* ── MainShell layout (Plan 02-06) ───────────────────────────────────── */
@@ -416,7 +424,16 @@ dialog.glass:has(.palette) {
   min-height: 100vh;
   height: 100vh;
   display: grid;
-  grid-template-rows: var(--title-height) 1fr;
+  /* v1.3 (2026-04-28): explicit 3-row template. MainShell renders 3 children
+   * — TitleBar, ActivityStrip, main-shell-body — but the template only
+   * declared 2 rows (title-height, 1fr). With 3 children the implicit row
+   * for body got `auto` while the explicit `1fr` row was consumed by
+   * ActivityStrip, distributing all remaining vertical space to a 28px-tall
+   * activity strip and shoving main-shell-body into an auto-sized implicit
+   * third row. Result: chat input clipped at the bottom edge, onboarding
+   * extending below the viewport. Now: title-height + auto (ActivityStrip
+   * natural height) + 1fr (body). */
+  grid-template-rows: var(--title-height) auto 1fr;
   isolation: isolate;
 }
 
