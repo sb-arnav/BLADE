@@ -69,7 +69,11 @@
 select {
   width: 100%;
   padding: var(--s-3) var(--s-4);
-  padding-right: var(--s-7);
+  /* v1.3 (2026-04-28): was var(--s-7) — not on the BLADE spacing scale
+   * (1,2,3,4,5,6,8,10,12,16,20). Resolved to nothing → chevron clipped.
+   * Bumped to --s-8 (32px) which clears the 12-18px chevron with breathing
+   * room. Caught by scripts/verify-css-token-names.mjs. */
+  padding-right: var(--s-8);
   font: inherit; font-family: var(--font-body); font-size: 14px;
   color: var(--t-1);
   background-color: rgba(14, 10, 28, 0.85);
