@@ -39,6 +39,15 @@ const STATUS_LABEL: Record<Status, string> = {
   error: 'Error',
 };
 
+// v1.3 (2026-04-28): the hint chip used to hardcode `⌘K` (Mac glyph) on
+// every platform. Detect once at module load via navigator.platform — Cmd on
+// Mac, Ctrl elsewhere. The traffic-light buttons themselves stay Mac-style
+// regardless (D-15 single aesthetic — user explicitly likes them).
+const IS_MAC =
+  typeof navigator !== 'undefined' &&
+  /(Mac|iPhone|iPad)/i.test(navigator.platform);
+const SHORTCUT_LABEL = IS_MAC ? '⌘K' : 'Ctrl+K';
+
 export function TitleBar() {
   const [status, setStatus] = useState<Status>('idle');
 
@@ -123,15 +132,15 @@ export function TitleBar() {
         </span>
       </div>
 
-      {/* Right zone — ⌘K hint chip. Visual only in Wave 1; Plan 02-05
-          wires the actual keyboard capture and palette open. */}
+      {/* Right zone — Cmd/Ctrl+K hint chip. Glyph is platform-aware (see
+          SHORTCUT_LABEL above): ⌘K on macOS, Ctrl+K on Windows/Linux. */}
       <div
         className="titlebar-hint"
         data-tauri-drag-region="false"
         data-hierarchy-tier="3"
         aria-hidden="true"
       >
-        <kbd>⌘K</kbd>
+        <kbd>{SHORTCUT_LABEL}</kbd>
       </div>
     </header>
   );

@@ -55,6 +55,20 @@
 .ambient-strip-slot { grid-column: span 12; min-width: 0; }
 .coming-soon-card   { grid-column: span 4; min-width: 0; }
 
+/* v1.3 (2026-04-28): TentacleSignalsCard / CalendarCard / IntegrationsCard
+ * use className="dash-card" (Phase 14 WIRE2-02 replaced ComingSoonCard with
+ * live data cards), but no .dash-card grid-column rule existed — each card
+ * defaulted to grid-column: span 1, taking 1/12 of width (~150px on a
+ * 1900px route). Dashboard appeared squashed to the left third with empty
+ * wallpaper on the right. Mirrors .coming-soon-card span. */
+.dash-card          { grid-column: span 4; min-width: 0; padding: var(--s-5); }
+.dash-card-head     { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); margin-bottom: var(--s-3); }
+.dash-card-title    { margin: 0; color: var(--t-1); }
+
+@media (max-width: 900px) {
+  .dash-card { grid-column: span 12; }
+}
+
 /* On narrower viewports collapse to single-column for readability. Uses the
  * same --nav-width-aware max-width that the shell picks — no magic px. */
 @media (max-width: 900px) {

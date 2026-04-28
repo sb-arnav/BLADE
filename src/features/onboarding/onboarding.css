@@ -17,6 +17,13 @@
   transform: translate(-50%, -50%);
   width: 900px;
   max-width: calc(100vw - 80px);
+  /* v1.3 (2026-04-28): without max-height the panel extends above and below
+   * the viewport when content (provider grid + button row) is taller than
+   * 100vh — the "pick a provider" CTA fell off the bottom on shorter screens.
+   * Cap to viewport minus 80px breathing room and let the panel scroll
+   * internally if the content can't fit. */
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
   padding: var(--s-12) var(--s-16) var(--s-12);
   border-radius: var(--r-2xl, 28px);
 }
