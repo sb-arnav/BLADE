@@ -33,7 +33,12 @@
   flex-direction: column;
   height: 100%;
   gap: var(--s-3);
-  padding: var(--s-4);
+  /* Bottom padding bumped from --s-4 (16px) to --s-6 (24px). At 16px the
+   * InputBar sat flush against the route bottom and Tauri WebView2 on
+   * Windows clipped the .btn hover shadow + a few pixels of the input
+   * border (operator UAT 2026-04-28). 24px clears the 0 8px 24px
+   * primary-button shadow with margin to spare. */
+  padding: var(--s-4) var(--s-4) var(--s-6);
   position: relative;   /* anchor for CompactingIndicator (Plan 03-04 slot) */
 }
 
@@ -120,6 +125,8 @@
   display: flex;
   align-items: center;
   gap: var(--s-2);
+  /* Never let MessageList growth eat the composer (operator UAT 2026-04-28). */
+  flex-shrink: 0;
 }
 
 .chat-input-bar > .input {
