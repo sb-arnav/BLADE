@@ -1164,6 +1164,23 @@ pub(crate) async fn send_message_stream_inline(
     let is_short_conversation = input_message_count <= 6;
 
     if tools.is_empty() || (only_native_tools && is_conversational && is_short_conversation) {
+        // Phase 3 WIRE-03 contract (P-UAT-1): emit blade_message_start BEFORE
+        // streaming so the frontend (src/features/chat/useChat.tsx) sets
+        // currentMessageIdRef and commits the assistant reply on chat_done.
+        // The 5 provider stream_text fns only emit chat_token + chat_done; the
+        // tool-loop branch emits message_start at L1490, but the fast streaming
+        // branch was missed when WIRE-03 landed — the symptom is a blank chat
+        // surface despite Groq dashboard counting API calls (v1.1 retraction
+        // 2026-04-27). Mirror the tool-loop pattern exactly: uuid msg id +
+        // env var handoff for blade_thinking_chunk tagging in anthropic.rs.
+        let msg_id = uuid::Uuid::new_v4().to_string();
+        emit_stream_event(&app, "blade_message_start", serde_json::json!({
+            "message_id": &msg_id,
+            "role": "assistant",
+        }));
+        std::env::set_var("BLADE_CURRENT_MSG_ID", &msg_id);
+        _current_message_id = Some(msg_id);
+
         let span = trace::TraceSpan::new(&config.provider, &config.model, "stream_text");
         let result = if use_extended_thinking && config.provider == "anthropic" {
             providers::stream_text_thinking(
