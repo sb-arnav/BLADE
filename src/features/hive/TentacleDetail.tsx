@@ -219,7 +219,7 @@ export function TentacleDetail() {
           The tentacle couldn't be found in the current hive status. It may not
           be spawned yet.
         </p>
-        <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
+        <div style={{ display: 'flex', gap: 'var(--s-2)', marginTop: 'var(--s-3)' }}>
           <Button onClick={() => setSpawnOpen(true)}>Spawn {active}</Button>
           <Button variant="ghost" onClick={() => router.openRoute('hive-mesh')}>
             Back to Hive
@@ -245,7 +245,7 @@ export function TentacleDetail() {
             </label>
             {spawnError && <Pill tone="new">{spawnError}</Pill>}
           </div>
-          <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end', marginTop: 'var(--space-3)' }}>
+          <div style={{ display: 'flex', gap: 'var(--s-2)', justifyContent: 'flex-end', marginTop: 'var(--s-3)' }}>
             <Button variant="ghost" onClick={() => setSpawnOpen(false)} disabled={spawnBusy}>
               Cancel
             </Button>
@@ -262,7 +262,7 @@ export function TentacleDetail() {
     <div className="tentacle-detail" data-testid="hive-tentacle-root">
       <div className="tentacle-detail-main">
         <GlassPanel className="tentacle-hero">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s-3)', flexWrap: 'wrap' }}>
             <h2 style={{ margin: 0 }}>{tentacle.platform}</h2>
             <Pill
               tone={tentacle.status === 'Active' ? 'free' : tentacle.status === 'Error' ? 'new' : 'default'}
@@ -281,7 +281,7 @@ export function TentacleDetail() {
             <div><strong>{tentacle.pending_report_count}</strong><span>pending</span></div>
             <div><strong>{relTime(tentacle.last_heartbeat)}</strong><span>heartbeat</span></div>
           </div>
-          <div style={{ marginTop: 'var(--space-3)' }}>
+          <div style={{ marginTop: 'var(--s-3)' }}>
             <Button onClick={() => setSpawnOpen(true)}>Spawn / reconfigure</Button>
           </div>
         </GlassPanel>
@@ -328,7 +328,7 @@ export function TentacleDetail() {
 
       <GlassPanel className="tentacle-side">
         <h3 style={{ margin: 0 }}>Per-action autonomy</h3>
-        <p style={{ color: 'var(--t-2)', fontSize: 12, marginTop: 'var(--space-2)' }}>
+        <p style={{ color: 'var(--t-2)', fontSize: 12, marginTop: 'var(--s-2)' }}>
           0 = ask always · 3 = confident acts · 5 = full autonomy
         </p>
         <div className="tentacle-autonomy-list">
@@ -362,17 +362,17 @@ export function TentacleDetail() {
         {selectedReport && (
           <>
             <h3 style={{ margin: 0 }}>{selectedReport.summary}</h3>
-            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 'var(--s-2)', marginTop: 'var(--s-2)', flexWrap: 'wrap' }}>
               <Pill tone={priorityTone(selectedReport.priority)}>{selectedReport.priority}</Pill>
               <Pill>{selectedReport.category}</Pill>
               {selectedReport.suggested_action && (
                 <Pill tone="pro">Suggested: {selectedReport.suggested_action}</Pill>
               )}
             </div>
-            <pre className="decision-details" style={{ marginTop: 'var(--space-3)' }}>
+            <pre className="decision-details" style={{ marginTop: 'var(--s-3)' }}>
               {JSON.stringify(selectedReport.details, null, 2)}
             </pre>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--space-3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--s-3)' }}>
               <Button variant="ghost" onClick={() => setSelectedReport(null)}>Close</Button>
             </div>
           </>
@@ -402,7 +402,7 @@ export function TentacleDetail() {
           </label>
           {spawnError && <Pill tone="new">{spawnError}</Pill>}
         </div>
-        <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end', marginTop: 'var(--space-3)' }}>
+        <div style={{ display: 'flex', gap: 'var(--s-2)', justifyContent: 'flex-end', marginTop: 'var(--s-3)' }}>
           <Button variant="ghost" onClick={() => setSpawnOpen(false)} disabled={spawnBusy}>
             Cancel
           </Button>
@@ -433,10 +433,10 @@ export function TentacleDetail() {
         <h3 style={{ margin: 0 }}>
           Raise {autonomyConfirm?.action} autonomy to {autonomyConfirm?.level}?
         </h3>
-        <p style={{ color: 'var(--t-2)', fontSize: 13, marginTop: 'var(--space-2)' }}>
+        <p style={{ color: 'var(--t-2)', fontSize: 13, marginTop: 'var(--s-2)' }}>
           Level 4+ lets the tentacle take this action without asking. Confirm?
         </p>
-        <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end', marginTop: 'var(--space-3)' }}>
+        <div style={{ display: 'flex', gap: 'var(--s-2)', justifyContent: 'flex-end', marginTop: 'var(--s-3)' }}>
           <Button variant="ghost" onClick={() => {
             setAutonomyConfirm(null);
             Promise.allSettled(

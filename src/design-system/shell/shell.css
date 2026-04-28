@@ -397,10 +397,16 @@
 
 /* Lift the palette up so it feels like a command palette, not a centered
  * modal. Phase 1's dialog.glass positioning is already good for other
- * dialogs; this selector only applies when the dialog contains a .palette. */
+ * dialogs; this selector only applies when the dialog contains a .palette.
+ *
+ * v1.3 (2026-04-28): dropped transform: translate(-50%, 0). The native
+ * <dialog> element with margin: auto (set in primitives.css L186) already
+ * centers horizontally — adding the translate shifted the panel LEFT by
+ * half its width on top of the auto-centering, putting it visibly off-
+ * center to the left (v1.1 grievance "⌘K is off-center"). The translate
+ * was written assuming `left: 50%` was set, which it isn't. */
 dialog.glass:has(.palette) {
   top: 25vh;
-  transform: translate(-50%, 0);
 }
 
 /* ── MainShell layout (Plan 02-06) ───────────────────────────────────── */

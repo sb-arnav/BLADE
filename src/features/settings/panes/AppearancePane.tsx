@@ -22,11 +22,15 @@ const GOD_MODE_TIERS = [
   { value: 'extreme',      label: 'Extreme — full ambient intelligence + autonomous actions' },
 ];
 
+// v1.3 (2026-04-28): the original used --fs-display / --fs-h1 / --fs-body /
+// --fs-code which DO NOT exist in tokens.css. Every preview row collapsed to
+// the inherited size (typography preview was visually broken). Sizes mirror
+// src/styles/typography.css .t-h1 / .t-h2 / .t-body / .t-mono utility classes.
 const TYPOGRAPHY = [
-  { role: 'Display',    font: 'Syne',           size: 'var(--fs-display)'  },
-  { role: 'Headings',   font: 'Bricolage Grotesque', size: 'var(--fs-h1)' },
-  { role: 'Body',       font: 'Fraunces',        size: 'var(--fs-body)'    },
-  { role: 'Code',       font: 'JetBrains Mono',  size: 'var(--fs-code)'    },
+  { role: 'Display',    font: 'Syne',                 size: '44px' },
+  { role: 'Headings',   font: 'Bricolage Grotesque',  size: '28px' },
+  { role: 'Body',       font: 'Fraunces',             size: '15px' },
+  { role: 'Code',       font: 'JetBrains Mono',       size: '13px' },
 ];
 
 export function AppearancePane() {

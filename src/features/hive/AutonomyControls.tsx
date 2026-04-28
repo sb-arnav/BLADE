@@ -170,11 +170,11 @@ export function AutonomyControls() {
     <div className="autonomy-controls" data-testid="hive-autonomy-root">
       <GlassPanel className="autonomy-global">
         <h2 style={{ margin: 0 }}>Autonomy Controls</h2>
-        <p style={{ color: 'var(--t-2)', fontSize: 13, marginTop: 'var(--space-1)' }}>
+        <p style={{ color: 'var(--t-2)', fontSize: 13, marginTop: 'var(--s-1)' }}>
           Top row controls the global hive autonomy (0.0 — 1.0). Matrix below is
           per-tentacle × per-action (0 = ask always, 5 = full autonomy).
         </p>
-        <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 'var(--s-3)', alignItems: 'center', marginTop: 'var(--s-2)', flexWrap: 'wrap' }}>
           <label htmlFor="autonomy-global" style={{ fontSize: 13 }}>
             Global hive autonomy: <strong>{status.autonomy.toFixed(2)}</strong>
           </label>
@@ -197,9 +197,9 @@ export function AutonomyControls() {
         </div>
       </GlassPanel>
 
-      <GlassPanel style={{ padding: 'var(--space-3)' }}>
+      <GlassPanel style={{ padding: 'var(--s-3)' }}>
         <h3 style={{ margin: 0 }}>Per-tentacle × per-action matrix</h3>
-        <div className="autonomy-matrix-wrap" style={{ marginTop: 'var(--space-3)' }}>
+        <div className="autonomy-matrix-wrap" style={{ marginTop: 'var(--s-3)' }}>
           <div
             className="autonomy-matrix"
             style={{
@@ -265,11 +265,11 @@ export function AutonomyControls() {
         <h3 style={{ margin: 0 }}>
           Raise global autonomy to {globalConfirm?.toFixed(2)}?
         </h3>
-        <p style={{ color: 'var(--t-2)', fontSize: 13, marginTop: 'var(--space-2)' }}>
+        <p style={{ color: 'var(--t-2)', fontSize: 13, marginTop: 'var(--s-2)' }}>
           Levels at 0.7+ allow the hive to act without asking first on most
           decisions across every tentacle.
         </p>
-        <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end', marginTop: 'var(--space-3)' }}>
+        <div style={{ display: 'flex', gap: 'var(--s-2)', justifyContent: 'flex-end', marginTop: 'var(--s-3)' }}>
           <Button
             variant="ghost"
             onClick={() => {
@@ -316,10 +316,10 @@ export function AutonomyControls() {
         <h3 style={{ margin: 0 }}>
           Raise {cellConfirm?.platform} / {cellConfirm?.action} to level {cellConfirm?.level}?
         </h3>
-        <p style={{ color: 'var(--t-2)', fontSize: 13, marginTop: 'var(--space-2)' }}>
+        <p style={{ color: 'var(--t-2)', fontSize: 13, marginTop: 'var(--s-2)' }}>
           Levels 4-5 let this tentacle perform this action without asking first.
         </p>
-        <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end', marginTop: 'var(--space-3)' }}>
+        <div style={{ display: 'flex', gap: 'var(--s-2)', justifyContent: 'flex-end', marginTop: 'var(--s-3)' }}>
           <Button
             variant="ghost"
             onClick={() => {

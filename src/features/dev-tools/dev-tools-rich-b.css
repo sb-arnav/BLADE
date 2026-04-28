@@ -89,7 +89,7 @@
     border-radius: var(--r-md);
     color: var(--t-1);
     padding: var(--s-2);
-    font-family: var(--font-sans);
+    font-family: var(--font-body);
     font-size: 13px;
     outline: none;
     resize: vertical;
@@ -131,7 +131,7 @@
     border-radius: var(--r-md);
     color: var(--t-1);
     padding: var(--s-2);
-    font-family: var(--font-sans);
+    font-family: var(--font-body);
     font-size: 13px;
     outline: none;
     resize: vertical;
@@ -261,7 +261,7 @@
     font-size: 13px;
     color: var(--t-1);
     white-space: pre-wrap;
-    font-family: var(--font-sans);
+    font-family: var(--font-body);
     line-height: 1.6;
     max-height: 520px;
     overflow-y: auto;
@@ -463,7 +463,7 @@
     border-radius: var(--r-md);
     color: var(--t-1);
     padding: var(--s-2);
-    font-family: var(--font-sans);
+    font-family: var(--font-body);
     font-size: 13px;
     outline: none;
     resize: vertical;

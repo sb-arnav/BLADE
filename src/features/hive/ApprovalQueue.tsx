@@ -274,17 +274,17 @@ export function ApprovalQueue() {
                   {summary}
                 </button>
                 {r.decision.type === 'Reply' && (
-                  <pre className="decision-details" style={{ marginTop: 'var(--space-2)' }}>
+                  <pre className="decision-details" style={{ marginTop: 'var(--s-2)' }}>
                     {r.decision.data.draft}
                   </pre>
                 )}
                 {r.decision.type === 'Act' && !r.decision.data.reversible && (
-                  <Pill tone="new" style={{ marginTop: 'var(--space-2)' }}>
+                  <Pill tone="new" style={{ marginTop: 'var(--s-2)' }}>
                     irreversible
                   </Pill>
                 )}
                 {expanded && (
-                  <pre className="decision-details" style={{ marginTop: 'var(--space-2)' }}>
+                  <pre className="decision-details" style={{ marginTop: 'var(--s-2)' }}>
                     {JSON.stringify(detail, null, 2)}
                   </pre>
                 )}
@@ -318,11 +318,11 @@ export function ApprovalQueue() {
         ariaLabel="Batch approve low-risk"
       >
         <h3 style={{ margin: 0 }}>Approve {batchDialog?.count} low-risk decisions?</h3>
-        <p style={{ color: 'var(--t-2)', fontSize: 13, marginTop: 'var(--space-2)' }}>
+        <p style={{ color: 'var(--t-2)', fontSize: 13, marginTop: 'var(--s-2)' }}>
           Low-risk = Reply with confidence &gt; 0.8. Each will be approved via
           hive_approve_decision sequentially.
         </p>
-        <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end', marginTop: 'var(--space-3)' }}>
+        <div style={{ display: 'flex', gap: 'var(--s-2)', justifyContent: 'flex-end', marginTop: 'var(--s-3)' }}>
           <Button variant="ghost" onClick={() => setBatchDialog(null)} disabled={batchBusy}>
             Cancel
           </Button>

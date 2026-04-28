@@ -14,18 +14,18 @@
   .hive-mesh {
     display: grid;
     grid-template-rows: auto auto 1fr auto;
-    gap: var(--space-4);
-    padding: var(--space-4);
+    gap: var(--s-4);
+    padding: var(--s-4);
   }
 
   .hive-hero {
-    padding: var(--space-4);
+    padding: var(--s-4);
   }
 
   .hive-hero-grid {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    gap: var(--space-4);
+    gap: var(--s-4);
     align-items: start;
   }
 
@@ -38,7 +38,7 @@
   .hive-hero-stats {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .hive-hero-stats > div {
@@ -61,7 +61,7 @@
   .hive-autonomy {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .hive-autonomy-label {
@@ -79,28 +79,28 @@
   .hive-filters {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
-    padding: var(--space-3);
+    gap: var(--s-2);
+    padding: var(--s-3);
     align-items: center;
   }
 
   .tentacle-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: var(--space-3);
+    gap: var(--s-3);
   }
 
   .tentacle-card {
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
-    background: var(--glass-1-bg);
+    padding: var(--s-3);
+    border-radius: var(--r-md);
+    background: var(--g-fill-weak);
     border: 1px solid transparent;
     cursor: pointer;
     text-align: left;
     transition: transform 200ms ease, border-color 200ms ease;
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
+    gap: var(--s-1);
   }
 
   .tentacle-card:hover:not(.status-dormant) {
@@ -133,7 +133,7 @@
   }
 
   .tentacle-platform {
-    font-weight: var(--font-weight-semibold);
+    font-weight: 600;
   }
 
   .tentacle-status {
@@ -156,22 +156,22 @@
   }
 
   .hive-decisions {
-    padding: var(--space-3);
+    padding: var(--s-3);
   }
 
   .hive-decisions-list {
     list-style: none;
     padding: 0;
-    margin: var(--space-2) 0 0;
+    margin: var(--s-2) 0 0;
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .hive-decisions-list li {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
+    gap: var(--s-2);
     font-size: 13px;
   }
 
@@ -183,8 +183,8 @@
   .tentacle-detail {
     display: grid;
     grid-template-columns: 1fr 320px;
-    gap: var(--space-4);
-    padding: var(--space-4);
+    gap: var(--s-4);
+    padding: var(--s-4);
   }
 
   @media (max-width: 960px) {
@@ -196,19 +196,19 @@
   .tentacle-detail-main {
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
+    gap: var(--s-4);
     min-width: 0;
   }
 
   .tentacle-hero {
-    padding: var(--space-4);
+    padding: var(--s-4);
   }
 
   .tentacle-stats {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: var(--space-2);
-    margin-top: var(--space-3);
+    gap: var(--s-2);
+    margin-top: var(--s-3);
   }
 
   .tentacle-stats > div {
@@ -228,28 +228,28 @@
   }
 
   .tentacle-reports {
-    padding: var(--space-3);
+    padding: var(--s-3);
   }
 
   .tentacle-report-list {
     list-style: none;
     padding: 0;
-    margin: var(--space-2) 0 0;
+    margin: var(--s-2) 0 0;
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .tentacle-report-row {
     display: grid;
     grid-template-columns: auto 1fr;
-    gap: var(--space-3);
+    gap: var(--s-3);
     align-items: start;
     width: 100%;
-    padding: var(--space-2);
-    background: var(--glass-1-bg);
+    padding: var(--s-2);
+    background: var(--g-fill-weak);
     border: 1px solid transparent;
-    border-radius: var(--radius-sm);
+    border-radius: var(--r-sm);
     cursor: pointer;
     text-align: left;
   }
@@ -261,7 +261,7 @@
   .tentacle-report-main {
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
+    gap: var(--s-1);
     min-width: 0;
   }
 
@@ -272,27 +272,27 @@
 
   .tentacle-report-meta {
     display: flex;
-    gap: var(--space-2);
+    gap: var(--s-2);
     align-items: center;
     font-size: 11px;
     color: var(--t-2);
   }
 
   .tentacle-side {
-    padding: var(--space-3);
+    padding: var(--s-3);
   }
 
   .tentacle-autonomy-list {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
-    margin-top: var(--space-2);
+    gap: var(--s-2);
+    margin-top: var(--s-2);
   }
 
   .tentacle-autonomy-row {
     display: grid;
     grid-template-columns: 110px 1fr 24px;
-    gap: var(--space-2);
+    gap: var(--s-2);
     align-items: center;
   }
 
@@ -309,14 +309,14 @@
   .tentacle-spawn-form {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
-    margin-top: var(--space-3);
+    gap: var(--s-2);
+    margin-top: var(--s-3);
   }
 
   .tentacle-spawn-form label {
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
+    gap: var(--s-1);
     font-size: 12px;
     color: var(--t-2);
   }
@@ -324,26 +324,26 @@
   .tentacle-spawn-form textarea.input {
     width: 100%;
     min-height: 120px;
-    padding: var(--space-2);
-    border-radius: var(--radius-sm);
-    background: var(--glass-1-bg);
+    padding: var(--s-2);
+    border-radius: var(--r-sm);
+    background: var(--g-fill-weak);
     border: 1px solid var(--border-1, transparent);
     color: var(--t-1);
   }
 
   /* ── AutonomyControls (HIVE-03) ───────────────────────────────────── */
   .autonomy-controls {
-    padding: var(--space-4);
+    padding: var(--s-4);
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
+    gap: var(--s-4);
   }
 
   .autonomy-global {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
-    padding: var(--space-3);
+    gap: var(--s-2);
+    padding: var(--s-3);
   }
 
   .autonomy-matrix-wrap {
@@ -354,31 +354,31 @@
     display: grid;
     grid-template-columns: 160px repeat(6, minmax(120px, 1fr));
     gap: 1px;
-    background: var(--border-1, var(--glass-1-bg));
-    border: 1px solid var(--border-1, var(--glass-1-bg));
-    border-radius: var(--radius-sm);
+    background: var(--border-1, var(--g-fill-weak));
+    border: 1px solid var(--border-1, var(--g-fill-weak));
+    border-radius: var(--r-sm);
     overflow: hidden;
     min-width: 860px;
   }
 
   .autonomy-cell {
-    background: var(--glass-1-bg);
-    padding: var(--space-2);
+    background: var(--g-fill-weak);
+    padding: var(--s-2);
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
+    gap: var(--s-1);
   }
 
   .autonomy-cell.header {
-    background: var(--glass-2-bg, var(--glass-1-bg));
-    font-weight: var(--font-weight-semibold);
+    background: var(--glass-2-bg, var(--g-fill-weak));
+    font-weight: 600;
     font-size: 12px;
     text-transform: lowercase;
   }
 
   .autonomy-cell.label {
-    font-weight: var(--font-weight-semibold);
+    font-weight: 600;
     font-size: 13px;
   }
 
@@ -402,30 +402,30 @@
   .approval-queue {
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
-    padding: var(--space-4);
+    gap: var(--s-3);
+    padding: var(--s-4);
   }
 
   .approval-header {
     display: flex;
-    gap: var(--space-2);
+    gap: var(--s-2);
     align-items: center;
     flex-wrap: wrap;
   }
 
   .approval-filters {
     display: flex;
-    gap: var(--space-2);
+    gap: var(--s-2);
     flex-wrap: wrap;
   }
 
   .approval-row {
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
-    background: var(--glass-1-bg);
+    padding: var(--s-3);
+    border-radius: var(--r-md);
+    background: var(--g-fill-weak);
     display: grid;
     grid-template-columns: auto 1fr auto;
-    gap: var(--space-3);
+    gap: var(--s-3);
     align-items: start;
   }
 
@@ -434,7 +434,7 @@
   }
 
   .decision-type {
-    font-weight: var(--font-weight-semibold);
+    font-weight: 600;
     color: var(--t-1);
   }
 
@@ -458,8 +458,8 @@
     font-family: var(--font-mono);
     font-size: 12px;
     background: rgba(0, 0, 0, 0.05);
-    padding: var(--space-2);
-    border-radius: var(--radius-sm);
+    padding: var(--s-2);
+    border-radius: var(--r-sm);
     max-height: 200px;
     overflow: auto;
     white-space: pre-wrap;
@@ -467,40 +467,40 @@
 
   .decision-actions {
     display: flex;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   /* ── AiDelegate (HIVE-06) ─────────────────────────────────────────── */
   .ai-delegate {
-    padding: var(--space-4);
+    padding: var(--s-4);
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
+    gap: var(--s-4);
   }
 
   .ai-delegate-hero {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
-    padding: var(--space-3);
+    gap: var(--s-2);
+    padding: var(--s-3);
   }
 
   .delegate-log {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: var(--s-2);
     max-height: 600px;
     overflow-y: auto;
-    padding: var(--space-2);
+    padding: var(--s-2);
   }
 
   .delegate-log-row {
-    padding: var(--space-3);
-    border-radius: var(--radius-sm);
-    background: var(--glass-1-bg);
+    padding: var(--s-3);
+    border-radius: var(--r-sm);
+    background: var(--g-fill-weak);
     display: grid;
     grid-template-columns: auto 1fr auto;
-    gap: var(--space-3);
+    gap: var(--s-3);
     align-items: center;
   }
 
@@ -525,16 +525,16 @@
   .feedback-form {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
-    margin-top: var(--space-3);
+    gap: var(--s-2);
+    margin-top: var(--s-3);
   }
 
   .feedback-form textarea.input {
     width: 100%;
     min-height: 80px;
-    padding: var(--space-2);
-    border-radius: var(--radius-sm);
-    background: var(--glass-1-bg);
+    padding: var(--s-2);
+    border-radius: var(--r-sm);
+    background: var(--g-fill-weak);
     border: 1px solid var(--border-1, transparent);
     color: var(--t-1);
   }

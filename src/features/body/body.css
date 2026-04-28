@@ -15,15 +15,15 @@
   .body-map-surface {
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
-    padding: var(--space-4);
+    gap: var(--s-4);
+    padding: var(--s-4);
   }
 
   .body-map-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-3);
+    gap: var(--s-3);
   }
 
   .body-map-title {
@@ -42,14 +42,14 @@
   .body-system-detail-loading {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-4);
+    gap: var(--s-2);
+    padding: var(--s-4);
   }
 
   .body-map-error,
   .body-system-detail-error {
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
+    padding: var(--s-3);
+    border-radius: var(--r-md);
     background: rgba(239, 68, 68, 0.08);
     border: 1px solid var(--status-error, rgba(239, 68, 68, 0.5));
   }
@@ -58,22 +58,22 @@
   .body-system-detail-empty {
     opacity: 0.7;
     font-size: 13px;
-    padding: var(--space-2) 0;
+    padding: var(--s-2) 0;
   }
 
   .body-map {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: var(--space-4);
+    gap: var(--s-4);
   }
 
   .body-system-card {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
-    background: var(--glass-1-bg);
+    gap: var(--s-2);
+    padding: var(--s-3);
+    border-radius: var(--r-md);
+    background: var(--g-fill-weak);
     border: 1px solid var(--border-1, rgba(255, 255, 255, 0.08));
     cursor: pointer;
     text-align: left;
@@ -84,7 +84,7 @@
 
   .body-system-card:hover {
     transform: translateY(-1px);
-    background: var(--glass-2-bg);
+    background: var(--g-fill);
     border-color: var(--status-running);
   }
 
@@ -97,7 +97,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .body-system-name {
@@ -136,15 +136,15 @@
   .body-system-detail {
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
-    padding: var(--space-4);
+    gap: var(--s-4);
+    padding: var(--s-4);
   }
 
   .body-system-detail-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-3);
+    gap: var(--s-3);
   }
 
   .body-system-detail-title {
@@ -162,18 +162,18 @@
 
   .body-system-detail-actions {
     display: flex;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .body-system-detail-tabs {
     display: flex;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .body-system-detail-tab {
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-md);
-    background: var(--glass-1-bg);
+    padding: var(--s-2) var(--s-3);
+    border-radius: var(--r-md);
+    background: var(--g-fill-weak);
     border: 1px solid var(--border-1, rgba(255, 255, 255, 0.08));
     cursor: pointer;
     font: inherit;
@@ -181,7 +181,7 @@
   }
 
   .body-system-detail-tab[data-active='true'] {
-    background: var(--glass-2-bg);
+    background: var(--g-fill);
     border-color: var(--status-running);
   }
 
@@ -195,20 +195,20 @@
     margin: 0;
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .body-module-row {
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
-    background: var(--glass-1-bg);
+    padding: var(--s-3);
+    border-radius: var(--r-md);
+    background: var(--g-fill-weak);
     border: 1px solid var(--border-1, rgba(255, 255, 255, 0.08));
   }
 
   .body-module-row-head {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .body-module-name {
@@ -229,7 +229,7 @@
   }
 
   .body-module-desc {
-    margin: var(--space-2) 0 0;
+    margin: var(--s-2) 0 0;
     opacity: 0.85;
     font-size: 12px;
   }
@@ -237,14 +237,14 @@
   .body-vitals-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: var(--space-3);
+    gap: var(--s-3);
   }
 
   .body-vitals-card {
-    padding: var(--space-3);
+    padding: var(--s-3);
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .body-vitals-card h3 {
@@ -265,7 +265,7 @@
   .body-vitals-stats li {
     display: flex;
     justify-content: space-between;
-    gap: var(--space-2);
+    gap: var(--s-2);
     font-size: 12px;
   }
 
@@ -291,7 +291,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .body-vitals-chips {
@@ -308,7 +308,7 @@
 
   .body-events-table th,
   .body-events-table td {
-    padding: var(--space-2);
+    padding: var(--s-2);
     border-bottom: 1px solid var(--border-1, rgba(255, 255, 255, 0.08));
     text-align: left;
   }
@@ -322,13 +322,13 @@
     flex-direction: column;
     gap: var(--s-1);
     font-size: 12px;
-    margin-top: var(--space-2);
+    margin-top: var(--s-2);
   }
 
   .body-dialog-actions {
     display: flex;
-    gap: var(--space-2);
-    margin-top: var(--space-3);
+    gap: var(--s-2);
+    margin-top: var(--s-3);
     justify-content: flex-end;
   }
 
@@ -336,15 +336,15 @@
   .hormone-bus-surface {
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
-    padding: var(--space-4);
+    gap: var(--s-4);
+    padding: var(--s-4);
   }
 
   .hormone-bus-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-3);
+    gap: var(--s-3);
   }
 
   .hormone-bus-title {
@@ -363,24 +363,24 @@
     display: grid;
     grid-template-columns: 2fr 1fr;
     grid-template-rows: auto auto;
-    gap: var(--space-3);
+    gap: var(--s-3);
   }
 
   .hormone-bus-meters {
     grid-row: span 2;
-    padding: var(--space-3);
+    padding: var(--s-3);
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .hormone-bus-dominant,
   .hormone-bus-circadian,
   .hormone-bus-directive {
-    padding: var(--space-3);
+    padding: var(--s-3);
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .hormone-bus-dominant h3,
@@ -399,7 +399,7 @@
 
   .hormone-directive-input {
     display: flex;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .hormone-directive-input > :first-child {
@@ -437,20 +437,20 @@
   .hormone-bus {
     display: grid;
     grid-template-columns: 2fr 1fr 2fr;
-    gap: var(--space-4);
-    padding: var(--space-4);
+    gap: var(--s-4);
+    padding: var(--s-4);
   }
 
   .hormone-row {
     display: grid;
     grid-template-columns: 100px 1fr 60px;
     align-items: center;
-    gap: var(--space-3);
+    gap: var(--s-3);
   }
 
   .hormone-meter {
     height: 8px;
-    background: var(--glass-1-bg);
+    background: var(--g-fill-weak);
     border-radius: 4px;
     overflow: hidden;
   }
@@ -504,22 +504,22 @@
   .organ-registry {
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
-    padding: var(--space-4);
+    gap: var(--s-3);
+    padding: var(--s-4);
   }
 
   .organ-registry-surface {
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
-    padding: var(--space-4);
+    gap: var(--s-3);
+    padding: var(--s-4);
   }
 
   .organ-registry-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-3);
+    gap: var(--s-3);
   }
 
   .organ-registry-title {
@@ -536,7 +536,7 @@
 
   .organ-registry-actions {
     display: flex;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .organ-list {
@@ -545,12 +545,12 @@
     margin: 0;
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .organ-row {
-    border-radius: var(--radius-md);
-    background: var(--glass-1-bg);
+    border-radius: var(--r-md);
+    background: var(--g-fill-weak);
     border: 1px solid var(--border-1, rgba(255, 255, 255, 0.08));
     overflow: hidden;
   }
@@ -563,9 +563,9 @@
     display: grid;
     grid-template-columns: 140px auto 1fr auto 24px;
     align-items: center;
-    gap: var(--space-2);
+    gap: var(--s-2);
     width: 100%;
-    padding: var(--space-3);
+    padding: var(--s-3);
     background: transparent;
     border: none;
     text-align: left;
@@ -575,7 +575,7 @@
   }
 
   .organ-row-head:hover {
-    background: var(--glass-2-bg);
+    background: var(--g-fill);
   }
 
   .organ-name {
@@ -604,11 +604,11 @@
   }
 
   .organ-row-body {
-    padding: var(--space-3);
+    padding: var(--s-3);
     border-top: 1px solid var(--border-1, rgba(255, 255, 255, 0.08));
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .organ-observations {
@@ -627,7 +627,7 @@
 
   .organ-caps-table th,
   .organ-caps-table td {
-    padding: 6px var(--space-2);
+    padding: 6px var(--s-2);
     border-bottom: 1px solid var(--border-1, rgba(255, 255, 255, 0.06));
     text-align: left;
     vertical-align: middle;
@@ -640,7 +640,7 @@
   .organ-autonomy {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .organ-autonomy input[type='range'] {
@@ -661,21 +661,21 @@
     white-space: pre-wrap;
     max-height: 360px;
     overflow: auto;
-    background: var(--glass-1-bg);
-    padding: var(--space-3);
-    border-radius: var(--radius-sm);
+    background: var(--g-fill-weak);
+    padding: var(--s-3);
+    border-radius: var(--r-sm);
   }
 
   /* ── DNA (BODY-05) ────────────────────────────────────────────────── */
   .dna {
-    padding: var(--space-4);
+    padding: var(--s-4);
   }
 
   .dna-surface {
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
-    padding: var(--space-4);
+    gap: var(--s-4);
+    padding: var(--s-4);
   }
 
   .dna-header {
@@ -698,14 +698,14 @@
 
   .dna-tabs {
     display: flex;
-    gap: var(--space-2);
-    margin-bottom: var(--space-4);
+    gap: var(--s-2);
+    margin-bottom: var(--s-4);
   }
 
   .dna-tab-pill {
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-md);
-    background: var(--glass-1-bg);
+    padding: var(--s-2) var(--s-3);
+    border-radius: var(--r-md);
+    background: var(--g-fill-weak);
     border: 1px solid var(--border-1, rgba(255, 255, 255, 0.08));
     cursor: pointer;
     font: inherit;
@@ -713,23 +713,23 @@
   }
 
   .dna-tab-pill[data-active='true'] {
-    background: var(--glass-2-bg);
+    background: var(--g-fill);
     border-color: var(--status-running);
   }
 
   .dna-section {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .dna-text {
     font-family: var(--font-mono);
     font-size: 12px;
     white-space: pre-wrap;
-    background: var(--glass-1-bg);
-    padding: var(--space-3);
-    border-radius: var(--radius-sm);
+    background: var(--g-fill-weak);
+    padding: var(--s-3);
+    border-radius: var(--r-sm);
     max-height: 400px;
     overflow: auto;
     margin: 0;
@@ -740,20 +740,20 @@
     min-height: 260px;
     font-family: var(--font-mono);
     font-size: 12px;
-    padding: var(--space-3);
-    border-radius: var(--radius-sm);
-    background: var(--glass-1-bg);
+    padding: var(--s-3);
+    border-radius: var(--r-sm);
+    background: var(--g-fill-weak);
     border: 1px solid var(--border-1, rgba(255, 255, 255, 0.08));
     color: inherit;
   }
 
   .dna-actions {
     display: flex;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .dna-deferral {
-    padding: var(--space-3);
+    padding: var(--s-3);
     display: flex;
     flex-direction: column;
     gap: var(--s-1);
@@ -763,7 +763,7 @@
 
   .dna-query-input {
     display: flex;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .dna-query-input > :first-child {
@@ -771,29 +771,29 @@
   }
 
   .dna-query-result {
-    padding: var(--space-3);
+    padding: var(--s-3);
   }
 
   /* ── WorldModel (BODY-06) ─────────────────────────────────────────── */
   .world-model {
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
-    padding: var(--space-4);
+    gap: var(--s-4);
+    padding: var(--s-4);
   }
 
   .world-model-surface {
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
-    padding: var(--space-4);
+    gap: var(--s-4);
+    padding: var(--s-4);
   }
 
   .world-model-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-3);
+    gap: var(--s-3);
   }
 
   .world-model-title {
@@ -810,17 +810,17 @@
 
   .world-model-actions {
     display: flex;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .world-hero {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: var(--space-3);
+    gap: var(--s-3);
   }
 
   .world-hero-card {
-    padding: var(--space-3);
+    padding: var(--s-3);
     display: flex;
     flex-direction: column;
     gap: var(--s-2);
@@ -841,7 +841,7 @@
 
   .world-load-bar {
     height: 6px;
-    background: var(--glass-1-bg);
+    background: var(--g-fill-weak);
     border-radius: 3px;
     overflow: hidden;
   }
@@ -854,14 +854,14 @@
 
   .world-tabs {
     display: flex;
-    gap: var(--space-2);
+    gap: var(--s-2);
     flex-wrap: wrap;
   }
 
   .world-tab-pill {
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-md);
-    background: var(--glass-1-bg);
+    padding: var(--s-2) var(--s-3);
+    border-radius: var(--r-md);
+    background: var(--g-fill-weak);
     border: 1px solid var(--border-1, rgba(255, 255, 255, 0.08));
     cursor: pointer;
     font: inherit;
@@ -869,7 +869,7 @@
   }
 
   .world-tab-pill[data-active='true'] {
-    background: var(--glass-2-bg);
+    background: var(--g-fill);
     border-color: var(--status-running);
   }
 
@@ -886,7 +886,7 @@
 
   .world-table th,
   .world-table td {
-    padding: var(--space-2);
+    padding: var(--s-2);
     border-bottom: 1px solid var(--border-1, rgba(255, 255, 255, 0.08));
     text-align: left;
     vertical-align: top;
@@ -902,13 +902,13 @@
     margin: 0;
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: var(--s-2);
   }
 
   .world-todo-row {
     display: grid;
     grid-template-columns: 200px 1fr;
-    gap: var(--space-2);
+    gap: var(--s-2);
     align-items: baseline;
     font-size: 12px;
   }
@@ -927,8 +927,8 @@
     white-space: pre-wrap;
     max-height: 360px;
     overflow: auto;
-    background: var(--glass-1-bg);
-    padding: var(--space-3);
-    border-radius: var(--radius-sm);
+    background: var(--g-fill-weak);
+    padding: var(--s-3);
+    border-radius: var(--r-sm);
   }
 }
