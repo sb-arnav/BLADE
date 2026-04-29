@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Phases
-status: "Plan 16-06 (capability-gap classifier eval) shipped; Wave 2 of Phase 16 closes (5/5 plans); only Wave 3 16-07 (verify-eval gate + DEFERRED.md + delete embeddings.rs:496-946) remains"
-last_updated: "2026-04-29T21:45:00Z"
+status: "Plan 16-07 (verify-eval gate + DEFERRED.md + embeddings.rs deletion) shipped; Wave 3 closes; Phase 16 ready for /gsd-execute-phase verification step"
+last_updated: "2026-04-29T22:30:00Z"
 progress:
   total_phases: 11
   completed_phases: 10
-  total_plans: 71
-  completed_plans: 71
-  percent: 99
+  total_plans: 72
+  completed_plans: 72
+  percent: 100
 ---
 
 # STATE — BLADE (v1.2)
@@ -17,8 +17,8 @@ progress:
 **Project:** BLADE — Desktop JARVIS
 **Current milestone:** v1.2 — Acting Layer with Brain Foundation (5 phases, 16–20)
 **Last shipped milestone:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27)
-**Current Focus:** Phase 16 (Eval Scaffolding Expansion) — Wave 1 complete + Wave 2 closed (6/7 plans); Wave 3 unblocked
-**Status:** Plan 16-06 (capability-gap classifier eval) shipped; fifth harness consumer live (4 positive + 1 false-positive regression + 2 negative, 7/7 rows pass, MRR 1.000); Wave 2 closes; only Wave 3 16-07 (verify-eval gate + DEFERRED.md + delete embeddings.rs:496-946) remains in Phase 16
+**Current Focus:** Phase 16 (Eval Scaffolding Expansion) — all 3 waves closed (7/7 plans); ready for `/gsd-execute-phase` verification step
+**Status:** Plan 16-07 (verify-eval gate + tests/evals/DEFERRED.md + package.json `verify:eval` chain entry + embeddings.rs:496-946 deletion) shipped; `npm run verify:all` exits 0 with chain count 30 → 31; embeddings.rs shrunk 946 → 495 lines (-451); 5/5 eval modules green (top-3 ≥ 80%, MRR ≥ 0.6 floors all met); EVAL-06 / EVAL-07 / EVAL-08 closed. Phase 16 done.
 
 ---
 
@@ -86,8 +86,8 @@ None. v1.1 closed cleanly with documented tech debt.
 
 ## Session Continuity
 
-**Last session:** 2026-04-29T21:45:00Z (Plan 16-06 — capability-gap classifier eval — shipped; Wave 2 closes; Wave 3 unblocked)
-**Next action:** Execute the Wave 3 plan — 16-07 (verify-eval gate + tests/evals/DEFERRED.md + package.json `verify:eval` chain entry; delete original `embeddings.rs:496-946` synth + real eval blocks). Closes Phase 16. Covers EVAL-06 (scored-table grep gate), EVAL-07 (verify chain integration moves count from 27 → 28+), EVAL-08 (DEFERRED.md for LLM-API evals).
+**Last session:** 2026-04-29T22:30:00Z (Plan 16-07 — verify-eval gate + DEFERRED.md + embeddings.rs deletion — shipped; Wave 3 closes; Phase 16 ready for verification)
+**Next action:** Run `/gsd-execute-phase` Phase 16 verification step (or `/gsd-verify` directly) to close Phase 16. After that: pivot to Phase 17 (Doctor module) — depends on Phase 16 eval signals.
 
 **Context cliff notes:**
 
