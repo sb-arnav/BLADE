@@ -15,7 +15,8 @@
 - [x] **EVAL-01
 **: `tests/evals/` directory exists with shared harness pattern (fixture builders, RR/MRR helpers, scored-table printer) — *file present, exported helpers used by ≥2 eval modules*
 - [ ] **EVAL-02**: Knowledge-graph integrity eval — fixture corpus stored via `kg_add_node` / `kg_add_edge`, `consolidate_kg` invoked, asserts zero orphan nodes + edge endpoints all present — *cargo test --lib evals::kg_integrity_eval green*
-- [ ] **EVAL-03**: BM25 / hybrid-search regression gate preserves existing 8/8-asserted floor (synthetic 4-dim) + 3 new adversarial fixtures (long content, unicode, near-duplicates) — *embeddings::memory_recall_eval extends with adversarial cases, MRR ≥ 0.6 floor holds*
+- [x] **EVAL-03
+**: BM25 / hybrid-search regression gate preserves existing 8/8-asserted floor (synthetic 4-dim) + 3 new adversarial fixtures (long content, unicode, near-duplicates) — *embeddings::memory_recall_eval extends with adversarial cases, MRR ≥ 0.6 floor holds*
 - [ ] **EVAL-04**: typed_memory category recall eval — 7-category fixture (Fact / Preference / Decision / Skill / Goal / Routine / Relationship), `recall_by_category` returns expected sets — *cargo test --lib evals::typed_memory_eval green*
 - [ ] **EVAL-05**: Evolution capability-gap detection eval — synthetic stderr / command-failure blobs fed to `detect_missing_tool`, asserts correct catalog entry returned for each — *cargo test --lib evals::capability_gap_eval green*
 - [ ] **EVAL-06**: Every eval module prints scored table to stdout in the existing `memory_recall_real_embedding` format (label / top1 / top3 / rr / top3-ids / wanted) — *grep stdout for ┌── delimiter on each eval invocation*

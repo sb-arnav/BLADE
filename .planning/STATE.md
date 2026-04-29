@@ -4,14 +4,14 @@ milestone: v1.2
 milestone_name: Acting Layer with Brain Foundation
 current_phase: 16
 status: in_progress
-last_updated: "2026-04-29T19:56:27Z"
-last_activity: 2026-04-29 -- Plan 16-01 (eval harness scaffolding) shipped; Wave 1 complete; Wave 2 unblocked
+last_updated: "2026-04-29T20:20:02Z"
+last_activity: 2026-04-29 -- Plan 16-02 (synthetic hybrid-search eval) shipped; Wave 2 progressing 1/5; asserted 8/8 floor preserved
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 7
-  completed_plans: 1
-  percent: 14
+  completed_plans: 2
+  percent: 28
 ---
 
 # STATE — BLADE (v1.2)
@@ -19,8 +19,8 @@ progress:
 **Project:** BLADE — Desktop JARVIS
 **Current milestone:** v1.2 — Acting Layer with Brain Foundation (5 phases, 16–20)
 **Last shipped milestone:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27)
-**Current Focus:** Phase 16 (Eval Scaffolding Expansion) — Wave 1 complete (1/7 plans)
-**Status:** Plan 16-01 (harness scaffolding) shipped; Wave 2 (5 parallel plans) unblocked; verifier passed 12/12 dimensions
+**Current Focus:** Phase 16 (Eval Scaffolding Expansion) — Wave 1 complete + Wave 2 in progress (2/7 plans)
+**Status:** Plan 16-02 (synthetic hybrid-search eval) shipped; harness consumer #1 live; remaining Wave 2 plans (16-03, 16-04, 16-05, 16-06) still parallel-ready
 
 ---
 
@@ -88,8 +88,8 @@ None. v1.1 closed cleanly with documented tech debt.
 
 ## Session Continuity
 
-**Last session:** 2026-04-29T19:53:54Z (Plan 16-01 — eval harness scaffolding — shipped; Wave 1 complete)
-**Next action:** Execute Wave 2 — Plans 16-02 (hybrid_search_eval), 16-03 (real_embedding_eval), 16-04 (kg_integrity_eval), 16-05 (typed_memory_eval), 16-06 (capability_gap_eval). All 5 are independent and can run in parallel; each imports `super::harness::*` from the harness shipped in Wave 1.
+**Last session:** 2026-04-29T20:20:02Z (Plan 16-02 — synthetic hybrid-search eval — shipped; harness consumer #1 live)
+**Next action:** Execute remaining Wave 2 plans — 16-03 (real_embedding_eval), 16-04 (kg_integrity_eval), 16-05 (typed_memory_eval), 16-06 (capability_gap_eval). All 4 are independent and can run in parallel; each imports `super::harness::*` from the harness shipped in Wave 1. Plan 16-07 (deletion of original `embeddings.rs:510-728`) waits for Wave 2 to finish.
 
 **Context cliff notes:**
 
@@ -103,3 +103,5 @@ None. v1.1 closed cleanly with documented tech debt.
 ---
 
 *State updated: 2026-04-29 — Plan 16-01 shipped (3 tasks / 3 commits / 7 files created / 1 file modified). Harness, EvalRow/EvalSummary, RR/MRR helpers, EVAL-06 box-drawing printer, temp_blade_env all live in `src-tauri/src/evals/harness.rs`. EVAL-01 marked complete in REQUIREMENTS.md. Wave 2 unblocked.*
+
+*State updated: 2026-04-29T20:20Z — Plan 16-02 shipped (1 task / 1 commit / 1 file modified). `evals/hybrid_search_eval.rs` populated with 8 baseline + 3 adversarial fixtures (long content / unicode CJK+emoji / near-duplicate Tuesday-Wednesday). Asserted floor 8/8 holds (top-3 100%, MRR 1.000). EVAL-03 marked complete in REQUIREMENTS.md. Original `mod memory_recall_eval` block at `embeddings.rs:510-728` left in place — Plan 16-07 deletes it after Wave 2 finishes. Wave 2 progress: 1/5 plans (16-02 done; 16-03, 16-04, 16-05, 16-06 remain).*
