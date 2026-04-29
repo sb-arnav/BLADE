@@ -163,6 +163,11 @@ function checkModules(audit) {
     // location is src-tauri/build.rs at crate root, already excluded by
     // RUST_DIR scope — D-49).
     if (file.endsWith('/build.rs') || file.endsWith('\\build.rs')) continue;
+    // evals/ is #[cfg(test)]-gated test code; not in production wiring audit.
+    // Phase 16 added src-tauri/src/evals/{harness,mod,hybrid_search_eval,
+    // real_embedding_eval,kg_integrity_eval,typed_memory_eval,capability_gap_eval}.rs
+    // — all behind cfg(test). The wiring audit inventories runtime modules only.
+    if (file.includes('/evals/') || file.includes('\\evals\\')) continue;
     rsCount += 1;
   }
   if (audit.modules.length !== rsCount) {
