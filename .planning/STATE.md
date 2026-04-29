@@ -1,17 +1,15 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.2
-milestone_name: Acting Layer with Brain Foundation
-current_phase: 16
-status: in_progress
-last_updated: "2026-04-29T20:20:02Z"
-last_activity: 2026-04-29 -- Plan 16-02 (synthetic hybrid-search eval) shipped; Wave 2 progressing 1/5; asserted 8/8 floor preserved
+milestone_name: Phases
+status: "Plan 16-03 (real-fastembed recall eval) shipped; second harness consumer live (real-fastembed path); remaining Wave 2 plans (16-04, 16-05, 16-06) still parallel-ready"
+last_updated: "2026-04-29T20:29:01Z"
 progress:
-  total_phases: 5
-  completed_phases: 0
-  total_plans: 7
-  completed_plans: 2
-  percent: 28
+  total_phases: 11
+  completed_phases: 10
+  total_plans: 71
+  completed_plans: 68
+  percent: 96
 ---
 
 # STATE — BLADE (v1.2)
@@ -19,8 +17,8 @@ progress:
 **Project:** BLADE — Desktop JARVIS
 **Current milestone:** v1.2 — Acting Layer with Brain Foundation (5 phases, 16–20)
 **Last shipped milestone:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27)
-**Current Focus:** Phase 16 (Eval Scaffolding Expansion) — Wave 1 complete + Wave 2 in progress (2/7 plans)
-**Status:** Plan 16-02 (synthetic hybrid-search eval) shipped; harness consumer #1 live; remaining Wave 2 plans (16-03, 16-04, 16-05, 16-06) still parallel-ready
+**Current Focus:** Phase 16 (Eval Scaffolding Expansion) — Wave 1 complete + Wave 2 in progress (3/7 plans)
+**Status:** Plan 16-03 (real-fastembed recall eval) shipped; second harness consumer live (real-fastembed path, 7/7 top-1, MRR 1.000); remaining Wave 2 plans (16-04, 16-05, 16-06) still parallel-ready
 
 ---
 
@@ -88,8 +86,8 @@ None. v1.1 closed cleanly with documented tech debt.
 
 ## Session Continuity
 
-**Last session:** 2026-04-29T20:20:02Z (Plan 16-02 — synthetic hybrid-search eval — shipped; harness consumer #1 live)
-**Next action:** Execute remaining Wave 2 plans — 16-03 (real_embedding_eval), 16-04 (kg_integrity_eval), 16-05 (typed_memory_eval), 16-06 (capability_gap_eval). All 4 are independent and can run in parallel; each imports `super::harness::*` from the harness shipped in Wave 1. Plan 16-07 (deletion of original `embeddings.rs:510-728`) waits for Wave 2 to finish.
+**Last session:** 2026-04-29T20:29:01Z (Plan 16-03 — real-fastembed recall eval — shipped; second harness consumer live)
+**Next action:** Execute remaining Wave 2 plans — 16-04 (kg_integrity_eval), 16-05 (typed_memory_eval), 16-06 (capability_gap_eval). All 3 are independent and can run in parallel; each imports `super::harness::*` from the harness shipped in Wave 1. Plan 16-07 (deletion of original `embeddings.rs:496-946` — both synthetic + real mods) waits for Wave 2 to finish.
 
 **Context cliff notes:**
 
@@ -105,3 +103,5 @@ None. v1.1 closed cleanly with documented tech debt.
 *State updated: 2026-04-29 — Plan 16-01 shipped (3 tasks / 3 commits / 7 files created / 1 file modified). Harness, EvalRow/EvalSummary, RR/MRR helpers, EVAL-06 box-drawing printer, temp_blade_env all live in `src-tauri/src/evals/harness.rs`. EVAL-01 marked complete in REQUIREMENTS.md. Wave 2 unblocked.*
 
 *State updated: 2026-04-29T20:20Z — Plan 16-02 shipped (1 task / 1 commit / 1 file modified). `evals/hybrid_search_eval.rs` populated with 8 baseline + 3 adversarial fixtures (long content / unicode CJK+emoji / near-duplicate Tuesday-Wednesday). Asserted floor 8/8 holds (top-3 100%, MRR 1.000). EVAL-03 marked complete in REQUIREMENTS.md. Original `mod memory_recall_eval` block at `embeddings.rs:510-728` left in place — Plan 16-07 deletes it after Wave 2 finishes. Wave 2 progress: 1/5 plans (16-02 done; 16-03, 16-04, 16-05, 16-06 remain).*
+
+*State updated: 2026-04-29T20:29Z — Plan 16-03 shipped (1 task / 1 commit / 1 file modified). `evals/real_embedding_eval.rs` populated (Wave 1 stub → 277 lines): 8-fact BLADE-shaped corpus + 7 natural-language scenarios moved verbatim from `embeddings.rs:730-946`, helpers swapped to `super::harness::*`. Floor preserved: 7/7 top-1, MRR 1.000 (matches 2026-04-28 baseline `9c5674a`). One Rule-3 deviation logged (inline 6-line `cosine_similarity` in smoke test rather than widening `embeddings::cosine_similarity` to `pub` — keeps `embeddings.rs` line count invariant at 946 for Plan 16-07's deletion arithmetic). EVAL-03 already marked complete by 16-02; this plan covers the real-fastembed half of the gate. Original `mod memory_recall_real_embedding` block at `embeddings.rs:730-946` left in place — Plan 16-07 deletes it. Wave 2 progress: 2/5 plans (16-02 + 16-03 done; 16-04, 16-05, 16-06 remain).*

@@ -66,7 +66,7 @@
 Plans:
 - [x] `16-01-harness-PLAN.md` — Wave 1: scaffold `evals/` module tree + shared harness (helpers, scored-table printer, temp-env). Covers EVAL-01. ✅ Shipped 2026-04-29 (commit `e6a0b02`).
 - [x] `16-02-hybrid-search-eval-PLAN.md` — Wave 2: extract synthetic 4-dim eval from `embeddings.rs:510-728` + add 3 adversarial fixtures (long content, unicode, near-duplicate). Covers EVAL-03 (synth). ✅ Shipped 2026-04-29 (commit `bbdd0f6`); asserted 8/8 floor (top-3 100%, MRR 1.000) preserved.
-- [ ] `16-03-real-embedding-eval-PLAN.md` — Wave 2: extract real-fastembed eval from `embeddings.rs:748-946`. Covers EVAL-03 (real).
+- [x] `16-03-real-embedding-eval-PLAN.md` — Wave 2: extract real-fastembed eval from `embeddings.rs:748-946`. Covers EVAL-03 (real). ✅ Shipped 2026-04-29 (commit `c3005ed`); 7/7 top-1, MRR 1.000 (matches 2026-04-28 baseline).
 - [ ] `16-04-kg-integrity-eval-PLAN.md` — Wave 2: NEW knowledge-graph round-trip + orphan-zero + idempotent-merge eval. Covers EVAL-02.
 - [ ] `16-05-typed-memory-eval-PLAN.md` — Wave 2: NEW 7-category typed-memory recall + cross-category isolation eval. Covers EVAL-04.
 - [ ] `16-06-capability-gap-eval-PLAN.md` — Wave 2: NEW `detect_missing_tool` classifier eval (4 positive + 1 false-positive regression + 2 negative). Covers EVAL-05.
