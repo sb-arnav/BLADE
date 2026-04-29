@@ -80,6 +80,8 @@ mod symbolic;
 mod supervisor;
 mod urinary;
 mod embeddings;
+#[cfg(test)]
+mod evals;
 mod files;
 mod history;
 mod managed_agents;
