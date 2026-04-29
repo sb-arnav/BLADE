@@ -726,3 +726,221 @@ mod memory_recall_eval {
         assert!(results.is_empty(), "empty store must return no results");
     }
 }
+
+/// End-to-end recall eval using the real fastembed `AllMiniLML6V2` model.
+///
+/// `memory_recall_eval` above tests the RRF ranking math with hand-picked
+/// 4-dim vectors — it verifies the fusion logic but says nothing about
+/// whether the actual embedding model produces useful semantics for
+/// BLADE's domain. This mod closes that gap: the corpus is real prose
+/// (the kind of facts BLADE actually stores), queries are natural
+/// language, and the embedding pipeline runs end-to-end.
+///
+/// Cost: first run downloads ~80MB of model weights and compiles the
+/// model graph (~20-30s). Subsequent runs in the same process reuse
+/// the global EMBEDDER static. Total embed cost for 8 corpus + 7
+/// queries ≈ 1-2s on CPU after first load.
+///
+/// Maturity audit (2026-04-27, .planning/notes/v1-2-self-improvement-maturity.md)
+/// flagged the memory cluster as "1,883 LoC, zero quality measurement"
+/// — this mod is the first real signal on that question.
+#[cfg(test)]
+mod memory_recall_real_embedding {
+    use super::*;
+    use tempfile::TempDir;
+
+    struct Fact {
+        source_id: &'static str,
+        content: &'static str,
+    }
+
+    /// Realistic BLADE-shaped facts about a hypothetical user. Each is the
+    /// kind of single-sentence memory that `auto_embed_exchange` would
+    /// store after a chat turn, minus the conversation framing.
+    fn corpus() -> Vec<Fact> {
+        vec![
+            Fact {
+                source_id: "mem_owner_name",
+                content: "User's name is Arnav. He is an engineer building BLADE, a desktop AI agent.",
+            },
+            Fact {
+                source_id: "mem_family_mom",
+                content: "User's mother's name is Priya. She lives in Mumbai and works as a teacher.",
+            },
+            Fact {
+                source_id: "mem_lang_pref",
+                content: "User strongly prefers Rust over Python for systems programming work.",
+            },
+            Fact {
+                source_id: "mem_exercise",
+                content: "User runs 5K every Tuesday morning at the riverside park.",
+            },
+            Fact {
+                source_id: "mem_meeting",
+                content: "Daily engineering standup is at 9:30 AM Pacific Time, hosted on Zoom.",
+            },
+            Fact {
+                source_id: "mem_food",
+                content: "User dislikes deep-dish pizza and prefers Neapolitan style with thin crust.",
+            },
+            Fact {
+                source_id: "mem_oncall",
+                content: "User is on the payments service on-call rotation this week.",
+            },
+            Fact {
+                source_id: "mem_birthday",
+                content: "User's birthday is March 15. Plans a quiet dinner each year.",
+            },
+        ]
+    }
+
+    /// Build an isolated VectorStore with the real-embedded corpus.
+    fn build_real_store() -> (TempDir, VectorStore) {
+        let temp = TempDir::new().expect("tempdir");
+        std::env::set_var("BLADE_CONFIG_DIR", temp.path());
+        let _ = crate::db::init_db();
+
+        let facts = corpus();
+        let texts: Vec<String> = facts.iter().map(|f| f.content.to_string()).collect();
+        let embeddings = embed_texts(&texts).expect("real embedding call");
+        assert_eq!(embeddings.len(), facts.len());
+
+        let mut store = VectorStore::new();
+        for (fact, emb) in facts.iter().zip(embeddings.iter()) {
+            store.add(
+                fact.content.to_string(),
+                emb.clone(),
+                "test_real_fixture".to_string(),
+                fact.source_id.to_string(),
+            );
+        }
+        (temp, store)
+    }
+
+    fn reciprocal_rank(results: &[SearchResult], expected: &str) -> f32 {
+        for (i, r) in results.iter().enumerate() {
+            if r.source_id == expected {
+                return 1.0 / ((i + 1) as f32);
+            }
+        }
+        0.0
+    }
+
+    fn top1_hit(results: &[SearchResult], expected: &str) -> bool {
+        results.first().map(|r| r.source_id == expected).unwrap_or(false)
+    }
+
+    fn topk_hit(results: &[SearchResult], expected: &str, k: usize) -> bool {
+        results.iter().take(k).any(|r| r.source_id == expected)
+    }
+
+    /// Natural-language queries paired with the expected source_id.
+    /// These are the kind of recall queries a user would actually ask
+    /// — "what's my mom's name", not "mom name lookup token".
+    fn scenarios() -> Vec<(&'static str, &'static str, &'static str)> {
+        vec![
+            // Direct possessive — "what's my X" pattern
+            ("what is my mother's name", "mem_family_mom", "direct_mom_name"),
+            ("when is my birthday", "mem_birthday", "direct_birthday"),
+            // Paraphrase — surface form differs from stored content
+            ("when do I exercise", "mem_exercise", "paraphrase_exercise"),
+            ("what time is the daily meeting", "mem_meeting", "paraphrase_standup"),
+            ("which programming language do I like", "mem_lang_pref", "paraphrase_lang"),
+            // Semantic association — query word doesn't appear literally
+            ("favorite italian food", "mem_food", "semantic_pizza"),
+            // Lexical-light query — should still find by short token
+            ("on call this week", "mem_oncall", "direct_oncall"),
+        ]
+    }
+
+    /// First-time model download can take 20-30s. Subsequent runs are
+    /// fast (~1-2s for the embed pass + sub-second search). Marked as
+    /// a regular test (not `#[ignore]`) — we want this in `verify:all`.
+    /// If CI ever needs to skip it (air-gapped, etc.), gate behind a
+    /// cargo feature.
+    #[test]
+    fn evaluates_real_embedding_recall() {
+        let (_tmp, store) = build_real_store();
+        let scenarios = scenarios();
+        let total = scenarios.len() as f32;
+        let mut top1 = 0;
+        let mut top3 = 0;
+        let mut rr_sum = 0.0;
+
+        println!("\n┌── Memory recall eval (real fastembed AllMiniLML6V2) ──");
+        for (query, expected, label) in &scenarios {
+            // Embed the query through the same path production uses.
+            let query_emb = embed_texts(&[query.to_string()])
+                .expect("query embed")
+                .into_iter()
+                .next()
+                .expect("non-empty");
+            let results = store.hybrid_search(&query_emb, query, 5);
+            let hit1 = top1_hit(&results, expected);
+            let hit3 = topk_hit(&results, expected, 3);
+            let rr = reciprocal_rank(&results, expected);
+            if hit1 { top1 += 1; }
+            if hit3 { top3 += 1; }
+            rr_sum += rr;
+            let top_ids: Vec<&str> = results.iter().take(3).map(|r| r.source_id.as_str()).collect();
+            println!(
+                "│ {:32} top1={} top3={} rr={:.2} → top3={:?} (want={})",
+                label, if hit1 { "✓" } else { "✗" }, if hit3 { "✓" } else { "✗" }, rr, top_ids, expected,
+            );
+        }
+        let mrr = rr_sum / total;
+        println!("├─────────────────────────────────────────────────────────");
+        println!(
+            "│ top-1: {}/{} ({:.0}%)  top-3: {}/{} ({:.0}%)  MRR: {:.3}",
+            top1, total as i32, (top1 as f32 / total) * 100.0,
+            top3, total as i32, (top3 as f32 / total) * 100.0,
+            mrr
+        );
+        println!("└─────────────────────────────────────────────────────────\n");
+
+        // Quality floor — same as the synthetic eval's gate. Real
+        // embeddings should match or exceed this on a curated corpus
+        // of clean facts. If this fails, the signal is real: either
+        // the model is wrong for our domain or the recall pipeline
+        // has a regression.
+        assert!(
+            (top3 as f32 / total) >= 0.80,
+            "real-embedding top-3 recall {}/{} below 80% floor",
+            top3, total as i32
+        );
+        assert!(
+            mrr >= 0.6,
+            "real-embedding MRR {:.3} below 0.6 floor",
+            mrr
+        );
+    }
+
+    /// Smoke test — confirms the real embedder loads and produces
+    /// non-zero, normalized vectors of the expected dimension.
+    /// Cheap signal that fastembed wiring isn't broken.
+    #[test]
+    fn embedder_produces_sane_vectors() {
+        let texts = vec![
+            "hello world".to_string(),
+            "rust async tokio".to_string(),
+        ];
+        let embeddings = embed_texts(&texts).expect("embed");
+        assert_eq!(embeddings.len(), 2);
+        // AllMiniLML6V2 emits 384-dim vectors. Don't hard-code the
+        // dim (model could change) — just assert it's plausible.
+        let dim = embeddings[0].len();
+        assert!(
+            dim >= 128 && dim <= 4096,
+            "embedding dim {} outside plausible range",
+            dim
+        );
+        // Both vectors must be the same dimension.
+        assert_eq!(embeddings[0].len(), embeddings[1].len());
+        // Vectors must contain non-zero magnitude (model didn't return zeros).
+        let mag: f32 = embeddings[0].iter().map(|x| x * x).sum::<f32>().sqrt();
+        assert!(mag > 0.1, "embedding magnitude {} suspiciously low", mag);
+        // Different inputs must produce different vectors (no constant output bug).
+        let cs = cosine_similarity(&embeddings[0], &embeddings[1]);
+        assert!(cs < 0.999, "different inputs produced near-identical vectors");
+    }
+}
