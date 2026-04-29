@@ -1,15 +1,17 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.2
-milestone_name: Phases
-status: "Plan 16-07 (verify-eval gate + DEFERRED.md + embeddings.rs deletion) shipped; Wave 3 closes; Phase 16 ready for /gsd-execute-phase verification step"
+milestone_name: Acting Layer with Brain Foundation
+current_phase: 17
+status: phase_complete
 last_updated: "2026-04-29T22:30:00Z"
+last_activity: 2026-04-29 -- Phase 16 (Eval Scaffolding Expansion) shipped + verified (25/25 must-haves, 4/4 SCs, 8/8 EVAL REQs); v1.2 progress 1/5 phases
 progress:
-  total_phases: 11
-  completed_phases: 10
-  total_plans: 72
-  completed_plans: 72
-  percent: 100
+  total_phases: 5
+  completed_phases: 1
+  total_plans: 7
+  completed_plans: 7
+  percent: 20
 ---
 
 # STATE — BLADE (v1.2)
@@ -17,8 +19,8 @@ progress:
 **Project:** BLADE — Desktop JARVIS
 **Current milestone:** v1.2 — Acting Layer with Brain Foundation (5 phases, 16–20)
 **Last shipped milestone:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27)
-**Current Focus:** Phase 16 (Eval Scaffolding Expansion) — all 3 waves closed (7/7 plans); ready for `/gsd-execute-phase` verification step
-**Status:** Plan 16-07 (verify-eval gate + tests/evals/DEFERRED.md + package.json `verify:eval` chain entry + embeddings.rs:496-946 deletion) shipped; `npm run verify:all` exits 0 with chain count 30 → 31; embeddings.rs shrunk 946 → 495 lines (-451); 5/5 eval modules green (top-3 ≥ 80%, MRR ≥ 0.6 floors all met); EVAL-06 / EVAL-07 / EVAL-08 closed. Phase 16 done.
+**Current Focus:** Phase 17 (Doctor Module) — Phase 16 ✅ shipped + verified 2026-04-29
+**Status:** Phase 16 complete: 7 plans / 19 commits / 5 eval modules green at MRR 1.000 / `verify:all` chain 30→31 / `embeddings.rs` 946→495 lines / VERIFICATION.md 25/25 must-haves PASS. Ready to scope Phase 17 (Doctor pane consuming Phase 16 eval signals + capability-gap log + tentacle health + drift signals).
 
 ---
 
@@ -86,28 +88,18 @@ None. v1.1 closed cleanly with documented tech debt.
 
 ## Session Continuity
 
-**Last session:** 2026-04-29T22:30:00Z (Plan 16-07 — verify-eval gate + DEFERRED.md + embeddings.rs deletion — shipped; Wave 3 closes; Phase 16 ready for verification)
-**Next action:** Run `/gsd-execute-phase` Phase 16 verification step (or `/gsd-verify` directly) to close Phase 16. After that: pivot to Phase 17 (Doctor module) — depends on Phase 16 eval signals.
+**Last session:** 2026-04-29T22:30:00Z (Phase 16 ✅ shipped + verified — 7 plans / 19 commits / 5 eval modules @ MRR 1.000 / `verify:all` 30→31 / VERIFICATION.md PASS 25/25)
+**Next action:** `/gsd-discuss-phase 17` — gather context for Phase 17 (Doctor Module). Or skip discussion: `/gsd-plan-phase 17`.
 
 **Context cliff notes:**
 
 - v1.0 + v1.1 both shipped; substrate is reachable + observable + capability-aware
-- 27 verify gates green; tsc clean
-- v1.2 = 5 phases (16=Eval, 17=Doctor, 18=JARVIS+Ego, 19=Operator-UAT, 20=Polish)
+- 31 verify gates green (was 30; Phase 16 added `verify:eval`); tsc clean
+- v1.2 = 5 phases (16=Eval ✅, 17=Doctor, 18=JARVIS+Ego, 19=Operator-UAT, 20=Polish)
 - v1.2 acting work flips the per-tentacle observe-only guardrail with explicit consent + trust-tier escalation, never silently
 - Activity log strip is the v1.1 contract every v1.2 cross-module action must honor
-- Memory recall pipeline verified healthy 2026-04-28 (7/7 top-1, MRR 1.000) — eval pattern established
+- Phase 16 eval harness lives at `src-tauri/src/evals/{harness, hybrid_search_eval, real_embedding_eval, kg_integrity_eval, typed_memory_eval, capability_gap_eval}.rs` — Phase 17 Doctor consumes these signals (DOCTOR-02)
 
 ---
 
-*State updated: 2026-04-29 — Plan 16-01 shipped (3 tasks / 3 commits / 7 files created / 1 file modified). Harness, EvalRow/EvalSummary, RR/MRR helpers, EVAL-06 box-drawing printer, temp_blade_env all live in `src-tauri/src/evals/harness.rs`. EVAL-01 marked complete in REQUIREMENTS.md. Wave 2 unblocked.*
-
-*State updated: 2026-04-29T20:20Z — Plan 16-02 shipped (1 task / 1 commit / 1 file modified). `evals/hybrid_search_eval.rs` populated with 8 baseline + 3 adversarial fixtures (long content / unicode CJK+emoji / near-duplicate Tuesday-Wednesday). Asserted floor 8/8 holds (top-3 100%, MRR 1.000). EVAL-03 marked complete in REQUIREMENTS.md. Original `mod memory_recall_eval` block at `embeddings.rs:510-728` left in place — Plan 16-07 deletes it after Wave 2 finishes. Wave 2 progress: 1/5 plans (16-02 done; 16-03, 16-04, 16-05, 16-06 remain).*
-
-*State updated: 2026-04-29T20:29Z — Plan 16-03 shipped (1 task / 1 commit / 1 file modified). `evals/real_embedding_eval.rs` populated (Wave 1 stub → 277 lines): 8-fact BLADE-shaped corpus + 7 natural-language scenarios moved verbatim from `embeddings.rs:730-946`, helpers swapped to `super::harness::*`. Floor preserved: 7/7 top-1, MRR 1.000 (matches 2026-04-28 baseline `9c5674a`). One Rule-3 deviation logged (inline 6-line `cosine_similarity` in smoke test rather than widening `embeddings::cosine_similarity` to `pub` — keeps `embeddings.rs` line count invariant at 946 for Plan 16-07's deletion arithmetic). EVAL-03 already marked complete by 16-02; this plan covers the real-fastembed half of the gate. Original `mod memory_recall_real_embedding` block at `embeddings.rs:730-946` left in place — Plan 16-07 deletes it. Wave 2 progress: 2/5 plans (16-02 + 16-03 done; 16-04, 16-05, 16-06 remain).*
-
-*State updated: 2026-04-29T21:05Z — Plan 16-04 shipped (1 task / 1 commit / 1 file modified). `evals/kg_integrity_eval.rs` populated (Wave 1 stub → 284 lines): 5 fixture nodes (blade, tauri, rust, arnav, jarvis demo) inserted via `add_node`, 5 edges via `add_edge` (depends_on / related_to / part_of), 5 integrity dimensions asserted (round-trip / edge-endpoints-resolve / orphan-zero / idempotent-merge / edge-upsert-no-dup). All 5 dimensions pass; MRR 1.000. File-header documents the `consolidate_kg` REQ-vs-real resolution: the named function does not exist; REQ wording satisfied by `add_node`'s built-in idempotent-merge path (`knowledge_graph.rs:221-248`) — no re-export added. Test command: `cd src-tauri && cargo test --lib evals::kg_integrity_eval -- --nocapture --test-threads=1` exits 0 with `┌── Knowledge graph integrity eval` table emitted. EVAL-02 marked complete in REQUIREMENTS.md. Wave 2 progress: 3/5 plans (16-02 + 16-03 + 16-04 done; 16-05, 16-06 remain).*
-
-*State updated: 2026-04-29T21:25Z — Plan 16-05 shipped (1 task / 1 commit / 1 file modified). `evals/typed_memory_eval.rs` populated (Wave 1 stub 1 LOC → 206 LOC): 7 fixtures, one per `MemoryCategory` variant (Fact / Preference / Decision / Relationship / Skill / Goal / Routine), each round-tripped through `store_typed_memory` → `recall_by_category(cat, 10)` with strict `len() == 1` + content-substring + category-tag checks. Eighth assertion is the cross-category isolation regression gate: `recall_by_category(Fact)` excludes Preference content AND every returned row tags as `"fact"` — catches a future SQL edit dropping the `WHERE category = ?1` clause at `typed_memory.rs:282`. All 8 rows pass; MRR 1.000. Test command: `cd src-tauri && cargo test --lib evals::typed_memory_eval -- --nocapture --test-threads=1` exits 0 with `┌── Typed memory category recall eval` table emitted. EVAL-04 marked complete in REQUIREMENTS.md. Wave 2 progress: 4/5 plans (16-02 + 16-03 + 16-04 + 16-05 done; 16-06 capability-gap remains). Per-task commit `01d9ee1`.*
-
-*State updated: 2026-04-29T21:45Z — Plan 16-06 shipped (1 task / 1 commit / 1 file modified). `evals/capability_gap_eval.rs` populated (Wave 1 stub 1 LOC → 206 LOC): 7 stderr/command pairs feed `self_upgrade::detect_missing_tool` — 4 positive (linux_apt_jq via `/bin/sh: 1: jq: not found`, linux_bash_ripgrep via `bash: ripgrep: command not found`, windows_cmd_node via `'node' is not recognized as an internal or external command`, macos_zsh_ffmpeg via `zsh: command not found: ffmpeg`) each asserting `Some(gap)` with case-insensitive suggestion-substring match; 1 false-positive regression case (`cargo build` stderr mentions `/tmp/fd-build.log` — first-token = `cargo` ∉ catalog → must return `None`; this is the regression gate for the strict-matcher fix at `self_upgrade.rs:272-285`); 2 negative cases (unknown-tool `foobarbaz-cli`, no-not-found-phrase). All 7 rows pass; MRR 1.000. File header documents the `evolution::detect_missing_tool` (REQ wording) → `self_upgrade::detect_missing_tool` (real path) resolution per RESEARCH §5 — no re-export added (zero re-exports between the two modules; cosmetic alignment with REQ text would be production-touching dead code). Pre-flight catalog-key existence asserts (`jq` / `ripgrep` / `node` / `ffmpeg`) surface clear errors if a future edit renames a key. No `temp_blade_env()` — `detect_missing_tool` is pure. Test command: `cd src-tauri && cargo test --lib evals::capability_gap_eval -- --nocapture --test-threads=1` exits 0 with `┌── Capability gap detection eval` table emitted. EVAL-05 marked complete in REQUIREMENTS.md. Catalog count documentation drift noted (CLAUDE.md says ~10; live capability_catalog returns 16 — flagged in plan SUMMARY, no fix required). Per-task commit `d9a4d8e`. **Wave 2 of Phase 16 closes** (5/5 plans shipped: 16-02 hybrid_search + 16-03 real_embedding + 16-04 kg_integrity + 16-05 typed_memory + 16-06 capability_gap; all green; all MRR 1.000 except hybrid_search's adversarial-relaxed rollup). Wave 3 (Plan 16-07: verify-eval gate + DEFERRED.md + package.json + delete `embeddings.rs:496-946`) unblocked.*
+*State updated: 2026-04-29 — **Phase 16 (Eval Scaffolding Expansion) shipped + verified.** 7 plans across 3 waves: Wave 1 = harness scaffold (16-01); Wave 2 = 5 eval modules (16-02 hybrid_search, 16-03 real_embedding, 16-04 kg_integrity, 16-05 typed_memory, 16-06 capability_gap); Wave 3 = gate-closer + cleanup (16-07: scripts/verify-eval.sh, tests/evals/DEFERRED.md, package.json verify:eval chain entry, embeddings.rs:496-946 deletion). Final state: 5 eval modules @ MRR 1.000, asserted floors held (top-3 ≥ 80%, MRR ≥ 0.6), `verify:all` 30→31 green, embeddings.rs 946→495 lines (production code byte-identical), 19 commits with no Co-Authored-By. Two REQ-vs-real path resolutions documented in file headers: EVAL-02 `consolidate_kg` does not exist (`add_node` idempotent-merge path satisfies); EVAL-05 `detect_missing_tool` lives at `self_upgrade::` not `evolution::` (no re-export added). One Rule-3 deviation: `scripts/verify-wiring-audit-shape.mjs` updated to exclude `src-tauri/src/evals/` from production wiring audit (test-only `#[cfg(test)]` modules). VERIFICATION.md PASS 25/25 must-haves, 4/4 ROADMAP SCs, 8/8 EVAL REQs. Phase 17 (Doctor Module) consumes these eval signals (DOCTOR-02).*

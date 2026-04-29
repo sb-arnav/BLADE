@@ -21,7 +21,7 @@
 
 | # | Phase | Goal | Requirements | Success Criteria | Days |
 |---|---|---|---|---|---|
-| 16 | **Eval Scaffolding Expansion** | Real eval harness in `tests/evals/` with floors enforced by `verify:all`. | EVAL-01..08 (8 REQs) | 4 eval modules pass, verify:eval gate green, count 27→28+ | 2 |
+| 16 ✅ | **Eval Scaffolding Expansion** *(shipped 2026-04-29)* | Real eval harness in `tests/evals/` with floors enforced by `verify:all`. | EVAL-01..08 (8/8 REQs) | 4/4 SCs green: 5 eval modules @ MRR 1.000, verify:eval in chain (count 30→31), all `┌──` tables emit, DEFERRED.md w/ 4 v1.3 entries | 2 |
 | 17 | **Doctor Module** | Central diagnostic aggregating eval scores + capability-gap log + tentacle health + drift signals. | DOCTOR-01..10 (10 REQs) | Doctor pane renders ≥5 signal classes; failing eval lights red end-to-end; auto-update presence reported | 2 |
 | 18 | **JARVIS Push-to-Talk → Cross-App** | Demo moment v1.1 wired everything for; ego refusal-elimination folded in. | JARVIS-01..12 (12 REQs) | Cold install + consent → PTT → real cross-app action executed; ego intercepts refusal + retries once max | 4 |
 | 19 | **Operator UAT Close** | 11 v1.1 carry-overs + HANDOFF-TO-MAC.md reconcile. | UAT-01..12 (12 REQs) | All 11 carry-overs evidenced (or re-deferred with rationale); v1.1 milestone-audit can re-run as `complete` | 2 |
@@ -184,10 +184,12 @@ From STATE.md (v1.1 close), still in force for v1.2 planning:
 
 ## Next Action
 
-`/gsd-discuss-phase 16` — gather context + clarify approach for Phase 16 (Eval Scaffolding Expansion).
+Phase 16 ✅ shipped 2026-04-29. Next:
 
-Or skip discussion: `/gsd-plan-phase 16` — plan directly.
+`/gsd-discuss-phase 17` — gather context + clarify approach for Phase 17 (Doctor Module).
+
+Or skip discussion: `/gsd-plan-phase 17` — plan directly.
 
 ---
 
-*Roadmap created 2026-04-29 from locked shape `notes/v1-2-milestone-shape.md`. Updated by `/gsd-plan-phase` and `/gsd-transition` as phases progress.*
+*Roadmap created 2026-04-29 from locked shape `notes/v1-2-milestone-shape.md`. Updated by `/gsd-plan-phase` and `/gsd-transition` as phases progress. Phase 16 closed 2026-04-29 (7 plans, 19 commits, verify:all 31/31, MRR 1.000 across all eval modules).*
