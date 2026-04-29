@@ -1,25 +1,26 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Functionality, Wiring, Accessibility
-current_phase: closed
-status: milestone_complete
-last_updated: "2026-04-27T09:15:00Z"
-last_activity: 2026-04-27 -- v1.1 milestone closed (status=tech_debt; phases 10-15 archived to milestones/v1.1-phases/)
+milestone: v1.2
+milestone_name: Acting Layer with Brain Foundation
+current_phase: 16
+status: defining_requirements
+last_updated: "2026-04-29T09:00:00Z"
+last_activity: 2026-04-29 -- v1.2 scoped via /gsd-new-milestone (5 phases 16-20; shape locked at notes/v1-2-milestone-shape.md)
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 29
-  completed_plans: 29
-  percent: 100
+  total_phases: 5
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
-# STATE — BLADE (post-v1.1)
+# STATE — BLADE (v1.2)
 
 **Project:** BLADE — Desktop JARVIS
+**Current milestone:** v1.2 — Acting Layer with Brain Foundation (5 phases, 16–20)
 **Last shipped milestone:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27)
-**Current Focus:** Planning v1.2 (run `/gsd-new-milestone`)
-**Status:** Awaiting next milestone scope
+**Current Focus:** Phase 16 (Eval Scaffolding Expansion) — defining requirements
+**Status:** Requirements + roadmap pending; phase planning unstarted
 
 ---
 
@@ -29,7 +30,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-27 at v1.1 close)
 
 **Core value:** BLADE works out of the box, and you can always see what it's doing.
 
-**v1.2 anchor candidates:** JARVIS push-to-talk, acting tentacles (per-tentacle consent + trust-tier escalation), browser-harness Q1 decision, 11 operator UAT carry-overs from v1.1, partial burn-down of 97 DEFERRED_V1_2 backend modules.
+**v1.2 locked scope:** Eval foundation + Doctor module + JARVIS (with ego folded in) + Operator UAT close + Polish. ACT (full per-tentacle outbound surface), Skills MVP, tool-replacer, WIRE3 backend burn → v1.3+. Locked input at `notes/v1-2-milestone-shape.md`.
 
 ---
 
@@ -82,16 +83,17 @@ None. v1.1 closed cleanly with documented tech debt.
 
 ## Session Continuity
 
-**Last session:** 2026-04-27T09:15:00Z (v1.1 milestone close)
-**Next action:** `/clear` then `/gsd-new-milestone` to start v1.2 scoping (questioning → research → requirements → roadmap).
+**Last session:** 2026-04-29T09:00:00Z (v1.2 scoped via /gsd-new-milestone)
+**Next action:** `/gsd-discuss-phase 16` (eval scaffolding) OR `/gsd-plan-phase 16` to skip discussion.
 
 **Context cliff notes:**
 - v1.0 + v1.1 both shipped; substrate is reachable + observable + capability-aware
 - 27 verify gates green; tsc clean
-- Phase 16+ continues global numbering
+- v1.2 = 5 phases (16=Eval, 17=Doctor, 18=JARVIS+Ego, 19=Operator-UAT, 20=Polish)
 - v1.2 acting work flips the per-tentacle observe-only guardrail with explicit consent + trust-tier escalation, never silently
 - Activity log strip is the v1.1 contract every v1.2 cross-module action must honor
+- Memory recall pipeline verified healthy 2026-04-28 (7/7 top-1, MRR 1.000) — eval pattern established
 
 ---
 
-*State updated: 2026-04-27 — v1.1 milestone closed; v1.2 scoping pending.*
+*State updated: 2026-04-29 — v1.2 milestone scoped (5 phases 16-20); requirements + roadmap pending.*

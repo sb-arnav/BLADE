@@ -46,17 +46,23 @@ BLADE is a desktop AI that lives on your machine — a "body" of 178+ Rust modul
 - ✓ LOG — persistent ActivityStrip + ActivityDrawer + 500-entry localStorage ring buffer; emit_activity_with_id signature wired into 6 ecosystem observer loops — v1.1 (LOG-04 time-range filter advisory; runtime UAT operator-owned)
 - ✓ DENSITY — spacing-ladder gate (0 violations across 39 CSS files); 18-file empty-state copy rewrite; 4-tier top-bar hierarchy with 1280/1100 responsive guardrails; RightNowHero with 4 live-signal chips — v1.1 (5-wallpaper + cold-install + 50-route UAT operator-owned)
 
-### Active (v1.2 — TBD via /gsd-new-milestone)
+### Current Milestone: v1.2 — Acting Layer with Brain Foundation
 
-To be defined. Anchor candidates from v1.1 deferral pool:
+**Goal:** BLADE can act, and we can measure whether it acts well. Ship the JARVIS demo moment v1.1 wired everything for, on top of an eval foundation + doctor surface so the acting layer is honest, not theatrical. Close the v1.1 operator UAT debt.
 
-- [ ] **JARVIS** — push-to-talk → natural-language command → cross-app action flow (consumes v1.1 wiring + ecosystem + activity log)
-- [ ] **ACT** — outbound acting capability per observer tentacle (Slack reply, Email reply, GitHub PR review comments, Calendar accept/decline, Linear ticket creation), each behind per-tentacle enablement + trust-tier escalation
-- [ ] **BROWSER** — evaluate `browser-use/browser-harness` vs current `browser_native.rs` + `browser_agent.rs` (Q1 decision; load-bearing for JARVIS)
-- [ ] **OPERATOR-UAT** — close the 11 operator-owned UAT items carried from v1.1 (cold-install screenshots, runtime persistence checks, 5-wallpaper contrast, keyboard-nav, 50-route ⌘K sweep)
-- [ ] **WIRE3** — burn down a tranche of the 97 DEFERRED_V1_2 backend modules (prioritize ones acting tentacles will consume)
+**Target features (5 phases, 16–20):**
 
-Final v1.2 scope locks during `/gsd-new-milestone`.
+- [ ] **EVAL** — `tests/evals/` harness extending the 2026-04-28 memory recall baseline. Knowledge-graph integrity, BM25 regression, typed_memory category recall, evolution capability-gap detection. Floors enforced by `verify:all` (count moves 27 → 28+).
+- [ ] **DOCTOR** — central diagnostic `doctor.rs`. Aggregates eval scores + capability-gap log + tentacle health + config drift + pulse signals. Severity-tiered Diagnostics-tab pane with per-signal drill-down.
+- [ ] **JARVIS** — push-to-talk → natural-language command → cross-app action flow. Ego refusal-elimination layer folded in as a post-processor (catches "I can't" and routes to `evolution_log_capability_gap` + `auto_install`). Browser-harness Q1 decision absorbed into Phase 18 plan, not a separate research phase.
+- [ ] **OPERATOR-UAT** — close the 11 carry-over UAT items from v1.1 (`STATE.md ## Deferred Items` + `milestones/v1.1-MILESTONE-AUDIT.md`). Plus reconcile `HANDOFF-TO-MAC.md` deletion intent.
+- [ ] **POLISH** — verify-gate consolidation, cargo/TS clean, v1.2 changelog entry, v1.2 milestone audit doc parallel to `v1.1-MILESTONE-AUDIT.md`.
+
+**Explicitly deferred to v1.3+:** ACT (per-tentacle outbound first-class surface beyond JARVIS-mediated subset), Skills MVP (ELIZA / Obsidian / GSD as user-installable runtime skills), Tool-replacer (Hermes / OpenClaw / Cowork), WIRE3 (97 deferred backend modules — backlog work isn't milestone-shaped, pick individual items as acting-tentacle dependencies arise), Android control / camera access / OS customization, persona / user-clone / humor maturity pass.
+
+**Reconciliation note:** This scope merges PROJECT.md's prior v1.1-close anchor candidates (JARVIS / ACT / BROWSER / UAT / WIRE3) with the maturity audit's "eval before flashy" insight from `v1-2-self-improvement-maturity.md`. The earlier brain-audit-only draft of `notes/v1-2-milestone-shape.md` was superseded after PROJECT.md and STATE.md were re-read end-to-end (the original draft was authored from notes alone, missing M-01's "v1.2 acting work" anchor).
+
+Locked input: `.planning/notes/v1-2-milestone-shape.md` (status: locked, 2026-04-29).
 
 ### Out of Scope
 
@@ -129,4 +135,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-*Last updated: 2026-04-27 — v1.1 milestone closed (status: tech_debt; no blockers; 11 operator-owned UAT items deferred per v1.0 Mac-smoke convention). v1.2 scope to be defined via /gsd-new-milestone.*
+*Last updated: 2026-04-29 — v1.2 milestone scoped via /gsd-new-milestone. Locked shape: `.planning/notes/v1-2-milestone-shape.md`. 5 phases (16–20): Eval → Doctor → JARVIS+Ego → Operator-UAT → Polish. 10–12 day target.*

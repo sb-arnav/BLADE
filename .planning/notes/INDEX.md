@@ -16,7 +16,7 @@ The dumps you (or Claude) made the deliberate decision to save as standalone not
 | [`v2-vision-tentacles.md`](v2-vision-tentacles.md) | 2026-04-20 | vision | v2+ destination — tentacles, heads, big agent. Communications/dev/ops/business/personal domains across v2→v5+ |
 | [`v1-2-ideation-arnav.md`](v1-2-ideation-arnav.md) | 2026-04-27 | ideation | Raw v1.2 brain dump — tool replacement (Hermes/OpenClaw), persona, self-upgrade, ego, growth loops |
 | [`v1-2-self-improvement-maturity.md`](v1-2-self-improvement-maturity.md) | 2026-04-27 | audit | Concrete maturity audit answering the v1.2 ideation questions — self_upgrade/evolution/memory/doctor/hormones |
-| [`v1-2-milestone-shape.md`](v1-2-milestone-shape.md) | 2026-04-29 | locked | v1.2 = "the brain audit milestone" — eval scaffolding + doctor + ego + skills MVP, 4 phases, 7-day target. Tool-replacer pushed to v1.3 |
+| [`v1-2-milestone-shape.md`](v1-2-milestone-shape.md) | 2026-04-29 | locked | v1.2 = "Acting Layer with Brain Foundation" — Eval + Doctor + JARVIS (with ego folded in) + Operator UAT close + Polish. 5 phases (16–20), 10–12 day target. Reconciles PROJECT.md authority with the maturity audit's "eval before flashy" insight |
 
 **Convention.** New captures land here as `{slug}.md` (semantic) or `{YYYY-MM-DD}-{slug}.md` (date-prefixed, per `gsd-note` spec). Either is fine — index over filename.
 

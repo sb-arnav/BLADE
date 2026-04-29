@@ -1,13 +1,25 @@
 ---
-title: "v1.2 milestone shape — drafted from ideation + maturity audit"
+title: "v1.2 milestone shape — Acting Layer with Brain Foundation"
 date: 2026-04-29
 context: >
-  Drafted by Claude on 2026-04-29 from `v1-2-ideation-arnav.md` (Arnav's
-  raw dump, captured 2026-04-27) and `v1-2-self-improvement-maturity.md`
-  (the audit answering Arnav's questions about what's actually built).
-  Frames v1.2 as "the brain audit milestone" — eval, doctor, ego, skills.
-  Pushes the flashy stuff (tool-replacer, Android, camera, "make BLADE
-  think") to v1.3 or later because they need eval scaffolding to be honest.
+  Drafted by Claude on 2026-04-29 from four authoritative inputs read
+  end-to-end: `.planning/PROJECT.md` (v1.2 anchor candidates set at v1.1
+  close), `.planning/STATE.md` (locked decisions, especially M-01 "v1.2
+  acting work obeys the same anchor"), `v1-2-ideation-arnav.md` (raw dump),
+  `v1-2-self-improvement-maturity.md` (concrete audit answering the dump),
+  plus the new 2026-04-28 memory recall eval baseline (7/7 top-1, MRR 1.000).
+
+  Reconciles two earlier framings — the "natural sequel" framing in
+  PROJECT.md (JARVIS / ACT / BROWSER / OPERATOR-UAT / WIRE3) and the
+  "brain audit" framing this file's earlier draft (Eval / Doctor / Ego /
+  Skills) — into a single merged scope that honors PROJECT.md's authority
+  while preserving the audit's "eval before flashy" insight.
+
+  Earlier draft of this file (status: locked, brain-audit framing) is
+  superseded by this rewrite. The earlier lock was based on a draft that
+  hadn't read PROJECT.md or STATE.md; on rereading those files the
+  divergence with M-01 was caught and the scope revised. Memory entry
+  `feedback_read_authority_files_first.md` records the lesson.
 
   This note is the planning input for /gsd-new-milestone. The milestone
   workflow should consume it and produce REQUIREMENTS.md + ROADMAP.md
@@ -19,156 +31,191 @@ locked_date: 2026-04-29
 audience: /gsd-new-milestone, /gsd-plan-phase, downstream phases
 ---
 
-# BLADE v1.2 — Brain Audit (Eval, Doctor, Ego, Skills)
+# BLADE v1.2 — Acting Layer with Brain Foundation
 
 ## Anchor
 
-> **v1.2 = "BLADE knows what it knows."**
+> **v1.2 = "BLADE can act, and we can measure whether it acts well."**
 
-v1.1 made the substrate functional and reachable. v1.2 makes BLADE *honest about itself* — measurable quality on the AI surfaces that already run blind, a central diagnostic that aggregates drift signals, a refusal-elimination layer that turns "I can't" into capability-gap routing, and a real skills surface so user-installable behavior (ELIZA / Obsidian / GSD) rides the existing evolution.rs gap pipeline.
+v1.0 shipped the substrate. v1.1 wired it into something a first-time user can actually use (paste-anything provider setup, smart deep scan, observer-class tentacles, activity-log strip). v1.2 ships the **JARVIS demo moment** the v1.1 wiring was built for — push-to-talk → natural-language command → cross-app action — but lands it on top of an **eval foundation + doctor surface** so the acting layer is honest, not theatrical. Closes the operator UAT debt v1.1 carried forward.
 
-## Why this framing (not the tool-replacer framing the dump leaned toward)
+## Why this framing (and how it reconciles two earlier framings)
 
-The 2026-04-27 ideation dump leaned heavily on **tool replacement** (Hermes / OpenClaw / Cowork, Android, camera, "make ourselves better than Codex in everything"). The maturity audit on the same day pushed back on that framing:
+Two prior framings existed in tension:
 
-> *"Replacing tools without quality measurement repeats the memory-cluster mistake at higher stakes."*
+**Framing A — the natural-sequel** (PROJECT.md `## Active (v1.2 — TBD)`, set at v1.1 close 2026-04-27):
+JARVIS push-to-talk + ACT (acting tentacles) + BROWSER (browser-harness Q1) + OPERATOR-UAT carry-overs + WIRE3 backend burn-down. Anchored on M-01: "v1.2 acting work obeys the same anchor."
 
-The audit found:
-- **Memory cluster** (1,883 LoC) — substantial functional surface, **zero quality measurement**. Was flagged as the single biggest hidden risk.
-- **evolution.rs** (1,134 LoC) — most ambitious self-improvement loop, hormone-gated, ambient research. Real frame, **no feedback signal on suggestion quality**.
-- **self_upgrade.rs** (730 LoC) — 10-entry catalog, narrow, **zero inline tests**. Pentest commands lived here for unclear reasons.
-- **doctor.rs** — does not exist. health_guardian.rs is screen-time only, wrong scope.
-- **Ego layer** — no LLM output post-processor that intercepts refusals. Pieces (`evolution_log_capability_gap`, `self_upgrade_install`, `blade_routing_capability_missing` event) exist but aren't connected.
+**Framing B — the brain audit** (this file's earlier draft 2026-04-29, drawn from `v1-2-self-improvement-maturity.md`):
+Eval scaffolding + Doctor module + Ego layer + Skills MVP. Pushed acting work to v1.3 because "replacing tools without eval is dumb."
 
-**New evidence since the audit (2026-04-28):** the memory recall pipeline was tested end-to-end with the real fastembed model — 7/7 top-1, MRR 1.000. **The brain works.** That confirms the eval pattern is the right framework and removes the "memory might be silently broken" anxiety. v1.2 leans into that pattern and extends it.
+Both have merit. The reconciliation: **A is the milestone's destination, B is its foundation.** The audit's insight ("eval before flashy") doesn't mean *defer the flashy* — it means *land eval first, then ship the flashy on top.* So:
 
-## The 4 phases
+- **Eval scaffolding ships** (Framing B) — gives us an honest measurement layer for the acting work.
+- **Doctor module ships** (Framing B) — central diagnostic that consumes eval signals + existing capability-gap log + tentacle health.
+- **JARVIS ships** (Framing A) — the demo moment. The ego refusal-elimination layer (was a standalone phase in B) **folds into JARVIS** as a post-processor — too small for its own phase, perfect fit where refusals matter most.
+- **Operator UAT closes** (Framing A) — 11 carry-overs from v1.1, tech debt that blocks formal v1.0/v1.1 archive.
+- **ACT (per-tentacle outbound), Skills MVP, Tool-replacer, BROWSER full architecture decision, WIRE3 backlog burn** all defer to v1.3 — explicitly listed in "Out of scope" below.
 
-### Phase 0 — Eval Scaffolding Expansion
+**New evidence that informs the shape (2026-04-28):** the memory recall pipeline was tested end-to-end with the real fastembed model — 7/7 top-1, MRR 1.000. The audit's "biggest hidden risk" turns out to be a non-risk. That confirms the eval pattern is the right framework and removes the case for postponing acting work.
 
-**Goal:** Extend the `memory_recall_real_embedding` pattern (shipped 2026-04-28, commit `9c5674a`) into a real eval harness that lives in `tests/evals/` and runs as part of `verify:all`.
+## The 5 phases
+
+Phase numbering continues globally per locked decision M-05. v1.0 ended at Phase 9, v1.1 ran Phases 10–15. **v1.2 starts at Phase 16.**
+
+### Phase 16 — Eval Scaffolding Expansion
+
+**Goal:** Extend the `memory_recall_real_embedding` pattern (shipped 2026-04-28, commit `9c5674a`) into a real `tests/evals/` harness with floors enforced by `verify:all`.
 
 **Ships:**
 - **Knowledge-graph integrity eval** — fixture corpus, assert nodes/edges round-trip without orphans after `consolidate_kg`.
 - **BM25 / hybrid-search regression gate** — keep the current 8/8-asserted floor, add 2-3 adversarial fixtures (long content, unicode, near-duplicates) to harden against silent drift.
-- **typed_memory category recall** — 7-category fixture, `recall_by_category` returns expected sets.
+- **typed_memory category recall** — 7-category fixture, `recall_by_category` returns expected sets per category.
 - **Evolution capability-gap detection** — feed synthetic stderr blobs to `detect_missing_tool`, assert correct catalog entry returned.
 - **Eval reporting** — every eval module prints a scored table; failures surface as `verify:all` floor breaches.
 
-**Deferred from this phase (need LLM API budget):** `extract_conversation_facts` precision, `weekly_memory_consolidation` correctness, evolution suggestion quality. Listed in `tests/evals/DEFERRED.md` so they can ship in v1.3 when API budget allows.
+**Deferred (need LLM API budget):** `extract_conversation_facts` precision, `weekly_memory_consolidation` correctness, evolution suggestion quality. Listed in `tests/evals/DEFERRED.md` as v1.3 candidates.
 
-**Falsifiable success:** `cargo test --lib evals` runs ≥4 eval modules. `verify:all` extends to include the eval gate. Each eval prints a scored table identical to the existing `memory_recall_real_embedding` format.
+**Falsifiable success:** `cargo test --lib evals` runs ≥4 eval modules. `verify:all` extends to include the eval gate (count moves from 27 → 28+). Each eval prints a scored table identical to the existing `memory_recall_real_embedding` format.
 
 ---
 
-### Phase 1 — Doctor Module
+### Phase 17 — Doctor Module
 
-**Goal:** Central diagnostic surface. Today, signals from `evolution.rs::evolution_log_capability_gap`, `pulse.rs`, `temporal_intel.rs`, `health_guardian.rs`, and the new evals from Phase 0 are scattered. Doctor aggregates them.
+**Goal:** Central diagnostic surface. Today, signals from `evolution.rs::evolution_log_capability_gap`, `pulse.rs`, `temporal_intel.rs`, `health_guardian.rs`, and the new evals from Phase 16 are scattered. Doctor aggregates them.
 
 **Ships (Rust):**
-- **`doctor.rs`** new module. Exposes commands: `doctor_run_full_check`, `doctor_get_recent`, `doctor_get_signal`.
-- **Signal sources:**
-  - Eval score history (Phase 0 outputs)
-  - Capability-gap log (count + recency, per capability)
-  - Tentacle health (which observers stale, which failing)
-  - Config drift (ledger consistency, scan-profile age)
-  - Pulse aggregations (existing module, surface its data)
+- **`doctor.rs`** new module. Commands: `doctor_run_full_check`, `doctor_get_recent`, `doctor_get_signal`.
+- **Signal sources:** eval score history, capability-gap log (count + recency per capability), tentacle health, config drift, pulse aggregations.
 - **`doctor_event` Tauri event** — emitted on regression detected (eval score drops, tentacle dead, gap-log spike).
 
 **Ships (UI):**
-- **Diagnostics tab** in admin already exists — extend with a "Doctor" pane.
-- **Severity-tiered surface** — green/amber/red per signal class.
+- **Diagnostics tab** in admin already exists — extend with a Doctor pane.
+- **Severity-tiered surface** (green / amber / red per signal class).
 - **Per-signal drill-down** — click row → drawer with raw data + last-changed timestamp + suggested fix.
 
-**Falsifiable success:** Doctor pane renders ≥5 distinct signal classes on a fresh install. At least one eval regression test (artificially failing eval) lights up the doctor surface red end-to-end. `doctor_run_full_check` returns a structured report.
+**Falsifiable success:** Doctor pane renders ≥5 distinct signal classes on a fresh install. An artificially failing eval lights up the doctor surface red end-to-end. `doctor_run_full_check` returns a structured report.
 
 ---
 
-### Phase 2 — Ego Layer (refusal-elimination)
+### Phase 18 — JARVIS Push-to-Talk → Cross-App Action
 
-**Goal:** Post-processor on assistant output. When BLADE says "I can't do that" or "I don't have access," intercept, route to capability-gap detection, attempt resolution, and re-try.
+**Goal:** Ship the demo moment v1.1 wired everything for. Push-to-talk → natural-language command → BLADE executes a cross-app action (e.g. *"post something about myself from my Arc account"*, *"summarize today's standup and post to #eng-updates"*).
 
 **Ships (Rust):**
-- **`ego.rs`** new module. `intercept_assistant_output(&str) -> EgoVerdict { passthrough | capability_gap(Capability) | hard_refuse(Reason) }`.
-- **Refusal pattern matcher** — regex + LLM-classifier fallback against a curated set: "I can't / I don't have access to / I don't have the ability / I'm not able to / I lack the / I cannot directly".
-- **Wire into `commands.rs`** chat tool loop — assistant output passes through ego before reaching the user.
-- **On capability_gap** — call `evolution_log_capability_gap`, attempt `auto_install` if catalog match, then re-prompt with the new capability available. Cap re-tries at 1 to avoid loops.
-- **On hard_refuse** — pass through to user (some refusals are safety-correct).
+- **PTT trigger pipeline** — global hotkey → audio capture → Whisper STT → command intent classification → tool-call dispatch.
+- **Cross-app dispatch** — uses existing observer tentacle credentials (read-only became read-write *for the specific consented intent*, never silently — explicit per-action consent prompt the first time, remembered after).
+- **Ego layer (folded in)** — post-processor on assistant output. Detects "I can't" / "I don't have access" patterns. Routes to `evolution_log_capability_gap` + `auto_install` if catalog match, then re-prompts with the new capability available. Hard cap: 1 retry. (Was originally a standalone phase in the brain-audit draft; folded here because refusal handling matters most where actions are attempted.)
+- **BROWSER Q1 decision absorbed** — the `browser-use/browser-harness` vs current `browser_native.rs` decision (open question in `research/questions.md`) lands as a Phase 18 plan input. If browser actions are needed for JARVIS, the decision happens here, not as a separate research phase.
 
 **Ships (UI):**
-- **Ego trace** in chat — when ego intercepts, surface a small inline pill: *"BLADE detected a capability gap (browser); attempting to resolve..."*. Honest about what happened.
-- **Settings → Ego** — toggle to disable, slider to set re-try aggressiveness.
+- **Activity-strip integration** — every JARVIS action emits to the activity log per M-07 contract.
+- **Consent dialog** — per-action explicit approval before BLADE writes to an external service (post, reply, deploy, modify).
+- **JARVIS in chat** — small inline pill when ego intercepts: *"BLADE detected a capability gap (browser); attempting to resolve..."* — honest about what happened.
 
-**Falsifiable success:** Synthetic chat run where the assistant output contains "I can't browse the web" intercepts and triggers either a successful capability install or a hard_refuse with a recorded reason. Cap on re-tries holds (no infinite loop).
+**Falsifiable success:** Cold install + 1 user consent → push-to-talk → BLADE executes a real cross-app action (e.g. posts to a Slack channel, replies to a GitHub PR comment). Synthetic refusal in chat triggers ego intercept and either successful capability install or a hard_refuse with recorded reason. Action logged to ActivityStrip.
 
 ---
 
-### Phase 3 — Skills Surface MVP
+### Phase 19 — Operator UAT Close
 
-**Goal:** User-installable runtime skills. Three first-class skills (ELIZA, Obsidian, GSD) ship as built-ins; the surface supports user-added skills.
+**Goal:** Close the 11 operator-owned UAT items carried from v1.1 close (per `STATE.md ## Deferred Items` and `milestones/v1.1-MILESTONE-AUDIT.md`).
 
-**Ships (Rust):**
-- **`skills/` registry** — each skill is a manifest + a small Rust shim or external command wrapper:
-  - **ELIZA skill** — pattern-matched conversational reflector (legacy paper). Cheap, useful as a "thinking out loud" mode.
-  - **Obsidian skill** — wraps Obsidian vault read/write via filesystem. Search / append / link.
-  - **GSD skill** — wraps `/gsd-*` commands as BLADE-callable tools (creates phases, runs plans, reads roadmap).
-- **Skill manifest format** — JSON: `{name, description, tools_added: [], triggers: [], requires_capabilities: []}`.
-- **Capability-gap pipeline integration** — installing a skill that needs a missing capability → routes through `self_upgrade_install` (already exists).
+**Items:**
 
-**Ships (UI):**
-- **Settings → Skills** page. Browse / install / disable / configure per skill. Each row: name, what tools it adds, what triggers it, current state.
-- **Skill manifest validator** — paste a JSON manifest, BLADE validates and offers to install.
+| Category | Phase | Item |
+|---|---|---|
+| uat_gaps | 14 | activity-strip cross-route persistence |
+| uat_gaps | 14 | drawer focus-restore |
+| uat_gaps | 14 | localStorage rehydrate-on-restart |
+| uat_gaps | 14 | cold-install Dashboard screenshot |
+| uat_gaps | 14 | keyboard tab-traversal |
+| uat_gaps | 14 + 15 | 5-wallpaper contrast |
+| uat_gaps | 15 | cold-install RightNowHero screenshot |
+| uat_gaps | 15 | top-bar hierarchy 1280×720 |
+| uat_gaps | 15 | 50-route empty-state ⌘K sweep |
+| uat_gaps | 15 | spacing-ladder spot-check |
+| uat_gaps | 12 | SCAN-13 cold-install baseline |
 
-**Falsifiable success:** ELIZA / Obsidian / GSD all installable from the Skills page. Each surfaces ≥1 callable tool in the chat tool list. Disabling a skill removes its tools cleanly without restart. Installing a skill that requires a missing capability prompts the gap-resolution flow from Phase 2.
+Plus reconcile `HANDOFF-TO-MAC.md` — currently shows as deleted in working tree (operator may have deleted intentionally on Windows; Phase 19 confirms intent and either restores from git history or formalizes deletion).
+
+**Ships:**
+- Operator UAT runbook (probably extends `/blade-uat` slash command with the 11 specific checks).
+- Per-item evidence in `docs/testing ss/` (note literal space) — screenshot + one-line observation.
+- 5-wallpaper contrast script — automate the visual sanity check that's currently manual.
+
+**Falsifiable success:** All 11 carry-over UAT items have either a green check + evidence file in `docs/testing ss/`, or a *re-deferred* status with explicit rationale (preserves the v1.0 Mac-smoke convention's honesty principle). v1.1 milestone audit can be re-run and emerge with status `complete` (currently `tech_debt`).
+
+---
+
+### Phase 20 — Polish + Verify Pass
+
+**Goal:** Mop-up. Whatever the v1.2 phases revealed that doesn't fit cleanly elsewhere.
+
+**Ships:**
+- Verify-gate consolidation (count should be 27 + Phase 16's eval gate + any new gates from 17/18/19).
+- Cargo / TS clean checkpoint.
+- v1.2 changelog entry.
+- v1.2 milestone audit (mirrors the v1.1 close audit pattern).
+
+**Falsifiable success:** `verify:all` green. `cargo check --no-default-features` clean (the WSL libspa-sys/libclang env limit from v1.1 may persist — CI green is the falsifier). v1.2 entry in CHANGELOG.md. Milestone audit doc parallels `v1.1-MILESTONE-AUDIT.md`.
 
 ---
 
 ## Sequencing
 
 ```
-   Phase 0 (eval scaffolding)
+   Phase 16 (eval scaffolding)
        │
-       ├──────────────┐
-       ▼              ▼
-   Phase 1         Phase 2          ← parallel after 0
-   (doctor)        (ego)
-       │              │
-       └──────┬───────┘
-              ▼
-          Phase 3
-       (skills MVP)        ← consumes ego's gap-resolution flow
+       ▼
+   Phase 17 (doctor)         ← consumes Phase 16's eval signals
+       │
+       ▼
+   Phase 18 (JARVIS + ego)   ← independent of doctor for shipping; benefits from it
+       │
+       ▼
+   Phase 19 (operator UAT)   ← can run parallel to 18 if operator is available
+       │
+       ▼
+   Phase 20 (polish + verify)
 ```
 
-Phase 0 is foundational because Phase 1 (doctor) consumes eval signals as a primary input. Phase 2 (ego) only soft-depends on 0 (the capability-gap path is independent). Phase 3 (skills) wants Phase 2's gap-resolution flow live so installing a skill with a missing capability has a real path.
-
-**Total target: 7 days.** Phase 0: 2d. Phase 1: 2d. Phase 2: 1d. Phase 3: 2d.
+**Total target: 10–12 days.** Phase 16: 2d. Phase 17: 2d. Phase 18: 4d (the heaviest — STT + intent + dispatch + ego + browser-Q1). Phase 19: 2d (operator-driven, depends on availability). Phase 20: 1d.
 
 ## Out of scope (deferred to v1.3+)
 
-Everything else from `v1-2-ideation-arnav.md` that isn't above:
+Explicit list of things from the dump and from PROJECT.md that **are NOT in v1.2**:
 
-- **Tool-replacer** (Hermes / OpenClaw / Cowork copy-or-control) → v1.3, gated on Phase 0 evals being live so we can measure "did the replacement actually replace?"
-- **Android control** (partial + full) → v1.3+, separate platform investigation
-- **Camera access** → v1.3+, separate input modality
-- **Sync** (Hermes-style) → v1.3+, gates on tool-replacer architecture
-- **OS customization / Windhawk** → v2+, not a milestone-shaped scope
-- **User-created custom agents** (full version) — Phase 3 ships the manifest surface, full agent-builder UI deferred
-- **Persona / user-clone / humor** → v1.3, separate persona maturity pass against `persona_engine.rs` + `personality_mirror.rs`
-- **"Make BLADE think" / "turn LLM into AI"** → v3+ destination, not a milestone
-- **More hormones / "how close to human body"** → v1.3+, after a hormone audit
-- **Perplexity-personal-computer-better** → too vague to scope; revisit when concrete
-- **CLI-Anything integration** → v1.3+ research first, then decide
-- **Compound engineering / growth loops** → meta-habits, not phases
-- **Auto-update** → needs a quick "does the current design have it?" check before scoping (open item below)
-- **Codex parity sweep** → continuous research habit, not a phase
+- **ACT (outbound acting per observer tentacle, full surface)** — Slack reply / Email reply / GitHub PR review comments / Calendar accept-decline / Linear ticket creation as standalone first-class flows. Phase 18 ships a JARVIS-mediated subset; the standalone per-tentacle UI surface is v1.3.
+- **Skills MVP (ELIZA / Obsidian / GSD as user-installable runtime skills)** — defer; user-customization theme has more room in v1.3.
+- **Tool-replacer (Hermes / OpenClaw / Cowork copy-or-control)** — v1.3, gated on Phase 16 evals being live so we can measure "did the replacement actually replace?"
+- **WIRE3 — burn down 97 deferred backend modules** — backlog work isn't milestone-shaped. Pick individual items as they become acting-tentacle dependencies; otherwise defer.
+- **Android control / camera access / OS customization (Windhawk-style)** — separate platform investigations, v1.3+.
+- **Persona / user-clone / humor** — v1.3, separate persona maturity pass against `persona_engine.rs` + `personality_mirror.rs`.
+- **"How to make BLADE think" / "turn LLM into AI" / Perplexity-personal-computer-better** — v3+ destination, not milestone-shaped.
+- **More hormones / "how close to human body"** — v1.3+ after a hormone audit.
+- **CLI-Anything integration** — v1.3 research first.
+- **Compound engineering / growth loops / Codex parity sweep** — meta-habits, not phases.
+- **Auto-update presence check** — quick grep through Tauri config / `config.rs` happens early in Phase 17 (Doctor surfaces "no auto-update channel" as an amber signal). If wired, no further scope. If not, fold into Phase 17.
 
 ## Open items entering /gsd-new-milestone
 
-- **API budget** affects Phase 0's deferred LLM-dependent evals. Decide: ship `tests/evals/DEFERRED.md` with stubs, or burn budget once on a fixture run to seed snapshots that future tests can mock against.
-- **Auto-update presence check** — quick grep through current Tauri config / config.rs to confirm `tauri-plugin-updater` is wired. If yes, no scope. If no, add as small Phase 4 or fold into Phase 1 (Doctor surfaces "no auto-update channel" as an amber signal).
-- **Mac smoke (M-41..M-46)** — still pending operator handoff; doesn't gate v1.2 start, runs in parallel.
-- **Pentest commands** — currently in `self_upgrade.rs` per the audit; refactoring to `pentest.rs` already happened (commit `0065185`). Not v1.2 scope, just a record.
+- **API budget** affects Phase 16's deferred LLM-dependent evals. Listed in `tests/evals/DEFERRED.md` as v1.3 stubs.
+- **Browser-harness Q1** — decision absorbed into Phase 18 plan, no separate research phase.
+- **HANDOFF-TO-MAC.md deletion** — currently deleted in working tree; Phase 19 confirms operator intent.
+- **Mac smoke (M-41..M-46)** — pending operator handoff per `HANDOFF-TO-MAC.md` (when restored). Doesn't gate v1.2 start.
+- **Pentest commands relocation** (already happened, commit `0065185`). Just a record.
 
 ## Authority
 
-This shape is **locked** (Arnav signed off 2026-04-29: *"feels about right"*). `/gsd-new-milestone` may flesh out requirements, success criteria, and dependencies — but should not silently change the phase list, sequencing, or scope. Any deviation needs explicit user sign-off.
+This shape supersedes the earlier brain-audit-only draft (locked-then-revised on 2026-04-29 after PROJECT.md / STATE.md were read end-to-end). It is **locked**.
+
+`/gsd-new-milestone` may flesh out requirements, success criteria, and dependencies — but should not silently change the phase list, sequencing, or scope. Any deviation needs explicit user sign-off.
+
+## Cross-references
+
+- Authority: `.planning/PROJECT.md` (Active section, Locked Decisions M-01..M-07)
+- Authority: `.planning/STATE.md` (Locked decisions, anchor candidates)
+- Inputs: `.planning/notes/v1-2-ideation-arnav.md` (raw dump), `v1-2-self-improvement-maturity.md` (audit)
+- Evidence: commit `9c5674a` (memory recall eval baseline 7/7), commit `dc114b8` (notes index)
+- Lesson: `~/.claude/projects/-home-arnav-blade/memory/feedback_read_authority_files_first.md`
