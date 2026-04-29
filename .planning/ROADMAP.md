@@ -1,78 +1,182 @@
 # Roadmap — BLADE
 
+**Current Milestone:** v1.2 — Acting Layer with Brain Foundation
+**Created:** 2026-04-29 | **Source:** `.planning/notes/v1-2-milestone-shape.md` (locked)
+**Phases:** 16–20 (continues global numbering per M-05; v1.1 ended at Phase 15)
+**Total target:** 10–12 days
+
+---
+
 ## Milestones
 
-- ✅ **v1.0 — Skin Rebuild** (substrate) — Phases 0–9 (shipped 2026-04-19, ~165 commits, 18 verify gates green)
-- ✅ **v1.1 — Functionality, Wiring, Accessibility** — Phases 10–15 (shipped 2026-04-24, closed 2026-04-27, 29 plans, 27 verify gates green)
-- 📋 **v1.2 — TBD** — to be planned via `/gsd-new-milestone` (deferred from v1.1: JARVIS push-to-talk demo, acting-class tentacles, browser-harness Q1 decision, plus 11 operator UAT carry-overs)
+| Version | Name | Status | Phases | Closed |
+|---|---|---|---|---|
+| v1.0 | Skin Rebuild substrate | ✅ Shipped | 0–9 | 2026-04-19 |
+| v1.1 | Functionality, Wiring, Accessibility | ✅ Shipped (tech_debt) | 10–15 | 2026-04-27 |
+| **v1.2** | **Acting Layer with Brain Foundation** | 🚧 **Active** | **16–20** | — |
 
 ---
 
-## Phases
+## v1.2 Phases
 
-<details>
-<summary>✅ v1.0 — Skin Rebuild (Phases 0–9) — SHIPPED 2026-04-19</summary>
+| # | Phase | Goal | Requirements | Success Criteria | Days |
+|---|---|---|---|---|---|
+| 16 | **Eval Scaffolding Expansion** | Real eval harness in `tests/evals/` with floors enforced by `verify:all`. | EVAL-01..08 (8 REQs) | 4 eval modules pass, verify:eval gate green, count 27→28+ | 2 |
+| 17 | **Doctor Module** | Central diagnostic aggregating eval scores + capability-gap log + tentacle health + drift signals. | DOCTOR-01..10 (10 REQs) | Doctor pane renders ≥5 signal classes; failing eval lights red end-to-end; auto-update presence reported | 2 |
+| 18 | **JARVIS Push-to-Talk → Cross-App** | Demo moment v1.1 wired everything for; ego refusal-elimination folded in. | JARVIS-01..12 (12 REQs) | Cold install + consent → PTT → real cross-app action executed; ego intercepts refusal + retries once max | 4 |
+| 19 | **Operator UAT Close** | 11 v1.1 carry-overs + HANDOFF-TO-MAC.md reconcile. | UAT-01..12 (12 REQs) | All 11 carry-overs evidenced (or re-deferred with rationale); v1.1 milestone-audit can re-run as `complete` | 2 |
+| 20 | **Polish + Verify Pass** | Mop-up + changelog + audit doc. | POLISH-01..06 (6 REQs) | verify:all green; cargo check + tsc clean; v1.2 CHANGELOG entry; v1.2 audit doc | 1 |
 
-| Phase | Name | Status |
-|-------|------|--------|
-| 0 | Pre-Rebuild Audit | Complete (b26a965) |
-| 1 | Foundation | Substrate shipped, WCAG checkpoint operator-owned |
-| 2 | Onboarding + Main Shell | Substrate shipped, operator smoke pending |
-| 3 | Dashboard + Chat + Settings | Substrate shipped, Mac smoke + cargo check pending |
-| 4 | Overlay Windows (QuickAsk + Orb + Ghost + HUD) | Substrate shipped, M-01..M-13 pending |
-| 5 | Agents + Knowledge | Complete |
-| 6 | Life OS + Identity | Complete |
-| 7 | Dev Tools + Admin | Complete |
-| 8 | Body + Hive | Complete |
-| 9 | Polish Pass | Complete |
-
-Phase directories remain at `.planning/phases/0[0-9]-*` (never formally archived). Mac smoke M-01..M-46 + WCAG 5-wallpaper checkpoint operator-owned per `HANDOFF-TO-MAC.md`.
-
-</details>
-
-<details>
-<summary>✅ v1.1 — Functionality, Wiring, Accessibility (Phases 10–15) — SHIPPED 2026-04-24</summary>
-
-| Phase | Name | Plans | Completed |
-|-------|------|-------|-----------|
-| 10 | Inventory & Wiring Audit | 5/5 | 2026-04-20 |
-| 11 | Smart Provider Setup (VERIFIED PASSED) | 6/6 | 2026-04-20 |
-| 12 | Smart Deep Scan | 5/5 | 2026-04-20 |
-| 13 | Self-Configuring Ecosystem (observe-only) | 3/3 | 2026-04-24 |
-| 14 | Wiring & Accessibility Pass (human_needed) | 5/5 | 2026-04-24 |
-| 15 | Density + Polish (human_needed) | 5/5 | 2026-04-24 |
-
-Full archive: `milestones/v1.1-ROADMAP.md` | Requirements: `milestones/v1.1-REQUIREMENTS.md` | Audit: `milestones/v1.1-MILESTONE-AUDIT.md` | Phase dirs: `milestones/v1.1-phases/`.
-
-</details>
-
-### 📋 v1.2 — Planned (next milestone)
-
-To be defined via `/gsd-new-milestone`. Carry-over candidates from v1.1 deferral pool:
-
-- **JARVIS push-to-talk demo** (M-04 deferred from v1.1)
-- **Acting tentacles** — Slack reply, Email reply, GitHub PR review, Calendar accept/decline, Linear ticket creation (M-03 observe-only guardrail flips per-tentacle)
-- **Browser harness Q1** — `browser-use/browser-harness` vs current `browser_native.rs` decision (deadline pre-v1.2 JARVIS phase plan)
-- **97 NOT-WIRED backend modules** flagged DEFERRED_V1_2 in 10-WIRING-AUDIT.json
-- **11 operator UAT items** carried from v1.1 (cold-install screenshots, runtime persistence, 5-wallpaper contrast, keyboard-nav, 50-route ⌘K sweep)
-- **LOG-04 time-range filter** in ActivityDrawer (advisory miss from Phase 14)
-- **ROUTING_CAPABILITY_MISSING UI consumer** (toast/banner — deferred from Phase 11 → 14 → v1.2)
+**Total:** 5 phases, 48 requirements, 10–12 day target.
 
 ---
 
-## Progress
+## Sequencing
 
-| Phase | Milestone | Plans Complete | Status | Completed |
-|-------|-----------|----------------|--------|-----------|
-| 0..9 | v1.0 | per-phase | Complete | 2026-04-19 |
-| 10. Inventory & Wiring Audit | v1.1 | 5/5 | Complete | 2026-04-20 |
-| 11. Smart Provider Setup | v1.1 | 6/6 | Complete (VERIFIED PASSED) | 2026-04-20 |
-| 12. Smart Deep Scan | v1.1 | 5/5 | Complete | 2026-04-20 |
-| 13. Self-Configuring Ecosystem | v1.1 | 3/3 | Complete | 2026-04-24 |
-| 14. Wiring & Accessibility Pass | v1.1 | 5/5 | Complete (human_needed) | 2026-04-24 |
-| 15. Density + Polish | v1.1 | 5/5 | Complete (human_needed) | 2026-04-24 |
-| 16+ | v1.2 | TBD | Not started | — |
+```
+   Phase 16 (eval scaffolding)
+       │
+       ▼
+   Phase 17 (doctor)         ← consumes 16's eval signals
+       │
+       ▼
+   Phase 18 (JARVIS + ego)   ← independent; benefits from doctor
+       │
+       ▼
+   Phase 19 (operator UAT)   ← can run parallel to 18 if operator available
+       │
+       ▼
+   Phase 20 (polish + verify)
+```
+
+**Parallelizable:** Phase 19 can run alongside Phase 18 if the operator is available — UAT items are evidence-collection, not code-blocked. Default sequencing is serial for predictable phase tracking.
 
 ---
 
-*v1.0 substrate shipped 2026-04-19. v1.1 closed 2026-04-27 with audit status `tech_debt` (no blockers; 11 operator-owned UAT items deferred). See `MILESTONES.md` for the historical record.*
+## Phase Details
+
+### Phase 16 — Eval Scaffolding Expansion
+
+**Goal:** Extend the `memory_recall_real_embedding` baseline (commit `9c5674a`, 2026-04-28) into a full `tests/evals/` harness with floors enforced by `verify:all`.
+
+**Requirements:** EVAL-01..08
+
+**Success criteria:**
+1. `cargo test --lib evals` runs ≥4 eval modules with all green
+2. `verify:eval` gate present in `verify:all` chain (count moves from 27 to 28+)
+3. Each eval module prints scored stdout table in the existing format
+4. `tests/evals/DEFERRED.md` documents LLM-API-dependent evals as v1.3 candidates
+
+**Dependencies:** None — foundation phase.
+**Blocks:** Phases 17, 20.
+
+---
+
+### Phase 17 — Doctor Module
+
+**Goal:** New `doctor.rs` module + Diagnostics-tab Doctor pane aggregating signals from Phase 16 evals + existing `evolution.rs::evolution_log_capability_gap` + `pulse.rs` + `temporal_intel.rs` + tentacle health + config drift.
+
+**Requirements:** DOCTOR-01..10
+
+**Success criteria:**
+1. 3 Tauri commands callable end-to-end (`doctor_run_full_check`, `doctor_get_recent`, `doctor_get_signal`)
+2. Doctor pane renders ≥5 distinct signal classes on fresh install
+3. Artificially failing eval (Phase 16) lights up doctor surface red
+4. `doctor_event` Tauri event emitted on regression
+5. Auto-update presence check folded in as amber signal if `tauri-plugin-updater` not wired
+
+**Dependencies:** Phase 16 (eval signals).
+**Blocks:** Phase 20.
+
+---
+
+### Phase 18 — JARVIS Push-to-Talk → Cross-App Action
+
+**Goal:** Ship the demo moment v1.1 wired everything for. Push-to-talk → natural-language command → cross-app action. Ego refusal-elimination layer folds in as post-processor.
+
+**Requirements:** JARVIS-01..12
+
+**Success criteria:**
+1. Cold install + 1 user consent → PTT activated → real cross-app action executes (Slack post, GitHub PR comment, etc.)
+2. Synthetic refusal in chat triggers ego intercept; either capability install or hard_refuse with logged reason
+3. Ego retry cap holds (no infinite loops on persistent refusal)
+4. Browser-harness Q1 closed in `research/questions.md` with verdict
+5. Every JARVIS action emits to ActivityStrip (M-07 contract)
+
+**Dependencies:** Phase 17 (doctor surfaces capability gaps that ego routes to).
+**Blocks:** Phase 20.
+
+---
+
+### Phase 19 — Operator UAT Close
+
+**Goal:** Close the 11 v1.1 carry-over UAT items (per `STATE.md ## Deferred Items` and `milestones/v1.1-MILESTONE-AUDIT.md`). Reconcile `HANDOFF-TO-MAC.md` deletion intent.
+
+**Requirements:** UAT-01..12
+
+**Success criteria:**
+1. All 11 carry-overs have either green check + evidence file in `docs/testing ss/`, or re-deferred status with explicit rationale
+2. v1.1 milestone-audit can re-run and emerge as status `complete` (currently `tech_debt`)
+3. `HANDOFF-TO-MAC.md` reconciled (restored or formal "deleted intentionally" note)
+
+**Dependencies:** Operator availability (real Windows machine with display) — can run parallel to Phase 18.
+**Blocks:** Phase 20.
+
+---
+
+### Phase 20 — Polish + Verify Pass
+
+**Goal:** Final mop-up. Verify-gate consolidation, cargo/TS clean, v1.2 changelog entry, v1.2 milestone audit doc.
+
+**Requirements:** POLISH-01..06
+
+**Success criteria:**
+1. `npm run verify:all` green with all consolidated gates
+2. `cargo check --no-default-features` clean (or CI-green if WSL env limit persists)
+3. `npx tsc --noEmit` clean
+4. v1.2 CHANGELOG.md entry follows v1.1 structure
+5. `milestones/v1.2-MILESTONE-AUDIT.md` mirrors v1.1 audit pattern
+6. Phase dirs 16–20 archived to `milestones/v1.2-phases/` on milestone close
+
+**Dependencies:** Phases 16, 17, 18, 19 all complete.
+**Blocks:** v1.2 milestone close.
+
+---
+
+## Coverage Validation
+
+48 requirements (EVAL × 8 + DOCTOR × 10 + JARVIS × 12 + UAT × 12 + POLISH × 6) → 5 phases. **100% mapped, zero unassigned.** See `REQUIREMENTS.md ## Traceability` for the inverse mapping (REQ-ID → phase).
+
+---
+
+## Locked Decisions Carried Forward
+
+From STATE.md (v1.1 close), still in force for v1.2 planning:
+
+- **M-01** v1.2 acting work obeys the same anchor (no new features for new-features' sake) — held; JARVIS lands on top of v1.1 wiring, not as parallel substrate
+- **M-03** Observe-only guardrail flips per-tentacle behind explicit user consent + trust escalation, never silently — JARVIS-05 enforces
+- **M-05** Phase numbering continues globally — v1.2 = phases 16–20
+- **M-07** Activity log is load-bearing — JARVIS-10 + DOCTOR-06 emit to ActivityStrip
+- **D-01..D-45 + D-56/D-57** v1.0 stack decisions remain locked (no shadcn/Radix, no Framer Motion, no Zustand, no React Router, etc.)
+
+---
+
+## Earlier Milestones (archived)
+
+### v1.1 — Functionality, Wiring, Accessibility (Phases 10–15)
+✅ Shipped 2026-04-24, closed 2026-04-27. 6 phases, 29 plans, 27 verify gates green. See `milestones/v1.1-ROADMAP.md` for full detail.
+
+### v1.0 — Skin Rebuild substrate (Phases 0–9)
+✅ Shipped 2026-04-19. 10 phases, ~165 commits, 18 verify gates green. Phase dirs at `.planning/phases/0[0-9]-*` (never formally archived). See git history before commit `6a78538` for v1.0 REQUIREMENTS.
+
+---
+
+## Next Action
+
+`/gsd-discuss-phase 16` — gather context + clarify approach for Phase 16 (Eval Scaffolding Expansion).
+
+Or skip discussion: `/gsd-plan-phase 16` — plan directly.
+
+---
+
+*Roadmap created 2026-04-29 from locked shape `notes/v1-2-milestone-shape.md`. Updated by `/gsd-plan-phase` and `/gsd-transition` as phases progress.*
