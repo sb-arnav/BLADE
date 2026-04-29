@@ -15,6 +15,7 @@ Every human-readable doc in the repo, mapped. If you can't find what you need fr
 | 3 | [`HANDOFF.md`](HANDOFF.md) | Frontend onboarding — Tauri ↔ React contract, page backlog, common gotchas |
 | 4 | [`BLADE_CONTEXT.md`](BLADE_CONTEXT.md) | Full technical context — give to any AI to bootstrap them on the codebase |
 | 5 | [`CHANGELOG.md`](CHANGELOG.md) | Versioned ship log (Keep-a-Changelog format) |
+| 6 | [`.planning/notes/INDEX.md`](.planning/notes/INDEX.md) | **Arnav's ideation index** — every dump, captured note, phase Q&A log, and where to find raw session transcripts |
 
 ---
 
