@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Acting Layer with Brain Foundation
 current_phase: 16
-status: defining_requirements
-last_updated: "2026-04-29T09:00:00Z"
-last_activity: 2026-04-29 -- v1.2 scoped via /gsd-new-milestone (5 phases 16-20; shape locked at notes/v1-2-milestone-shape.md)
+status: ready_to_execute
+last_updated: "2026-04-29T18:51:00Z"
+last_activity: 2026-04-29 -- Phase 16 (Eval Scaffolding Expansion) planned; 7 plans / 3 waves; verifier passed 12/12 dimensions
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
+  total_plans: 7
   completed_plans: 0
   percent: 0
 ---
@@ -19,8 +19,8 @@ progress:
 **Project:** BLADE — Desktop JARVIS
 **Current milestone:** v1.2 — Acting Layer with Brain Foundation (5 phases, 16–20)
 **Last shipped milestone:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27)
-**Current Focus:** Phase 16 (Eval Scaffolding Expansion) — defining requirements
-**Status:** Requirements + roadmap pending; phase planning unstarted
+**Current Focus:** Phase 16 (Eval Scaffolding Expansion) — planned, ready to execute
+**Status:** 7 plans across 3 waves; verifier passed 12/12 dimensions; awaiting `/gsd-execute-phase 16`
 
 ---
 
@@ -83,8 +83,8 @@ None. v1.1 closed cleanly with documented tech debt.
 
 ## Session Continuity
 
-**Last session:** 2026-04-29T09:00:00Z (v1.2 scoped via /gsd-new-milestone)
-**Next action:** `/gsd-discuss-phase 16` (eval scaffolding) OR `/gsd-plan-phase 16` to skip discussion.
+**Last session:** 2026-04-29T18:51:00Z (Phase 16 planned via /gsd-plan-phase 16)
+**Next action:** `/gsd-execute-phase 16` — run all 7 plans (Wave 1 → Waves 2 parallel → Wave 3).
 
 **Context cliff notes:**
 - v1.0 + v1.1 both shipped; substrate is reachable + observable + capability-aware
@@ -96,4 +96,4 @@ None. v1.1 closed cleanly with documented tech debt.
 
 ---
 
-*State updated: 2026-04-29 — v1.2 milestone scoped (5 phases 16-20); requirements + roadmap pending.*
+*State updated: 2026-04-29 — Phase 16 planned (7 plans, 3 waves); RESEARCH + PATTERNS + VALIDATION committed; verifier 12/12 PASS.*
