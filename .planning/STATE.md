@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Acting Layer with Brain Foundation
 current_phase: 16
-status: ready_to_execute
-last_updated: "2026-04-29T18:51:00Z"
-last_activity: 2026-04-29 -- Phase 16 (Eval Scaffolding Expansion) planned; 7 plans / 3 waves; verifier passed 12/12 dimensions
+status: in_progress
+last_updated: "2026-04-29T19:56:27Z"
+last_activity: 2026-04-29 -- Plan 16-01 (eval harness scaffolding) shipped; Wave 1 complete; Wave 2 unblocked
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 7
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 14
 ---
 
 # STATE — BLADE (v1.2)
@@ -19,8 +19,8 @@ progress:
 **Project:** BLADE — Desktop JARVIS
 **Current milestone:** v1.2 — Acting Layer with Brain Foundation (5 phases, 16–20)
 **Last shipped milestone:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27)
-**Current Focus:** Phase 16 (Eval Scaffolding Expansion) — planned, ready to execute
-**Status:** 7 plans across 3 waves; verifier passed 12/12 dimensions; awaiting `/gsd-execute-phase 16`
+**Current Focus:** Phase 16 (Eval Scaffolding Expansion) — Wave 1 complete (1/7 plans)
+**Status:** Plan 16-01 (harness scaffolding) shipped; Wave 2 (5 parallel plans) unblocked; verifier passed 12/12 dimensions
 
 ---
 
@@ -37,19 +37,23 @@ See: `.planning/PROJECT.md` (updated 2026-04-27 at v1.1 close)
 ## Recent Context
 
 ### Shipped milestones
+
 - **v1.0** (2026-04-19) — Skin Rebuild substrate (10 phases, ~165 commits, 18 verify gates green); phase dirs at `.planning/phases/0[0-9]-*` (never formally archived)
 - **v1.1** (2026-04-24, closed 2026-04-27) — Functionality, Wiring, Accessibility (6 phases, 29 plans, 27 verify gates green); archived to `milestones/v1.1-{ROADMAP,REQUIREMENTS,MILESTONE-AUDIT}.md` + `milestones/v1.1-phases/`
 
 ### v1.1 Locked Decisions (still in force for v1.2 planning)
+
 - **M-01** Wiring + smart defaults + a11y, NOT new features — held; v1.2 acting work obeys the same anchor
 - **M-03** Observe-only guardrail (`OBSERVE_ONLY: AtomicBool`) — v1.2 will flip per-tentacle behind explicit user consent + trust escalation, never silently
 - **M-05** Phase numbering continues globally — v1.2 starts at Phase 16
 - **M-07** Activity log is load-bearing — every cross-module action in v1.2 must continue to emit
 
 ### v1.0 Decisions Inherited
+
 D-01..D-45 + D-56/D-57 remain locked. See `PROJECT.md` Key Decisions table.
 
 ### Open research questions for v1.2
+
 - **Q1**: `browser-use/browser-harness` vs current `browser_native.rs` + `browser_agent.rs` — decision deadline before v1.2 JARVIS phase plan (`research/questions.md`)
 
 ---
@@ -69,6 +73,7 @@ Items acknowledged and deferred at v1.1 milestone close on 2026-04-27 (per `mile
 | backlog | 10 | 97 DEFERRED_V1_2 backend modules | catalogued | All carry `deferral_rationale` strings in 10-WIRING-AUDIT.json; v1.2 burn-down candidate |
 
 ### v1.0 Open Checkpoints (still operator-owned)
+
 - Mac smoke M-01..M-46 — `HANDOFF-TO-MAC.md`
 - Plan 01-09 WCAG checkpoint — Mac desktop environment
 - WIRE-08 full `cargo check` — WSL libspa-sys/libclang env limit; CI green
@@ -83,10 +88,11 @@ None. v1.1 closed cleanly with documented tech debt.
 
 ## Session Continuity
 
-**Last session:** 2026-04-29T18:51:00Z (Phase 16 planned via /gsd-plan-phase 16)
-**Next action:** `/gsd-execute-phase 16` — run all 7 plans (Wave 1 → Waves 2 parallel → Wave 3).
+**Last session:** 2026-04-29T19:53:54Z (Plan 16-01 — eval harness scaffolding — shipped; Wave 1 complete)
+**Next action:** Execute Wave 2 — Plans 16-02 (hybrid_search_eval), 16-03 (real_embedding_eval), 16-04 (kg_integrity_eval), 16-05 (typed_memory_eval), 16-06 (capability_gap_eval). All 5 are independent and can run in parallel; each imports `super::harness::*` from the harness shipped in Wave 1.
 
 **Context cliff notes:**
+
 - v1.0 + v1.1 both shipped; substrate is reachable + observable + capability-aware
 - 27 verify gates green; tsc clean
 - v1.2 = 5 phases (16=Eval, 17=Doctor, 18=JARVIS+Ego, 19=Operator-UAT, 20=Polish)
@@ -96,4 +102,4 @@ None. v1.1 closed cleanly with documented tech debt.
 
 ---
 
-*State updated: 2026-04-29 — Phase 16 planned (7 plans, 3 waves); RESEARCH + PATTERNS + VALIDATION committed; verifier 12/12 PASS.*
+*State updated: 2026-04-29 — Plan 16-01 shipped (3 tasks / 3 commits / 7 files created / 1 file modified). Harness, EvalRow/EvalSummary, RR/MRR helpers, EVAL-06 box-drawing printer, temp_blade_env all live in `src-tauri/src/evals/harness.rs`. EVAL-01 marked complete in REQUIREMENTS.md. Wave 2 unblocked.*

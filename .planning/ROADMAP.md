@@ -64,7 +64,7 @@
 **Plans:** 7 plans (Wave 1: harness scaffold; Wave 2: 5 parallel eval modules; Wave 3: gate-closer + cleanup)
 
 Plans:
-- [ ] `16-01-harness-PLAN.md` — Wave 1: scaffold `evals/` module tree + shared harness (helpers, scored-table printer, temp-env). Covers EVAL-01.
+- [x] `16-01-harness-PLAN.md` — Wave 1: scaffold `evals/` module tree + shared harness (helpers, scored-table printer, temp-env). Covers EVAL-01. ✅ Shipped 2026-04-29 (commit `e6a0b02`).
 - [ ] `16-02-hybrid-search-eval-PLAN.md` — Wave 2: extract synthetic 4-dim eval from `embeddings.rs:510-728` + add 3 adversarial fixtures (long content, unicode, near-duplicate). Covers EVAL-03 (synth).
 - [ ] `16-03-real-embedding-eval-PLAN.md` — Wave 2: extract real-fastembed eval from `embeddings.rs:748-946`. Covers EVAL-03 (real).
 - [ ] `16-04-kg-integrity-eval-PLAN.md` — Wave 2: NEW knowledge-graph round-trip + orphan-zero + idempotent-merge eval. Covers EVAL-02.
