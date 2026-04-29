@@ -69,7 +69,7 @@ Plans:
 - [x] `16-03-real-embedding-eval-PLAN.md` — Wave 2: extract real-fastembed eval from `embeddings.rs:748-946`. Covers EVAL-03 (real). ✅ Shipped 2026-04-29 (commit `c3005ed`); 7/7 top-1, MRR 1.000 (matches 2026-04-28 baseline).
 - [x] `16-04-kg-integrity-eval-PLAN.md` — Wave 2: NEW knowledge-graph round-trip + orphan-zero + idempotent-merge eval. Covers EVAL-02. ✅ Shipped 2026-04-29 (commit `1a764d3`); 5/5 dimensions pass (round-trip / endpoints-resolve / orphan-zero / idempotent-merge / edge-upsert), MRR 1.000.
 - [x] `16-05-typed-memory-eval-PLAN.md` — Wave 2: NEW 7-category typed-memory recall + cross-category isolation eval. Covers EVAL-04. ✅ Shipped 2026-04-29; 7/7 categories round-trip (Fact / Preference / Decision / Relationship / Skill / Goal / Routine) + cross-category isolation gate (`WHERE category` regression catcher), MRR 1.000.
-- [ ] `16-06-capability-gap-eval-PLAN.md` — Wave 2: NEW `detect_missing_tool` classifier eval (4 positive + 1 false-positive regression + 2 negative). Covers EVAL-05.
+- [x] `16-06-capability-gap-eval-PLAN.md` — Wave 2: NEW `detect_missing_tool` classifier eval (4 positive + 1 false-positive regression + 2 negative). Covers EVAL-05. ✅ Shipped 2026-04-29 (commit `d9a4d8e`); 7/7 cases pass (jq / ripgrep / node / ffmpeg + false-positive cargo-mentions-fd + 2 negative), MRR 1.000. Wave 2 closes.
 - [ ] `16-07-verify-eval-gate-PLAN.md` — Wave 3: ship `scripts/verify-eval.sh` + `tests/evals/DEFERRED.md` + `package.json` chain entry; delete `embeddings.rs:496-946`. Covers EVAL-06, EVAL-07, EVAL-08.
 
 **Success criteria:**

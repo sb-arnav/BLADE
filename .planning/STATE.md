@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Phases
-status: "Plan 16-05 (typed-memory recall + cross-category isolation eval) shipped; fourth harness consumer live (7 categories + isolation gate); only 16-06 (capability-gap) remains in Wave 2"
-last_updated: "2026-04-29T21:25:00Z"
+status: "Plan 16-06 (capability-gap classifier eval) shipped; Wave 2 of Phase 16 closes (5/5 plans); only Wave 3 16-07 (verify-eval gate + DEFERRED.md + delete embeddings.rs:496-946) remains"
+last_updated: "2026-04-29T21:45:00Z"
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 71
-  completed_plans: 70
+  completed_plans: 71
   percent: 99
 ---
 
@@ -17,8 +17,8 @@ progress:
 **Project:** BLADE — Desktop JARVIS
 **Current milestone:** v1.2 — Acting Layer with Brain Foundation (5 phases, 16–20)
 **Last shipped milestone:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27)
-**Current Focus:** Phase 16 (Eval Scaffolding Expansion) — Wave 1 complete + Wave 2 in progress (5/7 plans)
-**Status:** Plan 16-05 (typed-memory recall eval) shipped; fourth harness consumer live (7 categories round-trip + cross-category isolation regression gate, 8/8 rows pass, MRR 1.000); only 16-06 (capability-gap) remains in Wave 2
+**Current Focus:** Phase 16 (Eval Scaffolding Expansion) — Wave 1 complete + Wave 2 closed (6/7 plans); Wave 3 unblocked
+**Status:** Plan 16-06 (capability-gap classifier eval) shipped; fifth harness consumer live (4 positive + 1 false-positive regression + 2 negative, 7/7 rows pass, MRR 1.000); Wave 2 closes; only Wave 3 16-07 (verify-eval gate + DEFERRED.md + delete embeddings.rs:496-946) remains in Phase 16
 
 ---
 
@@ -86,8 +86,8 @@ None. v1.1 closed cleanly with documented tech debt.
 
 ## Session Continuity
 
-**Last session:** 2026-04-29T21:25:00Z (Plan 16-05 — typed-memory recall eval — shipped; fourth harness consumer live)
-**Next action:** Execute the last Wave 2 plan — 16-06 (capability_gap_eval). Independent, imports `super::harness::*` from the harness shipped in Wave 1. Plan 16-07 (deletion of original `embeddings.rs:496-946` — both synthetic + real mods) waits for 16-06 to finish; once it ships, Wave 2 closes and Wave 3 can pick up the gate-closer.
+**Last session:** 2026-04-29T21:45:00Z (Plan 16-06 — capability-gap classifier eval — shipped; Wave 2 closes; Wave 3 unblocked)
+**Next action:** Execute the Wave 3 plan — 16-07 (verify-eval gate + tests/evals/DEFERRED.md + package.json `verify:eval` chain entry; delete original `embeddings.rs:496-946` synth + real eval blocks). Closes Phase 16. Covers EVAL-06 (scored-table grep gate), EVAL-07 (verify chain integration moves count from 27 → 28+), EVAL-08 (DEFERRED.md for LLM-API evals).
 
 **Context cliff notes:**
 
@@ -109,3 +109,5 @@ None. v1.1 closed cleanly with documented tech debt.
 *State updated: 2026-04-29T21:05Z — Plan 16-04 shipped (1 task / 1 commit / 1 file modified). `evals/kg_integrity_eval.rs` populated (Wave 1 stub → 284 lines): 5 fixture nodes (blade, tauri, rust, arnav, jarvis demo) inserted via `add_node`, 5 edges via `add_edge` (depends_on / related_to / part_of), 5 integrity dimensions asserted (round-trip / edge-endpoints-resolve / orphan-zero / idempotent-merge / edge-upsert-no-dup). All 5 dimensions pass; MRR 1.000. File-header documents the `consolidate_kg` REQ-vs-real resolution: the named function does not exist; REQ wording satisfied by `add_node`'s built-in idempotent-merge path (`knowledge_graph.rs:221-248`) — no re-export added. Test command: `cd src-tauri && cargo test --lib evals::kg_integrity_eval -- --nocapture --test-threads=1` exits 0 with `┌── Knowledge graph integrity eval` table emitted. EVAL-02 marked complete in REQUIREMENTS.md. Wave 2 progress: 3/5 plans (16-02 + 16-03 + 16-04 done; 16-05, 16-06 remain).*
 
 *State updated: 2026-04-29T21:25Z — Plan 16-05 shipped (1 task / 1 commit / 1 file modified). `evals/typed_memory_eval.rs` populated (Wave 1 stub 1 LOC → 206 LOC): 7 fixtures, one per `MemoryCategory` variant (Fact / Preference / Decision / Relationship / Skill / Goal / Routine), each round-tripped through `store_typed_memory` → `recall_by_category(cat, 10)` with strict `len() == 1` + content-substring + category-tag checks. Eighth assertion is the cross-category isolation regression gate: `recall_by_category(Fact)` excludes Preference content AND every returned row tags as `"fact"` — catches a future SQL edit dropping the `WHERE category = ?1` clause at `typed_memory.rs:282`. All 8 rows pass; MRR 1.000. Test command: `cd src-tauri && cargo test --lib evals::typed_memory_eval -- --nocapture --test-threads=1` exits 0 with `┌── Typed memory category recall eval` table emitted. EVAL-04 marked complete in REQUIREMENTS.md. Wave 2 progress: 4/5 plans (16-02 + 16-03 + 16-04 + 16-05 done; 16-06 capability-gap remains). Per-task commit `01d9ee1`.*
+
+*State updated: 2026-04-29T21:45Z — Plan 16-06 shipped (1 task / 1 commit / 1 file modified). `evals/capability_gap_eval.rs` populated (Wave 1 stub 1 LOC → 206 LOC): 7 stderr/command pairs feed `self_upgrade::detect_missing_tool` — 4 positive (linux_apt_jq via `/bin/sh: 1: jq: not found`, linux_bash_ripgrep via `bash: ripgrep: command not found`, windows_cmd_node via `'node' is not recognized as an internal or external command`, macos_zsh_ffmpeg via `zsh: command not found: ffmpeg`) each asserting `Some(gap)` with case-insensitive suggestion-substring match; 1 false-positive regression case (`cargo build` stderr mentions `/tmp/fd-build.log` — first-token = `cargo` ∉ catalog → must return `None`; this is the regression gate for the strict-matcher fix at `self_upgrade.rs:272-285`); 2 negative cases (unknown-tool `foobarbaz-cli`, no-not-found-phrase). All 7 rows pass; MRR 1.000. File header documents the `evolution::detect_missing_tool` (REQ wording) → `self_upgrade::detect_missing_tool` (real path) resolution per RESEARCH §5 — no re-export added (zero re-exports between the two modules; cosmetic alignment with REQ text would be production-touching dead code). Pre-flight catalog-key existence asserts (`jq` / `ripgrep` / `node` / `ffmpeg`) surface clear errors if a future edit renames a key. No `temp_blade_env()` — `detect_missing_tool` is pure. Test command: `cd src-tauri && cargo test --lib evals::capability_gap_eval -- --nocapture --test-threads=1` exits 0 with `┌── Capability gap detection eval` table emitted. EVAL-05 marked complete in REQUIREMENTS.md. Catalog count documentation drift noted (CLAUDE.md says ~10; live capability_catalog returns 16 — flagged in plan SUMMARY, no fix required). Per-task commit `d9a4d8e`. **Wave 2 of Phase 16 closes** (5/5 plans shipped: 16-02 hybrid_search + 16-03 real_embedding + 16-04 kg_integrity + 16-05 typed_memory + 16-06 capability_gap; all green; all MRR 1.000 except hybrid_search's adversarial-relaxed rollup). Wave 3 (Plan 16-07: verify-eval gate + DEFERRED.md + package.json + delete `embeddings.rs:496-946`) unblocked.*
