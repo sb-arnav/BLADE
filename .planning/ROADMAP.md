@@ -61,6 +61,17 @@
 
 **Requirements:** EVAL-01..08
 
+**Plans:** 7 plans (Wave 1: harness scaffold; Wave 2: 5 parallel eval modules; Wave 3: gate-closer + cleanup)
+
+Plans:
+- [ ] `16-01-harness-PLAN.md` — Wave 1: scaffold `evals/` module tree + shared harness (helpers, scored-table printer, temp-env). Covers EVAL-01.
+- [ ] `16-02-hybrid-search-eval-PLAN.md` — Wave 2: extract synthetic 4-dim eval from `embeddings.rs:510-728` + add 3 adversarial fixtures (long content, unicode, near-duplicate). Covers EVAL-03 (synth).
+- [ ] `16-03-real-embedding-eval-PLAN.md` — Wave 2: extract real-fastembed eval from `embeddings.rs:748-946`. Covers EVAL-03 (real).
+- [ ] `16-04-kg-integrity-eval-PLAN.md` — Wave 2: NEW knowledge-graph round-trip + orphan-zero + idempotent-merge eval. Covers EVAL-02.
+- [ ] `16-05-typed-memory-eval-PLAN.md` — Wave 2: NEW 7-category typed-memory recall + cross-category isolation eval. Covers EVAL-04.
+- [ ] `16-06-capability-gap-eval-PLAN.md` — Wave 2: NEW `detect_missing_tool` classifier eval (4 positive + 1 false-positive regression + 2 negative). Covers EVAL-05.
+- [ ] `16-07-verify-eval-gate-PLAN.md` — Wave 3: ship `scripts/verify-eval.sh` + `tests/evals/DEFERRED.md` + `package.json` chain entry; delete `embeddings.rs:496-946`. Covers EVAL-06, EVAL-07, EVAL-08.
+
 **Success criteria:**
 1. `cargo test --lib evals` runs ≥4 eval modules with all green
 2. `verify:eval` gate present in `verify:all` chain (count moves from 27 to 28+)
