@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Phases
-status: "Plan 16-04 (KG integrity eval) shipped; third harness consumer live (CRUD + integrity path); remaining Wave 2 plans (16-05, 16-06) still parallel-ready"
-last_updated: "2026-04-29T21:05:00Z"
+status: "Plan 16-05 (typed-memory recall + cross-category isolation eval) shipped; fourth harness consumer live (7 categories + isolation gate); only 16-06 (capability-gap) remains in Wave 2"
+last_updated: "2026-04-29T21:25:00Z"
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 71
-  completed_plans: 69
-  percent: 97
+  completed_plans: 70
+  percent: 99
 ---
 
 # STATE — BLADE (v1.2)
@@ -17,8 +17,8 @@ progress:
 **Project:** BLADE — Desktop JARVIS
 **Current milestone:** v1.2 — Acting Layer with Brain Foundation (5 phases, 16–20)
 **Last shipped milestone:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27)
-**Current Focus:** Phase 16 (Eval Scaffolding Expansion) — Wave 1 complete + Wave 2 in progress (4/7 plans)
-**Status:** Plan 16-04 (KG integrity eval) shipped; third harness consumer live (CRUD + integrity path, 5/5 dimensions pass, MRR 1.000); remaining Wave 2 plans (16-05, 16-06) still parallel-ready
+**Current Focus:** Phase 16 (Eval Scaffolding Expansion) — Wave 1 complete + Wave 2 in progress (5/7 plans)
+**Status:** Plan 16-05 (typed-memory recall eval) shipped; fourth harness consumer live (7 categories round-trip + cross-category isolation regression gate, 8/8 rows pass, MRR 1.000); only 16-06 (capability-gap) remains in Wave 2
 
 ---
 
@@ -86,8 +86,8 @@ None. v1.1 closed cleanly with documented tech debt.
 
 ## Session Continuity
 
-**Last session:** 2026-04-29T21:05:00Z (Plan 16-04 — KG integrity eval — shipped; third harness consumer live)
-**Next action:** Execute remaining Wave 2 plans — 16-05 (typed_memory_eval), 16-06 (capability_gap_eval). Both are independent and can run in parallel; each imports `super::harness::*` from the harness shipped in Wave 1. Plan 16-07 (deletion of original `embeddings.rs:496-946` — both synthetic + real mods) waits for Wave 2 to finish.
+**Last session:** 2026-04-29T21:25:00Z (Plan 16-05 — typed-memory recall eval — shipped; fourth harness consumer live)
+**Next action:** Execute the last Wave 2 plan — 16-06 (capability_gap_eval). Independent, imports `super::harness::*` from the harness shipped in Wave 1. Plan 16-07 (deletion of original `embeddings.rs:496-946` — both synthetic + real mods) waits for 16-06 to finish; once it ships, Wave 2 closes and Wave 3 can pick up the gate-closer.
 
 **Context cliff notes:**
 
@@ -107,3 +107,5 @@ None. v1.1 closed cleanly with documented tech debt.
 *State updated: 2026-04-29T20:29Z — Plan 16-03 shipped (1 task / 1 commit / 1 file modified). `evals/real_embedding_eval.rs` populated (Wave 1 stub → 277 lines): 8-fact BLADE-shaped corpus + 7 natural-language scenarios moved verbatim from `embeddings.rs:730-946`, helpers swapped to `super::harness::*`. Floor preserved: 7/7 top-1, MRR 1.000 (matches 2026-04-28 baseline `9c5674a`). One Rule-3 deviation logged (inline 6-line `cosine_similarity` in smoke test rather than widening `embeddings::cosine_similarity` to `pub` — keeps `embeddings.rs` line count invariant at 946 for Plan 16-07's deletion arithmetic). EVAL-03 already marked complete by 16-02; this plan covers the real-fastembed half of the gate. Original `mod memory_recall_real_embedding` block at `embeddings.rs:730-946` left in place — Plan 16-07 deletes it. Wave 2 progress: 2/5 plans (16-02 + 16-03 done; 16-04, 16-05, 16-06 remain).*
 
 *State updated: 2026-04-29T21:05Z — Plan 16-04 shipped (1 task / 1 commit / 1 file modified). `evals/kg_integrity_eval.rs` populated (Wave 1 stub → 284 lines): 5 fixture nodes (blade, tauri, rust, arnav, jarvis demo) inserted via `add_node`, 5 edges via `add_edge` (depends_on / related_to / part_of), 5 integrity dimensions asserted (round-trip / edge-endpoints-resolve / orphan-zero / idempotent-merge / edge-upsert-no-dup). All 5 dimensions pass; MRR 1.000. File-header documents the `consolidate_kg` REQ-vs-real resolution: the named function does not exist; REQ wording satisfied by `add_node`'s built-in idempotent-merge path (`knowledge_graph.rs:221-248`) — no re-export added. Test command: `cd src-tauri && cargo test --lib evals::kg_integrity_eval -- --nocapture --test-threads=1` exits 0 with `┌── Knowledge graph integrity eval` table emitted. EVAL-02 marked complete in REQUIREMENTS.md. Wave 2 progress: 3/5 plans (16-02 + 16-03 + 16-04 done; 16-05, 16-06 remain).*
+
+*State updated: 2026-04-29T21:25Z — Plan 16-05 shipped (1 task / 1 commit / 1 file modified). `evals/typed_memory_eval.rs` populated (Wave 1 stub 1 LOC → 206 LOC): 7 fixtures, one per `MemoryCategory` variant (Fact / Preference / Decision / Relationship / Skill / Goal / Routine), each round-tripped through `store_typed_memory` → `recall_by_category(cat, 10)` with strict `len() == 1` + content-substring + category-tag checks. Eighth assertion is the cross-category isolation regression gate: `recall_by_category(Fact)` excludes Preference content AND every returned row tags as `"fact"` — catches a future SQL edit dropping the `WHERE category = ?1` clause at `typed_memory.rs:282`. All 8 rows pass; MRR 1.000. Test command: `cd src-tauri && cargo test --lib evals::typed_memory_eval -- --nocapture --test-threads=1` exits 0 with `┌── Typed memory category recall eval` table emitted. EVAL-04 marked complete in REQUIREMENTS.md. Wave 2 progress: 4/5 plans (16-02 + 16-03 + 16-04 + 16-05 done; 16-06 capability-gap remains). Per-task commit `01d9ee1`.*
