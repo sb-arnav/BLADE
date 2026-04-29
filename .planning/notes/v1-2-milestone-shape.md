@@ -13,7 +13,9 @@ context: >
   workflow should consume it and produce REQUIREMENTS.md + ROADMAP.md
   consistent with the shape below; deviations need explicit justification,
   not silent revision.
-status: draft
+status: locked
+locked_by: arnav
+locked_date: 2026-04-29
 audience: /gsd-new-milestone, /gsd-plan-phase, downstream phases
 ---
 
@@ -169,4 +171,4 @@ Everything else from `v1-2-ideation-arnav.md` that isn't above:
 
 ## Authority
 
-This shape is **draft**. Lock it (status: locked) once Arnav signs off on the four phases + scope decisions. After lock, `/gsd-new-milestone` may flesh out requirements, success criteria, and dependencies — but should not silently change the phase list, sequencing, or scope. Any deviation needs explicit user sign-off.
+This shape is **locked** (Arnav signed off 2026-04-29: *"feels about right"*). `/gsd-new-milestone` may flesh out requirements, success criteria, and dependencies — but should not silently change the phase list, sequencing, or scope. Any deviation needs explicit user sign-off.
