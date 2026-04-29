@@ -146,6 +146,8 @@ Free-form ideation captured between phases.
 | [`v1-1-milestone-shape.md`](.planning/notes/v1-1-milestone-shape.md) | v1.1 milestone shape — locked during /gsd-explore |
 | [`v1-2-ideation-arnav.md`](.planning/notes/v1-2-ideation-arnav.md) | v1.2 raw ideation dump |
 | [`v1-2-self-improvement-maturity.md`](.planning/notes/v1-2-self-improvement-maturity.md) | v1.2 self-improvement / memory / body maturity audit |
+| [`v1-2-milestone-shape.md`](.planning/notes/v1-2-milestone-shape.md) | v1.2 milestone shape — locked 2026-04-29 (brain audit: eval/doctor/ego/skills) |
+| [`v1-3-hermes-openclaw-skills-research.md`](.planning/notes/v1-3-hermes-openclaw-skills-research.md) | v1.3 input — Hermes / OpenClaw / agentskills.io research + integration shape |
 | [`v2-vision-tentacles.md`](.planning/notes/v2-vision-tentacles.md) | v2+ vision — tentacles, heads, big agent |
 
 ### Milestone archive ([`milestones/`](.planning/milestones/))

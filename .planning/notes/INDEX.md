@@ -17,6 +17,7 @@ The dumps you (or Claude) made the deliberate decision to save as standalone not
 | [`v1-2-ideation-arnav.md`](v1-2-ideation-arnav.md) | 2026-04-27 | ideation | Raw v1.2 brain dump — tool replacement (Hermes/OpenClaw), persona, self-upgrade, ego, growth loops |
 | [`v1-2-self-improvement-maturity.md`](v1-2-self-improvement-maturity.md) | 2026-04-27 | audit | Concrete maturity audit answering the v1.2 ideation questions — self_upgrade/evolution/memory/doctor/hormones |
 | [`v1-2-milestone-shape.md`](v1-2-milestone-shape.md) | 2026-04-29 | locked | v1.2 = "Acting Layer with Brain Foundation" — Eval + Doctor + JARVIS (with ego folded in) + Operator UAT close + Polish. 5 phases (16–20), 10–12 day target. Reconciles PROJECT.md authority with the maturity audit's "eval before flashy" insight |
+| [`v1-3-hermes-openclaw-skills-research.md`](v1-3-hermes-openclaw-skills-research.md) | 2026-04-29 | research | v1.3 input — adopt agentskills.io standard (YAML+SKILL.md, progressive disclosure); add Hermes 4 (Nous) as OpenRouter provider (~1 day); do NOT adopt OpenClaw/Hermes Agent runtimes wholesale. References pre-rewrite v1.2 shape; Phase-3 amendment now moot since v1.2 rewrite moved Skills MVP fully to v1.3 |
 
 **Convention.** New captures land here as `{slug}.md` (semantic) or `{YYYY-MM-DD}-{slug}.md` (date-prefixed, per `gsd-note` spec). Either is fine — index over filename.
 
