@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Phases
 status: planning
-last_updated: "2026-04-30T14:06:40.862Z"
+last_updated: "2026-04-30T14:30:00.000Z"
 progress:
   total_phases: 13
   completed_phases: 12
   total_plans: 92
-  completed_plans: 79
-  percent: 86
+  completed_plans: 80
+  percent: 87
 ---
 
 # STATE — BLADE (v1.2)
@@ -17,8 +17,8 @@ progress:
 **Project:** BLADE — Desktop JARVIS
 **Current milestone:** v1.2 — Acting Layer with Brain Foundation (5 phases, 16–20)
 **Last shipped milestone:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27)
-**Current Focus:** Phase 18 in progress (chat-first reinterpretation per CONTEXT D-01..D-21). Plan 18-01 ✅ shipped 2026-04-30T14:04Z (Wave 0 type-contract scaffolding: 4 new modules + 6 Tauri commands registered clash-free). Next: Wave 1 body fills (Plans 02-14 implement against locked contracts).
-**Status:** Phase 18 Plan 01 of 14 complete (Wave 0 scaffolding). All 5 enum type contracts locked with snake_case wire form; downstream plans (06 TS bindings, 08 ego, 09 intent_router, 10 consent, 14 dispatch) build against verbatim signatures with zero codebase exploration needed. cargo check + 6 stub tests green. Phase 17 prior status preserved: code complete, runtime UAT deferred per operator chat-first pivot.
+**Current Focus:** Phase 18 in progress (chat-first reinterpretation per CONTEXT D-01..D-21). Plan 18-01 + 18-02 ✅ shipped (Wave 0 scaffolding: 4 module skeletons + ecosystem WriteScope + CapabilityKind discriminator). Next: 18-03 (3 outbound tentacle skeletons) → continuing Wave 0.
+**Status:** Phase 18 Plan 02 of 14 complete (Wave 0 progressing). Plan 02 extended ecosystem.rs with WRITE_UNLOCKS + WriteScope (RAII, 30s caller-supplied TTL, M-03 OBSERVE_ONLY preserved verbatim) + 2-arg assert_observe_only_allowed signature; extended self_upgrade.rs with CapabilityKind { Runtime | Integration } discriminator (#[serde(default)] back-compat) + 5 Integration catalog entries (slack/github/gmail/calendar/linear outbound) + auto_install Integration short-circuit. +6 unit tests all green; cargo check clean; doctor 35-test reader unaffected (verified via --test-threads=1). Phase 17 prior status preserved: code complete, runtime UAT deferred per operator chat-first pivot.
 
 ---
 
@@ -86,8 +86,8 @@ None. v1.1 closed cleanly with documented tech debt.
 
 ## Session Continuity
 
-**Last session:** 2026-04-30T14:04:41Z (Plan 18-01 ✅ shipped — Wave 0 chat-first scaffolding; 3 task commits / 4 new files (ego.rs/intent_router.rs/jarvis_dispatch.rs/consent.rs) + lib.rs / +258 net insertions / 6 stub tests green / cargo check clean (only expected dead_code warnings — bodies in Plans 08/09/10/14). Locked 5 enum type contracts with snake_case wire form: EgoVerdict, EgoOutcome, IntentClass, DispatchResult, ConsentVerdict. 6 Tauri commands registered clash-free: ego_intercept, intent_router_classify, jarvis_dispatch_action (renamed from dispatch_action for greppability — 2 private dispatch_action fns exist in action_tags.rs:84 + goal_engine.rs:416), consent_get_decision, consent_set_decision, consent_revoke_all. 6-place config rule did NOT fire — zero BladeConfig fields added per CONTEXT D-04 chat-first frame.)
-**Next action:** `/gsd-execute-plan 18-02` — Wave 1+ body fills against locked Plan 01 contracts. Per phase plan order: Plan 02-04 land tentacle-outbound surface (slack/github/gmail), Plan 05 capability_catalog growth, Plan 06 TS literal unions mirroring snake_case wire form, Plan 08 ego refusal-pattern body + retry loop, Plan 09 intent_router heuristic+LLM-fallback, Plan 10 consent SQLite round-trip, Plan 14 jarvis_dispatch fan-out body.
+**Last session:** 2026-04-30T14:30Z (Plan 18-02 ✅ shipped — Wave 0 ecosystem.rs WriteScope + self_upgrade.rs CapabilityKind; 2 task commits 91d2d48 + e48b9ec / +323 net insertions / +6 unit tests all green / cargo check clean / doctor 35-test reader unaffected). Per-tentacle write-window guardrail: WRITE_UNLOCKS: OnceLock<Mutex<HashMap<String, Instant>>> + WriteScope RAII Drop guard with caller-supplied 30s TTL coexisting with global OBSERVE_ONLY (M-03 preserved verbatim, line 17 unchanged). assert_observe_only_allowed signature changed from 1-arg to 2-arg (tentacle, action) atomically (only the existing test caller required updating). CapabilityKind { Runtime | Integration } enum with #[serde(rename_all="snake_case")] + Default=Runtime impl; CapabilityGap struct extended with kind + integration_path fields, both #[serde(default)] for back-compat with Phase 17 reader. 16 existing Runtime catalog entries got explicit kind/integration_path fields (BLADE struct-literal convention); 5 new Integration entries (slack_outbound, github_outbound, gmail_outbound, calendar_write, linear_outbound) added. auto_install short-circuits on Integration kind before shell-out (defense-in-depth: install_cmd also empty). One pre-existing doctor parallel-run flake surfaced (BLADE_CONFIG_DIR env-var leak between tests) — not from this plan; verified all 35 doctor tests green with --test-threads=1.
+**Next action:** `/gsd-execute-plan 18-03` — Wave 0: 3 outbound tentacle skeletons (slack_outbound, github_outbound, gmail_outbound). Then Plan 04 (BLADE_EVENTS + payloads.ts) → 13 (deferral doc) → Wave 1 body fills (05/06) → Wave 2 (07/08) → Wave 3 (09 dispatch) → Wave 4 (10/11/14 wiring) → Wave 5 (12 verification + cold-install demo).
 
 **Context cliff notes:**
 
