@@ -89,29 +89,52 @@ fn last_run_cache() -> &'static Mutex<Vec<DoctorSignal>> {
 
 // ── Suggested-fix table (D-18) ────────────────────────────────────────────────
 
-/// Suggested-fix copy table per (class, severity). Verbatim strings from
-/// UI-SPEC § 15 land in Plan 17-04; Plan 17-02 ships placeholders so the
-/// match is exhaustive over all 15 (class × severity) pairs and `cargo
-/// check` doesn't warn about non-exhaustive arms.
+/// Suggested-fix copy table per (class, severity). VERBATIM strings from
+/// UI-SPEC § 15 — locked by D-18 (handwritten, NOT AI-generated). Any
+/// modification requires user revision; agents may not paraphrase. The
+/// `suggested_fix_strings_match_ui_spec_verbatim` test asserts substrings
+/// of three canonical entries to catch silent drift.
 pub(crate) fn suggested_fix(class: SignalClass, severity: Severity) -> &'static str {
     match (class, severity) {
-        (SignalClass::EvalScores, Severity::Green) => "TODO Plan 17-04: EvalScores Green string",
-        (SignalClass::EvalScores, Severity::Amber) => "TODO Plan 17-04: EvalScores Amber string",
-        (SignalClass::EvalScores, Severity::Red) => "TODO Plan 17-04: EvalScores Red string",
-        (SignalClass::CapabilityGaps, Severity::Green) => "TODO Plan 17-04: CapabilityGaps Green string",
-        (SignalClass::CapabilityGaps, Severity::Amber) => "TODO Plan 17-04: CapabilityGaps Amber string",
-        (SignalClass::CapabilityGaps, Severity::Red) => "TODO Plan 17-04: CapabilityGaps Red string",
-        (SignalClass::TentacleHealth, Severity::Green) => "TODO Plan 17-04: TentacleHealth Green string",
-        (SignalClass::TentacleHealth, Severity::Amber) => "TODO Plan 17-04: TentacleHealth Amber string",
-        (SignalClass::TentacleHealth, Severity::Red) => "TODO Plan 17-04: TentacleHealth Red string",
-        (SignalClass::ConfigDrift, Severity::Green) => "TODO Plan 17-04: ConfigDrift Green string",
-        (SignalClass::ConfigDrift, Severity::Amber) => "TODO Plan 17-04: ConfigDrift Amber string",
-        (SignalClass::ConfigDrift, Severity::Red) => "TODO Plan 17-04: ConfigDrift Red string",
-        (SignalClass::AutoUpdate, Severity::Green) => "TODO Plan 17-04: AutoUpdate Green string",
-        (SignalClass::AutoUpdate, Severity::Amber) => "TODO Plan 17-04: AutoUpdate Amber string",
-        (SignalClass::AutoUpdate, Severity::Red) => {
-            "TODO Plan 17-04: AutoUpdate Red string (per UI-SPEC § 15: sentinel — should never render)"
-        }
+        // Eval Scores — UI-SPEC § 15
+        (SignalClass::EvalScores, Severity::Green) =>
+            "All eval modules are passing their asserted floors. Last 5 runs recorded in tests/evals/history.jsonl.",
+        (SignalClass::EvalScores, Severity::Amber) =>
+            "An eval module's score dropped 10% or more from its prior run, but it's still above the asserted floor. Run bash scripts/verify-eval.sh to see which one and re-baseline if the change is intentional.",
+        (SignalClass::EvalScores, Severity::Red) =>
+            "An eval module breached its asserted floor (top-3 below 80% or MRR below 0.6). Run bash scripts/verify-eval.sh to identify which module and inspect tests/evals/history.jsonl for the drop point.",
+
+        // Capability Gaps — UI-SPEC § 15
+        (SignalClass::CapabilityGaps, Severity::Green) =>
+            "No unresolved capability gaps in the last 24 hours. Catalog is at src-tauri/src/self_upgrade.rs::capability_catalog.",
+        (SignalClass::CapabilityGaps, Severity::Amber) =>
+            "At least one unresolved capability gap was logged in the last 24 hours. Open the payload to see which capability and when.",
+        (SignalClass::CapabilityGaps, Severity::Red) =>
+            "The same capability has been requested 3 or more times in the last 7 days without resolution. This is a strong signal you need to add or re-route a tool. Check evolution.rs::evolution_log_capability_gap output and consider extending capability_catalog.",
+
+        // Tentacle Health — UI-SPEC § 15
+        (SignalClass::TentacleHealth, Severity::Green) =>
+            "All tentacle observers are reporting heartbeats within their expected interval.",
+        (SignalClass::TentacleHealth, Severity::Amber) =>
+            "At least one observer's heartbeat is more than 1 hour stale. Check src-tauri/src/integration_bridge.rs logs for the affected service and confirm credentials are still valid.",
+        (SignalClass::TentacleHealth, Severity::Red) =>
+            "At least one observer has been silent for over 24 hours and is treated as dead. Inspect supervisor health on the Health tab and restart the affected tentacle from there.",
+
+        // Config Drift — UI-SPEC § 15
+        (SignalClass::ConfigDrift, Severity::Green) =>
+            "Migration ledger is in sync and your scan profile is current.",
+        (SignalClass::ConfigDrift, Severity::Amber) =>
+            "Either the migration ledger is out of sync OR the scan profile is older than 30 days. Run npm run verify:migration-ledger to identify which.",
+        (SignalClass::ConfigDrift, Severity::Red) =>
+            "Both the migration ledger is out of sync AND the scan profile is older than 30 days. Run npm run verify:migration-ledger and trigger a Deep scan from the Deep scan tab to refresh.",
+
+        // Auto-Update — UI-SPEC § 15
+        (SignalClass::AutoUpdate, Severity::Green) =>
+            "tauri-plugin-updater is wired and initialized. BLADE will check for updates on launch.",
+        (SignalClass::AutoUpdate, Severity::Amber) =>
+            "tauri-plugin-updater is not fully wired. Confirm src-tauri/Cargo.toml lists the dep AND src-tauri/src/lib.rs initializes via tauri_plugin_updater::Builder::new().build().",
+        (SignalClass::AutoUpdate, Severity::Red) =>
+            "(Reserved — Auto-Update has no Red tier per D-09; if this string ever renders it indicates a bug in doctor.rs severity classification.)",
     }
 }
 
@@ -1107,5 +1130,31 @@ mod tests {
     fn drift_classify_red_on_ledger_and_missing_profile() {
         // Ledger drift + missing profile → both conditions trip → Red.
         assert_eq!(classify_drift(true, None), Severity::Red);
+    }
+
+    // ── Plan 17-04: suggested_fix verbatim lock (D-18 / UI-SPEC § 15) ────────
+
+    #[test]
+    fn suggested_fix_strings_match_ui_spec_verbatim() {
+        // These exact strings are LOCKED by UI-SPEC § 15 (D-18). Any change
+        // requires user revision, NOT agent paraphrase. Asserting full string
+        // equality on three canonical entries + the Red Auto-Update sentinel
+        // catches silent drift if anyone edits the table.
+        assert_eq!(
+            suggested_fix(SignalClass::EvalScores, Severity::Red),
+            "An eval module breached its asserted floor (top-3 below 80% or MRR below 0.6). Run bash scripts/verify-eval.sh to identify which module and inspect tests/evals/history.jsonl for the drop point."
+        );
+        assert_eq!(
+            suggested_fix(SignalClass::AutoUpdate, Severity::Green),
+            "tauri-plugin-updater is wired and initialized. BLADE will check for updates on launch."
+        );
+        assert_eq!(
+            suggested_fix(SignalClass::CapabilityGaps, Severity::Red),
+            "The same capability has been requested 3 or more times in the last 7 days without resolution. This is a strong signal you need to add or re-route a tool. Check evolution.rs::evolution_log_capability_gap output and consider extending capability_catalog."
+        );
+        // Red Auto-Update is "shouldn't happen" per D-09 — sentinel string.
+        assert!(
+            suggested_fix(SignalClass::AutoUpdate, Severity::Red).contains("(Reserved")
+        );
     }
 }
