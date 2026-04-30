@@ -304,3 +304,126 @@
   from { transform: scaleX(1); }
   to   { transform: scaleX(0); }
 }
+
+/* ── JarvisPill (Phase 18 / JARVIS-11 / D-18) ─────────────────────────────── */
+/* Inline pill rendered below the latest assistant bubble when
+ * `jarvis_intercept` fires. Composes the Badge primitive — only existing
+ * tokens are used (memory project_ghost_css_tokens.md: ghost tokens broke
+ * v1.1; never again). */
+
+.jarvis-pill {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 2px 0;
+}
+
+.jarvis-pill-dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--g-edge-mid);
+  background: var(--g-fill-weak);
+  color: var(--t-2);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+}
+
+.jarvis-pill-dismiss:hover {
+  background: var(--g-fill);
+  color: var(--t-1);
+}
+
+/* ── ConsentDialog (Phase 18 / JARVIS-05 / D-08, D-09) ─────────────────────── */
+/* Modal consent dialog before any cross-app write. Composes the Dialog
+ * primitive — only existing tokens used. NO blur layers per D-70. */
+
+.consent-dialog {
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-4);
+}
+
+.consent-dialog-header {
+  margin: 0;
+}
+
+.consent-dialog-title {
+  margin: 0;
+  color: var(--t-1);
+  font-family: var(--font-display);
+  font-size: 18px;
+  letter-spacing: -0.01em;
+}
+
+.consent-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.consent-dialog-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+}
+
+.consent-dialog-row-stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--s-1);
+}
+
+.consent-dialog-label {
+  color: var(--t-3);
+  font-family: var(--font-body);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  min-width: 120px;
+}
+
+.consent-dialog-value {
+  color: var(--t-1);
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+
+.consent-dialog-preview {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--g-fill-weak);
+  border: 1px solid var(--g-edge-lo);
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  max-height: 200px;
+  overflow: auto;
+  margin: 0;
+  color: var(--t-2);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.consent-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-2);
+}
+
+.consent-dialog-btn-danger {
+  color: var(--a-hot);
+  border-color: color-mix(in oklab, var(--g-edge-mid), var(--a-hot) 30%);
+}
+
+.consent-dialog-btn-danger:hover {
+  background: color-mix(in oklab, var(--g-fill), var(--a-hot) 12%);
+}
