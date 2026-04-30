@@ -385,6 +385,24 @@ pub fn get_integration_state() -> IntegrationState {
     integration_state().lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
+/// Phase 17 / DOCTOR-04 — return per-service last_poll for tentacle health
+/// classification. Used by `doctor::compute_tentacle_signal` (Plan 17-04) to
+/// detect stale (≥1h) and dead (≥24h) MCP tentacles per CONTEXT.md D-07.
+///
+/// Returns `Vec<(service_name, last_poll_unix_secs, enabled)>`. If an
+/// integration is disabled (`enabled == false`), its `last_poll` is still
+/// returned but the doctor severity classifier should ignore it. Reads from
+/// the same internal `get_configs()` source as `integration_toggle` /
+/// `integration_poll_now` (no struct mutation, no new state).
+#[allow(dead_code)] // Consumed by doctor::compute_tentacle_signal in Plan 17-04
+pub fn get_per_service_last_poll() -> Vec<(String, i64, bool)> {
+    let configs = get_configs();
+    configs
+        .iter()
+        .map(|cfg| (cfg.service.clone(), cfg.last_poll, cfg.enabled))
+        .collect()
+}
+
 /// Returns a concise 2–3 line plain-text summary for injection into the
 /// system prompt. Empty string if nothing noteworthy.
 pub fn get_integration_context() -> String {
