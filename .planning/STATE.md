@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Phases
 status: executing
-last_updated: "2026-04-30T10:42:27.969Z"
+last_updated: "2026-04-30T10:59:35.799Z"
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 78
-  completed_plans: 75
-  percent: 96
+  completed_plans: 76
+  percent: 97
 ---
 
 # STATE — BLADE (v1.2)
@@ -17,8 +17,8 @@ progress:
 **Project:** BLADE — Desktop JARVIS
 **Current milestone:** v1.2 — Acting Layer with Brain Foundation (5 phases, 16–20)
 **Last shipped milestone:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27)
-**Current Focus:** Phase 17 (Doctor Module) — Plans 17-01 + 17-02 + 17-03 + 17-04 ✅ shipped 2026-04-30 (Wave 0 backend scaffold + Wave 1 evals/capgap/autoupdate + Wave 2 tentacle/drift + verbatim D-18 strings complete)
-**Status:** Executing Phase 17 — 4/7 plans complete; doctor.rs now has all 5 signal sources (`compute_eval_signal` / `compute_capgap_signal` / `compute_autoupdate_signal` / `compute_tentacle_signal` / `compute_drift_signal`) + 15 verbatim UI-SPEC § 15 suggested_fix strings (D-18 lock with full-string-equality test). 29 doctor::tests + 9 evals tests green; cargo check clean. Next: Plan 17-05 (orchestrator wiring — `doctor_run_full_check` body with `tokio::join!` over all 5 sources + transition detection + `doctor_event` emission + ActivityStrip line per M-07).
+**Current Focus:** Phase 17 (Doctor Module) — Plans 17-01 + 17-02 + 17-03 + 17-04 + 17-05 ✅ shipped 2026-04-30 (Wave 0 backend scaffold + Wave 1 evals/capgap/autoupdate + Wave 2 tentacle/drift + Wave 3 orchestrator wiring + frontend event surface complete; backend now feature-complete)
+**Status:** Executing Phase 17 — 5/7 plans complete; doctor.rs orchestrator (`doctor_run_full_check`) now runs all 5 signal sources via `tokio::join!`, applies the D-20 transition gate (`prior != current && new ∈ {Amber, Red}`), emits `doctor_event` + `blade_activity_log` on warn-tier transitions per Pitfall 3 / P-06 (both emits in same if-block, doctor_event FIRST). Frontend `BLADE_EVENTS.DOCTOR_EVENT` + `DoctorEventPayload` typed surface landed (locked snake_case class + lowercase severity unions matching Rust serde rename_all). 35 doctor::tests + 9 evals tests green; cargo check + tsc clean. Next: Plan 17-06 (DoctorPane.tsx frontend consumer — drawer + 5 signal cards + ActivityStrip already picks up Doctor lines automatically via existing ACTIVITY_LOG subscription).
 
 ---
 
@@ -86,8 +86,8 @@ None. v1.1 closed cleanly with documented tech debt.
 
 ## Session Continuity
 
-**Last session:** 2026-04-30T10:40:00Z (Plan 17-04 ✅ shipped — Wave 2 `doctor.rs` TentacleHealth + ConfigDrift sources + verbatim D-18 strings; 3 commits / 1 file / +302 net insertions / 12 new unit tests green / cargo check + zero warnings; all 5 signal sources + 15 verbatim UI-SPEC § 15 suggested_fix strings now in place — only Plan 17-05 orchestrator wiring remains before Doctor backend is feature-complete)
-**Next action:** `/gsd-execute-plan 17-05` — Wave 3 orchestrator: write `doctor_run_full_check` body with `tokio::join!` over all 5 signal sources, transition detection (compare against PRIOR_SEVERITY map per D-20), `doctor_event` emission on Amber/Red transitions, ActivityStrip line per M-07. Covers DOCTOR-01 + DOCTOR-06 + DOCTOR-08.
+**Last session:** 2026-04-30T10:59:35.781Z (Plan 17-05 ✅ shipped — Wave 3 orchestrator + emit helpers + frontend event surface; 2 task commits / 3 files / +209 net insertions / 6 new transition-gate tests / 35 doctor::tests green / cargo check + tsc clean. Doctor backend feature-complete: `doctor_run_full_check` runs all 5 sources via `tokio::join!`, transition gate `if transitioned && new_is_warn` emits `doctor_event` + `blade_activity_log` in the SAME block per Pitfall 3 / P-06 (doctor_event FIRST); `BLADE_EVENTS.DOCTOR_EVENT` + `DoctorEventPayload` interface locked with snake_case class + lowercase severity literal unions matching Rust serde rename_all)
+**Next action:** `/gsd-execute-plan 17-06` — DoctorPane.tsx frontend consumer: 5 signal cards (most-volatile-first order: EvalScores → CapabilityGaps → TentacleHealth → ConfigDrift → AutoUpdate), drawer drill-down on click, useTauriEvent(BLADE_EVENTS.DOCTOR_EVENT, ...) for live updates. ActivityStrip already wired to ACTIVITY_LOG so Doctor lines flow automatically. Covers DOCTOR-07 + DOCTOR-08.
 
 **Context cliff notes:**
 
