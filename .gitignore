@@ -41,3 +41,7 @@ docs/testing ss/
 
 # Windows NTFS Alternate Data Streams (Mark-of-the-Web metadata) — not portable to NTFS checkouts
 *:Zone.Identifier
+
+# Phase 17 — Doctor Module (DOCTOR-02): eval run history is generated locally,
+# not committed. The directory is tracked via tests/evals/.gitkeep.
+tests/evals/history.jsonl
