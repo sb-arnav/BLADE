@@ -75,7 +75,20 @@ const CROSS_WINDOW_ALLOWLIST = new Set([
   'tentacles/calendar_tentacle.rs:calendar_event_alert',
   'tentacles/calendar_tentacle.rs:health_alert',
   'health_tracker.rs:health_alert',
+
+  // ───── doctor (Phase 17 — main DoctorPane + ActivityStrip subscribers) ─
+  'doctor.rs:doctor_event',
 ]);
+
+// Strip Rust `//` line and `/* ... */` block comments before regex scan so the
+// allowlist check ignores documentation that quotes emit call shapes (e.g.
+// doctor.rs:19 references `app.emit("doctor_event", ...)` in a use-statement
+// rationale comment — that line is not a real emit site).
+function stripComments(src) {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '');
+}
 
 // ---------------------------------------------------------------------------
 // Walk + scan.
@@ -97,7 +110,7 @@ let failed = false;
 let totalChecked = 0;
 for (const file of walk(RUST_DIR)) {
   const rel = relative(RUST_DIR, file).split('\\').join('/'); // Windows path normalisation
-  const text = readFileSync(file, 'utf8');
+  const text = stripComments(readFileSync(file, 'utf8'));
   for (const m of text.matchAll(EMIT_RE)) {
     totalChecked += 1;
     const eventName = m[1];
