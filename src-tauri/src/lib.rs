@@ -78,6 +78,10 @@ mod sysadmin;
 mod social_cognition;
 mod symbolic;
 mod doctor;
+mod consent;          // Phase 18 — per-action consent decisions (D-08)
+mod ego;              // Phase 18 — refusal detector + retry orchestrator (D-11)
+mod intent_router;    // Phase 18 — IntentClass classification (D-03)
+mod jarvis_dispatch;  // Phase 18 — outbound fan-out (D-05)
 mod supervisor;
 mod urinary;
 mod embeddings;
@@ -1341,6 +1345,13 @@ pub fn run() {
             doctor::doctor_run_full_check,
             doctor::doctor_get_recent,
             doctor::doctor_get_signal,
+            // Phase 18 — JARVIS chat-first (chat → cross-app action)
+            ego::ego_intercept,
+            intent_router::intent_router_classify,
+            jarvis_dispatch::jarvis_dispatch_action,
+            consent::consent_get_decision,
+            consent::consent_set_decision,
+            consent::consent_revoke_all,
             supervisor::supervisor_get_health,
             supervisor::supervisor_get_service,
             urinary::urinary_flush,
