@@ -99,7 +99,7 @@ Plans:
 **Plans:** 7 plans across 5 waves (Wave 0: harness scaffold + module skeleton; Waves 1–3: 5 signal sources + orchestrator; Wave 4: frontend pane; Wave 5: verification).
 
 Plans:
-- [ ] `17-01-PLAN.md` — Wave 0: `harness::record_eval_run` + `tests/evals/.gitkeep` + `.gitignore`. Covers DOCTOR-02.
+- [x] `17-01-PLAN.md` — Wave 0: `harness::record_eval_run` + `tests/evals/.gitkeep` + `.gitignore`. Covers DOCTOR-02. **Shipped 2026-04-30** (commits `3e1e617`, `4174eef`).
 - [ ] `17-02-PLAN.md` — Wave 0: `doctor.rs` skeleton + 3 stubbed Tauri commands + `mod doctor;` registration + `integration_bridge::get_per_service_last_poll` accessor. Covers DOCTOR-01, DOCTOR-04.
 - [ ] `17-03-PLAN.md` — Wave 1: 3 signal sources (`compute_eval_signal`, `compute_capgap_signal`, `compute_autoupdate_signal`) + wire `harness::record_eval_run` into all 5 Phase 16 eval modules. Covers DOCTOR-02, DOCTOR-03, DOCTOR-10.
 - [ ] `17-04-PLAN.md` — Wave 2: 2 signal sources (`compute_tentacle_signal`, `compute_drift_signal`) + verbatim UI-SPEC § 15 suggested-fix strings (D-18 lock). Covers DOCTOR-04, DOCTOR-05.

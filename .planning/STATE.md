@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Phases
-status: verifying
-last_updated: "2026-04-30T08:45:20.338Z"
+status: executing
+last_updated: "2026-04-30T09:01:25Z"
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 78
-  completed_plans: 71
-  percent: 91
+  completed_plans: 72
+  percent: 92
 ---
 
 # STATE — BLADE (v1.2)
@@ -17,8 +17,8 @@ progress:
 **Project:** BLADE — Desktop JARVIS
 **Current milestone:** v1.2 — Acting Layer with Brain Foundation (5 phases, 16–20)
 **Last shipped milestone:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27)
-**Current Focus:** Phase 17 (Doctor Module) — Phase 16 ✅ shipped + verified 2026-04-29
-**Status:** Phase 16 complete: 7 plans / 19 commits / 5 eval modules green at MRR 1.000 / `verify:all` chain 30→31 / `embeddings.rs` 946→495 lines / VERIFICATION.md 25/25 must-haves PASS. Ready to scope Phase 17 (Doctor pane consuming Phase 16 eval signals + capability-gap log + tentacle health + drift signals).
+**Current Focus:** Phase 17 (Doctor Module) — Plan 17-01 ✅ shipped 2026-04-30 (Wave 0 harness scaffold)
+**Status:** Executing Phase 17 — 1/7 plans complete; harness `record_eval_run` + `tests/evals/.gitkeep` + gitignore rule landed (DOCTOR-02 source infrastructure ready). Next: Plan 17-02 (`doctor.rs` skeleton + 3 stubbed Tauri commands).
 
 ---
 
@@ -86,8 +86,8 @@ None. v1.1 closed cleanly with documented tech debt.
 
 ## Session Continuity
 
-**Last session:** 2026-04-29T22:30:00Z (Phase 16 ✅ shipped + verified — 7 plans / 19 commits / 5 eval modules @ MRR 1.000 / `verify:all` 30→31 / VERIFICATION.md PASS 25/25)
-**Next action:** `/gsd-discuss-phase 17` — gather context for Phase 17 (Doctor Module). Or skip discussion: `/gsd-plan-phase 17`.
+**Last session:** 2026-04-30T09:01:25Z (Plan 17-01 ✅ shipped — Wave 0 harness scaffold; 2 commits / 3 files / 129 LOC / 1 unit test green / DOCTOR-02 writer infrastructure ready for Plan 17-03 wiring)
+**Next action:** `/gsd-execute-plan 17-02` — Wave 0 `doctor.rs` skeleton + 3 stubbed Tauri commands + `mod doctor;` registration. Covers DOCTOR-01 + DOCTOR-04.
 
 **Context cliff notes:**
 
