@@ -915,21 +915,24 @@ function DoctorPane() {
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Does Tauri 2 expose a stable runtime API for plugin enumeration?**
    - What we know: lib.rs:540-560 lists all 14 plugins via `.plugin(...)`; Cargo.toml has all dep declarations.
    - What's unclear: Whether `app.config().tauri.plugins` (or similar) reliably returns the loaded plugin list at runtime in Tauri 2.x stable.
+   - RESOLVED: Filesystem grep — Tauri 2 plugin enumeration API is unstable; Plan 03 uses Cargo.toml + lib.rs grep for DOCTOR-10.
    - Recommendation: Plan task 17-XX-doctor-autoupdate spends 15 minutes on Tauri 2 docs; if API exists → use it; if not → fallback to filesystem grep with a clear comment.
 
 2. **Should `record_eval_run` fire on test failure or only on success?**
    - What we know: D-15 says Doctor reads last 200 lines and computes 10%-drop detection.
    - What's unclear: If failed runs aren't recorded, the 10%-drop calc misses the moment of regression.
+   - RESOLVED: record_eval_run fires on every eval run (success and failure); Plan 03 places the call after print_eval_table regardless of pass/fail.
    - Recommendation: Record on every run (`floor_passed: bool` is the breadcrumb). Explicit user confirmation during plan stage.
 
 3. **Do MCP integration tentacles count for DOCTOR-04?**
    - What we know: CONTEXT.md D-04 lists supervisor-registered observers; integration_bridge.rs has its own poll cadence with `last_poll` timestamps.
    - What's unclear: Whether v1.2 ships only the 6 supervisor-registered services or also the 4 MCP integrations.
+   - RESOLVED: MCP integration tentacles included in v1.2 via the 6-line accessor in Plan 02 (integration_bridge.rs); v1.3 deferred items are listed in CONTEXT.md § Deferred Ideas.
    - Recommendation: Both. Add the 6-line accessor in integration_bridge.rs. Each surface contributes rows to the per-tentacle list inside the TentacleHealth payload.
 
 ---
