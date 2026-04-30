@@ -202,6 +202,12 @@ export const BLADE_EVENTS = {
   // Emitted by ecosystem.rs emit_activity_with_id() on every observer tick.
   // Payload: ActivityLogEntry (see src/features/activity-log/index.tsx).
   ACTIVITY_LOG: 'blade_activity_log',
+
+  // ───── Phase 17 — Doctor Module (DOCTOR-06) ──────────────────────────────
+  // Emitted by doctor.rs::emit_doctor_event() on severity transitions
+  // (NOT same-severity; emit ONLY when new severity ∈ {amber, red}).
+  // Payload: DoctorEventPayload (see ./payloads.ts).
+  DOCTOR_EVENT: 'doctor_event',
 } as const;
 
 /** Literal union of every string in BLADE_EVENTS. */

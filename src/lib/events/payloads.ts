@@ -738,3 +738,27 @@ export interface WorldStateUpdatedPayload {
   summary?: string;
   [k: string]: unknown;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 17 Plan 17-05 — Doctor Module (DOCTOR-06).
+//
+// Emitted by `src-tauri/src/doctor.rs::emit_doctor_event` on signal-class
+// severity transitions where new severity is amber or red. Same-severity and
+// recovery (→ green) transitions do NOT emit per CONTEXT.md D-20.
+//
+// Wire form: SignalClass is `#[serde(rename_all = "snake_case")]` and
+// Severity is `#[serde(rename_all = "lowercase")]` — these literal unions
+// MUST match exactly. Drift detection is human code-review (D-38-payload).
+//
+// @see src-tauri/src/doctor.rs::doctor_run_full_check (orchestrator emit site)
+// @see .planning/phases/17-doctor-module/17-CONTEXT.md §D-20 (transition rules)
+// @see .planning/phases/17-doctor-module/17-CONTEXT.md §D-21 (ActivityStrip line format)
+// ---------------------------------------------------------------------------
+
+export interface DoctorEventPayload {
+  class: 'eval_scores' | 'capability_gaps' | 'tentacle_health' | 'config_drift' | 'auto_update';
+  severity: 'green' | 'amber' | 'red';
+  prior_severity: 'green' | 'amber' | 'red';
+  last_changed_at: number;  // unix milliseconds
+  payload: unknown;
+}
