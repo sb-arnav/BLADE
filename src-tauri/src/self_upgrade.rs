@@ -23,12 +23,36 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+/// Phase 18 D-16 — discriminator separating shell-installable runtime gaps
+/// from OAuth/integration-flow gaps. Drives `auto_install`'s early-return for
+/// Integration entries (no `npm install slack` nonsense).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CapabilityKind {
+    Runtime,
+    Integration,
+}
+
+impl Default for CapabilityKind {
+    fn default() -> Self {
+        Self::Runtime
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapabilityGap {
     pub description: String,
-    pub category: String,    // "missing_tool", "missing_runtime", "missing_permission"
+    pub category: String,    // "missing_tool", "missing_runtime", "missing_permission", "missing_integration"
     pub suggestion: String,  // what to install
     pub install_cmd: String, // how to install it — empty string means "no installer on this OS"
+    /// Phase 18 — Runtime (shell install) vs Integration (route to Integrations tab).
+    /// `#[serde(default)]` keeps existing serialized state back-compat.
+    #[serde(default)]
+    pub kind: CapabilityKind,
+    /// Phase 18 — populated for Integration kind only (e.g. "Integrations tab → Slack").
+    /// Empty string for Runtime entries.
+    #[serde(default)]
+    pub integration_path: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -125,12 +149,16 @@ pub fn capability_catalog() -> HashMap<&'static str, CapabilityGap> {
         category: "missing_runtime".to_string(),
         suggestion: "Install Node.js".to_string(),
         install_cmd: node_cmd,
+        kind: CapabilityKind::Runtime,
+        integration_path: String::new(),
     });
     map.insert("python3", CapabilityGap {
         description: "Python3 not found".to_string(),
         category: "missing_runtime".to_string(),
         suggestion: "Install Python3".to_string(),
         install_cmd: pkg_install_cmd("python3 python3-pip", "python3", "python3 python3-pip", "Python.Python.3.12"),
+        kind: CapabilityKind::Runtime,
+        integration_path: String::new(),
     });
     let rust_cmd = if cfg!(target_os = "windows") {
         "winget install --silent --accept-package-agreements --accept-source-agreements Rustlang.Rustup".to_string()
@@ -142,6 +170,8 @@ pub fn capability_catalog() -> HashMap<&'static str, CapabilityGap> {
         category: "missing_runtime".to_string(),
         suggestion: "Install Rust via rustup".to_string(),
         install_cmd: rust_cmd,
+        kind: CapabilityKind::Runtime,
+        integration_path: String::new(),
     });
     let docker_cmd = if cfg!(target_os = "windows") {
         "winget install --silent --accept-package-agreements --accept-source-agreements Docker.DockerDesktop".to_string()
@@ -155,18 +185,24 @@ pub fn capability_catalog() -> HashMap<&'static str, CapabilityGap> {
         category: "missing_tool".to_string(),
         suggestion: "Install Docker".to_string(),
         install_cmd: docker_cmd,
+        kind: CapabilityKind::Runtime,
+        integration_path: String::new(),
     });
     map.insert("git", CapabilityGap {
         description: "Git not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install git".to_string(),
         install_cmd: pkg_install_cmd("git", "git", "git", "Git.Git"),
+        kind: CapabilityKind::Runtime,
+        integration_path: String::new(),
     });
     map.insert("ffmpeg", CapabilityGap {
         description: "FFmpeg not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install FFmpeg for media processing".to_string(),
         install_cmd: pkg_install_cmd("ffmpeg", "ffmpeg", "ffmpeg", "Gyan.FFmpeg"),
+        kind: CapabilityKind::Runtime,
+        integration_path: String::new(),
     });
     // npm/pip global installs: only offered when the relevant runtime exists.
     // No runtime → empty cmd → auto_install skips. This prevents the node/npm
@@ -181,6 +217,8 @@ pub fn capability_catalog() -> HashMap<&'static str, CapabilityGap> {
         category: "missing_tool".to_string(),
         suggestion: "Install Claude Code CLI for autonomous coding agents".to_string(),
         install_cmd: claude_cmd,
+        kind: CapabilityKind::Runtime,
+        integration_path: String::new(),
     });
     let aider_cmd = if which_exists("pip") || which_exists("pip3") {
         "pip install aider-chat".to_string()
@@ -192,36 +230,48 @@ pub fn capability_catalog() -> HashMap<&'static str, CapabilityGap> {
         category: "missing_tool".to_string(),
         suggestion: "Install Aider for pair programming".to_string(),
         install_cmd: aider_cmd,
+        kind: CapabilityKind::Runtime,
+        integration_path: String::new(),
     });
     map.insert("jq", CapabilityGap {
         description: "jq (JSON processor) not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install jq for JSON processing".to_string(),
         install_cmd: pkg_install_cmd("jq", "jq", "jq", "jqlang.jq"),
+        kind: CapabilityKind::Runtime,
+        integration_path: String::new(),
     });
     map.insert("ripgrep", CapabilityGap {
         description: "ripgrep not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install ripgrep for fast file search".to_string(),
         install_cmd: pkg_install_cmd("ripgrep", "ripgrep", "ripgrep", "BurntSushi.ripgrep.MSVC"),
+        kind: CapabilityKind::Runtime,
+        integration_path: String::new(),
     });
     map.insert("fd", CapabilityGap {
         description: "fd (find) not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install fd for fast file finding".to_string(),
         install_cmd: pkg_install_cmd("fd-find", "fd", "fd-find", "sharkdp.fd"),
+        kind: CapabilityKind::Runtime,
+        integration_path: String::new(),
     });
     map.insert("bat", CapabilityGap {
         description: "bat (better cat) not installed".to_string(),
         category: "missing_tool".to_string(),
         suggestion: "Install bat for syntax-highlighted file viewing".to_string(),
         install_cmd: pkg_install_cmd("bat", "bat", "bat", "sharkdp.bat"),
+        kind: CapabilityKind::Runtime,
+        integration_path: String::new(),
     });
     map.insert("go", CapabilityGap {
         description: "Go not installed".to_string(),
         category: "missing_runtime".to_string(),
         suggestion: "Install Go programming language".to_string(),
         install_cmd: pkg_install_cmd("golang-go", "go", "golang", "GoLang.Go"),
+        kind: CapabilityKind::Runtime,
+        integration_path: String::new(),
     });
     map.insert("htop", CapabilityGap {
         description: "htop not installed".to_string(),
@@ -229,6 +279,8 @@ pub fn capability_catalog() -> HashMap<&'static str, CapabilityGap> {
         suggestion: "Install htop for process monitoring".to_string(),
         // No native Windows htop; btop has a winget id, leave as no-op on Win.
         install_cmd: pkg_install_cmd("htop", "htop", "htop", ""),
+        kind: CapabilityKind::Runtime,
+        integration_path: String::new(),
     });
     map.insert("tmux", CapabilityGap {
         description: "tmux not installed".to_string(),
@@ -236,6 +288,51 @@ pub fn capability_catalog() -> HashMap<&'static str, CapabilityGap> {
         suggestion: "Install tmux for terminal multiplexing".to_string(),
         // tmux doesn't run natively on Windows.
         install_cmd: pkg_install_cmd("tmux", "tmux", "tmux", ""),
+        kind: CapabilityKind::Runtime,
+        integration_path: String::new(),
+    });
+
+    // Phase 18 D-16 — Integration-kind entries. These don't auto-install via shell;
+    // ego's auto_install short-circuits and routes the user to gap.integration_path.
+    map.insert("slack_outbound", CapabilityGap {
+        description: "BLADE doesn't have a Slack writer integration".to_string(),
+        category: "missing_integration".to_string(),
+        suggestion: "Connect Slack via Integrations tab".to_string(),
+        install_cmd: String::new(),
+        kind: CapabilityKind::Integration,
+        integration_path: "Integrations tab → Slack".to_string(),
+    });
+    map.insert("github_outbound", CapabilityGap {
+        description: "BLADE doesn't have a GitHub writer integration".to_string(),
+        category: "missing_integration".to_string(),
+        suggestion: "Connect GitHub via Integrations tab".to_string(),
+        install_cmd: String::new(),
+        kind: CapabilityKind::Integration,
+        integration_path: "Integrations tab → GitHub".to_string(),
+    });
+    map.insert("gmail_outbound", CapabilityGap {
+        description: "BLADE doesn't have a Gmail writer integration".to_string(),
+        category: "missing_integration".to_string(),
+        suggestion: "Connect Gmail via Integrations tab".to_string(),
+        install_cmd: String::new(),
+        kind: CapabilityKind::Integration,
+        integration_path: "Integrations tab → Gmail".to_string(),
+    });
+    map.insert("calendar_write", CapabilityGap {
+        description: "BLADE doesn't have a Calendar writer integration".to_string(),
+        category: "missing_integration".to_string(),
+        suggestion: "Connect Calendar via Integrations tab".to_string(),
+        install_cmd: String::new(),
+        kind: CapabilityKind::Integration,
+        integration_path: "Integrations tab → Calendar".to_string(),
+    });
+    map.insert("linear_outbound", CapabilityGap {
+        description: "BLADE doesn't have a Linear writer integration".to_string(),
+        category: "missing_integration".to_string(),
+        suggestion: "Connect Linear via Integrations tab".to_string(),
+        install_cmd: String::new(),
+        kind: CapabilityKind::Integration,
+        integration_path: "Integrations tab → Linear".to_string(),
     });
 
     map
@@ -288,6 +385,21 @@ pub fn detect_missing_tool(stderr: &str, command: &str) -> Option<CapabilityGap>
 /// Auto-install a missing tool. Returns (success, output).
 /// Only runs apt/pip/npm/winget — never touches system-critical paths.
 pub async fn auto_install(gap: &CapabilityGap) -> InstallResult {
+    // Phase 18 D-16 — Integration-kind capability gaps don't install via shell.
+    // Route the user to the Integrations tab path instead. Defense-in-depth: even
+    // if this short-circuit is skipped, install_cmd is empty for Integration entries.
+    if matches!(gap.kind, CapabilityKind::Integration) {
+        log::info!(
+            "[self-upgrade] Integration gap — routing to '{}'",
+            gap.integration_path
+        );
+        return InstallResult {
+            tool: gap.suggestion.clone(),
+            success: false,
+            output: format!("Connect via {}", gap.integration_path),
+        };
+    }
+
     let cmd = gap.install_cmd.trim();
 
     // No installer defined for this platform → skip silently. Previously the
@@ -510,4 +622,88 @@ pub async fn self_upgrade_audit() -> Vec<(String, bool)> {
 
     results.sort_by(|a, b| a.0.cmp(&b.0));
     results
+}
+
+// ── Unit tests ────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Phase 18 — existing serialized CapabilityGap rows omitting `kind`/`integration_path`
+    /// must deserialize as Runtime via `#[serde(default)]`. This is the back-compat gate
+    /// for any state previously written to disk by Phase 17 / earlier.
+    #[test]
+    fn capability_kind_default_is_runtime() {
+        let json = r#"{"description":"x","category":"y","suggestion":"z","install_cmd":"cmd"}"#;
+        let gap: CapabilityGap = serde_json::from_str(json).unwrap();
+        assert_eq!(gap.kind, CapabilityKind::Runtime);
+        assert_eq!(gap.integration_path, "");
+    }
+
+    /// Phase 18 D-16 — `auto_install` MUST NOT shell-execute when the gap is
+    /// Integration-kind. The output must reference the integration_path, and the
+    /// install_cmd must NOT be evaluated (proven by passing a poison command).
+    #[tokio::test]
+    async fn auto_install_integration_short_circuit() {
+        let gap = CapabilityGap {
+            description: "test".to_string(),
+            category: "missing_integration".to_string(),
+            suggestion: "Connect Test".to_string(),
+            // Poison command: if the short-circuit fails, sh would attempt this and
+            // emit a recognisable error in `output`. Test asserts that did NOT happen.
+            install_cmd: "this command MUST NOT execute".to_string(),
+            kind: CapabilityKind::Integration,
+            integration_path: "Integrations tab → Test".to_string(),
+        };
+        let result = auto_install(&gap).await;
+        assert!(
+            result.output.contains("Connect via Integrations tab → Test"),
+            "Integration short-circuit must reference integration_path; got: {}",
+            result.output
+        );
+        assert!(
+            !result.output.contains("MUST NOT execute"),
+            "install_cmd must not have been shelled out; got: {}",
+            result.output
+        );
+        assert!(
+            !result.success,
+            "Integration short-circuit returns success=false (the action requires user UI step)"
+        );
+    }
+
+    /// Phase 18 D-16 — the 5 locked Integration entries are present in the catalog
+    /// and each carries kind=Integration + a non-empty integration_path.
+    #[test]
+    fn catalog_has_five_integration_entries() {
+        let catalog = capability_catalog();
+        for key in [
+            "slack_outbound",
+            "github_outbound",
+            "gmail_outbound",
+            "calendar_write",
+            "linear_outbound",
+        ] {
+            let gap = catalog.get(key).unwrap_or_else(|| {
+                panic!("capability_catalog missing locked Integration entry '{}'", key)
+            });
+            assert_eq!(
+                gap.kind,
+                CapabilityKind::Integration,
+                "{} must be Integration kind",
+                key
+            );
+            assert!(
+                !gap.integration_path.is_empty(),
+                "{} must have a non-empty integration_path",
+                key
+            );
+            assert!(
+                gap.install_cmd.is_empty(),
+                "{} must have empty install_cmd (defense-in-depth)",
+                key
+            );
+        }
+    }
 }
