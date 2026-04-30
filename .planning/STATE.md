@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Phases
 status: executing
-last_updated: "2026-04-30T10:04:05Z"
+last_updated: "2026-04-30T10:42:27.969Z"
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 78
-  completed_plans: 74
-  percent: 95
+  completed_plans: 75
+  percent: 96
 ---
 
 # STATE — BLADE (v1.2)
@@ -17,8 +17,8 @@ progress:
 **Project:** BLADE — Desktop JARVIS
 **Current milestone:** v1.2 — Acting Layer with Brain Foundation (5 phases, 16–20)
 **Last shipped milestone:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27)
-**Current Focus:** Phase 17 (Doctor Module) — Plans 17-01 + 17-02 + 17-03 ✅ shipped 2026-04-30 (Wave 0 backend scaffold + Wave 1 half A signal sources complete)
-**Status:** Executing Phase 17 — 3/7 plans complete; doctor.rs now has 3 of the 5 signal sources (`compute_eval_signal` / `compute_capgap_signal` / `compute_autoupdate_signal`) + harness::record_eval_run wired into all 5 Phase 16 eval modules so tests/evals/history.jsonl populates on every verify-eval run. 17 doctor::tests + 9 evals tests green; cargo check clean. Next: Plan 17-04 (Wave 1 half B — `compute_tentacle_signal`, `compute_drift_signal` + verbatim UI-SPEC § 15 suggested-fix strings).
+**Current Focus:** Phase 17 (Doctor Module) — Plans 17-01 + 17-02 + 17-03 + 17-04 ✅ shipped 2026-04-30 (Wave 0 backend scaffold + Wave 1 evals/capgap/autoupdate + Wave 2 tentacle/drift + verbatim D-18 strings complete)
+**Status:** Executing Phase 17 — 4/7 plans complete; doctor.rs now has all 5 signal sources (`compute_eval_signal` / `compute_capgap_signal` / `compute_autoupdate_signal` / `compute_tentacle_signal` / `compute_drift_signal`) + 15 verbatim UI-SPEC § 15 suggested_fix strings (D-18 lock with full-string-equality test). 29 doctor::tests + 9 evals tests green; cargo check clean. Next: Plan 17-05 (orchestrator wiring — `doctor_run_full_check` body with `tokio::join!` over all 5 sources + transition detection + `doctor_event` emission + ActivityStrip line per M-07).
 
 ---
 
@@ -86,8 +86,8 @@ None. v1.1 closed cleanly with documented tech debt.
 
 ## Session Continuity
 
-**Last session:** 2026-04-30T09:30:11Z (Plan 17-02 ✅ shipped — Wave 0 `doctor.rs` skeleton; 3 commits / 3 files / 247 LOC / 5 unit tests green / cargo check + zero warnings; DoctorSignal contract locked + 3 Tauri commands surface ready + integration_bridge accessor for DOCTOR-04 tentacle source)
-**Next action:** `/gsd-execute-plan 17-03` — Wave 1 signal sources (`compute_eval_signal`, `compute_capgap_signal`, `compute_autoupdate_signal`) + wire `harness::record_eval_run` into all 5 Phase 16 eval modules. Covers DOCTOR-02 + DOCTOR-03 + DOCTOR-10.
+**Last session:** 2026-04-30T10:40:00Z (Plan 17-04 ✅ shipped — Wave 2 `doctor.rs` TentacleHealth + ConfigDrift sources + verbatim D-18 strings; 3 commits / 1 file / +302 net insertions / 12 new unit tests green / cargo check + zero warnings; all 5 signal sources + 15 verbatim UI-SPEC § 15 suggested_fix strings now in place — only Plan 17-05 orchestrator wiring remains before Doctor backend is feature-complete)
+**Next action:** `/gsd-execute-plan 17-05` — Wave 3 orchestrator: write `doctor_run_full_check` body with `tokio::join!` over all 5 signal sources, transition detection (compare against PRIOR_SEVERITY map per D-20), `doctor_event` emission on Amber/Red transitions, ActivityStrip line per M-07. Covers DOCTOR-01 + DOCTOR-06 + DOCTOR-08.
 
 **Context cliff notes:**
 
