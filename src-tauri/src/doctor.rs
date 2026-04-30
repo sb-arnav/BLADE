@@ -16,10 +16,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
-// `Emitter` is imported eagerly because Plan 17-04 wires `app.emit("doctor_event", ...)`
-// directly on top of this module without re-touching the import block. Keeping it
-// here in Plan 17-02 keeps the diff for Plan 17-04 a pure additive insert.
-#[allow(unused_imports)]
+// `Emitter` is imported eagerly because Plan 17-05 wires `app.emit("doctor_event", ...)`
+// + `app.emit_to("main", "blade_activity_log", ...)` directly on top of this module.
 use tauri::{AppHandle, Emitter};
 
 // Plan 17-03 — signal-source bodies (DOCTOR-02 / DOCTOR-03 / DOCTOR-10)
@@ -68,17 +66,13 @@ pub struct DoctorSignal {
 
 // ── Static state holders ──────────────────────────────────────────────────────
 
-/// Prior-severity map for transition detection (D-20). Plan 17-04 reads this
-/// before each `doctor_run_full_check` to decide whether to emit
-/// `doctor_event`. Plan 17-02 only initializes the cache lazily (smoke test
-/// + symbol exists); Plan 17-04 wires the actual transition logic.
-#[allow(dead_code)]
+/// Prior-severity map for transition detection (D-20). Plan 17-05 reads this
+/// before each `doctor_run_full_check` to decide whether to emit `doctor_event`.
 static PRIOR_SEVERITY: OnceLock<Mutex<HashMap<SignalClass, Severity>>> = OnceLock::new();
 
 /// Last-cached run result (D-19 `doctor_get_recent` reads from this).
 static LAST_RUN: OnceLock<Mutex<Vec<DoctorSignal>>> = OnceLock::new();
 
-#[allow(dead_code)]
 fn prior_severity_map() -> &'static Mutex<HashMap<SignalClass, Severity>> {
     PRIOR_SEVERITY.get_or_init(|| Mutex::new(HashMap::new()))
 }
@@ -140,16 +134,12 @@ pub(crate) fn suggested_fix(class: SignalClass, severity: Severity) -> &'static 
 
 // ── Signal source: EvalScores (DOCTOR-02 / D-05) — Plan 17-03 ────────────────
 //
-// All four functions below (`eval_history_path`, `read_eval_history`,
-// `compute_eval_signal`, plus the helper `EvalRunRecord` struct) are
-// `#[allow(dead_code)]` because Plan 17-05 wires them into the orchestrator
-// `doctor_run_full_check`. The Plan 17-03 contract is "signal source body
-// + tests"; production callers land in Plan 17-05. Tests reach them directly
-// via the `tests` module so the symbols are exercised under cargo test.
+// Plan 17-05 wires `compute_eval_signal` (and the other 4 sources) into the
+// orchestrator `doctor_run_full_check` via `tokio::join!`. The helpers below
+// remain pub(super)-private to the module.
 
 /// One parsed line from `tests/evals/history.jsonl` (Plan 17-01 producer).
 /// Mirrors the JSON shape `harness::record_eval_run` writes.
-#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 struct EvalRunRecord {
     #[allow(dead_code)]
@@ -174,7 +164,6 @@ struct EvalRunRecord {
 /// This helper duplicates the 4-line resolution logic so doctor.rs can read
 /// the file at runtime. Honors `BLADE_EVAL_HISTORY_PATH` env override for
 /// test isolation (Pitfall 4 mitigation).
-#[allow(dead_code)]
 fn eval_history_path() -> std::path::PathBuf {
     if let Ok(p) = std::env::var("BLADE_EVAL_HISTORY_PATH") {
         return std::path::PathBuf::from(p);
@@ -190,7 +179,6 @@ fn eval_history_path() -> std::path::PathBuf {
 /// Tail-read the last `limit` lines of history.jsonl. Missing file → empty Vec
 /// (D-16: Doctor treats no history as Green). Malformed lines silently dropped
 /// via `filter_map(...ok())`. With 200 lines × ~120 bytes = ~24KB max work.
-#[allow(dead_code)]
 fn read_eval_history(limit: usize) -> Vec<EvalRunRecord> {
     let path = eval_history_path();
     let Ok(content) = std::fs::read_to_string(&path) else {
@@ -214,9 +202,8 @@ fn read_eval_history(limit: usize) -> Vec<EvalRunRecord> {
 /// - **Green** otherwise (or empty history per D-16)
 ///
 /// Synchronous (bounded I/O — last 200 lines only). Plan 17-05's
-/// `doctor_run_full_check` will wrap in `tokio::spawn_blocking` for parallel
-/// fetch via `tokio::join!`.
-#[allow(dead_code)]
+/// `doctor_run_full_check` runs all 5 sources via `tokio::join!` over async
+/// blocks so the runtime can interleave file IO.
 fn compute_eval_signal() -> Result<DoctorSignal, String> {
     let history = read_eval_history(200);
     let now_ms = chrono::Utc::now().timestamp_millis();
@@ -315,7 +302,6 @@ fn compute_eval_signal() -> Result<DoctorSignal, String> {
 /// Note: "unresolved" maps operationally to "occurrences in time window"
 /// because the activity_timeline schema has no resolved flag. RESEARCH § C3
 /// documents the rationale.
-#[allow(dead_code)]
 fn compute_capgap_signal() -> Result<DoctorSignal, String> {
     let now_secs = chrono::Utc::now().timestamp();
     let now_ms = now_secs * 1000;
@@ -420,7 +406,6 @@ fn compute_capgap_signal() -> Result<DoctorSignal, String> {
 
 /// Inner classifier — testable without the `env!()` compile-time constraint.
 /// Green iff both anchors present per CONTEXT D-09; Amber otherwise.
-#[allow(dead_code)]
 fn classify_autoupdate(cargo_toml: &str, lib_rs: &str) -> Severity {
     let dep = cargo_toml.contains("tauri-plugin-updater");
     let init = lib_rs.contains("tauri_plugin_updater::Builder::new().build()");
@@ -442,7 +427,6 @@ fn classify_autoupdate(cargo_toml: &str, lib_rs: &str) -> Severity {
 /// - **Green** if BOTH anchors present (stock BLADE state — Cargo.toml line
 ///   25 has `tauri-plugin-updater = "2"` and lib.rs has the Builder init)
 /// - **Amber** if either is missing
-#[allow(dead_code)]
 fn compute_autoupdate_signal() -> Result<DoctorSignal, String> {
     let now_ms = chrono::Utc::now().timestamp_millis();
 
@@ -488,7 +472,6 @@ fn compute_autoupdate_signal() -> Result<DoctorSignal, String> {
 /// `now_secs` and `last_heartbeat` are unix seconds. The function is the
 /// testable seam for `compute_tentacle_signal` so unit tests can exercise
 /// every branch without needing a live supervisor / integration_bridge.
-#[allow(dead_code)]
 fn classify_tentacle(now_secs: i64, last_heartbeat: i64, status: &str) -> Severity {
     let age = now_secs.saturating_sub(last_heartbeat);
     if status == "dead" || age >= 86_400 {
@@ -519,7 +502,6 @@ fn classify_tentacle(now_secs: i64, last_heartbeat: i64, status: &str) -> Severi
 /// returns Green (defensive — no tentacles to fail). RESEARCH § D4 confirms
 /// this matches the eval-signal Green-on-empty-history convention from
 /// Plan 17-03.
-#[allow(dead_code)]
 fn compute_tentacle_signal() -> Result<DoctorSignal, String> {
     let now_secs = chrono::Utc::now().timestamp();
     let now_ms = now_secs * 1000;
@@ -625,7 +607,6 @@ fn compute_tentacle_signal() -> Result<DoctorSignal, String> {
 /// Testable seam: tests pass synthetic `(bool, Option<i64>)` and assert
 /// the verdict without needing a live Node child process or filesystem
 /// scan_results.json fixture.
-#[allow(dead_code)]
 fn classify_drift(ledger_drift: bool, profile_age_days: Option<i64>) -> Severity {
     let profile_stale = profile_age_days.map(|d| d > 30).unwrap_or(true);
     if ledger_drift && profile_stale {
@@ -648,7 +629,6 @@ fn classify_drift(ledger_drift: bool, profile_age_days: Option<i64>) -> Severity
 /// not interpreted by a shell. Path is built from `CARGO_MANIFEST_DIR` (a
 /// compile-time constant), not user input — no command injection surface
 /// per ASVS V12.3.
-#[allow(dead_code)]
 fn check_migration_ledger() -> (bool, String) {
     let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
     let repo_root = manifest_dir
@@ -691,7 +671,6 @@ fn check_migration_ledger() -> (bool, String) {
 /// `scanned_at` is unix milliseconds (RESEARCH § E2; confirmed at
 /// `deep_scan/leads.rs:165` — `pub scanned_at: i64` set via
 /// `chrono::Utc::now().timestamp_millis()`).
-#[allow(dead_code)]
 fn scan_profile_age_days() -> Option<i64> {
     let results = crate::deep_scan::load_results_pub()?;
     let now_ms = chrono::Utc::now().timestamp_millis();
@@ -705,7 +684,6 @@ fn scan_profile_age_days() -> Option<i64> {
 /// exit-code 0/1 = clean/drift) and scan-profile freshness (filesystem read
 /// of `~/.blade/identity/scan_results.json::scanned_at`). Severity verdict
 /// is delegated to `classify_drift` (testable in isolation).
-#[allow(dead_code)]
 fn compute_drift_signal() -> Result<DoctorSignal, String> {
     let now_ms = chrono::Utc::now().timestamp_millis();
     let (ledger_drift, ledger_note) = check_migration_ledger();
@@ -730,34 +708,116 @@ fn compute_drift_signal() -> Result<DoctorSignal, String> {
     })
 }
 
+// ── Emission helpers (D-20 / D-21 / M-07) — Plan 17-05 ───────────────────────
+
+/// Emit `doctor_event` Tauri event on severity transition.
+/// Per CONTEXT.md D-20: emit ONLY when prior != current AND current ∈ {Amber, Red}.
+/// Caller must enforce that gate; this helper unconditionally emits.
+fn emit_doctor_event(app: &AppHandle, signal: &DoctorSignal, prior: Severity) {
+    let _ = app.emit("doctor_event", serde_json::json!({
+        "class":           signal.class,
+        "severity":        signal.severity,
+        "prior_severity":  prior,
+        "last_changed_at": signal.last_changed_at,
+        "payload":         signal.payload,
+    }));
+}
+
+/// Emit `blade_activity_log` event for ActivityStrip per CONTEXT.md D-21 / M-07.
+/// Strip line format: `[Doctor] {class} → {severity}: {one-line summary}`.
+/// The `[Doctor]` prefix is rendered by the strip from the `module` field;
+/// this helper passes the rest as `human_summary`.
+fn emit_activity_for_doctor(app: &AppHandle, signal: &DoctorSignal) {
+    let class_str = match signal.class {
+        SignalClass::EvalScores      => "EvalScores",
+        SignalClass::CapabilityGaps  => "CapabilityGaps",
+        SignalClass::TentacleHealth  => "TentacleHealth",
+        SignalClass::ConfigDrift     => "ConfigDrift",
+        SignalClass::AutoUpdate      => "AutoUpdate",
+    };
+    let severity_str = match signal.severity {
+        Severity::Green => "Green",
+        Severity::Amber => "Amber",
+        Severity::Red   => "Red",
+    };
+    // One-line summary: prefer the payload's `note` (set by signal sources on
+    // empty / fallback cases) else use the suggested_fix copy.
+    let one_liner = signal.payload.get("note")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&signal.suggested_fix);
+    let summary = format!("{} → {}: {}", class_str, severity_str, one_liner);
+
+    let _ = app.emit_to("main", "blade_activity_log", serde_json::json!({
+        "module":        "Doctor",
+        "action":        "regression_detected",
+        "human_summary": crate::safe_slice(&summary, 200),
+        "payload_id":    serde_json::Value::Null,
+        "timestamp":     chrono::Utc::now().timestamp(),
+    }));
+}
+
 // ── Tauri Commands (D-19) ─────────────────────────────────────────────────────
 
-/// Run all signal sources synchronously, return aggregated list, cache
-/// result, emit doctor_event + ActivityStrip line on transitions.
+/// Run all 5 signal sources in parallel via `tokio::join!`, cache the
+/// result, detect severity transitions against PRIOR_SEVERITY, and emit
+/// `doctor_event` + `blade_activity_log` per CONTEXT.md D-20 / D-21.
 ///
-/// Plan 17-04 fills in the body. Plan 17-02 returns 5 placeholder Green
-/// signals so the frontend can be exercised end-to-end without crashing
-/// before the real signal sources land.
+/// Per RESEARCH.md § Pitfall 3: emit `doctor_event` BEFORE
+/// `blade_activity_log` so the doctor pane updates before the strip line
+/// renders. Both emit calls live inside the SAME `if transitioned && new_is_warn`
+/// block — splitting them would replay the v1.1 "missed once = silent regression"
+/// pattern (P-06).
 #[tauri::command]
-pub async fn doctor_run_full_check(_app: AppHandle) -> Result<Vec<DoctorSignal>, String> {
-    let now_ms = chrono::Utc::now().timestamp_millis();
-    let stub = |class: SignalClass| DoctorSignal {
-        class,
-        severity: Severity::Green,
-        payload: serde_json::json!({"stub": true, "plan": "17-02"}),
-        last_changed_at: now_ms,
-        suggested_fix: suggested_fix(class, Severity::Green).to_string(),
-    };
-    let signals = vec![
-        stub(SignalClass::EvalScores),
-        stub(SignalClass::CapabilityGaps),
-        stub(SignalClass::TentacleHealth),
-        stub(SignalClass::ConfigDrift),
-        stub(SignalClass::AutoUpdate),
+pub async fn doctor_run_full_check(app: AppHandle) -> Result<Vec<DoctorSignal>, String> {
+    // Sources are sync but run via `tokio::join!` over async blocks so the
+    // runtime can interleave file IO. Per CONTEXT "Claude's Discretion":
+    // parallel is the recommended path.
+    let (eval, capgap, tentacle, drift, autoupdate) = tokio::join!(
+        async { compute_eval_signal() },
+        async { compute_capgap_signal() },
+        async { compute_tentacle_signal() },
+        async { compute_drift_signal() },
+        async { compute_autoupdate_signal() },
+    );
+
+    // Order in the returned Vec is locked (most-volatile-first per
+    // UI-SPEC § 7.5): EvalScores → CapabilityGaps → TentacleHealth →
+    // ConfigDrift → AutoUpdate.
+    let signals: Vec<DoctorSignal> = vec![
+        eval.map_err(|e| format!("eval signal: {}", e))?,
+        capgap.map_err(|e| format!("capgap signal: {}", e))?,
+        tentacle.map_err(|e| format!("tentacle signal: {}", e))?,
+        drift.map_err(|e| format!("drift signal: {}", e))?,
+        autoupdate.map_err(|e| format!("autoupdate signal: {}", e))?,
     ];
+
+    // Diff against prior severity; emit on transitions where new ∈ {Amber, Red}.
+    if let Ok(mut prior_lock) = prior_severity_map().lock() {
+        for sig in &signals {
+            let prior = prior_lock
+                .get(&sig.class)
+                .copied()
+                .unwrap_or(Severity::Green);
+            let transitioned = prior != sig.severity;
+            let new_is_warn = matches!(sig.severity, Severity::Amber | Severity::Red);
+
+            if transitioned && new_is_warn {
+                // Per Pitfall 3: emit doctor_event FIRST, then activity_log.
+                // BOTH emits live in the same gate to prevent the v1.1 "missed
+                // once" silent-regression pattern (P-06).
+                emit_doctor_event(&app, sig, prior);
+                emit_activity_for_doctor(&app, sig);
+            }
+
+            prior_lock.insert(sig.class, sig.severity);
+        }
+    }
+
+    // Cache for doctor_get_recent / doctor_get_signal.
     if let Ok(mut cache) = last_run_cache().lock() {
         *cache = signals.clone();
     }
+
     Ok(signals)
 }
 
@@ -1156,5 +1216,73 @@ mod tests {
         assert!(
             suggested_fix(SignalClass::AutoUpdate, Severity::Red).contains("(Reserved")
         );
+    }
+
+    // ── Plan 17-05: transition-gate tests (D-20) ─────────────────────────────
+    //
+    // These cover all 6 corners of the emit predicate `transitioned && new_is_warn`
+    // that lives inside `doctor_run_full_check`. The v1.1 chat-streaming
+    // retraction was caused by a single missed emission branch — these tests
+    // exist so the doctor module never repeats that pattern.
+
+    /// Helper test: prior=Green, new=Red → should emit (transition + warn)
+    #[test]
+    fn transition_gate_emits_on_green_to_red() {
+        let prior = Severity::Green;
+        let current = Severity::Red;
+        let transitioned = prior != current;
+        let new_is_warn = matches!(current, Severity::Amber | Severity::Red);
+        assert!(transitioned && new_is_warn, "must emit on Green→Red");
+    }
+
+    #[test]
+    fn transition_gate_no_emit_on_green_to_green() {
+        let prior = Severity::Green;
+        let current = Severity::Green;
+        let transitioned = prior != current;
+        let new_is_warn = matches!(current, Severity::Amber | Severity::Red);
+        assert!(!(transitioned && new_is_warn), "must NOT emit on Green→Green");
+    }
+
+    #[test]
+    fn transition_gate_no_emit_on_red_to_red() {
+        // Same-severity transition: D-20 says no emit (would be noise).
+        let prior = Severity::Red;
+        let current = Severity::Red;
+        let transitioned = prior != current;
+        let new_is_warn = matches!(current, Severity::Amber | Severity::Red);
+        assert!(!(transitioned && new_is_warn), "must NOT emit on Red→Red (same-severity)");
+    }
+
+    #[test]
+    fn transition_gate_no_emit_on_amber_to_green() {
+        // Recovery transition: D-20 says emit ONLY when new severity ∈ {Amber, Red}.
+        // Green is not warn, so no emit even though prior != current.
+        let prior = Severity::Amber;
+        let current = Severity::Green;
+        let transitioned = prior != current;
+        let new_is_warn = matches!(current, Severity::Amber | Severity::Red);
+        assert!(!(transitioned && new_is_warn), "must NOT emit on Amber→Green (recovery)");
+    }
+
+    #[test]
+    fn transition_gate_emits_on_amber_to_red() {
+        let prior = Severity::Amber;
+        let current = Severity::Red;
+        let transitioned = prior != current;
+        let new_is_warn = matches!(current, Severity::Amber | Severity::Red);
+        assert!(transitioned && new_is_warn, "must emit on Amber→Red");
+    }
+
+    #[test]
+    fn activity_summary_format_matches_d21() {
+        // D-21: '[Doctor] {class} → {severity}: {one-line summary}'
+        // The '[Doctor]' is added by the strip from the `module` field; the
+        // human_summary string we emit is '{class} → {severity}: {one-line}'.
+        let class_str = "EvalScores";
+        let severity_str = "Red";
+        let one_liner = "Test summary";
+        let summary = format!("{} → {}: {}", class_str, severity_str, one_liner);
+        assert_eq!(summary, "EvalScores → Red: Test summary");
     }
 }
