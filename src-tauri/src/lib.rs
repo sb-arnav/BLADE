@@ -77,6 +77,7 @@ mod skeleton;
 mod sysadmin;
 mod social_cognition;
 mod symbolic;
+mod doctor;
 mod supervisor;
 mod urinary;
 mod embeddings;
@@ -1337,6 +1338,9 @@ pub fn run() {
             cardiovascular::cardio_get_blood_pressure,
             cardiovascular::cardio_get_event_registry,
             cardiovascular::blade_vital_signs,
+            doctor::doctor_run_full_check,
+            doctor::doctor_get_recent,
+            doctor::doctor_get_signal,
             supervisor::supervisor_get_health,
             supervisor::supervisor_get_service,
             urinary::urinary_flush,

@@ -68,12 +68,15 @@ pub struct DoctorSignal {
 
 /// Prior-severity map for transition detection (D-20). Plan 17-04 reads this
 /// before each `doctor_run_full_check` to decide whether to emit
-/// `doctor_event`.
+/// `doctor_event`. Plan 17-02 only initializes the cache lazily (smoke test
+/// + symbol exists); Plan 17-04 wires the actual transition logic.
+#[allow(dead_code)]
 static PRIOR_SEVERITY: OnceLock<Mutex<HashMap<SignalClass, Severity>>> = OnceLock::new();
 
 /// Last-cached run result (D-19 `doctor_get_recent` reads from this).
 static LAST_RUN: OnceLock<Mutex<Vec<DoctorSignal>>> = OnceLock::new();
 
+#[allow(dead_code)]
 fn prior_severity_map() -> &'static Mutex<HashMap<SignalClass, Severity>> {
     PRIOR_SEVERITY.get_or_init(|| Mutex::new(HashMap::new()))
 }
