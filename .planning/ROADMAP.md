@@ -125,7 +125,7 @@ Plans:
 - [x] `18-02-PLAN.md` — Wave 0: ecosystem.rs WriteScope + 30s TTL + self_upgrade.rs CapabilityKind + 5 Integration entries. Covers JARVIS-04/07. ✅ shipped 2026-04-30.
 - [x] `18-03-PLAN.md` — Wave 0: 3 outbound tentacle skeletons (slack/github/gmail_outbound). Covers JARVIS-04 (skeleton). ✅ shipped 2026-04-30.
 - [x] `18-04-PLAN.md` — Wave 0: BLADE_EVENTS + payloads.ts (JARVIS_INTERCEPT, CONSENT_REQUEST) + 10-WIRING-AUDIT.json preempt. Covers JARVIS-09/11. ✅ shipped 2026-04-30.
-- [ ] `18-05-PLAN.md` — Wave 1: ego.rs body — 9 refusal patterns + disjunction post-check + retry cap + emit_jarvis_intercept. Covers JARVIS-06/07/08.
+- [x] `18-05-PLAN.md` — Wave 1: ego.rs body — 9 refusal patterns + disjunction post-check + retry cap + emit_jarvis_intercept. Covers JARVIS-06/07/08. ✅ shipped 2026-04-30.
 - [ ] `18-06-PLAN.md` — Wave 1: intent_router heuristic-first body + consent SQLite CRUD body. Covers JARVIS-03/05.
 - [ ] `18-07-PLAN.md` — Wave 2: slack_outbound MCP-first + github_outbound gh_post bodies. Covers JARVIS-04.
 - [ ] `18-08-PLAN.md` — Wave 2: gmail_outbound base64url + Gmail API body. Covers JARVIS-04.
