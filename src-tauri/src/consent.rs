@@ -8,13 +8,36 @@
 //! Decision values are restricted to `allow_always` | `denied` per RESEARCH Open Q1
 //! (allow_once is in-memory only; never persisted).
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
+use tokio::sync::oneshot;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConsentVerdict {
     Allow,
     Deny,
     NeedsPrompt,
+}
+
+/// Plan 18-14 — the user's resolved choice, delivered through the oneshot channel.
+/// `AllowOnce` is in-memory only and never persists (T-18-CARRY-15). `AllowAlways`
+/// triggers a write to `consent_decisions`. `Deny` short-circuits the dispatcher.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConsentChoice {
+    AllowOnce,
+    AllowAlways,
+    Deny,
+}
+
+/// Pending consent requests keyed by `request_id`. The Sender half is stashed
+/// here when `request_consent` fires the dialog event; `consent_respond` removes
+/// the Sender and delivers the user's choice via the channel. T-18-CARRY-42:
+/// timeout cleanup also removes the entry to keep the map bounded.
+static PENDING: OnceLock<Mutex<HashMap<String, oneshot::Sender<ConsentChoice>>>> = OnceLock::new();
+
+fn pending_map() -> &'static Mutex<HashMap<String, oneshot::Sender<ConsentChoice>>> {
+    PENDING.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 const CONSENT_SCHEMA: &str = r#"
@@ -135,6 +158,105 @@ pub fn consent_check(intent_class: &str, target_service: &str) -> ConsentVerdict
         Some(d) if d == "allow_always" => ConsentVerdict::Allow,
         Some(d) if d == "denied" => ConsentVerdict::Deny,
         _ => ConsentVerdict::NeedsPrompt,
+    }
+}
+
+/// Plan 18-14 — request consent and AWAIT the user's decision via a tokio
+/// oneshot channel. Replaces the Wave-3 "emit + return NoConsent + frontend
+/// re-invokes" loop with a synchronous-from-the-dispatcher's-POV await.
+///
+/// Flow:
+/// 1. Generate a fresh `request_id` (UUID v4, T-18-CARRY-41 collision <2^-64).
+/// 2. Stash the oneshot Sender in `PENDING` keyed by request_id.
+/// 3. Emit `consent_request` event to the main window with full payload
+///    (intent_class, target_service, action_verb, action_kind, content_preview, request_id).
+/// 4. Await the Receiver with a 60s timeout. Timeout returns `Deny` and cleans
+///    up the pending entry (T-18-CARRY-42 bounded growth).
+/// 5. ConsentDialog → consentRespond(request_id, choice) on the frontend
+///    completes the channel.
+///
+/// content_preview is `safe_slice`'d at the emit boundary (cap 200 chars) before
+/// crossing the IPC seam, mirroring the Plan 09 emit_consent_request behaviour
+/// (T-18-03 / T-18-CARRY-44 mitigation chain unbroken).
+pub async fn request_consent(
+    app: &tauri::AppHandle,
+    intent_class: &str,
+    target_service: &str,
+    action_verb: &str,
+    action_kind: &str,
+    content_preview: &str,
+) -> ConsentChoice {
+    use tauri::Emitter;
+
+    let request_id = uuid::Uuid::new_v4().to_string();
+    let (tx, rx) = oneshot::channel::<ConsentChoice>();
+
+    // Insert before emit so the frontend's consent_respond cannot race ahead of
+    // the registration. Mutex poisoning collapses to Deny (fail-closed).
+    match pending_map().lock() {
+        Ok(mut map) => {
+            map.insert(request_id.clone(), tx);
+        }
+        Err(_) => return ConsentChoice::Deny,
+    }
+
+    let payload = serde_json::json!({
+        "intent_class":    intent_class,
+        "target_service":  target_service,
+        "action_verb":     action_verb,
+        "action_kind":     action_kind,
+        "content_preview": crate::safe_slice(content_preview, 200),
+        "request_id":      request_id,
+    });
+    let _ = app.emit_to("main", "consent_request", payload);
+
+    match tokio::time::timeout(std::time::Duration::from_secs(60), rx).await {
+        Ok(Ok(choice)) => choice,
+        Ok(Err(_recv_err)) => {
+            // Sender was dropped without sending — treat as Deny (fail-closed).
+            // The PENDING entry is already gone (consent_respond removes before send).
+            ConsentChoice::Deny
+        }
+        Err(_timeout) => {
+            // 60s elapsed without a response. Clean up the pending entry so the
+            // map doesn't accumulate ghost senders (T-18-CARRY-42).
+            if let Ok(mut map) = pending_map().lock() {
+                map.remove(&request_id);
+            }
+            ConsentChoice::Deny
+        }
+    }
+}
+
+/// Plan 18-14 — Tauri command invoked by ConsentDialog when the user clicks
+/// Allow once / Allow always / Deny. Pulls the matching Sender from PENDING and
+/// delivers the choice. Validation enforces the allow-list of choice strings
+/// (T-18-CARRY-43 mitigation).
+#[tauri::command]
+pub fn consent_respond(request_id: String, choice: String) -> Result<(), String> {
+    let parsed = match choice.as_str() {
+        "allow_once" => ConsentChoice::AllowOnce,
+        "allow_always" => ConsentChoice::AllowAlways,
+        "denied" => ConsentChoice::Deny,
+        other => {
+            return Err(format!(
+                "[consent_respond] invalid choice: {} (allow-list: allow_once | allow_always | denied)",
+                other
+            ));
+        }
+    };
+    let sender = pending_map()
+        .lock()
+        .map_err(|e| format!("[consent_respond] mutex poisoned: {}", e))?
+        .remove(&request_id);
+    match sender {
+        Some(tx) => tx
+            .send(parsed)
+            .map_err(|_| "[consent_respond] receiver dropped before send".to_string()),
+        None => Err(format!(
+            "[consent_respond] unknown request_id: {} (no pending sender)",
+            request_id
+        )),
     }
 }
 
@@ -319,5 +441,70 @@ mod tests {
         let v = consent_check_at(&path, "x", "y");
         assert_eq!(v, ConsentVerdict::NeedsPrompt);
         let _ = std::fs::remove_file(&path);
+    }
+
+    // ── Plan 18-14 — oneshot consent tests ────────────────────────────────
+
+    #[tokio::test]
+    async fn consent_respond_returns_err_for_unknown_request_id() {
+        let r = consent_respond("nonexistent-id-xyzzy".to_string(), "allow_once".to_string());
+        assert!(r.is_err(), "unknown request_id must surface an error");
+    }
+
+    #[tokio::test]
+    async fn consent_respond_rejects_invalid_choice_string() {
+        let r = consent_respond("any-id".to_string(), "maybe".to_string());
+        assert!(r.is_err(), "invalid choice must be rejected");
+        if let Err(msg) = r {
+            assert!(
+                msg.contains("invalid choice"),
+                "error message must mention invalid choice; got: {msg}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn consent_respond_completes_pending_request_with_allow_once() {
+        // Synthetic: insert a Sender into PENDING; consent_respond delivers Allow
+        // once via the channel; verify the receiver yields the expected choice.
+        let (tx, rx) = tokio::sync::oneshot::channel::<ConsentChoice>();
+        let id = "test-req-allow-once-001".to_string();
+        if let Ok(mut map) = pending_map().lock() {
+            map.insert(id.clone(), tx);
+        }
+        let result = consent_respond(id.clone(), "allow_once".to_string());
+        assert!(result.is_ok(), "consent_respond must accept allow_once for a pending id");
+        let received = rx.await.expect("Sender::send succeeded");
+        assert_eq!(received, ConsentChoice::AllowOnce);
+        // Pending map must no longer contain the id (consent_respond removes it).
+        if let Ok(map) = pending_map().lock() {
+            assert!(!map.contains_key(&id), "pending entry must be removed after respond");
+        }
+    }
+
+    #[tokio::test]
+    async fn consent_respond_completes_pending_request_with_allow_always() {
+        let (tx, rx) = tokio::sync::oneshot::channel::<ConsentChoice>();
+        let id = "test-req-allow-always-002".to_string();
+        if let Ok(mut map) = pending_map().lock() {
+            map.insert(id.clone(), tx);
+        }
+        let result = consent_respond(id.clone(), "allow_always".to_string());
+        assert!(result.is_ok());
+        let received = rx.await.expect("Sender::send succeeded");
+        assert_eq!(received, ConsentChoice::AllowAlways);
+    }
+
+    #[tokio::test]
+    async fn consent_respond_completes_pending_request_with_denied() {
+        let (tx, rx) = tokio::sync::oneshot::channel::<ConsentChoice>();
+        let id = "test-req-denied-003".to_string();
+        if let Ok(mut map) = pending_map().lock() {
+            map.insert(id.clone(), tx);
+        }
+        let result = consent_respond(id.clone(), "denied".to_string());
+        assert!(result.is_ok());
+        let received = rx.await.expect("Sender::send succeeded");
+        assert_eq!(received, ConsentChoice::Deny);
     }
 }

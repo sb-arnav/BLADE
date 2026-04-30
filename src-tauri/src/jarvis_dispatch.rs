@@ -53,28 +53,11 @@ fn emit_jarvis_activity(app: &AppHandle, intent_class: &str, target_service: &st
     }));
 }
 
-/// Emit a `consent_request` event so ChatPanel opens ConsentDialog (Plan 17 listener).
-/// Plan 14 (Wave 4) replaces this Wave-3 fire-and-forget pattern with a tokio::oneshot
-/// channel keyed by `request_id`, where the dispatcher awaits the user's choice instead
-/// of emitting + returning NoConsent. T-18-CARRY-27 mitigation: content_preview is
-/// safe_slice'd at the emit boundary (cap 200 chars) before crossing the IPC seam.
-fn emit_consent_request(
-    app: &AppHandle,
-    intent_class: &str,
-    target_service: &str,
-    action_verb: &str,
-    content_preview: &str,
-    request_id: &str,
-) {
-    let preview_capped = crate::safe_slice(content_preview, 200).to_string();
-    let _ = app.emit_to("main", "consent_request", serde_json::json!({
-        "intent_class":    intent_class,
-        "target_service":  target_service,
-        "action_verb":     action_verb,
-        "content_preview": preview_capped,
-        "request_id":      request_id,
-    }));
-}
+// Plan 18-14 supersedes the Wave-3 `emit_consent_request` helper with
+// `consent::request_consent`, which owns the oneshot channel + emit + await
+// in one call site (consent.rs). The dispatcher's NeedsPrompt arm now invokes
+// it directly. T-18-CARRY-27 mitigation (safe_slice on content_preview) is
+// preserved at the new emit site.
 
 /// Tier 1: native tentacle dispatch.
 ///
@@ -269,30 +252,47 @@ pub async fn jarvis_dispatch_action(
                     return Ok(DispatchResult::NoConsent);
                 }
                 ConsentVerdict::NeedsPrompt => {
-                    // Wave 3 simplification: emit consent_request, return NoConsent.
-                    // Frontend (Plan 17) opens ConsentDialog; user decision is persisted via
-                    // consent_set_decision; commands.rs re-invokes jarvis_dispatch_action.
-                    // Plan 14 replaces this with a tokio::oneshot await for "Allow once".
-                    let request_id = uuid::Uuid::new_v4().to_string();
+                    // Plan 18-14 — replace Wave-3's emit-and-return-NoConsent loop with a
+                    // tokio::oneshot await. request_consent stashes a Sender keyed by the
+                    // generated request_id, emits the consent_request event, and awaits
+                    // the Receiver (60s timeout returns Deny). The frontend's
+                    // consent_respond Tauri command delivers the user's choice through
+                    // the channel, completing the await in-place. Original action verb
+                    // (`action`) is preserved in this local scope — no re-invoke needed,
+                    // no `'post'` hardcode, no NeedsPrompt loop.
                     let action_verb = format!("{} on {}", action, service);
                     let preview_payload = serde_json::json!({
                         "service": service,
                         "action":  action,
                     });
-                    let content_preview = serde_json::to_string(&preview_payload).unwrap_or_default();
-                    emit_consent_request(
+                    let content_preview =
+                        serde_json::to_string(&preview_payload).unwrap_or_default();
+                    let choice = crate::consent::request_consent(
                         &app,
                         D17_INTENT_LABEL,
                         &service,
                         &action_verb,
+                        &action,
                         &content_preview,
-                        &request_id,
-                    );
-                    // Treat pending-prompt as "denied" for activity-log purposes — until the
-                    // user resolves the dialog there is no executed outbound. Plan 14 will
-                    // emit a more specific "pending_consent" outcome when the oneshot lands.
-                    emit_jarvis_activity(&app, D17_INTENT_LABEL, &service, "denied");
-                    return Ok(DispatchResult::NoConsent);
+                    )
+                    .await;
+                    match choice {
+                        crate::consent::ConsentChoice::Deny => {
+                            emit_jarvis_activity(&app, D17_INTENT_LABEL, &service, "denied");
+                            return Ok(DispatchResult::NoConsent);
+                        }
+                        crate::consent::ConsentChoice::AllowAlways => {
+                            // Persist for future invocations, then fall through to dispatch.
+                            let _ = crate::consent::consent_set_decision(
+                                D17_INTENT_LABEL.to_string(),
+                                service.clone(),
+                                "allow_always".to_string(),
+                            );
+                        }
+                        crate::consent::ConsentChoice::AllowOnce => {
+                            // In-memory only — fall through to dispatch WITHOUT writing.
+                        }
+                    }
                 }
                 ConsentVerdict::Allow => {
                     // proceed below
