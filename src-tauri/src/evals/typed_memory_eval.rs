@@ -29,7 +29,7 @@
 //! `--test-threads=1` is mandatory — `temp_blade_env()` mutates the
 //! `BLADE_CONFIG_DIR` process-global env var.
 
-use super::harness::{print_eval_table, temp_blade_env, EvalRow};
+use super::harness::{print_eval_table, summarize, temp_blade_env, EvalRow};
 use crate::typed_memory::{recall_by_category, store_typed_memory, MemoryCategory};
 
 // ────────────────────────────────────────────────────────────
@@ -189,6 +189,14 @@ fn evaluates_typed_memory_recall() {
 
     // ── Print the EVAL-06 scored table (the `┌──` opener) ───────────────
     print_eval_table("Typed memory category recall eval", &rows);
+
+    // Phase 17 / DOCTOR-02: record this run to history.jsonl BEFORE asserts.
+    // Typed-memory eval is "all per-category rows pass + isolation row" —
+    // the bool_row helper sets top1=true on pass, so asserted_top1_count ==
+    // asserted_total iff every assertion below would succeed.
+    let s = summarize(&rows);
+    let floor_passed = s.asserted_total > 0 && s.asserted_top1_count == s.asserted_total;
+    super::harness::record_eval_run("typed_memory_eval", &s, floor_passed);
 
     // ── Floor asserts (only after printing so the table always shows) ──
     for (i, fx) in fxs.iter().enumerate() {

@@ -38,7 +38,7 @@
 //! (the bash wrapper pins it). This eval is pure and would tolerate
 //! parallelism, but the verify-eval gate runs the whole suite serial.
 
-use super::harness::{print_eval_table, EvalRow};
+use super::harness::{print_eval_table, summarize, EvalRow};
 use crate::self_upgrade::{capability_catalog, detect_missing_tool, CapabilityGap};
 
 // ────────────────────────────────────────────────────────────
@@ -188,6 +188,14 @@ fn evaluates_capability_gap_detection() {
     }
 
     print_eval_table("Capability gap detection eval", &rows);
+
+    // Phase 17 / DOCTOR-02: record this run to history.jsonl BEFORE asserts.
+    // Capability-gap eval is "all 7 cases must pass" with bool_row-style
+    // pass/fail rows — asserted_top1_count == asserted_total mirrors the
+    // existing per-case + all_pass asserts below.
+    let s = summarize(&rows);
+    let floor_passed = s.asserted_total > 0 && s.asserted_top1_count == s.asserted_total;
+    super::harness::record_eval_run("capability_gap_eval", &s, floor_passed);
 
     // Floor: all 7 cases must pass. No slop tolerated for a classifier whose
     // false-positive case IS the regression gate for self_upgrade.rs:272-285.

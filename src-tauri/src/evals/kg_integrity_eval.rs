@@ -21,7 +21,7 @@
 //! orphan-zero / idempotent-merge / edge-upsert). Any failure = regression
 //! in the KG storage contract.
 
-use super::harness::{print_eval_table, temp_blade_env, EvalRow};
+use super::harness::{print_eval_table, summarize, temp_blade_env, EvalRow};
 use crate::knowledge_graph::{
     add_edge, add_node, ensure_tables, get_edges, get_node, KnowledgeNode,
 };
@@ -257,6 +257,14 @@ fn evaluates_kg_integrity() {
     ));
 
     print_eval_table("Knowledge graph integrity eval", &rows);
+
+    // Phase 17 / DOCTOR-02: record this run to history.jsonl BEFORE asserts.
+    // KG eval is "all 5 dimensions must pass" — the bool_row helper sets
+    // top1=top3=true on pass, so asserted_top1_count == asserted_total iff
+    // every dimension passed (matches the union of the 5 asserts below).
+    let s = summarize(&rows);
+    let floor_passed = s.asserted_total > 0 && s.asserted_top1_count == s.asserted_total;
+    super::harness::record_eval_run("kg_integrity_eval", &s, floor_passed);
 
     // ── Floor: all 5 dimensions must pass ────────────────────────────
     assert!(
