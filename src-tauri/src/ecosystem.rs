@@ -4,8 +4,10 @@
 //! Central OBSERVE_ONLY guardrail (AtomicBool) blocks all outbound actions.
 //! v1.2 acting-capability work removes one flag here, enabling write paths.
 
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter};
 use crate::config::{load_config, save_config, TentacleRecord};
 use crate::deep_scan::leads::DeepScanResults;
@@ -16,19 +18,71 @@ use crate::deep_scan::leads::DeepScanResults;
 /// v1.2 removes this flag in one place to enable acting tentacles.
 static OBSERVE_ONLY: AtomicBool = AtomicBool::new(true);
 
+// Phase 18 — per-tentacle write-unlock map (RESEARCH § OBSERVE_ONLY Architecture, locked).
+// Coexists with the global OBSERVE_ONLY flag (M-03). Per-tentacle entries take precedence
+// when present and not expired; otherwise the global flag governs.
+static WRITE_UNLOCKS: OnceLock<Mutex<HashMap<String, Instant>>> = OnceLock::new();
+
+/// RAII guard auto-revoking a per-tentacle write window on Drop.
+/// Plan 14's `jarvis_dispatch::dispatch_action` binds this with `let _scope = ...`
+/// to keep the window open for the duration of the outbound call (panic-safe).
+#[allow(dead_code)]
+pub struct WriteScope {
+    tentacle: String,
+}
+
+impl Drop for WriteScope {
+    fn drop(&mut self) {
+        if let Some(map) = WRITE_UNLOCKS.get() {
+            if let Ok(mut g) = map.lock() {
+                g.remove(&self.tentacle);
+            }
+        }
+    }
+}
+
+/// Grant a write window for `tentacle` for `ttl_secs` seconds.
+/// Phase 18 D-06: callers MUST bind the returned WriteScope (`let _scope = ...`)
+/// to keep the window alive for the duration of the action.
+/// 30s is the canonical TTL — do not extend.
+#[allow(dead_code)]
+pub fn grant_write_window(tentacle: &str, ttl_secs: u64) -> WriteScope {
+    let map = WRITE_UNLOCKS.get_or_init(|| Mutex::new(HashMap::new()));
+    let deadline = Instant::now() + Duration::from_secs(ttl_secs);
+    if let Ok(mut g) = map.lock() {
+        g.insert(tentacle.to_string(), deadline);
+    }
+    WriteScope { tentacle: tentacle.to_string() }
+}
+
 /// Returns Err if guardrail is active. Call at every write-path entry.
 ///
 /// v1.1 has no acting-class tentacles, so this guardrail has no production
 /// callers yet. The function is load-bearing for v1.2: every outbound write
 /// path (Slack reply, Email reply, GitHub PR review, etc.) must invoke this
 /// before performing the action. Invariants are exercised by the test suite.
+///
+/// Phase 18 — extended to a 2-arg signature: `tentacle` is checked against
+/// `WRITE_UNLOCKS` first (per-tentacle override), and if no live entry is
+/// present, the global OBSERVE_ONLY flag governs (M-03 preserved).
 #[allow(dead_code)]
-pub fn assert_observe_only_allowed(action: &str) -> Result<(), String> {
+pub fn assert_observe_only_allowed(tentacle: &str, action: &str) -> Result<(), String> {
+    // Per-tentacle override first (Phase 18 — D-06).
+    if let Some(map) = WRITE_UNLOCKS.get() {
+        if let Ok(g) = map.lock() {
+            if let Some(deadline) = g.get(tentacle) {
+                if *deadline > Instant::now() {
+                    return Ok(());
+                }
+            }
+        }
+    }
+    // Else fall through to global flag (M-03 preserved).
     if OBSERVE_ONLY.load(Ordering::SeqCst) {
         return Err(format!(
-            "[ecosystem] OBSERVE_ONLY guardrail blocked: {}. \
-             Acting capability requires explicit Settings-side enablement (v1.2).",
-            action
+            "[ecosystem] OBSERVE_ONLY guardrail blocked: {} on {}. \
+             Acting capability requires explicit consent (Phase 18 jarvis_dispatch).",
+            action, tentacle
         ));
     }
     Ok(())
@@ -413,12 +467,78 @@ mod tests {
     /// The guardrail must reject write-path calls with an Err containing "OBSERVE_ONLY".
     #[test]
     fn test_observe_only_guardrail() {
-        let result = assert_observe_only_allowed("test_action");
+        let result = assert_observe_only_allowed("test_tentacle", "test_action");
         assert!(result.is_err(), "guardrail must return Err when active");
         let msg = result.unwrap_err();
         assert!(
             msg.contains("OBSERVE_ONLY"),
             "error message must mention OBSERVE_ONLY, got: {}", msg
+        );
+    }
+
+    /// Phase 18: WriteScope RAII guard removes its tentacle entry on Drop.
+    #[test]
+    fn write_scope_drops_on_drop() {
+        let _ = WRITE_UNLOCKS.get_or_init(|| Mutex::new(HashMap::new()));
+        {
+            let _scope = grant_write_window("test_tentacle_drop", 30);
+            let map = WRITE_UNLOCKS.get().unwrap();
+            assert!(
+                map.lock().unwrap().contains_key("test_tentacle_drop"),
+                "entry must exist while scope is alive"
+            );
+        }
+        // _scope dropped here; Drop impl removes the entry.
+        let map = WRITE_UNLOCKS.get().unwrap();
+        assert!(
+            !map.lock().unwrap().contains_key("test_tentacle_drop"),
+            "entry must be removed after scope drops"
+        );
+    }
+
+    /// Phase 18: an expired write-window entry does NOT bypass the global guard.
+    #[test]
+    fn expired_window_blocks() {
+        let map = WRITE_UNLOCKS.get_or_init(|| Mutex::new(HashMap::new()));
+        let past = Instant::now() - Duration::from_secs(60);
+        map.lock().unwrap().insert("test_tentacle_expired".to_string(), past);
+        // Global OBSERVE_ONLY is true at startup; expired entry must fall through.
+        let result = assert_observe_only_allowed("test_tentacle_expired", "test_action");
+        assert!(
+            result.is_err(),
+            "expired window must NOT bypass the global guardrail"
+        );
+        // Cleanup
+        map.lock().unwrap().remove("test_tentacle_expired");
+    }
+
+    /// Phase 18: scopes for different tentacles are isolated — dropping one
+    /// doesn't disturb the other.
+    #[test]
+    fn concurrent_scopes_isolated() {
+        let _ = WRITE_UNLOCKS.get_or_init(|| Mutex::new(HashMap::new()));
+        let scope_a = grant_write_window("test_tentacle_a", 30);
+        {
+            let _scope_b = grant_write_window("test_tentacle_b", 30);
+            let map = WRITE_UNLOCKS.get().unwrap();
+            assert!(map.lock().unwrap().contains_key("test_tentacle_a"));
+            assert!(map.lock().unwrap().contains_key("test_tentacle_b"));
+        }
+        // _scope_b dropped; scope_a still alive.
+        let map = WRITE_UNLOCKS.get().unwrap();
+        assert!(
+            map.lock().unwrap().contains_key("test_tentacle_a"),
+            "scope_a must survive scope_b's drop"
+        );
+        assert!(
+            !map.lock().unwrap().contains_key("test_tentacle_b"),
+            "scope_b must be removed after its drop"
+        );
+        drop(scope_a);
+        // Final cleanup verification.
+        assert!(
+            !map.lock().unwrap().contains_key("test_tentacle_a"),
+            "scope_a entry must be removed after final drop"
         );
     }
 
