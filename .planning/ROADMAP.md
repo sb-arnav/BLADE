@@ -114,16 +114,33 @@ Plans:
 
 ### Phase 18 — JARVIS Push-to-Talk → Cross-App Action
 
-**Goal:** Ship the demo moment v1.1 wired everything for. Push-to-talk → natural-language command → cross-app action. Ego refusal-elimination layer folds in as post-processor.
+**Goal:** Ship the chat-first action+ego loop (chat-first reinterpretation per operator pivot 2026-04-30 — see 18-CONTEXT.md D-01). Text chat → natural-language command → consent dialog → cross-app action. Ego refusal-elimination layer folds in as post-processor. JARVIS-01 (PTT) + JARVIS-02 (Whisper STT) DEFERRED to v1.3 — dispatcher is voice-source-agnostic so resurrection is zero-rework.
 
-**Requirements:** JARVIS-01..12
+**Requirements:** JARVIS-01..12 (JARVIS-01/02 deferred per D-01; see 18-DEFERRAL.md)
 
-**Success criteria:**
-1. Cold install + 1 user consent → PTT activated → real cross-app action executes (Slack post, GitHub PR comment, etc.)
-2. Synthetic refusal in chat triggers ego intercept; either capability install or hard_refuse with logged reason
+**Plans:** 13 plans across 6 waves (Wave 0: scaffolding × 4 + deferral doc; Wave 1: ego + intent_router + consent bodies; Wave 2: outbound tentacle bodies; Wave 3: dispatcher; Wave 4: commands.rs + frontend; Wave 5: verification + cold-install demo).
+
+Plans:
+- [ ] `18-01-PLAN.md` — Wave 0: 4 module skeletons (ego, intent_router, jarvis_dispatch, consent) + lib.rs registration. Covers JARVIS-03/04/05/06/08/11 (skeleton).
+- [ ] `18-02-PLAN.md` — Wave 0: ecosystem.rs WriteScope + 30s TTL + self_upgrade.rs CapabilityKind + 5 Integration entries. Covers JARVIS-04/07.
+- [ ] `18-03-PLAN.md` — Wave 0: 3 outbound tentacle skeletons (slack/github/gmail_outbound). Covers JARVIS-04 (skeleton).
+- [ ] `18-04-PLAN.md` — Wave 0: BLADE_EVENTS + payloads.ts (JARVIS_INTERCEPT, CONSENT_REQUEST) + 10-WIRING-AUDIT.json preempt. Covers JARVIS-09/11.
+- [ ] `18-05-PLAN.md` — Wave 1: ego.rs body — 9 refusal patterns + disjunction post-check + retry cap + emit_jarvis_intercept. Covers JARVIS-06/07/08.
+- [ ] `18-06-PLAN.md` — Wave 1: intent_router heuristic-first body + consent SQLite CRUD body. Covers JARVIS-03/05.
+- [ ] `18-07-PLAN.md` — Wave 2: slack_outbound MCP-first + github_outbound gh_post bodies. Covers JARVIS-04.
+- [ ] `18-08-PLAN.md` — Wave 2: gmail_outbound base64url + Gmail API body. Covers JARVIS-04.
+- [ ] `18-09-PLAN.md` — Wave 3: jarvis_dispatch_action body — consent gate + WriteScope + 3-tier dispatch + D-17 LOCKED activity-log emission. Covers JARVIS-04/05/09/10.
+- [ ] `18-10-PLAN.md` — Wave 4: commands.rs ego wrap at l.~1517 + reset_retry_for_turn at function entry + research/questions.md Q1 closure. Covers JARVIS-03/06/07/08/09/10.
+- [ ] `18-11-PLAN.md` — Wave 4: frontend — 6 typed Tauri wrappers + JarvisPill + ConsentDialog + MessageList/ChatPanel wiring. Covers JARVIS-05/11.
+- [ ] `18-12-PLAN.md` — Wave 5: verification — static gates + cold-install demo (BLOCKING CHECKPOINT) + 18-VERIFICATION.md. Covers JARVIS-03..12.
+- [ ] `18-13-PLAN.md` — Wave 0 (parallel): 18-DEFERRAL.md documenting JARVIS-01/02 deferral + v1.3 hand-off shape. Covers JARVIS-01/02.
+
+**Success criteria (chat-first reinterpretation):**
+1. Cold install + 1 user consent → text chat → real cross-app action executes (Linear issue OR Slack post)
+2. Synthetic refusal triggers ego intercept; either capability install or hard_refuse with logged reason
 3. Ego retry cap holds (no infinite loops on persistent refusal)
-4. Browser-harness Q1 closed in `research/questions.md` with verdict
-5. Every JARVIS action emits to ActivityStrip (M-07 contract)
+4. Browser-harness Q1 closed in `.planning/research/questions.md` with verdict (D-20)
+5. Every JARVIS action emits to ActivityStrip with locked format `[JARVIS] {intent_class}: {target_service} → {outcome}` per D-17
 
 **Dependencies:** Phase 17 (doctor surfaces capability gaps that ego routes to).
 **Blocks:** Phase 20.
