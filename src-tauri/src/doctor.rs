@@ -588,6 +588,125 @@ fn compute_tentacle_signal() -> Result<DoctorSignal, String> {
     })
 }
 
+// ── Signal source: ConfigDrift (DOCTOR-05 / D-08) — Plan 17-04 ───────────────
+
+/// Classify config drift severity per CONTEXT.md D-08.
+///
+/// `profile_age_days = None` is treated as "stale" (per Recommendation A5 —
+/// missing scan profile = onboarding incomplete = drift signal).
+///
+/// - **Red** iff `ledger_drift` AND `profile_stale`
+/// - **Amber** iff `ledger_drift` XOR `profile_stale`
+/// - **Green** iff neither
+///
+/// Testable seam: tests pass synthetic `(bool, Option<i64>)` and assert
+/// the verdict without needing a live Node child process or filesystem
+/// scan_results.json fixture.
+#[allow(dead_code)]
+fn classify_drift(ledger_drift: bool, profile_age_days: Option<i64>) -> Severity {
+    let profile_stale = profile_age_days.map(|d| d > 30).unwrap_or(true);
+    if ledger_drift && profile_stale {
+        Severity::Red
+    } else if ledger_drift || profile_stale {
+        Severity::Amber
+    } else {
+        Severity::Green
+    }
+}
+
+/// Run `node scripts/verify-migration-ledger.mjs` and return `(drift, note)`.
+///
+/// Exit code convention (RESEARCH § E1):
+/// - `0` → no drift; `1` → drift; anything else → graceful no-drift fallback
+///   with note in payload (covers "Node missing", "script errored", "permission
+///   denied", etc.).
+///
+/// Spawned via `Command::new("node")` (NOT shell-out) so the script path is
+/// not interpreted by a shell. Path is built from `CARGO_MANIFEST_DIR` (a
+/// compile-time constant), not user input — no command injection surface
+/// per ASVS V12.3.
+#[allow(dead_code)]
+fn check_migration_ledger() -> (bool, String) {
+    let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let repo_root = manifest_dir
+        .parent()
+        .expect("CARGO_MANIFEST_DIR has parent");
+    let script = repo_root.join("scripts").join("verify-migration-ledger.mjs");
+
+    if !script.exists() {
+        return (false, format!("script missing: {}", script.to_string_lossy()));
+    }
+
+    let output = std::process::Command::new("node")
+        .arg(&script)
+        .current_dir(repo_root)
+        .output();
+
+    match output {
+        Ok(out) => {
+            let code = out.status.code().unwrap_or(-1);
+            match code {
+                0 => (false, "ledger clean".to_string()),
+                1 => (true, "ledger drift detected".to_string()),
+                other => (
+                    false,
+                    format!("ledger script exit {} (treated as no-drift)", other),
+                ),
+            }
+        }
+        Err(e) => (
+            false,
+            format!("could not run node: {} (treated as no-drift)", e),
+        ),
+    }
+}
+
+/// Return `scan_results.json` `scanned_at` age in days. `None` if the file
+/// is absent (fresh install / onboarding incomplete) — `classify_drift` then
+/// treats `None` as stale.
+///
+/// `scanned_at` is unix milliseconds (RESEARCH § E2; confirmed at
+/// `deep_scan/leads.rs:165` — `pub scanned_at: i64` set via
+/// `chrono::Utc::now().timestamp_millis()`).
+#[allow(dead_code)]
+fn scan_profile_age_days() -> Option<i64> {
+    let results = crate::deep_scan::load_results_pub()?;
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    let age_ms = now_ms - results.scanned_at;
+    Some(age_ms / (86_400 * 1000))
+}
+
+/// Compute the ConfigDrift signal per CONTEXT D-08.
+///
+/// Combines two probes: migration-ledger consistency (Node child process,
+/// exit-code 0/1 = clean/drift) and scan-profile freshness (filesystem read
+/// of `~/.blade/identity/scan_results.json::scanned_at`). Severity verdict
+/// is delegated to `classify_drift` (testable in isolation).
+#[allow(dead_code)]
+fn compute_drift_signal() -> Result<DoctorSignal, String> {
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    let (ledger_drift, ledger_note) = check_migration_ledger();
+    let profile_age = scan_profile_age_days();
+
+    let severity = classify_drift(ledger_drift, profile_age);
+    let profile_stale = profile_age.map(|d| d > 30).unwrap_or(true);
+
+    let payload = serde_json::json!({
+        "ledger_drift": ledger_drift,
+        "ledger_note": ledger_note,
+        "profile_age_days": profile_age,
+        "profile_stale": profile_stale,
+    });
+
+    Ok(DoctorSignal {
+        class: SignalClass::ConfigDrift,
+        severity,
+        payload,
+        last_changed_at: now_ms,
+        suggested_fix: suggested_fix(SignalClass::ConfigDrift, severity).to_string(),
+    })
+}
+
 // ── Tauri Commands (D-19) ─────────────────────────────────────────────────────
 
 /// Run all signal sources synchronously, return aggregated list, cache
@@ -949,5 +1068,44 @@ mod tests {
         let now = chrono::Utc::now().timestamp();
         // Fresh heartbeat but supervisor flagged dead → Red overrides age check.
         assert_eq!(classify_tentacle(now, now - 60, "dead"), Severity::Red);
+    }
+
+    // ── Plan 17-04: classify_drift tests (DOCTOR-05 / D-08) ──────────────────
+
+    #[test]
+    fn drift_classify_green_on_clean_and_fresh() {
+        // No ledger drift + scan profile 5 days old → Green per D-08.
+        assert_eq!(classify_drift(false, Some(5)), Severity::Green);
+    }
+
+    #[test]
+    fn drift_classify_amber_on_ledger_drift_only() {
+        // Ledger drift + scan profile fresh (<30d) → Amber per D-08.
+        assert_eq!(classify_drift(true, Some(5)), Severity::Amber);
+    }
+
+    #[test]
+    fn drift_classify_amber_on_stale_profile_only() {
+        // No ledger drift + scan profile 45 days old → Amber per D-08.
+        assert_eq!(classify_drift(false, Some(45)), Severity::Amber);
+    }
+
+    #[test]
+    fn drift_classify_amber_on_missing_profile() {
+        // No ledger drift + missing profile (None) → Amber (Recommendation A5:
+        // missing = stale).
+        assert_eq!(classify_drift(false, None), Severity::Amber);
+    }
+
+    #[test]
+    fn drift_classify_red_on_both() {
+        // Ledger drift + scan profile 45 days old → Red per D-08.
+        assert_eq!(classify_drift(true, Some(45)), Severity::Red);
+    }
+
+    #[test]
+    fn drift_classify_red_on_ledger_and_missing_profile() {
+        // Ledger drift + missing profile → both conditions trip → Red.
+        assert_eq!(classify_drift(true, None), Severity::Red);
     }
 }
