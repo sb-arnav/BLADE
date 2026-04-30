@@ -7322,6 +7322,150 @@
         "invokeTyped(\"doctor_get_recent\") -> src-tauri/src/doctor.rs:827",
         "invokeTyped(\"doctor_get_signal\") -> src-tauri/src/doctor.rs:842"
       ]
+    },
+    {
+      "file": "src-tauri/src/ego.rs",
+      "classification": "ACTIVE",
+      "purpose": "JARVIS EGO MODULE (Phase 18 Plan 18-01 skeleton) — refusal detector + capability_gap classifier + retry orchestrator per CONTEXT D-11..D-15. Wraps assistant turn output, intercepts on Refusal/CapabilityGap verdicts, attempts auto_install via self_upgrade::capability_catalog (D-13), retries once per turn (D-14), emits jarvis_intercept event (D-18) for inline pill UX. Bodies land in Plan 18-08.",
+      "trigger": "#[tauri::command] ego_intercept (called by chat send_message_stream pipeline post-assistant-turn)",
+      "ui_surface": "src/features/chat/MessageList.tsx (JARVIS pill consumer — Plan 18-17)",
+      "commands": [
+        {
+          "name": "ego::ego_intercept",
+          "registered": "src-tauri/src/ego.rs:60",
+          "invoked_from": null
+        }
+      ],
+      "internal_callers": [],
+      "reachable_paths": [
+        "invokeTyped(\"ego_intercept\") -> src-tauri/src/ego.rs:60"
+      ]
+    },
+    {
+      "file": "src-tauri/src/intent_router.rs",
+      "classification": "ACTIVE",
+      "purpose": "JARVIS INTENT ROUTER (Phase 18 Plan 18-01 skeleton) — IntentClass classifier per CONTEXT D-03/D-04. Heuristic-first regex/keyword pre-filter (action verb + service-name token → ActionRequired); LLM (haiku-class) fallback for ambiguous messages returning {chat, action, capability_gap}. Body lands in Plan 18-05. Parallel to existing router.rs::TaskType (model routing); IntentClass is action-vs-chat routing only.",
+      "trigger": "#[tauri::command] intent_router_classify (called by chat send_message_stream pipeline pre-dispatch)",
+      "ui_surface": null,
+      "commands": [
+        {
+          "name": "intent_router::intent_router_classify",
+          "registered": "src-tauri/src/intent_router.rs:23",
+          "invoked_from": null
+        }
+      ],
+      "internal_callers": [],
+      "reachable_paths": [
+        "invokeTyped(\"intent_router_classify\") -> src-tauri/src/intent_router.rs:23"
+      ]
+    },
+    {
+      "file": "src-tauri/src/jarvis_dispatch.rs",
+      "classification": "ACTIVE",
+      "purpose": "JARVIS DISPATCH MODULE (Phase 18 Plan 18-01 skeleton) — outbound action fan-out across 3 backends per CONTEXT D-05 priority order: (1) existing tentacles (slack/github/gmail outbound + calendar + linear_jira), (2) MCP tools (mcp.rs), (3) native_tools.rs. Calls consent::consent_check before dispatch; emits consent_request event (D-08, D-19) when NeedsPrompt; flips integration_bridge::OBSERVE_ONLY per-tentacle behind explicit consent (D-06). Body lands in Plan 18-09.",
+      "trigger": "#[tauri::command] jarvis_dispatch_action (called by ego::handle_refusal Retried / chat assistant turn after intent_router classifies ActionRequired)",
+      "ui_surface": "src/features/chat/ConsentDialog.tsx (Plan 18-17 — emits consent_request event payload here)",
+      "commands": [
+        {
+          "name": "jarvis_dispatch::jarvis_dispatch_action",
+          "registered": "src-tauri/src/jarvis_dispatch.rs:28",
+          "invoked_from": null
+        }
+      ],
+      "internal_callers": [],
+      "reachable_paths": [
+        "invokeTyped(\"jarvis_dispatch_action\") -> src-tauri/src/jarvis_dispatch.rs:28"
+      ]
+    },
+    {
+      "file": "src-tauri/src/consent.rs",
+      "classification": "ACTIVE",
+      "purpose": "JARVIS CONSENT MODULE (Phase 18 Plan 18-01 skeleton) — per-action consent persistence per CONTEXT D-08. consent_check returns ConsentVerdict { Allow | Deny | NeedsPrompt } per (intent_class, target_service) tuple; consent_set_decision persists allow_once/allow_always/denied to keyring (or new consent_decisions table — research-stage); consent_revoke_all clears all decisions (command-palette opt-out path). Body lands in Plan 18-06.",
+      "trigger": "#[tauri::command] consent_get_decision / consent_set_decision / consent_revoke_all (called by ConsentDialog accept/reject + command palette revoke action)",
+      "ui_surface": "src/features/chat/ConsentDialog.tsx (Plan 18-17)",
+      "commands": [
+        {
+          "name": "consent::consent_get_decision",
+          "registered": "src-tauri/src/consent.rs:27",
+          "invoked_from": null
+        },
+        {
+          "name": "consent::consent_set_decision",
+          "registered": "src-tauri/src/consent.rs:34",
+          "invoked_from": null
+        },
+        {
+          "name": "consent::consent_revoke_all",
+          "registered": "src-tauri/src/consent.rs:44",
+          "invoked_from": null
+        }
+      ],
+      "internal_callers": [],
+      "reachable_paths": [
+        "invokeTyped(\"consent_get_decision\") -> src-tauri/src/consent.rs:27",
+        "invokeTyped(\"consent_set_decision\") -> src-tauri/src/consent.rs:34",
+        "invokeTyped(\"consent_revoke_all\") -> src-tauri/src/consent.rs:44"
+      ]
+    },
+    {
+      "file": "src-tauri/src/tentacles/slack_outbound.rs",
+      "classification": "ACTIVE",
+      "purpose": "SLACK OUTBOUND TENTACLE (Phase 18 Plan 18-03 skeleton) — Slack chat.postMessage write path per CONTEXT D-05 priority 1. Reuses existing Slack OAuth creds from observer (slack_deep.rs / integration_bridge); flips OBSERVE_ONLY per-tentacle behind consent (D-06). Returns PostResult { ts, channel, ok }. Body lands in Plan 18-11. Calls ecosystem::assert_observe_only_allowed at line 1 of command body (Plan 18-02 surface).",
+      "trigger": "#[tauri::command] slack_outbound_post_message (called by jarvis_dispatch::jarvis_dispatch_action when target_service=slack + intent=action_required)",
+      "ui_surface": null,
+      "commands": [
+        {
+          "name": "slack_outbound::slack_outbound_post_message",
+          "registered": "src-tauri/src/tentacles/slack_outbound.rs:21",
+          "invoked_from": null
+        }
+      ],
+      "internal_callers": [],
+      "reachable_paths": [
+        "invokeTyped(\"slack_outbound_post_message\") -> src-tauri/src/tentacles/slack_outbound.rs:21"
+      ]
+    },
+    {
+      "file": "src-tauri/src/tentacles/github_outbound.rs",
+      "classification": "ACTIVE",
+      "purpose": "GITHUB OUTBOUND TENTACLE (Phase 18 Plan 18-03 skeleton) — GitHub PR comment + issue create write paths per CONTEXT D-05 priority 1. Reuses existing GitHub PAT from observer (github_deep.rs / integration_bridge); flips OBSERVE_ONLY per-tentacle behind consent (D-06). Returns GhCommentResult { id, url } / GhIssueResult { number, url }. Body lands in Plan 18-12. Calls ecosystem::assert_observe_only_allowed at line 1 of each command body (Plan 18-02 surface).",
+      "trigger": "#[tauri::command] github_outbound_create_pr_comment / github_outbound_create_issue (called by jarvis_dispatch::jarvis_dispatch_action when target_service=github + intent=action_required)",
+      "ui_surface": null,
+      "commands": [
+        {
+          "name": "github_outbound::github_outbound_create_pr_comment",
+          "registered": "src-tauri/src/tentacles/github_outbound.rs:26",
+          "invoked_from": null
+        },
+        {
+          "name": "github_outbound::github_outbound_create_issue",
+          "registered": "src-tauri/src/tentacles/github_outbound.rs:41",
+          "invoked_from": null
+        }
+      ],
+      "internal_callers": [],
+      "reachable_paths": [
+        "invokeTyped(\"github_outbound_create_pr_comment\") -> src-tauri/src/tentacles/github_outbound.rs:26",
+        "invokeTyped(\"github_outbound_create_issue\") -> src-tauri/src/tentacles/github_outbound.rs:41"
+      ]
+    },
+    {
+      "file": "src-tauri/src/tentacles/gmail_outbound.rs",
+      "classification": "ACTIVE",
+      "purpose": "GMAIL OUTBOUND TENTACLE (Phase 18 Plan 18-03 skeleton) — Gmail send via OAuth or MCP fallback write path per CONTEXT D-05 priority 1. Reuses existing Gmail OAuth creds from observer (email_deep.rs / integration_bridge); flips OBSERVE_ONLY per-tentacle behind consent (D-06). Returns SendResult { id, thread_id } with #[serde(rename_all=\"camelCase\")] for Gmail API threadId convention. Body lands in Plan 18-13. Calls ecosystem::assert_observe_only_allowed at line 1 of command body (Plan 18-02 surface).",
+      "trigger": "#[tauri::command] gmail_outbound_send (called by jarvis_dispatch::jarvis_dispatch_action when target_service=gmail + intent=action_required)",
+      "ui_surface": null,
+      "commands": [
+        {
+          "name": "gmail_outbound::gmail_outbound_send",
+          "registered": "src-tauri/src/tentacles/gmail_outbound.rs:20",
+          "invoked_from": null
+        }
+      ],
+      "internal_callers": [],
+      "reachable_paths": [
+        "invokeTyped(\"gmail_outbound_send\") -> src-tauri/src/tentacles/gmail_outbound.rs:20"
+      ]
     }
   ],
   "routes": [
