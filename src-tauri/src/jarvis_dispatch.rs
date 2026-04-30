@@ -241,6 +241,7 @@ async fn try_mcp_tool(
 pub async fn jarvis_dispatch_action(
     app: AppHandle,
     intent: IntentClass,
+    args: serde_json::Value,
 ) -> Result<DispatchResult, String> {
     match intent {
         IntentClass::ChatOnly => Ok(DispatchResult::NotApplicable),
@@ -303,12 +304,11 @@ pub async fn jarvis_dispatch_action(
             // RAII binding: dropped on every return path below (panic-safe).
             let _scope = ecosystem::grant_write_window(&service, 30);
 
-            // Wave 3 contract: args are not yet extracted from the LLM tool-call payload.
-            // Plan 14 (Wave 4) populates `args` from intent_router's structured output.
-            // For now we pass an empty object; outbounds that require fields (e.g.
-            // gmail_outbound_send needs `to`) will return Err which we route to
-            // HardFailedNoCreds with the outbound's own D-10 wording.
-            let args = serde_json::json!({});
+            // Plan 18-14 — args are extracted by intent_router::classify_intent and
+            // passed through commands.rs to this dispatcher. The Wave-3 empty-`{}`
+            // placeholder is gone. Outbounds with missing fields surface their own
+            // D-10 hard-fail message (already wired below).
+            // shadow `args` with the parameter so existing call sites stay unchanged.
 
             // Tier 1 — native tentacle.
             if let Some(result) = try_native_tentacle(&service, &action, &args, &app).await {
