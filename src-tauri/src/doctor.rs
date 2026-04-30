@@ -453,6 +453,141 @@ fn compute_autoupdate_signal() -> Result<DoctorSignal, String> {
     })
 }
 
+// ── Signal source: TentacleHealth (DOCTOR-04 / D-07) — Plan 17-04 ────────────
+
+/// Classify a single tentacle's severity per CONTEXT.md D-07.
+///
+/// - **Red** iff `status == "dead"` OR `(now - last_heartbeat) >= 24h`
+/// - **Amber** iff `status == "restarting"` OR `status == "unknown"` OR
+///   `(now - last_heartbeat) >= 1h`
+/// - **Green** otherwise (status running AND heartbeat fresh < 1h)
+///
+/// `now_secs` and `last_heartbeat` are unix seconds. The function is the
+/// testable seam for `compute_tentacle_signal` so unit tests can exercise
+/// every branch without needing a live supervisor / integration_bridge.
+#[allow(dead_code)]
+fn classify_tentacle(now_secs: i64, last_heartbeat: i64, status: &str) -> Severity {
+    let age = now_secs.saturating_sub(last_heartbeat);
+    if status == "dead" || age >= 86_400 {
+        Severity::Red
+    } else if status == "restarting" || status == "unknown" || age >= 3_600 {
+        Severity::Amber
+    } else {
+        Severity::Green
+    }
+}
+
+/// Compute the TentacleHealth signal per CONTEXT D-07.
+///
+/// Aggregates two observer surfaces into a worst-of severity rollup:
+///
+/// 1. **Supervisor-registered tentacles** — perception, screen_timeline,
+///    godmode, learning_engine, homeostasis, hive (the 6 BLADE services
+///    registered via `supervisor::register_service`). Read each
+///    `ServiceHealth.status + last_heartbeat` (unix seconds).
+///
+/// 2. **MCP integrations** — Gmail / Calendar / Slack / GitHub etc., as
+///    surfaced by `integration_bridge::get_per_service_last_poll`. Each
+///    entry exposes `(name, last_poll_unix_secs, enabled)`. Disabled
+///    integrations are filtered out (not a tentacle the user expects to
+///    be live).
+///
+/// Severity rollup: worst-of (Red > Amber > Green). Empty observer set
+/// returns Green (defensive — no tentacles to fail). RESEARCH § D4 confirms
+/// this matches the eval-signal Green-on-empty-history convention from
+/// Plan 17-03.
+#[allow(dead_code)]
+fn compute_tentacle_signal() -> Result<DoctorSignal, String> {
+    let now_secs = chrono::Utc::now().timestamp();
+    let now_ms = now_secs * 1000;
+
+    // Supervisor-registered tentacles (RESEARCH § D2 — 6 BLADE services).
+    let supervisor_rows: Vec<(String, Severity, serde_json::Value)> =
+        crate::supervisor::supervisor_get_health()
+            .into_iter()
+            .map(|svc| {
+                let sev = classify_tentacle(now_secs, svc.last_heartbeat, &svc.status);
+                let payload = serde_json::json!({
+                    "name": svc.name,
+                    "kind": "supervised",
+                    "status": svc.status,
+                    "last_heartbeat_unix_secs": svc.last_heartbeat,
+                    "age_secs": now_secs.saturating_sub(svc.last_heartbeat),
+                    "crash_count": svc.crash_count,
+                });
+                (svc.name, sev, payload)
+            })
+            .collect();
+
+    // MCP integrations — filter disabled; integration_bridge has no per-service
+    // status enum, so map last_poll == 0 to "unknown" (never polled) and
+    // anything else to "running" (poller is the implicit liveness probe).
+    let mcp_rows: Vec<(String, Severity, serde_json::Value)> =
+        crate::integration_bridge::get_per_service_last_poll()
+            .into_iter()
+            .filter(|(_, _, enabled)| *enabled)
+            .map(|(name, last_poll, enabled)| {
+                let status = if last_poll == 0 { "unknown" } else { "running" };
+                let sev = classify_tentacle(now_secs, last_poll, status);
+                let payload = serde_json::json!({
+                    "name": name,
+                    "kind": "mcp_integration",
+                    "status": status,
+                    "last_poll_unix_secs": last_poll,
+                    "age_secs": now_secs.saturating_sub(last_poll),
+                    "enabled": enabled,
+                });
+                (name, sev, payload)
+            })
+            .collect();
+
+    let mut all_rows: Vec<(String, Severity, serde_json::Value)> = supervisor_rows;
+    all_rows.extend(mcp_rows);
+
+    // Worst-of severity rollup: Red > Amber > Green.
+    let severity = all_rows
+        .iter()
+        .map(|(_, sev, _)| *sev)
+        .max_by_key(|sev| match sev {
+            Severity::Green => 0,
+            Severity::Amber => 1,
+            Severity::Red => 2,
+        })
+        .unwrap_or(Severity::Green);
+
+    let supervised_count = all_rows
+        .iter()
+        .filter(|(_, _, p)| p.get("kind").and_then(|k| k.as_str()) == Some("supervised"))
+        .count();
+    let mcp_count = all_rows
+        .iter()
+        .filter(|(_, _, p)| p.get("kind").and_then(|k| k.as_str()) == Some("mcp_integration"))
+        .count();
+
+    let payload = serde_json::json!({
+        "total_tentacles": all_rows.len(),
+        "supervised_count": supervised_count,
+        "mcp_count": mcp_count,
+        "tentacles": all_rows.iter().map(|(name, sev, p)| serde_json::json!({
+            "name": name,
+            "severity": match sev {
+                Severity::Green => "green",
+                Severity::Amber => "amber",
+                Severity::Red => "red",
+            },
+            "details": p,
+        })).collect::<Vec<_>>(),
+    });
+
+    Ok(DoctorSignal {
+        class: SignalClass::TentacleHealth,
+        severity,
+        payload,
+        last_changed_at: now_ms,
+        suggested_fix: suggested_fix(SignalClass::TentacleHealth, severity).to_string(),
+    })
+}
+
 // ── Tauri Commands (D-19) ─────────────────────────────────────────────────────
 
 /// Run all signal sources synchronously, return aggregated list, cache
@@ -777,5 +912,42 @@ mod tests {
         assert_eq!(result.class, SignalClass::AutoUpdate);
         assert_eq!(result.payload["cargo_toml_dep"], true);
         assert_eq!(result.payload["lib_rs_init"], true);
+    }
+
+    // ── Plan 17-04: classify_tentacle tests (DOCTOR-04 / D-07) ───────────────
+
+    #[test]
+    fn tentacle_classify_green_on_fresh_running() {
+        let now = chrono::Utc::now().timestamp();
+        // Heartbeat 60s ago, status running → Green.
+        assert_eq!(classify_tentacle(now, now - 60, "running"), Severity::Green);
+    }
+
+    #[test]
+    fn tentacle_classify_amber_on_1h_stale() {
+        let now = chrono::Utc::now().timestamp();
+        // Heartbeat 3700s ago (>1h, <24h), status running → Amber per D-07.
+        assert_eq!(classify_tentacle(now, now - 3700, "running"), Severity::Amber);
+    }
+
+    #[test]
+    fn tentacle_classify_amber_on_restarting_status() {
+        let now = chrono::Utc::now().timestamp();
+        // Fresh heartbeat but supervisor flagged restarting → Amber per D-07.
+        assert_eq!(classify_tentacle(now, now - 60, "restarting"), Severity::Amber);
+    }
+
+    #[test]
+    fn tentacle_classify_red_on_24h_dead() {
+        let now = chrono::Utc::now().timestamp();
+        // Heartbeat 86500s ago (>24h), status running → Red per D-07.
+        assert_eq!(classify_tentacle(now, now - 86_500, "running"), Severity::Red);
+    }
+
+    #[test]
+    fn tentacle_classify_red_on_dead_status() {
+        let now = chrono::Utc::now().timestamp();
+        // Fresh heartbeat but supervisor flagged dead → Red overrides age check.
+        assert_eq!(classify_tentacle(now, now - 60, "dead"), Severity::Red);
     }
 }
