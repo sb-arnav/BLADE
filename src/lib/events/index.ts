@@ -208,6 +208,20 @@ export const BLADE_EVENTS = {
   // (NOT same-severity; emit ONLY when new severity ∈ {amber, red}).
   // Payload: DoctorEventPayload (see ./payloads.ts).
   DOCTOR_EVENT: 'doctor_event',
+
+  // ───── Phase 18 — JARVIS Chat → Cross-App Action (JARVIS-11) ─────────────
+  // Emitted by ego.rs::emit_jarvis_intercept (single-window via emit_to("main", ...))
+  // on capability_gap / refusal / retry / hard_refused state transitions in the
+  // tool-loop branch only. Fast-streaming branch is ego-blind (RESEARCH Pitfall 3).
+  // Payload: JarvisInterceptPayload (see ./payloads.ts).
+  JARVIS_INTERCEPT: 'jarvis_intercept',
+
+  // ───── Phase 18 — JARVIS Consent Request (JARVIS-05) ─────────────────────
+  // Emitted by jarvis_dispatch::emit_consent_request when consent_check returns
+  // NeedsPrompt for a (intent_class, target_service) tuple. ChatPanel opens
+  // ConsentDialog and awaits user decision (max 60s, then assumed deny).
+  // Payload: ConsentRequestPayload (see ./payloads.ts).
+  CONSENT_REQUEST: 'consent_request',
 } as const;
 
 /** Literal union of every string in BLADE_EVENTS. */

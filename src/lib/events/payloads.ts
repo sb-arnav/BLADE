@@ -762,3 +762,42 @@ export interface DoctorEventPayload {
   last_changed_at: number;  // unix milliseconds
   payload: unknown;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 18 Plan 18-04 — JARVIS Chat → Cross-App Action.
+//
+// Wire form: Rust side emits with `#[serde(rename_all = "snake_case")]`; field
+// names below mirror that exactly. Drift detection is human code-review per
+// D-38-payload (no runtime schema validation, no codegen). Phase 17
+// PATTERNS.md ghost-snake_case landmine documented; Plan 17 frontend consumer
+// (MessageList JarvisPill + ChatPanel ConsentDialog) imports these verbatim.
+//
+// @see src-tauri/src/ego.rs::emit_jarvis_intercept (Plan 18-08 emit site)
+// @see src-tauri/src/jarvis_dispatch.rs::emit_consent_request (Plan 18-14 emit site)
+// @see .planning/phases/18-jarvis-ptt-cross-app/18-CONTEXT.md §D-18, §D-19
+// ---------------------------------------------------------------------------
+
+/** Mirrors Rust emit at `src-tauri/src/ego.rs::emit_jarvis_intercept`.
+ *  Fires when ego intercepts an assistant turn (capability gap detected,
+ *  retry in flight, or hard refusal). MessageList renders an inline pill
+ *  (JarvisPill.tsx) until the next assistant message lands or user dismisses.
+ *  Wire form: #[serde(rename_all = "snake_case")] on the Rust side. */
+export interface JarvisInterceptPayload {
+  intent_class: string;                                // e.g. "action_required" / "chat_only"
+  action: 'intercepting' | 'installing' | 'retrying' | 'hard_refused';
+  capability?: string;                                 // present for installing/retrying
+  reason?: string;                                     // present for hard_refused
+}
+
+/** Mirrors Rust emit at `src-tauri/src/jarvis_dispatch::emit_consent_request`.
+ *  Fires when dispatch_action determines consent is required for a (intent_class,
+ *  target_service) tuple with no prior decision in `consent_decisions`. ChatPanel
+ *  opens ConsentDialog showing target / action / content preview / 3 buttons.
+ *  Wire form: #[serde(rename_all = "snake_case")] on the Rust side. */
+export interface ConsentRequestPayload {
+  intent_class: string;                                // e.g. "action_required"
+  target_service: string;                              // e.g. "slack" / "linear"
+  action_verb: string;                                 // human-readable, e.g. "Post message to #team"
+  content_preview: string;                             // safe_slice'd to 200 chars Rust-side
+  request_id: string;                                  // correlation id for the consent response channel
+}
