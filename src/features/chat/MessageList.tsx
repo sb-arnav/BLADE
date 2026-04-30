@@ -16,10 +16,20 @@
 // thinkingContent.length] keeps the viewport pinned to bottom as content
 // grows. `behavior: 'smooth'` matches the prototype.
 //
+// Phase 18 (JARVIS-11): subscribes to BLADE_EVENTS.JARVIS_INTERCEPT via
+// useTauriEvent (D-13 lock — only permitted listen surface) and renders an
+// inline JarvisPill below the latest assistant bubble. Auto-clears the pill
+// on next BLADE_MESSAGE_START unless action='hard_refused' (which stays
+// until the user dismisses).
+//
 // @see .planning/phases/03-dashboard-chat-settings/03-CONTEXT.md §D-67
 // @see .planning/phases/03-dashboard-chat-settings/03-PATTERNS.md §5
+// @see .planning/phases/18-jarvis-ptt-cross-app/18-CONTEXT.md §D-13, §D-18
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { BLADE_EVENTS, useTauriEvent, type Event } from '@/lib/events';
+import type { JarvisInterceptPayload } from '@/lib/events/payloads';
+import { JarvisPill } from './JarvisPill';
 import { MessageBubble } from './MessageBubble';
 import { useChatCtx } from './useChat';
 
@@ -27,6 +37,27 @@ export function MessageList() {
   const { messages, currentMessageId, streamingContent, thinkingContent, status } =
     useChatCtx();
   const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  // ── Phase 18: jarvis_intercept inline pill (D-18) ─────────────────────────
+  const [intercept, setIntercept] = useState<JarvisInterceptPayload | null>(null);
+  const handleIntercept = useCallback((e: Event<JarvisInterceptPayload>) => {
+    setIntercept(e.payload);
+  }, []);
+  useTauriEvent<JarvisInterceptPayload>(BLADE_EVENTS.JARVIS_INTERCEPT, handleIntercept);
+
+  // Auto-clear non-hard_refused pills when a new assistant message starts.
+  // currentMessageId flips from null → string on BLADE_MESSAGE_START; we read
+  // the latest intercept via a ref so the effect doesn't churn on every state
+  // tick during streaming.
+  const interceptRef = useRef(intercept);
+  interceptRef.current = intercept;
+  useEffect(() => {
+    if (!currentMessageId) return;
+    const cur = interceptRef.current;
+    if (cur && cur.action !== 'hard_refused') {
+      setIntercept(null);
+    }
+  }, [currentMessageId]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -59,6 +90,12 @@ export function MessageList() {
             createdAt: Date.now(),
           }}
           streaming
+        />
+      ) : null}
+      {intercept ? (
+        <JarvisPill
+          payload={intercept}
+          onDismiss={() => setIntercept(null)}
         />
       ) : null}
     </div>
