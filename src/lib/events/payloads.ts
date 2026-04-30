@@ -798,6 +798,7 @@ export interface ConsentRequestPayload {
   intent_class: string;                                // e.g. "action_required"
   target_service: string;                              // e.g. "slack" / "linear"
   action_verb: string;                                 // human-readable, e.g. "Post message to #team"
+  action_kind: string;                                 // Plan 18-14 — original verb token (e.g. "post" / "create" / "send")
   content_preview: string;                             // safe_slice'd to 200 chars Rust-side
   request_id: string;                                  // correlation id for the consent response channel
 }

@@ -83,3 +83,28 @@ This rewriting is operator-blessed (chat-first pivot 2026-04-30) and is the e2e 
 | 18-14 | Appends D-04 Step 2 LLM-fallback deferral (path B — heuristic-only suffices for v1.2) — see end of this file post-Plan-14 |
 | JARVIS-01 / JARVIS-02 | DEFERRED to v1.3 — re-enabled by a small follow-up plan (1-2 tasks) when v1.3 voice surface is on the roadmap |
 | D-04 Step 2 LLM-fallback | DEFERRED to v1.3 (path B) — heuristic-only intent classification ships in v1.2; appended to this file by Plan 14 Task 4 |
+
+---
+
+## D-04 Step 2 LLM-fallback (path B — deferred to v1.3)
+
+CONTEXT D-04 specified a heuristic-first / LLM-fallback two-tier intent classifier. v1.2 ships **heuristic-only** intent classification (`intent_router::classify_intent` with `match_heuristic` for verb × service token pairs).
+
+### Rationale
+
+- **Coverage**: heuristic covers all cold-install demo prompts (Linear "create a linear issue: ...", Slack "post 'X' to #team in slack", Calendar "summarize meeting", GitHub "create a github issue in owner/repo: ...", Gmail "send an email to alice subject: ...").
+- **Latency**: LLM-fallback adds a small-model (haiku-class) call without measurable benefit for the v1.2 SC. Cold-install demo budget cannot absorb the extra round-trip.
+- **Friction**: deferred to v1.3 — to be wired only if operator UAT surfaces heuristic miss-rate as a real friction. Plan 14 Task 1 + Task 4 lock the heuristic-first contract.
+
+### v1.3 hand-off shape
+
+- `intent_router::classify_intent_llm(message: &str) -> Option<IntentClass>` is the existing hook (currently returns None unconditionally; Plan 06 stub).
+- v1.3 wires it via `crate::providers::generate_oneshot("haiku", prompt, max_tokens=8)` (or `crate::router::select_provider` for the cheap model) with a fixed-format response prompt; parses to `Option<IntentClass>`.
+- Zero changes to dispatcher / consent / commands.rs surfaces — the fallback is opt-in via the existing `unwrap_or(IntentClass::ChatOnly)` return path.
+- Args extraction stays heuristic in v1.3 unless operator UAT shows the args bag is the bottleneck (orthogonal decision).
+
+### Tracking
+
+- This deferral is recorded against D-04 in CONTEXT.md.
+- 18-VERIFICATION.md (Plan 12) cross-references this section in the JARVIS-03 evidence row ("heuristic-only — LLM fallback deferred per 18-DEFERRAL.md path B").
+- Plan 18-14 closes this as "DEFERRED-DOCUMENTED" (path B is recorded; v1.3 will land path A or close the deferral with operator sign-off).

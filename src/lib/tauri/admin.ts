@@ -1946,26 +1946,62 @@ export function egoIntercept(transcript: string): Promise<EgoVerdict> {
 
 /**
  * @see src-tauri/src/intent_router.rs intent_router_classify
- * Rust signature: `intent_router_classify(message: String) -> IntentClass`.
+ * Rust signature (Plan 18-14 widened):
+ *   `intent_router_classify(message: String) -> serde_json::Value`
+ *   shape: `{ intent: IntentClass, args: Record<string, unknown> }`
  *
- * Heuristic-first (verb × service token); LLM-fallback returns `chat_only`
- * in v1.2 per 18-DEFERRAL.md.
+ * Heuristic-first (verb × service token); LLM-fallback DEFERRED to v1.3 per
+ * 18-DEFERRAL.md path B. Args extracted heuristically per service/verb.
  */
-export function intentRouterClassify(message: string): Promise<IntentClass> {
-  return invokeTyped<IntentClass, { message: string }>('intent_router_classify', { message });
+export interface IntentClassifyResult {
+  intent: IntentClass;
+  args: Record<string, unknown>;
+}
+export function intentRouterClassify(message: string): Promise<IntentClassifyResult> {
+  return invokeTyped<IntentClassifyResult, { message: string }>(
+    'intent_router_classify',
+    { message },
+  );
 }
 
 /**
  * @see src-tauri/src/jarvis_dispatch.rs jarvis_dispatch_action
- * Rust signature: `jarvis_dispatch_action(app: AppHandle, intent: IntentClass) -> Result<DispatchResult, String>`.
+ * Rust signature (Plan 18-14 widened):
+ *   `jarvis_dispatch_action(app, intent: IntentClass, args: serde_json::Value)
+ *    -> Result<DispatchResult, String>`.
  *
  * 3-tier dispatch: native tentacle → MCP fallback → native_tools (D-05/06/07).
- * Consent gate (T-18-01) runs first; on `NeedsPrompt` the dispatcher emits
- * `consent_request` and returns `NoConsent` (Wave-3 simplification — Plan 14
- * replaces this with a tokio::oneshot await on the user's dialog choice).
+ * Consent gate (T-18-01) runs first; on `NeedsPrompt` the dispatcher AWAITS
+ * the user's choice via the Plan-14 oneshot channel — `consentRespond` from
+ * ConsentDialog completes the await in-place (no re-invoke).
  */
-export function jarvisDispatchAction(intent: IntentClass): Promise<DispatchResult> {
-  return invokeTyped<DispatchResult, { intent: IntentClass }>('jarvis_dispatch_action', { intent });
+export function jarvisDispatchAction(
+  intent: IntentClass,
+  args: Record<string, unknown> = {},
+): Promise<DispatchResult> {
+  return invokeTyped<DispatchResult, { intent: IntentClass; args: Record<string, unknown> }>(
+    'jarvis_dispatch_action',
+    { intent, args },
+  );
+}
+
+/**
+ * @see src-tauri/src/consent.rs consent_respond
+ * Rust signature: `consent_respond(request_id: String, choice: String) -> Result<(), String>`.
+ *
+ * Plan 18-14 — Frontend ConsentDialog calls this on user click. The dispatcher
+ * awaits the matching oneshot Receiver and resumes in-place (no re-invoke,
+ * no `'post'` hardcode). `choice` is allow-list validated Rust-side; the TS
+ * literal-union prevents drift at compile time.
+ */
+export function consentRespond(
+  requestId: string,
+  choice: 'allow_once' | 'allow_always' | 'denied',
+): Promise<void> {
+  return invokeTyped<void, { request_id: string; choice: string }>(
+    'consent_respond',
+    { request_id: requestId, choice },
+  );
 }
 
 /**

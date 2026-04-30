@@ -870,6 +870,37 @@ pub(crate) async fn send_message_stream_inline(
     // and cap input length to prevent context window abuse.
     let last_user_text = sanitize_input(&last_user_text);
 
+    // ── Phase 18 Plan 14 — JARVIS chat → cross-app action ───────────────────
+    // intent_router::classify_intent returns (IntentClass, ArgsBag); when
+    // ActionRequired, dispatch fires in a background task so the chat reply
+    // continues to stream. The dispatcher's consent gate awaits the user's
+    // dialog choice via the Plan-14 oneshot channel; ActivityStrip surfaces
+    // the outcome via blade_activity_log (D-17 LOCKED format). ChatOnly
+    // intent short-circuits to NotApplicable and is a no-op.
+    {
+        let dispatch_app = app.clone();
+        let dispatch_msg = last_user_text.clone();
+        tokio::spawn(async move {
+            let (intent, args) = crate::intent_router::classify_intent(&dispatch_msg).await;
+            // ChatOnly skips the dispatcher entirely (no log noise).
+            if matches!(intent, crate::intent_router::IntentClass::ChatOnly) {
+                return;
+            }
+            let args_json = serde_json::Value::Object(args);
+            if let Err(e) = crate::jarvis_dispatch::jarvis_dispatch_action(
+                dispatch_app,
+                intent,
+                args_json,
+            )
+            .await
+            {
+                // Dispatcher errors already emit blade_activity_log; surface
+                // to the dev console only.
+                eprintln!("[jarvis_dispatch] background dispatch error: {}", e);
+            }
+        });
+    }
+
     // ── Fast acknowledgment (two-tier routing) ──────────────────────────────
     // Immediately fire a cheap/fast model to give the user a <500 ms response
     // while the real full model is being prepared. Emitted as "chat_ack" so the
