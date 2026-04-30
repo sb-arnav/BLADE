@@ -22,6 +22,8 @@ use std::sync::{Mutex, OnceLock};
 #[allow(unused_imports)]
 use tauri::{AppHandle, Emitter};
 
+// Plan 17-03 — signal-source bodies (DOCTOR-02 / DOCTOR-03 / DOCTOR-10)
+
 // ── Locked enum + struct definitions (CONTEXT D-02 / D-03 / D-04) ─────────────
 
 /// Signal classes aggregated by Doctor (D-03). Wire form is `snake_case` so
@@ -111,6 +113,156 @@ pub(crate) fn suggested_fix(class: SignalClass, severity: Severity) -> &'static 
             "TODO Plan 17-04: AutoUpdate Red string (per UI-SPEC § 15: sentinel — should never render)"
         }
     }
+}
+
+// ── Signal source: EvalScores (DOCTOR-02 / D-05) — Plan 17-03 ────────────────
+
+/// One parsed line from `tests/evals/history.jsonl` (Plan 17-01 producer).
+/// Mirrors the JSON shape `harness::record_eval_run` writes.
+#[derive(Debug, Clone, Deserialize)]
+struct EvalRunRecord {
+    #[allow(dead_code)]
+    timestamp: String,
+    module: String,
+    #[allow(dead_code)]
+    top1: usize,
+    #[allow(dead_code)]
+    top3: usize,
+    mrr: f32,
+    floor_passed: bool,
+    #[allow(dead_code)]
+    asserted_count: usize,
+    #[allow(dead_code)]
+    relaxed_count: usize,
+}
+
+/// Resolve the path to `tests/evals/history.jsonl`.
+///
+/// The `evals` module in `lib.rs` is `#[cfg(test)]`-gated so we cannot call
+/// `crate::evals::harness::history_jsonl_path()` from production code.
+/// This helper duplicates the 4-line resolution logic so doctor.rs can read
+/// the file at runtime. Honors `BLADE_EVAL_HISTORY_PATH` env override for
+/// test isolation (Pitfall 4 mitigation).
+fn eval_history_path() -> std::path::PathBuf {
+    if let Ok(p) = std::env::var("BLADE_EVAL_HISTORY_PATH") {
+        return std::path::PathBuf::from(p);
+    }
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("CARGO_MANIFEST_DIR has parent")
+        .join("tests")
+        .join("evals")
+        .join("history.jsonl")
+}
+
+/// Tail-read the last `limit` lines of history.jsonl. Missing file → empty Vec
+/// (D-16: Doctor treats no history as Green). Malformed lines silently dropped
+/// via `filter_map(...ok())`. With 200 lines × ~120 bytes = ~24KB max work.
+fn read_eval_history(limit: usize) -> Vec<EvalRunRecord> {
+    let path = eval_history_path();
+    let Ok(content) = std::fs::read_to_string(&path) else {
+        return Vec::new();
+    };
+    let lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).collect();
+    let start = lines.len().saturating_sub(limit);
+    lines[start..]
+        .iter()
+        .filter_map(|l| serde_json::from_str::<EvalRunRecord>(l).ok())
+        .collect()
+}
+
+/// Compute the EvalScores signal per CONTEXT D-05.
+///
+/// Severity:
+/// - **Red** if any module's most-recent run has `floor_passed: false`
+///   (top-3 < 80% OR MRR < 0.6 — the asserted floor)
+/// - **Amber** if any module's latest mrr dropped ≥10% absolute from its
+///   prior recorded run
+/// - **Green** otherwise (or empty history per D-16)
+///
+/// Synchronous (bounded I/O — last 200 lines only). Plan 17-05's
+/// `doctor_run_full_check` will wrap in `tokio::spawn_blocking` for parallel
+/// fetch via `tokio::join!`.
+fn compute_eval_signal() -> Result<DoctorSignal, String> {
+    let history = read_eval_history(200);
+    let now_ms = chrono::Utc::now().timestamp_millis();
+
+    if history.is_empty() {
+        return Ok(DoctorSignal {
+            class: SignalClass::EvalScores,
+            severity: Severity::Green,
+            payload: serde_json::json!({
+                "history_count": 0,
+                "note": "No eval runs recorded yet (tests/evals/history.jsonl missing or empty).",
+            }),
+            last_changed_at: now_ms,
+            suggested_fix: suggested_fix(SignalClass::EvalScores, Severity::Green).to_string(),
+        });
+    }
+
+    // Group records by module preserving append order (chronological).
+    let mut by_module: HashMap<String, Vec<&EvalRunRecord>> = HashMap::new();
+    for rec in &history {
+        by_module.entry(rec.module.clone()).or_default().push(rec);
+    }
+
+    let mut any_red = false;
+    let mut any_amber = false;
+    let mut breakdown = serde_json::Map::new();
+
+    for (module, runs) in &by_module {
+        let latest = runs.last().expect("runs non-empty after grouping");
+        let prior = runs.iter().rev().nth(1);
+
+        // D-05 Red: latest run breached the asserted floor.
+        let red = !latest.floor_passed;
+        // D-05 Amber: latest mrr dropped ≥10% absolute from prior.
+        let amber = match prior {
+            Some(p) => latest.mrr + 0.10 < p.mrr,
+            None => false,
+        };
+
+        if red {
+            any_red = true;
+        }
+        if amber && !red {
+            any_amber = true;
+        }
+
+        breakdown.insert(
+            module.clone(),
+            serde_json::json!({
+                "latest_top1": latest.top1,
+                "latest_top3": latest.top3,
+                "latest_mrr": latest.mrr,
+                "latest_floor_passed": latest.floor_passed,
+                "prior_mrr": prior.map(|p| p.mrr),
+                "drop_amber": amber,
+                "breach_red": red,
+                "run_count": runs.len(),
+            }),
+        );
+    }
+
+    let severity = if any_red {
+        Severity::Red
+    } else if any_amber {
+        Severity::Amber
+    } else {
+        Severity::Green
+    };
+
+    Ok(DoctorSignal {
+        class: SignalClass::EvalScores,
+        severity,
+        payload: serde_json::json!({
+            "history_count": history.len(),
+            "module_count": by_module.len(),
+            "modules": breakdown,
+        }),
+        last_changed_at: now_ms,
+        suggested_fix: suggested_fix(SignalClass::EvalScores, severity).to_string(),
+    })
 }
 
 // ── Tauri Commands (D-19) ─────────────────────────────────────────────────────
@@ -224,5 +376,94 @@ mod tests {
         // Smoke: lazy-init returns a usable lock. Plan 17-04's transition
         // detector relies on this. Touch + drop without mutating shared state.
         let _ = prior_severity_map().lock().map(|m| m.len());
+    }
+
+    // ── Plan 17-03: compute_eval_signal tests (DOCTOR-02 / D-05) ─────────────
+
+    /// RAII guard that removes an env var when the test completes (or panics).
+    /// Local copy — `harness::tests::EnvGuard` is not visible from here.
+    struct EnvGuard(&'static str);
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            std::env::remove_var(self.0);
+        }
+    }
+
+    fn write_history_lines(path: &std::path::Path, lines: &[&str]) {
+        let body = lines.join("\n") + "\n";
+        std::fs::write(path, body).expect("write history fixture");
+    }
+
+    #[test]
+    fn eval_signal_green_on_missing_history() {
+        let _g = EnvGuard("BLADE_EVAL_HISTORY_PATH");
+        let tmp = tempfile::TempDir::new().unwrap();
+        // Path that does NOT exist inside the tempdir.
+        let path = tmp.path().join("does_not_exist.jsonl");
+        std::env::set_var("BLADE_EVAL_HISTORY_PATH", &path);
+
+        let result = compute_eval_signal().expect("compute_eval_signal");
+        assert_eq!(result.severity, Severity::Green);
+        assert_eq!(result.class, SignalClass::EvalScores);
+        assert_eq!(result.payload["history_count"], 0);
+    }
+
+    #[test]
+    fn eval_signal_red_on_floor_breach() {
+        let _g = EnvGuard("BLADE_EVAL_HISTORY_PATH");
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("history.jsonl");
+        write_history_lines(
+            &path,
+            &[
+                r#"{"timestamp":"2026-04-30T12:00:00Z","module":"hybrid_search_eval","top1":2,"top3":4,"mrr":0.4,"floor_passed":false,"asserted_count":8,"relaxed_count":0}"#,
+            ],
+        );
+        std::env::set_var("BLADE_EVAL_HISTORY_PATH", &path);
+
+        let result = compute_eval_signal().expect("compute_eval_signal");
+        assert_eq!(result.severity, Severity::Red);
+        assert_eq!(result.class, SignalClass::EvalScores);
+        assert_eq!(result.payload["history_count"], 1);
+    }
+
+    #[test]
+    fn eval_signal_amber_on_10pct_drop() {
+        let _g = EnvGuard("BLADE_EVAL_HISTORY_PATH");
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("history.jsonl");
+        // Same module; prior mrr 1.0, latest mrr 0.85 (0.15 drop > 0.10)
+        write_history_lines(
+            &path,
+            &[
+                r#"{"timestamp":"2026-04-29T12:00:00Z","module":"hybrid_search_eval","top1":8,"top3":8,"mrr":1.0,"floor_passed":true,"asserted_count":8,"relaxed_count":0}"#,
+                r#"{"timestamp":"2026-04-30T12:00:00Z","module":"hybrid_search_eval","top1":7,"top3":8,"mrr":0.85,"floor_passed":true,"asserted_count":8,"relaxed_count":0}"#,
+            ],
+        );
+        std::env::set_var("BLADE_EVAL_HISTORY_PATH", &path);
+
+        let result = compute_eval_signal().expect("compute_eval_signal");
+        assert_eq!(result.severity, Severity::Amber);
+        assert_eq!(result.class, SignalClass::EvalScores);
+    }
+
+    #[test]
+    fn eval_signal_green_on_steady() {
+        let _g = EnvGuard("BLADE_EVAL_HISTORY_PATH");
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("history.jsonl");
+        // Two runs, both at mrr 1.0 — no drop, no breach
+        write_history_lines(
+            &path,
+            &[
+                r#"{"timestamp":"2026-04-29T12:00:00Z","module":"hybrid_search_eval","top1":8,"top3":8,"mrr":1.0,"floor_passed":true,"asserted_count":8,"relaxed_count":0}"#,
+                r#"{"timestamp":"2026-04-30T12:00:00Z","module":"hybrid_search_eval","top1":8,"top3":8,"mrr":1.0,"floor_passed":true,"asserted_count":8,"relaxed_count":0}"#,
+            ],
+        );
+        std::env::set_var("BLADE_EVAL_HISTORY_PATH", &path);
+
+        let result = compute_eval_signal().expect("compute_eval_signal");
+        assert_eq!(result.severity, Severity::Green);
+        assert_eq!(result.class, SignalClass::EvalScores);
     }
 }
