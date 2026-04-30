@@ -1,0 +1,189 @@
+/*
+ * admin-rich-c.css — Phase 17 Plan 17-06 (Doctor pane partial)
+ *
+ * EXTENDS src/features/admin/admin.css per the admin.css:5 extension rule:
+ *   "Plans 07-05 and 07-06 EXTEND this file via scoped partial CSS files
+ *    (admin-rich-a.css, admin-rich-b.css); never replace."
+ *
+ * Phase 17 adds admin-rich-c.css for the Doctor sub-tab inside
+ * Diagnostics.tsx. Imported by Diagnostics.tsx (NOT global).
+ *
+ * UI-SPEC § 8 token audit: ZERO ghost tokens. Every var() reference
+ * resolves to a value in src/styles/tokens.css verified 2026-04-30.
+ */
+
+@layer features {
+  /* Doctor row list container */
+  .doctor-row-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+  }
+
+  /* Doctor row (collapsed state) */
+  .doctor-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    align-items: center;
+    gap: var(--s-3);
+    padding: var(--s-3) var(--s-4);
+    min-height: 56px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    font-family: var(--font-body);
+    color: var(--t-1);
+    transition:
+      background var(--dur-fast) var(--ease-out),
+      border-left-color var(--dur-base) var(--ease-out);
+  }
+
+  .doctor-row[data-severity="green"]   { border-left: 4px solid var(--status-success); }
+  .doctor-row[data-severity="amber"]   { border-left: 4px solid var(--a-warm); }
+  .doctor-row[data-severity="red"]     { border-left: 4px solid var(--status-error); }
+  .doctor-row[data-severity="unknown"] { border-left: 4px solid var(--status-idle); }
+  .doctor-row[data-severity="error"]   { border-left: 4px solid var(--t-4); }
+
+  .doctor-row:hover {
+    background: rgba(255, 255, 255, 0.07);
+  }
+
+  .doctor-row:focus-visible {
+    outline: 2px solid var(--a-warm);
+    outline-offset: -2px;
+  }
+
+  .doctor-row[data-expanded="true"] {
+    background: rgba(255, 255, 255, 0.11);
+  }
+
+  /* Doctor row content cells */
+  .doctor-row-name {
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--t-1);
+  }
+
+  .doctor-row-meta {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--t-3);
+  }
+
+  .doctor-row-chevron {
+    font-size: 13px;
+    color: var(--t-3);
+    margin-left: var(--s-1);
+  }
+
+  /* All-green sparse summary row override */
+  .doctor-row.doctor-row--summary {
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .doctor-row.doctor-row--summary:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  /* Doctor drawer (extends dialog.glass) */
+  .doctor-drawer.dialog {
+    min-width: min(640px, calc(100vw - var(--s-12)));
+    max-width: min(720px, calc(100vw - var(--s-12)));
+    max-height: min(80vh, 720px);
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .doctor-drawer-header {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: var(--s-3);
+    padding: var(--s-4) var(--s-4) var(--s-3);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .doctor-drawer-title {
+    font-family: var(--font-body);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--t-1);
+    margin: 0;
+  }
+
+  .doctor-drawer-meta {
+    grid-column: 1;
+    grid-row: 2;
+    font-size: 11px;
+    color: var(--t-3);
+    font-family: var(--font-mono);
+  }
+
+  .doctor-drawer-close {
+    font-size: 12px;
+    color: var(--t-2);
+    background: var(--g-fill-weak);
+    border: 1px solid var(--g-edge-mid);
+    border-radius: var(--r-sm);
+    padding: var(--s-1) var(--s-2);
+    cursor: pointer;
+  }
+
+  .doctor-drawer-body {
+    padding: var(--s-4);
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+  }
+
+  .doctor-drawer-section-label {
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--t-3);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 0 0 var(--s-1) 0;
+  }
+
+  .doctor-drawer-fix-copy {
+    padding: var(--s-3);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    color: var(--t-2);
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .doctor-drawer-payload-pre {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: var(--s-2);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--t-2);
+    max-height: 320px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    margin: 0;
+  }
+
+  .doctor-drawer-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--s-2);
+    padding: var(--s-3) var(--s-4);
+    border-top: 1px solid var(--line);
+  }
+}
