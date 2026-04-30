@@ -712,6 +712,11 @@ pub(crate) async fn send_message_stream_inline(
     // Reset cancel flag at the start of every new request
     CHAT_CANCEL.store(false, Ordering::SeqCst);
 
+    // Phase 18 (D-14, Plan 18-10): retry counter resets at the START of each turn.
+    // Without this, RETRY_COUNT accumulates across turns and the cap (=1) bypasses
+    // on the second-and-later turn. AtomicU32::store(0, SeqCst) is total-ordered.
+    crate::ego::reset_retry_for_turn();
+
     // Phase 3 WIRE-03 (Plan 03-01, D-64): tracks the current assistant turn's
     // message_id so the same id can be set in BLADE_CURRENT_MSG_ID env var below
     // for `blade_thinking_chunk` tagging in providers/anthropic.rs (WIRE-04).
@@ -1164,6 +1169,17 @@ pub(crate) async fn send_message_stream_inline(
     let is_short_conversation = input_message_count <= 6;
 
     if tools.is_empty() || (only_native_tools && is_conversational && is_short_conversation) {
+        // Phase 18 — KNOWN GAP (Pitfall 3 / Plan 18-10): the fast-streaming branch emits
+        // tokens directly via providers::stream_text without server-side accumulation.
+        // ego::intercept_assistant_output requires the FULL transcript and runs in the
+        // tool-loop branch only (l.~1517). Refusals on this branch are NOT caught by ego.
+        // This branch only fires for short conversational queries (`is_conversational &&
+        // is_short_conversation`), so refusal-eliciting prompts rarely land here.
+        // Workaround: when a refusal is observed in the fast path, re-issue the message
+        // with a hint that forces only_native_tools=false (routes to tool-loop).
+        // Full coverage requires an accumulator refactor — deferred to v1.3
+        // (RESEARCH § Pitfall 3, 18-CONTEXT.md D-11..D-15).
+        //
         // Phase 3 WIRE-03 contract (P-UAT-1): emit blade_message_start BEFORE
         // streaming so the frontend (src/features/chat/useChat.tsx) sets
         // currentMessageIdRef and commits the assistant reply on chat_done.
@@ -1512,9 +1528,31 @@ pub(crate) async fn send_message_stream_inline(
             std::env::set_var("BLADE_CURRENT_MSG_ID", &msg_id);
             _current_message_id = Some(msg_id);
 
+            // Phase 18 (Plan 18-10, D-11..D-15) — ego intercept on the assistant transcript.
+            // Tool-loop branch ONLY (RESEARCH § Pitfall 3 — fast-streaming branch is ego-blind,
+            // see comment at the fast-path entry above). Wraps `turn.content` BEFORE
+            // extract_actions so a refusal/capability_gap verdict can rewrite the assistant
+            // output. On non-Pass verdict, handle_refusal logs to evolution_log_capability_gap,
+            // optionally auto-installs (Runtime kind), and returns either a retried response
+            // or a hard-refuse with the D-15 LOCKED format. Plan 14 will wire the actual
+            // LLM-retry call into the AutoInstalled.then_retried placeholder.
+            let final_content = match crate::ego::intercept_assistant_output(&turn.content) {
+                crate::ego::EgoVerdict::Pass => turn.content.clone(),
+                verdict @ crate::ego::EgoVerdict::CapabilityGap { .. }
+                | verdict @ crate::ego::EgoVerdict::Refusal { .. } => {
+                    let outcome = crate::ego::handle_refusal(&app, verdict, &last_user_text).await;
+                    match outcome {
+                        crate::ego::EgoOutcome::Retried { new_response } => new_response,
+                        crate::ego::EgoOutcome::AutoInstalled { then_retried, .. } => then_retried,
+                        crate::ego::EgoOutcome::HardRefused { final_response, .. } => final_response,
+                    }
+                }
+            };
+
             // Extract and execute semantic action tags before emitting to frontend.
             // clean_content has [ACTION:...] tags stripped; actions are dispatched async.
-            let (clean_content, parsed_actions) = crate::action_tags::extract_actions(&turn.content);
+            // (Plan 18-10) — use ego-rewritten `final_content` (was `&turn.content`).
+            let (clean_content, parsed_actions) = crate::action_tags::extract_actions(&final_content);
 
             // Execute actions in the background (fire-and-forget)
             if !parsed_actions.is_empty() {
