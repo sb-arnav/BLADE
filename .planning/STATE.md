@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Phases
 status: executing
-last_updated: "2026-04-30T11:30:00.000Z"
+last_updated: "2026-04-30T12:15:00.000Z"
 progress:
   total_phases: 12
-  completed_phases: 11
-  total_plans: 78
-  completed_plans: 78
+  completed_phases: 12
+  total_plans: 79
+  completed_plans: 79
   percent: 100
 ---
 
@@ -17,8 +17,8 @@ progress:
 **Project:** BLADE — Desktop JARVIS
 **Current milestone:** v1.2 — Acting Layer with Brain Foundation (5 phases, 16–20)
 **Last shipped milestone:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27)
-**Current Focus:** Phase 17 (Doctor Module) — Plans 17-01 + 17-02 + 17-03 + 17-04 + 17-05 + 17-06 ✅ shipped 2026-04-30 (Wave 0 backend scaffold + Wave 1 evals/capgap/autoupdate + Wave 2 tentacle/drift + Wave 3 orchestrator + frontend event surface + Wave 4 frontend Doctor pane). Backend + frontend now feature-complete; only Wave 5 verification gate (Plan 17-07) remains.
-**Status:** Executing Phase 17 — 6/7 plans complete; Plan 17-06 landed the frontend Doctor pane: 3 type-safe Tauri wrappers in admin.ts (doctorRunFullCheck/doctorGetRecent/doctorGetSignal), admin-rich-c.css partial (canonical tokens only — ZERO ghost tokens, 5 severity-stripe rules), DoctorPane.tsx (lazy-loaded, useTauriEvent subscription to BLADE_EVENTS.DOCTOR_EVENT, 5 collapsible severity-striped rows in locked most-volatile-first order, click-to-open Dialog drawer with suggested_fix + raw payload + last-changed timestamp, sparse 'All signals green' summary, page-level error EmptyState), and 5 surgical edits to Diagnostics.tsx adding the 7th 'Doctor' sub-tab (existing 6 preserved). tsc clean + verify-tokens-consistency.mjs OK + zero raw listen() in DoctorPane. DOCTOR-07/08/09 shipped. Next: Plan 17-07 (Wave 5 — verification: 7 static gates + /blade-uat 16-box checklist + screenshots; closes Phase 17).
+**Current Focus:** Phase 17 ✅ closed 2026-04-30 (code complete; runtime UAT explicitly deferred per operator chat-first pivot). v1.2 next phase TBD pending operator decision: continue ROADMAP as planned (Phase 18 — JARVIS PTT → cross-app action) or re-shape v1.2 around chat-capability. The realisation: "we only need a chat place capable enough to do anything, not a big box of beautiful UI with nothing functional inside" — UI surface work is paused.
+**Status:** Phase 17 functionally complete (7/7 plans shipped; ~25 commits). Static gates fully green: cargo + tsc + verify:all 30+ sub-gates + verify:eval. Two infra repairs landed during 17-07 (verify-emit-policy.mjs allowlist + comment-stripping; 10-WIRING-AUDIT.json doctor.rs entry). Runtime UAT (UI-SPEC § 17 16-box checklist + 4 screenshots + read-back per CLAUDE.md Verification Protocol) DEFERRED by operator on 2026-04-30 in favor of chat-first work. See `.planning/phases/17-doctor-module/17-07-SUMMARY.md` for the full deferral rationale + REQ → evidence map. Next: operator decides Phase 18 or v1.2 re-shape.
 
 ---
 
