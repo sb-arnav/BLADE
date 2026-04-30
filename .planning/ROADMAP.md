@@ -127,7 +127,7 @@ Plans:
 - [x] `18-04-PLAN.md` — Wave 0: BLADE_EVENTS + payloads.ts (JARVIS_INTERCEPT, CONSENT_REQUEST) + 10-WIRING-AUDIT.json preempt. Covers JARVIS-09/11. ✅ shipped 2026-04-30.
 - [x] `18-05-PLAN.md` — Wave 1: ego.rs body — 9 refusal patterns + disjunction post-check + retry cap + emit_jarvis_intercept. Covers JARVIS-06/07/08. ✅ shipped 2026-04-30.
 - [x] `18-06-PLAN.md` — Wave 1: intent_router heuristic-first body + consent SQLite CRUD body. Covers JARVIS-03/05. ✅ shipped 2026-04-30 (20 unit tests green; D-04 Step 2 LLM-fallback hook stubbed → deferred to v1.3 per Plan 14 path B; consent_check_at testability seam pre-pinned).
-- [ ] `18-07-PLAN.md` — Wave 2: slack_outbound MCP-first + github_outbound gh_post bodies. Covers JARVIS-04.
+- [x] `18-07-PLAN.md` — Wave 2: slack_outbound MCP-first + github_outbound gh_post bodies. Covers JARVIS-04. ✅ shipped 2026-04-30 (14 unit tests green; D-10 hard-fail format locked verbatim across 3 paths; gh_post header set replicated locally to break github_deep coupling).
 - [ ] `18-08-PLAN.md` — Wave 2: gmail_outbound base64url + Gmail API body. Covers JARVIS-04.
 - [ ] `18-09-PLAN.md` — Wave 3: jarvis_dispatch_action body — consent gate + WriteScope + 3-tier dispatch + D-17 LOCKED activity-log emission. Covers JARVIS-04/05/09/10.
 - [ ] `18-10-PLAN.md` — Wave 4: commands.rs ego wrap at l.~1517 + reset_retry_for_turn at function entry + research/questions.md Q1 closure. Covers JARVIS-03/06/07/08/09/10.
