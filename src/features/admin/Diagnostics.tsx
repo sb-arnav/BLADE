@@ -12,7 +12,7 @@
 // @see .planning/phases/07-dev-tools-admin/07-PATTERNS.md §4, §5
 // @see src/lib/tauri/admin.ts (supervisor*, trace*, authority*, deep_scan*, config*)
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { Button, Dialog, GlassPanel, GlassSpinner, Input, EmptyState, ListSkeleton } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import { usePrefs } from '@/hooks/usePrefs';
@@ -42,8 +42,13 @@ import type {
 import { DiagnosticsSysadminTab } from './DiagnosticsSysadminTab';
 import './admin.css';
 import './admin-rich-b.css';
+import './admin-rich-c.css';
 
-type DiagTab = 'health' | 'traces' | 'authority' | 'deep' | 'sysadmin' | 'config';
+const DoctorPane = lazy(() =>
+  import('./DoctorPane').then((m) => ({ default: m.DoctorPane }))
+);
+
+type DiagTab = 'health' | 'traces' | 'authority' | 'deep' | 'sysadmin' | 'config' | 'doctor';
 const TAB_PREF_KEY = 'admin.activeTab';
 const TAB_PREF_PREFIX = 'diag:';
 const DEFAULT_TAB: DiagTab = 'health';
@@ -57,7 +62,8 @@ function readInitialTab(raw: string | number | boolean | undefined): DiagTab {
       t === 'authority' ||
       t === 'deep' ||
       t === 'sysadmin' ||
-      t === 'config'
+      t === 'config' ||
+      t === 'doctor'
     ) {
       return t;
     }
@@ -149,6 +155,7 @@ export function Diagnostics() {
               ['deep', 'Deep scan'],
               ['sysadmin', 'Sysadmin'],
               ['config', 'Config'],
+              ['doctor', 'Doctor'],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -175,6 +182,11 @@ export function Diagnostics() {
         {tab === 'deep' && <DeepScanTab />}
         {tab === 'sysadmin' && <DiagnosticsSysadminTab />}
         {tab === 'config' && <ConfigTab />}
+        {tab === 'doctor' && (
+          <Suspense fallback={<ListSkeleton rows={5} rowHeight={56} />}>
+            <DoctorPane />
+          </Suspense>
+        )}
       </div>
     </GlassPanel>
   );
