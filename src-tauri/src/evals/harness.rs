@@ -184,3 +184,128 @@ pub fn temp_blade_env() -> TempDir {
     let _ = crate::db::init_db();
     temp
 }
+
+/// Resolve the history.jsonl path. Honors the `BLADE_EVAL_HISTORY_PATH` env
+/// var so unit tests can redirect to a tempdir without polluting the real
+/// repo file (Phase 17 / Pitfall 4 — see `17-RESEARCH.md` § Pitfall 4).
+///
+/// Default: `<repo-root>/tests/evals/history.jsonl` resolved via
+/// `CARGO_MANIFEST_DIR` (which points at `src-tauri/`) + `..` + `tests/evals`.
+///
+/// `env!("CARGO_MANIFEST_DIR")` is compile-time so the default cannot be
+/// stubbed at test runtime; the env override is the test seam.
+pub fn history_jsonl_path() -> std::path::PathBuf {
+    if let Ok(p) = std::env::var("BLADE_EVAL_HISTORY_PATH") {
+        return std::path::PathBuf::from(p);
+    }
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("CARGO_MANIFEST_DIR has parent")
+        .join("tests")
+        .join("evals")
+        .join("history.jsonl")
+}
+
+/// Append a single JSONL line to `tests/evals/history.jsonl` recording one
+/// eval run. Phase 17 / DOCTOR-02 source — `doctor.rs` reads the last 200
+/// lines on `doctor_run_full_check` to compute eval-score severity (D-05).
+///
+/// The file is git-ignored (only `.gitkeep` is committed). On a fresh
+/// install the file may not exist; `doctor.rs` treats "missing" as Green
+/// (CONTEXT.md D-16).
+///
+/// Best-effort: errors are silently swallowed (matches `print_eval_table`
+/// fire-and-forget convention). Per CONTEXT.md D-14 the call is added to
+/// every Phase 16 eval module BEFORE the `assert!` block so failures still
+/// generate a JSONL row (RESEARCH.md § B2 recommendation A1). Pitfall 1:
+/// JSON is constructed inline via `serde_json::json!` — do NOT add a
+/// serde derive to `EvalSummary`.
+pub fn record_eval_run(module: &str, summary: &EvalSummary, floor_passed: bool) {
+    use std::io::Write;
+    let line = serde_json::json!({
+        "timestamp":      chrono::Utc::now().to_rfc3339(),
+        "module":         module,
+        "top1":           summary.asserted_top1_count,
+        "top3":           summary.asserted_top3_count,
+        "mrr":            summary.asserted_mrr,
+        "floor_passed":   floor_passed,
+        "asserted_count": summary.asserted_total,
+        "relaxed_count":  summary.total.saturating_sub(summary.asserted_total),
+    });
+
+    let path = history_jsonl_path();
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        let _ = writeln!(f, "{}", line);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// RAII guard that removes an env var when the test completes (or panics),
+    /// so a failure inside the test does not leak the override to sibling tests
+    /// even though the harness pins `--test-threads=1`.
+    struct EnvGuard(&'static str);
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            std::env::remove_var(self.0);
+        }
+    }
+
+    fn fixture_summary() -> EvalSummary {
+        EvalSummary {
+            total: 8,
+            top1_count: 8,
+            top3_count: 8,
+            mrr: 1.0,
+            asserted_total: 8,
+            asserted_top1_count: 8,
+            asserted_top3_count: 8,
+            asserted_mrr: 1.0,
+        }
+    }
+
+    #[test]
+    fn record_eval_run_appends_jsonl() {
+        let dir = tempfile::TempDir::new().expect("tempdir");
+        let history = dir.path().join("history.jsonl");
+
+        // Drop guard ensures cleanup even on panic.
+        let _guard = EnvGuard("BLADE_EVAL_HISTORY_PATH");
+        std::env::set_var("BLADE_EVAL_HISTORY_PATH", &history);
+
+        // Sanity: helper resolves to the override path.
+        assert_eq!(history_jsonl_path(), history);
+
+        let s = fixture_summary();
+        record_eval_run("hybrid_search_eval", &s, true);
+        record_eval_run("hybrid_search_eval", &s, true);
+
+        assert!(history.exists(), "history.jsonl should exist after record");
+        let raw = std::fs::read_to_string(&history).expect("read history");
+        let lines: Vec<&str> = raw.lines().filter(|l| !l.is_empty()).collect();
+        assert_eq!(lines.len(), 2, "exactly two JSONL lines expected, got {}: {:?}", lines.len(), lines);
+
+        for line in &lines {
+            let v: serde_json::Value = serde_json::from_str(line).expect("each line parses as JSON");
+            assert_eq!(v["module"], "hybrid_search_eval");
+            assert_eq!(v["top1"], 8);
+            assert_eq!(v["top3"], 8);
+            // mrr is a JSON number; compare via f64
+            assert!((v["mrr"].as_f64().expect("mrr is number") - 1.0).abs() < f64::EPSILON);
+            assert_eq!(v["floor_passed"], true);
+            assert_eq!(v["asserted_count"], 8);
+            assert_eq!(v["relaxed_count"], 0);
+            let ts = v["timestamp"].as_str().expect("timestamp is string");
+            assert!(!ts.is_empty(), "timestamp non-empty");
+        }
+    }
+}
