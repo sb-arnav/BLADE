@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Phases
 status: planning
-last_updated: "2026-04-30T14:30:00.000Z"
+last_updated: "2026-04-30T14:35:00.000Z"
 progress:
   total_phases: 13
   completed_phases: 12
   total_plans: 92
-  completed_plans: 80
+  completed_plans: 81
   percent: 87
 ---
 
@@ -17,8 +17,8 @@ progress:
 **Project:** BLADE — Desktop JARVIS
 **Current milestone:** v1.2 — Acting Layer with Brain Foundation (5 phases, 16–20)
 **Last shipped milestone:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27)
-**Current Focus:** Phase 18 in progress (chat-first reinterpretation per CONTEXT D-01..D-21). Plan 18-01 + 18-02 ✅ shipped (Wave 0 scaffolding: 4 module skeletons + ecosystem WriteScope + CapabilityKind discriminator). Next: 18-03 (3 outbound tentacle skeletons) → continuing Wave 0.
-**Status:** Phase 18 Plan 02 of 14 complete (Wave 0 progressing). Plan 02 extended ecosystem.rs with WRITE_UNLOCKS + WriteScope (RAII, 30s caller-supplied TTL, M-03 OBSERVE_ONLY preserved verbatim) + 2-arg assert_observe_only_allowed signature; extended self_upgrade.rs with CapabilityKind { Runtime | Integration } discriminator (#[serde(default)] back-compat) + 5 Integration catalog entries (slack/github/gmail/calendar/linear outbound) + auto_install Integration short-circuit. +6 unit tests all green; cargo check clean; doctor 35-test reader unaffected (verified via --test-threads=1). Phase 17 prior status preserved: code complete, runtime UAT deferred per operator chat-first pivot.
+**Current Focus:** Phase 18 in progress (chat-first reinterpretation per CONTEXT D-01..D-21). Plans 18-01 + 18-02 + 18-03 ✅ shipped (Wave 0 scaffolding: 4 module skeletons + ecosystem WriteScope + CapabilityKind discriminator + 3 outbound tentacle skeletons). Next: 18-04 (BLADE_EVENTS + payloads.ts JARVIS_INTERCEPT/CONSENT_REQUEST + 10-WIRING-AUDIT.json preempt) → continuing Wave 0.
+**Status:** Phase 18 Plan 03 of 14 complete (Wave 0 progressing). Plan 03 created 3 outbound tentacle skeleton modules (tentacles/slack_outbound.rs, github_outbound.rs, gmail_outbound.rs) with locked Tauri command signatures (slack_outbound_post_message, github_outbound_create_pr_comment, github_outbound_create_issue, gmail_outbound_send) + locked return shapes (PostResult, GhCommentResult, GhIssueResult, SendResult with #[serde(rename_all="camelCase")]). Each command body calls crate::ecosystem::assert_observe_only_allowed(tentacle, action)? at line 1 (Plan 02 surface wired) then returns Err("not yet implemented (Wave 0 skeleton)") — bodies land in Plans 11/12/13. Module registration 3-step honored: tentacles/mod.rs +3 pub mod lines + lib.rs generate_handler! +4 entries under Phase 18 banners. cargo check clean (only pre-existing dead_code warnings on Plan 01 stubs); 3 stub tests green. All 4 Tauri command names verified clash-free pre-flight. Phase 17 prior status preserved: code complete, runtime UAT deferred per operator chat-first pivot.
 
 ---
 
@@ -86,8 +86,8 @@ None. v1.1 closed cleanly with documented tech debt.
 
 ## Session Continuity
 
-**Last session:** 2026-04-30T14:30Z (Plan 18-02 ✅ shipped — Wave 0 ecosystem.rs WriteScope + self_upgrade.rs CapabilityKind; 2 task commits 91d2d48 + e48b9ec / +323 net insertions / +6 unit tests all green / cargo check clean / doctor 35-test reader unaffected). Per-tentacle write-window guardrail: WRITE_UNLOCKS: OnceLock<Mutex<HashMap<String, Instant>>> + WriteScope RAII Drop guard with caller-supplied 30s TTL coexisting with global OBSERVE_ONLY (M-03 preserved verbatim, line 17 unchanged). assert_observe_only_allowed signature changed from 1-arg to 2-arg (tentacle, action) atomically (only the existing test caller required updating). CapabilityKind { Runtime | Integration } enum with #[serde(rename_all="snake_case")] + Default=Runtime impl; CapabilityGap struct extended with kind + integration_path fields, both #[serde(default)] for back-compat with Phase 17 reader. 16 existing Runtime catalog entries got explicit kind/integration_path fields (BLADE struct-literal convention); 5 new Integration entries (slack_outbound, github_outbound, gmail_outbound, calendar_write, linear_outbound) added. auto_install short-circuits on Integration kind before shell-out (defense-in-depth: install_cmd also empty). One pre-existing doctor parallel-run flake surfaced (BLADE_CONFIG_DIR env-var leak between tests) — not from this plan; verified all 35 doctor tests green with --test-threads=1.
-**Next action:** `/gsd-execute-plan 18-03` — Wave 0: 3 outbound tentacle skeletons (slack_outbound, github_outbound, gmail_outbound). Then Plan 04 (BLADE_EVENTS + payloads.ts) → 13 (deferral doc) → Wave 1 body fills (05/06) → Wave 2 (07/08) → Wave 3 (09 dispatch) → Wave 4 (10/11/14 wiring) → Wave 5 (12 verification + cold-install demo).
+**Last session:** 2026-04-30T14:35Z (Plan 18-03 ✅ shipped — Wave 0 outbound tentacle skeletons; 2 task commits a6175ca + 7e5b11f / +156 net insertions / +3 stub tests all green / cargo check clean). Created tentacles/slack_outbound.rs (42L) + github_outbound.rs (60L) + gmail_outbound.rs (44L) with locked Tauri command signatures: slack_outbound_post_message (PostResult { ts, channel, ok }), github_outbound_create_pr_comment (GhCommentResult { id, url }), github_outbound_create_issue (GhIssueResult { number, url }), gmail_outbound_send (SendResult { id, thread_id } with #[serde(rename_all="camelCase")] for Gmail API threadId convention). Each command body has assert_observe_only_allowed("<service>", "<action>")? at line 1 followed by Err("[<module>] not yet implemented (Wave 0 skeleton)") — bodies land in Plans 11/12/13. Module registration 3-step honored at Wave 0 (file → pub mod → generate_handler!) per CLAUDE.md to preempt Phase 17 gate-miss pattern: tentacles/mod.rs +5L (3 pub mod under Phase 18 banner) + lib.rs +6L (4 generate_handler! entries adjacent to Plan 01 Phase 18 block). Pre-flight clash check confirmed all 4 command names unique. cargo test --lib skeleton_returns_not_implemented → 3 passed / 0 failed.
+**Next action:** `/gsd-execute-plan 18-04` — Wave 0: BLADE_EVENTS taxonomy + payloads.ts (JARVIS_INTERCEPT, CONSENT_REQUEST event types) + 10-WIRING-AUDIT.json preempt. Then Plan 13 (deferral doc) → Wave 1 body fills (05/06) → Wave 2 (07/08 outbound tentacle bodies — fills the skeletons from this plan) → Wave 3 (09 dispatch) → Wave 4 (10/11/14 wiring) → Wave 5 (12 verification + cold-install demo).
 
 **Context cliff notes:**
 
