@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Phases
 status: verifying
-last_updated: "2026-04-30T17:36Z"
+last_updated: "2026-04-30T17:53Z"
 progress:
   total_phases: 13
   completed_phases: 12
   total_plans: 92
-  completed_plans: 87
-  percent: 95
+  completed_plans: 88
+  percent: 96
 ---
 
 # STATE — BLADE (v1.2)
@@ -17,8 +17,8 @@ progress:
 **Project:** BLADE — Desktop JARVIS
 **Current milestone:** v1.2 — Acting Layer with Brain Foundation (5 phases, 16–20)
 **Last shipped milestone:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27)
-**Current Focus:** Phase 18 in progress (chat-first reinterpretation per CONTEXT D-01..D-21). Wave 0 ✅ closed (Plans 18-01/02/03/04/13). Wave 1 ✅ closed (Plans 18-05 ego.rs + 18-06 intent_router/consent). Wave 2 begun: Plan 18-07 ✅ shipped (slack_outbound MCP-first body + github_outbound gh_post bodies; 14 unit tests green; D-10 hard-fail format locked verbatim across 3 paths). Next: Plan 18-08 (gmail_outbound base64url + Gmail API body).
-**Status:** Phase 18 Plan 18-07 of 14 complete (Wave 2 begun). Plan 05 filled the Wave 0 ego.rs skeleton with full bodies for `intercept_assistant_output` (9 refusal regex patterns: 5 mandatory D-12 + 3 stretch + 1 capability-gap precursor; disjunction-aware post-check `\bbut\b.+\bcan\b` within 80 chars suppresses false positives per Pitfall 8; CapabilityGap precedes Refusal per D-13), `handle_refusal` (D-14 retry cap = 1 per turn via `RETRY_COUNT.fetch_add` SeqCst with `prev >= 1` gate; CapabilityGap → emit intercepting → `evolution_log_capability_gap` → catalog lookup with key/_outbound/_write fallbacks → Runtime kind via live `self_upgrade::auto_install(&CapabilityGap)` returning InstallResult with `.success` routing OR Integration kind to D-15-locked HardRefused with `gap.integration_path`), and `emit_jarvis_intercept` (single-window `app.emit_to("main", "jarvis_intercept", ...)` per Phase 17 precedent — no allowlist entry needed; reason field bounded via safe_slice(200) per T-18-CARRY-14). 7 occurrences of D-15 locked phrase "I tried, but ..." across handle_refusal branches. 18 unit tests green: 8 pattern matches + disjunction suppress + however-can guard + helpful pass + 2 capability-gap + retry cap atomic + D-15 phrase guard + non-ASCII safe_slice + 2 carried skeleton tests. cargo check clean (warnings only on dead-code symbols consumed by Plan 18-10); verify:emit-policy clean (60 broadcast emits unchanged). 2 task commits (`1259bbb` Task 1 + `b44719a` Task 2); zero deviations beyond plan-allowed adoption of live auto_install signature.
+**Current Focus:** Phase 18 in progress (chat-first reinterpretation per CONTEXT D-01..D-21). Wave 0 ✅ closed (Plans 18-01/02/03/04/13). Wave 1 ✅ closed (Plans 18-05 ego.rs + 18-06 intent_router/consent). Wave 2 in progress: Plan 18-07 ✅ shipped (slack_outbound MCP-first body + github_outbound gh_post bodies; 14 unit tests green; D-10 format locked across 3 paths). Plan 18-08 ✅ shipped (gmail_outbound MCP-first body + Gmail API users.messages.send HTTP fallback; 12 unit tests green; URL_SAFE_NO_PAD encoding; 401 → Reconnect Gmail; OAuth refresh deferred to v1.3). Next: Plan 18-09 (jarvis_dispatch_action body — consent gate + WriteScope + 3-tier dispatch + D-17 LOCKED activity-log emission).
+**Status:** Phase 18 Plan 18-08 of 14 complete (Wave 2 progressing). Plan 18-08 replaced the Plan 03 gmail_outbound skeleton (41 lines, 1 placeholder test) with full body (384 lines, 12 unit tests). Three-tier dispatch: `try_mcp_path` (3 candidate qualified names — `mcp__gmail_send_message`, `mcp__gmail_messages.send`, `mcp__gmail_send` — runtime-validated via `Err(e) if e.starts_with("Unknown tool:")` discriminator, mirrors slack_outbound pattern using `SharedMcpManager` via `integration_bridge::get_app_handle`) → `try_http_path` (POST to `https://gmail.googleapis.com/gmail/v1/users/me/messages/send` with `Bearer {oauth_access_token}`, RFC2822 message base64url-encoded via `base64::engine::general_purpose::URL_SAFE_NO_PAD` into the JSON body's `raw` field) → D-10 hard-fail with locked wording "Connect via Integrations tab → Gmail (no OAuth token in keyring or MCP server registered)". 401 routes to "Gmail token expired — Reconnect Gmail via Integrations tab" (OAuth refresh-token rotation deferred to v1.3 per RESEARCH § Watch Out, T-18-CARRY-25 mitigation). `assert_observe_only_allowed("gmail", "send_message")` gates at top (defense-in-depth; Plan 14 holds WriteScope). `parse_gmail_response` helper handles both error-envelope shapes — `{ error: "string" }` (MCP wrappers) and `{ error: { code, message } }` (Gmail REST) — closing the silent-success flaw in the plan's pseudocode. 12 unit tests green: D-10 wording + 401 wording + RFC2822 header set + CRLF separator + base64url no `=`/`+`/`/` chars + token/MCP-registered smokes + happy-path id/threadId extraction + snake_case thread_id fallback + error-envelope string + error-envelope object + garbage-JSON guard + unicode (Café + emoji) round-trip. cargo check clean. 1 task commit (`717cbc0` feat); 5 deviations all auto-fixed (1 Rule 3 blocking — plan's `crate::mcp::manager().has_tool()` API doesn't exist, swapped to slack_outbound's `SharedMcpManager` pattern; 4 Rule 2 critical — added `parse_gmail_response` for error envelopes, `safe_slice` on MCP errors, non-2xx HTTP error surfacing, and 8 extra tests for parity with slack/github outbounds).
 
 ---
 
