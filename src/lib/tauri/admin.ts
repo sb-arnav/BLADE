@@ -1810,3 +1810,74 @@ export function forgeDeleteTool(id: string): Promise<void> {
 export function forgeTestTool(id: string): Promise<string> {
   return invokeTyped<string, { id: string }>('forge_test_tool', { id });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// doctor.rs — diagnostic aggregator (3 commands)
+//
+// Phase 17 / DOCTOR-01. See:
+//   src-tauri/src/doctor.rs
+//   .planning/phases/17-doctor-module/17-CONTEXT.md (D-19, D-02..04)
+//
+// Wire form: SignalClass uses #[serde(rename_all = "snake_case")];
+// Severity uses #[serde(rename_all = "lowercase")]. The literal unions
+// below MUST stay in lockstep with the Rust enum variants.
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type SignalClass =
+  | 'eval_scores'
+  | 'capability_gaps'
+  | 'tentacle_health'
+  | 'config_drift'
+  | 'auto_update';
+
+export type Severity = 'green' | 'amber' | 'red';
+
+export interface DoctorSignal {
+  class: SignalClass;
+  severity: Severity;
+  payload: unknown;
+  /** Unix milliseconds. */
+  last_changed_at: number;
+  suggested_fix: string;
+}
+
+/**
+ * @see src-tauri/src/doctor.rs::doctor_run_full_check
+ * Rust signature: `doctor_run_full_check(app: AppHandle) -> Result<Vec<DoctorSignal>, String>`.
+ *
+ * Runs all 5 signal sources in parallel, caches the aggregated list,
+ * emits `doctor_event` + `blade_activity_log` on severity transitions
+ * (per CONTEXT.md D-20 / D-21).
+ */
+export function doctorRunFullCheck(): Promise<DoctorSignal[]> {
+  return invokeTyped<DoctorSignal[]>('doctor_run_full_check');
+}
+
+/**
+ * @see src-tauri/src/doctor.rs::doctor_get_recent
+ * Rust signature: `doctor_get_recent(class: Option<SignalClass>) -> Vec<DoctorSignal>`.
+ *
+ * Returns the last cached run; if `class` is provided, filters to that
+ * class's history.
+ */
+export function doctorGetRecent(
+  args: { class?: SignalClass | null } = {}
+): Promise<DoctorSignal[]> {
+  return invokeTyped<DoctorSignal[], { class: SignalClass | null }>(
+    'doctor_get_recent',
+    { class: args.class ?? null }
+  );
+}
+
+/**
+ * @see src-tauri/src/doctor.rs::doctor_get_signal
+ * Rust signature: `doctor_get_signal(class: SignalClass) -> Option<DoctorSignal>`.
+ */
+export function doctorGetSignal(
+  args: { class: SignalClass }
+): Promise<DoctorSignal | null> {
+  return invokeTyped<DoctorSignal | null, { class: SignalClass }>(
+    'doctor_get_signal',
+    args
+  );
+}
