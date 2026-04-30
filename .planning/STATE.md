@@ -1,17 +1,15 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.2
-milestone_name: Acting Layer with Brain Foundation
-current_phase: 17
-status: phase_complete
-last_updated: "2026-04-29T22:30:00Z"
-last_activity: 2026-04-29 -- Phase 16 (Eval Scaffolding Expansion) shipped + verified (25/25 must-haves, 4/4 SCs, 8/8 EVAL REQs); v1.2 progress 1/5 phases
+milestone_name: Phases
+status: verifying
+last_updated: "2026-04-30T08:45:20.338Z"
 progress:
-  total_phases: 5
-  completed_phases: 1
-  total_plans: 7
-  completed_plans: 7
-  percent: 20
+  total_phases: 12
+  completed_phases: 11
+  total_plans: 78
+  completed_plans: 71
+  percent: 91
 ---
 
 # STATE — BLADE (v1.2)
@@ -103,3 +101,5 @@ None. v1.1 closed cleanly with documented tech debt.
 ---
 
 *State updated: 2026-04-29 — **Phase 16 (Eval Scaffolding Expansion) shipped + verified.** 7 plans across 3 waves: Wave 1 = harness scaffold (16-01); Wave 2 = 5 eval modules (16-02 hybrid_search, 16-03 real_embedding, 16-04 kg_integrity, 16-05 typed_memory, 16-06 capability_gap); Wave 3 = gate-closer + cleanup (16-07: scripts/verify-eval.sh, tests/evals/DEFERRED.md, package.json verify:eval chain entry, embeddings.rs:496-946 deletion). Final state: 5 eval modules @ MRR 1.000, asserted floors held (top-3 ≥ 80%, MRR ≥ 0.6), `verify:all` 30→31 green, embeddings.rs 946→495 lines (production code byte-identical), 19 commits with no Co-Authored-By. Two REQ-vs-real path resolutions documented in file headers: EVAL-02 `consolidate_kg` does not exist (`add_node` idempotent-merge path satisfies); EVAL-05 `detect_missing_tool` lives at `self_upgrade::` not `evolution::` (no re-export added). One Rule-3 deviation: `scripts/verify-wiring-audit-shape.mjs` updated to exclude `src-tauri/src/evals/` from production wiring audit (test-only `#[cfg(test)]` modules). VERIFICATION.md PASS 25/25 must-haves, 4/4 ROADMAP SCs, 8/8 EVAL REQs. Phase 17 (Doctor Module) consumes these eval signals (DOCTOR-02).*
+
+**Planned Phase:** 17 (doctor-module) — 7 plans — 2026-04-30T08:45:20.302Z
