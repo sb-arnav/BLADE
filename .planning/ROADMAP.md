@@ -104,7 +104,7 @@ Plans:
 - [x] `17-03-PLAN.md` — Wave 1: 3 signal sources (`compute_eval_signal`, `compute_capgap_signal`, `compute_autoupdate_signal`) + wire `harness::record_eval_run` into all 5 Phase 16 eval modules. Covers DOCTOR-02, DOCTOR-03, DOCTOR-10. **Shipped 2026-04-30** (commits `d416c4c`, `6e93fb0`, `1227c39`).
 - [x] `17-04-PLAN.md` — Wave 2: 2 signal sources (`compute_tentacle_signal`, `compute_drift_signal`) + verbatim UI-SPEC § 15 suggested-fix strings (D-18 lock). Covers DOCTOR-04, DOCTOR-05. **Shipped 2026-04-30** (commits `6ccfdfd`, `33ddf46`, `b81c080`).
 - [x] `17-05-PLAN.md` — Wave 3: orchestrator body for `doctor_run_full_check` (tokio::join! + transition gate + emit_doctor_event + emit_activity_for_doctor) + `BLADE_EVENTS.DOCTOR_EVENT` + `DoctorEventPayload` TS interface. Covers DOCTOR-01, DOCTOR-06. **Shipped 2026-04-30** (commits `6efa580`, `3c3bf53`).
-- [ ] `17-06-PLAN.md` — Wave 4: 3 type-safe Tauri wrappers + `admin-rich-c.css` (canonical tokens only) + `DoctorPane.tsx` + 5 surgical edits to `Diagnostics.tsx` (7th tab). Covers DOCTOR-01, DOCTOR-07, DOCTOR-08, DOCTOR-09.
+- [x] `17-06-PLAN.md` — Wave 4: 3 type-safe Tauri wrappers + `admin-rich-c.css` (canonical tokens only) + `DoctorPane.tsx` + 5 surgical edits to `Diagnostics.tsx` (7th tab). Covers DOCTOR-01, DOCTOR-07, DOCTOR-08, DOCTOR-09. **Shipped 2026-04-30** (commits `476032e`, `849d957`, `faa0c35`, `f418c04`).
 - [ ] `17-07-PLAN.md` — Wave 5: verification — 7 static gates + `/blade-uat` 16-box checklist + 4 screenshots saved + Read back + `17-VERIFICATION.md`. Covers all DOCTOR-01..10.
 
 **Dependencies:** Phase 16 (eval signals).

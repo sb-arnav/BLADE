@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Phases
 status: executing
-last_updated: "2026-04-30T10:59:35.799Z"
+last_updated: "2026-04-30T11:30:00.000Z"
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 78
-  completed_plans: 76
-  percent: 97
+  completed_plans: 78
+  percent: 100
 ---
 
 # STATE — BLADE (v1.2)
@@ -17,8 +17,8 @@ progress:
 **Project:** BLADE — Desktop JARVIS
 **Current milestone:** v1.2 — Acting Layer with Brain Foundation (5 phases, 16–20)
 **Last shipped milestone:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27)
-**Current Focus:** Phase 17 (Doctor Module) — Plans 17-01 + 17-02 + 17-03 + 17-04 + 17-05 ✅ shipped 2026-04-30 (Wave 0 backend scaffold + Wave 1 evals/capgap/autoupdate + Wave 2 tentacle/drift + Wave 3 orchestrator wiring + frontend event surface complete; backend now feature-complete)
-**Status:** Executing Phase 17 — 5/7 plans complete; doctor.rs orchestrator (`doctor_run_full_check`) now runs all 5 signal sources via `tokio::join!`, applies the D-20 transition gate (`prior != current && new ∈ {Amber, Red}`), emits `doctor_event` + `blade_activity_log` on warn-tier transitions per Pitfall 3 / P-06 (both emits in same if-block, doctor_event FIRST). Frontend `BLADE_EVENTS.DOCTOR_EVENT` + `DoctorEventPayload` typed surface landed (locked snake_case class + lowercase severity unions matching Rust serde rename_all). 35 doctor::tests + 9 evals tests green; cargo check + tsc clean. Next: Plan 17-06 (DoctorPane.tsx frontend consumer — drawer + 5 signal cards + ActivityStrip already picks up Doctor lines automatically via existing ACTIVITY_LOG subscription).
+**Current Focus:** Phase 17 (Doctor Module) — Plans 17-01 + 17-02 + 17-03 + 17-04 + 17-05 + 17-06 ✅ shipped 2026-04-30 (Wave 0 backend scaffold + Wave 1 evals/capgap/autoupdate + Wave 2 tentacle/drift + Wave 3 orchestrator + frontend event surface + Wave 4 frontend Doctor pane). Backend + frontend now feature-complete; only Wave 5 verification gate (Plan 17-07) remains.
+**Status:** Executing Phase 17 — 6/7 plans complete; Plan 17-06 landed the frontend Doctor pane: 3 type-safe Tauri wrappers in admin.ts (doctorRunFullCheck/doctorGetRecent/doctorGetSignal), admin-rich-c.css partial (canonical tokens only — ZERO ghost tokens, 5 severity-stripe rules), DoctorPane.tsx (lazy-loaded, useTauriEvent subscription to BLADE_EVENTS.DOCTOR_EVENT, 5 collapsible severity-striped rows in locked most-volatile-first order, click-to-open Dialog drawer with suggested_fix + raw payload + last-changed timestamp, sparse 'All signals green' summary, page-level error EmptyState), and 5 surgical edits to Diagnostics.tsx adding the 7th 'Doctor' sub-tab (existing 6 preserved). tsc clean + verify-tokens-consistency.mjs OK + zero raw listen() in DoctorPane. DOCTOR-07/08/09 shipped. Next: Plan 17-07 (Wave 5 — verification: 7 static gates + /blade-uat 16-box checklist + screenshots; closes Phase 17).
 
 ---
 
