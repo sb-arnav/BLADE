@@ -121,7 +121,7 @@ Plans:
 **Plans:** 14 plans across 6 waves (Wave 0: scaffolding × 4 + deferral doc; Wave 1: ego + intent_router + consent bodies; Wave 2: outbound tentacle bodies; Wave 3: dispatcher; Wave 4: commands.rs + frontend + pipeline-wiring (Plan 14); Wave 5: verification + cold-install demo).
 
 Plans:
-- [ ] `18-01-PLAN.md` — Wave 0: 4 module skeletons (ego, intent_router, jarvis_dispatch, consent) + lib.rs registration. Covers JARVIS-03/04/05/06/08/11 (skeleton).
+- [x] `18-01-PLAN.md` — Wave 0: 4 module skeletons (ego, intent_router, jarvis_dispatch, consent) + lib.rs registration. Covers JARVIS-03/04/05/06/08/11 (skeleton). ✅ shipped 2026-04-30.
 - [ ] `18-02-PLAN.md` — Wave 0: ecosystem.rs WriteScope + 30s TTL + self_upgrade.rs CapabilityKind + 5 Integration entries. Covers JARVIS-04/07.
 - [ ] `18-03-PLAN.md` — Wave 0: 3 outbound tentacle skeletons (slack/github/gmail_outbound). Covers JARVIS-04 (skeleton).
 - [ ] `18-04-PLAN.md` — Wave 0: BLADE_EVENTS + payloads.ts (JARVIS_INTERCEPT, CONSENT_REQUEST) + 10-WIRING-AUDIT.json preempt. Covers JARVIS-09/11.

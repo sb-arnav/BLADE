@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Phases
-status: executing
-last_updated: "2026-04-30T12:15:00.000Z"
+status: planning
+last_updated: "2026-04-30T14:06:40.862Z"
 progress:
-  total_phases: 12
+  total_phases: 13
   completed_phases: 12
-  total_plans: 79
+  total_plans: 92
   completed_plans: 79
-  percent: 100
+  percent: 86
 ---
 
 # STATE — BLADE (v1.2)
@@ -17,8 +17,8 @@ progress:
 **Project:** BLADE — Desktop JARVIS
 **Current milestone:** v1.2 — Acting Layer with Brain Foundation (5 phases, 16–20)
 **Last shipped milestone:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27)
-**Current Focus:** Phase 17 ✅ closed 2026-04-30 (code complete; runtime UAT explicitly deferred per operator chat-first pivot). v1.2 next phase TBD pending operator decision: continue ROADMAP as planned (Phase 18 — JARVIS PTT → cross-app action) or re-shape v1.2 around chat-capability. The realisation: "we only need a chat place capable enough to do anything, not a big box of beautiful UI with nothing functional inside" — UI surface work is paused.
-**Status:** Phase 17 functionally complete (7/7 plans shipped; ~25 commits). Static gates fully green: cargo + tsc + verify:all 30+ sub-gates + verify:eval. Two infra repairs landed during 17-07 (verify-emit-policy.mjs allowlist + comment-stripping; 10-WIRING-AUDIT.json doctor.rs entry). Runtime UAT (UI-SPEC § 17 16-box checklist + 4 screenshots + read-back per CLAUDE.md Verification Protocol) DEFERRED by operator on 2026-04-30 in favor of chat-first work. See `.planning/phases/17-doctor-module/17-07-SUMMARY.md` for the full deferral rationale + REQ → evidence map. Next: operator decides Phase 18 or v1.2 re-shape.
+**Current Focus:** Phase 18 in progress (chat-first reinterpretation per CONTEXT D-01..D-21). Plan 18-01 ✅ shipped 2026-04-30T14:04Z (Wave 0 type-contract scaffolding: 4 new modules + 6 Tauri commands registered clash-free). Next: Wave 1 body fills (Plans 02-14 implement against locked contracts).
+**Status:** Phase 18 Plan 01 of 14 complete (Wave 0 scaffolding). All 5 enum type contracts locked with snake_case wire form; downstream plans (06 TS bindings, 08 ego, 09 intent_router, 10 consent, 14 dispatch) build against verbatim signatures with zero codebase exploration needed. cargo check + 6 stub tests green. Phase 17 prior status preserved: code complete, runtime UAT deferred per operator chat-first pivot.
 
 ---
 
@@ -86,8 +86,8 @@ None. v1.1 closed cleanly with documented tech debt.
 
 ## Session Continuity
 
-**Last session:** 2026-04-30T10:59:35.781Z (Plan 17-05 ✅ shipped — Wave 3 orchestrator + emit helpers + frontend event surface; 2 task commits / 3 files / +209 net insertions / 6 new transition-gate tests / 35 doctor::tests green / cargo check + tsc clean. Doctor backend feature-complete: `doctor_run_full_check` runs all 5 sources via `tokio::join!`, transition gate `if transitioned && new_is_warn` emits `doctor_event` + `blade_activity_log` in the SAME block per Pitfall 3 / P-06 (doctor_event FIRST); `BLADE_EVENTS.DOCTOR_EVENT` + `DoctorEventPayload` interface locked with snake_case class + lowercase severity literal unions matching Rust serde rename_all)
-**Next action:** `/gsd-execute-plan 17-06` — DoctorPane.tsx frontend consumer: 5 signal cards (most-volatile-first order: EvalScores → CapabilityGaps → TentacleHealth → ConfigDrift → AutoUpdate), drawer drill-down on click, useTauriEvent(BLADE_EVENTS.DOCTOR_EVENT, ...) for live updates. ActivityStrip already wired to ACTIVITY_LOG so Doctor lines flow automatically. Covers DOCTOR-07 + DOCTOR-08.
+**Last session:** 2026-04-30T14:04:41Z (Plan 18-01 ✅ shipped — Wave 0 chat-first scaffolding; 3 task commits / 4 new files (ego.rs/intent_router.rs/jarvis_dispatch.rs/consent.rs) + lib.rs / +258 net insertions / 6 stub tests green / cargo check clean (only expected dead_code warnings — bodies in Plans 08/09/10/14). Locked 5 enum type contracts with snake_case wire form: EgoVerdict, EgoOutcome, IntentClass, DispatchResult, ConsentVerdict. 6 Tauri commands registered clash-free: ego_intercept, intent_router_classify, jarvis_dispatch_action (renamed from dispatch_action for greppability — 2 private dispatch_action fns exist in action_tags.rs:84 + goal_engine.rs:416), consent_get_decision, consent_set_decision, consent_revoke_all. 6-place config rule did NOT fire — zero BladeConfig fields added per CONTEXT D-04 chat-first frame.)
+**Next action:** `/gsd-execute-plan 18-02` — Wave 1+ body fills against locked Plan 01 contracts. Per phase plan order: Plan 02-04 land tentacle-outbound surface (slack/github/gmail), Plan 05 capability_catalog growth, Plan 06 TS literal unions mirroring snake_case wire form, Plan 08 ego refusal-pattern body + retry loop, Plan 09 intent_router heuristic+LLM-fallback, Plan 10 consent SQLite round-trip, Plan 14 jarvis_dispatch fan-out body.
 
 **Context cliff notes:**
 
@@ -102,4 +102,4 @@ None. v1.1 closed cleanly with documented tech debt.
 
 *State updated: 2026-04-29 — **Phase 16 (Eval Scaffolding Expansion) shipped + verified.** 7 plans across 3 waves: Wave 1 = harness scaffold (16-01); Wave 2 = 5 eval modules (16-02 hybrid_search, 16-03 real_embedding, 16-04 kg_integrity, 16-05 typed_memory, 16-06 capability_gap); Wave 3 = gate-closer + cleanup (16-07: scripts/verify-eval.sh, tests/evals/DEFERRED.md, package.json verify:eval chain entry, embeddings.rs:496-946 deletion). Final state: 5 eval modules @ MRR 1.000, asserted floors held (top-3 ≥ 80%, MRR ≥ 0.6), `verify:all` 30→31 green, embeddings.rs 946→495 lines (production code byte-identical), 19 commits with no Co-Authored-By. Two REQ-vs-real path resolutions documented in file headers: EVAL-02 `consolidate_kg` does not exist (`add_node` idempotent-merge path satisfies); EVAL-05 `detect_missing_tool` lives at `self_upgrade::` not `evolution::` (no re-export added). One Rule-3 deviation: `scripts/verify-wiring-audit-shape.mjs` updated to exclude `src-tauri/src/evals/` from production wiring audit (test-only `#[cfg(test)]` modules). VERIFICATION.md PASS 25/25 must-haves, 4/4 ROADMAP SCs, 8/8 EVAL REQs. Phase 17 (Doctor Module) consumes these eval signals (DOCTOR-02).*
 
-**Planned Phase:** 17 (doctor-module) — 7 plans — 2026-04-30T08:45:20.302Z
+**Planned Phase:** 18 (jarvis-ptt-cross-app) — 14 plans — 2026-04-30T13:50:27.514Z

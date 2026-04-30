@@ -47,15 +47,21 @@
 
 - [ ] **JARVIS-01**: Push-to-talk global hotkey registered (configurable; default `Ctrl+Alt+Space` on Win / `Cmd+Opt+Space` on Mac) — *register_global_shortcut succeeds, releases on app exit*
 - [ ] **JARVIS-02**: PTT flow captures audio → Whisper STT (existing `voice.rs` or `whisper_local` if feature flag set) → text — *transcript returned to dispatcher*
-- [ ] **JARVIS-03**: Command intent classification routes transcript to either chat or tool-dispatch path — *intent_router::classify returns IntentClass enum*
-- [ ] **JARVIS-04**: Cross-app dispatch reuses existing observer tentacle credentials (Slack / GitHub / Calendar / Linear) for outbound writes — *write path uses same credentials store as observer probes*
-- [ ] **JARVIS-05**: Per-action explicit consent dialog before any external write (post / reply / deploy / modify); decision persisted per (intent_class, target_service) tuple — *first invocation prompts; subsequent same-tuple actions skip prompt; opt-out clears persisted consent*
-- [ ] **JARVIS-06**: Ego post-processor — regex pattern matcher detects "I can't" / "I don't have access" / "I'm not able to" / "I cannot directly" / "I lack the" — *ego::intercept_assistant_output classifies; ≥5 patterns covered*
+- [x] **JARVIS-03
+**: Command intent classification routes transcript to either chat or tool-dispatch path — *intent_router::classify returns IntentClass enum*
+- [x] **JARVIS-04
+**: Cross-app dispatch reuses existing observer tentacle credentials (Slack / GitHub / Calendar / Linear) for outbound writes — *write path uses same credentials store as observer probes*
+- [x] **JARVIS-05
+**: Per-action explicit consent dialog before any external write (post / reply / deploy / modify); decision persisted per (intent_class, target_service) tuple — *first invocation prompts; subsequent same-tuple actions skip prompt; opt-out clears persisted consent*
+- [x] **JARVIS-06
+**: Ego post-processor — regex pattern matcher detects "I can't" / "I don't have access" / "I'm not able to" / "I cannot directly" / "I lack the" — *ego::intercept_assistant_output classifies; ≥5 patterns covered*
 - [ ] **JARVIS-07**: On capability_gap verdict, ego invokes `evolution_log_capability_gap` + attempts `auto_install` if catalog match, then re-prompts assistant — *integration test fakes a refusal, observes gap log + retry*
-- [ ] **JARVIS-08**: Ego retry cap holds at 1 retry per turn (no infinite loops) — *integration test simulates persistent refusal; second retry never fires*
+- [x] **JARVIS-08
+**: Ego retry cap holds at 1 retry per turn (no infinite loops) — *integration test simulates persistent refusal; second retry never fires*
 - [ ] **JARVIS-09**: Browser-harness Q1 decision absorbed into Phase 18 plan (`research/questions.md` Q1 closed with verdict) — *research/questions.md Q1 has decision + rationale*
 - [ ] **JARVIS-10**: Every JARVIS action emits to ActivityStrip (M-07 contract) with intent / target / outcome — *ActivityStrip subscriber observes ≥1 entry per JARVIS turn*
-- [ ] **JARVIS-11**: Inline JARVIS pill in chat when ego intercepts (e.g. *"BLADE detected a capability gap (browser); attempting to resolve..."*) — *MessageList renders pill on intercept event*
+- [x] **JARVIS-11
+**: Inline JARVIS pill in chat when ego intercepts (e.g. *"BLADE detected a capability gap (browser); attempting to resolve..."*) — *MessageList renders pill on intercept event*
 - [ ] **JARVIS-12**: Cold-install end-to-end demo: PTT activated → user speaks command → BLADE prompts consent → executes real cross-app action (e.g. posts to Slack channel, replies to GitHub PR) → action visible in target service — *operator UAT screenshot in `docs/testing ss/` (literal space); narrative captioned*
 
 ---
