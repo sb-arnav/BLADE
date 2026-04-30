@@ -9,6 +9,65 @@ Versioning: [Semantic Versioning 2.0](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (v1.2 — Acting Layer with Brain Foundation)
+
+> Shipped 2026-04-30 across phases 16–20 (5 phases planned; 19 deferred to v1.3 under operator chat-first pivot). 89 commits since 2026-04-29. Static gates: `cargo check` clean · `npx tsc --noEmit` clean · `npm run verify:all` 31/31 sub-gates green · `bash scripts/verify-eval.sh` 5/5 floors green.
+
+**Phase 16 — Eval Scaffolding Expansion** *(shipped 2026-04-29)*
+- 5 eval modules under `tests/evals/` driving asserted floors per module (top-3 ≥ 80% / MRR ≥ 0.6): `hybrid_search_eval`, `real_embedding_eval`, `kg_integrity_eval`, `typed_memory_eval`, `capability_gap_eval`. All 5 baselines @ MRR 1.000.
+- `verify:eval` script gates `npm run verify:all` chain (chain count 30→31).
+- Scored-table format `┌──` rows emit per module per run; rows feed Phase 17 Doctor's eval-history source.
+- 8/8 EVAL-XX requirements satisfied; `DEFERRED.md` with 4 v1.3 entries (multi-eval LLM-as-judge, eval-replay-on-PR, eval-MCP-fixtures, eval-trend-graphs).
+
+**Phase 17 — Doctor Module** *(closed 2026-04-30 — code complete; runtime UAT deferred per operator chat-first pivot)*
+- New `src-tauri/src/doctor.rs` module aggregating 5 signal classes into a unified Diagnostics sub-tab: `EvalScores`, `CapabilityGaps`, `TentacleHealth`, `ConfigDrift`, `AutoUpdate`.
+- 3 Tauri commands: `doctor_run_full_check`, `doctor_get_recent`, `doctor_get_signal`. `tokio::join!` parallel source fetch.
+- `doctor_event` Tauri event emits on warn-tier transitions only (D-20 — `prior != current && current ∈ {Amber, Red}`); paired ActivityStrip emission per M-07 (`[Doctor] {class} → {severity}: {summary}`).
+- `harness::record_eval_run` extension (Phase 16) + `tests/evals/history.jsonl` append-only artifact (gitignored, dir tracked).
+- Frontend: `DoctorPane.tsx` lazy-loaded sub-tab in `Diagnostics.tsx` (existing 6 tabs preserved, Doctor lands as 7th); 5 collapsible severity-stripe rows + Dialog drawer drill-down. Verbatim 15-string `suggested_fix` table from UI-SPEC § 15.
+- `BLADE_EVENTS.DOCTOR_EVENT` + `DoctorEventPayload` interface; useTauriEvent subscription per D-13 lock.
+- Two infrastructure repairs landed during verification: `verify-emit-policy.mjs` allowlist for `doctor.rs:doctor_event` + comment-stripping (eliminates documentation false-positive class); `10-WIRING-AUDIT.json` registers `doctor.rs` (modules.length 196→197).
+- 35/35 `doctor::tests` green; runtime UI-polish UAT deferred (UI not load-bearing for v1.2 chat-first pivot — `17-07-SUMMARY.md`).
+
+**Phase 18 — Chat → Cross-App Action** *(closed 2026-04-30 — code complete; cold-install demo deferred per operator API-key constraint)*
+
+Chat-first reinterpretation per CONTEXT D-01..D-21. Original "JARVIS Push-to-Talk → Cross-App Action" PTT/voice path deferred to v1.3 (`18-DEFERRAL.md`). Phase 18 ships text-chat → intent classifier → 3-tier dispatch → consent → outbound write → ego post-processor.
+
+- 4 new Rust modules: `ego.rs` (refusal regex matcher with 9 patterns + disjunction post-check + retry orchestrator), `intent_router.rs` (heuristic verb × service classifier returning `(IntentClass, ArgsBag)`), `jarvis_dispatch.rs` (3-tier fan-out: native-tentacle FIRST → MCP → native_tools), `consent.rs` (SQLite `consent_decisions` table + tokio::oneshot one-shot consent flow).
+- `ecosystem.rs` extension: `WRITE_UNLOCKS: HashMap<tentacle, Instant>` + `WriteScope` RAII guard with 30s TTL — per-tentacle observe-only flip behind explicit consent (M-03 v1.1 lock first-time exercised).
+- `self_upgrade::CapabilityGap` extended with `kind: Runtime | Integration` discriminator + 5 Integration entries (slack/github/gmail/calendar/linear outbound) routing to "Connect via Integrations tab → {Service}".
+- 3 outbound tentacles: `slack_outbound.rs` (MCP-first + HTTP fallback), `github_outbound.rs` (PR comment + issue create), `gmail_outbound.rs` (base64url MIME + `users.messages.send`).
+- `commands.rs` ego intercept wired at line 1539 in tool-loop branch; fast-streaming branch (line 1166) documented as ego-blind known gap (deferred to v1.3 — accumulator refactor).
+- Frontend: `JarvisPill.tsx` (4 D-18 states), `ConsentDialog.tsx` (3 buttons: Allow once / Allow always / Deny), `MessageList` + `ChatPanel` integration via `BLADE_EVENTS.JARVIS_INTERCEPT` + `CONSENT_REQUEST` per D-13.
+- `research/questions.md` Q1 (browser-harness) closed with verdict: always require explicit consent for browser-harness installs (D-20).
+- 87/87 Phase 18 unit tests green; tsc + verify:all + verify:emit-policy + verify:wiring-audit-shape all green on first run (Phase 17 gate-miss patterns preempted in Wave 0 per Plan 18-04).
+- Operator deferral: cold-install runtime demo (JARVIS-12 e2e) deferred — operator lacks API keys for Linear/Slack/Gmail/GitHub. Code path is architecturally complete and unit-test covered.
+
+**Phase 19 — Operator UAT Close** *(DEFERRED to v1.3 under chat-first pivot)*
+
+Pure UAT/screenshot phase; operator lacks bandwidth + integration credentials. All 12 UAT-XX requirements roll forward to v1.3 dedicated UAT phase. v1.1 milestone-audit stays `tech_debt`. See `.planning/phases/19-operator-uat-close/19-DEFERRAL.md` for full carry-forward log.
+
+**Phase 20 — Polish + Verify Pass** *(this entry)*
+- POLISH-01: `npm run verify:all` 31/31 sub-gates green.
+- POLISH-02: `cargo check` exit 0 (1 pre-existing `consent_check_at` testability-seam warning — not a regression).
+- POLISH-03: `npx tsc --noEmit` exit 0.
+- POLISH-04: this CHANGELOG entry.
+- POLISH-05: `milestones/v1.2-MILESTONE-AUDIT.md` (mirrors v1.1 audit pattern).
+- POLISH-06: phase dirs 16–20 archived to `milestones/v1.2-phases/`.
+
+### Deferred (v1.3+)
+- JARVIS-01 (PTT global hotkey) + JARVIS-02 (Whisper STT integration with dispatcher) — `18-DEFERRAL.md`.
+- D-04 Step 2 (LLM-fallback for ambiguous intent classification) — heuristic-only acceptable for v1.2; `18-DEFERRAL.md` path B.
+- All 12 UAT-XX requirements (Phase 19 carry-overs) — `19-DEFERRAL.md`.
+- Phase 17 Doctor pane runtime UI-polish UAT (16-box UI-SPEC § 17 checklist + screenshots) — `17-07-SUMMARY.md`.
+- Phase 18 cold-install runtime demo (JARVIS-12 e2e) — `18-12-SUMMARY.md`.
+- Fast-streaming ego intercept gap (`commands.rs:1166` accumulator refactor) — Phase 18 known gap.
+
+### Deleted (v1.2)
+- `.planning/HANDOFF-TO-MAC.md` — intentionally deleted in v1.2 close (Mac smoke checkpoints M-01..M-46 absorbed into v1.3 carry-overs). Reconciles UAT-12 deletion intent without restoring the file.
+
+---
+
 ### Added (V1 — BLADE Skin Rebuild)
 
 **Phase 0 — Pre-Rebuild Audit**
