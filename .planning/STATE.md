@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Phases
 status: executing
-last_updated: "2026-04-30T09:30:11Z"
+last_updated: "2026-04-30T10:04:05Z"
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 78
-  completed_plans: 73
-  percent: 94
+  completed_plans: 74
+  percent: 95
 ---
 
 # STATE — BLADE (v1.2)
@@ -17,8 +17,8 @@ progress:
 **Project:** BLADE — Desktop JARVIS
 **Current milestone:** v1.2 — Acting Layer with Brain Foundation (5 phases, 16–20)
 **Last shipped milestone:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27)
-**Current Focus:** Phase 17 (Doctor Module) — Plans 17-01 + 17-02 ✅ shipped 2026-04-30 (Wave 0 backend scaffold complete)
-**Status:** Executing Phase 17 — 2/7 plans complete; `doctor.rs` skeleton + 3 stubbed Tauri commands (`doctor_run_full_check`, `doctor_get_recent`, `doctor_get_signal`) + `integration_bridge::get_per_service_last_poll` accessor landed (DOCTOR-01 + DOCTOR-04 surface ready). Next: Plan 17-03 (Wave 1 signal sources — `compute_eval_signal`, `compute_capgap_signal`, `compute_autoupdate_signal` + wire `harness::record_eval_run` into all 5 Phase 16 eval modules).
+**Current Focus:** Phase 17 (Doctor Module) — Plans 17-01 + 17-02 + 17-03 ✅ shipped 2026-04-30 (Wave 0 backend scaffold + Wave 1 half A signal sources complete)
+**Status:** Executing Phase 17 — 3/7 plans complete; doctor.rs now has 3 of the 5 signal sources (`compute_eval_signal` / `compute_capgap_signal` / `compute_autoupdate_signal`) + harness::record_eval_run wired into all 5 Phase 16 eval modules so tests/evals/history.jsonl populates on every verify-eval run. 17 doctor::tests + 9 evals tests green; cargo check clean. Next: Plan 17-04 (Wave 1 half B — `compute_tentacle_signal`, `compute_drift_signal` + verbatim UI-SPEC § 15 suggested-fix strings).
 
 ---
 

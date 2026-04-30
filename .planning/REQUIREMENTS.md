@@ -29,15 +29,15 @@
 ## Doctor Module (DOCTOR) — Phase 17
 
 - [ ] **DOCTOR-01**: `doctor.rs` module with three Tauri commands: `doctor_run_full_check`, `doctor_get_recent`, `doctor_get_signal` — *registered in lib.rs generate_handler!, callable from frontend*
-- [ ] **DOCTOR-02**: Eval-score-history signal source — reads Phase 16 eval output history from `tests/evals/` artifact storage and surfaces score trend per eval module — *doctor_get_signal "eval_history" returns ≥1 series*
-- [ ] **DOCTOR-03**: Capability-gap log aggregation — counts + recency per capability via `evolution_log_capability_gap` consumer — *doctor_get_signal "capability_gaps" returns aggregated table*
+- [x] **DOCTOR-02**: Eval-score-history signal source — reads Phase 16 eval output history from `tests/evals/` artifact storage and surfaces score trend per eval module — *doctor_get_signal "eval_history" returns ≥1 series* — **Shipped Plan 17-03 (commit `d416c4c`)**: `compute_eval_signal` reads tests/evals/history.jsonl tail-200, classifies severity per D-05 (Red on floor breach / Amber on ≥10% drop / Green); JSONL producer wired into all 5 Phase 16 eval modules in commit `1227c39`.
+- [x] **DOCTOR-03**: Capability-gap log aggregation — counts + recency per capability via `evolution_log_capability_gap` consumer — *doctor_get_signal "capability_gaps" returns aggregated table* — **Shipped Plan 17-03 (commit `6e93fb0`)**: `compute_capgap_signal` queries activity_timeline via json_extract(metadata, '$.capability') with 24h+7d window aggregation; classifies severity per D-06 (Red ≥3 in 7d / Amber ≥1 in 24h / Green).
 - [ ] **DOCTOR-04**: Tentacle health signal source — surfaces which observers are alive / stale / failing — *doctor_get_signal "tentacles" returns per-tentacle state row*
 - [ ] **DOCTOR-05**: Config drift detection — ledger consistency + scan-profile age signals — *doctor_get_signal "drift" surfaces ≥1 drift indicator (or "none" green)*
 - [ ] **DOCTOR-06**: `doctor_event` Tauri event emitted on regression detected (eval score drop ≥10%, tentacle dead ≥1h, gap-log spike) — *event_logger.rs registers emit, payload schema documented*
 - [ ] **DOCTOR-07**: Diagnostics admin tab extended with Doctor pane (Diagnostics surface already exists) — *route reachable, NavRail link or Diagnostics sub-tab*
 - [ ] **DOCTOR-08**: Severity-tiered visual hierarchy (green / amber / red) per signal class — *DOM elements carry severity classes; verify:contrast green per tier*
 - [ ] **DOCTOR-09**: Per-signal drill-down — click row → drawer with raw data + last-changed timestamp + suggested fix copy — *click handler opens drawer; drawer renders signal payload*
-- [ ] **DOCTOR-10**: Auto-update presence check folded in — Doctor surfaces "no auto-update channel" as amber if `tauri-plugin-updater` not wired in `tauri.conf.json` — *doctor_get_signal "auto_update" returns wired/unwired*
+- [x] **DOCTOR-10**: Auto-update presence check folded in — Doctor surfaces "no auto-update channel" as amber if `tauri-plugin-updater` not wired in `tauri.conf.json` — *doctor_get_signal "auto_update" returns wired/unwired* — **Shipped Plan 17-03 (commit `6e93fb0`)**: `compute_autoupdate_signal` greps Cargo.toml + lib.rs for the `tauri-plugin-updater` dep + Builder init; classifies per D-09 (Green if both present, Amber if either missing); inner `classify_autoupdate(cargo_toml, lib_rs)` helper makes all 4 branches unit-testable; live-tree integration test confirms Green on stock BLADE.
 
 ---
 
