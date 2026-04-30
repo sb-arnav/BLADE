@@ -36,3 +36,8 @@ pub mod discord_deep;
 pub mod linear_jira;
 pub mod log_monitor;
 pub mod cloud_costs;
+
+// Phase 18 — outbound writers (chat → cross-app action; D-05 priority 1)
+pub mod slack_outbound;
+pub mod github_outbound;
+pub mod gmail_outbound;

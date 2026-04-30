@@ -1352,6 +1352,11 @@ pub fn run() {
             consent::consent_get_decision,
             consent::consent_set_decision,
             consent::consent_revoke_all,
+            // Phase 18 — outbound tentacles (chat → cross-app action; D-05 priority 1)
+            tentacles::slack_outbound::slack_outbound_post_message,
+            tentacles::github_outbound::github_outbound_create_pr_comment,
+            tentacles::github_outbound::github_outbound_create_issue,
+            tentacles::gmail_outbound::gmail_outbound_send,
             supervisor::supervisor_get_health,
             supervisor::supervisor_get_service,
             urinary::urinary_flush,
