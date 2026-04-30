@@ -265,6 +265,180 @@ fn compute_eval_signal() -> Result<DoctorSignal, String> {
     })
 }
 
+// ── Signal source: CapabilityGaps (DOCTOR-03 / D-06) — Plan 17-03 ────────────
+
+/// Compute the CapabilityGaps signal per CONTEXT D-06.
+///
+/// Reads `activity_timeline` rows where `event_type = 'capability_gap'` from
+/// `<blade_config_dir>/blade.db` (the same path `evolution_log_capability_gap`
+/// writes to). Aggregates per-capability counts in 24h + 7d windows.
+///
+/// Severity:
+/// - **Red** if any capability has ≥3 occurrences in last 7 days
+/// - **Amber** if any capability has ≥1 occurrence in last 24h (and not Red)
+/// - **Green** otherwise (or DB unavailable — defensive)
+///
+/// Note: "unresolved" maps operationally to "occurrences in time window"
+/// because the activity_timeline schema has no resolved flag. RESEARCH § C3
+/// documents the rationale.
+fn compute_capgap_signal() -> Result<DoctorSignal, String> {
+    let now_secs = chrono::Utc::now().timestamp();
+    let now_ms = now_secs * 1000;
+    let cutoff_7d = now_secs - (7 * 86_400);
+    let cutoff_24h = now_secs - 86_400;
+
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    let conn = match rusqlite::Connection::open(&db_path) {
+        Ok(c) => c,
+        Err(_) => {
+            // DB unavailable → Green (no observable gaps).
+            return Ok(DoctorSignal {
+                class: SignalClass::CapabilityGaps,
+                severity: Severity::Green,
+                payload: serde_json::json!({"note": "blade.db unavailable; treating as zero gaps"}),
+                last_changed_at: now_ms,
+                suggested_fix: suggested_fix(SignalClass::CapabilityGaps, Severity::Green)
+                    .to_string(),
+            });
+        }
+    };
+
+    // Aggregate per-capability counts. SQLite extracts the capability key from
+    // the `metadata` JSON column via `json_extract(metadata, '$.capability')`.
+    let mut stmt = match conn.prepare(
+        "SELECT json_extract(metadata, '$.capability') AS capability,
+                COUNT(*) AS cnt_7d,
+                SUM(CASE WHEN timestamp >= ?1 THEN 1 ELSE 0 END) AS cnt_24h,
+                MAX(timestamp) AS last_seen
+         FROM activity_timeline
+         WHERE event_type = 'capability_gap' AND timestamp >= ?2
+         GROUP BY capability
+         ORDER BY cnt_7d DESC",
+    ) {
+        Ok(s) => s,
+        Err(e) => {
+            // Table may not exist yet (fresh install / no events yet) — Green.
+            return Ok(DoctorSignal {
+                class: SignalClass::CapabilityGaps,
+                severity: Severity::Green,
+                payload: serde_json::json!({
+                    "note": format!("activity_timeline query unavailable: {}", e),
+                }),
+                last_changed_at: now_ms,
+                suggested_fix: suggested_fix(SignalClass::CapabilityGaps, Severity::Green)
+                    .to_string(),
+            });
+        }
+    };
+
+    let rows: Vec<(String, i64, i64, i64)> = stmt
+        .query_map([cutoff_24h, cutoff_7d], |r| {
+            Ok((
+                r.get::<_, Option<String>>(0)?
+                    .unwrap_or_else(|| "<unknown>".to_string()),
+                r.get::<_, i64>(1)?,
+                r.get::<_, i64>(2)?,
+                r.get::<_, i64>(3)?,
+            ))
+        })
+        .map(|i| i.filter_map(Result::ok).collect())
+        .unwrap_or_default();
+
+    // D-06 severity ladder: Red ≥3 in 7d, else Amber ≥1 in 24h, else Green.
+    let any_red = rows.iter().any(|(_, c7d, _, _)| *c7d >= 3);
+    let any_amber = rows.iter().any(|(_, _, c24h, _)| *c24h >= 1);
+
+    let severity = if any_red {
+        Severity::Red
+    } else if any_amber {
+        Severity::Amber
+    } else {
+        Severity::Green
+    };
+
+    let last_changed_at = rows
+        .iter()
+        .map(|(_, _, _, last)| *last * 1000)
+        .max()
+        .unwrap_or(now_ms);
+
+    let payload = serde_json::json!({
+        "total_capabilities": rows.len(),
+        "rows": rows.iter().map(|(cap, c7d, c24h, last)| serde_json::json!({
+            "capability": cap,
+            "count_7d": c7d,
+            "count_24h": c24h,
+            "last_seen_unix_secs": last,
+        })).collect::<Vec<_>>(),
+    });
+
+    Ok(DoctorSignal {
+        class: SignalClass::CapabilityGaps,
+        severity,
+        payload,
+        last_changed_at,
+        suggested_fix: suggested_fix(SignalClass::CapabilityGaps, severity).to_string(),
+    })
+}
+
+// ── Signal source: AutoUpdate (DOCTOR-10 / D-09) — Plan 17-03 ────────────────
+
+/// Inner classifier — testable without the `env!()` compile-time constraint.
+/// Green iff both anchors present per CONTEXT D-09; Amber otherwise.
+fn classify_autoupdate(cargo_toml: &str, lib_rs: &str) -> Severity {
+    let dep = cargo_toml.contains("tauri-plugin-updater");
+    let init = lib_rs.contains("tauri_plugin_updater::Builder::new().build()");
+    if dep && init {
+        Severity::Green
+    } else {
+        Severity::Amber
+    }
+}
+
+/// Compute the AutoUpdate signal per CONTEXT D-09.
+///
+/// Reads the live `Cargo.toml` + `src/lib.rs` at filesystem level (via
+/// `CARGO_MANIFEST_DIR`) and substring-greps for both anchors. RESEARCH § I2
+/// chose this "filesystem grep" approach over runtime plugin introspection
+/// because the plugin loader does not expose a stable presence API.
+///
+/// Severity:
+/// - **Green** if BOTH anchors present (stock BLADE state — Cargo.toml line
+///   25 has `tauri-plugin-updater = "2"` and lib.rs has the Builder init)
+/// - **Amber** if either is missing
+fn compute_autoupdate_signal() -> Result<DoctorSignal, String> {
+    let now_ms = chrono::Utc::now().timestamp_millis();
+
+    let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let cargo_toml_path = manifest_dir.join("Cargo.toml");
+    let lib_rs_path = manifest_dir.join("src").join("lib.rs");
+
+    let cargo_toml = std::fs::read_to_string(&cargo_toml_path).unwrap_or_default();
+    let lib_rs = std::fs::read_to_string(&lib_rs_path).unwrap_or_default();
+
+    let severity = classify_autoupdate(&cargo_toml, &lib_rs);
+
+    let dep_present = cargo_toml.contains("tauri-plugin-updater");
+    let init_present = lib_rs.contains("tauri_plugin_updater::Builder::new().build()");
+
+    let payload = serde_json::json!({
+        "cargo_toml_dep": dep_present,
+        "lib_rs_init": init_present,
+        "cargo_toml_path": cargo_toml_path.to_string_lossy(),
+        "lib_rs_path": lib_rs_path.to_string_lossy(),
+        "method": "filesystem_grep",
+        "note": "Per CONTEXT.md D-09: must run live, not hardcoded.",
+    });
+
+    Ok(DoctorSignal {
+        class: SignalClass::AutoUpdate,
+        severity,
+        payload,
+        last_changed_at: now_ms,
+        suggested_fix: suggested_fix(SignalClass::AutoUpdate, severity).to_string(),
+    })
+}
+
 // ── Tauri Commands (D-19) ─────────────────────────────────────────────────────
 
 /// Run all signal sources synchronously, return aggregated list, cache
@@ -465,5 +639,129 @@ mod tests {
         let result = compute_eval_signal().expect("compute_eval_signal");
         assert_eq!(result.severity, Severity::Green);
         assert_eq!(result.class, SignalClass::EvalScores);
+    }
+
+    // ── Plan 17-03: compute_capgap_signal tests (DOCTOR-03 / D-06) ───────────
+
+    /// Bootstrap a minimal `activity_timeline` table inside a fresh DB. Mirrors
+    /// the schema from `db.rs:390-401`. Avoids the full `db::init_db` so tests
+    /// stay fast and don't need every BLADE table.
+    fn init_capgap_test_db(db_path: &std::path::Path) -> rusqlite::Connection {
+        let conn = rusqlite::Connection::open(db_path).expect("open test db");
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS activity_timeline (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp INTEGER NOT NULL,
+                event_type TEXT NOT NULL,
+                title TEXT NOT NULL DEFAULT '',
+                content TEXT NOT NULL DEFAULT '',
+                app_name TEXT NOT NULL DEFAULT '',
+                metadata TEXT NOT NULL DEFAULT '{}'
+            );
+            CREATE INDEX IF NOT EXISTS idx_activity_timeline_ts ON activity_timeline(timestamp DESC);
+            CREATE INDEX IF NOT EXISTS idx_activity_timeline_type ON activity_timeline(event_type);",
+        )
+        .expect("create activity_timeline");
+        conn
+    }
+
+    fn insert_capgap_row(conn: &rusqlite::Connection, capability: &str, ts_secs: i64) {
+        let metadata = format!(r#"{{"capability":"{}"}}"#, capability);
+        conn.execute(
+            "INSERT INTO activity_timeline (timestamp, event_type, title, content, app_name, metadata)
+             VALUES (?1, 'capability_gap', '', '', 'BLADE', ?2)",
+            rusqlite::params![ts_secs, metadata],
+        )
+        .expect("insert capgap row");
+    }
+
+    #[test]
+    fn capgap_signal_green_on_no_gaps() {
+        let _g = EnvGuard("BLADE_CONFIG_DIR");
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::env::set_var("BLADE_CONFIG_DIR", tmp.path());
+        let _conn = init_capgap_test_db(&tmp.path().join("blade.db"));
+
+        let result = compute_capgap_signal().expect("compute_capgap_signal");
+        assert_eq!(result.severity, Severity::Green);
+        assert_eq!(result.class, SignalClass::CapabilityGaps);
+        assert_eq!(result.payload["total_capabilities"], 0);
+    }
+
+    #[test]
+    fn capgap_signal_red_on_3_in_7d() {
+        let _g = EnvGuard("BLADE_CONFIG_DIR");
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::env::set_var("BLADE_CONFIG_DIR", tmp.path());
+        let conn = init_capgap_test_db(&tmp.path().join("blade.db"));
+
+        let now = chrono::Utc::now().timestamp();
+        // 3 occurrences of same capability in last 7 days (and outside 24h
+        // window so we KNOW Red is firing on the 7d threshold, not Amber).
+        insert_capgap_row(&conn, "jq", now - 6 * 86_400);
+        insert_capgap_row(&conn, "jq", now - 5 * 86_400);
+        insert_capgap_row(&conn, "jq", now - 4 * 86_400);
+
+        let result = compute_capgap_signal().expect("compute_capgap_signal");
+        assert_eq!(result.severity, Severity::Red);
+        assert_eq!(result.class, SignalClass::CapabilityGaps);
+    }
+
+    #[test]
+    fn capgap_signal_amber_on_1_in_24h() {
+        let _g = EnvGuard("BLADE_CONFIG_DIR");
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::env::set_var("BLADE_CONFIG_DIR", tmp.path());
+        let conn = init_capgap_test_db(&tmp.path().join("blade.db"));
+
+        let now = chrono::Utc::now().timestamp();
+        // Single recent occurrence — must surface Amber per D-06.
+        insert_capgap_row(&conn, "ripgrep", now - 3600);
+
+        let result = compute_capgap_signal().expect("compute_capgap_signal");
+        assert_eq!(result.severity, Severity::Amber);
+        assert_eq!(result.class, SignalClass::CapabilityGaps);
+    }
+
+    // ── Plan 17-03: compute_autoupdate_signal tests (DOCTOR-10 / D-09) ───────
+
+    #[test]
+    fn autoupdate_classify_green_when_both_present() {
+        let cargo = "[dependencies]\ntauri-plugin-updater = \"2\"\n";
+        let lib = ".plugin(tauri_plugin_updater::Builder::new().build())\n";
+        assert_eq!(classify_autoupdate(cargo, lib), Severity::Green);
+    }
+
+    #[test]
+    fn autoupdate_classify_amber_when_dep_missing() {
+        let cargo = "[dependencies]\nserde = \"1\"\n";
+        let lib = ".plugin(tauri_plugin_updater::Builder::new().build())\n";
+        assert_eq!(classify_autoupdate(cargo, lib), Severity::Amber);
+    }
+
+    #[test]
+    fn autoupdate_classify_amber_when_init_missing() {
+        let cargo = "[dependencies]\ntauri-plugin-updater = \"2\"\n";
+        let lib = "// no updater builder here\n";
+        assert_eq!(classify_autoupdate(cargo, lib), Severity::Amber);
+    }
+
+    #[test]
+    fn autoupdate_classify_amber_when_both_missing() {
+        let cargo = "[dependencies]\nserde = \"1\"\n";
+        let lib = "// no updater wiring\n";
+        assert_eq!(classify_autoupdate(cargo, lib), Severity::Amber);
+    }
+
+    #[test]
+    fn autoupdate_signal_green_on_stock_install() {
+        // Live tree: per CONTEXT D-09 + RESEARCH § I1, stock BLADE has both
+        // anchors present (Cargo.toml line 25 + lib.rs line ~556). This test
+        // proves compute_autoupdate_signal returns Green against the real tree.
+        let result = compute_autoupdate_signal().expect("compute_autoupdate_signal");
+        assert_eq!(result.severity, Severity::Green);
+        assert_eq!(result.class, SignalClass::AutoUpdate);
+        assert_eq!(result.payload["cargo_toml_dep"], true);
+        assert_eq!(result.payload["lib_rs_init"], true);
     }
 }
