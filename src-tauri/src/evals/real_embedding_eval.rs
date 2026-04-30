@@ -229,6 +229,16 @@ fn evaluates_real_embedding_recall() {
     // pipeline has a regression.
     let s = summarize(&rows);
     let total = s.total as f32;
+
+    // Phase 17 / DOCTOR-02: record this run to history.jsonl BEFORE asserts so
+    // a failing eval still produces a JSONL row Doctor's D-05 Red tier needs.
+    // This eval has zero relaxed rows so total == asserted_total — the floor
+    // formula matches the existing assert (top3 recall on full set).
+    let floor_passed = s.total > 0
+        && (s.top3_count as f32 / total) >= 0.80
+        && s.mrr >= 0.6;
+    super::harness::record_eval_run("real_embedding_eval", &s, floor_passed);
+
     assert!(
         (s.top3_count as f32 / total) >= 0.80,
         "real-embedding top-3 recall {}/{} below 80% floor",

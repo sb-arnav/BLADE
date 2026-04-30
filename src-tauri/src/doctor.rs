@@ -116,9 +116,17 @@ pub(crate) fn suggested_fix(class: SignalClass, severity: Severity) -> &'static 
 }
 
 // ── Signal source: EvalScores (DOCTOR-02 / D-05) — Plan 17-03 ────────────────
+//
+// All four functions below (`eval_history_path`, `read_eval_history`,
+// `compute_eval_signal`, plus the helper `EvalRunRecord` struct) are
+// `#[allow(dead_code)]` because Plan 17-05 wires them into the orchestrator
+// `doctor_run_full_check`. The Plan 17-03 contract is "signal source body
+// + tests"; production callers land in Plan 17-05. Tests reach them directly
+// via the `tests` module so the symbols are exercised under cargo test.
 
 /// One parsed line from `tests/evals/history.jsonl` (Plan 17-01 producer).
 /// Mirrors the JSON shape `harness::record_eval_run` writes.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 struct EvalRunRecord {
     #[allow(dead_code)]
@@ -143,6 +151,7 @@ struct EvalRunRecord {
 /// This helper duplicates the 4-line resolution logic so doctor.rs can read
 /// the file at runtime. Honors `BLADE_EVAL_HISTORY_PATH` env override for
 /// test isolation (Pitfall 4 mitigation).
+#[allow(dead_code)]
 fn eval_history_path() -> std::path::PathBuf {
     if let Ok(p) = std::env::var("BLADE_EVAL_HISTORY_PATH") {
         return std::path::PathBuf::from(p);
@@ -158,6 +167,7 @@ fn eval_history_path() -> std::path::PathBuf {
 /// Tail-read the last `limit` lines of history.jsonl. Missing file → empty Vec
 /// (D-16: Doctor treats no history as Green). Malformed lines silently dropped
 /// via `filter_map(...ok())`. With 200 lines × ~120 bytes = ~24KB max work.
+#[allow(dead_code)]
 fn read_eval_history(limit: usize) -> Vec<EvalRunRecord> {
     let path = eval_history_path();
     let Ok(content) = std::fs::read_to_string(&path) else {
@@ -183,6 +193,7 @@ fn read_eval_history(limit: usize) -> Vec<EvalRunRecord> {
 /// Synchronous (bounded I/O — last 200 lines only). Plan 17-05's
 /// `doctor_run_full_check` will wrap in `tokio::spawn_blocking` for parallel
 /// fetch via `tokio::join!`.
+#[allow(dead_code)]
 fn compute_eval_signal() -> Result<DoctorSignal, String> {
     let history = read_eval_history(200);
     let now_ms = chrono::Utc::now().timestamp_millis();
@@ -281,6 +292,7 @@ fn compute_eval_signal() -> Result<DoctorSignal, String> {
 /// Note: "unresolved" maps operationally to "occurrences in time window"
 /// because the activity_timeline schema has no resolved flag. RESEARCH § C3
 /// documents the rationale.
+#[allow(dead_code)]
 fn compute_capgap_signal() -> Result<DoctorSignal, String> {
     let now_secs = chrono::Utc::now().timestamp();
     let now_ms = now_secs * 1000;
@@ -385,6 +397,7 @@ fn compute_capgap_signal() -> Result<DoctorSignal, String> {
 
 /// Inner classifier — testable without the `env!()` compile-time constraint.
 /// Green iff both anchors present per CONTEXT D-09; Amber otherwise.
+#[allow(dead_code)]
 fn classify_autoupdate(cargo_toml: &str, lib_rs: &str) -> Severity {
     let dep = cargo_toml.contains("tauri-plugin-updater");
     let init = lib_rs.contains("tauri_plugin_updater::Builder::new().build()");
@@ -406,6 +419,7 @@ fn classify_autoupdate(cargo_toml: &str, lib_rs: &str) -> Severity {
 /// - **Green** if BOTH anchors present (stock BLADE state — Cargo.toml line
 ///   25 has `tauri-plugin-updater = "2"` and lib.rs has the Builder init)
 /// - **Amber** if either is missing
+#[allow(dead_code)]
 fn compute_autoupdate_signal() -> Result<DoctorSignal, String> {
     let now_ms = chrono::Utc::now().timestamp_millis();
 

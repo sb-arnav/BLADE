@@ -320,6 +320,14 @@ fn evaluates_synthetic_hybrid_recall() {
     // surface in the table but do NOT contribute to floor math.
     let s = summarize(&rows);
     let asserted_total = s.asserted_total as f32;
+
+    // Phase 17 / DOCTOR-02: record this run to history.jsonl BEFORE asserts so
+    // a failing eval still produces a JSONL row Doctor's D-05 Red tier needs.
+    let floor_passed = s.asserted_total > 0
+        && (s.asserted_top3_count as f32 / asserted_total) >= 0.80
+        && s.asserted_mrr >= 0.6;
+    super::harness::record_eval_run("hybrid_search_eval", &s, floor_passed);
+
     assert!(
         (s.asserted_top3_count as f32 / asserted_total) >= 0.80,
         "asserted top-3 recall {}/{} below 80% floor",
