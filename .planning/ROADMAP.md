@@ -118,7 +118,7 @@ Plans:
 
 **Requirements:** JARVIS-01..12 (JARVIS-01/02 deferred per D-01; see 18-DEFERRAL.md)
 
-**Plans:** 13 plans across 6 waves (Wave 0: scaffolding × 4 + deferral doc; Wave 1: ego + intent_router + consent bodies; Wave 2: outbound tentacle bodies; Wave 3: dispatcher; Wave 4: commands.rs + frontend; Wave 5: verification + cold-install demo).
+**Plans:** 14 plans across 6 waves (Wave 0: scaffolding × 4 + deferral doc; Wave 1: ego + intent_router + consent bodies; Wave 2: outbound tentacle bodies; Wave 3: dispatcher; Wave 4: commands.rs + frontend + pipeline-wiring (Plan 14); Wave 5: verification + cold-install demo).
 
 Plans:
 - [ ] `18-01-PLAN.md` — Wave 0: 4 module skeletons (ego, intent_router, jarvis_dispatch, consent) + lib.rs registration. Covers JARVIS-03/04/05/06/08/11 (skeleton).
@@ -134,6 +134,7 @@ Plans:
 - [ ] `18-11-PLAN.md` — Wave 4: frontend — 6 typed Tauri wrappers + JarvisPill + ConsentDialog + MessageList/ChatPanel wiring. Covers JARVIS-05/11.
 - [ ] `18-12-PLAN.md` — Wave 5: verification — static gates + cold-install demo (BLOCKING CHECKPOINT) + 18-VERIFICATION.md. Covers JARVIS-03..12.
 - [ ] `18-13-PLAN.md` — Wave 0 (parallel): 18-DEFERRAL.md documenting JARVIS-01/02 deferral + v1.3 hand-off shape. Covers JARVIS-01/02.
+- [ ] `18-14-PLAN.md` — Wave 4: pipeline-wiring — args extraction in intent_router + Linear/Calendar concrete wiring in jarvis_dispatch + tokio::oneshot consent (request_consent + consent_respond) + commands.rs (intent, args) wiring + ConsentDialog/ChatPanel one-shot. Closes 4 plan-checker BLOCKERS. Covers JARVIS-04/05.
 
 **Success criteria (chat-first reinterpretation):**
 1. Cold install + 1 user consent → text chat → real cross-app action executes (Linear issue OR Slack post)
