@@ -17,4 +17,6 @@ Open questions surfaced during exploration that need deeper investigation before
   - Latency profile vs our current vision loop
   - License + maintenance posture
 - **Decision deadline:** Before v1.1 plan-phase for the JARVIS-moment phase
-- **Status:** open
+- **Status:** closed
+- **Verdict — closed 2026-04-30 (Phase 18 research):** Browser-harness installs ALWAYS require explicit consent. They are large, slow, and user-perceptible (downloads a Chromium binary, starts a long-lived process). Routine creds-based capability gaps (Slack OAuth, GitHub PAT, etc.) auto-prompt via the standard consent dialog. Browser/runtime installs go through a separate explicit-consent surface that surfaces install size, time-to-first-use, and disk footprint before downloading. Browser-harness adoption decision (whether to integrate it at all vs. keeping browser_native.rs + browser_agent.rs) is **deferred to v1.3** when Phase 18's chat-action spine is operational and we can measure where browser fallback is actually needed.
+- **Closer:** Phase 18 Plan 18-10 (commands.rs ego integration + Q1 verdict landing) — see `.planning/phases/18-jarvis-ptt-cross-app/18-CONTEXT.md` D-20.
