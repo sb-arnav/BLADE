@@ -1,0 +1,59 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run tauri:*)",
+      "Bash(npm run tauri dev)",
+      "Bash(npm run tauri build)",
+      "Bash(npm run dev)",
+      "Bash(npm run start)",
+      "Bash(npm run verify:*)",
+      "Bash(npm run test:e2e:*)",
+      "Bash(npm run test:e2e)",
+      "Bash(npm run lint)",
+      "Bash(npm run lint:*)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx tsc:*)",
+      "Bash(npx playwright:*)",
+      "Bash(npx vite:*)",
+      "Bash(cargo build:*)",
+      "Bash(cargo run:*)",
+      "Bash(cargo test:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(cargo fmt:*)",
+      "Bash(cargo info:*)",
+      "Bash(cargo search:*)",
+      "Bash(cargo install:*)",
+      "Bash(cargo doc:*)",
+      "Bash(cargo tree:*)",
+      "Bash(rustc --version)",
+      "Bash(cargo --version)",
+      "Bash(rust-analyzer-mcp:*)",
+      "Bash(lsof -i:*)",
+      "Bash(lsof -ti:*)",
+      "Bash(fuser:*)",
+      "Bash(pgrep -f *)",
+      "Bash(pkill -f *)"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(rm -rf /home/*)",
+      "Bash(git push --force *)",
+      "Bash(git reset --hard origin/*)",
+      "Bash(cargo install --force *)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/uat-evidence-required.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
