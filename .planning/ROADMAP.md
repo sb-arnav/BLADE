@@ -133,7 +133,7 @@ Plans:
 - [ ] `18-10-PLAN.md` — Wave 4: commands.rs ego wrap at l.~1517 + reset_retry_for_turn at function entry + research/questions.md Q1 closure. Covers JARVIS-03/06/07/08/09/10.
 - [ ] `18-11-PLAN.md` — Wave 4: frontend — 6 typed Tauri wrappers + JarvisPill + ConsentDialog + MessageList/ChatPanel wiring. Covers JARVIS-05/11.
 - [ ] `18-12-PLAN.md` — Wave 5: verification — static gates + cold-install demo (BLOCKING CHECKPOINT) + 18-VERIFICATION.md. Covers JARVIS-03..12.
-- [ ] `18-13-PLAN.md` — Wave 0 (parallel): 18-DEFERRAL.md documenting JARVIS-01/02 deferral + v1.3 hand-off shape. Covers JARVIS-01/02.
+- [x] `18-13-PLAN.md` — Wave 0 (parallel): 18-DEFERRAL.md documenting JARVIS-01/02 deferral + v1.3 hand-off shape. Covers JARVIS-01/02. ✅ shipped 2026-04-30.
 - [ ] `18-14-PLAN.md` — Wave 4: pipeline-wiring — args extraction in intent_router + Linear/Calendar concrete wiring in jarvis_dispatch + tokio::oneshot consent (request_consent + consent_respond) + commands.rs (intent, args) wiring + ConsentDialog/ChatPanel one-shot. Closes 4 plan-checker BLOCKERS. Covers JARVIS-04/05.
 
 **Success criteria (chat-first reinterpretation):**
