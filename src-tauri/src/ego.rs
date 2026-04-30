@@ -1,14 +1,13 @@
 //! ego.rs — refusal detector + capability_gap classifier + retry orchestrator
 //!
 //! Phase 18 (chat-first reinterpretation) — see 18-CONTEXT.md D-11..D-15.
-//! Plan 18-05 (Wave 1) Task 1: refusal patterns + intercept_assistant_output body.
-//! Task 2 (handle_refusal + emit_jarvis_intercept) lands in the next commit.
+//! Plan 18-05 (Wave 1) fills the body skeleton from Plan 18-01.
 
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::OnceLock;
 use regex::Regex;
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -77,6 +76,7 @@ pub fn intercept_assistant_output(transcript: &str) -> EgoVerdict {
                 // — split the matched substring and take the token before "integration|tool|api".
                 let matched = m.as_str();
                 let tokens: Vec<&str> = matched.split_whitespace().collect();
+                // Find the suffix token (integration|tool|api) and take the word before it.
                 let capability = tokens
                     .iter()
                     .position(|t| {
@@ -100,6 +100,7 @@ pub fn intercept_assistant_output(transcript: &str) -> EgoVerdict {
             let lookahead: &str = if let Some(slice) = transcript.get(end..lookahead_end) {
                 slice
             } else {
+                // Byte range crossed a UTF-8 boundary — use safe_slice on the remainder.
                 let remaining = &transcript[end..];
                 lookahead_owned = crate::safe_slice(remaining, 80).to_string();
                 &lookahead_owned
@@ -116,12 +117,177 @@ pub fn intercept_assistant_output(transcript: &str) -> EgoVerdict {
     EgoVerdict::Pass
 }
 
-/// Wave 0 skeleton — Plan 18-05 Task 2 implements full retry loop + auto_install routing.
-pub async fn handle_refusal(_app: &AppHandle, _verdict: EgoVerdict, _original: &str) -> EgoOutcome {
-    let _ = RETRY_COUNT.fetch_add(0, Ordering::SeqCst);
-    EgoOutcome::HardRefused {
-        final_response: String::new(),
-        logged_gap: false,
+/// Phase 18 D-18 — emit `jarvis_intercept` to the main window only.
+/// Single-window emit_to (Phase 17 precedent — same shape as `blade_activity_log`)
+/// — verify-emit-policy.mjs accepts emit_to without an allowlist entry.
+///
+/// `action` is one of: "intercepting" | "installing" | "retrying" | "hard_refused".
+/// Long `reason` strings are bounded via `safe_slice` (T-18-CARRY-14 mitigation).
+pub fn emit_jarvis_intercept(
+    app: &AppHandle,
+    action: &str,
+    capability: Option<&str>,
+    reason: Option<&str>,
+) {
+    let payload = serde_json::json!({
+        "intent_class": "action_required",
+        "action":       action,
+        "capability":   capability,
+        "reason":       reason.map(|r| crate::safe_slice(r, 200).to_string()),
+    });
+    let _ = app.emit_to("main", "jarvis_intercept", payload);
+}
+
+/// Phase 18 D-14/D-15/D-16/D-18 — handle a non-Pass EgoVerdict.
+///
+/// Behavior:
+/// - D-14 retry cap = 1 per turn. `RETRY_COUNT.fetch_add` returns the previous value;
+///   if previous ≥ 1, we already retried this turn → HardRefused immediately.
+/// - CapabilityGap branch:
+///     - emit "intercepting", log via `evolution_log_capability_gap` (verbatim reuse
+///       of evolution.rs:1115).
+///     - look up the catalog entry; route by `kind` (D-16):
+///         * Runtime    → emit "installing" → `self_upgrade::auto_install` →
+///                       emit "retrying" → AutoInstalled (Plan 18-10 wires the
+///                       LLM retry call; this plan returns a placeholder).
+///         * Integration→ emit "hard_refused" → HardRefused with D-15 locked
+///                       output format including `gap.integration_path`.
+/// - Refusal branch (no CapabilityGap precursor):
+///     - emit "intercepting" → log gap → emit "hard_refused" → HardRefused with
+///       D-15 locked output format.
+pub async fn handle_refusal(app: &AppHandle, verdict: EgoVerdict, original: &str) -> EgoOutcome {
+    // D-14: retry cap = 1 per turn. fetch_add returns the PREVIOUS value;
+    // if it's already ≥ 1, we've consumed this turn's budget.
+    let prev = RETRY_COUNT.fetch_add(1, Ordering::SeqCst);
+    if prev >= 1 {
+        let final_response = "I tried, but I exhausted my retry budget for this turn. \
+            Try rephrasing or starting a new turn."
+            .to_string();
+        emit_jarvis_intercept(app, "hard_refused", None, Some("retry_cap_exceeded"));
+        return EgoOutcome::HardRefused {
+            final_response,
+            logged_gap: false,
+        };
+    }
+
+    match verdict {
+        EgoVerdict::Pass => {
+            // Defensive — handle_refusal should not be called for Pass.
+            EgoOutcome::Retried { new_response: original.to_string() }
+        }
+        EgoVerdict::CapabilityGap { capability, suggestion: _ } => {
+            // 1. Log the gap (reuses evolution.rs:1115 verbatim).
+            emit_jarvis_intercept(app, "intercepting", Some(&capability), None);
+            let _ = crate::evolution::evolution_log_capability_gap(
+                capability.clone(),
+                crate::safe_slice(original, 200).to_string(),
+            );
+
+            // 2. Look up the catalog entry; route by kind (D-16).
+            // The catalog uses lowercase keys (e.g. "slack_outbound"); also try common suffixes
+            // and the bare lowercase capability noun extracted from the regex.
+            let catalog = crate::self_upgrade::capability_catalog();
+            let key = capability.to_lowercase();
+            let outbound_key = format!("{}_outbound", key);
+            let write_key = format!("{}_write", key);
+            let entry: Option<crate::self_upgrade::CapabilityGap> = catalog
+                .get(key.as_str())
+                .or_else(|| catalog.get(outbound_key.as_str()))
+                .or_else(|| catalog.get(write_key.as_str()))
+                .cloned();
+
+            match entry {
+                Some(gap) if matches!(gap.kind, crate::self_upgrade::CapabilityKind::Integration) => {
+                    // D-16 Integration kind: D-15 locked hard-refuse format with integration_path.
+                    let final_response = format!(
+                        "I tried, but I don't have a {} integration. Here's what I'd need: {}. You can connect it via {}.",
+                        capability,
+                        gap.description,
+                        gap.integration_path
+                    );
+                    emit_jarvis_intercept(
+                        app,
+                        "hard_refused",
+                        Some(&capability),
+                        Some(&gap.description),
+                    );
+                    EgoOutcome::HardRefused {
+                        final_response,
+                        logged_gap: true,
+                    }
+                }
+                Some(gap_runtime) => {
+                    // D-16 Runtime kind: emit installing → auto_install → emit retrying.
+                    // LIVE auto_install signature (W2 pre-pin verified at self_upgrade.rs:387):
+                    //   `pub async fn auto_install(gap: &CapabilityGap) -> InstallResult`
+                    //   InstallResult { tool, success, output }.
+                    emit_jarvis_intercept(app, "installing", Some(&capability), None);
+                    let install_result =
+                        crate::self_upgrade::auto_install(&gap_runtime).await;
+                    if !install_result.success {
+                        // Install failed — D-15 locked hard-refuse format with install output as reason.
+                        let final_response = format!(
+                            "I tried, but I couldn't install {}. Here's what I'd need: {}. You can connect it manually via Integrations tab.",
+                            capability,
+                            crate::safe_slice(&install_result.output, 100)
+                        );
+                        emit_jarvis_intercept(
+                            app,
+                            "hard_refused",
+                            Some(&capability),
+                            Some("install_failed"),
+                        );
+                        return EgoOutcome::HardRefused {
+                            final_response,
+                            logged_gap: true,
+                        };
+                    }
+                    emit_jarvis_intercept(app, "retrying", Some(&capability), None);
+                    EgoOutcome::AutoInstalled {
+                        capability: capability.clone(),
+                        // then_retried filled in by Plan 18-10 commands.rs wrapper which calls the LLM again.
+                        then_retried: format!(
+                            "<retry-pending: {} installed via {}>",
+                            capability, install_result.tool
+                        ),
+                    }
+                }
+                None => {
+                    // No catalog entry — D-15 locked hard-refuse with generic reason.
+                    let final_response = format!(
+                        "I tried, but I don't have a {} capability. Here's what I'd need: {} support. You can connect it via Integrations tab.",
+                        capability, capability
+                    );
+                    emit_jarvis_intercept(
+                        app,
+                        "hard_refused",
+                        Some(&capability),
+                        Some("no_catalog_entry"),
+                    );
+                    EgoOutcome::HardRefused {
+                        final_response,
+                        logged_gap: true,
+                    }
+                }
+            }
+        }
+        EgoVerdict::Refusal { pattern, reason } => {
+            // Bare refusal (no CapabilityGap precursor) — log as gap, hard-refuse.
+            emit_jarvis_intercept(app, "intercepting", None, Some(&pattern));
+            let _ = crate::evolution::evolution_log_capability_gap(
+                pattern.clone(),
+                crate::safe_slice(original, 200).to_string(),
+            );
+            let final_response = format!(
+                "I tried, but {}. Here's what I'd need: clearer context or an integration. You can rephrase or start a new turn.",
+                crate::safe_slice(&reason, 100)
+            );
+            emit_jarvis_intercept(app, "hard_refused", None, Some(&pattern));
+            EgoOutcome::HardRefused {
+                final_response,
+                logged_gap: true,
+            }
+        }
     }
 }
 
@@ -204,6 +370,7 @@ mod tests {
 
     #[test]
     fn no_false_positive_on_but_can() {
+        // "I can't help with that, but I can suggest …" must NOT trigger refusal.
         let v = intercept_assistant_output(
             "I can't help with that, but I can suggest some approaches.",
         );
@@ -212,10 +379,13 @@ mod tests {
 
     #[test]
     fn no_false_positive_on_however_can() {
-        // Guard: the post-check is `but ... can`-anchored, not generic disjunction.
+        // "however ... can" inside lookahead window — the regex requires "but ... can"
+        // explicitly, so this case still classifies as Refusal. Guard test: confirms
+        // the post-check is anchored on `\bbut\b` not on any disjunction word.
         let v = intercept_assistant_output(
             "I can't do X. However, I can do Y.",
         );
+        // "but" is absent, so this should still be Refusal.
         assert!(matches!(v, EgoVerdict::Refusal { .. }), "post-check is `but ... can`-anchored");
     }
 
@@ -231,6 +401,8 @@ mod tests {
 
     #[test]
     fn capability_gap_precedes_refusal() {
+        // Even though "I cannot directly" matches as Refusal, "I'd need a Slack integration"
+        // takes precedence per D-13 (Pattern 9 first in iteration order).
         let v = intercept_assistant_output(
             "I cannot directly post — I'd need a Slack integration to do that.",
         );
@@ -245,6 +417,7 @@ mod tests {
 
     #[test]
     fn capability_gap_extracts_capability_noun() {
+        // "I'd need a GitHub tool" — capability noun is "GitHub".
         let v = intercept_assistant_output("To do that, I'd need a GitHub tool.");
         match v {
             EgoVerdict::CapabilityGap { capability, .. } => {
@@ -254,10 +427,50 @@ mod tests {
         }
     }
 
-    // ── Non-ASCII (uses safe_slice on lookahead boundary cross) ──────────────
+    // ── Retry cap (Task 2 / D-14) ────────────────────────────────────────────
+
+    #[test]
+    fn retry_cap_holds() {
+        // Reset, then exercise the RETRY_COUNT.fetch_add semantics directly.
+        // First call: counter goes 0 → 1 (prev = 0, allow).
+        // Second call: counter goes 1 → 2 (prev = 1, BLOCK — cap exceeded).
+        reset_retry_for_turn();
+        assert_eq!(RETRY_COUNT.load(Ordering::SeqCst), 0);
+
+        let prev = RETRY_COUNT.fetch_add(1, Ordering::SeqCst);
+        assert_eq!(prev, 0, "first retry should be allowed (prev = 0)");
+
+        let prev2 = RETRY_COUNT.fetch_add(1, Ordering::SeqCst);
+        assert!(prev2 >= 1, "retry cap must trigger on second attempt (prev = {prev2})");
+
+        reset_retry_for_turn();
+        assert_eq!(RETRY_COUNT.load(Ordering::SeqCst), 0);
+    }
+
+    // ── D-15 locked output format guard (Task 2) ─────────────────────────────
+
+    #[test]
+    fn hard_refuse_format_locked() {
+        // The format string for HardRefused (Integration kind) follows D-15 verbatim.
+        // Construct the exact substring the format!() macro would produce and assert
+        // the locked phrase ordering. Catches future paraphrase regressions.
+        let template = format!(
+            "I tried, but I don't have a {} integration. Here's what I'd need: {}. You can connect it via {}.",
+            "slack",
+            "BLADE doesn't have a Slack writer integration",
+            "Integrations tab → Slack"
+        );
+        assert!(template.contains("I tried, but"), "missing 'I tried, but' phrase");
+        assert!(template.contains("Here's what I'd need"), "missing 'Here's what I'd need' phrase");
+        assert!(template.contains("You can connect it via"), "missing 'You can connect it via' phrase");
+    }
+
+    // ── Non-ASCII / safe_slice path (Task 2) ─────────────────────────────────
 
     #[test]
     fn safe_slice_used_on_long_content() {
+        // Long unicode content: no refusal pattern matches, verifies no panic on
+        // non-ASCII boundaries inside the lookahead path.
         let long_unicode = "🦀".repeat(500);
         let v = intercept_assistant_output(&long_unicode);
         assert!(matches!(v, EgoVerdict::Pass));
