@@ -61,8 +61,8 @@
     {
       "file": "src-tauri/src/action_tags.rs",
       "classification": "ACTIVE",
-      "purpose": "ACTION TAGS \u2014 Semantic action tags embedded in LLM responses.",
-      "trigger": "internal \u2014 called by src-tauri/src/commands.rs:1461",
+      "purpose": "ACTION TAGS — Semantic action tags embedded in LLM responses.",
+      "trigger": "internal — called by src-tauri/src/commands.rs:1461",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/commands.rs:1461",
@@ -76,8 +76,8 @@
     {
       "file": "src-tauri/src/activity_monitor.rs",
       "classification": "ACTIVE",
-      "purpose": "Activity Monitor \u2014 BLADE's passive user awareness layer.",
-      "trigger": "internal \u2014 called by src-tauri/src/brain.rs:1059",
+      "purpose": "Activity Monitor — BLADE's passive user awareness layer.",
+      "trigger": "internal — called by src-tauri/src/brain.rs:1059",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/brain.rs:1059",
@@ -149,7 +149,7 @@
     {
       "file": "src-tauri/src/agent_factory.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Agent Factory \u2014 NosShip-inspired \"describe it, deploy it\" agent generator.",
+      "purpose": "BLADE Agent Factory — NosShip-inspired \"describe it, deploy it\" agent generator.",
       "trigger": "#[tauri::command] factory_create_agent (+ others)",
       "ui_surface": "src/lib/tauri/agents.ts:451",
       "commands": [
@@ -188,7 +188,7 @@
       "file": "src-tauri/src/agents/executor.rs",
       "classification": "ACTIVE",
       "purpose": "Maximum number of retry attempts per step (including the first attempt).",
-      "trigger": "internal \u2014 called by src-tauri/src/agent_commands.rs:1",
+      "trigger": "internal — called by src-tauri/src/agent_commands.rs:1",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/agent_commands.rs:1",
@@ -205,8 +205,8 @@
     {
       "file": "src-tauri/src/agents/mod.rs",
       "classification": "ACTIVE",
-      "purpose": "Agent Roles \u2014 specialization templates ",
-      "trigger": "internal \u2014 called by src-tauri/src/agent_commands.rs:1",
+      "purpose": "Agent Roles — specialization templates ",
+      "trigger": "internal — called by src-tauri/src/agent_commands.rs:1",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/agent_commands.rs:1",
@@ -224,7 +224,7 @@
       "file": "src-tauri/src/agents/planner.rs",
       "classification": "ACTIVE",
       "purpose": "Stage 1 output",
-      "trigger": "internal \u2014 called by src-tauri/src/agent_commands.rs:1",
+      "trigger": "internal — called by src-tauri/src/agent_commands.rs:1",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/agent_commands.rs:1",
@@ -242,7 +242,7 @@
       "file": "src-tauri/src/agents/queue.rs",
       "classification": "ACTIVE",
       "purpose": "Module queue",
-      "trigger": "internal \u2014 called by src-tauri/src/agent_commands.rs:1",
+      "trigger": "internal — called by src-tauri/src/agent_commands.rs:1",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/agent_commands.rs:1",
@@ -260,7 +260,7 @@
       "file": "src-tauri/src/agents/thought_tree.rs",
       "classification": "ACTIVE",
       "purpose": "Complexity detection",
-      "trigger": "internal \u2014 called by src-tauri/src/agent_commands.rs:1",
+      "trigger": "internal — called by src-tauri/src/agent_commands.rs:1",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/agent_commands.rs:1",
@@ -306,7 +306,7 @@
     {
       "file": "src-tauri/src/ambient.rs",
       "classification": "ACTIVE",
-      "purpose": "Ambient intelligence monitor \u2014 runs in background from app launch.",
+      "purpose": "Ambient intelligence monitor — runs in background from app launch.",
       "trigger": "body_registry anatomy entry",
       "ui_surface": null,
       "body_registry_entry": "ambient",
@@ -317,8 +317,8 @@
     {
       "file": "src-tauri/src/audio_timeline.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Audio Timeline \u2014 always-on audio capture + smart extraction",
-      "trigger": "internal \u2014 called by src-tauri/src/brain.rs:666",
+      "purpose": "BLADE Audio Timeline — always-on audio capture + smart extraction",
+      "trigger": "internal — called by src-tauri/src/brain.rs:666",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/brain.rs:666",
@@ -335,7 +335,7 @@
     {
       "file": "src-tauri/src/audit.rs",
       "classification": "ACTIVE",
-      "purpose": "AUDIT LOG \u2014 BLADE explains its decisions.",
+      "purpose": "AUDIT LOG — BLADE explains its decisions.",
       "trigger": "#[tauri::command] audit_get_log (+ others)",
       "ui_surface": "src/lib/tauri/admin.ts:1219",
       "commands": [
@@ -359,7 +359,7 @@
     {
       "file": "src-tauri/src/authority_engine.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Authority Hierarchy \u2014 9 specialist agents with defined scopes and explicitly denied actions.",
+      "purpose": "BLADE Authority Hierarchy — 9 specialist agents with defined scopes and explicitly denied actions.",
       "trigger": "#[tauri::command] authority_get_agents (+ others)",
       "ui_surface": "src/lib/tauri/admin.ts:1143",
       "commands": [
@@ -402,8 +402,8 @@
     {
       "file": "src-tauri/src/auto_fix.rs",
       "classification": "NOT-WIRED",
-      "purpose": "Auto-Fix Pipeline \u2014 BLADE's showcase autonomous CI repair engine.",
-      "trigger": "#[tauri::command] auto_fix_analyze \u2014 registered but no invokeTyped consumer",
+      "purpose": "Auto-Fix Pipeline — BLADE's showcase autonomous CI repair engine.",
+      "trigger": "#[tauri::command] auto_fix_analyze — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -432,7 +432,7 @@
     {
       "file": "src-tauri/src/auto_reply.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Auto-Reply \u2014 drafts responses in your style when someone messages you.",
+      "purpose": "BLADE Auto-Reply — drafts responses in your style when someone messages you.",
       "trigger": "#[tauri::command] auto_reply_draft (+ others)",
       "ui_surface": "src/lib/tauri/dev_tools.ts:858",
       "commands": [
@@ -556,7 +556,7 @@
       "file": "src-tauri/src/autonomous_research.rs",
       "classification": "NOT-WIRED",
       "purpose": "BLADE identifies its own knowledge gaps and proactively researches them.",
-      "trigger": "#[tauri::command] research_list_gaps \u2014 registered but no invokeTyped consumer",
+      "trigger": "#[tauri::command] research_list_gaps — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -592,8 +592,8 @@
     {
       "file": "src-tauri/src/autoskills.rs",
       "classification": "ACTIVE",
-      "purpose": "AUTOSKILLS \u2014 Automatic capability acquisition.",
-      "trigger": "internal \u2014 called by src-tauri/src/commands.rs:1930",
+      "purpose": "AUTOSKILLS — Automatic capability acquisition.",
+      "trigger": "internal — called by src-tauri/src/commands.rs:1930",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/commands.rs:1930",
@@ -673,7 +673,7 @@
     {
       "file": "src-tauri/src/body_registry.rs",
       "classification": "ACTIVE",
-      "purpose": "BODY REGISTRY \u2014 maps every BLADE module to its biological body system.",
+      "purpose": "BODY REGISTRY — maps every BLADE module to its biological body system.",
       "trigger": "#[tauri::command] body_get_map (+ others)",
       "ui_surface": "src/lib/tauri/body.ts:208",
       "commands": [
@@ -701,8 +701,8 @@
     {
       "file": "src-tauri/src/brain_planner.rs",
       "classification": "ACTIVE",
-      "purpose": "BRAIN PLANNER \u2014 BLADE's task decomposition layer.",
-      "trigger": "internal \u2014 called by src-tauri/src/commands.rs:1303",
+      "purpose": "BRAIN PLANNER — BLADE's task decomposition layer.",
+      "trigger": "internal — called by src-tauri/src/commands.rs:1303",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/commands.rs:1303",
@@ -718,7 +718,7 @@
       "file": "src-tauri/src/brain.rs",
       "classification": "NOT-WIRED",
       "purpose": "Different models need different prompting strategies.",
-      "trigger": "#[tauri::command] brain_extract_from_exchange \u2014 registered but no invokeTyped consumer",
+      "trigger": "#[tauri::command] brain_extract_from_exchange — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -762,7 +762,7 @@
     {
       "file": "src-tauri/src/browser_agent.rs",
       "classification": "ACTIVE",
-      "purpose": "Browser automation agent for BLADE \u2014 Phase 1 of the JARVIS plan.",
+      "purpose": "Browser automation agent for BLADE — Phase 1 of the JARVIS plan.",
       "trigger": "#[tauri::command] browser_action (+ others)",
       "ui_surface": "src/lib/tauri/dev_tools.ts:772",
       "commands": [
@@ -832,7 +832,7 @@
     {
       "file": "src-tauri/src/cardiovascular.rs",
       "classification": "ACTIVE",
-      "purpose": "CARDIOVASCULAR SYSTEM \u2014 BLADE's data flow monitoring and event registry.",
+      "purpose": "CARDIOVASCULAR SYSTEM — BLADE's data flow monitoring and event registry.",
       "trigger": "#[tauri::command] cardio_get_blood_pressure (+ others)",
       "ui_surface": "src/lib/tauri/body.ts:390",
       "commands": [
@@ -865,8 +865,8 @@
     {
       "file": "src-tauri/src/causal_graph.rs",
       "classification": "NOT-WIRED",
-      "purpose": "CAUSAL GRAPH \u2014 BLADE's temporal reasoning engine.",
-      "trigger": "#[tauri::command] causal_get_insights \u2014 registered but no invokeTyped consumer",
+      "purpose": "CAUSAL GRAPH — BLADE's temporal reasoning engine.",
+      "trigger": "#[tauri::command] causal_get_insights — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -972,8 +972,8 @@
     {
       "file": "src-tauri/src/clipboard.rs",
       "classification": "NOT-WIRED",
-      "purpose": "Clipboard prefetch cache \u2014 one slot, keyed by content hash",
-      "trigger": "#[tauri::command] get_clipboard \u2014 registered but no invokeTyped consumer",
+      "purpose": "Clipboard prefetch cache — one slot, keyed by content hash",
+      "trigger": "#[tauri::command] get_clipboard — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -1009,7 +1009,7 @@
       "file": "src-tauri/src/cmd_util.rs",
       "classification": "ACTIVE",
       "purpose": "Utility for spawning subprocesses without a flash console window on Windows.",
-      "trigger": "internal \u2014 called by src-tauri/src/activity_monitor.rs:137",
+      "trigger": "internal — called by src-tauri/src/activity_monitor.rs:137",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/activity_monitor.rs:137",
@@ -1026,7 +1026,7 @@
     {
       "file": "src-tauri/src/code_sandbox.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Code Sandbox \u2014 safely execute code snippets in multiple languages.",
+      "purpose": "BLADE Code Sandbox — safely execute code snippets in multiple languages.",
       "trigger": "#[tauri::command] sandbox_run (+ others)",
       "ui_surface": "src/lib/tauri/dev_tools.ts:640",
       "commands": [
@@ -1059,7 +1059,7 @@
     {
       "file": "src-tauri/src/commands.rs",
       "classification": "ACTIVE",
-      "purpose": "Global cancel flag \u2014 set to true to abort the current chat inference.",
+      "purpose": "Global cancel flag — set to true to abort the current chat inference.",
       "trigger": "#[tauri::command] cancel_chat (+ others)",
       "ui_surface": "src/lib/tauri/chat.ts:35",
       "commands": [
@@ -1224,7 +1224,7 @@
     {
       "file": "src-tauri/src/computer_use.rs",
       "classification": "ACTIVE",
-      "purpose": "Computer Use \u2014 Blade's ability to operate the computer autonomously.",
+      "purpose": "Computer Use — Blade's ability to operate the computer autonomously.",
       "trigger": "#[tauri::command] computer_use_task (+ others)",
       "ui_surface": "src/lib/tauri/dev_tools.ts:986",
       "commands": [
@@ -1310,8 +1310,8 @@
     {
       "file": "src-tauri/src/consequence.rs",
       "classification": "NOT-WIRED",
-      "purpose": "CONSEQUENCE ENGINE \u2014 predict outcomes before acting.",
-      "trigger": "#[tauri::command] consequence_predict \u2014 registered but no invokeTyped consumer",
+      "purpose": "CONSEQUENCE ENGINE — predict outcomes before acting.",
+      "trigger": "#[tauri::command] consequence_predict — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -1332,7 +1332,7 @@
     {
       "file": "src-tauri/src/context_engine.rs",
       "classification": "ACTIVE",
-      "purpose": "CONTEXT ENGINE \u2014 Smart RAG backbone for BLADE.",
+      "purpose": "CONTEXT ENGINE — Smart RAG backbone for BLADE.",
       "trigger": "#[tauri::command] context_assemble (+ others)",
       "ui_surface": "src/lib/tauri/identity.ts:792",
       "commands": [
@@ -1364,7 +1364,7 @@
       "file": "src-tauri/src/context.rs",
       "classification": "NOT-WIRED",
       "purpose": "Get the currently focused window info",
-      "trigger": "#[tauri::command] get_active_window \u2014 registered but no invokeTyped consumer",
+      "trigger": "#[tauri::command] get_active_window — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -1406,7 +1406,7 @@
     {
       "file": "src-tauri/src/cron.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE CRON \u2014 Autonomous Scheduled Tasks",
+      "purpose": "BLADE CRON — Autonomous Scheduled Tasks",
       "trigger": "#[tauri::command] cron_add (+ others)",
       "ui_surface": "src/lib/tauri/dev_tools.ts:1417",
       "commands": [
@@ -1756,7 +1756,7 @@
       "file": "src-tauri/src/db.rs",
       "classification": "ACTIVE",
       "purpose": "Row types ",
-      "trigger": "internal \u2014 called by src-tauri/src/activity_monitor.rs:447",
+      "trigger": "internal — called by src-tauri/src/activity_monitor.rs:447",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/activity_monitor.rs:447",
@@ -1773,7 +1773,7 @@
     {
       "file": "src-tauri/src/decision_gate.rs",
       "classification": "ACTIVE",
-      "purpose": "Decision Gate \u2014 BLADE's autonomous decision classifier.",
+      "purpose": "Decision Gate — BLADE's autonomous decision classifier.",
       "trigger": "#[tauri::command] get_decision_log (+ others)",
       "ui_surface": "src/lib/tauri/admin.ts:1096",
       "commands": [
@@ -1808,7 +1808,7 @@
     {
       "file": "src-tauri/src/deep_scan/mod.rs",
       "classification": "ACTIVE",
-      "purpose": "Deep System Discovery \u2014 scans the user's machine on first run to build",
+      "purpose": "Deep System Discovery — scans the user's machine on first run to build",
       "trigger": "#[tauri::command] deep_scan_start (+ others)",
       "ui_surface": "src/lib/tauri/admin.ts:1462",
       "internal_callers": [
@@ -1844,7 +1844,7 @@
       "file": "src-tauri/src/deepgram.rs",
       "classification": "ACTIVE",
       "purpose": "BLADE Deepgram Streaming STT Client",
-      "trigger": "internal \u2014 called by src-tauri/src/ghost_mode.rs:660",
+      "trigger": "internal — called by src-tauri/src/ghost_mode.rs:660",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/ghost_mode.rs:660"
@@ -1857,8 +1857,8 @@
     {
       "file": "src-tauri/src/deeplearn.rs",
       "classification": "NOT-WIRED",
-      "purpose": "Deep Learn \u2014 Blade's mission zero.",
-      "trigger": "#[tauri::command] deeplearn_discover_sources \u2014 registered but no invokeTyped consumer",
+      "purpose": "Deep Learn — Blade's mission zero.",
+      "trigger": "#[tauri::command] deeplearn_discover_sources — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -1881,8 +1881,8 @@
     {
       "file": "src-tauri/src/discord.rs",
       "classification": "NOT-WIRED",
-      "purpose": "BLADE Discord notifications \u2014 post pulse thoughts, briefings, and",
-      "trigger": "#[tauri::command] discord_connect \u2014 registered but no invokeTyped consumer",
+      "purpose": "BLADE Discord notifications — post pulse thoughts, briefings, and",
+      "trigger": "#[tauri::command] discord_connect — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -1924,7 +1924,7 @@
       "file": "src-tauri/src/discovery.rs",
       "classification": "NOT-WIRED",
       "purpose": "Scans the user's machine for AI tools, code projects, dev environment,",
-      "trigger": "#[tauri::command] run_discovery \u2014 registered but no invokeTyped consumer",
+      "trigger": "#[tauri::command] run_discovery — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -1947,7 +1947,7 @@
     {
       "file": "src-tauri/src/dna.rs",
       "classification": "ACTIVE",
-      "purpose": "DNA \u2014 BLADE's shared knowledge query layer.",
+      "purpose": "DNA — BLADE's shared knowledge query layer.",
       "trigger": "#[tauri::command] dna_get_identity (+ others)",
       "ui_surface": "src/lib/tauri/body.ts:299",
       "commands": [
@@ -2049,8 +2049,8 @@
     {
       "file": "src-tauri/src/dream_mode.rs",
       "classification": "NOT-WIRED",
-      "purpose": "When the user is away for 20+ minutes, BLADE enters Dream Mode \u2014 processing,",
-      "trigger": "#[tauri::command] dream_is_active \u2014 registered but no invokeTyped consumer",
+      "purpose": "When the user is away for 20+ minutes, BLADE enters Dream Mode — processing,",
+      "trigger": "#[tauri::command] dream_is_active — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -2117,7 +2117,7 @@
     {
       "file": "src-tauri/src/emotional_intelligence.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Emotional Intelligence \u2014 Adaptive Empathy Engine",
+      "purpose": "BLADE Emotional Intelligence — Adaptive Empathy Engine",
       "trigger": "#[tauri::command] emotion_get_current (+ others)",
       "ui_surface": "src/lib/tauri/life_os.ts:1238",
       "commands": [
@@ -2161,7 +2161,7 @@
     {
       "file": "src-tauri/src/evolution.rs",
       "classification": "ACTIVE",
-      "purpose": "EVOLUTION ENGINE \u2014 BLADE's self-improvement loop.",
+      "purpose": "EVOLUTION ENGINE — BLADE's self-improvement loop.",
       "trigger": "#[tauri::command] evolution_get_level (+ others)",
       "ui_surface": "src/lib/tauri/admin.ts:1000",
       "commands": [
@@ -2208,7 +2208,7 @@
     {
       "file": "src-tauri/src/execution_memory.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE EXECUTION MEMORY \u2014 every shell command BLADE has ever run, stored forever.",
+      "purpose": "BLADE EXECUTION MEMORY — every shell command BLADE has ever run, stored forever.",
       "trigger": "#[tauri::command] exmem_record (+ others)",
       "ui_surface": "src/lib/tauri/admin.ts:1414",
       "commands": [
@@ -2243,7 +2243,7 @@
     {
       "file": "src-tauri/src/file_indexer.rs",
       "classification": "ACTIVE",
-      "purpose": "FILE INDEXER \u2014 BLADE indexes ALL files on the user's machine, not just code.",
+      "purpose": "FILE INDEXER — BLADE indexes ALL files on the user's machine, not just code.",
       "trigger": "#[tauri::command] file_index_scan_now (+ others)",
       "ui_surface": "src/lib/tauri/dev_tools.ts:489",
       "commands": [
@@ -2326,7 +2326,7 @@
     {
       "file": "src-tauri/src/financial_brain.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Financial Brain \u2014 Personal Finance Intelligence",
+      "purpose": "BLADE Financial Brain — Personal Finance Intelligence",
       "trigger": "#[tauri::command] finance_add_transaction (+ others)",
       "ui_surface": "src/lib/tauri/life_os.ts:586",
       "commands": [
@@ -2418,8 +2418,8 @@
     {
       "file": "src-tauri/src/ghost_mode.rs",
       "classification": "NOT-WIRED",
-      "purpose": "BLADE Ghost Mode \u2014 invisible AI overlay for meetings and chat",
-      "trigger": "#[tauri::command] ghost_start \u2014 registered but no invokeTyped consumer",
+      "purpose": "BLADE Ghost Mode — invisible AI overlay for meetings and chat",
+      "trigger": "#[tauri::command] ghost_start — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -2458,7 +2458,7 @@
     {
       "file": "src-tauri/src/git_style.rs",
       "classification": "ACTIVE",
-      "purpose": "GIT STYLE \u2014 Learn your coding style from commit history.",
+      "purpose": "GIT STYLE — Learn your coding style from commit history.",
       "trigger": "#[tauri::command] git_style_mine (+ others)",
       "ui_surface": "src/lib/tauri/dev_tools.ts:602",
       "commands": [
@@ -2491,7 +2491,7 @@
     {
       "file": "src-tauri/src/goal_engine.rs",
       "classification": "ACTIVE",
-      "purpose": "Autonomous AGI goal pursuit. Goals never fail \u2014 they change strategy.",
+      "purpose": "Autonomous AGI goal pursuit. Goals never fail — they change strategy.",
       "trigger": "#[tauri::command] goal_add (+ others)",
       "ui_surface": "src/lib/tauri/life_os.ts:755",
       "commands": [
@@ -2539,8 +2539,8 @@
     {
       "file": "src-tauri/src/godmode.rs",
       "classification": "NOT-WIRED",
-      "purpose": "God Mode v2 \u2014 BLADE's ambient intelligence layer.",
-      "trigger": "#[tauri::command] get_proactive_tasks \u2014 registered but no invokeTyped consumer",
+      "purpose": "God Mode v2 — BLADE's ambient intelligence layer.",
+      "trigger": "#[tauri::command] get_proactive_tasks — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -2576,7 +2576,7 @@
     {
       "file": "src-tauri/src/habit_engine.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Habit Engine \u2014 Streak Tracking, Friction Analysis & Smart Reminders",
+      "purpose": "BLADE Habit Engine — Streak Tracking, Friction Analysis & Smart Reminders",
       "trigger": "#[tauri::command] habit_create (+ others)",
       "ui_surface": "src/lib/tauri/life_os.ts:819",
       "commands": [
@@ -2643,7 +2643,7 @@
     {
       "file": "src-tauri/src/health_guardian.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Health Guardian \u2014 Screen Time & Wellbeing Monitor",
+      "purpose": "BLADE Health Guardian — Screen Time & Wellbeing Monitor",
       "trigger": "#[tauri::command] health_guardian_stats (+ others)",
       "ui_surface": "src/lib/tauri/life_os.ts:559",
       "commands": [
@@ -2673,7 +2673,7 @@
     {
       "file": "src-tauri/src/health_tracker.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Health Tracker \u2014 Wellbeing Intelligence Engine",
+      "purpose": "BLADE Health Tracker — Wellbeing Intelligence Engine",
       "trigger": "#[tauri::command] health_log (+ others)",
       "ui_surface": "src/lib/tauri/life_os.ts:446",
       "commands": [
@@ -2767,7 +2767,7 @@
       "file": "src-tauri/src/history.rs",
       "classification": "ACTIVE",
       "purpose": "Module history",
-      "trigger": "internal \u2014 called by src-tauri/src/commands.rs:2393",
+      "trigger": "internal — called by src-tauri/src/commands.rs:2393",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/commands.rs:2393",
@@ -2784,7 +2784,7 @@
     {
       "file": "src-tauri/src/hive.rs",
       "classification": "ACTIVE",
-      "purpose": "HIVE \u2014 BLADE's distributed agent mesh across every platform the user touches.",
+      "purpose": "HIVE — BLADE's distributed agent mesh across every platform the user touches.",
       "trigger": "#[tauri::command] hive_get_digest (+ others)",
       "ui_surface": "src/lib/tauri/hive.ts:166",
       "commands": [
@@ -2849,7 +2849,7 @@
     {
       "file": "src-tauri/src/homeostasis.rs",
       "classification": "ACTIVE",
-      "purpose": "HOMEOSTASIS \u2014 BLADE's hypothalamus + neuromodulatory hormone bus.",
+      "purpose": "HOMEOSTASIS — BLADE's hypothalamus + neuromodulatory hormone bus.",
       "trigger": "#[tauri::command] homeostasis_get (+ others)",
       "ui_surface": "src/lib/tauri/homeostasis.ts:23",
       "commands": [
@@ -2889,7 +2889,7 @@
     {
       "file": "src-tauri/src/immune_system.rs",
       "classification": "ACTIVE",
-      "purpose": "IMMUNE SYSTEM \u2014 BLADE's self-evolution coordinator.",
+      "purpose": "IMMUNE SYSTEM — BLADE's self-evolution coordinator.",
       "trigger": "#[tauri::command] immune_resolve_gap (+ others)",
       "ui_surface": "src/lib/tauri/admin.ts:1075",
       "commands": [
@@ -2910,7 +2910,7 @@
     {
       "file": "src-tauri/src/indexer.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE CODEBASE INDEXER \u2014 persistent living knowledge graph of every project.",
+      "purpose": "BLADE CODEBASE INDEXER — persistent living knowledge graph of every project.",
       "trigger": "#[tauri::command] blade_index_project (+ others)",
       "ui_surface": "src/lib/tauri/dev_tools.ts:545",
       "commands": [
@@ -2955,7 +2955,7 @@
     {
       "file": "src-tauri/src/integration_bridge.rs",
       "classification": "ACTIVE",
-      "purpose": "integration_bridge.rs \u2014 Phase 4 MCP Integration Polling",
+      "purpose": "integration_bridge.rs — Phase 4 MCP Integration Polling",
       "trigger": "#[tauri::command] integration_get_state (+ others)",
       "ui_surface": "src/lib/tauri/admin.ts:1622",
       "commands": [
@@ -2990,7 +2990,7 @@
     {
       "file": "src-tauri/src/iot_bridge.rs",
       "classification": "ACTIVE",
-      "purpose": "IoT / Smart Home bridge \u2014 Home Assistant REST API + Spotify local control",
+      "purpose": "IoT / Smart Home bridge — Home Assistant REST API + Spotify local control",
       "trigger": "#[tauri::command] iot_get_entities (+ others)",
       "ui_surface": "src/lib/tauri/iot.ts:35",
       "commands": [
@@ -3040,7 +3040,7 @@
     {
       "file": "src-tauri/src/joints.rs",
       "classification": "ACTIVE",
-      "purpose": "JOINTS \u2014 Trait-based contracts between BLADE modules.",
+      "purpose": "JOINTS — Trait-based contracts between BLADE modules.",
       "trigger": "#[tauri::command] joints_list_providers (+ others)",
       "ui_surface": "src/lib/tauri/body.ts:484",
       "commands": [
@@ -3066,8 +3066,8 @@
     {
       "file": "src-tauri/src/journal.rs",
       "classification": "NOT-WIRED",
-      "purpose": "BLADE's internal journal \u2014 written from BLADE's perspective, not for the user.",
-      "trigger": "#[tauri::command] journal_get_recent \u2014 registered but no invokeTyped consumer",
+      "purpose": "BLADE's internal journal — written from BLADE's perspective, not for the user.",
+      "trigger": "#[tauri::command] journal_get_recent — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -3096,7 +3096,7 @@
     {
       "file": "src-tauri/src/kali.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Kali \u2014 world-class security intelligence module.",
+      "purpose": "BLADE Kali — world-class security intelligence module.",
       "trigger": "#[tauri::command] kali_recon (+ others)",
       "ui_surface": "src/lib/tauri/identity.ts:935",
       "commands": [
@@ -3143,7 +3143,7 @@
     {
       "file": "src-tauri/src/knowledge_graph.rs",
       "classification": "ACTIVE",
-      "purpose": "KNOWLEDGE GRAPH \u2014 BLADE's semantic concept network.",
+      "purpose": "KNOWLEDGE GRAPH — BLADE's semantic concept network.",
       "trigger": "#[tauri::command] graph_add_node (+ others)",
       "ui_surface": "src/lib/tauri/knowledge.ts:414",
       "commands": [
@@ -3203,7 +3203,7 @@
     {
       "file": "src-tauri/src/learning_engine.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Learning Engine \u2014 behavioral pattern detection and proactive prediction.",
+      "purpose": "BLADE Learning Engine — behavioral pattern detection and proactive prediction.",
       "trigger": "#[tauri::command] learning_get_predictions (+ others)",
       "ui_surface": "src/lib/tauri/life_os.ts:1481",
       "commands": [
@@ -3237,7 +3237,7 @@
       "file": "src-tauri/src/lib.rs",
       "classification": "ACTIVE",
       "purpose": "Module lib",
-      "trigger": "Tauri entry point \u2014 generate_handler! + 35+ background task spawns",
+      "trigger": "Tauri entry point — generate_handler! + 35+ background task spawns",
       "ui_surface": null,
       "body_registry_entry": "lib",
       "reachable_paths": [
@@ -3248,7 +3248,7 @@
       "file": "src-tauri/src/main.rs",
       "classification": "ACTIVE",
       "purpose": "Prevents additional console window on Windows in release, DO NOT REMOVE!! ",
-      "trigger": "binary shim \u2014 invokes blade_lib::run()",
+      "trigger": "binary shim — invokes blade_lib::run()",
       "ui_surface": null,
       "body_registry_entry": "main",
       "reachable_paths": [
@@ -3276,8 +3276,8 @@
     {
       "file": "src-tauri/src/mcp_fs_server.rs",
       "classification": "ACTIVE",
-      "purpose": "Built-in MCP filesystem server \u2014 exposes safe file operations as MCP tools.",
-      "trigger": "internal \u2014 called by src-tauri/src/mcp.rs:504",
+      "purpose": "Built-in MCP filesystem server — exposes safe file operations as MCP tools.",
+      "trigger": "internal — called by src-tauri/src/mcp.rs:504",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/mcp.rs:504",
@@ -3293,8 +3293,8 @@
     {
       "file": "src-tauri/src/mcp_memory_server.rs",
       "classification": "ACTIVE",
-      "purpose": "Built-in MCP memory server \u2014 exposes BLADE's brain knowledge graph as MCP tools.",
-      "trigger": "internal \u2014 called by src-tauri/src/mcp.rs:503",
+      "purpose": "Built-in MCP memory server — exposes BLADE's brain knowledge graph as MCP tools.",
+      "trigger": "internal — called by src-tauri/src/mcp.rs:503",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/mcp.rs:503",
@@ -3311,7 +3311,7 @@
       "file": "src-tauri/src/mcp.rs",
       "classification": "ACTIVE",
       "purpose": "How often (seconds) the background health monitor checks for dead servers. ",
-      "trigger": "internal \u2014 called by src-tauri/src/agent_commands.rs:8",
+      "trigger": "internal — called by src-tauri/src/agent_commands.rs:8",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/agent_commands.rs:8",
@@ -3395,7 +3395,7 @@
     {
       "file": "src-tauri/src/memory_palace.rs",
       "classification": "ACTIVE",
-      "purpose": "MEMORY PALACE \u2014 BLADE's episodic long-term memory system.",
+      "purpose": "MEMORY PALACE — BLADE's episodic long-term memory system.",
       "trigger": "#[tauri::command] memory_search (+ others)",
       "ui_surface": "src/lib/tauri/knowledge.ts:487",
       "commands": [
@@ -3490,8 +3490,8 @@
     {
       "file": "src-tauri/src/metacognition.rs",
       "classification": "NOT-WIRED",
-      "purpose": "METACOGNITION \u2014 BLADE's awareness of its own cognitive state.",
-      "trigger": "#[tauri::command] metacognition_assess \u2014 registered but no invokeTyped consumer",
+      "purpose": "METACOGNITION — BLADE's awareness of its own cognitive state.",
+      "trigger": "#[tauri::command] metacognition_assess — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -3514,8 +3514,8 @@
     {
       "file": "src-tauri/src/multimodal.rs",
       "classification": "NOT-WIRED",
-      "purpose": "What's visible in the image \u2014 objects, scene, layout",
-      "trigger": "#[tauri::command] multimodal_analyze_file \u2014 registered but no invokeTyped consumer",
+      "purpose": "What's visible in the image — objects, scene, layout",
+      "trigger": "#[tauri::command] multimodal_analyze_file — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -3568,7 +3568,7 @@
     {
       "file": "src-tauri/src/native_tools.rs",
       "classification": "ACTIVE",
-      "purpose": "Built-in AI tools \u2014 always available without MCP. ",
+      "purpose": "Built-in AI tools — always available without MCP. ",
       "trigger": "#[tauri::command] run_code_block (+ others)",
       "ui_surface": "src/lib/tauri/dev_tools.ts:409",
       "commands": [
@@ -3603,7 +3603,7 @@
     {
       "file": "src-tauri/src/negotiation_engine.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Negotiation Engine \u2014 Debate Coach + Negotiation Assistant",
+      "purpose": "BLADE Negotiation Engine — Debate Coach + Negotiation Assistant",
       "trigger": "#[tauri::command] negotiation_build_argument (+ others)",
       "ui_surface": "src/lib/tauri/identity.ts:565",
       "commands": [
@@ -3674,8 +3674,8 @@
     {
       "file": "src-tauri/src/notification_listener.rs",
       "classification": "NOT-WIRED",
-      "purpose": "Phase 5 (partial): OS Notification Listener \u2014 surface Windows (and macOS/Linux) notifications to BLADE.",
-      "trigger": "#[tauri::command] notification_get_recent \u2014 registered but no invokeTyped consumer",
+      "purpose": "Phase 5 (partial): OS Notification Listener — surface Windows (and macOS/Linux) notifications to BLADE.",
+      "trigger": "#[tauri::command] notification_get_recent — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -3701,8 +3701,8 @@
     {
       "file": "src-tauri/src/obsidian.rs",
       "classification": "NOT-WIRED",
-      "purpose": "BLADE \u00d7 Obsidian \u2014 writes into your vault so everything BLADE knows",
-      "trigger": "#[tauri::command] obsidian_ensure_daily_note \u2014 registered but no invokeTyped consumer",
+      "purpose": "BLADE × Obsidian — writes into your vault so everything BLADE knows",
+      "trigger": "#[tauri::command] obsidian_ensure_daily_note — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -3747,7 +3747,7 @@
     {
       "file": "src-tauri/src/organ.rs",
       "classification": "ACTIVE",
-      "purpose": "ORGAN TRAIT \u2014 Standard interface for all BLADE organs.",
+      "purpose": "ORGAN TRAIT — Standard interface for all BLADE organs.",
       "trigger": "#[tauri::command] organ_get_registry (+ others)",
       "ui_surface": "src/lib/tauri/body.ts:243",
       "commands": [
@@ -3784,7 +3784,7 @@
     {
       "file": "src-tauri/src/overlay_manager.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Overlay Manager \u2014 HUD, toast notifications, and meeting overlay control.",
+      "purpose": "BLADE Overlay Manager — HUD, toast notifications, and meeting overlay control.",
       "trigger": "#[tauri::command] overlay_hide_hud (+ others)",
       "ui_surface": "src/features/hud/HudMenu.tsx:109",
       "commands": [
@@ -3827,7 +3827,7 @@
     {
       "file": "src-tauri/src/people_graph.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE People Graph \u2014 knows the people in your life and how to talk to each of them differently.",
+      "purpose": "BLADE People Graph — knows the people in your life and how to talk to each of them differently.",
       "trigger": "#[tauri::command] people_list (+ others)",
       "ui_surface": "src/lib/tauri/life_os.ts:1411",
       "commands": [
@@ -3882,7 +3882,7 @@
     {
       "file": "src-tauri/src/perception_fusion.rs",
       "classification": "ACTIVE",
-      "purpose": "Perception Fusion \u2014 BLADE's sensory integration layer.",
+      "purpose": "Perception Fusion — BLADE's sensory integration layer.",
       "trigger": "#[tauri::command] perception_get_latest (+ others)",
       "ui_surface": "src/lib/tauri/perception.ts:22",
       "commands": [
@@ -3912,7 +3912,7 @@
     {
       "file": "src-tauri/src/permissions.rs",
       "classification": "ACTIVE",
-      "purpose": "Tool risk level \u2014 determines whether user approval is needed",
+      "purpose": "Tool risk level — determines whether user approval is needed",
       "trigger": "#[tauri::command] classify_mcp_tool (+ others)",
       "ui_surface": "src/lib/tauri/admin.ts:749",
       "commands": [
@@ -3949,7 +3949,7 @@
     {
       "file": "src-tauri/src/persona_engine.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Persona Engine \u2014 \"Soul Deepening\" System",
+      "purpose": "BLADE Persona Engine — \"Soul Deepening\" System",
       "trigger": "#[tauri::command] persona_get_context (+ others)",
       "ui_surface": "src/lib/tauri/identity.ts:462",
       "commands": [
@@ -4029,7 +4029,7 @@
     {
       "file": "src-tauri/src/personality_mirror.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Personality Mirror \u2014 WeClone-inspired chat style extraction",
+      "purpose": "BLADE Personality Mirror — WeClone-inspired chat style extraction",
       "trigger": "#[tauri::command] personality_analyze (+ others)",
       "ui_surface": "src/lib/tauri/identity.ts:900",
       "commands": [
@@ -4065,7 +4065,7 @@
       "file": "src-tauri/src/plugins/loader.rs",
       "classification": "ACTIVE",
       "purpose": "Load all installed plugins from the plugins directory",
-      "trigger": "internal \u2014 called by src-tauri/src/plugins/registry.rs:1",
+      "trigger": "internal — called by src-tauri/src/plugins/registry.rs:1",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/plugins/registry.rs:1"
@@ -4079,7 +4079,7 @@
       "file": "src-tauri/src/plugins/mod.rs",
       "classification": "ACTIVE",
       "purpose": "Plugin manifest (blade-plugin.json)",
-      "trigger": "internal \u2014 called by src-tauri/src/plugins/loader.rs:1",
+      "trigger": "internal — called by src-tauri/src/plugins/loader.rs:1",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/plugins/loader.rs:1",
@@ -4094,7 +4094,7 @@
       "file": "src-tauri/src/plugins/registry.rs",
       "classification": "NOT-WIRED",
       "purpose": "Tauri commands for plugin management",
-      "trigger": "#[tauri::command] plugin_list \u2014 registered but no invokeTyped consumer",
+      "trigger": "#[tauri::command] plugin_list — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -4135,7 +4135,7 @@
     {
       "file": "src-tauri/src/prediction_engine.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE PREDICTION ENGINE \u2014 Anticipatory intelligence.",
+      "purpose": "BLADE PREDICTION ENGINE — Anticipatory intelligence.",
       "trigger": "#[tauri::command] prediction_get_pending (+ others)",
       "ui_surface": "src/lib/tauri/life_os.ts:1186",
       "commands": [
@@ -4185,8 +4185,8 @@
     {
       "file": "src-tauri/src/prefrontal.rs",
       "classification": "NOT-WIRED",
-      "purpose": "PREFRONTAL WORKING MEMORY \u2014 the Brain's active task scratchpad.",
-      "trigger": "#[tauri::command] prefrontal_get \u2014 registered but no invokeTyped consumer",
+      "purpose": "PREFRONTAL WORKING MEMORY — the Brain's active task scratchpad.",
+      "trigger": "#[tauri::command] prefrontal_get — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -4216,8 +4216,8 @@
     {
       "file": "src-tauri/src/proactive_engine.rs",
       "classification": "NOT-WIRED",
-      "purpose": "PROACTIVE ENGINE \u2014 BLADE's autonomous initiative layer.",
-      "trigger": "#[tauri::command] proactive_get_pending \u2014 registered but no invokeTyped consumer",
+      "purpose": "PROACTIVE ENGINE — BLADE's autonomous initiative layer.",
+      "trigger": "#[tauri::command] proactive_get_pending — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -4264,8 +4264,8 @@
     {
       "file": "src-tauri/src/proactive_vision.rs",
       "classification": "NOT-WIRED",
-      "purpose": "PROACTIVE VISION \u2014 Omi-style assistants that analyze screen on context switch.",
-      "trigger": "#[tauri::command] proactive_get_cards \u2014 registered but no invokeTyped consumer",
+      "purpose": "PROACTIVE VISION — Omi-style assistants that analyze screen on context switch.",
+      "trigger": "#[tauri::command] proactive_get_cards — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -4299,7 +4299,7 @@
       "file": "src-tauri/src/providers/anthropic.rs",
       "classification": "ACTIVE",
       "purpose": "Module anthropic",
-      "trigger": "internal \u2014 called by src-tauri/src/accountability.rs:396",
+      "trigger": "internal — called by src-tauri/src/accountability.rs:396",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/accountability.rs:396",
@@ -4317,7 +4317,7 @@
       "file": "src-tauri/src/providers/gemini.rs",
       "classification": "ACTIVE",
       "purpose": "Module gemini",
-      "trigger": "internal \u2014 called by src-tauri/src/accountability.rs:396",
+      "trigger": "internal — called by src-tauri/src/accountability.rs:396",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/accountability.rs:396",
@@ -4334,8 +4334,8 @@
     {
       "file": "src-tauri/src/providers/groq.rs",
       "classification": "ACTIVE",
-      "purpose": "Non-vision models reject array content \u2014 flatten image messages to text only",
-      "trigger": "internal \u2014 called by src-tauri/src/accountability.rs:396",
+      "purpose": "Non-vision models reject array content — flatten image messages to text only",
+      "trigger": "internal — called by src-tauri/src/accountability.rs:396",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/accountability.rs:396",
@@ -4353,7 +4353,7 @@
       "file": "src-tauri/src/providers/mod.rs",
       "classification": "ACTIVE",
       "purpose": "Shared HTTP client with timeouts. Prevents permanent hangs when network drops. ",
-      "trigger": "internal \u2014 called by src-tauri/src/accountability.rs:396",
+      "trigger": "internal — called by src-tauri/src/accountability.rs:396",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/accountability.rs:396",
@@ -4371,7 +4371,7 @@
       "file": "src-tauri/src/providers/ollama.rs",
       "classification": "ACTIVE",
       "purpose": "Module ollama",
-      "trigger": "internal \u2014 called by src-tauri/src/accountability.rs:396",
+      "trigger": "internal — called by src-tauri/src/accountability.rs:396",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/accountability.rs:396",
@@ -4389,7 +4389,7 @@
       "file": "src-tauri/src/providers/openai.rs",
       "classification": "ACTIVE",
       "purpose": "Resolve a base_url (e.g. \"https://openrouter.ai/api/v1\") to a full",
-      "trigger": "internal \u2014 called by src-tauri/src/accountability.rs:396",
+      "trigger": "internal — called by src-tauri/src/accountability.rs:396",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/accountability.rs:396",
@@ -4406,8 +4406,8 @@
     {
       "file": "src-tauri/src/pulse.rs",
       "classification": "NOT-WIRED",
-      "purpose": "PULSE \u2014 Blade's heartbeat. The thing that makes it alive.",
-      "trigger": "#[tauri::command] pulse_get_digest \u2014 registered but no invokeTyped consumer",
+      "purpose": "PULSE — Blade's heartbeat. The thing that makes it alive.",
+      "trigger": "#[tauri::command] pulse_get_digest — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -4461,7 +4461,7 @@
       "file": "src-tauri/src/rag.rs",
       "classification": "NOT-WIRED",
       "purpose": "Module rag",
-      "trigger": "#[tauri::command] rag_ingest_file \u2014 registered but no invokeTyped consumer",
+      "trigger": "#[tauri::command] rag_ingest_file — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -4490,7 +4490,7 @@
     {
       "file": "src-tauri/src/reasoning_engine.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE System 2 \u2014 true multi-step reasoning.",
+      "purpose": "BLADE System 2 — true multi-step reasoning.",
       "trigger": "#[tauri::command] reasoning_think (+ others)",
       "ui_surface": "src/lib/tauri/identity.ts:723",
       "commands": [
@@ -4532,7 +4532,7 @@
     {
       "file": "src-tauri/src/reminders.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Reminders \u2014 time-based alerts with full context.",
+      "purpose": "BLADE Reminders — time-based alerts with full context.",
       "trigger": "#[tauri::command] reminder_add (+ others)",
       "ui_surface": "src/lib/tauri/dev_tools.ts:1298",
       "commands": [
@@ -4614,7 +4614,7 @@
     {
       "file": "src-tauri/src/reproductive.rs",
       "classification": "ACTIVE",
-      "purpose": "REPRODUCTIVE SYSTEM \u2014 BLADE creates new life that inherits its DNA.",
+      "purpose": "REPRODUCTIVE SYSTEM — BLADE creates new life that inherits its DNA.",
       "trigger": "#[tauri::command] reproductive_get_dna (+ others)",
       "ui_surface": "src/lib/tauri/body.ts:449",
       "commands": [
@@ -4643,7 +4643,7 @@
       "file": "src-tauri/src/research.rs",
       "classification": "NOT-WIRED",
       "purpose": "BLADE AMBIENT RESEARCH ENGINE",
-      "trigger": "#[tauri::command] research_get_recent \u2014 registered but no invokeTyped consumer",
+      "trigger": "#[tauri::command] research_get_recent — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -4677,8 +4677,8 @@
     {
       "file": "src-tauri/src/roles.rs",
       "classification": "NOT-WIRED",
-      "purpose": "BLADE ROLES \u2014 Specialist operating modes.",
-      "trigger": "#[tauri::command] roles_list \u2014 registered but no invokeTyped consumer",
+      "purpose": "BLADE ROLES — Specialist operating modes.",
+      "trigger": "#[tauri::command] roles_list — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -4711,7 +4711,7 @@
       "file": "src-tauri/src/router.rs",
       "classification": "NOT-WIRED",
       "purpose": "Classify what kind of task a message is, to route to the right model",
-      "trigger": "#[tauri::command] classify_message \u2014 registered but no invokeTyped consumer",
+      "trigger": "#[tauri::command] classify_message — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -4736,7 +4736,7 @@
       "file": "src-tauri/src/runtimes.rs",
       "classification": "NOT-WIRED",
       "purpose": "Module runtimes",
-      "trigger": "#[tauri::command] discover_ai_runtimes \u2014 registered but no invokeTyped consumer",
+      "trigger": "#[tauri::command] discover_ai_runtimes — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -4992,8 +4992,8 @@
     {
       "file": "src-tauri/src/screen_timeline.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Total Recall \u2014 Screen Timeline",
-      "trigger": "internal \u2014 called by src-tauri/src/godmode.rs:150",
+      "purpose": "BLADE Total Recall — Screen Timeline",
+      "trigger": "internal — called by src-tauri/src/godmode.rs:150",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/godmode.rs:150",
@@ -5011,7 +5011,7 @@
       "file": "src-tauri/src/screen.rs",
       "classification": "NOT-WIRED",
       "purpose": "Module screen",
-      "trigger": "#[tauri::command] capture_screen \u2014 registered but no invokeTyped consumer",
+      "trigger": "#[tauri::command] capture_screen — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -5053,7 +5053,7 @@
     {
       "file": "src-tauri/src/security_monitor.rs",
       "classification": "ACTIVE",
-      "purpose": "Phase 9 \u2014 Security Fortress",
+      "purpose": "Phase 9 — Security Fortress",
       "trigger": "#[tauri::command] security_scan_network (+ others)",
       "ui_surface": "src/lib/tauri/admin.ts:1234",
       "commands": [
@@ -5116,8 +5116,8 @@
     {
       "file": "src-tauri/src/self_code.rs",
       "classification": "NOT-WIRED",
-      "purpose": "JITRO \u2014 BLADE codes itself.",
-      "trigger": "#[tauri::command] blade_self_code \u2014 registered but no invokeTyped consumer",
+      "purpose": "JITRO — BLADE codes itself.",
+      "trigger": "#[tauri::command] blade_self_code — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -5140,7 +5140,7 @@
     {
       "file": "src-tauri/src/self_critique.rs",
       "classification": "ACTIVE",
-      "purpose": "SELF-CRITIQUE ENGINE \u2014 BLADE's build-roast-rebuild cycle.",
+      "purpose": "SELF-CRITIQUE ENGINE — BLADE's build-roast-rebuild cycle.",
       "trigger": "#[tauri::command] self_critique_response (+ others)",
       "ui_surface": "src/lib/tauri/admin.ts:1736",
       "commands": [
@@ -5213,7 +5213,7 @@
     {
       "file": "src-tauri/src/pentest.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE PENTEST MODE \u2014 authorization gate, model routing, command surface",
+      "purpose": "BLADE PENTEST MODE — authorization gate, model routing, command surface",
       "trigger": "#[tauri::command] pentest_authorize (+ 4 others)",
       "ui_surface": "src/lib/tauri/admin.ts:946",
       "commands": [
@@ -5248,7 +5248,7 @@
       "file": "src-tauri/src/session_handoff.rs",
       "classification": "NOT-WIRED",
       "purpose": "BLADE SESSION HANDOFF",
-      "trigger": "#[tauri::command] session_handoff_clear \u2014 registered but no invokeTyped consumer",
+      "trigger": "#[tauri::command] session_handoff_clear — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -5280,8 +5280,8 @@
     {
       "file": "src-tauri/src/show_engine.rs",
       "classification": "NOT-WIRED",
-      "purpose": "SHOW ENGINE \u2014 BLADE proactively opens windows to show you things.",
-      "trigger": "#[tauri::command] show_record_request \u2014 registered but no invokeTyped consumer",
+      "purpose": "SHOW ENGINE — BLADE proactively opens windows to show you things.",
+      "trigger": "#[tauri::command] show_record_request — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -5365,7 +5365,7 @@
     {
       "file": "src-tauri/src/skeleton.rs",
       "classification": "ACTIVE",
-      "purpose": "SKELETON \u2014 Central database schema initialization.",
+      "purpose": "SKELETON — Central database schema initialization.",
       "trigger": "body_registry anatomy entry",
       "ui_surface": null,
       "body_registry_entry": "skeleton",
@@ -5376,8 +5376,8 @@
     {
       "file": "src-tauri/src/skill_engine.rs",
       "classification": "ACTIVE",
-      "purpose": "SKILL ENGINE \u2014 Blade's self-improving reflex layer.",
-      "trigger": "internal \u2014 called by src-tauri/src/brain.rs:770",
+      "purpose": "SKILL ENGINE — Blade's self-improving reflex layer.",
+      "trigger": "internal — called by src-tauri/src/brain.rs:770",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/brain.rs:770",
@@ -5393,8 +5393,8 @@
     {
       "file": "src-tauri/src/social_cognition.rs",
       "classification": "NOT-WIRED",
-      "purpose": "SOCIAL COGNITION \u2014 understanding social dynamics, not just individual people.",
-      "trigger": "#[tauri::command] social_get_advice \u2014 registered but no invokeTyped consumer",
+      "purpose": "SOCIAL COGNITION — understanding social dynamics, not just individual people.",
+      "trigger": "#[tauri::command] social_get_advice — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -5414,7 +5414,7 @@
     {
       "file": "src-tauri/src/social_graph.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Social Graph \u2014 Personal CRM with Emotional Intelligence",
+      "purpose": "BLADE Social Graph — Personal CRM with Emotional Intelligence",
       "trigger": "#[tauri::command] social_add_contact (+ others)",
       "ui_surface": "src/lib/tauri/life_os.ts:1050",
       "commands": [
@@ -5486,7 +5486,7 @@
     {
       "file": "src-tauri/src/soul_commands.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Soul \u2014 weekly character snapshot, diff, and transparency UI",
+      "purpose": "BLADE Soul — weekly character snapshot, diff, and transparency UI",
       "trigger": "#[tauri::command] soul_get_state (+ others)",
       "ui_surface": "src/lib/tauri/identity.ts:391",
       "commands": [
@@ -5532,7 +5532,7 @@
     {
       "file": "src-tauri/src/streak_stats.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Streak & Stats \u2014 gamification layer that makes people not want to uninstall.",
+      "purpose": "BLADE Streak & Stats — gamification layer that makes people not want to uninstall.",
       "trigger": "#[tauri::command] streak_get_stats (+ others)",
       "ui_surface": "src/lib/tauri/life_os.ts:1380",
       "commands": [
@@ -5563,7 +5563,7 @@
     {
       "file": "src-tauri/src/supervisor.rs",
       "classification": "ACTIVE",
-      "purpose": "SERVICE SUPERVISOR \u2014 keeps BLADE's background services alive.",
+      "purpose": "SERVICE SUPERVISOR — keeps BLADE's background services alive.",
       "trigger": "#[tauri::command] supervisor_get_health (+ others)",
       "ui_surface": "src/lib/tauri/admin.ts:1492",
       "commands": [
@@ -5593,7 +5593,7 @@
     {
       "file": "src-tauri/src/swarm_commands.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Swarm Commands \u2014 Tauri commands + coordinator loop",
+      "purpose": "BLADE Swarm Commands — Tauri commands + coordinator loop",
       "trigger": "#[tauri::command] swarm_create (+ others)",
       "ui_surface": "src/lib/tauri/agents.ts:346",
       "commands": [
@@ -5656,8 +5656,8 @@
     {
       "file": "src-tauri/src/swarm_planner.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Swarm Planner \u2014 LLM-based DAG decomposition",
-      "trigger": "internal \u2014 called by src-tauri/src/swarm_commands.rs:377",
+      "purpose": "BLADE Swarm Planner — LLM-based DAG decomposition",
+      "trigger": "internal — called by src-tauri/src/swarm_commands.rs:377",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/swarm_commands.rs:377",
@@ -5671,8 +5671,8 @@
     {
       "file": "src-tauri/src/swarm.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Swarm \u2014 Parallel Multi-Agent Orchestration",
-      "trigger": "internal \u2014 called by src-tauri/src/swarm_commands.rs:13",
+      "purpose": "BLADE Swarm — Parallel Multi-Agent Orchestration",
+      "trigger": "internal — called by src-tauri/src/swarm_commands.rs:13",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/swarm_commands.rs:13",
@@ -5689,7 +5689,7 @@
     {
       "file": "src-tauri/src/symbolic.rs",
       "classification": "ACTIVE",
-      "purpose": "SYMBOLIC REASONING LAYER \u2014 deterministic logic that LLMs can't be trusted with.",
+      "purpose": "SYMBOLIC REASONING LAYER — deterministic logic that LLMs can't be trusted with.",
       "trigger": "#[tauri::command] symbolic_check_policy (+ others)",
       "ui_surface": "src/lib/tauri/admin.ts:1314",
       "commands": [
@@ -5727,7 +5727,7 @@
     {
       "file": "src-tauri/src/sysadmin.rs",
       "classification": "ACTIVE",
-      "purpose": "SYSADMIN MODULE \u2014 Makes BLADE capable of complex system administration.",
+      "purpose": "SYSADMIN MODULE — Makes BLADE capable of complex system administration.",
       "trigger": "#[tauri::command] sysadmin_detect_hardware (+ others)",
       "ui_surface": "src/lib/tauri/admin.ts:1527",
       "commands": [
@@ -5787,8 +5787,8 @@
     {
       "file": "src-tauri/src/system_control.rs",
       "classification": "NOT-WIRED",
-      "purpose": "Phase 7: System Control \u2014 BLADE's autonomous desktop management layer.",
-      "trigger": "#[tauri::command] lock_screen \u2014 registered but no invokeTyped consumer",
+      "purpose": "Phase 7: System Control — BLADE's autonomous desktop management layer.",
+      "trigger": "#[tauri::command] lock_screen — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -5870,8 +5870,8 @@
     {
       "file": "src-tauri/src/telegram.rs",
       "classification": "NOT-WIRED",
-      "purpose": "BLADE Telegram bridge \u2014 lets users chat with BLADE through a Telegram bot.",
-      "trigger": "#[tauri::command] telegram_start \u2014 registered but no invokeTyped consumer",
+      "purpose": "BLADE Telegram bridge — lets users chat with BLADE through a Telegram bot.",
+      "trigger": "#[tauri::command] telegram_start — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -5912,7 +5912,7 @@
     {
       "file": "src-tauri/src/temporal_intel.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Temporal Intelligence \u2014 \"What was I doing N hours ago?\"",
+      "purpose": "BLADE Temporal Intelligence — \"What was I doing N hours ago?\"",
       "trigger": "#[tauri::command] temporal_what_was_i_doing (+ others)",
       "ui_surface": "src/lib/tauri/admin.ts:1367",
       "commands": [
@@ -5948,8 +5948,8 @@
     {
       "file": "src-tauri/src/tentacles/calendar_tentacle.rs",
       "classification": "NOT-WIRED",
-      "purpose": "TENTACLE: calendar_tentacle.rs \u2014 Manages schedule, meeting prep, focus blocking,",
-      "trigger": "#[tauri::command] calendar_get_today \u2014 registered but no invokeTyped consumer",
+      "purpose": "TENTACLE: calendar_tentacle.rs — Manages schedule, meeting prep, focus blocking,",
+      "trigger": "#[tauri::command] calendar_get_today — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -6015,8 +6015,8 @@
     {
       "file": "src-tauri/src/tentacles/cloud_costs.rs",
       "classification": "NOT-WIRED",
-      "purpose": "BLADE Cloud Costs Tentacle \u2014 Cloud spend monitoring and optimisation.",
-      "trigger": "#[tauri::command] cloud_check_aws_costs \u2014 registered but no invokeTyped consumer",
+      "purpose": "BLADE Cloud Costs Tentacle — Cloud spend monitoring and optimisation.",
+      "trigger": "#[tauri::command] cloud_check_aws_costs — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -6064,8 +6064,8 @@
     {
       "file": "src-tauri/src/tentacles/discord_deep.rs",
       "classification": "NOT-WIRED",
-      "purpose": "BLADE Discord Deep Tentacle \u2014 BLADE manages communities, not just watches them.",
-      "trigger": "#[tauri::command] discord_process_mentions \u2014 registered but no invokeTyped consumer",
+      "purpose": "BLADE Discord Deep Tentacle — BLADE manages communities, not just watches them.",
+      "trigger": "#[tauri::command] discord_process_mentions — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -6107,8 +6107,8 @@
     {
       "file": "src-tauri/src/tentacles/email_deep.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Email Deep Tentacle \u2014 full email management, not just monitoring.",
-      "trigger": "internal \u2014 called by src-tauri/src/brain.rs:1086",
+      "purpose": "BLADE Email Deep Tentacle — full email management, not just monitoring.",
+      "trigger": "internal — called by src-tauri/src/brain.rs:1086",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/brain.rs:1086",
@@ -6125,8 +6125,8 @@
     {
       "file": "src-tauri/src/tentacles/filesystem_watch.rs",
       "classification": "NOT-WIRED",
-      "purpose": "TENTACLE: filesystem_watch.rs \u2014 Proactive file-system management.",
-      "trigger": "#[tauri::command] filesystem_approve_move \u2014 registered but no invokeTyped consumer",
+      "purpose": "TENTACLE: filesystem_watch.rs — Proactive file-system management.",
+      "trigger": "#[tauri::command] filesystem_approve_move — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -6150,8 +6150,8 @@
     {
       "file": "src-tauri/src/tentacles/github_deep.rs",
       "classification": "NOT-WIRED",
-      "purpose": "GITHUB DEEP TENTACLE \u2014 BLADE lives inside GitHub.",
-      "trigger": "#[tauri::command] github_review_pr \u2014 registered but no invokeTyped consumer",
+      "purpose": "GITHUB DEEP TENTACLE — BLADE lives inside GitHub.",
+      "trigger": "#[tauri::command] github_review_pr — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -6223,8 +6223,8 @@
     {
       "file": "src-tauri/src/tentacles/heads.rs",
       "classification": "ACTIVE",
-      "purpose": "HEAD MODELS \u2014 Domain-specific AI coordinators for BLADE's Hive.",
-      "trigger": "internal \u2014 called by src-tauri/src/brain.rs:1086",
+      "purpose": "HEAD MODELS — Domain-specific AI coordinators for BLADE's Hive.",
+      "trigger": "internal — called by src-tauri/src/brain.rs:1086",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/brain.rs:1086",
@@ -6241,8 +6241,8 @@
     {
       "file": "src-tauri/src/tentacles/linear_jira.rs",
       "classification": "NOT-WIRED",
-      "purpose": "BLADE Linear/Jira Tentacle \u2014 Project management automation.",
-      "trigger": "#[tauri::command] linear_sync_git_to_tickets \u2014 registered but no invokeTyped consumer",
+      "purpose": "BLADE Linear/Jira Tentacle — Project management automation.",
+      "trigger": "#[tauri::command] linear_sync_git_to_tickets — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -6284,8 +6284,8 @@
     {
       "file": "src-tauri/src/tentacles/log_monitor.rs",
       "classification": "NOT-WIRED",
-      "purpose": "BLADE Log Monitor Tentacle \u2014 Production log intelligence.",
-      "trigger": "#[tauri::command] log_start_tailing \u2014 registered but no invokeTyped consumer",
+      "purpose": "BLADE Log Monitor Tentacle — Production log intelligence.",
+      "trigger": "#[tauri::command] log_start_tailing — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -6333,8 +6333,8 @@
     {
       "file": "src-tauri/src/tentacles/mod.rs",
       "classification": "ACTIVE",
-      "purpose": "TENTACLES \u2014 Platform-specific live agents that make up BLADE's Hive mesh.",
-      "trigger": "internal \u2014 called by src-tauri/src/brain.rs:1086",
+      "purpose": "TENTACLES — Platform-specific live agents that make up BLADE's Hive mesh.",
+      "trigger": "internal — called by src-tauri/src/brain.rs:1086",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/brain.rs:1086",
@@ -6351,8 +6351,8 @@
     {
       "file": "src-tauri/src/tentacles/slack_deep.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Slack Deep Tentacle \u2014 BLADE lives in Slack, not just watches it.",
-      "trigger": "internal \u2014 called by src-tauri/src/brain.rs:1086",
+      "purpose": "BLADE Slack Deep Tentacle — BLADE lives in Slack, not just watches it.",
+      "trigger": "internal — called by src-tauri/src/brain.rs:1086",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/brain.rs:1086",
@@ -6369,8 +6369,8 @@
     {
       "file": "src-tauri/src/tentacles/terminal_watch.rs",
       "classification": "ACTIVE",
-      "purpose": "TENTACLE: terminal_watch.rs \u2014 Watches terminal activity and provides intelligent assistance.",
-      "trigger": "internal \u2014 called by src-tauri/src/brain.rs:1086",
+      "purpose": "TENTACLE: terminal_watch.rs — Watches terminal activity and provides intelligent assistance.",
+      "trigger": "internal — called by src-tauri/src/brain.rs:1086",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/brain.rs:1086",
@@ -6387,8 +6387,8 @@
     {
       "file": "src-tauri/src/thread.rs",
       "classification": "NOT-WIRED",
-      "purpose": "THREAD \u2014 Blade's working memory layer.",
-      "trigger": "#[tauri::command] blade_thread_update \u2014 registered but no invokeTyped consumer",
+      "purpose": "THREAD — Blade's working memory layer.",
+      "trigger": "#[tauri::command] blade_thread_update — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -6424,7 +6424,7 @@
     {
       "file": "src-tauri/src/tool_forge.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Tool Forge \u2014 self-expanding capability engine.",
+      "purpose": "BLADE Tool Forge — self-expanding capability engine.",
       "trigger": "#[tauri::command] forge_new_tool (+ others)",
       "ui_surface": "src/lib/tauri/admin.ts:1787",
       "commands": [
@@ -6480,7 +6480,7 @@
       "file": "src-tauri/src/tray.rs",
       "classification": "NOT-WIRED",
       "purpose": "Module tray",
-      "trigger": "#[tauri::command] set_tray_status \u2014 registered but no invokeTyped consumer",
+      "trigger": "#[tauri::command] set_tray_status — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -6500,8 +6500,8 @@
     {
       "file": "src-tauri/src/tts.rs",
       "classification": "NOT-WIRED",
-      "purpose": "BLADE Text-to-Speech \u2014 OS-native + OpenAI TTS.",
-      "trigger": "#[tauri::command] tts_speak \u2014 registered but no invokeTyped consumer",
+      "purpose": "BLADE Text-to-Speech — OS-native + OpenAI TTS.",
+      "trigger": "#[tauri::command] tts_speak — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -6549,7 +6549,7 @@
     {
       "file": "src-tauri/src/typed_memory.rs",
       "classification": "ACTIVE",
-      "purpose": "TYPED MEMORY \u2014 Omi-inspired structured memory categories for BLADE.",
+      "purpose": "TYPED MEMORY — Omi-inspired structured memory categories for BLADE.",
       "trigger": "#[tauri::command] memory_store_typed (+ others)",
       "ui_surface": "src/lib/tauri/knowledge.ts:560",
       "commands": [
@@ -6684,7 +6684,7 @@
     {
       "file": "src-tauri/src/urinary.rs",
       "classification": "ACTIVE",
-      "purpose": "URINARY SYSTEM \u2014 BLADE's waste filtration and excretion.",
+      "purpose": "URINARY SYSTEM — BLADE's waste filtration and excretion.",
       "trigger": "#[tauri::command] urinary_flush (+ others)",
       "ui_surface": "src/lib/tauri/body.ts:426",
       "commands": [
@@ -6713,7 +6713,7 @@
       "file": "src-tauri/src/vad.rs",
       "classification": "ACTIVE",
       "purpose": "BLADE VAD (Voice Activity Detection) Engine",
-      "trigger": "internal \u2014 called by src-tauri/src/ghost_mode.rs:591",
+      "trigger": "internal — called by src-tauri/src/ghost_mode.rs:591",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/ghost_mode.rs:591",
@@ -6727,7 +6727,7 @@
     {
       "file": "src-tauri/src/voice_global.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Global Voice Input \u2014 push-to-talk + conversational voice mode.",
+      "purpose": "BLADE Global Voice Input — push-to-talk + conversational voice mode.",
       "trigger": "#[tauri::command] start_voice_conversation (+ others)",
       "ui_surface": "src/features/voice-orb/VoiceOrbWindow.tsx:107",
       "commands": [
@@ -6761,8 +6761,8 @@
     {
       "file": "src-tauri/src/voice_intelligence.rs",
       "classification": "NOT-WIRED",
-      "purpose": "VOICE INTELLIGENCE \u2014 Emotion-aware voice context for BLADE.",
-      "trigger": "#[tauri::command] voice_intel_start_session \u2014 registered but no invokeTyped consumer",
+      "purpose": "VOICE INTELLIGENCE — Emotion-aware voice context for BLADE.",
+      "trigger": "#[tauri::command] voice_intel_start_session — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -6822,8 +6822,8 @@
     {
       "file": "src-tauri/src/voice_local.rs",
       "classification": "NOT-WIRED",
-      "purpose": "voice_local \u2014 delegates to whisper_local for local Whisper.cpp inference.",
-      "trigger": "#[tauri::command] whisper_model_available \u2014 registered but no invokeTyped consumer",
+      "purpose": "voice_local — delegates to whisper_local for local Whisper.cpp inference.",
+      "trigger": "#[tauri::command] whisper_model_available — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -6853,7 +6853,7 @@
       "file": "src-tauri/src/voice.rs",
       "classification": "NOT-WIRED",
       "purpose": "Start recording from the default microphone",
-      "trigger": "#[tauri::command] voice_start_recording \u2014 registered but no invokeTyped consumer",
+      "trigger": "#[tauri::command] voice_start_recording — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -6895,7 +6895,7 @@
     {
       "file": "src-tauri/src/wake_word.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Wake Word Detection \u2014 \"Hey BLADE\" always-on voice activation",
+      "purpose": "BLADE Wake Word Detection — \"Hey BLADE\" always-on voice activation",
       "trigger": "#[tauri::command] set_wake_word_enabled (+ others)",
       "ui_surface": "src/lib/tauri/config.ts:239",
       "commands": [
@@ -6928,7 +6928,7 @@
     {
       "file": "src-tauri/src/watcher.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Resource Watcher \u2014 ambient intelligence for the web.",
+      "purpose": "BLADE Resource Watcher — ambient intelligence for the web.",
       "trigger": "#[tauri::command] watcher_add (+ others)",
       "ui_surface": "src/lib/tauri/dev_tools.ts:1363",
       "commands": [
@@ -6965,7 +6965,7 @@
       "file": "src-tauri/src/whisper_local.rs",
       "classification": "NOT-WIRED",
       "purpose": "Local Whisper transcription via whisper-rs (whisper.cpp bindings)",
-      "trigger": "#[tauri::command] whisper_transcribe_local \u2014 registered but no invokeTyped consumer",
+      "trigger": "#[tauri::command] whisper_transcribe_local — registered but no invokeTyped consumer",
       "ui_surface": null,
       "commands": [
         {
@@ -6989,7 +6989,7 @@
     {
       "file": "src-tauri/src/workflow_builder.rs",
       "classification": "ACTIVE",
-      "purpose": "BLADE Workflow Builder \u2014 Visual n8n-style automation engine",
+      "purpose": "BLADE Workflow Builder — Visual n8n-style automation engine",
       "trigger": "#[tauri::command] workflow_list (+ others)",
       "ui_surface": "src/lib/tauri/dev_tools.ts:698",
       "commands": [
@@ -7076,7 +7076,7 @@
     {
       "file": "src-tauri/src/provider_paste_parser.rs",
       "classification": "ACTIVE",
-      "purpose": "Shared Phase 11 paste parser \u2014 detects cURL / JSON-config / Python-SDK snippets and returns a unified ParsedProviderConfig (provider + model + base_url + api_key + headers)",
+      "purpose": "Shared Phase 11 paste parser — detects cURL / JSON-config / Python-SDK snippets and returns a unified ParsedProviderConfig (provider + model + base_url + api_key + headers)",
       "trigger": "#[tauri::command] parse_provider_paste (onboarding + Settings paste flows)",
       "ui_surface": "src/features/providers/ProviderPasteForm.tsx",
       "commands": [
@@ -7095,7 +7095,7 @@
     {
       "file": "src-tauri/src/capability_probe.rs",
       "classification": "ACTIVE",
-      "purpose": "Phase 11 capability probe \u2014 wraps providers::test_connection with a static capability-matrix lookup to populate ProviderCapabilityRecord (vision / audio / tool_calling / long_context) on key save. Idempotent, single-shot per key save (4ab464c posture).",
+      "purpose": "Phase 11 capability probe — wraps providers::test_connection with a static capability-matrix lookup to populate ProviderCapabilityRecord (vision / audio / tool_calling / long_context) on key save. Idempotent, single-shot per key save (4ab464c posture).",
       "trigger": "#[tauri::command] probe_provider_capabilities (Settings save + onboarding save)",
       "ui_surface": "src/features/providers/CapabilityPillStrip.tsx",
       "commands": [
@@ -7116,8 +7116,8 @@
     {
       "file": "src-tauri/src/deep_scan/enrichment.rs",
       "classification": "ACTIVE",
-      "purpose": "Phase 12 deep_scan enrichment \u2014 enriches scan profile with additional metadata.",
-      "trigger": "internal \u2014 called by deep_scan orchestration",
+      "purpose": "Phase 12 deep_scan enrichment — enriches scan profile with additional metadata.",
+      "trigger": "internal — called by deep_scan orchestration",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/deep_scan/mod.rs"
@@ -7128,8 +7128,8 @@
     {
       "file": "src-tauri/src/deep_scan/leads.rs",
       "classification": "ACTIVE",
-      "purpose": "Phase 12 deep_scan leads \u2014 generates actionable leads from scan results.",
-      "trigger": "internal \u2014 called by deep_scan orchestration",
+      "purpose": "Phase 12 deep_scan leads — generates actionable leads from scan results.",
+      "trigger": "internal — called by deep_scan orchestration",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/deep_scan/mod.rs"
@@ -7140,8 +7140,8 @@
     {
       "file": "src-tauri/src/deep_scan/profile.rs",
       "classification": "ACTIVE",
-      "purpose": "Phase 12 deep_scan profile \u2014 ScanProfile struct + persistence.",
-      "trigger": "internal \u2014 called by deep_scan orchestration",
+      "purpose": "Phase 12 deep_scan profile — ScanProfile struct + persistence.",
+      "trigger": "internal — called by deep_scan orchestration",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/deep_scan/mod.rs"
@@ -7152,8 +7152,8 @@
     {
       "file": "src-tauri/src/deep_scan/queue.rs",
       "classification": "ACTIVE",
-      "purpose": "Phase 12 deep_scan queue \u2014 scan job queue and prioritization.",
-      "trigger": "internal \u2014 called by deep_scan orchestration",
+      "purpose": "Phase 12 deep_scan queue — scan job queue and prioritization.",
+      "trigger": "internal — called by deep_scan orchestration",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/deep_scan/mod.rs"
@@ -7164,8 +7164,8 @@
     {
       "file": "src-tauri/src/deep_scan/rhythm.rs",
       "classification": "ACTIVE",
-      "purpose": "Phase 12 deep_scan rhythm \u2014 scheduling and cadence control for scan loops.",
-      "trigger": "internal \u2014 called by deep_scan orchestration",
+      "purpose": "Phase 12 deep_scan rhythm — scheduling and cadence control for scan loops.",
+      "trigger": "internal — called by deep_scan orchestration",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/deep_scan/mod.rs"
@@ -7176,8 +7176,8 @@
     {
       "file": "src-tauri/src/deep_scan/scanners/mod.rs",
       "classification": "ACTIVE",
-      "purpose": "Phase 12 deep_scan scanners module root \u2014 exports all scanner implementations.",
-      "trigger": "internal \u2014 re-exports from sub-modules",
+      "purpose": "Phase 12 deep_scan scanners module root — exports all scanner implementations.",
+      "trigger": "internal — re-exports from sub-modules",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/deep_scan/mod.rs"
@@ -7188,8 +7188,8 @@
     {
       "file": "src-tauri/src/deep_scan/scanners/ai_sessions.rs",
       "classification": "ACTIVE",
-      "purpose": "Phase 12 scanner \u2014 discovers active AI session directories and config files.",
-      "trigger": "internal \u2014 called by deep_scan scheduler",
+      "purpose": "Phase 12 scanner — discovers active AI session directories and config files.",
+      "trigger": "internal — called by deep_scan scheduler",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/deep_scan/scanners/mod.rs"
@@ -7200,8 +7200,8 @@
     {
       "file": "src-tauri/src/deep_scan/scanners/bookmarks.rs",
       "classification": "ACTIVE",
-      "purpose": "Phase 12 scanner \u2014 reads browser bookmarks to build context about user interests.",
-      "trigger": "internal \u2014 called by deep_scan scheduler",
+      "purpose": "Phase 12 scanner — reads browser bookmarks to build context about user interests.",
+      "trigger": "internal — called by deep_scan scheduler",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/deep_scan/scanners/mod.rs"
@@ -7212,8 +7212,8 @@
     {
       "file": "src-tauri/src/deep_scan/scanners/fs_repos.rs",
       "classification": "ACTIVE",
-      "purpose": "Phase 12 scanner \u2014 walks filesystem for local code repositories.",
-      "trigger": "internal \u2014 called by deep_scan scheduler",
+      "purpose": "Phase 12 scanner — walks filesystem for local code repositories.",
+      "trigger": "internal — called by deep_scan scheduler",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/deep_scan/scanners/mod.rs"
@@ -7224,8 +7224,8 @@
     {
       "file": "src-tauri/src/deep_scan/scanners/git_remotes.rs",
       "classification": "ACTIVE",
-      "purpose": "Phase 12 scanner \u2014 extracts git remote URLs from discovered repositories.",
-      "trigger": "internal \u2014 called by deep_scan scheduler",
+      "purpose": "Phase 12 scanner — extracts git remote URLs from discovered repositories.",
+      "trigger": "internal — called by deep_scan scheduler",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/deep_scan/scanners/mod.rs"
@@ -7236,8 +7236,8 @@
     {
       "file": "src-tauri/src/deep_scan/scanners/ide_workspaces.rs",
       "classification": "ACTIVE",
-      "purpose": "Phase 12 scanner \u2014 discovers IDE workspace configs (VS Code, JetBrains, etc.).",
-      "trigger": "internal \u2014 called by deep_scan scheduler",
+      "purpose": "Phase 12 scanner — discovers IDE workspace configs (VS Code, JetBrains, etc.).",
+      "trigger": "internal — called by deep_scan scheduler",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/deep_scan/scanners/mod.rs"
@@ -7248,8 +7248,8 @@
     {
       "file": "src-tauri/src/deep_scan/scanners/mru.rs",
       "classification": "ACTIVE",
-      "purpose": "Phase 12 scanner \u2014 reads Most Recently Used file lists from OS shell.",
-      "trigger": "internal \u2014 called by deep_scan scheduler",
+      "purpose": "Phase 12 scanner — reads Most Recently Used file lists from OS shell.",
+      "trigger": "internal — called by deep_scan scheduler",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/deep_scan/scanners/mod.rs"
@@ -7260,8 +7260,8 @@
     {
       "file": "src-tauri/src/deep_scan/scanners/shell_history.rs",
       "classification": "ACTIVE",
-      "purpose": "Phase 12 scanner \u2014 parses shell history (.zsh_history, .bash_history) for tech stack signals.",
-      "trigger": "internal \u2014 called by deep_scan scheduler",
+      "purpose": "Phase 12 scanner — parses shell history (.zsh_history, .bash_history) for tech stack signals.",
+      "trigger": "internal — called by deep_scan scheduler",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/deep_scan/scanners/mod.rs"
@@ -7272,8 +7272,8 @@
     {
       "file": "src-tauri/src/deep_scan/scanners/which_sweep.rs",
       "classification": "ACTIVE",
-      "purpose": "Phase 12 scanner \u2014 runs `which` sweep for CLI tools to detect installed stack.",
-      "trigger": "internal \u2014 called by deep_scan scheduler",
+      "purpose": "Phase 12 scanner — runs `which` sweep for CLI tools to detect installed stack.",
+      "trigger": "internal — called by deep_scan scheduler",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/deep_scan/scanners/mod.rs"
@@ -7284,13 +7284,43 @@
     {
       "file": "src-tauri/src/ecosystem.rs",
       "classification": "ACTIVE",
-      "purpose": "Phase 13 ecosystem \u2014 tentacle orchestration, emit_activity logging, observer loop management.",
+      "purpose": "Phase 13 ecosystem — tentacle orchestration, emit_activity logging, observer loop management.",
       "trigger": "#[tauri::command] ecosystem_list_tentacles (+ others)",
       "ui_surface": "src/features/settings/panes/EcosystemPane.tsx",
       "internal_callers": [],
       "body_registry_entry": "ecosystem",
       "reachable_paths": [
         "invokeTyped('ecosystem_list_tentacles') -> src-tauri/src/ecosystem.rs"
+      ]
+    },
+    {
+      "file": "src-tauri/src/doctor.rs",
+      "classification": "ACTIVE",
+      "purpose": "DOCTOR MODULE (Phase 17) — diagnostic aggregator surfacing 5 signal classes (eval scores, capability gaps, tentacle health, config drift, auto-update) into the Diagnostics admin tab; emits doctor_event on warn-tier transitions per D-20 + ActivityStrip line per D-21/M-07.",
+      "trigger": "#[tauri::command] doctor_run_full_check / doctor_get_recent / doctor_get_signal",
+      "ui_surface": "src/features/admin/DoctorPane.tsx:1",
+      "commands": [
+        {
+          "name": "doctor::doctor_run_full_check",
+          "registered": "src-tauri/src/doctor.rs:771",
+          "invoked_from": "src/lib/tauri/admin.ts:1853"
+        },
+        {
+          "name": "doctor::doctor_get_recent",
+          "registered": "src-tauri/src/doctor.rs:827",
+          "invoked_from": "src/lib/tauri/admin.ts:1867"
+        },
+        {
+          "name": "doctor::doctor_get_signal",
+          "registered": "src-tauri/src/doctor.rs:842",
+          "invoked_from": "src/lib/tauri/admin.ts:1880"
+        }
+      ],
+      "internal_callers": [],
+      "reachable_paths": [
+        "invokeTyped(\"doctor_run_full_check\") -> src-tauri/src/doctor.rs:771",
+        "invokeTyped(\"doctor_get_recent\") -> src-tauri/src/doctor.rs:827",
+        "invokeTyped(\"doctor_get_signal\") -> src-tauri/src/doctor.rs:842"
       ]
     }
   ],
@@ -9445,7 +9475,7 @@
       "section": "core",
       "palette_visible": true,
       "shortcut": null,
-      "data_shape": "EcosystemPane \u2014 tentacle enable/disable toggles, Phase 13 self-configuring ecosystem",
+      "data_shape": "EcosystemPane — tentacle enable/disable toggles, Phase 13 self-configuring ecosystem",
       "data_source": [],
       "flow_status": "data pipes"
     },
@@ -9456,7 +9486,7 @@
       "section": "core",
       "palette_visible": true,
       "shortcut": null,
-      "data_shape": "palette-only LockScreenAction \u2014 calls lockScreen() on mount then navigates to settings",
+      "data_shape": "palette-only LockScreenAction — calls lockScreen() on mount then navigates to settings",
       "data_source": [],
       "flow_status": "data pipes"
     },
@@ -9467,7 +9497,7 @@
       "section": "identity",
       "palette_visible": true,
       "shortcut": null,
-      "data_shape": "ProfileView \u2014 user profile from Phase 12 scan identity context",
+      "data_shape": "ProfileView — user profile from Phase 12 scan identity context",
       "data_source": [],
       "flow_status": "placeholder"
     }
@@ -10855,7 +10885,7 @@
       "disk_persisted": true,
       "classification": "ACTIVE",
       "ui_surface": null,
-      "control_type": "complex (ScanClassesEnabled struct \u2014 per-class bool map)"
+      "control_type": "complex (ScanClassesEnabled struct — per-class bool map)"
     },
     {
       "field": "BladeConfig.ecosystem_tentacles",
@@ -10864,7 +10894,7 @@
       "disk_persisted": true,
       "classification": "ACTIVE",
       "ui_surface": "src/features/settings/panes/EcosystemPane.tsx",
-      "control_type": "complex (Vec<TentacleRecord> \u2014 managed by ecosystem.rs)"
+      "control_type": "complex (Vec<TentacleRecord> — managed by ecosystem.rs)"
     },
     {
       "field": "BladeConfig.ecosystem_observe_only",
@@ -10873,7 +10903,7 @@
       "disk_persisted": true,
       "classification": "ACTIVE",
       "ui_surface": null,
-      "control_type": "boolean \u2014 guardrail M-03 (observe-only mode for v1.1)"
+      "control_type": "boolean — guardrail M-03 (observe-only mode for v1.1)"
     }
   ],
   "not_wired_backlog": [
@@ -10886,7 +10916,7 @@
         "src-tauri/src/auto_fix.rs:964"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10897,7 +10927,7 @@
         "src-tauri/src/autonomous_research.rs:424"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10910,7 +10940,7 @@
         "src-tauri/src/brain.rs:1855"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10923,7 +10953,7 @@
         "src-tauri/src/causal_graph.rs:784"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10934,7 +10964,7 @@
         "src-tauri/src/clipboard.rs:429"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10955,7 +10985,7 @@
         "src-tauri/src/context.rs:405"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10965,7 +10995,7 @@
         "src-tauri/src/deeplearn.rs:160"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10977,7 +11007,7 @@
         "src-tauri/src/discord.rs:201"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "deferred to v1.2 \u2014 acting capability (M-03 observe-only guardrail)"
+      "deferral_rationale": "deferred to v1.2 — acting capability (M-03 observe-only guardrail)"
     },
     {
       "item_type": "module",
@@ -10987,7 +11017,7 @@
         "src-tauri/src/discovery.rs:689"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -10998,7 +11028,7 @@
         "src-tauri/src/dream_mode.rs:534"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11010,7 +11040,7 @@
         "src-tauri/src/ghost_mode.rs:930"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11021,7 +11051,7 @@
         "src-tauri/src/godmode.rs:139"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11031,7 +11061,7 @@
         "src-tauri/src/journal.rs:180"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11040,7 +11070,7 @@
         "src-tauri/src/metacognition.rs:373"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11055,7 +11085,7 @@
         "src-tauri/src/multimodal.rs:604"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11065,7 +11095,7 @@
         "src-tauri/src/notification_listener.rs:80"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11078,7 +11108,7 @@
         "src-tauri/src/obsidian.rs:222"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11091,7 +11121,7 @@
         "src-tauri/src/plugins/registry.rs:26"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11101,7 +11131,7 @@
         "src-tauri/src/prefrontal.rs:157"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11115,7 +11145,7 @@
         "src-tauri/src/proactive_engine.rs:875"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11126,7 +11156,7 @@
         "src-tauri/src/proactive_vision.rs:511"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11140,7 +11170,7 @@
         "src-tauri/src/pulse.rs:1089"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11151,7 +11181,7 @@
         "src-tauri/src/rag.rs:184"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11162,7 +11192,7 @@
         "src-tauri/src/research.rs:276"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11173,7 +11203,7 @@
         "src-tauri/src/roles.rs:310"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11182,7 +11212,7 @@
         "src-tauri/src/router.rs:164"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11217,7 +11247,7 @@
         "src-tauri/src/runtimes.rs:5738"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11229,7 +11259,7 @@
         "src-tauri/src/screen.rs:232"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11239,7 +11269,7 @@
         "src-tauri/src/self_code.rs:132"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11250,7 +11280,7 @@
         "src-tauri/src/session_handoff.rs:159"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "deferred to v1.2 \u2014 acting capability (M-03 observe-only guardrail)"
+      "deferral_rationale": "deferred to v1.2 — acting capability (M-03 observe-only guardrail)"
     },
     {
       "item_type": "module",
@@ -11261,7 +11291,7 @@
         "src-tauri/src/show_engine.rs:251"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11270,7 +11300,7 @@
         "src-tauri/src/social_cognition.rs:148"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11289,7 +11319,7 @@
         "src-tauri/src/system_control.rs:599"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11302,7 +11332,7 @@
         "src-tauri/src/telegram.rs:462"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11318,7 +11348,7 @@
         "src-tauri/src/tentacles/calendar_tentacle.rs:943"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11331,7 +11361,7 @@
         "src-tauri/src/tentacles/cloud_costs.rs:952"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11343,7 +11373,7 @@
         "src-tauri/src/tentacles/discord_deep.rs:684"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11352,7 +11382,7 @@
         "src-tauri/src/tentacles/filesystem_watch.rs:653"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11369,7 +11399,7 @@
         "src-tauri/src/tentacles/github_deep.rs:1945"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11381,7 +11411,7 @@
         "src-tauri/src/tentacles/linear_jira.rs:852"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11394,7 +11424,7 @@
         "src-tauri/src/tentacles/log_monitor.rs:594"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11405,7 +11435,7 @@
         "src-tauri/src/thread.rs:179"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11427,7 +11457,7 @@
         "src-tauri/src/tts.rs:690"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11439,7 +11469,7 @@
         "src-tauri/src/voice.rs:199"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11454,7 +11484,7 @@
         "src-tauri/src/voice_intelligence.rs:678"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11465,7 +11495,7 @@
         "src-tauri/src/voice_local.rs:18"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "module",
@@ -11474,7 +11504,7 @@
         "src-tauri/src/whisper_local.rs:395"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11483,7 +11513,7 @@
         "src-tauri/src/config.rs:247"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11492,7 +11522,7 @@
         "src-tauri/src/config.rs:249"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11501,7 +11531,7 @@
         "src-tauri/src/config.rs:253"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11510,7 +11540,7 @@
         "src-tauri/src/config.rs:261"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11519,7 +11549,7 @@
         "src-tauri/src/config.rs:263"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11528,7 +11558,7 @@
         "src-tauri/src/config.rs:265"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11537,7 +11567,7 @@
         "src-tauri/src/config.rs:267"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11546,7 +11576,7 @@
         "src-tauri/src/config.rs:269"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11555,7 +11585,7 @@
         "src-tauri/src/config.rs:271"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11564,7 +11594,7 @@
         "src-tauri/src/config.rs:273"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11573,7 +11603,7 @@
         "src-tauri/src/config.rs:275"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11582,7 +11612,7 @@
         "src-tauri/src/config.rs:277"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11591,7 +11621,7 @@
         "src-tauri/src/config.rs:279"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11600,7 +11630,7 @@
         "src-tauri/src/config.rs:289"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11609,7 +11639,7 @@
         "src-tauri/src/config.rs:292"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11618,7 +11648,7 @@
         "src-tauri/src/config.rs:295"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11627,7 +11657,7 @@
         "src-tauri/src/config.rs:301"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11636,7 +11666,7 @@
         "src-tauri/src/config.rs:304"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11645,7 +11675,7 @@
         "src-tauri/src/config.rs:310"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11654,7 +11684,7 @@
         "src-tauri/src/config.rs:313"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11663,7 +11693,7 @@
         "src-tauri/src/config.rs:316"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11672,7 +11702,7 @@
         "src-tauri/src/config.rs:319"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11681,7 +11711,7 @@
         "src-tauri/src/config.rs:322"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11690,7 +11720,7 @@
         "src-tauri/src/config.rs:325"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11699,7 +11729,7 @@
         "src-tauri/src/config.rs:76"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11708,7 +11738,7 @@
         "src-tauri/src/config.rs:78"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11717,7 +11747,7 @@
         "src-tauri/src/config.rs:82"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11726,7 +11756,7 @@
         "src-tauri/src/config.rs:90"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11735,7 +11765,7 @@
         "src-tauri/src/config.rs:92"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11744,7 +11774,7 @@
         "src-tauri/src/config.rs:94"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11753,7 +11783,7 @@
         "src-tauri/src/config.rs:96"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11762,7 +11792,7 @@
         "src-tauri/src/config.rs:98"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11771,7 +11801,7 @@
         "src-tauri/src/config.rs:100"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11780,7 +11810,7 @@
         "src-tauri/src/config.rs:102"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11789,7 +11819,7 @@
         "src-tauri/src/config.rs:104"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11798,7 +11828,7 @@
         "src-tauri/src/config.rs:106"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11807,7 +11837,7 @@
         "src-tauri/src/config.rs:108"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11816,7 +11846,7 @@
         "src-tauri/src/config.rs:118"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11825,7 +11855,7 @@
         "src-tauri/src/config.rs:120"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11834,7 +11864,7 @@
         "src-tauri/src/config.rs:122"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11843,7 +11873,7 @@
         "src-tauri/src/config.rs:128"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11852,7 +11882,7 @@
         "src-tauri/src/config.rs:130"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11861,7 +11891,7 @@
         "src-tauri/src/config.rs:135"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11870,7 +11900,7 @@
         "src-tauri/src/config.rs:137"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11879,7 +11909,7 @@
         "src-tauri/src/config.rs:139"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11888,7 +11918,7 @@
         "src-tauri/src/config.rs:141"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11897,7 +11927,7 @@
         "src-tauri/src/config.rs:144"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11906,7 +11936,7 @@
         "src-tauri/src/config.rs:147"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11915,7 +11945,7 @@
         "src-tauri/Cargo.toml:62"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     },
     {
       "item_type": "config",
@@ -11924,7 +11954,7 @@
         "src-tauri/src/providers/anthropic.rs:358"
       ],
       "phase_14_owner": "DEFERRED_V1_2",
-      "deferral_rationale": "Deferred to v1.2 \u2014 Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
+      "deferral_rationale": "Deferred to v1.2 — Phase 14 WIRE2 scope was settings pane wiring (voice/privacy/appearance) and dashboard cards only. Full module wiring planned for v1.2 wiring sweep."
     }
   ],
   "dead_deletion_plan": [
@@ -11935,7 +11965,7 @@
       ],
       "imports": [],
       "safe_to_delete": true,
-      "deletion_note": "Legacy field with #[serde(default, skip_serializing)] \u2014 only read during load_config() to migrate plaintext keys into the keyring, then cleared. Never written. Kept for backwards compatibility; once telemetry confirms no users still have plaintext config.json, this field can be removed in Phase 14."
+      "deletion_note": "Legacy field with #[serde(default, skip_serializing)] — only read during load_config() to migrate plaintext keys into the keyring, then cleared. Never written. Kept for backwards compatibility; once telemetry confirms no users still have plaintext config.json, this field can be removed in Phase 14."
     }
   ]
 }
