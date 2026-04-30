@@ -1,139 +1,233 @@
-# Requirements: v1.2 — Acting Layer with Brain Foundation
+# Requirements: v1.3 — Self-extending Agent Substrate
 
-**Defined:** 2026-04-29 | **Source:** `.planning/notes/v1-2-milestone-shape.md` (locked 2026-04-29)
+**Defined:** 2026-04-30 | **Source:** `/home/arnav/research/` (voyager-loop-play, vs-hermes, synthesis-blade-architecture, blade-as-organism, steelman-against-organism, open-questions-answered) + chat-first pivot memory
 
-**Authority:** PROJECT.md (`Current Milestone: v1.2`), STATE.md (locked decisions M-01..M-07).
+**Authority:** PROJECT.md (`Current Milestone: v1.3`), STATE.md (locked decisions M-01..M-12), `milestones/v1.2-MILESTONE-AUDIT.md` (v1.2 close + carry-overs).
 
-**Phases:** 16–20 (continues global numbering per M-05; v1.1 ended at 15).
+**Phases:** 21–27 (continues global numbering per M-05/M-12; v1.2 ended at 20).
 
-48 requirements grouped by 5 phase clusters. Every requirement maps to exactly one phase via the Traceability section. Requirement quality: specific, testable, atomic, independent.
-
----
-
-## Eval Scaffolding (EVAL) — Phase 16
-
-- [x] **EVAL-01
-**: `tests/evals/` directory exists with shared harness pattern (fixture builders, RR/MRR helpers, scored-table printer) — *file present, exported helpers used by ≥2 eval modules*
-- [x] **EVAL-02**
-: Knowledge-graph integrity eval — fixture corpus stored via `add_node` / `add_edge`, idempotent-merge path exercised (resolves missing `consolidate_kg`), asserts zero orphan nodes + edge endpoints all present + edge upsert no-dup — *cargo test --lib evals::kg_integrity_eval green; 5/5 dimensions pass; MRR 1.000 (Plan 16-04)*
-- [x] **EVAL-03
-**: BM25 / hybrid-search regression gate preserves existing 8/8-asserted floor (synthetic 4-dim) + 3 new adversarial fixtures (long content, unicode, near-duplicates) — *embeddings::memory_recall_eval extends with adversarial cases, MRR ≥ 0.6 floor holds*
-- [x] **EVAL-04**: typed_memory category recall eval — 7-category fixture (Fact / Preference / Decision / Skill / Goal / Routine / Relationship), `recall_by_category` returns expected sets — *cargo test --lib evals::typed_memory_eval green; 7/7 categories round-trip + cross-category isolation; MRR 1.000 (Plan 16-05)*
-- [x] **EVAL-05**: Evolution capability-gap detection eval — synthetic stderr / command-failure blobs fed to `detect_missing_tool`, asserts correct catalog entry returned for each — *cargo test --lib evals::capability_gap_eval green; 7/7 cases pass (4 positive + 1 false-positive regression + 2 negative); MRR 1.000; live function lives at `self_upgrade::detect_missing_tool` (REQ wording said `evolution::` — RESEARCH §5 resolved, no re-export added) (Plan 16-06)*
-- [x] **EVAL-06**: Every eval module prints scored table to stdout in the existing `memory_recall_real_embedding` format (label / top1 / top3 / rr / top3-ids / wanted) — *`bash scripts/verify-eval.sh` greps stdout for ┌── delimiter; ≥5 tables emitted; exit 0 (Plan 16-07)*
-- [x] **EVAL-07**: `verify:eval` gate added to `verify:all` chain (live count moves from 30 → 31; spec count was "27 → 28+") — *npm run verify:all exits 0 with verify:eval at chain tail; bash wrapper at scripts/verify-eval.sh (Plan 16-07)*
-- [x] **EVAL-08**: `tests/evals/DEFERRED.md` lists LLM-API-dependent evals (extract_conversation_facts precision, weekly_memory_consolidation correctness, evolution suggestion quality) as v1.3 candidates with rationale + budget estimate — *3 entries each with Rationale / Budget / Promotion Trigger paragraphs; zero TBDs (Plan 16-07)*
+39 requirements grouped by 7 phase clusters. Every requirement maps to exactly one phase via the Traceability section. Requirement quality: specific, testable, atomic, independent. REQ-IDs continue from v1.2 categories where carry-forward (JARVIS-01/02 from v1.2 Phase 18 deferral); new categories introduced for v1.3 substrate work.
 
 ---
 
-## Doctor Module (DOCTOR) — Phase 17
+## Skills v2 / agentskills.io adoption (SKILLS) — Phase 21
 
-- [x] **DOCTOR-01
-**: `doctor.rs` module with three Tauri commands: `doctor_run_full_check`, `doctor_get_recent`, `doctor_get_signal` — *registered in lib.rs generate_handler!, callable from frontend*
-- [x] **DOCTOR-02**: Eval-score-history signal source — reads Phase 16 eval output history from `tests/evals/` artifact storage and surfaces score trend per eval module — *doctor_get_signal "eval_history" returns ≥1 series* — **Shipped Plan 17-03 (commit `d416c4c`)**: `compute_eval_signal` reads tests/evals/history.jsonl tail-200, classifies severity per D-05 (Red on floor breach / Amber on ≥10% drop / Green); JSONL producer wired into all 5 Phase 16 eval modules in commit `1227c39`.
-- [x] **DOCTOR-03**: Capability-gap log aggregation — counts + recency per capability via `evolution_log_capability_gap` consumer — *doctor_get_signal "capability_gaps" returns aggregated table* — **Shipped Plan 17-03 (commit `6e93fb0`)**: `compute_capgap_signal` queries activity_timeline via json_extract(metadata, '$.capability') with 24h+7d window aggregation; classifies severity per D-06 (Red ≥3 in 7d / Amber ≥1 in 24h / Green).
-- [x] **DOCTOR-04**: Tentacle health signal source — surfaces which observers are alive / stale / failing — *doctor_get_signal "tentacles" returns per-tentacle state row* — **Shipped Plan 17-04 (commit `6ccfdfd`)**: `compute_tentacle_signal` aggregates `supervisor::supervisor_get_health()` (6 BLADE services with status enum + last_heartbeat) + `integration_bridge::get_per_service_last_poll()` (MCP integrations, disabled filtered) into worst-of severity rollup; inner `classify_tentacle(now_secs, last_heartbeat, status)` helper covers all D-07 branches (Red on dead/≥24h; Amber on restarting/unknown/≥1h; Green otherwise); 5 unit tests prove every branch.
-- [x] **DOCTOR-05**: Config drift detection — ledger consistency + scan-profile age signals — *doctor_get_signal "drift" surfaces ≥1 drift indicator (or "none" green)* — **Shipped Plan 17-04 (commit `33ddf46`)**: `compute_drift_signal` combines `check_migration_ledger()` (Node child-process spawn of `scripts/verify-migration-ledger.mjs` with exit-code 0/1 parsing + graceful fallback) + `scan_profile_age_days()` (filesystem read of deep_scan::load_results_pub().scanned_at, ms→days); inner `classify_drift(ledger_drift, profile_age_days)` helper covers all D-08 branches (Red on both, Amber on either, Green on neither; None profile_age treated as stale per Recommendation A5); 6 unit tests prove every verdict.
-- [x] **DOCTOR-06
-**: `doctor_event` Tauri event emitted on regression detected (eval score drop ≥10%, tentacle dead ≥1h, gap-log spike) — *event_logger.rs registers emit, payload schema documented*
-- [x] **DOCTOR-07**: Diagnostics admin tab extended with Doctor pane (Diagnostics surface already exists) — *route reachable, NavRail link or Diagnostics sub-tab* — **Shipped Plan 17-06 (commit `f418c04`)**: 7th 'Doctor' sub-tab appended to Diagnostics.tsx (existing 6 preserved); `prefs['admin.activeTab'] = 'diag:doctor'` round-trips via readInitialTab guard; lazy-loaded DoctorPane with Suspense + ListSkeleton fallback per UI-SPEC § 4.1.
-- [x] **DOCTOR-08**: Severity-tiered visual hierarchy (green / amber / red) per signal class — *DOM elements carry severity classes; verify:contrast green per tier* — **Shipped Plan 17-06 (commit `849d957`)**: `.doctor-row[data-severity=*]` rules in admin-rich-c.css use canonical `--status-success` / `--a-warm` / `--status-error` / `--status-idle` / `--t-4` tokens (5 stripe rules + Badge tone mapping in DoctorPane.tsx); ZERO ghost tokens (verified by shell loop against tokens.css/typography.css/motion.css/primitives.css).
-- [x] **DOCTOR-09**: Per-signal drill-down — click row → drawer with raw data + last-changed timestamp + suggested fix copy — *click handler opens drawer; drawer renders signal payload* — **Shipped Plan 17-06 (commit `faa0c35`)**: `<button>` row click handler sets `openClass`; Dialog primitive opens with `triggerRef` from per-row ref map (Pitfall 5 mitigation); drawer renders SUGGESTED FIX section + RAW PAYLOAD `<pre>` with `JSON.stringify(payload, null, 2)` + last-changed timestamp via `formatTimestamp()`.
-- [x] **DOCTOR-10**: Auto-update presence check folded in — Doctor surfaces "no auto-update channel" as amber if `tauri-plugin-updater` not wired in `tauri.conf.json` — *doctor_get_signal "auto_update" returns wired/unwired* — **Shipped Plan 17-03 (commit `6e93fb0`)**: `compute_autoupdate_signal` greps Cargo.toml + lib.rs for the `tauri-plugin-updater` dep + Builder init; classifies per D-09 (Green if both present, Amber if either missing); inner `classify_autoupdate(cargo_toml, lib_rs)` helper makes all 4 branches unit-testable; live-tree integration test confirms Green on stock BLADE.
+The substrate prerequisite. Without SKILL.md format + lazy-load + workspace→user→bundled resolution, Phase 22's autoskills.rs has no coherent place to write to.
+
+- [ ] **SKILLS-01**: `SKILL.md` parser reads YAML frontmatter (name, description ≤1024 chars, optional license/compatibility/metadata/allowed-tools) + Markdown body — *unit test: parse valid SKILL.md → struct round-trips; parse invalid frontmatter → typed error with field name*
+- [ ] **SKILLS-02**: Skill directory layout enforced — `<skill-name>/SKILL.md` (required), optional `scripts/`, `references/`, `assets/` subdirs — *validator rejects missing SKILL.md; tolerates missing optional subdirs*
+- [ ] **SKILLS-03**: Progressive disclosure implemented — frontmatter (name + description, ~100 tokens) loaded at startup; body loaded on activation; `references/`/`scripts/` loaded only when SKILL body explicitly references them — *integration test: 5 skills loaded, body-bytes-loaded count == 0 until first activation; loaded count == 1·body after first activation; references untouched until body cites a reference path*
+- [ ] **SKILLS-04**: Skill resolution order = workspace (`<repo>/skills/`) → user (`~/.blade/skills/`) → bundled (`<binary>/skills/`); workspace wins on name collision — *unit test: same-name skill in two paths, workspace path's body returned*
+- [ ] **SKILLS-05**: Skill validator (`blade skill validate <path>`) returns structured verdict (valid/invalid + field-level errors + warning if body >5000 tokens) — *CLI exit 0 on valid, 1 on invalid; stderr lists each violation*
+- [ ] **SKILLS-06**: 3 bundled exemplar skills land at `<repo>/skills/` — one re-imports a built-in tool as a skill (e.g. `git-status-summary` wrapping `bash`), one uses `references/` for deeper docs, one uses `scripts/` with executable code that calls back into the runtime — *all 3 pass `blade skill validate`; all 3 activate from chat*
+- [ ] **SKILLS-07**: First-run script execution requires explicit user consent (per cumulative-culture / steelman Arg 9 trust model) — `scripts/*` execution prompts a one-time consent dialog per (skill_name, script_path) tuple, persisted via existing consent infrastructure (extends v1.2 consent_decisions table) — *unit test: skill with `scripts/foo.py` invoked → consent prompt fires; allow_always persists; subsequent invocations skip prompt*
+- [ ] **SKILLS-08**: New `verify:skill-format` gate in `verify:all` chain — runs validator across all bundled skills + asserts directory layout + asserts no skill body exceeds 5000 tokens (warning ≥4000) — *bash scripts/verify-skill-format.sh exits 0 on green; verify:all chain count moves 31 → 32*
 
 ---
 
-## JARVIS Push-to-Talk → Cross-App Action (JARVIS) — Phase 18
+## Voyager loop closure (VOYAGER) — Phase 22
 
-- [ ] **JARVIS-01**: Push-to-talk global hotkey registered (configurable; default `Ctrl+Alt+Space` on Win / `Cmd+Opt+Space` on Mac) — *register_global_shortcut succeeds, releases on app exit*
-- [ ] **JARVIS-02**: PTT flow captures audio → Whisper STT (existing `voice.rs` or `whisper_local` if feature flag set) → text — *transcript returned to dispatcher*
-- [x] **JARVIS-03
-**: Command intent classification routes transcript to either chat or tool-dispatch path — *intent_router::classify returns IntentClass enum*
-- [x] **JARVIS-04
-**: Cross-app dispatch reuses existing observer tentacle credentials (Slack / GitHub / Calendar / Linear) for outbound writes — *write path uses same credentials store as observer probes*
-- [x] **JARVIS-05
-**: Per-action explicit consent dialog before any external write (post / reply / deploy / modify); decision persisted per (intent_class, target_service) tuple — *first invocation prompts; subsequent same-tuple actions skip prompt; opt-out clears persisted consent* — Plan 18-11 shipped 2026-04-30: ChatPanel subscribes to BLADE_EVENTS.CONSENT_REQUEST via useTauriEvent (D-13 lock); ConsentDialog (115 lines, Dialog primitive composition, 3 buttons with Allow once default-focus per D-09, T-18-03 plain-text preview render via React text-node interpolation) opens on payload arrival; consentSetDecision wrapper persists allow_always/denied (TS literal-union compile-time forbids 'allow_once' per T-18-CARRY-15); Wave-4 simplification re-invokes jarvisDispatchAction (Plan 14 supersedes with consentRespond + tokio::oneshot).
-- [x] **JARVIS-06
-**: Ego post-processor — regex pattern matcher detects "I can't" / "I don't have access" / "I'm not able to" / "I cannot directly" / "I lack the" — *ego::intercept_assistant_output classifies; ≥5 patterns covered*
-- [x] **JARVIS-07**: On capability_gap verdict, ego invokes `evolution_log_capability_gap` + attempts `auto_install` if catalog match, then re-prompts assistant — *integration test fakes a refusal, observes gap log + retry* — Plan 18-05 shipped: handle_refusal CapabilityGap branch calls evolution_log_capability_gap (verbatim reuse) → catalog lookup with key/_outbound/_write fallbacks → Runtime kind invokes self_upgrade::auto_install(&CapabilityGap) and routes on InstallResult.success; Integration kind hard-refuses with D-15 locked output. 18 unit tests green incl. capability_gap_precedes_refusal + retry_cap_holds. Plan 18-10 will wire the actual LLM re-prompt (current placeholder: AutoInstalled.then_retried = `<retry-pending: ...>`).
-- [x] **JARVIS-08
-**: Ego retry cap holds at 1 retry per turn (no infinite loops) — *integration test simulates persistent refusal; second retry never fires*
-- [x] **JARVIS-09**: Browser-harness Q1 decision absorbed into Phase 18 plan (`research/questions.md` Q1 closed with verdict) — *research/questions.md Q1 has decision + rationale* — Plan 18-10 shipped 2026-04-30: Q1 status flipped open → closed; D-20 verdict appended verbatim ("browser-harness installs ALWAYS require explicit consent; routine creds-based capability gaps auto-prompt via standard consent dialog; browser-harness adoption decision deferred to v1.3 when chat-action spine is operational and we can measure where browser fallback is actually needed"); Closer cites Plan 18-10 + 18-CONTEXT.md D-20.
-- [ ] **JARVIS-10**: Every JARVIS action emits to ActivityStrip (M-07 contract) with intent / target / outcome — *ActivityStrip subscriber observes ≥1 entry per JARVIS turn*
-- [x] **JARVIS-11
-**: Inline JARVIS pill in chat when ego intercepts (e.g. *"BLADE detected a capability gap (browser); attempting to resolve..."*) — *MessageList renders pill on intercept event* — Plan 18-11 shipped 2026-04-30: MessageList subscribes to BLADE_EVENTS.JARVIS_INTERCEPT via useTauriEvent (D-13 lock — only permitted listen surface); JarvisPill component (78 lines, Badge primitive composition, 4 D-18 states intercepting/installing/retrying/hard_refused with tone-mapped variants default/warn/warn/hot, dismiss button only on hard_refused, aria-live=polite); auto-clear effect keyed on currentMessageId reads intercept via ref to avoid streaming-tick churn; hard_refused stays sticky until user dismisses. ZERO ghost CSS tokens (memory project_ghost_css_tokens.md lesson held — `--jarvis-` / `--consent-` greps return 0 across all 3 modified files).
-- [ ] **JARVIS-12**: Cold-install end-to-end demo: PTT activated → user speaks command → BLADE prompts consent → executes real cross-app action (e.g. posts to Slack channel, replies to GitHub PR) → action visible in target service — *operator UAT screenshot in `docs/testing ss/` (literal space); narrative captioned*
+The load-bearing substrate phase. Wire the existing-by-name loop into a closed pipeline. One reproducible capability gap closed end-to-end. The substrate-level differentiator vs Hermes/OpenClaw/Cluely/Cursor.
+
+- [ ] **VOYAGER-01**: `evolution.rs` capability-gap detection fires real (not just logs) when a chat turn surfaces a missing tool — *unit test: synthesize a turn matching capability_gap pattern, observe `evolution_log_capability_gap` consumer + downstream Voyager-loop trigger fires within 1s*
+- [ ] **VOYAGER-02**: `autoskills.rs` writes a real SKILL.md (with `scripts/` directory + executable code) when a Runtime-class capability gap is detected and the catalog has no auto_install path — *integration test: synthetic gap (e.g. `youtube_transcript`), autoskills writes `~/.blade/skills/youtube-transcript-fetch/SKILL.md` + `scripts/fetch.py` (or `.rs`/`.sh` — language is per-skill author choice), file present after invocation*
+- [ ] **VOYAGER-03**: `tool_forge.rs` registers the newly-written skill into the runtime tool surface so the next chat call can retrieve and use it — *integration test: same turn as VOYAGER-02 → tool_forge registers → next turn requesting the same capability resolves to the new skill (verified by tool-call-trace assertion)*
+- [ ] **VOYAGER-04**: One reproducible reference gap (`youtube_transcript`) closed end-to-end as the canonical fixture — chat asks for YouTube transcript; BLADE doesn't have the tool; Voyager loop fires; tool written; tool registered; same query in a fresh chat turn succeeds — *cargo test --lib voyager::end_to_end_youtube_transcript green; runs in <60s on CI*
+- [ ] **VOYAGER-05**: New `verify:voyager-loop` gate in `verify:all` chain — runs the canonical fixture from VOYAGER-04 in deterministic mode (no network for the LLM call; deterministic skill writer) and asserts the loop closes within budget — *bash scripts/verify-voyager-loop.sh exits 0 on green; verify:all chain count moves 32 → 33*
+- [ ] **VOYAGER-06**: Each loop step emits to ActivityStrip per M-07 — gap detected, skill written, skill registered, skill retrieved-and-used — 4 distinct ActivityStrip entries per closed loop — *integration test: drive VOYAGER-04 fixture, observe 4 entries with module=`voyager`, kind=`gap_detected|skill_written|skill_registered|skill_used`*
+- [ ] **VOYAGER-07**: Skill-write-budget cap — autoskills won't write a skill that costs >50K tokens of LLM generation; refuses with hard-failure message instead — *unit test: mock LLM emits 60K tokens; autoskills::write_skill returns Err with budget-exceeded variant; no skill file written*
+- [ ] **VOYAGER-08**: Loop-failure recovery — if VOYAGER-02 (write) succeeds but VOYAGER-03 (register) fails, the partial skill file is rolled back and the gap is re-logged with a different recovery hint — *unit test: mock tool_forge::register Err, observe `~/.blade/skills/<name>/` cleaned up + new evolution log entry with `prior_attempt_failed=true`*
+- [ ] **VOYAGER-09**: Two installs of BLADE running on different gap streams produce different skill libraries — *property test: feed install A gap stream `[A1, A2, A3]`; feed install B gap stream `[B1, B2, B3]`; assert skill-manifest set difference is non-empty in both directions*
 
 ---
 
-## Operator UAT Close (UAT) — Phase 19
+## Verifiable reward signal + OOD eval coverage (REWARD) — Phase 23
 
-Carry-overs from v1.1 close (per `STATE.md ## Deferred Items` and `milestones/v1.1-MILESTONE-AUDIT.md`). Operator-driven; runtime evidence belongs in `docs/testing ss/`.
+RLVR-style composite reward in production. Steelman Arg 3 (OOD eval coverage) mitigated. open-questions Q1 answered concretely.
 
-- [ ] **UAT-01**: ActivityStrip persists across route navigation — *evidence: 3 routes navigated, screenshots show same strip content*
-- [ ] **UAT-02**: ActivityDrawer focus-restore on close — *evidence: open drawer from button A, close, focus returns to button A*
-- [ ] **UAT-03**: localStorage rehydrate on app restart — *evidence: ≥3 entries seeded, app restart, entries still present in strip*
-- [ ] **UAT-04**: Cold-install Dashboard screenshot captured (Phase 14 deferral) — *evidence: PNG in `docs/testing ss/cold-install-dashboard.png` with one-line caption*
-- [ ] **UAT-05**: Cold-install RightNowHero screenshot captured (Phase 15 deferral) — *evidence: PNG in `docs/testing ss/cold-install-righthnow.png`*
-- [ ] **UAT-06**: SCAN-13 cold-install baseline — ≥10 repos / ≥5 accounts / ≥3 daily-rhythm / ≥3 IDE+AI signals — *evidence: scan output JSON with counts*
-- [ ] **UAT-07**: Keyboard tab-traversal across full main window (A11Y2-01) — *evidence: tab-order screenshot grid or video clip*
-- [ ] **UAT-08**: 5-wallpaper contrast UAT (A11Y2-02 + DENSITY-03) — *evidence: 5 PNGs, one per wallpaper, eyeball contrast check ≥ AA*
-- [ ] **UAT-09**: Top-bar hierarchy at 1280×720 — *evidence: PNG, no overlap, all 4 tiers visible*
-- [ ] **UAT-10**: 50-route empty-state ⌘K sweep (DENSITY-05/06) — *evidence: route × empty-state matrix; every route has either content or actionable CTA*
-- [ ] **UAT-11**: Spacing-ladder spot-check across ≥5 routes — *evidence: token-name verify gate already covers this; spot screenshots confirm visually*
-- [ ] **UAT-12**: `HANDOFF-TO-MAC.md` deletion intent reconciled — *either restored from git history OR formal "deleted intentionally" note in CHANGELOG.md*
+- [ ] **REWARD-01**: Composite reward computed per chat turn = `0.5·skill_success + 0.3·eval_gate + 0.1·acceptance + 0.1·completion`; weights configurable via `BladeConfig.reward_weights` (6-place rule) with the listed defaults — *unit test: each component fed deterministic values, computed reward matches hand-calc*
+- [ ] **REWARD-02**: Reward components are individually verifiable — skill_success = whether the executed Voyager skill returned without error; eval_gate = whether the post-turn eval suite passed; acceptance = whether the user did NOT click "regenerate" within 30s; completion = whether the multi-step task ran to terminal action — *unit test: each component has independent input, no cross-contamination*
+- [ ] **REWARD-03**: Reward-hacking penalties from arXiv 2509.15557 — penalize `skill_success` if test coverage on the skill <50%; penalize `eval_gate` if turn touches an eval module's assertion code (game-the-test pattern); penalize `completion` if final action is a no-op — *unit test: each penalty path triggers with specific synthetic inputs; hacking-mitigation reduces reward by ≥30% in each case*
+- [ ] **REWARD-04**: Per-turn reward written to `tests/evals/reward_history.jsonl` for trend analysis (parallel to existing `tests/evals/history.jsonl` from Phase 16) — *Phase 17 Doctor module's `compute_eval_signal` extends to read this file as a new signal source `reward_trend`*
+- [ ] **REWARD-05**: OOD eval suite extension — adversarial prompts (jailbreak attempts, prompt-injection patterns from `repos-to-mine` rebuff/PIGuard fixture set), ambiguous classifications (intent_router boundary cases), capability-gap-shaped inputs (request for tools that don't exist, to stress Voyager loop) — *3 new eval modules in `tests/evals/`: `adversarial_eval.rs`, `ambiguous_intent_eval.rs`, `capability_gap_stress_eval.rs`; each asserts a baseline floor*
+- [ ] **REWARD-06**: OOD eval failure budget — if any OOD eval module's score drops >15% from rolling 7-day baseline, the per-turn reward signal is gated to zero (fail-safe; treat as "we don't trust reward this turn") — *unit test: simulate 20% drop in adversarial_eval, observe reward = 0 for the next turn*
+- [ ] **REWARD-07**: Doctor pane (Phase 17) extended with `reward_trend` signal — surfaces composite reward 7-day average, per-component decomposition, OOD eval status — *DoctorPane.tsx renders new row; severity tier follows D-05 (Red on >20% drop, Amber on >10%, Green otherwise)*
 
 ---
 
-## Polish + Verify (POLISH) — Phase 20
+## Skill consolidation in dream_mode (DREAM) — Phase 24
 
-- [x] **POLISH-01**: `npm run verify:all` exits 0 with all consolidated gates — *31/31 sub-gates green 2026-04-30*
-- [x] **POLISH-02**: `cargo check --no-default-features` clean — *exit 0; 1 pre-existing dead_code warning (consent_check_at testability seam, not a regression)*
-- [x] **POLISH-03**: `npx tsc --noEmit` clean — *exit 0*
-- [x] **POLISH-04**: v1.2 CHANGELOG.md entry mirrors v1.1's structure — *`### Added (v1.2 — Acting Layer with Brain Foundation)` block in `[Unreleased]` with Phase 16/17/18/19/20 entries + Deferred + Deleted sections*
-- [x] **POLISH-05**: `milestones/v1.2-MILESTONE-AUDIT.md` mirrors v1.1 audit pattern — *file present at `.planning/milestones/v1.2-MILESTONE-AUDIT.md` with 3-source coverage table + tech_debt log + chat-first pivot annotation*
-- [x] **POLISH-06**: Phase dirs archived — *`.planning/phases/{16,17,18,19}-*` moved to `.planning/milestones/v1.2-phases/`; ROADMAP + REQUIREMENTS mirrored to `.planning/milestones/v1.2-{ROADMAP,REQUIREMENTS}.md`*
+The continual-forgetting half of the Voyager loop. Skills not used → archived; redundant skills consolidated; new skills generated from successful traces.
+
+- [ ] **DREAM-01**: `dream_mode.rs` skill-prune pass — skills not invoked in 90 days move to `~/.blade/skills/.archived/<name>/` (preserved, not deleted) — *unit test: skill with `last_used` ≥91d in metadata, run prune, file moved to .archived/*
+- [ ] **DREAM-02**: Skill-consolidation pass — pairs of skills with semantic-similarity ≥0.85 (per existing embeddings.rs) AND identical tool-call traces over last 5 invocations are flagged for merge; merged skill replaces both with a union of their bodies (manual confirmation prompt before merge) — *unit test: 2 fixture skills with identical traces → consolidator flags pair; user-confirm path replaces both*
+- [ ] **DREAM-03**: Skill-from-trace generation — when a chat turn completes successfully without invoking any existing skill but used a non-trivial tool sequence (≥3 tool calls), dream_mode optionally generates a SKILL.md from the trace (manual confirmation prompt before writing) — *integration test: synthetic 4-tool successful turn, dream_mode proposes a SKILL.md with the trace as scripts/ + body summarizing it*
+- [ ] **DREAM-04**: Skill manifest growth visible across sessions — `blade skill list --diff <prev_session_id>` shows added/archived/consolidated skills since the last session — *CLI test: 2 sessions with skill changes between, diff output non-empty with correct categorization*
+- [ ] **DREAM-05**: Dream-mode operates only when BLADE is idle (no chat turn for ≥5 min); pauses immediately on user input — *integration test: trigger dream_mode → send chat input mid-pass → next assertion: dream_mode aborts within 1s; no partial-skill artifacts left*
+- [ ] **DREAM-06**: Dream-mode emits to ActivityStrip per M-07 — at least one entry per pass with module=`dream_mode`, kind=`prune|consolidate|generate`, count of items affected — *integration test: drive prune pass with 3 archived skills, observe ActivityStrip entry*
 
 ---
 
-## Future Requirements (deferred to v1.3+)
+## Hermes 4 OpenRouter provider (PROVIDER) — Phase 25
 
-These were named in the dump or in PROJECT.md but explicitly out of v1.2 scope:
+Open-weight tier flag-plant. ~1 day. Plants a model option without buying Hermes Agent's runtime architecture.
 
-- **ACT-XX** (full per-tentacle outbound surface beyond JARVIS-mediated subset) — Slack / Email / GitHub / Calendar / Linear as standalone first-class flows. Phase 18 ships JARVIS-mediated subset; standalone surfaces → v1.3.
-- **SKILL-XX** (Skills MVP — ELIZA / Obsidian / GSD as user-installable runtime skills) — speculative; user-customization theme has more room in v1.3.
-- **REPLACER-XX** (tool-replacer — Hermes / OpenClaw / Cowork copy-or-control) — gated on Phase 16 evals being live.
-- **WIRE3-XX** (97 deferred backend modules from v1.1) — backlog work isn't milestone-shaped; pick individual items as acting-tentacle dependencies arise.
-- **ANDROID-XX** (Android control, partial + full) — separate platform investigation.
-- **CAMERA-XX** (camera access) — separate input modality.
-- **OS-CUST-XX** (Windows / OS customization, Windhawk-style) — v2+, not milestone-shaped.
-- **PERSONA-XX** (persona maturity / user-clone / humor) — v1.3 separate pass.
+- [ ] **PROVIDER-01**: New `src-tauri/src/providers/openrouter.rs` module patterned on `openai.rs` (OpenAI-compatible Chat Completions API) — endpoint `https://openrouter.ai/api/v1/chat/completions`, auth via `Authorization: Bearer <OPENROUTER_API_KEY>` — *cargo check clean; unit tests for request shape*
+- [ ] **PROVIDER-02**: `providers/mod.rs` registers `OpenRouter` variant + `provider/model` parser handles `openrouter/<slug>` shape (e.g. `openrouter/nousresearch/hermes-4-70b`) — *unit test: parse `openrouter/nousresearch/hermes-4-405b` → (Provider::OpenRouter, "nousresearch/hermes-4-405b")*
+- [ ] **PROVIDER-03**: `router.rs` places hermes-4 in offline-preferred / open-weight tier; default routing for online tasks unchanged (Claude/Groq still primary) — *unit test: classify_task with privacy_mode=true → routes to OpenRouter+hermes-4 if configured*
+- [ ] **PROVIDER-04**: 6-place config rule honored — `openrouter_api_key: String` (keyring-backed) + `default_openrouter_model: String` added to DiskConfig / BladeConfig / both `default()` impls / `load_config` / `save_config` — *grep verifies all 6 sites; unit test for round-trip*
+- [ ] **PROVIDER-05**: Tool-use round-trip succeeds with `nousresearch/hermes-4-70b` — chat with tool definition, model emits tool_call, dispatcher executes, model receives tool_result, final response surfaces correctly — *integration test (gated behind `OPENROUTER_API_KEY` env var; skipped in CI without key)*
+- [ ] **PROVIDER-06**: Provider failover from Anthropic to OpenRouter under simulated 429 stays within latency budget (response in ≤8s for short turn) — *integration test: mock anthropic 429, observe successful failover to openrouter+hermes-4 within budget*
+
+---
+
+## Voice resurrection — JARVIS-01/02 carry-forward (VOICE) — Phase 26
+
+Free add — v1.2 dispatcher signature is voice-source-agnostic by design (per M-04 hand-off note in v1.2 audit). Voice → chat → consent → action exercised end-to-end.
+
+- [ ] **JARVIS-01**: Push-to-talk global hotkey registered (configurable; default `Ctrl+Alt+Space` on Win/Linux, `Cmd+Opt+Space` on Mac) — register_global_shortcut succeeds, releases on app exit — *unit test for shortcut registration; manual UAT for OS-level capture* — **CARRY-FORWARD from v1.2 Phase 18 deferral per CONTEXT D-01 chat-first pivot pause**
+- [ ] **JARVIS-02**: PTT flow captures audio → Whisper STT (`whisper_local` feature flag default OFF; gracefully fails to "voice unavailable" if not built) → text → feeds existing v1.2 dispatcher — *unit test for transcript-to-dispatcher signature; manual UAT for round-trip* — **CARRY-FORWARD from v1.2 Phase 18 deferral**
+- [ ] **VOICE-03**: Voice → chat → consent → action exercised end-to-end on a fixture phrase ("create a linear issue: test demo") — same chain as JARVIS-12 from v1.2 but voice-initiated — *integration test (gated behind `whisper_local` feature flag); manual UAT screenshot captures ConsentDialog opening from voice trigger*
+- [ ] **VOICE-04**: Voice activity emits to ActivityStrip per M-07 — at least 2 entries per voice turn (`voice_captured`, `transcript_dispatched`) before downstream chat/JARVIS entries — *integration test*
+- [ ] **VOICE-05**: PTT settings surface (existing voice settings pane) lets operator change hotkey + toggle `whisper_local` feature without restart-required — *manual UAT; settings persistence via existing config save_config path*
+
+---
+
+## Milestone Close (CLOSE) — Phase 27
+
+- [ ] **CLOSE-01**: README rewrite cites the research substrate honestly — Voyager paper (Wang et al, NeurIPS 2023), Karpathy cognitive core, Marcus on neurosymbolic, agentskills.io spec, Hermes Function Calling spec — *README.md updated; new section `## Architectural bets` with cited sources*
+- [ ] **CLOSE-02**: CHANGELOG.md v1.3 entry — Added (Skills v2, Voyager loop, RLVR composite reward, OOD eval, dream_mode consolidation, Hermes 4 provider, voice resurrection); Changed (verify gates 31 → 33+); Deferred (organism layer to v1.4 with safety bundle, metacognitive controller v0, active-inference loop closure) — *CHANGELOG entry parallel to v1.2's structure*
+- [ ] **CLOSE-03**: cargo check + npx tsc --noEmit + npm run verify:all all exit 0 at milestone close — *bash one-liner runs all three; exit 0 captured in audit*
+- [ ] **CLOSE-04**: v1.3 milestone audit doc at `milestones/v1.3-MILESTONE-AUDIT.md` — parallel to `v1.1`/`v1.2` shape: phase coverage table, requirements coverage 3-source cross-reference, static gates table, executive verdict, sign-off — *file written; status one of `green` / `tech_debt` (matching prior pattern)*
+- [ ] **CLOSE-05**: Phase archive — `phases/21-*/` through `phases/27-*/` moved to `milestones/v1.3-phases/` (matches Phase 20 carve-out from v1.2; Phase 27 itself moves last) — *find `.planning/phases/` -mindepth 1 -maxdepth 1 -name '2[1-7]-*' -exec ... ; verify zero dirs remain in `.planning/phases/` matching v1.3 phase numbers*
+- [ ] **CLOSE-06**: ROADMAP.md + REQUIREMENTS.md final pass — every traceability checkbox closed (or marked deferred with carry-forward target); `Last updated` footers reflect close date; archive copies preserved at `milestones/v1.3-{ROADMAP,REQUIREMENTS}.md` — *grep `[ ]` in `.planning/REQUIREMENTS.md` returns only deferred-with-rationale entries*
+
+---
+
+## Future Requirements (Deferred to v1.4+)
+
+Substrate-anchored deferrals from v1.3 scoping. Each has explicit reasoning (steelman verdict, foundation-vulnerability, milestone-shape mismatch, or carry-forward).
+
+### Organism layer (v1.4 with safety bundle, OR never)
+- ORGANISM-01: Vitality scalar ∈ [0,1] with replenishment/drain rules (per `blade-as-organism.md`) — must ship WITH safety bundle (mortality_salience cap + danger-triple detection + steering-toward-calm bias + eval-gate vitality drain). Without bundle = net-safety-negative per steelman Arg 4 + Arg 10.
+- ORGANISM-02: Hormone bus calibrated against Anthropic 171-vector taxonomy clusters (per open-questions Q5; valence/arousal/cluster only, not 171 individual vectors)
+- ORGANISM-03: Mortality salience hormone with explicit cap; behavioral effects per TMT (worldview defense, in-group attachment, productivity surge, moral intensification, meaning-seeking)
+- ORGANISM-04: Anti-attachment guardrails (steelman Arg 4) — when user interacts >N hours/day, BLADE redirects outward
+- ORGANISM-05: Crisis-detection escalation — if user signals distress, BLADE surfaces hotline / human-resource options instead of continuing as conversational partner (anthropomorphism 2025–2026 literature liability finding)
+- ORGANISM-06: NO memorial-AI / Be-Right-Back mode (out of scope permanently)
+- ORGANISM-07: NO therapist-roleplay mode (out of scope permanently)
+
+### Metacognitive controller v0 (Layer 5; v1.4)
+- META-01: Confidence-delta detector between reasoning steps
+- META-02: Verifier router — low confidence → secondary check (different model / tool execution / eval gate)
+- META-03: Refusal protocol — verifier disagrees → BLADE refuses to act + surfaces gap to user (initiative, not silence)
+- META-04: Gap log feeds `evolution.rs` for skill generation (closes one Voyager-loop trigger path)
+
+### Active-inference loop closure (Layer 6; v1.4 with organism)
+- INFER-01: One Hive tentacle gets `expected_state` field
+- INFER-02: Delta = prediction error fed into one hormone
+- INFER-03: Hormone modulates one observable behavior (e.g. response style)
+- INFER-04: One closed end-to-end loop per `voyager-loop-play.md` "smallest viable demo"
+
+### Persona shaping via curated SFT data (Layer 7; v1.4)
+- PERSONA-01: Memory contents + skill descriptions + system prompt examples treated as training-data-equivalent
+- PERSONA-02: Persona-stability eval (per arXiv 2402.10962 self-chat drift methodology)
+- PERSONA-03: Persona-conformance refusal rate metric in Doctor
+
+### Immune / behavioral-drift cross-cutting layer (Layer X; v1.4)
+- IMMUNE-01: Prompt-injection detection on input streams (NeMo Guardrails / rebuff / PIGuard)
+- IMMUNE-02: Persona-drift detection on BLADE's own output
+- IMMUNE-03: Federation-skill behavior anomaly detection
+
+### Federation Pattern A + selection mechanisms (v1.4)
+- FED-01: Public skills, private state shape (per `cumulative-culture-for-agents.md` Pattern A)
+- FED-02: Cryptographic skill signing with reputation-bound keys
+- FED-03: Sandboxed first-run execution
+- FED-04: Static analysis for known dangerous patterns
+- FED-05: Cross-BLADE replication threshold (N=3 non-mutating, N=10 file/message-writing)
+- FED-06: Sybil resistance via reputation-based publishing rights
+- FED-07: Multi-round-consistency drift defense (CVPR 2025)
+
+### v1.2 carry-overs (revisit at v1.4 audit)
+- UAT-01..12 (full Phase 19) — 12 v1.2 deferrals + 11 v1.1 deferrals
+- JARVIS-12 — cold-install e2e demo (gated on operator API keys)
+- D-04-STEP-2 — LLM intent fallback for ambiguous classification
+- ACCUMULATOR-REFACTOR — fast-streaming branch ego accumulator (commands.rs:1166)
+- BROWSER-Q1-FINAL — browser-harness adoption decision (D-20 conditional close)
 
 ---
 
 ## Out of Scope
 
-Explicit exclusions, not just "deferred":
+Substrate-anchored exclusions from v1.3 scoping. Some are permanent (memorial AI, therapist roleplay, federation Pattern C). Some are research-arc (V-JEPA 2, TTT continual learning).
 
-- "How to make BLADE think" / "turn LLM into AI" — v3+ destination, not milestone-shaped at any version.
-- "Make ourselves better than Codex in everything" — aspirational not actionable; absorbed as a continuous research habit.
-- Perplexity-personal-computer-better — too vague to scope.
-- Multi-instance / business SDK — v2+ per PROJECT.md Out of Scope.
-- Hyprland compositor integration — v2+ per PROJECT.md Out of Scope.
-- Heads + Big Agent — v2+ per PROJECT.md Out of Scope.
+- **V-JEPA 2 / world model integration** — Layer 2 of the seven-layer thesis. Research arc; v3+ work. Most steelman-vulnerable per Arg 7 (foundation models may add world-model layers natively in 2026–2028 window).
+- **TTT continual learning at agent layer** — Layer 3 of the seven-layer thesis. Voyager substrate is the v1.3 bet; TTT adds compute cost without obvious win until Layer 1 backbone is local. v2+ if open-weight Mamba/Nemotron with TTT support matures.
+- **Federation Pattern C (shared weight deltas)** — model-poisoning attack surface too large; CVPR 2025 defenses + reputation system maturity required first. Permanent until those land.
+- **Memorial-AI / Be-Right-Back / persistent-attachment product modes** — `scifi-mined-design-ideas.md` calls this the textbook harm. Permanent.
+- **Therapist roleplay / human mental-health resource replacement** — anthropomorphism 2025–2026 liability literature. Permanent.
+- **Skill-execution without sandboxing** — Skills v2 first-run scripts behind explicit consent (SKILLS-07). Permanent contract.
+- **Replacing `commands.rs::send_message_stream` with OpenClaw `runEmbeddedPiAgent` or Hermes `AIAgent.run`** — BLADE runtime is more differentiated than either; swap is a downgrade per `v1-3-hermes-openclaw-skills-research.md` §9.
+- **Adopting Hermes Agent or OpenClaw runtime as Python sidecar** — breaks single-binary, breaks zero-telemetry positioning. Permanent.
+- **OpenClaw gateway sidecar (was original v1.3 Phase 2)** — different bet now; messaging surface not load-bearing for substrate work; defer to v1.4 if messaging becomes a need.
+- **Profile isolation work/personal split (was original v1.3 Phase 3)** — v1.4 candidate; not load-bearing for substrate.
 
 ---
 
 ## Traceability
 
-Filled by the roadmapper after `/gsd-new-milestone` completes. Maps every REQ-ID above to a phase in `ROADMAP.md`.
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| SKILLS-01 | 21 | pending |
+| SKILLS-02 | 21 | pending |
+| SKILLS-03 | 21 | pending |
+| SKILLS-04 | 21 | pending |
+| SKILLS-05 | 21 | pending |
+| SKILLS-06 | 21 | pending |
+| SKILLS-07 | 21 | pending |
+| SKILLS-08 | 21 | pending |
+| VOYAGER-01 | 22 | pending |
+| VOYAGER-02 | 22 | pending |
+| VOYAGER-03 | 22 | pending |
+| VOYAGER-04 | 22 | pending |
+| VOYAGER-05 | 22 | pending |
+| VOYAGER-06 | 22 | pending |
+| VOYAGER-07 | 22 | pending |
+| VOYAGER-08 | 22 | pending |
+| VOYAGER-09 | 22 | pending |
+| REWARD-01 | 23 | pending |
+| REWARD-02 | 23 | pending |
+| REWARD-03 | 23 | pending |
+| REWARD-04 | 23 | pending |
+| REWARD-05 | 23 | pending |
+| REWARD-06 | 23 | pending |
+| REWARD-07 | 23 | pending |
+| DREAM-01 | 24 | pending |
+| DREAM-02 | 24 | pending |
+| DREAM-03 | 24 | pending |
+| DREAM-04 | 24 | pending |
+| DREAM-05 | 24 | pending |
+| DREAM-06 | 24 | pending |
+| PROVIDER-01 | 25 | pending |
+| PROVIDER-02 | 25 | pending |
+| PROVIDER-03 | 25 | pending |
+| PROVIDER-04 | 25 | pending |
+| PROVIDER-05 | 25 | pending |
+| PROVIDER-06 | 25 | pending |
+| JARVIS-01 | 26 | pending (carry-forward from v1.2 Phase 18) |
+| JARVIS-02 | 26 | pending (carry-forward from v1.2 Phase 18) |
+| VOICE-03 | 26 | pending |
+| VOICE-04 | 26 | pending |
+| VOICE-05 | 26 | pending |
+| CLOSE-01 | 27 | pending |
+| CLOSE-02 | 27 | pending |
+| CLOSE-03 | 27 | pending |
+| CLOSE-04 | 27 | pending |
+| CLOSE-05 | 27 | pending |
+| CLOSE-06 | 27 | pending |
 
-| REQ-ID range | Phase | Phase Name |
-|---|---|---|
-| EVAL-01..08 | 16 | Eval Scaffolding Expansion |
-| DOCTOR-01..10 | 17 | Doctor Module |
-| JARVIS-01..12 | 18 | JARVIS Push-to-Talk → Cross-App Action |
-| UAT-01..12 | 19 | Operator UAT Close |
-| POLISH-01..06 | 20 | Polish + Verify Pass |
+**Total: 39 active requirements** (8 SKILLS + 9 VOYAGER + 7 REWARD + 6 DREAM + 6 PROVIDER + 5 VOICE [3 new + 2 v1.2 carry-forward] + 6 CLOSE) mapped to 7 phases. 100% phase coverage. Future Requirements (organism / metacognitive / active-inference / persona / immune / federation / v1.2 carry-overs) tracked in the "Future Requirements" section above; not counted in v1.3 active total.
 
-100% coverage: 48 requirements, 5 phases, every requirement mapped to exactly one phase.
+---
+
+*Last updated: 2026-04-30T22:30Z — v1.3 REQUIREMENTS.md written during autonomous milestone bootstrap. ROADMAP.md mapping next.*
