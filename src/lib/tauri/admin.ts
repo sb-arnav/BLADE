@@ -1881,3 +1881,141 @@ export function doctorGetSignal(
     args
   );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Phase 18 — JARVIS chat-first (chat → cross-app action) — 6 commands
+//
+// ego.rs (1) + intent_router.rs (1) + jarvis_dispatch.rs (1) + consent.rs (3).
+// All six already registered in `src-tauri/src/lib.rs` generate_handler! — see
+// .planning/phases/18-jarvis-ptt-cross-app/18-04-SUMMARY.md for the wire
+// catalogue. Wire form mirrors Rust serde:
+//   - Enum tag      → discriminator field literally named `kind`.
+//   - Variant names → snake_case (rename_all = "snake_case").
+//   - Struct fields → snake_case (Rust default + the explicit serde rename).
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * @see src-tauri/src/ego.rs:14 EgoVerdict
+ * Rust derive: `#[serde(tag = "kind", rename_all = "snake_case")]`.
+ *
+ * Refusal/capability_gap fields mirror the struct variant payload verbatim
+ * (T-18-CARRY-29: drift detection is human code-review per D-38-payload).
+ */
+export type EgoVerdict =
+  | { kind: 'pass' }
+  | { kind: 'refusal'; pattern: string; reason: string }
+  | { kind: 'capability_gap'; capability: string; suggestion: string };
+
+/**
+ * @see src-tauri/src/intent_router.rs:15 IntentClass
+ * Rust derive: `#[serde(tag = "kind", rename_all = "snake_case")]`.
+ *
+ * `action_required` carries the (service, action) tuple resolved by the
+ * heuristic-first classifier (Plan 18-06). LLM-fallback returns `chat_only`
+ * unconditionally in v1.2 (deferred per 18-DEFERRAL.md).
+ */
+export type IntentClass =
+  | { kind: 'chat_only' }
+  | { kind: 'action_required'; service: string; action: string };
+
+/**
+ * @see src-tauri/src/jarvis_dispatch.rs:24 DispatchResult
+ * Rust derive: `#[serde(tag = "kind", rename_all = "snake_case")]`.
+ *
+ * `executed.payload` is `serde_json::Value` Rust-side — kept loose here per
+ * D-38-payload (each tentacle's success payload differs; consumers branch on
+ * service + parse out the fields they need).
+ */
+export type DispatchResult =
+  | { kind: 'executed'; service: string; payload: unknown }
+  | { kind: 'no_consent' }
+  | { kind: 'hard_failed_no_creds'; service: string; suggestion: string }
+  | { kind: 'not_applicable' };
+
+/**
+ * @see src-tauri/src/ego.rs:295 ego_intercept
+ * Rust signature: `ego_intercept(transcript: String) -> EgoVerdict`.
+ *
+ * Synchronous classification surface — does NOT trigger retries / installs.
+ * The full retry+install orchestration is `ego::handle_refusal` (consumed
+ * inside commands.rs send_message_stream tool-loop branch — Plan 18-10).
+ */
+export function egoIntercept(transcript: string): Promise<EgoVerdict> {
+  return invokeTyped<EgoVerdict, { transcript: string }>('ego_intercept', { transcript });
+}
+
+/**
+ * @see src-tauri/src/intent_router.rs intent_router_classify
+ * Rust signature: `intent_router_classify(message: String) -> IntentClass`.
+ *
+ * Heuristic-first (verb × service token); LLM-fallback returns `chat_only`
+ * in v1.2 per 18-DEFERRAL.md.
+ */
+export function intentRouterClassify(message: string): Promise<IntentClass> {
+  return invokeTyped<IntentClass, { message: string }>('intent_router_classify', { message });
+}
+
+/**
+ * @see src-tauri/src/jarvis_dispatch.rs jarvis_dispatch_action
+ * Rust signature: `jarvis_dispatch_action(app: AppHandle, intent: IntentClass) -> Result<DispatchResult, String>`.
+ *
+ * 3-tier dispatch: native tentacle → MCP fallback → native_tools (D-05/06/07).
+ * Consent gate (T-18-01) runs first; on `NeedsPrompt` the dispatcher emits
+ * `consent_request` and returns `NoConsent` (Wave-3 simplification — Plan 14
+ * replaces this with a tokio::oneshot await on the user's dialog choice).
+ */
+export function jarvisDispatchAction(intent: IntentClass): Promise<DispatchResult> {
+  return invokeTyped<DispatchResult, { intent: IntentClass }>('jarvis_dispatch_action', { intent });
+}
+
+/**
+ * @see src-tauri/src/consent.rs:62 consent_get_decision
+ * Rust signature: `consent_get_decision(intent_class: String, target_service: String) -> Option<String>`.
+ *
+ * Returns `null` when no row exists; otherwise `"allow_always"` or `"denied"`.
+ * `allow_once` is NEVER persisted (RESEARCH Open Q1 / T-18-CARRY-15).
+ */
+export function consentGetDecision(
+  intentClass: string,
+  targetService: string,
+): Promise<string | null> {
+  return invokeTyped<string | null, { intent_class: string; target_service: string }>(
+    'consent_get_decision',
+    { intent_class: intentClass, target_service: targetService },
+  );
+}
+
+/**
+ * @see src-tauri/src/consent.rs:76 consent_set_decision
+ * Rust signature: `consent_set_decision(intent_class: String, target_service: String, decision: String) -> Result<(), String>`.
+ *
+ * `decision` MUST be `'allow_always'` or `'denied'`. Passing `'allow_once'`
+ * is a Rust-side error (T-18-CARRY-15); the TS literal-union prevents it at
+ * compile time. The `allow_once` flow re-invokes dispatch WITHOUT calling
+ * this function.
+ */
+export function consentSetDecision(
+  intentClass: string,
+  targetService: string,
+  decision: 'allow_always' | 'denied',
+): Promise<void> {
+  return invokeTyped<
+    void,
+    { intent_class: string; target_service: string; decision: 'allow_always' | 'denied' }
+  >('consent_set_decision', {
+    intent_class: intentClass,
+    target_service: targetService,
+    decision,
+  });
+}
+
+/**
+ * @see src-tauri/src/consent.rs:99 consent_revoke_all
+ * Rust signature: `consent_revoke_all() -> Result<(), String>`.
+ *
+ * Wipes every row from `consent_decisions`. Used by Settings → Privacy
+ * "Revoke all consents" (D-10).
+ */
+export function consentRevokeAll(): Promise<void> {
+  return invokeTyped<void>('consent_revoke_all');
+}
