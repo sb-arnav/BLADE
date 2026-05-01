@@ -28,6 +28,7 @@ mod reminders;
 mod skill_engine;
 pub mod skills;         // Phase 21 v1.3 — agentskills.io SKILL.md format substrate (pub for skill_validator bin)
 mod voyager_log;        // Phase 22 v1.3 — Voyager loop ActivityStrip emit helpers
+mod reward;             // Phase 23 v1.3 — composite reward + per-turn JSONL persistence + tail-reader
 mod telegram;
 mod thread;
 mod tts;
