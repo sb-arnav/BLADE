@@ -36,6 +36,7 @@
 pub mod activate;
 pub mod consent;
 pub mod export;
+pub mod lifecycle;
 pub mod loader;
 pub mod parser;
 pub mod resolver;

@@ -164,8 +164,25 @@ pub fn init_db() -> Result<Connection, String> {
     Ok(conn)
 }
 
+/// Phase 24 (v1.3) — non-test, lifecycle-side connection opener used by
+/// `crate::skills::lifecycle::recent_unmatched_traces`.
+///
+/// Runs `run_migrations` idempotently before returning the connection —
+/// production callers see a no-op (boot already ran), tests see the
+/// `turn_traces` table created on first use (e.g. integration tests in
+/// Plan 24-05 with tempdir BLADE_CONFIG_DIR that bypass init_db at boot).
+pub(crate) fn open_db_for_lifecycle() -> Result<Connection, String> {
+    let path = crate::config::blade_config_dir().join("blade.db");
+    let conn = Connection::open(&path).map_err(|e| format!("DB open error: {e}"))?;
+    // Phase 24: ensure cross-module turn_traces table exists in test envs
+    // where init_db() may not have run (tempdir BLADE_CONFIG_DIR). Idempotent
+    // in production (boot already ran).
+    run_migrations(&conn).map_err(|e| format!("run_migrations: {}", e))?;
+    Ok(conn)
+}
+
 /// Runs all CREATE TABLE IF NOT EXISTS migrations.
-fn run_migrations(conn: &Connection) -> Result<(), String> {
+pub(crate) fn run_migrations(conn: &Connection) -> Result<(), String> {
     conn.execute_batch(
         "
         -- Conversations
