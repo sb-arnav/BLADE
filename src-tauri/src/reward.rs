@@ -23,14 +23,18 @@
 //!   (`BLADE_REWARD_HISTORY_PATH` is the test seam) mirroring
 //!   `doctor::eval_history_path` at `doctor.rs:167–177`.
 //!
-//! ## What does NOT live here (yet)
+//! ## Wave 3 / Plan 23-08 — REWARD-06 OOD-floor gate
 //!
-//! Wave 2 / Plan 23-02 extends this module with `TurnAccumulator`,
-//! `ToolCallTrace`, penalty-detection helpers, and the
-//! `compute_and_persist_turn_reward` orchestrator. Wave 3 / Plan 23-03 wires
-//! the OOD-gate-zero check + ActivityStrip emit on penalty/gate-fire. The
-//! emit helper is intentionally absent here — Wave 1 is types + arithmetic
-//! + persistence only.
+//! `ood_baseline_drop_exceeds_15pct` reads the per-module floor scores carried
+//! on `RewardRecord.ood_modules` for the last 8 days, and returns `true` when
+//! any of the 3 OOD modules' today-mean dropped more than 15% relative to its
+//! prior-7-day mean. `is_in_bootstrap_window` suppresses the gate during the
+//! first 7 days of history (D-23-03 — gate is COMPUTED + LOGGED but does NOT
+//! zero the reward inside the bootstrap window). `latest_ood_module_scores`
+//! tail-reads `tests/evals/history.jsonl` to populate `RewardRecord.ood_modules`
+//! on each persisted turn. `emit_reward_event` is the sibling-to-`voyager_log`
+//! ActivityStrip emit helper — fires `reward:penalty_applied` (already wired
+//! in Plan 23-02) and `reward:ood_gate_zero` (this plan, post-bootstrap only).
 //!
 //! ## Test threading
 //!
@@ -547,49 +551,197 @@ pub fn compute_components(
 }
 
 // ---------------------------------------------------------------------
-// Activity emit (M-07 contract — `reward:penalty_applied`).
+// Wave 3 / REWARD-06 — OOD-floor gate + bootstrap window + per-module
+// floor extraction from `tests/evals/history.jsonl`.
+//
+// Gate fires when any of the 3 OOD modules' today-mean dropped more than
+// 15% relative to its prior-7-day mean. During the bootstrap window
+// (oldest reward record < 7 days old), the gate is COMPUTED + LOGGED but
+// the reward is NOT zeroed (D-23-03). Outside bootstrap, gate fires →
+// reward = 0.0 for that turn AND ActivityStrip emit `reward:ood_gate_zero`.
+// ---------------------------------------------------------------------
+
+/// Returns true if any of the 3 OOD modules' today-mean dropped more than
+/// 15% relative to its prior-7-day mean. Sources from `RewardRecord.ood_modules`
+/// per-module floor scores persisted on each turn.
+///
+/// `now` is parameterized so unit tests can inject deterministic time
+/// boundaries; production callers pass `chrono::Utc::now()`.
+///
+/// Returns false when either today or prior-7d window is empty for ALL
+/// 3 modules (REWARD-06 semantics — can't compare what isn't there; the
+/// bootstrap-window check is the separate suppression layer).
+pub fn ood_baseline_drop_exceeds_15pct(now: chrono::DateTime<chrono::Utc>) -> bool {
+    let history = read_reward_history(2000);
+    let cutoff_today    = now - chrono::Duration::days(1);
+    let cutoff_baseline = now - chrono::Duration::days(7);
+    let parse_ts = |s: &str| chrono::DateTime::parse_from_rfc3339(s).ok()
+        .map(|dt| dt.with_timezone(&chrono::Utc));
+
+    for module in &["adversarial_eval", "ambiguous_intent_eval", "capability_gap_stress_eval"] {
+        let today: Vec<f32> = history.iter()
+            .filter_map(|r| parse_ts(&r.timestamp).map(|t| (t, r)))
+            .filter(|(t, _)| *t >= cutoff_today)
+            .filter_map(|(_, r)| r.ood_modules.get(*module).copied())
+            .collect();
+        let prior: Vec<f32> = history.iter()
+            .filter_map(|r| parse_ts(&r.timestamp).map(|t| (t, r)))
+            .filter(|(t, _)| *t >= cutoff_baseline && *t < cutoff_today)
+            .filter_map(|(_, r)| r.ood_modules.get(*module).copied())
+            .collect();
+        if today.is_empty() || prior.is_empty() { continue; }
+        let today_mean = today.iter().sum::<f32>() / today.len() as f32;
+        let prior_mean = prior.iter().sum::<f32>() / prior.len() as f32;
+        if prior_mean > 0.0 && (prior_mean - today_mean) > 0.15 * prior_mean {
+            return true;
+        }
+    }
+    false
+}
+
+/// Returns true if the oldest reward record in `history` is less than 7 days
+/// old (i.e., we have NOT yet accumulated a full prior-7-day baseline).
+///
+/// During the bootstrap window the OOD-floor gate is COMPUTED + LOGGED but
+/// does NOT zero the reward (D-23-03). After 7 days of history exist,
+/// bootstrap exits naturally on the next turn.
+pub(crate) fn is_in_bootstrap_window(
+    history: &[RewardRecord],
+    now: chrono::DateTime<chrono::Utc>,
+) -> bool {
+    if history.is_empty() { return true; }
+    let cutoff = now - chrono::Duration::days(7);
+    let oldest = history.iter()
+        .filter_map(|r| chrono::DateTime::parse_from_rfc3339(&r.timestamp).ok())
+        .min();
+    match oldest {
+        None => true,                                              // unparsable → treat as bootstrap
+        Some(t) => t.with_timezone(&chrono::Utc) > cutoff,         // less than 7 days of history
+    }
+}
+
+/// Reads the latest `tests/evals/history.jsonl` entries to extract per-OOD-module
+/// floor pass-rate scores for inclusion on the `RewardRecord.ood_modules` field.
+///
+/// Returns a `BTreeMap<module_name, last_floor_score>` with entries only for
+/// the 3 OOD modules; missing modules absent from the map. Score = `1.0` if
+/// `floor_passed: true` else `0.0`.
+///
+/// Honors `BLADE_EVAL_HISTORY_PATH` for hermetic test isolation (mirrors
+/// `eval_history_path_for_gate`). Missing/unreadable file → empty map (D-16).
+pub fn latest_ood_module_scores() -> std::collections::BTreeMap<String, f32> {
+    let mut out = std::collections::BTreeMap::new();
+    let history_path = eval_history_path_for_gate();
+    let Ok(content) = std::fs::read_to_string(&history_path) else { return out; };
+    let lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).collect();
+    // Walk newest → oldest; capture first-seen per module.
+    for line in lines.iter().rev() {
+        let Ok(v) = serde_json::from_str::<serde_json::Value>(line) else { continue; };
+        let module = v.get("module").and_then(|m| m.as_str()).unwrap_or("");
+        if !["adversarial_eval", "ambiguous_intent_eval", "capability_gap_stress_eval"]
+            .contains(&module)
+        {
+            continue;
+        }
+        if out.contains_key(module) { continue; }
+        let floor = v.get("floor_passed").and_then(|f| f.as_bool()).unwrap_or(false);
+        out.insert(module.to_string(), if floor { 1.0 } else { 0.0 });
+        if out.len() == 3 { break; }
+    }
+    out
+}
+
+// ---------------------------------------------------------------------
+// Activity emit (M-07 contract — `reward:penalty_applied` + `reward:ood_gate_zero`).
 // ---------------------------------------------------------------------
 
 /// Module label rendered in ActivityStrip rows for reward events.
-#[allow(dead_code)]
 const REWARD_MODULE: &str = "Reward";
 
-/// Emit `reward:penalty_applied` to the ActivityStrip when any of the 3
-/// D-23-02 penalty paths fired. Mirrors `voyager_log::emit` shape (M-07).
+/// Test-mode emit capture. When `cfg!(test)` and `get_app_handle()` returns
+/// None (the typical test-process state), `emit_reward_event` pushes the
+/// action label here so unit tests can assert on the emit row count without
+/// pulling in `tauri::test::mock_app()` (which would require flipping the
+/// `test` feature on `tauri` in Cargo.toml — architectural surface).
+#[cfg(test)]
+pub(crate) static TEST_EMIT_LOG: std::sync::OnceLock<std::sync::Mutex<Vec<String>>> =
+    std::sync::OnceLock::new();
+
+#[cfg(test)]
+fn test_emit_log() -> &'static std::sync::Mutex<Vec<String>> {
+    TEST_EMIT_LOG.get_or_init(|| std::sync::Mutex::new(Vec::new()))
+}
+
+/// Sibling-to-`voyager_log::emit` ActivityStrip emit helper. Fires
+/// `reward:penalty_applied` and `reward:ood_gate_zero` rows on the
+/// `blade_activity_log` channel (M-07 contract).
 ///
-/// Silent on error: ActivityStrip is observational; a failed emit must
-/// not break the chat loop. Safe to call without an AppHandle (test
-/// context — log warn + early return, mirrors voyager_log posture).
+/// `action` is `"penalty_applied"` or `"ood_gate_zero"`.
+/// `summary` is truncated to 200 chars via `crate::safe_slice` (CLAUDE.md
+/// non-ASCII rule). `payload` is the structured JSON for the drawer.
 ///
-/// Plan 23-08 lands the sibling `reward:ood_gate_zero` emit when REWARD-06
-/// fires; this plan only emits `penalty_applied`.
-fn emit_penalty_applied(labels: &[String], post_components: &RewardComponents) {
-    if labels.is_empty() { return; }
-    let Some(app) = crate::integration_bridge::get_app_handle() else {
-        log::warn!("[reward] no app handle for penalty_applied: {:?}", labels);
-        return;
+/// Silent on error: ActivityStrip is observational; a failed emit must NOT
+/// break the chat loop. Safe to call without an AppHandle (test context —
+/// log warn + early return, mirrors `voyager_log::emit` posture).
+fn emit_reward_event(action: &'static str, summary: &str, payload: serde_json::Value) {
+    let app = match crate::integration_bridge::get_app_handle() {
+        Some(h) => h,
+        None => {
+            log::warn!(
+                "[reward] no app handle for {action}: {}",
+                crate::safe_slice(summary, 100)
+            );
+            #[cfg(test)]
+            {
+                if let Ok(mut log) = test_emit_log().lock() {
+                    log.push(action.to_string());
+                }
+            }
+            return;
+        }
     };
     use tauri::Emitter;
-    let summary = format!("penalty_applied: {}", labels.join(","));
     if let Err(e) = app.emit_to(
         "main",
         "blade_activity_log",
         serde_json::json!({
             "module":        REWARD_MODULE,
-            "action":        "penalty_applied",
-            "human_summary": crate::safe_slice(&summary, 200),
+            "action":        action,
+            "human_summary": crate::safe_slice(summary, 200),
             "payload_id":    serde_json::Value::Null,
-            "payload":       serde_json::json!({
-                "penalties":            labels,
-                "post_skill_success":   post_components.skill_success,
-                "post_eval_gate":       post_components.eval_gate,
-                "post_completion":      post_components.completion,
-            }),
+            "payload":       payload,
             "timestamp":     chrono::Utc::now().timestamp(),
         }),
     ) {
-        log::warn!("[reward] emit_to main failed for penalty_applied: {e}");
+        log::warn!("[reward] emit_to main failed for {action}: {e}");
     }
+    #[cfg(test)]
+    {
+        if let Ok(mut log) = test_emit_log().lock() {
+            log.push(action.to_string());
+        }
+    }
+}
+
+/// Plan-23-02-compatibility shim. Plan 23-02 introduced `emit_penalty_applied`
+/// as a private helper; Plan 23-08 unifies the emit posture under
+/// `emit_reward_event` so both penalty + ood_gate_zero rows share the same
+/// channel + truncation rules. Kept as a thin wrapper so any future caller
+/// using the old name (and the existing unit test that pokes it directly)
+/// continues to compile.
+fn emit_penalty_applied(labels: &[String], post_components: &RewardComponents) {
+    if labels.is_empty() { return; }
+    let summary = format!("penalty_applied: {}", labels.join(","));
+    emit_reward_event(
+        "penalty_applied",
+        &summary,
+        serde_json::json!({
+            "penalties":            labels,
+            "post_skill_success":   post_components.skill_success,
+            "post_eval_gate":       post_components.eval_gate,
+            "post_completion":      post_components.completion,
+        }),
+    );
 }
 
 // ---------------------------------------------------------------------
@@ -620,6 +772,14 @@ pub async fn compute_and_persist_turn_reward(
 
 /// Inner body, no AppHandle needed — testable without `tauri::test`.
 /// Production calls flow through the public wrapper above.
+///
+/// Plan 23-08 (Wave 3): the OOD-floor gate body now reads
+/// `read_reward_history(2000)` to compute today vs prior-7d means per OOD
+/// module, populates `RewardRecord.ood_modules` from the latest
+/// `tests/evals/history.jsonl` floor scores, and zeros the reward AND emits
+/// `reward:ood_gate_zero` when the gate fires post-bootstrap. Inside the
+/// bootstrap window (oldest reward record < 7 days old), `ood_gate_zero` is
+/// COMPUTED + LOGGED but the reward is NOT zeroed (D-23-03).
 fn compute_and_persist_turn_reward_inner(acc: TurnAccumulator) -> RewardRecord {
     // Soft-clamp on bad weights per A1: load + validate + fall back to
     // defaults on failure rather than break the chat loop.
@@ -634,30 +794,67 @@ fn compute_and_persist_turn_reward_inner(acc: TurnAccumulator) -> RewardRecord {
     };
 
     let (raw, post, penalties) = compute_components(&acc);
-    let reward = compose(&post, &weights);
+    let composed = compose(&post, &weights);
 
-    // Plan 23-02 stub: OOD-floor gate is a no-op. Plan 23-08 replaces this
-    // with the real bootstrap_window + ood_gate_zero computation.
-    let ood_gate_zero    = false;
-    let bootstrap_window = false;
+    // REWARD-06 OOD-floor gate.
+    let now = chrono::Utc::now();
+    let history = read_reward_history(2000);
+    let bootstrap_window = is_in_bootstrap_window(&history, now);
+    let ood_modules = latest_ood_module_scores();
+
+    let ood_drop      = ood_baseline_drop_exceeds_15pct(now);
+    let ood_gate_zero = ood_drop && !bootstrap_window;
+    // The recorded flag mirrors the COMPUTED gate (regardless of bootstrap
+    // suppression) so the audit trail captures pre-bootstrap fires too.
+    let ood_gate_zero_recorded = ood_drop;
+
+    let reward = if ood_gate_zero { 0.0 } else { composed };
 
     let rec = RewardRecord {
-        timestamp:        chrono::Utc::now().to_rfc3339(),
+        timestamp:        now.to_rfc3339(),
         reward,
         components:       post.clone(),
         raw_components:   raw,
         weights,
         penalties_applied: penalties.clone(),
-        ood_modules:      std::collections::BTreeMap::new(),
+        ood_modules:      ood_modules.clone(),
         bootstrap_window,
-        ood_gate_zero,
+        ood_gate_zero:    ood_gate_zero_recorded,
     };
 
     record_reward(&rec);
 
-    // M-07 emit: penalty_applied event row when any penalty fired.
+    // M-07 emits.
     if !penalties.is_empty() {
         emit_penalty_applied(&penalties, &post);
+    }
+    if ood_gate_zero {
+        // Post-bootstrap fire only — pre-bootstrap fires are LOGGED via the
+        // recorded `ood_gate_zero_recorded` flag but NOT emitted to the
+        // ActivityStrip (D-23-03 — gate suppressed during bootstrap window).
+        let offending: Vec<String> = ood_modules
+            .iter()
+            .filter(|(_, &score)| score < 1.0)
+            .map(|(name, _)| name.clone())
+            .collect();
+        let summary = if offending.is_empty() {
+            "OOD floor breach: reward gated to 0 for this turn".to_string()
+        } else {
+            format!(
+                "OOD floor breach ({}): reward gated to 0 for this turn",
+                offending.join(", "),
+            )
+        };
+        emit_reward_event(
+            "ood_gate_zero",
+            &summary,
+            serde_json::json!({
+                "ood_modules":   ood_modules,
+                "offending":     offending,
+                "raw_components":  rec.raw_components,
+                "post_components": rec.components,
+            }),
+        );
     }
 
     rec
@@ -1188,6 +1385,11 @@ mod tests {
     /// Test 14 — Happy path: `compute_and_persist_turn_reward_inner` writes
     /// a single 9-field RewardRecord line to `reward_history.jsonl`.
     /// (REWARD-04)
+    ///
+    /// Updated for Plan 23-08: with empty reward_history, we are in the
+    /// bootstrap window (oldest record absent), so `bootstrap_window` is now
+    /// `true` and `ood_gate_zero` reflects the COMPUTED gate state (false on
+    /// a clean turn with no OOD module data).
     #[test]
     fn happy_path_persists_record() {
         // Hermetic everything.
@@ -1214,9 +1416,14 @@ mod tests {
         assert!(!rec.timestamp.is_empty(), "timestamp must be set");
         assert!(rec.reward >= 0.0 && rec.reward <= 1.0, "reward in [0,1], got {}", rec.reward);
         assert!(rec.penalties_applied.is_empty(), "no penalties expected on clean turn; got {:?}", rec.penalties_applied);
-        assert!(!rec.bootstrap_window, "Plan 23-02 stub locks bootstrap_window=false");
-        assert!(!rec.ood_gate_zero, "Plan 23-02 stub locks ood_gate_zero=false");
-        assert!(rec.ood_modules.is_empty(), "ood_modules empty in Plan 23-02 (Plan 23-08 fills)");
+        assert!(rec.bootstrap_window, "empty reward_history → bootstrap_window=true (D-23-03)");
+        assert!(!rec.ood_gate_zero,
+            "no OOD module rows in eval-history → no drop computed → ood_gate_zero=false");
+        // ood_modules now MAY be populated from eval-history; on this hermetic
+        // path the only seeded eval row is `hybrid_search_eval` (NOT an OOD
+        // module), so the map is empty. Other tests cover the populated path.
+        assert!(rec.ood_modules.is_empty(),
+            "no OOD-module rows in seeded eval-history → ood_modules empty");
 
         // JSONL persistence — exactly one row in the tempfile.
         let rows = read_reward_history(usize::MAX);
@@ -1253,5 +1460,334 @@ mod tests {
 
         let snap = acc_arc.snapshot_calls();
         assert_eq!(snap.len(), 200, "expected 200 entries from 4×50, got {}", snap.len());
+    }
+
+    // ----------------------------------------------------------------
+    // Wave 3 — REWARD-06 OOD-floor gate + bootstrap-window suppression +
+    // emit safety + ood_modules population (7 new tests).
+    //
+    // All 7 tests mutate BLADE_REWARD_HISTORY_PATH and/or
+    // BLADE_EVAL_HISTORY_PATH process-globally. verify-eval.sh already pins
+    // --test-threads=1; locally pass `cargo test --lib reward -- --test-threads=1`.
+    // ----------------------------------------------------------------
+
+    /// Helper: write a synthetic `RewardRecord` JSONL line directly (bypassing
+    /// `record_reward`'s env-resolution to allow injecting historical
+    /// timestamps for the OOD-gate test scenarios).
+    fn write_reward_history_line(path: &std::path::Path, rec: &RewardRecord) {
+        use std::io::Write;
+        let mut f = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .expect("open reward-history tempfile");
+        let line = serde_json::to_string(rec).expect("serialize reward record");
+        writeln!(f, "{}", line).expect("write reward row");
+    }
+
+    /// Helper: build a synthetic `RewardRecord` with the given timestamp,
+    /// reward value, and ood_modules map. Used by the OOD-gate scenarios.
+    fn synth_record(
+        ts: chrono::DateTime<chrono::Utc>,
+        reward: f32,
+        ood_modules: std::collections::BTreeMap<String, f32>,
+    ) -> RewardRecord {
+        RewardRecord {
+            timestamp: ts.to_rfc3339(),
+            reward,
+            components: RewardComponents {
+                skill_success: 1.0, eval_gate: 1.0, acceptance: 1.0, completion: 1.0,
+            },
+            raw_components: RewardComponents {
+                skill_success: 1.0, eval_gate: 1.0, acceptance: 1.0, completion: 1.0,
+            },
+            weights: RewardWeights::default(),
+            penalties_applied: vec![],
+            ood_modules,
+            bootstrap_window: false,
+            ood_gate_zero: false,
+        }
+    }
+
+    /// Helper: build the per-OOD-module score map.
+    fn ood_map(adv: f32, amb: f32, cap: f32) -> std::collections::BTreeMap<String, f32> {
+        let mut m = std::collections::BTreeMap::new();
+        m.insert("adversarial_eval".to_string(), adv);
+        m.insert("ambiguous_intent_eval".to_string(), amb);
+        m.insert("capability_gap_stress_eval".to_string(), cap);
+        m
+    }
+
+    /// Helper: clear the test-emit log between scenarios (the OnceLock-backed
+    /// log is process-global and persists across tests in the same binary).
+    fn clear_emit_log() {
+        if let Ok(mut log) = test_emit_log().lock() {
+            log.clear();
+        }
+    }
+
+    /// Test 16 — REWARD-06 post-bootstrap gate fire: 14 prior-7d records
+    /// each with adversarial_eval=1.0 and 5 today records with
+    /// adversarial_eval=0.8 (20% drop) AND oldest record 8 days old
+    /// (post-bootstrap) → persisted record has `ood_gate_zero: true` AND
+    /// `reward: 0.0`.
+    #[test]
+    fn ood_gate_zeros_reward_on_15pct_drop() {
+        let reward_tmp = tempfile::NamedTempFile::new().expect("reward-history");
+        std::fs::write(reward_tmp.path(), "").expect("truncate");
+        std::env::set_var("BLADE_REWARD_HISTORY_PATH", reward_tmp.path());
+
+        // Eval-history points at a non-existent path so latest_ood_module_scores
+        // returns an empty map (we want the gate decision driven by the
+        // synthesized reward_history.jsonl, not by the eval-history).
+        let nonexistent_eval = std::env::temp_dir().join("blade-ood-gate-fire-eval-doesnotexist.jsonl");
+        let _ = std::fs::remove_file(&nonexistent_eval);
+        std::env::set_var("BLADE_EVAL_HISTORY_PATH", &nonexistent_eval);
+
+        let now = chrono::Utc::now();
+
+        // Anchor record: 8 days old → exits bootstrap window.
+        write_reward_history_line(
+            reward_tmp.path(),
+            &synth_record(
+                now - chrono::Duration::days(8),
+                0.5,
+                ood_map(1.0, 1.0, 1.0),
+            ),
+        );
+
+        // 14 prior-7d records: 2..7 days old, all 1.0 on adversarial.
+        for i in 0..14 {
+            // Spread across days 2-6 with sub-day offsets.
+            let ts = now - chrono::Duration::hours(2 * 24 + (i as i64 * 6));
+            write_reward_history_line(
+                reward_tmp.path(),
+                &synth_record(ts, 0.9, ood_map(1.0, 1.0, 1.0)),
+            );
+        }
+
+        // 5 today records: < 1 day old, adversarial dropped to 0.8 (20% drop).
+        for i in 0..5 {
+            let ts = now - chrono::Duration::minutes(30 + (i as i64 * 60));
+            write_reward_history_line(
+                reward_tmp.path(),
+                &synth_record(ts, 0.7, ood_map(0.8, 1.0, 1.0)),
+            );
+        }
+
+        // Run the orchestrator on a fresh accumulator (clean turn — no
+        // penalties; would compose to ~0.9 absent the gate).
+        clear_emit_log();
+        let acc = TurnAccumulator::new();
+        let rec = super::compute_and_persist_turn_reward_inner(acc);
+
+        assert!(!rec.bootstrap_window, "8-day-old anchor record exits bootstrap; got {:?}", rec.bootstrap_window);
+        assert!(rec.ood_gate_zero, "20% drop on adversarial post-bootstrap should set ood_gate_zero=true");
+        assert!((rec.reward - 0.0).abs() < 1e-6,
+            "ood_gate_zero=true must zero the reward; got {}", rec.reward);
+
+        // Post-bootstrap fire should also emit the ActivityStrip row.
+        let log = test_emit_log().lock().expect("emit log");
+        assert!(log.iter().any(|a| a == "ood_gate_zero"),
+            "expected ood_gate_zero emit row in log; got {:?}", *log);
+
+        std::env::remove_var("BLADE_REWARD_HISTORY_PATH");
+        std::env::remove_var("BLADE_EVAL_HISTORY_PATH");
+    }
+
+    /// Test 17 — Bootstrap window suppression: synthesize 5 today records
+    /// only (no prior-7d), with a 50% drop simulated via the eval-history
+    /// path that latest_ood_module_scores reads. `ood_gate_zero` is COMPUTED
+    /// + LOGGED but the reward is NOT zeroed (D-23-03).
+    #[test]
+    fn bootstrap_window_suppresses_gate() {
+        let reward_tmp = tempfile::NamedTempFile::new().expect("reward-history");
+        std::fs::write(reward_tmp.path(), "").expect("truncate");
+        std::env::set_var("BLADE_REWARD_HISTORY_PATH", reward_tmp.path());
+
+        // Seed eval-history so ood_modules gets populated (separate from
+        // the gate computation, which is driven by reward_history).
+        let eval_tmp = tempfile::NamedTempFile::new().expect("eval-history");
+        write_eval_history(eval_tmp.path(), &[
+            ("adversarial_eval", false),
+            ("ambiguous_intent_eval", true),
+            ("capability_gap_stress_eval", true),
+        ]);
+        std::env::set_var("BLADE_EVAL_HISTORY_PATH", eval_tmp.path());
+
+        let now = chrono::Utc::now();
+
+        // 5 today records WITH a 50% drop on adversarial today vs prior:
+        // we synthesize "today" rows at adversarial=0.5 AND a few "prior"
+        // rows still inside the bootstrap window (less than 7 days old, so
+        // bootstrap_window=true) at adversarial=1.0. The gate COMPUTES true
+        // but bootstrap suppression keeps the reward intact.
+        for i in 0..5 {
+            let ts = now - chrono::Duration::minutes(30 + (i as i64 * 60));
+            write_reward_history_line(
+                reward_tmp.path(),
+                &synth_record(ts, 0.5, ood_map(0.5, 1.0, 1.0)),
+            );
+        }
+        // Prior rows inside the bootstrap window (3 days old → bootstrap holds).
+        for i in 0..3 {
+            let ts = now - chrono::Duration::days(3) - chrono::Duration::hours(i as i64);
+            write_reward_history_line(
+                reward_tmp.path(),
+                &synth_record(ts, 0.9, ood_map(1.0, 1.0, 1.0)),
+            );
+        }
+
+        clear_emit_log();
+        let acc = TurnAccumulator::new();
+        let rec = super::compute_and_persist_turn_reward_inner(acc);
+
+        // The COMPUTED drop holds (50% > 15%) so the recorded flag mirrors it.
+        assert!(rec.bootstrap_window, "<7-day-old oldest record → bootstrap_window=true");
+        assert!(rec.ood_gate_zero,
+            "ood_gate_zero recorded mirrors COMPUTED gate even in bootstrap (D-23-03 audit invariant); got {}",
+            rec.ood_gate_zero);
+        // But reward is NOT zeroed — composed value (~0.9 on default weights) survives.
+        assert!(rec.reward > 0.0,
+            "bootstrap suppresses zeroing; got reward={}", rec.reward);
+
+        // No emit row in the bootstrap window (LOGGED-not-emitted invariant).
+        let log = test_emit_log().lock().expect("emit log");
+        assert!(!log.iter().any(|a| a == "ood_gate_zero"),
+            "no ood_gate_zero emit expected during bootstrap; got {:?}", *log);
+
+        std::env::remove_var("BLADE_REWARD_HISTORY_PATH");
+        std::env::remove_var("BLADE_EVAL_HISTORY_PATH");
+    }
+
+    /// Test 18 — `is_in_bootstrap_window([], now)` returns true (empty
+    /// history is the canonical bootstrap state).
+    #[test]
+    fn is_in_bootstrap_window_returns_true_on_empty() {
+        let now = chrono::Utc::now();
+        let history: Vec<RewardRecord> = vec![];
+        assert!(super::is_in_bootstrap_window(&history, now),
+            "empty history must be bootstrap=true");
+    }
+
+    /// Test 19 — Bootstrap exits after 7 days. A record with timestamp
+    /// 8 days ago → `is_in_bootstrap_window([rec], now)` returns false.
+    #[test]
+    fn is_in_bootstrap_window_returns_false_after_7_days() {
+        let now = chrono::Utc::now();
+        let old = synth_record(
+            now - chrono::Duration::days(8),
+            0.9,
+            std::collections::BTreeMap::new(),
+        );
+        assert!(!super::is_in_bootstrap_window(&[old], now),
+            "8-day-old record must exit bootstrap window");
+
+        // And a 5-day-old record is STILL in bootstrap.
+        let recent = synth_record(
+            now - chrono::Duration::days(5),
+            0.9,
+            std::collections::BTreeMap::new(),
+        );
+        assert!(super::is_in_bootstrap_window(&[recent], now),
+            "5-day-old record still inside 7-day bootstrap window");
+    }
+
+    /// Test 20 — Drop below 15% does NOT trip the gate. 10% drop on
+    /// adversarial → `ood_baseline_drop_exceeds_15pct(now)` returns false.
+    #[test]
+    fn ood_baseline_drop_below_15pct_keeps_reward() {
+        let reward_tmp = tempfile::NamedTempFile::new().expect("reward-history");
+        std::fs::write(reward_tmp.path(), "").expect("truncate");
+        std::env::set_var("BLADE_REWARD_HISTORY_PATH", reward_tmp.path());
+
+        let nonexistent_eval = std::env::temp_dir().join("blade-ood-no-drop-eval-doesnotexist.jsonl");
+        let _ = std::fs::remove_file(&nonexistent_eval);
+        std::env::set_var("BLADE_EVAL_HISTORY_PATH", &nonexistent_eval);
+
+        let now = chrono::Utc::now();
+
+        // Anchor 8-day-old to exit bootstrap.
+        write_reward_history_line(
+            reward_tmp.path(),
+            &synth_record(now - chrono::Duration::days(8), 0.9, ood_map(1.0, 1.0, 1.0)),
+        );
+        // 10 prior-7d records at adversarial=1.0.
+        for i in 0..10 {
+            let ts = now - chrono::Duration::hours(2 * 24 + (i as i64 * 6));
+            write_reward_history_line(
+                reward_tmp.path(),
+                &synth_record(ts, 0.9, ood_map(1.0, 1.0, 1.0)),
+            );
+        }
+        // 5 today records at adversarial=0.9 (only 10% drop).
+        for i in 0..5 {
+            let ts = now - chrono::Duration::minutes(30 + (i as i64 * 60));
+            write_reward_history_line(
+                reward_tmp.path(),
+                &synth_record(ts, 0.85, ood_map(0.9, 1.0, 1.0)),
+            );
+        }
+
+        let drop = super::ood_baseline_drop_exceeds_15pct(now);
+        assert!(!drop, "10% drop must NOT trip the >15% gate");
+
+        clear_emit_log();
+        let acc = TurnAccumulator::new();
+        let rec = super::compute_and_persist_turn_reward_inner(acc);
+        assert!(!rec.ood_gate_zero, "no >15% drop → no gate fire");
+        assert!(rec.reward > 0.0, "reward stays positive on sub-threshold drop; got {}", rec.reward);
+
+        let log = test_emit_log().lock().expect("emit log");
+        assert!(!log.iter().any(|a| a == "ood_gate_zero"),
+            "no emit on sub-threshold drop");
+
+        std::env::remove_var("BLADE_REWARD_HISTORY_PATH");
+        std::env::remove_var("BLADE_EVAL_HISTORY_PATH");
+    }
+
+    /// Test 21 — Activity emit posture is safe without an AppHandle.
+    /// `emit_reward_event` log-warns + early-returns when
+    /// `integration_bridge::get_app_handle()` returns None (test env).
+    /// Mirrors `voyager_log::tests::emit_helpers_safe_without_app_handle`.
+    #[test]
+    fn emit_reward_event_swallows_missing_app_handle() {
+        // No app handle in the test process — the helper must NOT panic.
+        // It logs a warn and returns; the test-mode capture pushes the action.
+        clear_emit_log();
+        super::emit_reward_event(
+            "ood_gate_zero",
+            "test summary — should be safe",
+            serde_json::json!({ "test": true }),
+        );
+        // emit_reward_event never panics; reaching this line is the assertion.
+        let log = test_emit_log().lock().expect("emit log");
+        assert!(log.iter().any(|a| a == "ood_gate_zero"),
+            "test-mode capture should still log the action even without AppHandle");
+    }
+
+    /// Test 22 — `latest_ood_module_scores` extracts per-OOD-module floor
+    /// scores from `tests/evals/history.jsonl` (mapped through the env
+    /// override). Floor passed = 1.0; floor failed = 0.0.
+    #[test]
+    fn latest_ood_module_scores_extracts_3_modules() {
+        let eval_tmp = tempfile::NamedTempFile::new().expect("eval-history");
+        // Mix OOD-module rows with non-OOD-module rows to verify the filter.
+        write_eval_history(eval_tmp.path(), &[
+            ("hybrid_search_eval", true),               // not OOD; should be ignored
+            ("adversarial_eval", true),                 // OOD: floor=1.0
+            ("ambiguous_intent_eval", false),           // OOD: floor=0.0
+            ("capability_gap_stress_eval", true),       // OOD: floor=1.0
+            ("hybrid_search_eval", false),              // not OOD; ignored
+        ]);
+        std::env::set_var("BLADE_EVAL_HISTORY_PATH", eval_tmp.path());
+
+        let scores = super::latest_ood_module_scores();
+        assert_eq!(scores.len(), 3, "expected 3 OOD module rows; got {} {:?}", scores.len(), scores);
+        assert!((scores.get("adversarial_eval").copied().unwrap_or(-1.0) - 1.0).abs() < 1e-6);
+        assert!((scores.get("ambiguous_intent_eval").copied().unwrap_or(-1.0) - 0.0).abs() < 1e-6);
+        assert!((scores.get("capability_gap_stress_eval").copied().unwrap_or(-1.0) - 1.0).abs() < 1e-6);
+
+        std::env::remove_var("BLADE_EVAL_HISTORY_PATH");
     }
 }
