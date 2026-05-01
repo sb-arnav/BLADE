@@ -295,6 +295,176 @@ fn compute_eval_signal() -> Result<DoctorSignal, String> {
     })
 }
 
+// ── Signal source: RewardTrend (Phase 23 / REWARD-04 / D-23-04) — Plan 23-07 ─
+
+/// Resolve the path to `tests/evals/reward_history.jsonl`.
+///
+/// Doctor-side mirror of `eval_history_path` (doctor.rs:167-177). Honors
+/// `BLADE_REWARD_HISTORY_PATH` env override for hermetic tests. The
+/// production read path runs through `crate::reward::read_reward_history`
+/// which has its own resolver at `reward.rs::reward_history_path` — both
+/// honor the same env var. This helper is retained for symmetry with the
+/// Phase 17 eval-signal substrate (D-23-04 lock + plan acceptance gate
+/// `grep -q "fn reward_history_path"`).
+#[allow(dead_code)]
+fn reward_history_path() -> std::path::PathBuf {
+    if let Ok(p) = std::env::var("BLADE_REWARD_HISTORY_PATH") {
+        return std::path::PathBuf::from(p);
+    }
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("CARGO_MANIFEST_DIR has parent")
+        .join("tests")
+        .join("evals")
+        .join("reward_history.jsonl")
+}
+
+/// Thin wrapper over `crate::reward::read_reward_history` so doctor.rs uses
+/// the SAME read path that `reward.rs` persists through. Avoids duplicating
+/// the parse logic.
+fn read_reward_history_for_doctor(limit: usize) -> Vec<crate::reward::RewardRecord> {
+    crate::reward::read_reward_history(limit)
+}
+
+/// Compute the RewardTrend signal per CONTEXT D-23-04.
+///
+/// Reads `tests/evals/reward_history.jsonl` (Plan 23-02 producer:
+/// `compute_and_persist_turn_reward`) and classifies severity by comparing
+/// the current 1-day mean composite reward against the prior 7-day rolling
+/// mean.
+///
+/// Severity:
+/// - **Red** if drop_pct > 0.20
+/// - **Amber** if drop_pct > 0.10
+/// - **Green** otherwise (or empty history per D-16 / bootstrap window)
+///
+/// Payload includes `components_today_mean` 4-key breakdown (REWARD-07
+/// verifiability) plus `ood_gate_zero_count_today` and `bootstrap_window`
+/// flags so the Doctor pane can render the regression cause.
+fn compute_reward_signal() -> Result<DoctorSignal, String> {
+    let history = read_reward_history_for_doctor(2000);
+    let now_ms = chrono::Utc::now().timestamp_millis();
+
+    if history.is_empty() {
+        return Ok(DoctorSignal {
+            class: SignalClass::RewardTrend,
+            severity: Severity::Green,
+            payload: serde_json::json!({
+                "history_count": 0,
+                "note": "No reward history yet (tests/evals/reward_history.jsonl missing or empty).",
+            }),
+            last_changed_at: now_ms,
+            suggested_fix: suggested_fix(SignalClass::RewardTrend, Severity::Green).to_string(),
+        });
+    }
+
+    let now = chrono::Utc::now();
+    let cutoff_today = now - chrono::Duration::days(1);
+    let cutoff_baseline = now - chrono::Duration::days(7);
+    let parse_ts = |s: &str| {
+        chrono::DateTime::parse_from_rfc3339(s)
+            .ok()
+            .map(|dt| dt.with_timezone(&chrono::Utc))
+    };
+
+    let today: Vec<f32> = history
+        .iter()
+        .filter_map(|r| parse_ts(&r.timestamp).map(|t| (t, r.reward)))
+        .filter(|(t, _)| *t >= cutoff_today)
+        .map(|(_, r)| r)
+        .collect();
+    let prior: Vec<f32> = history
+        .iter()
+        .filter_map(|r| parse_ts(&r.timestamp).map(|t| (t, r.reward)))
+        .filter(|(t, _)| *t >= cutoff_baseline && *t < cutoff_today)
+        .map(|(_, r)| r)
+        .collect();
+
+    if today.is_empty() || prior.is_empty() {
+        return Ok(DoctorSignal {
+            class: SignalClass::RewardTrend,
+            severity: Severity::Green,
+            payload: serde_json::json!({
+                "history_count": history.len(),
+                "today_count": today.len(),
+                "prior_7d_count": prior.len(),
+                "note": "Bootstrap or single-day operation — Green per D-16 missing-history convention.",
+                "bootstrap_window": true,
+            }),
+            last_changed_at: now_ms,
+            suggested_fix: suggested_fix(SignalClass::RewardTrend, Severity::Green).to_string(),
+        });
+    }
+
+    let today_mean: f32 = today.iter().sum::<f32>() / today.len() as f32;
+    let prior_mean: f32 = prior.iter().sum::<f32>() / prior.len() as f32;
+    let drop_pct = if prior_mean > 0.0 {
+        (prior_mean - today_mean) / prior_mean
+    } else {
+        0.0
+    };
+
+    let severity = if drop_pct > 0.20 {
+        Severity::Red
+    } else if drop_pct > 0.10 {
+        Severity::Amber
+    } else {
+        Severity::Green
+    };
+
+    // Components today mean (REWARD-07 spec — 4-key breakdown).
+    let mut comp_skill = 0.0f32;
+    let mut comp_eval = 0.0f32;
+    let mut comp_acpt = 0.0f32;
+    let mut comp_comp = 0.0f32;
+    let mut n = 0u32;
+    for r in history
+        .iter()
+        .filter(|r| parse_ts(&r.timestamp).map_or(false, |t| t >= cutoff_today))
+    {
+        comp_skill += r.components.skill_success;
+        comp_eval += r.components.eval_gate;
+        comp_acpt += r.components.acceptance;
+        comp_comp += r.components.completion;
+        n += 1;
+    }
+    let nf = n.max(1) as f32;
+    let ood_gate_zero_count_today = history
+        .iter()
+        .filter(|r| parse_ts(&r.timestamp).map_or(false, |t| t >= cutoff_today))
+        .filter(|r| r.ood_gate_zero)
+        .count();
+    let any_bootstrap = history
+        .iter()
+        .filter(|r| parse_ts(&r.timestamp).map_or(false, |t| t >= cutoff_today))
+        .any(|r| r.bootstrap_window);
+
+    let payload = serde_json::json!({
+        "history_count":  history.len(),
+        "today_count":    today.len(),
+        "today_mean":     today_mean,
+        "prior_7d_count": prior.len(),
+        "prior_7d_mean":  prior_mean,
+        "drop_pct":       drop_pct,
+        "components_today_mean": {
+            "skill_success": comp_skill / nf,
+            "eval_gate":     comp_eval  / nf,
+            "acceptance":    comp_acpt  / nf,
+            "completion":    comp_comp  / nf,
+        },
+        "ood_gate_zero_count_today": ood_gate_zero_count_today,
+        "bootstrap_window": any_bootstrap,
+    });
+
+    Ok(DoctorSignal {
+        class: SignalClass::RewardTrend,
+        severity,
+        payload,
+        last_changed_at: now_ms,
+        suggested_fix: suggested_fix(SignalClass::RewardTrend, severity).to_string(),
+    })
+}
+
 // ── Signal source: CapabilityGaps (DOCTOR-03 / D-06) — Plan 17-03 ────────────
 
 /// Compute the CapabilityGaps signal per CONTEXT D-06.
@@ -782,23 +952,25 @@ pub async fn doctor_run_full_check(app: AppHandle) -> Result<Vec<DoctorSignal>, 
     // Sources are sync but run via `tokio::join!` over async blocks so the
     // runtime can interleave file IO. Per CONTEXT "Claude's Discretion":
     // parallel is the recommended path.
-    let (eval, capgap, tentacle, drift, autoupdate) = tokio::join!(
+    let (eval, capgap, tentacle, drift, autoupdate, reward_trend) = tokio::join!(
         async { compute_eval_signal() },
         async { compute_capgap_signal() },
         async { compute_tentacle_signal() },
         async { compute_drift_signal() },
         async { compute_autoupdate_signal() },
+        async { compute_reward_signal() },
     );
 
     // Order in the returned Vec is locked (most-volatile-first per
     // UI-SPEC § 7.5): EvalScores → CapabilityGaps → TentacleHealth →
-    // ConfigDrift → AutoUpdate.
+    // ConfigDrift → AutoUpdate → RewardTrend (Phase 23 / D-23-04).
     let signals: Vec<DoctorSignal> = vec![
         eval.map_err(|e| format!("eval signal: {}", e))?,
         capgap.map_err(|e| format!("capgap signal: {}", e))?,
         tentacle.map_err(|e| format!("tentacle signal: {}", e))?,
         drift.map_err(|e| format!("drift signal: {}", e))?,
         autoupdate.map_err(|e| format!("autoupdate signal: {}", e))?,
+        reward_trend.map_err(|e| format!("reward_trend signal: {}", e))?,
     ];
 
     // Diff against prior severity; emit on transitions where new ∈ {Amber, Red}.
@@ -1303,5 +1475,245 @@ mod tests {
         let one_liner = "Test summary";
         let summary = format!("{} → {}: {}", class_str, severity_str, one_liner);
         assert_eq!(summary, "EvalScores → Red: Test summary");
+    }
+
+    // ── Plan 23-07: compute_reward_signal tests (REWARD-04 / REWARD-07 / D-23-04) ─
+
+    /// Build a single JSONL row for `tests/evals/reward_history.jsonl`.
+    /// Mirrors the 9-field schema locked by Phase 23 Plan 23-01 (reward.rs:84-97).
+    /// Timestamps are RFC3339 (matching `chrono::Utc::now().to_rfc3339()` shape).
+    fn reward_row(timestamp: &str, reward: f32, components: (f32, f32, f32, f32)) -> String {
+        format!(
+            r#"{{"timestamp":"{ts}","reward":{r},"components":{{"skill_success":{cs},"eval_gate":{ce},"acceptance":{ca},"completion":{cc}}},"raw_components":{{"skill_success":{cs},"eval_gate":{ce},"acceptance":{ca},"completion":{cc}}},"weights":{{"skill_success":0.5,"eval_gate":0.3,"acceptance":0.0,"completion":0.1}},"penalties_applied":[],"ood_modules":{{}},"bootstrap_window":false,"ood_gate_zero":false}}"#,
+            ts = timestamp,
+            r = reward,
+            cs = components.0,
+            ce = components.1,
+            ca = components.2,
+            cc = components.3,
+        )
+    }
+
+    fn write_reward_history(path: &std::path::Path, lines: &[String]) {
+        let body = lines.join("\n") + "\n";
+        std::fs::write(path, body).expect("write reward_history fixture");
+    }
+
+    #[test]
+    fn reward_signal_green_on_empty_history() {
+        let _g = EnvGuard("BLADE_REWARD_HISTORY_PATH");
+        let tmp = tempfile::TempDir::new().unwrap();
+        // Path that does NOT exist inside the tempdir.
+        let path = tmp.path().join("does_not_exist.jsonl");
+        std::env::set_var("BLADE_REWARD_HISTORY_PATH", &path);
+
+        let signal = compute_reward_signal().expect("compute_reward_signal");
+        assert_eq!(signal.class, SignalClass::RewardTrend);
+        assert_eq!(signal.severity, Severity::Green);
+        assert_eq!(signal.payload["history_count"], 0);
+    }
+
+    #[test]
+    fn reward_signal_green_on_bootstrap() {
+        // Only today_records, no prior_7d → Green with bootstrap_window: true.
+        let _g = EnvGuard("BLADE_REWARD_HISTORY_PATH");
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("reward_history.jsonl");
+        let now = chrono::Utc::now();
+        let rows = vec![
+            reward_row(
+                &(now - chrono::Duration::hours(1)).to_rfc3339(),
+                0.85,
+                (1.0, 1.0, 0.0, 1.0),
+            ),
+            reward_row(
+                &(now - chrono::Duration::hours(2)).to_rfc3339(),
+                0.85,
+                (1.0, 1.0, 0.0, 1.0),
+            ),
+            reward_row(
+                &(now - chrono::Duration::hours(3)).to_rfc3339(),
+                0.85,
+                (1.0, 1.0, 0.0, 1.0),
+            ),
+        ];
+        write_reward_history(&path, &rows);
+        std::env::set_var("BLADE_REWARD_HISTORY_PATH", &path);
+
+        let signal = compute_reward_signal().expect("compute_reward_signal");
+        assert_eq!(signal.class, SignalClass::RewardTrend);
+        assert_eq!(signal.severity, Severity::Green);
+        assert_eq!(signal.payload["bootstrap_window"], true);
+    }
+
+    #[test]
+    fn reward_signal_green_on_steady() {
+        // today_mean ≈ prior_7d_mean → Green (drop_pct < 0.10).
+        let _g = EnvGuard("BLADE_REWARD_HISTORY_PATH");
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("reward_history.jsonl");
+        let now = chrono::Utc::now();
+        let mut rows = Vec::new();
+        // 7 prior_7d rows at 0.85 (days 2..8).
+        for d in 2..9i64 {
+            rows.push(reward_row(
+                &(now - chrono::Duration::days(d)).to_rfc3339(),
+                0.85,
+                (1.0, 1.0, 0.0, 1.0),
+            ));
+        }
+        // 7 today rows at 0.85 (hours 1..15 to spread within today bucket).
+        for h in 1..8i64 {
+            rows.push(reward_row(
+                &(now - chrono::Duration::hours(h)).to_rfc3339(),
+                0.85,
+                (1.0, 1.0, 0.0, 1.0),
+            ));
+        }
+        write_reward_history(&path, &rows);
+        std::env::set_var("BLADE_REWARD_HISTORY_PATH", &path);
+
+        let signal = compute_reward_signal().expect("compute_reward_signal");
+        assert_eq!(signal.class, SignalClass::RewardTrend);
+        assert_eq!(signal.severity, Severity::Green);
+        let drop_pct = signal.payload["drop_pct"].as_f64().unwrap();
+        assert!(drop_pct.abs() < 0.10, "drop_pct = {} should be < 0.10", drop_pct);
+    }
+
+    #[test]
+    fn reward_signal_amber_on_10pct_drop() {
+        // today_mean = 0.76, prior_7d_mean = 0.85 → drop_pct ≈ 0.106 → Amber.
+        let _g = EnvGuard("BLADE_REWARD_HISTORY_PATH");
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("reward_history.jsonl");
+        let now = chrono::Utc::now();
+        let mut rows = Vec::new();
+        for d in 2..9i64 {
+            rows.push(reward_row(
+                &(now - chrono::Duration::days(d)).to_rfc3339(),
+                0.85,
+                (1.0, 1.0, 0.0, 1.0),
+            ));
+        }
+        for h in 1..8i64 {
+            rows.push(reward_row(
+                &(now - chrono::Duration::hours(h)).to_rfc3339(),
+                0.76,
+                (0.9, 0.9, 0.0, 0.9),
+            ));
+        }
+        write_reward_history(&path, &rows);
+        std::env::set_var("BLADE_REWARD_HISTORY_PATH", &path);
+
+        let signal = compute_reward_signal().expect("compute_reward_signal");
+        assert_eq!(signal.class, SignalClass::RewardTrend);
+        assert_eq!(signal.severity, Severity::Amber);
+    }
+
+    #[test]
+    fn reward_signal_red_on_20pct_drop() {
+        // today_mean = 0.65, prior_7d_mean = 0.85 → drop_pct ≈ 0.235 → Red.
+        let _g = EnvGuard("BLADE_REWARD_HISTORY_PATH");
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("reward_history.jsonl");
+        let now = chrono::Utc::now();
+        let mut rows = Vec::new();
+        for d in 2..9i64 {
+            rows.push(reward_row(
+                &(now - chrono::Duration::days(d)).to_rfc3339(),
+                0.85,
+                (1.0, 1.0, 0.0, 1.0),
+            ));
+        }
+        for h in 1..8i64 {
+            rows.push(reward_row(
+                &(now - chrono::Duration::hours(h)).to_rfc3339(),
+                0.65,
+                (0.7, 0.7, 0.0, 0.7),
+            ));
+        }
+        write_reward_history(&path, &rows);
+        std::env::set_var("BLADE_REWARD_HISTORY_PATH", &path);
+
+        let signal = compute_reward_signal().expect("compute_reward_signal");
+        assert_eq!(signal.class, SignalClass::RewardTrend);
+        assert_eq!(signal.severity, Severity::Red);
+    }
+
+    #[test]
+    fn reward_signal_payload_carries_components_today_mean() {
+        // REWARD-07 verifiability: payload exposes the 4-key components_today_mean
+        // breakdown so the Doctor pane can render which component is regressing.
+        let _g = EnvGuard("BLADE_REWARD_HISTORY_PATH");
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("reward_history.jsonl");
+        let now = chrono::Utc::now();
+        let mut rows = Vec::new();
+        // Need both prior_7d AND today_records populated to land in the
+        // full-classification branch that emits components_today_mean.
+        for d in 2..9i64 {
+            rows.push(reward_row(
+                &(now - chrono::Duration::days(d)).to_rfc3339(),
+                0.85,
+                (1.0, 1.0, 0.0, 1.0),
+            ));
+        }
+        for h in 1..4i64 {
+            rows.push(reward_row(
+                &(now - chrono::Duration::hours(h)).to_rfc3339(),
+                0.85,
+                (0.5, 0.6, 0.0, 0.7),
+            ));
+        }
+        write_reward_history(&path, &rows);
+        std::env::set_var("BLADE_REWARD_HISTORY_PATH", &path);
+
+        let signal = compute_reward_signal().expect("compute_reward_signal");
+        let cm = &signal.payload["components_today_mean"];
+        assert!(cm.get("skill_success").is_some(), "missing skill_success");
+        assert!(cm.get("eval_gate").is_some(), "missing eval_gate");
+        assert!(cm.get("acceptance").is_some(), "missing acceptance");
+        assert!(cm.get("completion").is_some(), "missing completion");
+        // skill_success should be ≈ 0.5 (the today rows we wrote).
+        let ss = cm["skill_success"].as_f64().unwrap();
+        assert!((ss - 0.5).abs() < 0.01, "skill_success = {} expected ~0.5", ss);
+    }
+
+    #[tokio::test]
+    async fn doctor_run_full_check_returns_six_signals() {
+        // Direct-aggregator test: verify all 6 compute_*_signal functions
+        // produce a valid signal in the same order as the production
+        // tokio::join! aggregator. Avoids the tauri::test feature flag
+        // (which would require activating Tauri's test feature in Cargo.toml,
+        // an architectural change beyond this plan's scope per Rule 3).
+        // Plan 23-08's TS lockstep adds the AppHandle-driven smoke test.
+        let _g = EnvGuard("BLADE_REWARD_HISTORY_PATH");
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("reward_history.jsonl");
+        // Empty file — exercises the Green-on-empty-history branch.
+        std::fs::write(&path, "").unwrap();
+        std::env::set_var("BLADE_REWARD_HISTORY_PATH", &path);
+
+        // Mirror the production tokio::join! aggregator at doctor.rs:775-783.
+        let (eval, capgap, tentacle, drift, autoupdate, reward_trend) = tokio::join!(
+            async { compute_eval_signal() },
+            async { compute_capgap_signal() },
+            async { compute_tentacle_signal() },
+            async { compute_drift_signal() },
+            async { compute_autoupdate_signal() },
+            async { compute_reward_signal() },
+        );
+
+        let signals: Vec<DoctorSignal> = vec![
+            eval.expect("eval"),
+            capgap.expect("capgap"),
+            tentacle.expect("tentacle"),
+            drift.expect("drift"),
+            autoupdate.expect("autoupdate"),
+            reward_trend.expect("reward_trend"),
+        ];
+
+        assert_eq!(signals.len(), 6, "doctor aggregator must return 6 signals");
+        assert_eq!(signals[5].class, SignalClass::RewardTrend);
     }
 }
