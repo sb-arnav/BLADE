@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Phases
 status: executing
-last_updated: "2026-05-01T20:58:46.873Z"
+last_updated: "2026-05-01T21:20:13.274Z"
 last_activity: 2026-05-01
 progress:
   total_phases: 15
   completed_phases: 11
   total_plans: 80
-  completed_plans: 79
-  percent: 99
+  completed_plans: 80
+  percent: 100
 ---
 
 # STATE — BLADE (v1.3 in progress; Phases 21 + 22 + 23 ✅ shipped)
@@ -25,9 +25,31 @@ progress:
 ## Current Position
 
 Phase: 24 (skill-consolidation-dream-mode) — EXECUTING
-Plan: 4 of 7
+Plan: 5 of 7
 Status: Ready to execute
 Last activity: 2026-05-01
+
+### Phase 24 Plan 04 Decisions
+
+- Plan 24-04 ships Wave 2 pure-logic substrate (`skills/lifecycle.rs` NEW) in 1 atomic commit: `15cb64c` (Task 1: skills/lifecycle.rs NEW with 8 pure-logic fns + 4 DB readers + 1 fs helper + 8 unit tests + skills/mod.rs `pub mod lifecycle` registration + tool_forge.rs `pub(crate) fn open_db_for_lifecycle` + db.rs `pub(crate) fn open_db_for_lifecycle` + db.rs `run_migrations` visibility bump from `fn` to `pub(crate) fn`).
+- D-24-E merge body shape locked verbatim end-to-end. `deterministic_merge_body<F: Fn(&str) -> bool>` output: name = `<lex-smaller>_merged` then `ensure_unique_name(name, is_taken)`; description = `format!("{} | {}", a.description, b.description)` (arg-position order, NOT lex-smaller-first); language + script_path cloned from lex-smaller; usage = `dedup_lines(<a.usage>\n<b.usage>)`; parameters = `union_dedup_by_name(&a.parameters, &b.parameters)` (first-occurrence wins); test_output = `<a.test_output>\n--- merged ---\n<b.test_output>`; created_at = `chrono::Utc::now().timestamp()`; last_used = `Some(created_at)` per D-24-A; use_count = 0; forged_from = `format!("merge:{}+{}", a.name, b.name)` (also arg-position-ordered). Test `merge_body_deterministic` asserts `m.description == "alpha desc | beta desc"` and `m.forged_from == "merge:zeta_tool+alpha_tool"` from inputs (zeta_tool, alpha desc) + (alpha_tool, beta desc) — confirming the format strings honor arg order even when zeta > alpha.
+- Discretion item 3 name dedup ladder locked: `ensure_unique_name<F: Fn(&str) -> bool>` returns `base` if not taken; else `_v2`, `_v3`, ..., `_v999`; else `base_<uuid_v4>` fallback. Test `merge_name_falls_back_to_uuid_when_999_taken` constructs predicate true-for-base-AND-every-_v2-through-_v999, asserts result starts with `x_merged_` and total length > `'x_merged_'.len() + 8` (uuid-tail length sentinel; full uuids are 36 chars). 999-cap is operator-perceptibility threshold (T-24-04-03 accept disposition: 999 SELECTs at sub-ms each = under 1s).
+- Predicate-injection over DB-open in pure logic. `deterministic_merge_body` and `ensure_unique_name` accept `&dyn Fn(&str) -> bool` predicate rather than calling DB internally. Tests pass deterministic stubs (`&|_| false`, `&|n| n == "alpha_tool_merged"`); production wires `&|n| forged_name_exists(n)` from Plan 24-05/24-07 callers. Same shape Plan 24-05 will use for `is_dreaming: &dyn Fn() -> bool` wrapping `DREAMING.load(Ordering::Relaxed)`. Pattern keeps pure logic unit-testable without tempdir setup.
+- Cosine similarity reimplemented inline (NOT re-exported from embeddings.rs). 11-line port matches `embeddings::cosine_similarity` body verbatim including the two zero guards (`a.len() != b.len() || a.is_empty()` and `mag_a == 0.0 || mag_b == 0.0`). Test `cosine_sim_basic` locks the 1.0 / 0.0 / mismatched-length / empty-input contracts. Trade-off: 11 lines of code duplication < 1 new public symbol forever in embeddings.rs.
+- Cross-module open helpers landed in BOTH `tool_forge.rs` and `db.rs` as `pub(crate) fn open_db_for_lifecycle`. Both invoke `run_migrations` idempotently before returning the Connection — production callers see no-ops (boot already ran), tempdir test envs (Plan 24-05/24-07 integration tests bypassing `init_db` at boot) get a complete schema on first lifecycle-side read. tool_forge-side ALSO calls `ensure_table` + `ensure_invocations_table` for the same idempotent posture. `db::run_migrations` promoted from private `fn` to `pub(crate) fn` (minimum visibility bump that satisfies cross-module access without exposing to external crates).
+- archive_skill order-of-operations locked: `fs::rename` FIRST → DB `DELETE FROM forged_tools WHERE name = ?1` only on rename success. T-24-04-04 + T-24-04-05 mitigation. If `fs::rename` fails (cross-device link, permissions) the function returns Err and the caller (Plan 24-05) skips the DB delete so the row stays live and is retried next cycle. If src dir doesn't exist (idempotent re-archive after a prior failed cycle), rename is skipped but DB delete still runs to clean up the leftover row. On collision in the archive destination, suffix with `_dup<unix_ts>` to preserve both copies.
+- DB readers (prune_candidate_selection, last_5_trace_hashes, recent_unmatched_traces, forged_name_exists) all fail-open on DB-open or prepare failure (return empty Vec or `false`). Pitfall 4 mitigation: a transient SQLite WAL collision between dream pass and chat path should NOT halt the dream pass; missed reads recover next cycle.
+- Module-level `#![allow(dead_code)]` on lifecycle.rs because Plans 24-05/24-07 ship its consumers; the allow prevents 11 "is never used" warnings polluting `cargo build --lib` output between this plan and Plans 24-05/24-07. Allow removed implicitly when consumers wire in (use-sites trip dead-code analysis off for those symbols).
+- 8 unit tests green: `merge_body_deterministic`, `merge_body_two_calls_match`, `merge_name_collision_suffixed_v2`, `merge_name_falls_back_to_uuid_when_999_taken`, `proposed_name_deterministic`, `dedup_lines_preserves_order_unique`, `union_dedup_by_name_first_wins`, `cosine_sim_basic` (`cargo test --lib skills::lifecycle::tests -- --test-threads=1` reports `8 passed; 0 failed`). All 13 plan grep gates green: 7 lifecycle.rs functions + skills/mod.rs `pub mod lifecycle` + the two locked SQL predicate literals (`91 * 86400` and `json_array_length(tool_names) >= 3`) + both `open_db_for_lifecycle` exposures + `run_migrations` reachable from tool_forge.rs.
+- `cargo build --lib` clean (7m 29s). 6 warnings: 5 carry-forward from Plan 24-02 (`dream_prune` / `dream_consolidate` / `dream_generate` / `cap_items` / `last_activity_ts` await Wave 2/3 wiring; Plans 24-05/24-07 will consume them) + 1 carry-forward `reward.rs:236 timestamp_ms`. NO new warnings introduced by this plan.
+- Wave 2/3 unblocked: Plan 24-05 (DREAM-01/02/03 dream task bodies) can call `crate::skills::lifecycle::{prune_candidate_selection, last_5_trace_hashes, recent_unmatched_traces, archive_skill, deterministic_merge_body, ensure_unique_name, proposed_name_from_trace, forged_name_exists}` directly. Plan 24-07 (commands.rs apply path on operator yes/merge) consumes the same `deterministic_merge_body` + `ensure_unique_name` to land merged tools when operator confirms a chat-injected proposal — both consumers wired to the same canonical implementation.
+- DREAM-01/02/03 NOT marked complete in REQUIREMENTS by this plan — only the substrate (pure logic + DB readers + archive_skill) landed; the actual dream_mode task bodies that wire these into `run_dream_session` + the operator-confirm chat-injected prompt prompts are Plan 24-05 + 24-07 scope. Same posture as Plan 24-02 (LAST_ACTIVITY substrate landed; DREAM-05 abort_within_one_second integration test is Plan 24-05 scope).
+
+### Phase 24 Plan 03 Decisions
+
+- Plan 24-03 ships Wave 1 skills snapshot + per-session archive (DREAM-04 substrate) in 2 atomic commits + 1 docs commit (`9ebe904` + `19d7e75` + `1e8d88c`). Adds `pub struct SkillRef` + `pub fn list_skills_snapshot()` aggregator (skills/loader.rs) + `SessionHandoff.skills_snapshot` field with `#[serde(default)]` back-compat marker + `<config_dir>/sessions/<generated_at>.json` per-session archive directory + `sweep_sessions_to_cap(30)` mtime-based archive cap. 4 new tests green; Wave 1 close `cargo build --lib` clean (6 warnings carry-forward + reward.rs timestamp_ms).
+- 34-test Wave 1 verification block green: `cargo test --lib -- --test-threads=1 tool_forge:: voyager_log:: dream_mode::tests::last_activity_ts_reads_static skills::loader::tests:: session_handoff::tests:: db::tests::run_migrations_creates_turn_traces` reports `34 passed; 0 failed`.
+- DREAM-04 NOT marked complete in REQUIREMENTS by this plan — only the snapshot substrate (`SkillRef` + `list_skills_snapshot()` + `SessionHandoff.skills_snapshot` field + per-session archive) landed; the actual `skill_validator list --diff <session_id>` CLI body is Plan 24-06 scope.
 
 ### Phase 24 Plan 02 Decisions
 
@@ -234,7 +256,7 @@ None. v1.2 closed cleanly with documented tech debt; v1.3 scope locked by operat
 
 ## Session Continuity
 
-**Last session:** 2026-05-01T20:58:46.858Z
+**Last session:** 2026-05-01T21:19:36.973Z
 
 Phase 23 commit chain (~18 commits across 9 plans):
 
@@ -257,15 +279,19 @@ Phase 23 commit chain (~18 commits across 9 plans):
 
 Across the phase: ~52 unit/integration tests added (11 Wave-1 reward + 9 Wave-2 reward + 7 reward Plan 23-08 + 7 Doctor Plan 23-07 + 17 + 18 + 17 OOD eval fixtures = 86 total assert!s; many fixtures share a single `#[test]` entry so the reportable test count is 33 reward+config+doctor + 12 evals = 45 reportable tests). 1 new file (`reward.rs`) + 3 new OOD eval modules + 4 modified TS files + 3 modified Rust files + 1 modified shell gate. verify chain count unchanged at 33; verify:eval EXPECTED tightened from 5 to 8 (gate extension, not new gate). DoctorPane row UAT-deferred per chat-first pivot anchor (substrate-only landing).
 
-Next: Plan 24-03 (DREAM-01 prune pass — Wave 2 dream-mode task body landing).
+Next: Plan 24-05 (DREAM-01/02/03 dream task bodies — Wave 2 dream_mode integration: 3 new tasks `task_skill_prune` + `task_skill_consolidate` + `task_skill_from_trace` wired into `run_dream_session` chain after `task_skill_synthesis`, consuming `crate::skills::lifecycle::*` from Plan 24-04, plus the abort_within_one_second integration test using the LAST_ACTIVITY accessor from Plan 24-02).
 
-Phase 24 commit chain so far (~5 commits across 2 plans):
+Phase 24 commit chain so far (~9 commits across 4 plans):
 
   - `227d035` 24-01 Task 1 — tool_forge.rs ensure_table backfill + invocations table + record_tool_use signature (DREAM-01/02/03 substrate)
   - `386312a` 24-01 Task 2 — db.rs turn_traces table + commands.rs dispatch hook + reward-hook trace write
   - `25a0fbe` 24-01 docs (Plan 24-01 close)
   - `db10e09` 24-02 Task 1 — voyager_log.rs 3 dream_* emit helpers + cap_items + 4 tests (DREAM-06)
   - `6a18952` 24-02 Task 2 — dream_mode.rs pub fn last_activity_ts() accessor + 1 test (DREAM-05 substrate; full DREAM-05 abort lands in Plan 24-05)
+  - `9ebe904` 24-03 Task 1 — skills/loader.rs SkillRef + list_skills_snapshot() aggregator + 2 tests
+  - `19d7e75` 24-03 Task 2 — session_handoff.rs skills_snapshot field + per-session archive + cap-30 sweep + 2 tests
+  - `1e8d88c` 24-03 docs (Plan 24-03 close)
+  - `15cb64c` 24-04 Task 1 — skills/lifecycle.rs NEW pure-logic substrate (deterministic_merge_body D-24-E + ensure_unique_name Discretion item 3 + proposed_name_from_trace + DB readers + archive_skill + 8 unit tests) + tool_forge.rs/db.rs `pub(crate) fn open_db_for_lifecycle` cross-module migration-idempotency openers + `db::run_migrations` visibility bump (DREAM-01/02/03 substrate; consumers ship in Plans 24-05 + 24-07)
 
 Phase 21 commit chain (8 commits):
 
