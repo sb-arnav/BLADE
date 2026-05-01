@@ -1,15 +1,16 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.3
-milestone_name: Self-extending Agent Substrate
-status: in_progress
-last_updated: "2026-05-01T10:30:00.000Z"
+milestone_name: Phases
+status: verifying
+last_updated: "2026-05-01T11:28:07.373Z"
+last_activity: "2026-05-01 — `/gsd-discuss-phase 23` ran interactive: 4 gray areas surfaced (acceptance proxy / penalty enforcement / OOD eval scope / doctor surface shape); 2 user-explicit picks (OOD: hand-curate inline + bootstrap suppression; Doctor: new SignalClass::RewardTrend variant); 2 user-delegated picks ("your call") locked to recommended (acceptance: heuristic stub + weight=0; penalty: tool-call-trace inspection). Substrate-only scope per chat-first pivot anchor. Resume file: `.planning/phases/23-verifiable-reward-ood-eval/23-CONTEXT.md`. Next: `/gsd-plan-phase 23`."
 progress:
-  total_phases: 7
-  completed_phases: 2
-  total_plans: 16
-  completed_plans: 16
-  percent: 35
+  total_phases: 14
+  completed_phases: 10
+  total_plans: 73
+  completed_plans: 67
+  percent: 92
 ---
 
 # STATE — BLADE (v1.3 in progress; Phases 21 + 22 ✅ shipped)
@@ -39,6 +40,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-30 at v1.3 milestone start)
 **v1.3 locked scope:** Skills v2 (agentskills.io) → Voyager loop closure → RLVR-style verifiable composite reward + OOD eval → dream_mode skill consolidation → Hermes 4 OpenRouter provider → JARVIS-01/02 voice resurrection → close. Organism layer (vitality/hormones/mortality), metacognitive controller, active-inference loop closure, persona shaping, immune cross-cutting layer, federation, Phase 19 UAT close → all deferred to v1.4 with explicit reasoning per steelman verdict.
 
 **Locked inputs (read end-to-end during scoping):**
+
 - `/home/arnav/research/blade/voyager-loop-play.md` — Voyager loop demo target (Wang et al, NeurIPS 2023) + sources
 - `/home/arnav/research/blade/vs-hermes.md` — competitive positioning (Hermes = reactive learning; BLADE = proactive environmental + self-extending)
 - `/home/arnav/research/ai-substrate/synthesis-blade-architecture.md` — seven-layer working thesis; v1.3 carves Layer 4 (memory + skills) deepest, defers Layers 0/2/3/5/6/7
@@ -128,6 +130,7 @@ None. v1.2 closed cleanly with documented tech debt; v1.3 scope locked by operat
 **Last session:** 2026-05-01T~10:00Z (Phase 21 ✅ SHIPPED + Phase 22 Wave 1 ✅ shipped — full morning autonomous push after "this is morning bro I said keep going you could have gotten so much done"). 12 atomic commits across 2 phases.
 
 Phase 21 commit chain (8 commits):
+
   - `b663e93` 21-01 parser + types (18 tests)
   - `ebf5aab` 21-02 loader + resolver (16 tests; workspace > user > bundled)
   - `b579eed` 21-03 lazy-load disclosure (10 tests; BODY_BYTES_LOADED atomic)
@@ -137,6 +140,7 @@ Phase 21 commit chain (8 commits):
   - `b779115` 21-07 + 21-08 verify gate + close
 
 Phase 22 Wave 1 commit chain (4 commits + 1 prep):
+
   - `9939351` 22-RESEARCH + 22-CONTEXT (audit existing wiring; 8-plan decomposition)
   - `d4aba45` 22-01 SKILL.md exporter (11 tests; integrates Phase 21 substrate with tool_forge)
   - `dd3a3b1` 22-02 ActivityStrip emission (3 tests; 4 emit points across the loop)
@@ -148,15 +152,19 @@ Phase 22 Wave 1 commit chain (4 commits + 1 prep):
 count 31 → 32. Runtime smoke confirmed end-to-end.
 
 Phase 22 carry-forward to next push:
+
   - 22-05 deterministic fixture (VOYAGER-04 — canonical `youtube_transcript`
     end-to-end test). Requires test-seam refactor: extract the side-effect
     body of `forge_tool` into a `persist_forged_tool(capability, language,
     ForgeGeneration)` helper so `forge_tool_from_fixture` can share the
     persistence path without the LLM call.
+
   - 22-06 divergence property test (VOYAGER-09 — two installs / different
     gap streams / different manifests). Depends on 22-05.
+
   - 22-07 verify-voyager-loop gate (VOYAGER-05 — chain count 32 → 33).
     Depends on 22-05.
+
   - 22-08 phase summary + close.
 
 **Prior session (2026-04-30T22:30Z):** v1.3 milestone scoped autonomously
@@ -186,3 +194,5 @@ bootstrap commits (1deb738 PROJECT+STATE / ba309bb REQUIREMENTS /
 ---
 
 *State updated: 2026-04-30T22:30Z — v1.3 milestone bootstrap in progress. PROJECT.md updated; STATE.md reset; REQUIREMENTS.md + ROADMAP.md next.*
+
+**Planned Phase:** 23 (verifiable-reward-ood-eval) — 9 plans — 2026-05-01T11:28:07.301Z
