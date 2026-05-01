@@ -48,3 +48,6 @@ docs/testing ss/
 # Phase 17 — Doctor Module (DOCTOR-02): eval run history is generated locally,
 # not committed. The directory is tracked via tests/evals/.gitkeep.
 tests/evals/history.jsonl
+# Phase 23 — Verifiable Reward (REWARD-04): per-turn composite reward record.
+# Created at first runtime by reward::record_reward; same gitkeep posture.
+tests/evals/reward_history.jsonl
