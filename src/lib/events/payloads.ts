@@ -756,7 +756,7 @@ export interface WorldStateUpdatedPayload {
 // ---------------------------------------------------------------------------
 
 export interface DoctorEventPayload {
-  class: 'eval_scores' | 'capability_gaps' | 'tentacle_health' | 'config_drift' | 'auto_update';
+  class: 'eval_scores' | 'capability_gaps' | 'tentacle_health' | 'config_drift' | 'auto_update' | 'reward_trend';
   severity: 'green' | 'amber' | 'red';
   prior_severity: 'green' | 'amber' | 'red';
   last_changed_at: number;  // unix milliseconds
