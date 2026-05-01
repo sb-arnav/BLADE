@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Phases
 status: executing
-last_updated: "2026-05-01T12:15:53.874Z"
+last_updated: "2026-05-01T13:27:25.372Z"
 last_activity: 2026-05-01
 progress:
   total_phases: 14
   completed_phases: 10
   total_plans: 73
-  completed_plans: 68
-  percent: 93
+  completed_plans: 69
+  percent: 95
 ---
 
 # STATE — BLADE (v1.3 in progress; Phases 21 + 22 ✅ shipped)
@@ -20,14 +20,19 @@ progress:
 **Last shipped milestone:** v1.2 — Acting Layer with Brain Foundation (closed 2026-04-30 as `tech_debt`; chat-first pivot recorded mid-milestone)
 **Prior shipped:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27 as `tech_debt`); v1.0 — Skin Rebuild substrate (closed 2026-04-19)
 **Current Focus:** Phase 23 — verifiable-reward-ood-eval
-**Status:** Executing Phase 23 — Plan 01 ✅ shipped (RewardWeights + reward.rs Wave-1 substrate)
+**Status:** Executing Phase 23 — Plan 02 ✅ shipped (TurnAccumulator + 3 D-23-02 penalty paths + commands.rs hook at line 1831)
 
 ## Current Position
 
 Phase: 23 (verifiable-reward-ood-eval) — EXECUTING
-Plan: 2 of 9 (Wave 2 — penalty + OOD modules)
-Status: Plan 01 complete; ready to execute Plan 02
-Last activity: 2026-05-01 -- Phase 23 Plan 01 complete (44a48ef + e6771cd + 27d997b; 11 unit tests green)
+Plan: 3 of 9 (Wave 2 — OOD eval modules + verify-eval bump)
+Status: Plan 02 complete; ready to execute Plan 03
+Last activity: 2026-05-01 -- Phase 23 Plan 02 complete (f52e45f + ba1b459; 20 unit tests green; REWARD-02 + REWARD-03 satisfied)
+
+### Phase 23 Plan 02 Decisions
+- A2/A6 lexical-exit assumption corrected: commands.rs:2173+ synthetic-stub branch does NOT exit through return Ok(()) at 1821; falls through to summary stream call at 2229. Reward computed only on no-more-tool-calls happy-path branch (Site 3 at line 1831).
+- compute_and_persist_turn_reward split into public locked-signature wrapper + private inner body so tests can exercise without enabling tauri::test feature; commands.rs hook signature unchanged.
+- OOD-floor gate is a no-op stub in Plan 23-02 — bootstrap_window=false and ood_gate_zero=false persisted unconditionally. Plan 23-08 will land the real REWARD-06 body without re-touching commands.rs (signature locked).
 
 ---
 
@@ -127,7 +132,7 @@ None. v1.2 closed cleanly with documented tech debt; v1.3 scope locked by operat
 
 ## Session Continuity
 
-**Last session:** 2026-05-01T12:15:53Z
+**Last session:** 2026-05-01T13:27:25.357Z
 
 Phase 21 commit chain (8 commits):
 

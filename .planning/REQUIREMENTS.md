@@ -47,8 +47,10 @@ RLVR-style composite reward in production. Steelman Arg 3 (OOD eval coverage) mi
 
 - [x] **REWARD-01
 **: Composite reward computed per chat turn = `0.5·skill_success + 0.3·eval_gate + 0.1·acceptance + 0.1·completion`; weights configurable via `BladeConfig.reward_weights` (6-place rule) with the listed defaults — *unit test: each component fed deterministic values, computed reward matches hand-calc*
-- [ ] **REWARD-02**: Reward components are individually verifiable — skill_success = whether the executed Voyager skill returned without error; eval_gate = whether the post-turn eval suite passed; acceptance = whether the user did NOT click "regenerate" within 30s; completion = whether the multi-step task ran to terminal action — *unit test: each component has independent input, no cross-contamination*
-- [ ] **REWARD-03**: Reward-hacking penalties from arXiv 2509.15557 — penalize `skill_success` if test coverage on the skill <50%; penalize `eval_gate` if turn touches an eval module's assertion code (game-the-test pattern); penalize `completion` if final action is a no-op — *unit test: each penalty path triggers with specific synthetic inputs; hacking-mitigation reduces reward by ≥30% in each case*
+- [x] **REWARD-02
+**: Reward components are individually verifiable — skill_success = whether the executed Voyager skill returned without error; eval_gate = whether the post-turn eval suite passed; acceptance = whether the user did NOT click "regenerate" within 30s; completion = whether the multi-step task ran to terminal action — *unit test: each component has independent input, no cross-contamination*
+- [x] **REWARD-03
+**: Reward-hacking penalties from arXiv 2509.15557 — penalize `skill_success` if test coverage on the skill <50%; penalize `eval_gate` if turn touches an eval module's assertion code (game-the-test pattern); penalize `completion` if final action is a no-op — *unit test: each penalty path triggers with specific synthetic inputs; hacking-mitigation reduces reward by ≥30% in each case*
 - [x] **REWARD-04
 **: Per-turn reward written to `tests/evals/reward_history.jsonl` for trend analysis (parallel to existing `tests/evals/history.jsonl` from Phase 16) — *Phase 17 Doctor module's `compute_eval_signal` extends to read this file as a new signal source `reward_trend`*
 - [ ] **REWARD-05**: OOD eval suite extension — adversarial prompts (jailbreak attempts, prompt-injection patterns from `repos-to-mine` rebuff/PIGuard fixture set), ambiguous classifications (intent_router boundary cases), capability-gap-shaped inputs (request for tools that don't exist, to stress Voyager loop) — *3 new eval modules in `tests/evals/`: `adversarial_eval.rs`, `ambiguous_intent_eval.rs`, `capability_gap_stress_eval.rs`; each asserts a baseline floor*
@@ -197,10 +199,10 @@ Substrate-anchored exclusions from v1.3 scoping. Some are permanent (memorial AI
 | VOYAGER-07 | 22 | ✅ shipped (Plan 22-03) |
 | VOYAGER-08 | 22 | ✅ shipped (Plan 22-04) |
 | VOYAGER-09 | 22 | ✅ shipped (Plan 22-06) |
-| REWARD-01 | 23 | pending |
-| REWARD-02 | 23 | pending |
-| REWARD-03 | 23 | pending |
-| REWARD-04 | 23 | pending |
+| REWARD-01 | 23 | ✅ shipped (Plan 23-01) |
+| REWARD-02 | 23 | ✅ shipped (Plan 23-02) |
+| REWARD-03 | 23 | ✅ shipped (Plan 23-02) |
+| REWARD-04 | 23 | partial — JSONL writer + per-turn persist via compute_and_persist_turn_reward shipped (Plan 23-02); Doctor reward_trend signal source pending (Plan 23-08) |
 | REWARD-05 | 23 | pending |
 | REWARD-06 | 23 | pending |
 | REWARD-07 | 23 | pending |
