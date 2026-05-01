@@ -204,7 +204,7 @@ Substrate-anchored exclusions from v1.3 scoping. Some are permanent (memorial AI
 | REWARD-02 | 23 | ✅ shipped (Plan 23-02) |
 | REWARD-03 | 23 | ✅ shipped (Plan 23-02) |
 | REWARD-04 | 23 | partial — JSONL writer + per-turn persist via compute_and_persist_turn_reward shipped (Plan 23-02); Doctor reward_trend signal source pending (Plan 23-08) |
-| REWARD-05 | 23 | partial — `adversarial_eval.rs` shipped (Plan 23-03); `ambiguous_intent_eval.rs` + `capability_gap_stress_eval.rs` + `mod` registration pending (Plans 23-04 / 23-05 / 23-06) |
+| REWARD-05 | 23 | partial — `adversarial_eval.rs` shipped (Plan 23-03) + `ambiguous_intent_eval.rs` shipped (Plan 23-04); `capability_gap_stress_eval.rs` + `mod` registration pending (Plans 23-05 / 23-06) |
 | REWARD-06 | 23 | pending |
 | REWARD-07 | 23 | pending |
 | DREAM-01 | 24 | pending |

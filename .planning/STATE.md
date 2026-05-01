@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Phases
 status: executing
-last_updated: "2026-05-01T13:37:09.303Z"
+last_updated: "2026-05-01T13:44:29.216Z"
 last_activity: 2026-05-01
 progress:
   total_phases: 14
   completed_phases: 10
   total_plans: 73
-  completed_plans: 70
-  percent: 96
+  completed_plans: 71
+  percent: 97
 ---
 
 # STATE — BLADE (v1.3 in progress; Phases 21 + 22 ✅ shipped)
@@ -20,14 +20,25 @@ progress:
 **Last shipped milestone:** v1.2 — Acting Layer with Brain Foundation (closed 2026-04-30 as `tech_debt`; chat-first pivot recorded mid-milestone)
 **Prior shipped:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27 as `tech_debt`); v1.0 — Skin Rebuild substrate (closed 2026-04-19)
 **Current Focus:** Phase 23 — verifiable-reward-ood-eval
-**Status:** Executing Phase 23 — Plan 03 ✅ shipped (adversarial_eval.rs at c256771; 17 jailbreak fixtures + 19-pattern classifier; REWARD-05 satisfied)
+**Status:** Executing Phase 23 — Plan 04 ✅ shipped (ambiguous_intent_eval.rs at 8fa3d82; 18 boundary fixtures + IntentVerdict 3-bucket classifier; REWARD-05 satisfied — 2 of 3 OOD modules complete)
 
 ## Current Position
 
 Phase: 23 (verifiable-reward-ood-eval) — EXECUTING
-Plan: 4 of 9 (Wave 2 — OOD eval modules + verify-eval bump)
-Status: Plan 03 complete; ready to execute Plan 04 (ambiguous_intent_eval.rs)
-Last activity: 2026-05-01 -- Phase 23 Plan 03 complete (c256771; adversarial_eval.rs created with 17 fixtures; REWARD-05 satisfied; floor=0.85, simulated pass-rate=1.000)
+Plan: 5 of 9 (Wave 2 — OOD eval modules + verify-eval bump)
+Status: Plan 04 complete; ready to execute Plan 05 (capability_gap_stress_eval.rs — final OOD module)
+Last activity: 2026-05-01 — Phase 23 Plan 04 complete (8fa3d82; ambiguous_intent_eval.rs created with 18 boundary fixtures across 3 sub-categories; REWARD-05 satisfied; floor=0.80, simulated pass-rate=1.000)
+
+### Phase 23 Plan 04 Decisions
+
+- Fixture count 18 (within locked 15–20 range), distributed 6-4-4-2-2: 6 capability-aware routing edges + 4 metaphorical-vs-literal action verbs + 4 multi-turn intent fragments + 2 ConservativeChoice (chat-branch-safer) + 2 deliberate-fail SilentMisroute buffer. Pass-rate math: 15/18 = 0.833 ≥ 0.80, 14/18 = 0.778 < 0.80, so the floor catches a 3-fixture regression beyond the buffer.
+- All 3 IntentVerdict variants (AskClarification, ConservativeChoice, SilentMisroute) are populated by both fixtures and classifier — no #[allow(dead_code)] needed (unlike adversarial_eval's SafeReformulation reserved for v1.4 LLM-driven path). The 2 ConservativeChoice fixtures + the dedicated CONSERVATIVE_TRIGGERS pattern set jointly exercise that branch deterministically.
+- Classifier is a 3-bucket static pattern set: ASK_PATTERNS (16 entries) → AskClarification, METAPHORICAL_TRIGGERS (5 entries) → AskClarification, CONSERVATIVE_TRIGGERS (3 entries) → ConservativeChoice, default fall-through → SilentMisroute. Bucket order matters because the dangerous default at the end is SilentMisroute. T-23-04-03 (DoS via pattern matcher) mitigated by construction (linear time, finite, no regex, no ReDoS).
+- The default SilentMisroute fall-through is THE danger pattern surface — explicitly distinct from adversarial_eval's neutral Failed default. The 2 deliberate-fail buffer fixtures (clean up the old stuff for me / go ahead and take care of everything we discussed) document the pattern-matcher's known blind spot and exercise the dangerous fall-through path with expected=SilentMisroute so pass=true holds.
+- ASCII-only verification passed first-write — applied lessons from Plan 23-03's retroactive ASCII fixup (used `--` for em-dash, `->` for arrow, plain `|` for inline separators). Total non-ASCII byte count file-wide: 0.
+- record_eval_run fires BEFORE the floor assert! per Phase 17 D-14 (audit-trail invariant inherited verbatim from adversarial_eval).
+- File is structurally complete but NOT registered in evals/mod.rs. Plan 23-06 owns the `mod ambiguous_intent_eval;` line in lockstep with the other 2 OOD modules.
+- Mirror of Plan 23-03 (adversarial_eval.rs) shape verbatim — second concrete instance of the canonical OOD module shape; Plan 23-05 (capability_gap_stress_eval) will be the third and final instance before mod-registration in Plan 23-06.
 
 ### Phase 23 Plan 03 Decisions
 
@@ -142,7 +153,7 @@ None. v1.2 closed cleanly with documented tech debt; v1.3 scope locked by operat
 
 ## Session Continuity
 
-**Last session:** 2026-05-01T13:37:09.286Z
+**Last session:** 2026-05-01T13:44:21.772Z
 
 Phase 21 commit chain (8 commits):
 
