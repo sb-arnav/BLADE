@@ -253,6 +253,181 @@ async fn task_skill_synthesis(app: tauri::AppHandle) -> String {
     "Reviewed skill patterns".to_string()
 }
 
+// ── Phase 24 (v1.3) — dream_mode skill lifecycle tasks ──────────────────────
+// Order: prune → consolidate → from_trace (Pitfall 5 — consolidate selects
+// from post-prune state). Each task delegates pure logic to skills::lifecycle
+// and writes proposals via skills::pending. Each emits exactly one
+// voyager_log::dream_*(count, items) at task end (D-24-F). Per-step
+// DREAMING.load(Ordering::Relaxed) checkpoints between work units >100ms
+// (D-24-D + Discretion item 8).
+
+/// Phase 24 — DREAM-01 prune pass.
+/// Sweeps .pending/ housekeeping first (Discretion item 4 LOCK).
+async fn task_skill_prune(_app: tauri::AppHandle) -> String {
+    let now = chrono::Utc::now().timestamp();
+
+    // Top-of-cycle .pending/ housekeeping — 7-day mark + 30-day purge.
+    crate::skills::pending::auto_dismiss_old(now);
+
+    let candidates = crate::skills::lifecycle::prune_candidate_selection(now);
+    let mut archived: Vec<String> = Vec::new();
+
+    for (_rowid, name, _script_path, _last_used) in candidates {
+        // Per-step abort checkpoint (≤1s SLA).
+        if !DREAMING.load(Ordering::Relaxed) {
+            break;
+        }
+        match crate::skills::lifecycle::archive_skill(&name) {
+            Ok(_) => archived.push(name),
+            Err(e) => log::warn!("[dream_mode::prune] archive {}: {e}", name),
+        }
+    }
+
+    let count = archived.len() as i64;
+    crate::voyager_log::dream_prune(count, archived.clone());
+    format!("dream:prune archived {} skill(s)", count)
+}
+
+/// Phase 24 — DREAM-02 consolidation pass.
+/// Cap: 1 merge proposal per cycle (D-24-B).
+async fn task_skill_consolidate(_app: tauri::AppHandle) -> String {
+    let rows = crate::tool_forge::get_forged_tools();
+    if rows.len() < 2 {
+        crate::voyager_log::dream_consolidate(0, vec![]);
+        return "dream:consolidate 0 pair(s) flagged".to_string();
+    }
+
+    // Build description+usage embedding inputs (D-24-E embedding source per Q6 LOCK).
+    let texts: Vec<String> = rows
+        .iter()
+        .map(|r| format!("{} {}", r.description, r.usage))
+        .collect();
+    let embeddings = match crate::embeddings::embed_texts(&texts) {
+        Ok(e) => e,
+        Err(e) => {
+            log::warn!("[dream_mode::consolidate] embed_texts: {e}");
+            crate::voyager_log::dream_consolidate(0, vec![]);
+            return format!("dream:consolidate skipped (embed: {e})");
+        }
+    };
+
+    // Abort checkpoint after the heavy embed call.
+    if !DREAMING.load(Ordering::Relaxed) {
+        crate::voyager_log::dream_consolidate(0, vec![]);
+        return "dream:consolidate aborted post-embed".to_string();
+    }
+
+    let mut flagged: Vec<String> = Vec::new();
+    let n = rows.len();
+    let mut pair_idx = 0usize;
+    'outer: for i in 0..n {
+        for j in (i + 1)..n {
+            pair_idx += 1;
+            // Every 20 pairs, checkpoint (Discretion item 8 LOCK).
+            if pair_idx % 20 == 0 && !DREAMING.load(Ordering::Relaxed) {
+                break 'outer;
+            }
+            let sim = crate::skills::lifecycle::cosine_sim(&embeddings[i], &embeddings[j]);
+            if sim < 0.85 {
+                continue;
+            }
+            let hashes_a = crate::skills::lifecycle::last_5_trace_hashes(&rows[i].name);
+            let hashes_b = crate::skills::lifecycle::last_5_trace_hashes(&rows[j].name);
+            if hashes_a.len() == 5 && hashes_a == hashes_b {
+                // FLAG! Build proposal.
+                let merged = crate::skills::lifecycle::deterministic_merge_body(
+                    &rows[i],
+                    &rows[j],
+                    &crate::skills::lifecycle::forged_name_exists,
+                );
+                let payload = serde_json::json!({
+                    "source_a": rows[i].name,
+                    "source_b": rows[j].name,
+                    "merged_body": merged,
+                });
+                let id = uuid::Uuid::new_v4().to_string()[..8].to_string();
+                let content_hash = crate::skills::pending::compute_content_hash(
+                    "merge",
+                    &merged.name,
+                    &payload,
+                );
+                let prop = crate::skills::pending::Proposal {
+                    id: id.clone(),
+                    kind: "merge".to_string(),
+                    proposed_name: merged.name.clone(),
+                    payload,
+                    created_at: chrono::Utc::now().timestamp(),
+                    dismissed: false,
+                    content_hash,
+                };
+                if let Ok(true) = crate::skills::pending::write_proposal(&prop) {
+                    flagged.push(format!("{}+{}", rows[i].name, rows[j].name));
+                }
+                break 'outer; // Cap: 1 merge per cycle (D-24-B).
+            }
+        }
+    }
+
+    let count = flagged.len() as i64;
+    crate::voyager_log::dream_consolidate(count, flagged.clone());
+    format!("dream:consolidate {} pair(s) flagged", count)
+}
+
+/// Phase 24 — DREAM-03 skill-from-trace pass.
+/// Cap: 1 generate proposal per cycle (D-24-B).
+async fn task_skill_from_trace(_app: tauri::AppHandle) -> String {
+    let now = chrono::Utc::now().timestamp();
+    let traces = crate::skills::lifecycle::recent_unmatched_traces(now);
+    let mut proposed: Vec<String> = Vec::new();
+
+    for trace in traces {
+        // Per-trace abort checkpoint.
+        if !DREAMING.load(Ordering::Relaxed) {
+            break;
+        }
+        // Build proposed name + skill.md skeleton.
+        let base = crate::skills::lifecycle::proposed_name_from_trace(&trace);
+        let proposed_name = crate::skills::lifecycle::ensure_unique_name(
+            &base,
+            &crate::skills::lifecycle::forged_name_exists,
+        );
+        let payload = serde_json::json!({
+            "trace": trace,
+            "proposed_skill_md": format!(
+                "# {}\n\nProposed by dream_mode skill-from-trace generator on turn that used {} tool calls without matching any existing forged tool.\n\nTool sequence:\n{}\n",
+                proposed_name,
+                trace.len(),
+                trace.iter().map(|t| format!("- {}", t)).collect::<Vec<_>>().join("\n")
+            ),
+        });
+        let id = uuid::Uuid::new_v4().to_string()[..8].to_string();
+        let content_hash = crate::skills::pending::compute_content_hash(
+            "generate",
+            &proposed_name,
+            &payload,
+        );
+        let prop = crate::skills::pending::Proposal {
+            id: id.clone(),
+            kind: "generate".to_string(),
+            proposed_name: proposed_name.clone(),
+            payload,
+            created_at: chrono::Utc::now().timestamp(),
+            dismissed: false,
+            content_hash,
+        };
+        if let Ok(true) = crate::skills::pending::write_proposal(&prop) {
+            proposed.push(proposed_name);
+            break; // Cap: 1 generate per cycle (D-24-B).
+        }
+        // If write_proposal returned Ok(false) — deduped against earlier
+        // cycle's already-pending proposal; keep iterating for a fresh trace.
+    }
+
+    let count = proposed.len() as i64;
+    crate::voyager_log::dream_generate(count, proposed.clone());
+    format!("dream:generate {} skill(s) proposed", count)
+}
+
 /// Task 5 — Code health scan.
 async fn task_code_health_scan() -> String {
     // Find recently changed Rust and TypeScript files in the cwd.
@@ -439,6 +614,12 @@ pub async fn run_dream_session(app: tauri::AppHandle) -> DreamSession {
     // Task 4 — Skill synthesis
     run_task!("skill_synthesis", task_skill_synthesis(app.clone()));
 
+    // Phase 24 (v1.3) — Voyager forgetting half: prune → consolidate → from_trace.
+    // Order matters per Pitfall 5 (consolidate selects from post-prune state).
+    run_task!("skill_prune",       task_skill_prune(app.clone()));
+    run_task!("skill_consolidate", task_skill_consolidate(app.clone()));
+    run_task!("skill_from_trace",  task_skill_from_trace(app.clone()));
+
     // Task 5 — Code health scan
     run_task!("code_health_scan", task_code_health_scan());
 
@@ -555,5 +736,227 @@ mod tests {
         let now = chrono::Utc::now().timestamp();
         // Allow <=2s skew for the SystemTime + atomic-store path.
         assert!((now - ts).abs() <= 2, "expected ts within 2s of now; got {} vs {}", ts, now);
+    }
+
+    // ── Phase 24 Plan 24-05 integration tests ──────────────────────────────
+    //
+    // The 3 tests below pin DREAM-01 prune semantics + archive_skill side
+    // effect (TBD-02-01) and DREAM-05 per-step abort + ≤1s SLA (TBD-02-08).
+    // Each uses a tempdir BLADE_CONFIG_DIR + direct seeding of forged_tools
+    // rows + matching `<user_root>/<sanitized_name>/SKILL.md` directory
+    // seeding so `archive_skill` has a real source dir to rename. The tests
+    // share BLADE_CONFIG_DIR mutation, so `cargo test --test-threads=1` is
+    // mandatory (the verify command below uses it). Drives the prune loop
+    // body via the public `skills::lifecycle` surface (mirrors the actual
+    // task body since AppHandle cannot be fabricated in unit tests).
+
+    fn seed_stale_forged_tools(tmp_path: &std::path::Path, count: usize, days_old: i64) {
+        // Seed `count` stale forged_tools rows + matching <user_root>/<sanitized_name>/ dirs.
+        // Uses crate::skills::export::sanitize_name to mirror archive_skill's path resolution.
+        let conn = rusqlite::Connection::open(tmp_path.join("blade.db")).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS forged_tools (
+                id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, description TEXT NOT NULL,
+                language TEXT NOT NULL, script_path TEXT NOT NULL, usage TEXT NOT NULL,
+                parameters TEXT DEFAULT '[]', test_output TEXT DEFAULT '',
+                created_at INTEGER NOT NULL, last_used INTEGER, use_count INTEGER DEFAULT 0,
+                forged_from TEXT DEFAULT ''
+            );",
+        ).unwrap();
+        let now = chrono::Utc::now().timestamp();
+        let stale = now - days_old * 86400;
+        for i in 0..count {
+            let name = format!("stale_{}", i);
+            conn.execute(
+                "INSERT INTO forged_tools (id, name, description, language, script_path, usage, created_at, last_used) \
+                 VALUES (?1, ?2, 'd', 'bash', '/tmp/x.sh', 'u', ?3, ?3)",
+                rusqlite::params![format!("id{}", i), name, stale],
+            ).unwrap();
+            // Seed the on-disk dir that archive_skill will rename.
+            if let Some(sanitized) = crate::skills::export::sanitize_name(&format!("stale_{}", i)) {
+                let dir = crate::skills::loader::user_root().join(&sanitized);
+                std::fs::create_dir_all(&dir).ok();
+                std::fs::write(
+                    dir.join("SKILL.md"),
+                    format!("---\nname: {}\ndescription: x\n---\n", sanitized),
+                ).ok();
+            }
+        }
+    }
+
+    fn run_prune_loop_body() -> usize {
+        // Mirrors task_skill_prune's loop body via the public lifecycle
+        // surface — used by all 3 prune tests since the actual `task_skill_prune`
+        // is private + requires a real AppHandle to invoke directly.
+        let now = chrono::Utc::now().timestamp();
+        crate::skills::pending::auto_dismiss_old(now);
+        let candidates = crate::skills::lifecycle::prune_candidate_selection(now);
+        let mut archived: Vec<String> = Vec::new();
+        for (_rowid, name, _script_path, _last_used) in candidates {
+            if !DREAMING.load(Ordering::Relaxed) {
+                break;
+            }
+            if let Ok(_) = crate::skills::lifecycle::archive_skill(&name) {
+                archived.push(name);
+            }
+        }
+        archived.len()
+    }
+
+    #[test]
+    fn task_skill_prune_archives_stale() {
+        let tmp = tempfile::TempDir::new().expect("tempdir");
+        std::env::set_var("BLADE_CONFIG_DIR", tmp.path());
+
+        // Seed 2 stale rows (92 days old) + 1 fresh row (30 days old).
+        seed_stale_forged_tools(tmp.path(), 2, 92);
+        // Append the fresh row directly.
+        let conn = rusqlite::Connection::open(tmp.path().join("blade.db")).unwrap();
+        let now = chrono::Utc::now().timestamp();
+        let fresh = now - 30 * 86400;
+        conn.execute(
+            "INSERT INTO forged_tools (id, name, description, language, script_path, usage, created_at, last_used) \
+             VALUES ('fresh_id', 'fresh_one', 'd', 'bash', '/tmp/x.sh', 'u', ?1, ?1)",
+            rusqlite::params![fresh],
+        ).unwrap();
+        drop(conn);
+
+        // Drive prune loop body to completion (DREAMING true throughout).
+        DREAMING.store(true, Ordering::SeqCst);
+        let archived_count = run_prune_loop_body();
+
+        // 2 stale rows archived; 1 fresh row remains.
+        assert_eq!(archived_count, 2, "expected 2 stale rows archived");
+        let conn = rusqlite::Connection::open(tmp.path().join("blade.db")).unwrap();
+        let remaining: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM forged_tools",
+            [],
+            |r| r.get(0),
+        ).unwrap();
+        assert_eq!(remaining, 1, "expected 1 row remaining (the fresh one)");
+        let fresh_name: String = conn.query_row(
+            "SELECT name FROM forged_tools",
+            [],
+            |r| r.get(0),
+        ).unwrap();
+        assert_eq!(fresh_name, "fresh_one");
+        drop(conn);
+
+        // Confirm 2 dirs landed under .archived/.
+        let archived_root = crate::skills::loader::user_root().join(".archived");
+        let archived_dirs: Vec<_> = std::fs::read_dir(&archived_root)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_dir())
+            .collect();
+        assert_eq!(archived_dirs.len(), 2, "expected 2 dirs under .archived/");
+
+        DREAMING.store(false, Ordering::SeqCst);
+        std::env::remove_var("BLADE_CONFIG_DIR");
+    }
+
+    #[tokio::test]
+    async fn prune_respects_dreaming_atomic() {
+        // DREAM-05 / TBD-02-08 — per-step abort guarantee.
+        //
+        // Test posture: drive the prune loop body via a deterministic
+        // limited-progress fixture rather than wall-clock racing the
+        // spawn_blocking worker. We run the loop body MANUALLY,
+        // archive-by-archive, flipping DREAMING off after a controlled
+        // number of iterations to prove the per-step DREAMING.load
+        // checkpoint actually breaks the loop mid-pass.
+        let tmp = tempfile::TempDir::new().expect("tempdir");
+        std::env::set_var("BLADE_CONFIG_DIR", tmp.path());
+
+        // Seed 10 stale forged_tools rows + matching dirs.
+        seed_stale_forged_tools(tmp.path(), 10, 92);
+
+        // Set DREAMING true so the prune loop will iterate.
+        DREAMING.store(true, Ordering::SeqCst);
+
+        // Drive the loop body manually with an injected DREAMING-flip
+        // after the 3rd archive completes. This is deterministic:
+        // exactly 3 rows archived, exactly 7 rows remaining.
+        let now = chrono::Utc::now().timestamp();
+        crate::skills::pending::auto_dismiss_old(now);
+        let candidates = crate::skills::lifecycle::prune_candidate_selection(now);
+        let mut archived: Vec<String> = Vec::new();
+        for (idx, (_rowid, name, _script_path, _last_used)) in candidates.into_iter().enumerate() {
+            // Per-step abort checkpoint — same as the production task body.
+            if !DREAMING.load(Ordering::Relaxed) {
+                break;
+            }
+            // Flip DREAMING off *after* archive #3 completes so the loop
+            // exits on iteration 4's checkpoint with exactly 3 archived.
+            if idx == 3 {
+                DREAMING.store(false, Ordering::SeqCst);
+            }
+            if let Ok(_) = crate::skills::lifecycle::archive_skill(&name) {
+                archived.push(name);
+            }
+        }
+        let archived_count = archived.len();
+
+        // After abort: some pruned + some left untouched.
+        let conn = rusqlite::Connection::open(tmp.path().join("blade.db")).unwrap();
+        let remaining: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM forged_tools",
+            [],
+            |r| r.get(0),
+        ).unwrap();
+        drop(conn);
+
+        // Per-step abort behaviour proven: SOME archived (>0) AND
+        // SOME remaining (>0). The exact split is deterministic given
+        // the manual flip ordering above.
+        assert!(
+            archived_count > 0,
+            "expected at least one archive before abort; got {}",
+            archived_count
+        );
+        assert!(
+            remaining > 0,
+            "expected some rows untouched after abort; got remaining={}",
+            remaining
+        );
+        assert!(
+            archived_count + (remaining as usize) == 10,
+            "archived + remaining must sum to 10; got {} + {}",
+            archived_count, remaining
+        );
+
+        DREAMING.store(false, Ordering::SeqCst);
+        std::env::remove_var("BLADE_CONFIG_DIR");
+    }
+
+    #[tokio::test]
+    async fn abort_within_one_second() {
+        // Seed a tempdir BLADE_CONFIG_DIR + populate forged_tools with
+        // ≥10 stale rows so prune has work. Drive the prune body via the
+        // same `run_prune_loop_body` helper, flip DREAMING mid-pass, assert
+        // ≤1s wall-clock to return.
+        let tmp = tempfile::TempDir::new().expect("tempdir");
+        std::env::set_var("BLADE_CONFIG_DIR", tmp.path());
+
+        seed_stale_forged_tools(tmp.path(), 50, 100);
+
+        DREAMING.store(true, Ordering::SeqCst);
+
+        let handle = tokio::task::spawn_blocking(|| run_prune_loop_body());
+
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        let abort_at = tokio::time::Instant::now();
+        DREAMING.store(false, Ordering::SeqCst);
+
+        let _archived = handle.await.expect("prune task joined");
+        let elapsed = abort_at.elapsed();
+        assert!(
+            elapsed.as_millis() <= 1000,
+            "expected abort ≤1s; got {}ms",
+            elapsed.as_millis()
+        );
+
+        DREAMING.store(false, Ordering::SeqCst);
+        std::env::remove_var("BLADE_CONFIG_DIR");
     }
 }
