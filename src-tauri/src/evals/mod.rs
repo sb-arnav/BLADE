@@ -13,3 +13,6 @@
 #[cfg(test)] mod kg_integrity_eval;
 #[cfg(test)] mod typed_memory_eval;
 #[cfg(test)] mod capability_gap_eval;
+#[cfg(test)] mod adversarial_eval;            // Phase 23 / REWARD-05
+#[cfg(test)] mod ambiguous_intent_eval;       // Phase 23 / REWARD-05
+#[cfg(test)] mod capability_gap_stress_eval;  // Phase 23 / REWARD-05
