@@ -46,7 +46,7 @@ pub use activate::{
     activate, body_bytes_loaded, load_reference, reference_bytes_loaded,
     reset_disclosure_counters, resolve_reference_path,
 };
-pub use loader::{bundled_root, scan_tier, user_root, workspace_root};
+pub use loader::{bundled_root, list_skills_snapshot, scan_tier, user_root, workspace_root, SkillRef};
 pub use parser::parse_skill;
 pub use resolver::Catalog;
 pub use types::{Skill, SkillBody, SkillFrontmatter, SkillStub, SourceTier};
