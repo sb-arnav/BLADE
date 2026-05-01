@@ -504,6 +504,18 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
             diff_summary TEXT NOT NULL DEFAULT ''
         );
         CREATE INDEX IF NOT EXISTS idx_soul_snap_ts ON soul_snapshots(created_at DESC);
+
+        -- Phase 24 (v1.3) DREAM-03 -- turn_traces records the per-chat-turn
+        -- tool-call sequence used by dream_mode skill-from-trace generation.
+        -- Written from commands.rs at the same site as compute_and_persist_turn_reward.
+        CREATE TABLE IF NOT EXISTS turn_traces (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            turn_ts INTEGER NOT NULL,
+            tool_names TEXT NOT NULL,
+            forged_tool_used TEXT,
+            success INTEGER NOT NULL DEFAULT 1
+        );
+        CREATE INDEX IF NOT EXISTS idx_tt_ts ON turn_traces(turn_ts DESC);
         ",
     )
     .map_err(|e| format!("DB error: {}", e))?;
@@ -1205,6 +1217,28 @@ mod tests {
         let conn = test_db();
         // Running migrations a second time should be fine
         run_migrations(&conn).unwrap();
+    }
+
+    /// Phase 24 Plan 24-01 -- DREAM-03 substrate. Confirms run_migrations
+    /// creates the turn_traces table + idx_tt_ts index. Mirrors the existing
+    /// in-memory + run_migrations posture (test_db helper) -- init_db is the
+    /// public seam but uses BLADE_CONFIG_DIR which the rest of the test
+    /// module avoids; run_migrations is the migration body init_db calls.
+    #[test]
+    fn run_migrations_creates_turn_traces() {
+        let conn = test_db();
+        let table_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='turn_traces'",
+            [],
+            |r| r.get(0),
+        ).unwrap();
+        assert_eq!(table_count, 1);
+        let index_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_tt_ts'",
+            [],
+            |r| r.get(0),
+        ).unwrap();
+        assert_eq!(index_count, 1);
     }
 
     #[test]
