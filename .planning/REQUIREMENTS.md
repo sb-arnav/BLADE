@@ -55,7 +55,8 @@ RLVR-style composite reward in production. Steelman Arg 3 (OOD eval coverage) mi
 **: Per-turn reward written to `tests/evals/reward_history.jsonl` for trend analysis (parallel to existing `tests/evals/history.jsonl` from Phase 16) — *Phase 17 Doctor module's `compute_eval_signal` extends to read this file as a new signal source `reward_trend`*
 - [x] **REWARD-05
 **: OOD eval suite extension — adversarial prompts (jailbreak attempts, prompt-injection patterns from `repos-to-mine` rebuff/PIGuard fixture set), ambiguous classifications (intent_router boundary cases), capability-gap-shaped inputs (request for tools that don't exist, to stress Voyager loop) — *3 new eval modules in `tests/evals/`: `adversarial_eval.rs`, `ambiguous_intent_eval.rs`, `capability_gap_stress_eval.rs`; each asserts a baseline floor*
-- [ ] **REWARD-06**: OOD eval failure budget — if any OOD eval module's score drops >15% from rolling 7-day baseline, the per-turn reward signal is gated to zero (fail-safe; treat as "we don't trust reward this turn") — *unit test: simulate 20% drop in adversarial_eval, observe reward = 0 for the next turn*
+- [x] **REWARD-06
+**: OOD eval failure budget — if any OOD eval module's score drops >15% from rolling 7-day baseline, the per-turn reward signal is gated to zero (fail-safe; treat as "we don't trust reward this turn") — *unit test: simulate 20% drop in adversarial_eval, observe reward = 0 for the next turn*
 - [x] **REWARD-07
 **: Doctor pane (Phase 17) extended with `reward_trend` signal — surfaces composite reward 7-day average, per-component decomposition, OOD eval status — *DoctorPane.tsx renders new row; severity tier follows D-05 (Red on >20% drop, Amber on >10%, Green otherwise)*
 

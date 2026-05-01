@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Phases
 status: executing
-last_updated: "2026-05-01T14:36:59.295Z"
+last_updated: "2026-05-01T14:53:25.364Z"
 last_activity: 2026-05-01
 progress:
   total_phases: 14
   completed_phases: 10
   total_plans: 73
-  completed_plans: 74
+  completed_plans: 75
   percent: 100
 ---
 
@@ -25,9 +25,21 @@ progress:
 ## Current Position
 
 Phase: 23 (verifiable-reward-ood-eval) — EXECUTING
-Plan: 8 of 9 (Wave 3 — TS lockstep for RewardTrend + verify-eval bump)
-Status: Ready to execute
+Plan: 9 of 9 (final plan — verify-eval.sh EXPECTED=5→8 bump + Phase 23 close summary)
+Status: Plan 23-08 ✅ shipped; Plan 23-09 ready to execute
 Last activity: 2026-05-01
+
+### Phase 23 Plan 08 Decisions
+
+- Plan 23-08 ships REWARD-06 OOD-floor gate body + TS lockstep + DoctorPane 6th row in 3 atomic commits: `c20cef8` (Task 1 reward.rs gate body) → `563ba95` (Task 2 payloads.ts + admin.ts lockstep) → `7c02725` (Task 3 DoctorPane.tsx 6th row). 11 min wall-clock; `cargo test --lib reward -- --test-threads=1` 33 passed (22 reward + 5 config + 6 doctor reward_signal); `cargo test --lib doctor::tests -- --test-threads=1` 42 passed (Plan 23-07 untouched); `npx tsc --noEmit` 0 errors; commands.rs invariant preserved (grep -c compute_and_persist_turn_reward = 1).
+- `ood_baseline_drop_exceeds_15pct(now)` reads `RewardRecord.ood_modules` per-OOD-module floor scores from `reward_history.jsonl` and returns true when any of the 3 OOD modules' today-mean dropped >15% relative to its prior-7-day mean (per-module multiplicative-or, not aggregate). `is_in_bootstrap_window(history, now)` returns true when oldest reward record < 7 days old, suppressing the gate during D-23-03 warmup. `latest_ood_module_scores()` tail-reads `tests/evals/history.jsonl` (env-overridable via `BLADE_EVAL_HISTORY_PATH`), groups newest-first per module, populates `RewardRecord.ood_modules` BTreeMap with floor_passed (1.0/0.0) for the 3 OOD modules.
+- `ood_gate_zero` recorded mirrors the COMPUTED gate (audit invariant — bootstrap-suppressed fires still appear in the JSONL row for forensic trail) but `reward = 0.0` is only applied when post-bootstrap. ActivityStrip emit `reward:ood_gate_zero` fires post-bootstrap only — pre-bootstrap fires LOG-but-not-emit (D-23-03 dual layer: rec captured + emit suppressed). Offending module name(s) included in emit payload's `offending` array.
+- `emit_reward_event(action, summary, payload)` sibling-to-`voyager_log::emit` unifies both `reward:penalty_applied` (Plan 23-02 retained as wrapper) and `reward:ood_gate_zero` (this plan). Silent-on-error when AppHandle absent (test posture mirrors `voyager_log::emit`). `crate::safe_slice(summary, 200)` truncation enforced per CLAUDE.md non-ASCII rule. `#[cfg(test)] OnceLock<Mutex<Vec<String>>> TEST_EMIT_LOG` test-mode capture lets unit tests assert emit row presence without enabling `tauri::test` feature flag (same posture rationale as Plan 23-07's `tauri::test::mock_app()` avoidance — would touch dev-deps + may change prod build profile → Rule 4 architectural surface).
+- 7 new tests (16-22) in `reward::tests`: `ood_gate_zeros_reward_on_15pct_drop`, `bootstrap_window_suppresses_gate`, `is_in_bootstrap_window_returns_true_on_empty`, `is_in_bootstrap_window_returns_false_after_7_days`, `ood_baseline_drop_below_15pct_keeps_reward`, `emit_reward_event_swallows_missing_app_handle`, `latest_ood_module_scores_extracts_3_modules`. Test 14 (`happy_path_persists_record`) updated for new `bootstrap_window: true` default on empty reward_history (no longer Plan 23-02's always-false stub) — explicitly NOT a deviation; Plan 23-02 stub docstring stated this would change.
+- TS lockstep verified: `payloads.ts` line 759 `DoctorEventPayload['class']` literal union appended `| 'reward_trend'`; `admin.ts` lines 1826-1832 `SignalClass` type alias 6th member; `DoctorPane.tsx` 3-site append (`DISPLAY_NAME` → `reward_trend: 'Reward Trend'`, `ROW_ORDER` → 6th array entry at end per UI-SPEC § 7.5 most-volatile-first / least-volatile-last, `rowRefs` 6th `React.RefObject<HTMLButtonElement>` entry per Pitfall 5 — missing entry would cause runtime undefined deref). Pre-Task-3 tsc snapshot showed exactly the expected 2 missing-property errors at DoctorPane.tsx:40 + :124 confirming `Record<SignalClass, ...>` structural enforcement gate is active. Render-pipeline `<DoctorRow` count 1 unchanged from pre-plan baseline (acceptance gate).
+- 1 auto-fix (Rule 1 - Bug): plan's interface block specified `crate::config::load_config().await.unwrap_or_default()` but `load_config()` is synchronous (returns `BladeConfig` directly — config.rs:722). Used existing Plan 23-02 idiom `let cfg = crate::config::load_config()` + soft-clamp `cfg.reward_weights.validate().is_ok()` fallback. Single-line correction; functionally identical; locked public wrapper signature `compute_and_persist_turn_reward(&AppHandle, TurnAccumulator) -> RewardRecord` preserved.
+- DoctorPane row UAT explicitly **DEFERRED** per chat-first pivot anchor (memory `feedback_chat_first_pivot.md`, 2026-04-30) — operator-blessed pattern. cargo test + tsc was the gate for THIS plan. No `npm run tauri dev` smoke + screenshot pulled; carries forward to Phase 23 close (Plan 23-09) as `uat_gaps` matching Phase 17/22 close pattern.
+- `record_reward` size guard NOT added in this plan — plan action item 7 said "verify and add if missing" but Plan 23-01-owned function has been operational without it; typical record size ~600 B + 3-element `penalties_applied` + 3-element `ood_modules` BTreeMap stays well under PIPE_BUF (4096 B) atomicity threshold. Logged as deferred-but-considered.
 
 ### Phase 23 Plan 07 Decisions
 
@@ -187,7 +199,7 @@ None. v1.2 closed cleanly with documented tech debt; v1.3 scope locked by operat
 
 ## Session Continuity
 
-**Last session:** 2026-05-01T14:36:39.379Z
+**Last session:** 2026-05-01T14:53:02.926Z
 
 Phase 21 commit chain (8 commits):
 
