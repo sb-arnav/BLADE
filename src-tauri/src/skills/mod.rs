@@ -34,6 +34,7 @@
 #![allow(dead_code, unused_imports)] // Wave 1 lands substrate; Wave 2/3 wires consumers.
 
 pub mod activate;
+pub mod consent;
 pub mod loader;
 pub mod parser;
 pub mod resolver;
