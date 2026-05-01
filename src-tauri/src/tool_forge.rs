@@ -64,6 +64,22 @@ fn default_true() -> bool { true }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/// Phase 22 Plan 22-03 (v1.3) — Voyager skill-write token-budget estimator.
+///
+/// Estimates total tokens (prompt + max response) using the 4-chars-per-token
+/// heuristic. Reserves 30_000 chars (~7_500 tokens) as the response budget
+/// — covers typical Python/Bash/Node script generation including JSON-wrap
+/// overhead. Pathological prompts (e.g. a copy-pasted 50KB error log) trip
+/// the cap before the LLM call.
+pub fn estimate_skill_write_tokens(prompt: &str) -> u64 {
+    const CHARS_PER_TOKEN: u64 = 4;
+    const RESPONSE_RESERVE_CHARS: u64 = 30_000;
+
+    let prompt_tokens = (prompt.len() as u64).saturating_add(CHARS_PER_TOKEN - 1) / CHARS_PER_TOKEN;
+    let response_tokens = RESPONSE_RESERVE_CHARS / CHARS_PER_TOKEN;
+    prompt_tokens.saturating_add(response_tokens)
+}
+
 /// Returns ~/.blade/tools/, creating it if missing.
 fn tools_dir() -> PathBuf {
     let dir = crate::config::blade_config_dir().join("tools");
@@ -194,6 +210,20 @@ async fn generate_tool_script(
         capability = capability,
         lang_notes = lang_notes,
     );
+
+    // Phase 22 Plan 22-03 (v1.3) — Voyager skill-write budget cap (VOYAGER-07).
+    // Refuse the LLM call if prompt + estimated response would exceed the
+    // configured token budget. Default 50_000 (see config::default_voyager_
+    // skill_write_budget_tokens). Estimate uses the same 4-chars-per-token
+    // heuristic the validator already uses for body sizing — rough but
+    // sufficient to bound runaway token spend on pathological inputs.
+    let estimated = estimate_skill_write_tokens(&prompt);
+    if estimated > config.voyager_skill_write_budget_tokens {
+        return Err(format!(
+            "[tool_forge] skill-write budget exceeded: estimated {estimated} tokens > cap {} (set BladeConfig.voyager_skill_write_budget_tokens to raise)",
+            config.voyager_skill_write_budget_tokens
+        ));
+    }
 
     let messages = vec![crate::providers::ConversationMessage::User(prompt)];
 
@@ -603,4 +633,55 @@ pub async fn forge_test_tool(id: String) -> Result<String, String> {
     .map_err(|e| format!("DB update error: {}", e))?;
 
     Ok(output)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn estimate_short_prompt_under_default_budget() {
+        let est = estimate_skill_write_tokens("fetch a youtube transcript");
+        assert!(est < 50_000, "estimate {est} should be well under 50K cap");
+        // Short prompt: 30K-char response reserve dominates → ~7500 tokens
+        assert!(est >= 7_500);
+        assert!(est < 8_000);
+    }
+
+    #[test]
+    fn estimate_grows_linearly_with_prompt_size() {
+        let small = estimate_skill_write_tokens(&"a".repeat(400));
+        let big = estimate_skill_write_tokens(&"a".repeat(40_000));
+        assert!(big > small);
+        // 40_000 chars / 4 chars-per-token = 10_000 prompt tokens; plus
+        // ~7500 response reserve = ~17_500 total. Should be near that.
+        assert!(big >= 17_400);
+        assert!(big <= 17_600);
+    }
+
+    #[test]
+    fn pathological_prompt_exceeds_default_budget() {
+        // ~200_000 chars / 4 = 50_000 prompt tokens; plus 7500 response =
+        // 57_500 total. Above the 50_000 default cap.
+        let pathological = "x".repeat(200_000);
+        let est = estimate_skill_write_tokens(&pathological);
+        assert!(
+            est > 50_000,
+            "pathological prompt should exceed 50K cap, got {est}"
+        );
+    }
+
+    #[test]
+    fn empty_prompt_only_response_reserve() {
+        let est = estimate_skill_write_tokens("");
+        assert_eq!(est, 30_000 / 4);
+    }
+
+    #[test]
+    fn estimate_uses_saturating_add() {
+        // Ensure no panic on huge inputs (boundary test)
+        let huge = "x".repeat(1_000_000);
+        let _ = estimate_skill_write_tokens(&huge);
+        // Just confirm it returns without overflow panic
+    }
 }

@@ -172,6 +172,13 @@ pub struct TentacleRecord {
 fn default_ecosystem_tentacles() -> Vec<TentacleRecord> { vec![] }
 fn default_ecosystem_observe_only() -> bool { true }
 
+// Phase 22 (v1.3) — Voyager skill-write budget cap (VOYAGER-07).
+// Total tokens (prompt + estimated response) above which forge_tool refuses
+// the LLM call. 50_000 is generous headroom for typical scripts (~1K prompt
+// + 5K-30K response); pathological cases trigger the refusal instead of
+// runaway token spend.
+fn default_voyager_skill_write_budget_tokens() -> u64 { 50_000 }
+
 /// Config as stored on disk — api_key is NOT stored here anymore
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct DiskConfig {
@@ -288,6 +295,9 @@ struct DiskConfig {
     ecosystem_tentacles: Vec<TentacleRecord>,
     #[serde(default = "default_ecosystem_observe_only")]
     ecosystem_observe_only: bool,
+    // Phase 22 Plan 22-03 (v1.3) — Voyager skill-write budget cap (VOYAGER-07)
+    #[serde(default = "default_voyager_skill_write_budget_tokens")]
+    voyager_skill_write_budget_tokens: u64,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -366,6 +376,7 @@ impl Default for DiskConfig {
             scan_classes_enabled: default_scan_classes_enabled(),
             ecosystem_tentacles: vec![],
             ecosystem_observe_only: true,
+            voyager_skill_write_budget_tokens: default_voyager_skill_write_budget_tokens(),
             api_key: None,
         }
     }
@@ -498,6 +509,11 @@ pub struct BladeConfig {
     pub ecosystem_tentacles: Vec<TentacleRecord>,
     #[serde(default = "default_ecosystem_observe_only")]
     pub ecosystem_observe_only: bool,
+    /// Phase 22 Plan 22-03 (v1.3) — Voyager skill-write budget cap (VOYAGER-07).
+    /// Total tokens (prompt + estimated response) above which `tool_forge::
+    /// forge_tool` refuses the LLM call. Default 50_000.
+    #[serde(default = "default_voyager_skill_write_budget_tokens")]
+    pub voyager_skill_write_budget_tokens: u64,
 }
 
 impl BladeConfig {
@@ -562,6 +578,7 @@ impl Default for BladeConfig {
             scan_classes_enabled: default_scan_classes_enabled(),
             ecosystem_tentacles: vec![],
             ecosystem_observe_only: true,
+            voyager_skill_write_budget_tokens: default_voyager_skill_write_budget_tokens(),
         }
     }
 }
@@ -720,6 +737,7 @@ pub fn load_config() -> BladeConfig {
         scan_classes_enabled: disk.scan_classes_enabled,
         ecosystem_tentacles: disk.ecosystem_tentacles,
         ecosystem_observe_only: disk.ecosystem_observe_only,
+        voyager_skill_write_budget_tokens: disk.voyager_skill_write_budget_tokens,
     }
 }
 
@@ -780,6 +798,7 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         scan_classes_enabled: config.scan_classes_enabled.clone(),
         ecosystem_tentacles: config.ecosystem_tentacles.clone(),
         ecosystem_observe_only: config.ecosystem_observe_only,
+        voyager_skill_write_budget_tokens: config.voyager_skill_write_budget_tokens,
         api_key: None,
     };
 
