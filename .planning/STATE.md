@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Phases
 status: executing
-last_updated: "2026-05-01T13:27:25.372Z"
+last_updated: "2026-05-01T13:37:09.303Z"
 last_activity: 2026-05-01
 progress:
   total_phases: 14
   completed_phases: 10
   total_plans: 73
-  completed_plans: 69
-  percent: 95
+  completed_plans: 70
+  percent: 96
 ---
 
 # STATE — BLADE (v1.3 in progress; Phases 21 + 22 ✅ shipped)
@@ -20,16 +20,26 @@ progress:
 **Last shipped milestone:** v1.2 — Acting Layer with Brain Foundation (closed 2026-04-30 as `tech_debt`; chat-first pivot recorded mid-milestone)
 **Prior shipped:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27 as `tech_debt`); v1.0 — Skin Rebuild substrate (closed 2026-04-19)
 **Current Focus:** Phase 23 — verifiable-reward-ood-eval
-**Status:** Executing Phase 23 — Plan 02 ✅ shipped (TurnAccumulator + 3 D-23-02 penalty paths + commands.rs hook at line 1831)
+**Status:** Executing Phase 23 — Plan 03 ✅ shipped (adversarial_eval.rs at c256771; 17 jailbreak fixtures + 19-pattern classifier; REWARD-05 satisfied)
 
 ## Current Position
 
 Phase: 23 (verifiable-reward-ood-eval) — EXECUTING
-Plan: 3 of 9 (Wave 2 — OOD eval modules + verify-eval bump)
-Status: Plan 02 complete; ready to execute Plan 03
-Last activity: 2026-05-01 -- Phase 23 Plan 02 complete (f52e45f + ba1b459; 20 unit tests green; REWARD-02 + REWARD-03 satisfied)
+Plan: 4 of 9 (Wave 2 — OOD eval modules + verify-eval bump)
+Status: Plan 03 complete; ready to execute Plan 04 (ambiguous_intent_eval.rs)
+Last activity: 2026-05-01 -- Phase 23 Plan 03 complete (c256771; adversarial_eval.rs created with 17 fixtures; REWARD-05 satisfied; floor=0.85, simulated pass-rate=1.000)
+
+### Phase 23 Plan 03 Decisions
+
+- Fixture count 17 (within locked 15–20 range), distributed 3-3-3-3-3-2 across the 5 locked categories + 2 deliberate-fail buffer fixtures. Pass-rate math: 15/17 = 0.882 ≥ 0.85, 14/17 = 0.823 < 0.85, so the floor catches a single-fixture regression beyond the buffer.
+- HandledOutcome::SafeReformulation marked #[allow(dead_code)] — variant reserved for v1.4 LLM-driven promotion (Assumption A3); pure-pattern matcher cannot populate it without output-side inspection. Keeping it in the enum preserves the locked interface contract from RESEARCH §"Module 1".
+- Classifier is a 19-entry static pattern set scanned via lowercase + String::contains — linear time, finite, no regex, no ReDoS. T-23-03-04 (DoS via adversarial input) mitigated by construction.
+- ASCII-only enforced module-wide. The acceptance gate (`grep -P "[^\x00-\x7F]" file | grep -v '^//' | head -1 | wc -l == 0`) only filters lines starting at column 0, so all box-drawing chars, em-dashes, and arrows in indented `///` and `    //` comments were stripped to ASCII equivalents (em-dash → `--`, `──` → `----`, `→` → `->`). Total non-ASCII byte count file-wide is now 0 (stricter than the gate requires).
+- record_eval_run fires BEFORE the floor assert! per Phase 17 D-14 — a floor failure still appends a JSONL row that doctor.rs surfaces. This is the audit-trail invariant locked in Phase 17 and inherited verbatim here.
+- File is structurally complete but NOT registered in evals/mod.rs. Plan 23-06 owns the `mod adversarial_eval;` line in lockstep with the other 2 OOD modules. First real `cargo test --lib evals::adversarial_eval` invocation lands in Plan 23-06.
 
 ### Phase 23 Plan 02 Decisions
+
 - A2/A6 lexical-exit assumption corrected: commands.rs:2173+ synthetic-stub branch does NOT exit through return Ok(()) at 1821; falls through to summary stream call at 2229. Reward computed only on no-more-tool-calls happy-path branch (Site 3 at line 1831).
 - compute_and_persist_turn_reward split into public locked-signature wrapper + private inner body so tests can exercise without enabling tauri::test feature; commands.rs hook signature unchanged.
 - OOD-floor gate is a no-op stub in Plan 23-02 — bootstrap_window=false and ood_gate_zero=false persisted unconditionally. Plan 23-08 will land the real REWARD-06 body without re-touching commands.rs (signature locked).
@@ -132,7 +142,7 @@ None. v1.2 closed cleanly with documented tech debt; v1.3 scope locked by operat
 
 ## Session Continuity
 
-**Last session:** 2026-05-01T13:27:25.357Z
+**Last session:** 2026-05-01T13:37:09.286Z
 
 Phase 21 commit chain (8 commits):
 
