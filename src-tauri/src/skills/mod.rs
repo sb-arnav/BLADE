@@ -39,6 +39,7 @@ pub mod export;
 pub mod lifecycle;
 pub mod loader;
 pub mod parser;
+pub mod pending;
 pub mod resolver;
 pub mod types;
 pub mod validator;
