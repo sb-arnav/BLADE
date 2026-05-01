@@ -56,7 +56,8 @@ RLVR-style composite reward in production. Steelman Arg 3 (OOD eval coverage) mi
 - [x] **REWARD-05
 **: OOD eval suite extension — adversarial prompts (jailbreak attempts, prompt-injection patterns from `repos-to-mine` rebuff/PIGuard fixture set), ambiguous classifications (intent_router boundary cases), capability-gap-shaped inputs (request for tools that don't exist, to stress Voyager loop) — *3 new eval modules in `tests/evals/`: `adversarial_eval.rs`, `ambiguous_intent_eval.rs`, `capability_gap_stress_eval.rs`; each asserts a baseline floor*
 - [ ] **REWARD-06**: OOD eval failure budget — if any OOD eval module's score drops >15% from rolling 7-day baseline, the per-turn reward signal is gated to zero (fail-safe; treat as "we don't trust reward this turn") — *unit test: simulate 20% drop in adversarial_eval, observe reward = 0 for the next turn*
-- [ ] **REWARD-07**: Doctor pane (Phase 17) extended with `reward_trend` signal — surfaces composite reward 7-day average, per-component decomposition, OOD eval status — *DoctorPane.tsx renders new row; severity tier follows D-05 (Red on >20% drop, Amber on >10%, Green otherwise)*
+- [x] **REWARD-07
+**: Doctor pane (Phase 17) extended with `reward_trend` signal — surfaces composite reward 7-day average, per-component decomposition, OOD eval status — *DoctorPane.tsx renders new row; severity tier follows D-05 (Red on >20% drop, Amber on >10%, Green otherwise)*
 
 ---
 
@@ -203,10 +204,10 @@ Substrate-anchored exclusions from v1.3 scoping. Some are permanent (memorial AI
 | REWARD-01 | 23 | ✅ shipped (Plan 23-01) |
 | REWARD-02 | 23 | ✅ shipped (Plan 23-02) |
 | REWARD-03 | 23 | ✅ shipped (Plan 23-02) |
-| REWARD-04 | 23 | partial — JSONL writer + per-turn persist via compute_and_persist_turn_reward shipped (Plan 23-02); Doctor reward_trend signal source pending (Plan 23-08) |
+| REWARD-04 | 23 | ✅ shipped — JSONL writer + per-turn persist via `compute_and_persist_turn_reward` (Plan 23-02 / `c935cd3`) + Doctor `reward_trend` signal source (Plan 23-07 / `38459ef` + `8f25bab`): 6th `SignalClass::RewardTrend` variant + `compute_reward_signal()` body + 6th `tokio::join!` arm in `doctor_run_full_check`; reads `tests/evals/reward_history.jsonl` via `crate::reward::read_reward_history(2000)`. TS lockstep (Plan 23-08) renders the new payload. |
 | REWARD-05 | 23 | shipped — all 3 OOD modules authored AND mod-registered: `adversarial_eval.rs` (Plan 23-03) + `ambiguous_intent_eval.rs` (Plan 23-04) + `capability_gap_stress_eval.rs` (Plan 23-05); 3-line `#[cfg(test)] mod` registration block in `evals/mod.rs` (Plan 23-06 / `5e105f7`); all 3 floors pass at top-1=100% / top-3=100% / MRR=1.000; `cargo test --lib evals` emits 8 EVAL-06 tables |
 | REWARD-06 | 23 | pending |
-| REWARD-07 | 23 | pending |
+| REWARD-07 | 23 | ✅ shipped — Doctor surface verifiability lands (Plan 23-07 / `8f25bab`): `compute_reward_signal()` payload exposes the 4-key `components_today_mean` breakdown (`skill_success` / `eval_gate` / `acceptance` / `completion`) + `ood_gate_zero_count_today` + `bootstrap_window` flag — Plan 23-08's `DoctorPane.tsx` will render which component is regressing on Amber/Red. Severity ladder per D-23-04: drop_pct >0.20 → Red, >0.10 → Amber, else Green. 42/42 doctor::tests green. |
 | DREAM-01 | 24 | pending |
 | DREAM-02 | 24 | pending |
 | DREAM-03 | 24 | pending |

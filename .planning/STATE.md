@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Phases
 status: executing
-last_updated: "2026-05-01T14:16:15.019Z"
+last_updated: "2026-05-01T14:36:59.295Z"
 last_activity: 2026-05-01
 progress:
   total_phases: 14
   completed_phases: 10
   total_plans: 73
-  completed_plans: 73
+  completed_plans: 74
   percent: 100
 ---
 
@@ -25,9 +25,21 @@ progress:
 ## Current Position
 
 Phase: 23 (verifiable-reward-ood-eval) — EXECUTING
-Plan: 7 of 9 (Wave 2 — OOD eval modules + verify-eval bump)
+Plan: 8 of 9 (Wave 3 — TS lockstep for RewardTrend + verify-eval bump)
 Status: Ready to execute
 Last activity: 2026-05-01
+
+### Phase 23 Plan 07 Decisions
+
+- 6th `SignalClass::RewardTrend` variant lands in `src-tauri/src/doctor.rs` per Phase 23 D-23-04 LOCKED — verbatim mirror of `compute_eval_signal` shape (Phase 17 / DOCTOR-02 substrate). 5 surgical edit sites: enum line 40, 3 suggested_fix arms (lines 134-141 — VERBATIM D-23-04 strings), `compute_reward_signal()` body (lines 298-471 including `reward_history_path()` symmetry helper + `read_reward_history_for_doctor()` thin wrapper), 6th `tokio::join!` arm in `doctor_run_full_check` (line 955 + 973), `emit_activity_for_doctor` 6th match arm (line 916).
+- Severity ladder per D-23-04: `drop_pct > 0.20 → Red`, `> 0.10 → Amber`, else Green; `today.is_empty() || prior.is_empty() → Green` with `bootstrap_window: true` and explanatory note (D-16 missing-history convention). Comparison is current 1-day mean composite reward vs prior 7-day rolling mean (separate from REWARD-06's OOD-floor gate at >15% which fires at the per-turn reward layer in Plan 23-08).
+- Payload exposes `components_today_mean` 4-key breakdown (`skill_success`, `eval_gate`, `acceptance`, `completion`) per REWARD-07 verifiability spec, plus `ood_gate_zero_count_today` count + `bootstrap_window` flag — Plan 23-08's `DoctorPane.tsx` will render which component is regressing.
+- Retained doctor-side `reward_history_path()` marked `#[allow(dead_code)]` for symmetry with `eval_history_path` AND plan acceptance gate (`grep -q "fn reward_history_path"`). Production read path delegates to `crate::reward::read_reward_history` (which has its own resolver via `crate::reward::reward_history_path`); both honor `BLADE_REWARD_HISTORY_PATH` env var so test isolation is unbroken.
+- Used `#[tokio::test]` direct-aggregator pattern instead of `tauri::test::mock_app()` for `doctor_run_full_check_returns_six_signals` — Tauri `test` feature NOT currently enabled in `src-tauri/Cargo.toml` (only `tray-icon`, `image-png`, `macos-private-api` features active). Activating it would touch dev-deps + may change prod build profile → architectural surface (Rule 4 territory). Direct test calls all 6 `compute_*_signal()` functions through the same `tokio::join!` shape and asserts `signals.len() == 6` + `signals[5].class == SignalClass::RewardTrend` — same property without the feature-flag pull.
+- `suggested_fix_table_is_exhaustive` test extended to iterate the 6th class (5×3 + 3 = 18 pairs) — silent arm-removal regression now caught. `suggested_fix_strings_match_ui_spec_verbatim` extended with the (RewardTrend, Red) verbatim drift sentinel (any character change in the locked Red string fails the test).
+- `cargo test --lib doctor::tests -- --test-threads=1` reports `42 passed; 0 failed` (was 35 pre-edit; +7 new RewardTrend tests). Initial `cargo test` build took 4m27s (incremental compile after Plans 23-01..06 source additions); subsequent test invocations 3.37s. `cargo check --lib` clean (only pre-existing `reward.rs:231-232` `ToolCallTrace.is_error / .timestamp_ms` warning — out of scope per executor scope-boundary rule).
+- 2 task commits: `38459ef` (Task 1: variant + 3 suggested_fix arms + emit + verbatim test) → `8f25bab` (Task 2: compute_reward_signal + tokio::join 6th arm + 7 tests).
+- TS files NOT modified — `payloads.ts` / `admin.ts` / `DoctorPane.tsx` are Plan 23-08's scope (TS lockstep). Plan 23-09 owns the verify-eval.sh `EXPECTED=5 → 8` bump (deferred from Plan 23-06 close).
 
 ### Phase 23 Plan 06 Decisions
 
@@ -175,7 +187,7 @@ None. v1.2 closed cleanly with documented tech debt; v1.3 scope locked by operat
 
 ## Session Continuity
 
-**Last session:** 2026-05-01T14:16:15.001Z
+**Last session:** 2026-05-01T14:36:39.379Z
 
 Phase 21 commit chain (8 commits):
 
