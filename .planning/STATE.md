@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Phases
 status: executing
-last_updated: "2026-05-01T18:33:49.031Z"
+last_updated: "2026-05-01T19:16:46.406Z"
 last_activity: 2026-05-01
 progress:
   total_phases: 15
   completed_phases: 11
   total_plans: 80
-  completed_plans: 77
-  percent: 96
+  completed_plans: 78
+  percent: 98
 ---
 
 # STATE — BLADE (v1.3 in progress; Phases 21 + 22 + 23 ✅ shipped)
@@ -25,9 +25,20 @@ progress:
 ## Current Position
 
 Phase: 24 (skill-consolidation-dream-mode) — EXECUTING
-Plan: 2 of 7
+Plan: 3 of 7
 Status: Ready to execute
 Last activity: 2026-05-01
+
+### Phase 24 Plan 02 Decisions
+
+- Plan 24-02 ships Wave 1 ActivityStrip emit helpers (DREAM-06) + LAST_ACTIVITY cross-module accessor (Pitfall 6 substrate) in 2 atomic commits: `db10e09` (Task 1: voyager_log.rs — 3 new pub fn dream_prune/dream_consolidate/dream_generate emit helpers parallel to skill_used + private fn cap_items capping wire payload at 11 elements with "... (+N more)" sentinel + 4 new tests in voyager_log::tests) + `6a18952` (Task 2: dream_mode.rs — pub fn last_activity_ts() -> i64 accessor mirroring is_dreaming() shape + new mod tests block with last_activity_ts_reads_static).
+- D-24-F locked end-to-end at the emit layer: MODULE = "Voyager" constant preserved verbatim — dream-mode is the forgetting half of the Voyager loop, not a separate ActivityStrip module label. Frontend filters by action prefix `dream_mode:*` within the same Voyager bucket. Three locked `&'static str` action namespaces: `dream_mode:prune` / `dream_mode:consolidate` / `dream_mode:generate` (T-24-02-04 mitigation — caller cannot influence the action string; the 3 helpers each use a hard-coded literal).
+- LAST_ACTIVITY exposure via `pub fn last_activity_ts() -> i64` accessor (NOT pub(crate) static promotion) — mirrors the existing `pub fn is_dreaming()` / `static DREAMING` shape verbatim. Single read seam keeps the AtomicI64 encapsulated; consumers don't need to import Ordering. Wave 3 plan 24-07 proactive_engine drain reads via this accessor for the 30s idle gate (Pitfall 6 mitigation before draining `~/.blade/skills/.pending/`).
+- cap_items is private (no `pub`) — the 10-cap is a D-24-F invariant baked into the three dream_* helpers; external callers can't vary it. Tests access via `use super::*` (canonical Rust same-module test pattern). T-24-02-02 mitigation: `cap_items(&items, 10)` caps wire payload at 11 elements regardless of upstream items.len() — with D-24-B's per-cycle cap of 1 merge + 1 generate as the upstream bound.
+- Plan-grep-vs-test-name overlap (documented, not auto-fixed): plan acceptance criterion `grep -c "fn dream_prune\|fn dream_consolidate\|fn dream_generate" src-tauri/src/voyager_log.rs returns 3` actually returns 4. The 4th hit is the test function `fn dream_prune_caps_items_at_10` (specified by the plan) which contains the substring `fn dream_prune`. Substantive gate met: 3 `pub fn` helpers exist at file scope (lines 124/137/150). The 4th match is a private test function inside `mod tests`. Plan's `<verification>` already says "count of new tests by name is 4" confirming the test name was the plan's intent.
+- 5 new tests green: `dream_prune_caps_items_at_10`, `cap_items_returns_clone_when_under_cap`, `dream_action_strings_locked`, `dream_emit_helpers_safe_without_app_handle` (in voyager_log::tests — total 7 tests pass: 3 existing + 4 new), `last_activity_ts_reads_static` (in dream_mode::tests — 1 test pass). `cargo check --lib` clean (5 expected "is never used" warnings on the new helpers — Wave 2/3 wires them in plans 24-03/24-04/24-07; pre-existing `timestamp_ms` warning carried forward from Plan 24-01).
+- Wave 2/3 unblocked: Plan 24-03 (DREAM-01 prune pass) can call `voyager_log::dream_prune(count, items)`. Plan 24-04 (DREAM-02 consolidate + DREAM-03 generate) can call `voyager_log::dream_consolidate` and `voyager_log::dream_generate`. Plan 24-07 (proactive_engine drain) can read `dream_mode::last_activity_ts()` for the 30s idle gate. Plan 24-05 (DREAM-05 abort_within_one_second) will append the abort integration test to the same `dream_mode::tests` block this plan created.
+- DREAM-05 NOT marked complete in REQUIREMENTS by this plan — only the substrate (LAST_ACTIVITY accessor) landed; the actual abort_within_one_second integration test + per-step DREAMING.load checkpoints are Plan 24-05 scope. DREAM-06 marked complete (the 3 emit helpers + cap_items utility are the load-bearing surface for the requirement).
 
 ### Phase 24 Plan 01 Decisions
 
@@ -223,7 +234,7 @@ None. v1.2 closed cleanly with documented tech debt; v1.3 scope locked by operat
 
 ## Session Continuity
 
-**Last session:** 2026-05-01T15:25:00.000Z — Phase 23 closed end-to-end. Plan 23-09 landed verify-eval.sh `EXPECTED=8` bump (`86841ab`) + REQUIREMENTS.md REWARD-01..07 traceability flips with shipped-Plan citations + STATE.md close + 23-PHASE-CLOSE.md milestone-style artifact.
+**Last session:** 2026-05-01T19:16:15.916Z
 
 Phase 23 commit chain (~18 commits across 9 plans):
 
@@ -246,7 +257,15 @@ Phase 23 commit chain (~18 commits across 9 plans):
 
 Across the phase: ~52 unit/integration tests added (11 Wave-1 reward + 9 Wave-2 reward + 7 reward Plan 23-08 + 7 Doctor Plan 23-07 + 17 + 18 + 17 OOD eval fixtures = 86 total assert!s; many fixtures share a single `#[test]` entry so the reportable test count is 33 reward+config+doctor + 12 evals = 45 reportable tests). 1 new file (`reward.rs`) + 3 new OOD eval modules + 4 modified TS files + 3 modified Rust files + 1 modified shell gate. verify chain count unchanged at 33; verify:eval EXPECTED tightened from 5 to 8 (gate extension, not new gate). DoctorPane row UAT-deferred per chat-first pivot anchor (substrate-only landing).
 
-Next: Phase 24 (dream_mode skill consolidation) — pending CONTEXT gather.
+Next: Plan 24-03 (DREAM-01 prune pass — Wave 2 dream-mode task body landing).
+
+Phase 24 commit chain so far (~5 commits across 2 plans):
+
+  - `227d035` 24-01 Task 1 — tool_forge.rs ensure_table backfill + invocations table + record_tool_use signature (DREAM-01/02/03 substrate)
+  - `386312a` 24-01 Task 2 — db.rs turn_traces table + commands.rs dispatch hook + reward-hook trace write
+  - `25a0fbe` 24-01 docs (Plan 24-01 close)
+  - `db10e09` 24-02 Task 1 — voyager_log.rs 3 dream_* emit helpers + cap_items + 4 tests (DREAM-06)
+  - `6a18952` 24-02 Task 2 — dream_mode.rs pub fn last_activity_ts() accessor + 1 test (DREAM-05 substrate; full DREAM-05 abort lands in Plan 24-05)
 
 Phase 21 commit chain (8 commits):
 

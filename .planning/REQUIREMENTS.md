@@ -64,7 +64,7 @@ The continual-forgetting half of the Voyager loop. Skills not used → archived;
 - [ ] **DREAM-03**: Skill-from-trace generation — when a chat turn completes successfully without invoking any existing skill but used a non-trivial tool sequence (≥3 tool calls), dream_mode optionally generates a SKILL.md from the trace (manual confirmation prompt before writing) — *integration test: synthetic 4-tool successful turn, dream_mode proposes a SKILL.md with the trace as scripts/ + body summarizing it*
 - [ ] **DREAM-04**: Skill manifest growth visible across sessions — `blade skill list --diff <prev_session_id>` shows added/archived/consolidated skills since the last session — *CLI test: 2 sessions with skill changes between, diff output non-empty with correct categorization*
 - [ ] **DREAM-05**: Dream-mode operates only when BLADE is idle (no chat turn for ≥5 min); pauses immediately on user input — *integration test: trigger dream_mode → send chat input mid-pass → next assertion: dream_mode aborts within 1s; no partial-skill artifacts left*
-- [ ] **DREAM-06**: Dream-mode emits to ActivityStrip per M-07 — at least one entry per pass with module=`dream_mode`, kind=`prune|consolidate|generate`, count of items affected — *integration test: drive prune pass with 3 archived skills, observe ActivityStrip entry*
+- [x] **DREAM-06**: Dream-mode emits to ActivityStrip per M-07 — at least one entry per pass with module=`dream_mode`, kind=`prune|consolidate|generate`, count of items affected — *Shipped Plan 24-02 (db10e09 voyager_log.rs 3 dream_* helpers + cap_items + 4 tests); voyager_log::tests::dream_action_strings_locked + dream_emit_helpers_safe_without_app_handle + dream_prune_caps_items_at_10 + cap_items_returns_clone_when_under_cap green.*
 
 ---
 
