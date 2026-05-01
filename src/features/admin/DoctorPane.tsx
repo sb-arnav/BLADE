@@ -43,15 +43,18 @@ const DISPLAY_NAME: Record<SignalClass, string> = {
   tentacle_health: 'Tentacle Health',
   config_drift: 'Config Drift',
   auto_update: 'Auto-Update',
+  reward_trend: 'Reward Trend',
 };
 
-// UI-SPEC § 7.5 — fixed most-volatile-first order
+// UI-SPEC § 7.5 — fixed most-volatile-first order. RewardTrend appended at
+// end (least volatile — composite reward changes slowly) per Phase 23 D-23-04.
 const ROW_ORDER: SignalClass[] = [
   'eval_scores',
   'capability_gaps',
   'tentacle_health',
   'config_drift',
   'auto_update',
+  'reward_trend',
 ];
 
 // UI-SPEC § 5.4 — badge tone mapping
@@ -127,6 +130,7 @@ export function DoctorPane() {
       tentacle_health: { current: null as HTMLButtonElement | null } as React.RefObject<HTMLButtonElement>,
       config_drift: { current: null as HTMLButtonElement | null } as React.RefObject<HTMLButtonElement>,
       auto_update: { current: null as HTMLButtonElement | null } as React.RefObject<HTMLButtonElement>,
+      reward_trend: { current: null as HTMLButtonElement | null } as React.RefObject<HTMLButtonElement>,
     };
     return map;
   }, []);
