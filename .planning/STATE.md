@@ -6,27 +6,27 @@ status: in_progress
 last_updated: "2026-04-30T22:30:00.000Z"
 progress:
   total_phases: 7
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 8
+  completed_plans: 8
+  percent: 14
 ---
 
-# STATE — BLADE (v1.3 in progress)
+# STATE — BLADE (v1.3 in progress; Phase 21 ✅ shipped)
 
 **Project:** BLADE — Desktop JARVIS
 **Current milestone:** v1.3 — Self-extending Agent Substrate (started 2026-04-30; target ship ~2026-05-11)
 **Last shipped milestone:** v1.2 — Acting Layer with Brain Foundation (closed 2026-04-30 as `tech_debt`; chat-first pivot recorded mid-milestone)
 **Prior shipped:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27 as `tech_debt`); v1.0 — Skin Rebuild substrate (closed 2026-04-19)
-**Current Focus:** v1.3 just scoped. Phase 21 (Skills v2 / agentskills.io adoption) is the substrate-prerequisite phase — must land before Phase 22 (Voyager loop closure) can write SKILL.md outputs anywhere coherent. No phase plans written yet; ROADMAP.md + REQUIREMENTS.md are the next artifacts.
-**Status:** Milestone scaffolding bootstrap in progress. PROJECT.md updated with v1.3 Current Milestone block + 5 new key decisions (M-08..M-12). REQUIREMENTS.md + ROADMAP.md to be written next. After scaffolding, kick off `/gsd-plan-phase 21` (or `/gsd-discuss-phase 21` if discuss preferred — config has `discuss_mode: discuss`, so workflow auto-routes).
+**Current Focus:** Phase 21 (Skills v2 / agentskills.io adoption) ✅ shipped 2026-05-01 — 8 plans, 65 unit tests, verify chain 31 → 32 gates. Substrate ready for Phase 22 (Voyager loop closure). Phase 22 is the load-bearing demo moment — wires `evolution.rs → autoskills.rs → tool_forge.rs` end-to-end into the new `mod skills` substrate so BLADE writes its own tools.
+**Status:** Phase 21 closed. Phase 22 ready to begin. 22-CONTEXT.md is next artifact (mirrors 21-CONTEXT shape; pre-plan substrate). Voyager loop is more invasive than Phase 21 (touches existing evolution / autoskills / tool_forge modules); 22-RESEARCH.md needs to map current vs target wiring before plan write.
 
 ## Current Position
 
-Phase: 21 (Skills v2 / agentskills.io adoption) — not started, awaiting plan
+Phase: 22 (Voyager loop closure) — pending plan; Phase 21 ✅ SHIPPED 2026-05-01
 Plan: —
-Status: Defining requirements and roadmap
-Last activity: 2026-04-30T22:30Z — v1.3 milestone scoped autonomously after operator handoff; Voyager-loop-led shape locked; PROJECT.md updated
+Status: Phase 22 pre-plan
+Last activity: 2026-05-01T08:30Z — Phase 21 ✅ shipped autonomously across morning push (8 plans 21-01..21-08 + 4 milestone bootstrap commits); 65 unit tests added; verify-skill-format gate green
 
 ---
 
@@ -125,7 +125,34 @@ None. v1.2 closed cleanly with documented tech debt; v1.3 scope locked by operat
 
 ## Session Continuity
 
-**Last session:** 2026-04-30T22:30Z (v1.3 milestone scoped autonomously after operator handoff "going to sleep, run autonomously, don't fuckup or stop"). Inputs: `/gsd-new-milestone` invocation; instruction "I have some research at /arnav/research read them like READ them not just the names" → read 6 research docs end-to-end (voyager-loop-play, vs-hermes, synthesis-blade-architecture, blade-as-organism, steelman-against-organism, open-questions-answered) before re-shaping; instruction "idk why the research is stuck with demo and shit, but you have the data now decide and shape what to do and how" → shifted v1.3 framing from launch-anchored to substrate-anchored. Output: 7-phase v1.3 shape (21 Skills v2 → 22 Voyager loop closure → 23 verifiable reward + OOD eval → 24 dream_mode skill consolidation → 25 Hermes 4 provider → 26 voice resurrection → 27 close). Locked by operator: "Lock and proceed (Recommended)" before sleep. PROJECT.md updated with new Current Milestone block + 5 new key decisions (M-08..M-12) + new Out of Scope additions (organism without safety bundle, memorial-AI mode, therapist roleplay, federation Pattern C, unsandboxed skill execution). REQUIREMENTS.md + ROADMAP.md to be written next.
+**Last session:** 2026-05-01T08:30Z (Phase 21 ✅ SHIPPED autonomously across morning push after operator returned with "this is morning bro I said keep going you could have gotten so much done"). 8 atomic commits closing the full phase from substrate-up.
+
+Phase 21 commit chain:
+  - `b663e93` 21-01 parser + types (18 tests)
+  - `ebf5aab` 21-02 loader + resolver (16 tests; workspace > user > bundled)
+  - `b579eed` 21-03 lazy-load disclosure (10 tests; BODY_BYTES_LOADED atomic)
+  - `2aaef13` 21-04 validator + skill_validator binary (14 tests)
+  - `2ec9996` 21-05 3 bundled exemplars (git-status-summary / troubleshoot-cargo-build / format-clipboard-as-markdown)
+  - `c3d51bb` 21-06 consent extension (7 tests; v1.2 schema reuse, no migration)
+  - `b779115` 21-07 + 21-08 verify gate + close
+
+65 unit tests across 7 production source files + 1 binary; 3 bundled
+exemplars (one tool-wrapper, one with `references/`, one with executable
+`scripts/`); 1 new verify gate (`verify:skill-format`); chain count 31 → 32.
+Runtime smoke confirmed end-to-end (validator OK on 3 exemplars; format.py
+runs; verify-skill-format gate green).
+
+**Prior session (2026-04-30T22:30Z):** v1.3 milestone scoped autonomously
+during operator's sleep window. Read 6 research docs end-to-end at
+`/home/arnav/research/` (voyager-loop-play, vs-hermes, synthesis-blade-
+architecture, blade-as-organism, steelman-against-organism, open-questions-
+answered). Shifted v1.3 from launch-anchored to substrate-anchored. Locked
+7-phase shape (21 Skills v2 → 22 Voyager loop closure → 23 verifiable
+reward + OOD eval → 24 dream_mode skill consolidation → 25 Hermes 4
+provider → 26 voice resurrection → 27 close). PROJECT.md updated with
+v1.3 milestone block + 5 new key decisions (M-08..M-12). 4 milestone
+bootstrap commits (1deb738 PROJECT+STATE / ba309bb REQUIREMENTS /
+95d480a ROADMAP / a3406a1 21-CONTEXT pre-plan).
 
 ---
 
