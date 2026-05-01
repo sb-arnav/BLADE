@@ -128,6 +128,33 @@ fn open_db() -> Result<rusqlite::Connection, String> {
     rusqlite::Connection::open(&db_path).map_err(|e| format!("DB open error: {}", e))
 }
 
+/// Phase 24 (v1.3) — non-test, lifecycle-side connection opener used by
+/// `crate::skills::lifecycle`. Distinct from `open_db()` only in
+/// visibility; opens the same blade.db.
+///
+/// Runs `ensure_table` + `ensure_invocations_table` + `crate::db::run_migrations`
+/// idempotently before returning the connection — production callers see
+/// a no-op (boot already ran), tests see the tables created on first use
+/// (e.g. integration tests with tempdir BLADE_CONFIG_DIR that bypass boot).
+///
+/// Pitfall 4 mitigation: dream pass uses a separate Connection from the
+/// chat path so SQLite WAL handles reader+writer concurrency.
+pub(crate) fn open_db_for_lifecycle() -> Result<rusqlite::Connection, String> {
+    let conn = open_db()?;
+    // Idempotent table guards — first launch in production already ran
+    // migrations at boot, so these are no-ops there. In tests with a fresh
+    // tempdir BLADE_CONFIG_DIR (Plan 24-05 abort_within_one_second + Plan
+    // 24-07 proposal_reply_yes_merge_persists_merged_tool), boot did NOT
+    // run, so we ensure the schema exists on first lifecycle-side read.
+    ensure_table(&conn).ok();
+    ensure_invocations_table(&conn).ok();
+    // turn_traces lives in db.rs::run_migrations — call into that path so
+    // recent_unmatched_traces (which uses crate::db::open_db_for_lifecycle)
+    // and any direct callers of this opener both see a complete schema.
+    crate::db::run_migrations(&conn).map_err(|e| format!("run_migrations: {}", e))?;
+    Ok(conn)
+}
+
 /// Ensure the `forged_tools` table exists.
 fn ensure_table(conn: &rusqlite::Connection) -> Result<(), String> {
     conn.execute_batch(
