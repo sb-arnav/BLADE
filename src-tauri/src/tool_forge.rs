@@ -343,12 +343,68 @@ async fn test_tool(script_path: &str, language: &str) -> Result<String, String> 
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
+/// Phase 22 Plan 22-05 (v1.3) — output of the LLM-generation half of `forge_tool`.
+/// Separated out so `persist_forged_tool` can be exercised without an LLM call
+/// (the test seam used by `forge_tool_from_fixture` and the canonical
+/// `youtube_transcript` end-to-end fixture).
+#[derive(Debug, Clone)]
+pub struct ForgeGeneration {
+    pub script_code: String,
+    pub description: String,
+    /// Usage hint produced by the LLM. The `"tool.py"` placeholder is
+    /// substituted with the real filename inside `persist_forged_tool`.
+    pub usage_template: String,
+    pub parameters: Vec<ToolParameter>,
+}
+
 /// Forge a new tool from a natural-language capability description.
 /// Generates script, writes it to disk, tests it, and saves to DB.
+///
+/// Phase 22 Plan 22-05 (v1.3): refactored into `generate_tool_script` (LLM)
+/// + `persist_forged_tool` (side effects). The split lets the deterministic
+/// test seam (`forge_tool_from_fixture`) share the persistence path without
+/// needing an LLM call.
 pub async fn forge_tool(capability: &str) -> Result<ForgedTool, String> {
     let language = choose_language(capability).to_string();
+
+    // Generate script via LLM (or budget-refuse if pathological prompt)
+    let (script_code, description, usage_template, parameters) =
+        generate_tool_script(capability, &language).await?;
+
+    persist_forged_tool(
+        capability,
+        &language,
+        ForgeGeneration {
+            script_code,
+            description,
+            usage_template,
+            parameters,
+        },
+    )
+    .await
+}
+
+/// Persist a generated tool to disk + DB + (optionally) SKILL.md.
+///
+/// Side effects (in order):
+///   1. Resolve unique name (DB query for collision; ts-suffix if needed)
+///   2. Write `<tools_dir>/<name>.<ext>` script file + chmod 755 on Unix
+///   3. Emit `voyager:skill_written` ActivityStrip event (Plan 22-02)
+///   4. Smoke-test the script
+///   5. INSERT into forged_tools — on failure, roll back step 2 + re-log
+///      the gap with `prior_attempt_failed=true` (Plan 22-04)
+///   6. Export to agentskills.io SKILL.md at `<user_skills_root>/<name>/`
+///      (Plan 22-01) — non-fatal; logs warn on failure
+///   7. Emit `voyager:skill_registered` ActivityStrip event (Plan 22-02)
+///
+/// On success, returns the populated `ForgedTool` record.
+pub async fn persist_forged_tool(
+    capability: &str,
+    language: &str,
+    gen: ForgeGeneration,
+) -> Result<ForgedTool, String> {
     let base_name = capability_to_name(capability);
-    let ext = extension(&language);
+    let ext = extension(language);
 
     // Ensure uniqueness by appending a short timestamp suffix if name collides
     let conn = open_db().map_err(|e| e.to_string())?;
@@ -374,15 +430,13 @@ pub async fn forge_tool(capability: &str) -> Result<ForgedTool, String> {
     let script_path = tools_dir().join(format!("{}.{}", name, ext));
     let script_path_str = script_path.to_string_lossy().to_string();
 
-    // Generate script via LLM
-    let (script_code, description, usage_template, parameters) =
-        generate_tool_script(capability, &language).await?;
-
     // Substitute the real filename in the usage string
-    let usage = usage_template.replace("tool.py", &format!("{}.{}", name, ext));
+    let usage = gen
+        .usage_template
+        .replace("tool.py", &format!("{}.{}", name, ext));
 
     // Write script to disk
-    std::fs::write(&script_path, &script_code)
+    std::fs::write(&script_path, &gen.script_code)
         .map_err(|e| format!("Failed to write script: {}", e))?;
 
     // Make executable on Unix
@@ -398,14 +452,14 @@ pub async fn forge_tool(capability: &str) -> Result<ForgedTool, String> {
     crate::voyager_log::skill_written(&name, &script_path_str);
 
     // Smoke-test
-    let test_output = test_tool(&script_path_str, &language)
+    let test_output = test_tool(&script_path_str, language)
         .await
         .unwrap_or_else(|e| format!("Test failed: {}", e));
 
     // Persist to DB
     let id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().timestamp();
-    let params_json = serde_json::to_string(&parameters).unwrap_or_else(|_| "[]".to_string());
+    let params_json = serde_json::to_string(&gen.parameters).unwrap_or_else(|_| "[]".to_string());
 
     if let Err(e) = conn.execute(
         "INSERT INTO forged_tools \
@@ -414,7 +468,7 @@ pub async fn forge_tool(capability: &str) -> Result<ForgedTool, String> {
         params![
             id,
             name,
-            description,
+            gen.description,
             language,
             script_path_str,
             usage,
@@ -425,10 +479,6 @@ pub async fn forge_tool(capability: &str) -> Result<ForgedTool, String> {
         ],
     ) {
         // Phase 22 Plan 22-04 (v1.3) — failure recovery (VOYAGER-08).
-        // Script is already on disk + skill_written event already emitted.
-        // DB insert failed → orphan script. Roll back the script file and
-        // re-log the capability gap with prior_attempt_failed so the next
-        // forge attempt has signal that this didn't land cleanly.
         rollback_partial_forge(&script_path, capability, &format!("DB insert error: {e}"));
         return Err(format!(
             "[tool_forge] DB insert error after script write (script rolled back): {e}"
@@ -440,11 +490,11 @@ pub async fn forge_tool(capability: &str) -> Result<ForgedTool, String> {
     let forged = ForgedTool {
         id,
         name,
-        description,
-        language,
+        description: gen.description,
+        language: language.to_string(),
         script_path: script_path_str,
         usage,
-        parameters,
+        parameters: gen.parameters,
         test_output,
         created_at: now,
         last_used: None,
@@ -453,14 +503,8 @@ pub async fn forge_tool(capability: &str) -> Result<ForgedTool, String> {
     };
 
     // Phase 22 (v1.3) Plan 22-01 — export to agentskills.io SKILL.md at the
-    // user tier so the Phase 21 Catalog::resolve path can find this skill +
-    // ecosystem validators can ingest it. Coexists with the existing
-    // <blade_config_dir>/tools/<name>.<ext> artifact + forged_tools row.
-    //
-    // Non-fatal: a name that doesn't sanitize to agentskills.io-compliant
-    // form (or a missing source script — shouldn't happen here since we
-    // just wrote it) logs a warning and the loop continues. The forge
-    // succeeded; the SKILL.md export is a discoverability bonus.
+    // user tier. Coexists with the existing flat-layout tool_forge artifacts.
+    // Non-fatal: warn + None on any export failure; the forge has succeeded.
     let user_skills_root = crate::skills::user_root();
     let skill_md_path = match crate::skills::export::export_to_user_tier(&forged, &user_skills_root) {
         Ok(crate::skills::export::ExportOutcome::Written { skill_md_path, .. }) => {
@@ -476,12 +520,60 @@ pub async fn forge_tool(capability: &str) -> Result<ForgedTool, String> {
         }
     };
 
-    // Phase 22 (v1.3) — Voyager loop step 3 of 4: skill is now resolvable
-    // (DB row + optional SKILL.md). Emits AFTER the export attempt so the
-    // payload can carry skill_md_path on success.
+    // Phase 22 (v1.3) — Voyager loop step 3 of 4: skill is now resolvable.
     crate::voyager_log::skill_registered(&forged.name, &forged.id, skill_md_path.as_deref());
 
     Ok(forged)
+}
+
+/// Phase 22 Plan 22-05 (v1.3) — deterministic test seam.
+///
+/// Bypasses the LLM call by accepting pre-built `ForgeGeneration`. Callers
+/// (tests + CI fixture binary) get the same persistence guarantees as the
+/// production `forge_tool` path, including ActivityStrip emission, SKILL.md
+/// export, and partial-write rollback. Behind `#[cfg(any(test, feature =
+/// "voyager-fixture"))]` so production builds don't expose it.
+#[cfg(any(test, feature = "voyager-fixture"))]
+pub async fn forge_tool_from_fixture(
+    capability: &str,
+    language: &str,
+    gen: ForgeGeneration,
+) -> Result<ForgedTool, String> {
+    persist_forged_tool(capability, language, gen).await
+}
+
+/// Canonical `youtube_transcript` fixture per `voyager-loop-play.md` § "smallest
+/// viable demo". Used by Plan 22-05 end-to-end test + Plan 22-07 verify-
+/// voyager-loop gate. Behind the same gate as `forge_tool_from_fixture`.
+#[cfg(any(test, feature = "voyager-fixture"))]
+pub fn youtube_transcript_fixture() -> ForgeGeneration {
+    ForgeGeneration {
+        script_code: r#"#!/usr/bin/env python3
+"""Fetch the transcript of a YouTube video (deterministic fixture).
+
+In production this would call the real YouTube API. The Voyager fixture
+returns a canned response so the loop can be verified without network.
+"""
+import sys, json
+def main():
+    if len(sys.argv) < 2:
+        print("usage: youtube_transcript.py <url>", file=sys.stderr)
+        sys.exit(1)
+    url = sys.argv[1]
+    print(json.dumps({"url": url, "transcript": "[fixture]"}))
+if __name__ == "__main__":
+    main()
+"#
+        .to_string(),
+        description: "Fetch the transcript of a YouTube video by URL.".to_string(),
+        usage_template: "tool.py <youtube_url>".to_string(),
+        parameters: vec![ToolParameter {
+            name: "url".to_string(),
+            param_type: "string".to_string(),
+            description: "YouTube video URL".to_string(),
+            required: true,
+        }],
+    }
 }
 
 /// Load all forged tools from the DB, sorted by use_count descending.
@@ -739,6 +831,14 @@ mod tests {
         p
     }
 
+    /// Shared lock for all tests that touch `BLADE_CONFIG_DIR`. The env var is
+    /// process-global; without serialization, parallel tests would race
+    /// each other's overrides and produce bizarre cross-contamination
+    /// (e.g. install A's forge writing to install B's temp dir mid-test).
+    /// Module-level on purpose so it covers BOTH `voyager_end_to_end_*` AND
+    /// `voyager_two_installs_diverge`.
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn rollback_removes_existing_script() {
         let dir = temp_dir("rollback-existing");
@@ -760,5 +860,198 @@ mod tests {
         rollback_partial_forge(&script_path, "test capability", "synthetic reason");
         assert!(!script_path.exists());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Phase 22 Plan 22-05 (v1.3) — VOYAGER-04 canonical end-to-end fixture.
+    ///
+    /// Drives `forge_tool_from_fixture` with the `youtube_transcript` fixture
+    /// against an isolated `BLADE_CONFIG_DIR`. Asserts the full pipeline:
+    ///
+    ///   1. Script artifact present at `<BLADE_CONFIG_DIR>/tools/<name>.py`
+    ///   2. forged_tools DB row exists at `<BLADE_CONFIG_DIR>/blade.db`
+    ///   3. SKILL.md present at `<BLADE_CONFIG_DIR>/skills/<canonical-name>/SKILL.md`
+    ///   4. The exported SKILL.md passes `validate_skill_dir`
+    ///   5. The Phase 21 Catalog::resolve resolves the name from the user tier
+    ///   6. Re-export round-trips (no panic; idempotent on repeated calls
+    ///      because the name uniqueness suffix kicks in)
+    ///
+    /// Runtime: <2s on a warm dev box (no network; no LLM call).
+    ///
+    /// Uses a Mutex to serialize because BLADE_CONFIG_DIR is a process-global
+    /// env var and parallel tests would race the override.
+    #[tokio::test]
+    async fn voyager_end_to_end_youtube_transcript_fixture() {
+        let _g = ENV_LOCK.lock().unwrap();
+
+        let dir = temp_dir("voyager-e2e");
+        std::env::set_var("BLADE_CONFIG_DIR", &dir);
+
+        let result = forge_tool_from_fixture(
+            "fetch a youtube transcript",
+            "python",
+            youtube_transcript_fixture(),
+        )
+        .await;
+
+        let forged = result.expect("forge_tool_from_fixture should succeed");
+
+        // 1. Script artifact present
+        let script_path = PathBuf::from(&forged.script_path);
+        assert!(
+            script_path.is_file(),
+            "script should exist at {}",
+            script_path.display()
+        );
+        // The script is one of the python file entries in tools_dir
+        assert!(forged.script_path.ends_with(".py"));
+
+        // 2. DB row exists — query it back via get_forged_tools
+        let all = get_forged_tools();
+        assert!(
+            all.iter().any(|t| t.id == forged.id),
+            "forged tool should be retrievable via get_forged_tools"
+        );
+
+        // 3. SKILL.md present at the canonical (hyphenated) skill dir
+        let canonical_name = crate::skills::export::sanitize_name(&forged.name)
+            .expect("forged name should sanitize");
+        let skill_md = dir
+            .join("skills")
+            .join(&canonical_name)
+            .join("SKILL.md");
+        assert!(
+            skill_md.is_file(),
+            "SKILL.md should exist at {}",
+            skill_md.display()
+        );
+
+        // 4. Exported SKILL.md passes the validator
+        let skill_dir = skill_md.parent().unwrap();
+        let report = crate::skills::validator::validate_skill_dir(skill_dir);
+        assert!(
+            report.is_valid(),
+            "exported SKILL.md should validate; findings: {:?}",
+            report.findings
+        );
+
+        // 5. Catalog::resolve finds it from the user tier
+        let user_root = dir.join("skills");
+        let bundled_root = dir.join("nonexistent_bundled");
+        let catalog = crate::skills::Catalog::build(None, &user_root, &bundled_root);
+        let resolved = catalog
+            .resolve(&canonical_name)
+            .expect("catalog should resolve the forged skill");
+        assert_eq!(resolved.source, crate::skills::SourceTier::User);
+        assert_eq!(resolved.frontmatter.name, canonical_name);
+
+        // 6. Repeat-call idempotence — second forge of the same capability
+        //    appends a timestamp suffix instead of clobbering the first.
+        let second = forge_tool_from_fixture(
+            "fetch a youtube transcript",
+            "python",
+            youtube_transcript_fixture(),
+        )
+        .await
+        .expect("second forge should succeed");
+        assert_ne!(second.id, forged.id, "second forge should produce a new id");
+        assert_ne!(
+            second.name, forged.name,
+            "second forge should disambiguate the name with a ts suffix"
+        );
+
+        std::env::remove_var("BLADE_CONFIG_DIR");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Plan 22-06 (VOYAGER-09) — divergence property test.
+    ///
+    /// Two `BLADE_CONFIG_DIR`-isolated runs each fed a different gap stream
+    /// produce different skill manifests. Confirms the substrate-level claim
+    /// "two installs of BLADE diverge over time."
+    #[tokio::test]
+    async fn voyager_two_installs_diverge() {
+        let _g = ENV_LOCK.lock().unwrap();
+
+        // Install A — gap stream { youtube_transcript, summarize_pdf }
+        let dir_a = temp_dir("diverge-a");
+        std::env::set_var("BLADE_CONFIG_DIR", &dir_a);
+        forge_tool_from_fixture(
+            "fetch a youtube transcript",
+            "python",
+            youtube_transcript_fixture(),
+        )
+        .await
+        .expect("A1 should succeed");
+        forge_tool_from_fixture(
+            "summarize a pdf",
+            "python",
+            ForgeGeneration {
+                script_code: "#!/usr/bin/env python3\nprint('pdf-summary fixture')\n".to_string(),
+                description: "Summarize a PDF document.".to_string(),
+                usage_template: "tool.py <pdf_path>".to_string(),
+                parameters: vec![],
+            },
+        )
+        .await
+        .expect("A2 should succeed");
+        let manifest_a = manifest_names(&dir_a);
+
+        // Install B — gap stream { format_csv, extract_metadata }
+        let dir_b = temp_dir("diverge-b");
+        std::env::set_var("BLADE_CONFIG_DIR", &dir_b);
+        forge_tool_from_fixture(
+            "format a csv as markdown table",
+            "python",
+            ForgeGeneration {
+                script_code: "#!/usr/bin/env python3\nprint('csv fixture')\n".to_string(),
+                description: "Format a CSV as a markdown table.".to_string(),
+                usage_template: "tool.py <csv_path>".to_string(),
+                parameters: vec![],
+            },
+        )
+        .await
+        .expect("B1 should succeed");
+        forge_tool_from_fixture(
+            "extract image metadata",
+            "python",
+            ForgeGeneration {
+                script_code: "#!/usr/bin/env python3\nprint('exif fixture')\n".to_string(),
+                description: "Extract EXIF metadata from an image.".to_string(),
+                usage_template: "tool.py <image_path>".to_string(),
+                parameters: vec![],
+            },
+        )
+        .await
+        .expect("B2 should succeed");
+        let manifest_b = manifest_names(&dir_b);
+
+        // Assert set difference is non-empty in both directions
+        let only_in_a: Vec<&String> = manifest_a.iter().filter(|n| !manifest_b.contains(n)).collect();
+        let only_in_b: Vec<&String> = manifest_b.iter().filter(|n| !manifest_a.contains(n)).collect();
+        assert!(
+            !only_in_a.is_empty(),
+            "install A should have skills install B doesn't ({:?} vs {:?})",
+            manifest_a, manifest_b
+        );
+        assert!(
+            !only_in_b.is_empty(),
+            "install B should have skills install A doesn't ({:?} vs {:?})",
+            manifest_a, manifest_b
+        );
+
+        std::env::remove_var("BLADE_CONFIG_DIR");
+        let _ = std::fs::remove_dir_all(&dir_a);
+        let _ = std::fs::remove_dir_all(&dir_b);
+    }
+
+    fn manifest_names(blade_config_dir: &Path) -> Vec<String> {
+        let user_root = blade_config_dir.join("skills");
+        let bundled_root = blade_config_dir.join("nonexistent");
+        let catalog = crate::skills::Catalog::build(None, &user_root, &bundled_root);
+        catalog
+            .all()
+            .iter()
+            .map(|s| s.frontmatter.name.clone())
+            .collect()
     }
 }
