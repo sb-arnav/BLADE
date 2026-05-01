@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Phases
 status: executing
-last_updated: "2026-05-01T14:53:25.364Z"
+last_updated: "2026-05-01T15:25:00.000Z"
 last_activity: 2026-05-01
 progress:
   total_phases: 14
@@ -13,21 +13,29 @@ progress:
   percent: 100
 ---
 
-# STATE — BLADE (v1.3 in progress; Phases 21 + 22 ✅ shipped)
+# STATE — BLADE (v1.3 in progress; Phases 21 + 22 + 23 ✅ shipped)
 
 **Project:** BLADE — Desktop JARVIS
-**Current milestone:** v1.3 — Self-extending Agent Substrate (started 2026-04-30; target ship ~2026-05-11)
+**Current milestone:** v1.3 — Self-extending Agent Substrate (started 2026-04-30; target ship ~2026-05-11; Phases 21 + 22 + 23 ✅ shipped)
 **Last shipped milestone:** v1.2 — Acting Layer with Brain Foundation (closed 2026-04-30 as `tech_debt`; chat-first pivot recorded mid-milestone)
 **Prior shipped:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27 as `tech_debt`); v1.0 — Skin Rebuild substrate (closed 2026-04-19)
-**Current Focus:** Phase 23 — verifiable-reward-ood-eval
-**Status:** Ready to execute
+**Current Focus:** Phase 24 — dream_mode skill consolidation (pending context gather)
+**Status:** Phase 23 ✅ shipped; Phase 24 next
 
 ## Current Position
 
-Phase: 23 (verifiable-reward-ood-eval) — EXECUTING
-Plan: 9 of 9 (final plan — verify-eval.sh EXPECTED=5→8 bump + Phase 23 close summary)
-Status: Plan 23-08 ✅ shipped; Plan 23-09 ready to execute
-Last activity: 2026-05-01
+Phase: 24 (dream_mode skill consolidation) — pending context
+Plan: —
+Status: Phase 23 ✅ shipped (verify chain stays at 33; OOD gate operational; Doctor pane carries 6th RewardTrend row). RLVR-style composite reward shipped at agent layer per M-10 + open-questions-answered Q1. ~52 unit/integration tests added across 9 plans. verify:eval `EXPECTED=5→8` (gate extended; chain count unchanged at 33). DoctorPane row UAT-deferred per chat-first pivot (substrate-only landing).
+Last activity: 2026-05-01 — Phase 23 closed end-to-end. Plan 23-09 landed verify-eval.sh `EXPECTED=8` bump + REQUIREMENTS.md REWARD-01..07 traceability flips + STATE.md close + 23-PHASE-CLOSE.md milestone-style artifact.
+
+### Phase 23 Plan 09 Decisions
+
+- Plan 23-09 ships REWARD-05 phase close in 2 atomic commits: `86841ab` (Task 1: scripts/verify-eval.sh `EXPECTED=5→8` + comment expansion listing all 8 modules verbatim) + Task 2 (REQUIREMENTS.md REWARD-01..07 row flips with shipped-Plan citations + commit-hash audit trail + STATE.md Phase 23 close + 23-PHASE-CLOSE.md milestone-style artifact). `bash scripts/verify-eval.sh` exits 0 with "8/8 scored tables emitted, all floors green" — the load-bearing gate. `npx tsc --noEmit` clean (Plan 23-08 baseline preserved).
+- Verify chain count unchanged at 33 per RESEARCH §"Verify Gate Wiring" lock — Plan 23-09 is a gate EXTENSION (verify:eval now requires 8 EVAL-06 tables instead of ≥5), not a new gate addition. The `npm run verify:all` chain runs the same 32 npm sub-script references as pre-Phase-23 (operator narrative count = 33 when including the implicit `tsc --noEmit` + `cargo check` companions).
+- REQUIREMENTS.md flips honor Phase 22 precedent — original requirement text preserved verbatim, original italicized test specifier replaced by italicized `*Shipped Plan 23-XX (commit-hash description); test_name green.*` clause separated by ` — `. REWARD-01 formula text `0.1·acceptance` preserved verbatim per D-23-01 — acceptance=0.0 v1.3 default is documented in PROJECT.md / 23-CONTEXT.md, not via inline parenthetical in REQUIREMENTS.md.
+- Phase 23 thesis verification (per 23-09-PLAN `<output>` block): RLVR-style composite reward at agent layer per M-10. Voyager-loop's `skill_success` contributes 0.5; Phase 16/17 eval gate contributes 0.3; v1.3-stub `acceptance=0.0` + `completion=0.1` round out the formula; OOD failure gate fail-safes reward to 0 on >15% per-OOD-module drop (post-bootstrap); Doctor pane surfaces the trend with severity per D-23-04. Substrate is observable (ActivityStrip emit), audit-trailed (per-turn jsonl rows + raw_components pre-penalty preserved), and reaches user surface via existing M-07 channel. Phase 24 (dream_mode skill consolidation) unblocked.
+- Pre-existing test failures in `router::tests::select_provider_tier2_task_routing` + `deep_scan::scanners::fs_repos::tests::*` (3 tests) carry forward unchanged from Plan 23-02 audit — out of scope per executor scope-boundary rule (not caused by reward.rs / commands.rs / evals/mod.rs / doctor.rs Phase 23 changes; failures reproduced against pre-Phase-23 commits). Logged in 23-PHASE-CLOSE.md as known carry-forward.
 
 ### Phase 23 Plan 08 Decisions
 
@@ -199,7 +207,30 @@ None. v1.2 closed cleanly with documented tech debt; v1.3 scope locked by operat
 
 ## Session Continuity
 
-**Last session:** 2026-05-01T14:53:02.926Z
+**Last session:** 2026-05-01T15:25:00.000Z — Phase 23 closed end-to-end. Plan 23-09 landed verify-eval.sh `EXPECTED=8` bump (`86841ab`) + REQUIREMENTS.md REWARD-01..07 traceability flips with shipped-Plan citations + STATE.md close + 23-PHASE-CLOSE.md milestone-style artifact.
+
+Phase 23 commit chain (~18 commits across 9 plans):
+
+  - `44a48ef` 23-01 Task 1 — RewardWeights struct + 6-place wiring (REWARD-01)
+  - `e6771cd` 23-01 Task 2 — reward.rs Wave-1 substrate + lib.rs registration (REWARD-04)
+  - `27d997b` 23-01 Task 3 — gitignore tests/evals/reward_history.jsonl (REWARD-04)
+  - `f52e45f` 23-02 Task 1 — TurnAccumulator + 3 D-23-02 penalty detectors + compute_components + compute_and_persist_turn_reward stub (REWARD-02, REWARD-03)
+  - `ba1b459` 23-02 Task 2 — commands.rs send_message_stream_inline 3-site hook (line 715/2173/1831)
+  - `c256771` 23-03 — adversarial_eval.rs / 17 fixtures / floor 0.85 (REWARD-05)
+  - `8fa3d82` 23-04 — ambiguous_intent_eval.rs / 18 fixtures / floor 0.80 (REWARD-05)
+  - `8ca8e62` 23-05 — capability_gap_stress_eval.rs / 17 fixtures / floor 0.75 (REWARD-05)
+  - `5e105f7` 23-06 — evals/mod.rs lockstep mod-registration of all 3 OOD modules (REWARD-05)
+  - `38459ef` 23-07 Task 1 — SignalClass::RewardTrend variant + 3 D-23-04 suggested_fix arms + emit + verbatim test
+  - `8f25bab` 23-07 Task 2 — compute_reward_signal + 6th tokio::join arm + 7 RewardTrend tests (REWARD-04, REWARD-07)
+  - `c20cef8` 23-08 Task 1 — REWARD-06 OOD-floor gate body + ActivityStrip emit + populate ood_modules on RewardRecord
+  - `563ba95` 23-08 Task 2 — payloads.ts + admin.ts TS lockstep (DoctorEventPayload + SignalClass extended with `reward_trend`)
+  - `7c02725` 23-08 Task 3 — DoctorPane.tsx 6th `Reward Trend` row (DISPLAY_NAME + ROW_ORDER + rowRefs)
+  - `86841ab` 23-09 Task 1 — verify-eval.sh `EXPECTED=5→8` (REWARD-05 phase close)
+  - 23-09 Task 2 — REQUIREMENTS.md REWARD-01..07 flips + STATE.md close + 23-PHASE-CLOSE.md (this commit)
+
+Across the phase: ~52 unit/integration tests added (11 Wave-1 reward + 9 Wave-2 reward + 7 reward Plan 23-08 + 7 Doctor Plan 23-07 + 17 + 18 + 17 OOD eval fixtures = 86 total assert!s; many fixtures share a single `#[test]` entry so the reportable test count is 33 reward+config+doctor + 12 evals = 45 reportable tests). 1 new file (`reward.rs`) + 3 new OOD eval modules + 4 modified TS files + 3 modified Rust files + 1 modified shell gate. verify chain count unchanged at 33; verify:eval EXPECTED tightened from 5 to 8 (gate extension, not new gate). DoctorPane row UAT-deferred per chat-first pivot anchor (substrate-only landing).
+
+Next: Phase 24 (dream_mode skill consolidation) — pending CONTEXT gather.
 
 Phase 21 commit chain (8 commits):
 
@@ -256,7 +287,7 @@ bootstrap commits (1deb738 PROJECT+STATE / ba309bb REQUIREMENTS /
 ## Context cliff notes
 
 - v1.0 + v1.1 + v1.2 all shipped; substrate is reachable, observable, capability-aware, and chat-action-capable
-- 31 verify gates green at v1.2 close; v1.3 will add `verify:skill-format` (Phase 21) + `verify:voyager-loop` (Phase 22) + extended `verify:eval` with OOD fixtures (Phase 23) — target 33–34 gates by close
+- 33 verify gates green at Phase 23 close — verify:eval extended to `EXPECTED=8` (5 existing eval modules + 3 new OOD modules); chain count stays at 33 per RESEARCH §"Verify Gate Wiring" lock (gate extension, not new gate). Phase 21 added `verify:skill-format` (31 → 32); Phase 22 added `verify:voyager-loop` (32 → 33); Phase 23 extends `verify:eval` floor without adding a new gate (33 → 33).
 - v1.3 = 7 phases (21=Skills v2, 22=Voyager loop closure, 23=verifiable reward + OOD eval, 24=dream_mode consolidation, 25=Hermes 4 provider, 26=voice resurrection, 27=close)
 - The substrate-level claim v1.3 enables: "Two installs of BLADE genuinely diverge over time" — Voyager skill library grows from each user's specific capability gaps; no other consumer agent ships executable-code skill libraries
 - May 11 deadline (₹2000 from non-brother source per WORKSPACE.md MONEY_MISSION) is downstream consequence, not goal — substrate ships → README + Polar wiring in Phase 27 takes a day → Show HN follows
