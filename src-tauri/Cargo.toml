@@ -67,6 +67,11 @@ filetime = "0.2"
 [features]
 default = []
 local-whisper = ["whisper-rs"]
+# Phase 22 Plan 22-05 (v1.3) — exposes tool_forge::forge_tool_from_fixture
+# and tool_forge::youtube_transcript_fixture for the verify-voyager-loop
+# gate (Plan 22-07) to drive the Voyager loop deterministically without
+# an LLM call. Tests get the same surface unconditionally via #[cfg(test)].
+voyager-fixture = []
 
 [target.'cfg(windows)'.dependencies]
 uiautomation = "0.24.4"
