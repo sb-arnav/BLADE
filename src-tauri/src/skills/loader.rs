@@ -7,8 +7,23 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use serde::{Deserialize, Serialize};
+
 use super::parser::parse_skill;
 use super::types::{SkillStub, SourceTier};
+
+/// Phase 24 (v1.3) — flat reference to a skill across all 4 sources, used
+/// by `session_handoff::SessionHandoff.skills_snapshot` and the
+/// `skill_validator list --diff` CLI subcommand. Carries enough metadata to
+/// distinguish forged_tools (which have `last_used` + `forged_from`) from
+/// SKILL.md tier skills (which carry only `name` + `source`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SkillRef {
+    pub name: String,
+    pub source: String,                    // "forged" | "bundled" | "user" | "archived"
+    pub last_used: Option<i64>,
+    pub forged_from: Option<String>,
+}
 
 /// Scan a tier root for skills.
 ///
@@ -121,6 +136,64 @@ pub fn bundled_root() -> PathBuf {
     PathBuf::from(manifest).join("..").join("skills").join("bundled")
 }
 
+/// Phase 24 (v1.3) — flatten all 4 skill sources into a single snapshot
+/// vec for session_handoff persistence + CLI diff consumption.
+///
+/// Sources:
+///   - `forged`   — rows from `forged_tools` SQLite (name + last_used + forged_from)
+///   - `bundled`  — SKILL.md skills under `bundled_root()` (no usage metadata)
+///   - `user`     — SKILL.md skills under `user_root()` (excluding dotfile dirs)
+///   - `archived` — SKILL.md skills under `<user_root>/.archived/` (Phase 24 prune destination)
+pub fn list_skills_snapshot() -> Vec<SkillRef> {
+    let mut out: Vec<SkillRef> = Vec::new();
+
+    // Forged tools — DB-backed, carry usage metadata.
+    for ft in crate::tool_forge::get_forged_tools() {
+        out.push(SkillRef {
+            name: ft.name,
+            source: "forged".to_string(),
+            last_used: ft.last_used,
+            forged_from: if ft.forged_from.is_empty() { None } else { Some(ft.forged_from) },
+        });
+    }
+
+    // Bundled — SKILL.md skills shipped with BLADE.
+    for stub in scan_tier(&bundled_root(), super::types::SourceTier::Bundled) {
+        out.push(SkillRef {
+            name: stub.frontmatter.name,
+            source: "bundled".to_string(),
+            last_used: None,
+            forged_from: None,
+        });
+    }
+
+    // User — SKILL.md skills under user_root() (scan_tier already skips dotfiles).
+    for stub in scan_tier(&user_root(), super::types::SourceTier::User) {
+        out.push(SkillRef {
+            name: stub.frontmatter.name,
+            source: "user".to_string(),
+            last_used: None,
+            forged_from: None,
+        });
+    }
+
+    // Archived — explicit walk of <user_root>/.archived/ (scan_tier skips
+    // dotfile-prefixed PARENT dirs, but here we feed it the dotfile dir
+    // directly as the root, so its inner subdirs are NOT dotfile-prefixed
+    // and will be enumerated correctly).
+    let archived_root = user_root().join(".archived");
+    for stub in scan_tier(&archived_root, super::types::SourceTier::User) {
+        out.push(SkillRef {
+            name: stub.frontmatter.name,
+            source: "archived".to_string(),
+            last_used: None,
+            forged_from: None,
+        });
+    }
+
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -223,6 +296,73 @@ mod tests {
             root.ends_with(&suffix),
             "expected bundled root to end with skills/bundled, got {root:?}"
         );
+    }
+
+    #[test]
+    fn list_skills_snapshot_includes_all_4_sources() {
+        let tmp = tempfile::TempDir::new().expect("tempdir");
+        std::env::set_var("BLADE_CONFIG_DIR", tmp.path());
+
+        // Seed 1 forged tool via direct INSERT (avoid LLM path).
+        let conn = rusqlite::Connection::open(tmp.path().join("blade.db")).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS forged_tools (
+                id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, description TEXT NOT NULL,
+                language TEXT NOT NULL, script_path TEXT NOT NULL, usage TEXT NOT NULL,
+                parameters TEXT DEFAULT '[]', test_output TEXT DEFAULT '',
+                created_at INTEGER NOT NULL, last_used INTEGER, use_count INTEGER DEFAULT 0,
+                forged_from TEXT DEFAULT ''
+            );"
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO forged_tools (id, name, description, language, script_path, usage, created_at, last_used, forged_from) \
+             VALUES ('id1', 'forged_one', 'd', 'bash', '/tmp/f.sh', 'u', 100, 100, 'cap')",
+            [],
+        ).unwrap();
+        drop(conn);
+
+        // Seed 1 user SKILL.md.
+        let user = tmp.path().join("skills").join("user-one");
+        std::fs::create_dir_all(&user).unwrap();
+        std::fs::write(
+            user.join("SKILL.md"),
+            "---\nname: user-one\ndescription: x\n---\n# user-one\n"
+        ).unwrap();
+
+        // Seed 1 archived SKILL.md under .archived/.
+        let arch = tmp.path().join("skills").join(".archived").join("archived-one");
+        std::fs::create_dir_all(&arch).unwrap();
+        std::fs::write(
+            arch.join("SKILL.md"),
+            "---\nname: archived-one\ndescription: x\n---\n# archived-one\n"
+        ).unwrap();
+
+        let snap = list_skills_snapshot();
+        assert!(snap.iter().any(|r| r.source == "forged" && r.name == "forged_one"));
+        assert!(snap.iter().any(|r| r.source == "user" && r.name == "user-one"));
+        assert!(snap.iter().any(|r| r.source == "archived" && r.name == "archived-one"));
+
+        std::env::remove_var("BLADE_CONFIG_DIR");
+    }
+
+    #[test]
+    fn list_skills_snapshot_handles_missing_dirs() {
+        // Fresh tempdir with NO seeded data — function must not panic on
+        // missing user_root / archived_root / forged_tools table.
+        let tmp = tempfile::TempDir::new().expect("tempdir");
+        std::env::set_var("BLADE_CONFIG_DIR", tmp.path());
+        let snap = list_skills_snapshot();
+        // Bundled may surface entries from <workspace>/skills/bundled/ via
+        // the dev-fallback bundled_root(); accept any non-bundled entries
+        // are absent.
+        for r in &snap {
+            assert!(
+                r.source == "bundled",
+                "expected only bundled entries in fresh tempdir, got source={}",
+                r.source
+            );
+        }
+        std::env::remove_var("BLADE_CONFIG_DIR");
     }
 }
 
