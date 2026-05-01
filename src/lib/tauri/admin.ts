@@ -1828,7 +1828,8 @@ export type SignalClass =
   | 'capability_gaps'
   | 'tentacle_health'
   | 'config_drift'
-  | 'auto_update';
+  | 'auto_update'
+  | 'reward_trend';
 
 export type Severity = 'green' | 'amber' | 'red';
 
