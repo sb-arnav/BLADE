@@ -11,7 +11,7 @@
 
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 // ── Public structs ────────────────────────────────────────────────────────────
 
@@ -63,6 +63,41 @@ struct LlmToolParameter {
 fn default_true() -> bool { true }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Phase 22 Plan 22-04 (v1.3) — failure recovery (VOYAGER-08).
+///
+/// Roll back partial forge state when a side effect after the first one
+/// fails. Currently called from `forge_tool` when DB insert fails after
+/// script fs::write succeeds. The order of operations is:
+///   1. Remove the script file from disk (best-effort; ignore if missing)
+///   2. Re-log the capability gap via `evolution_log_capability_gap` with
+///      a `prior_attempt_failed` suffix so the next forge attempt knows
+///      this isn't the first try
+///
+/// This helper is intentionally narrow — Phase 22 v1.3 doesn't ship a
+/// full UndoStep machinery because the only post-first-side-effect
+/// failure mode `forge_tool` actually exhibits is "DB insert after
+/// script write." Broader rollback (SKILL.md export, multi-step undo)
+/// can be refactored in if v1.4 surfaces more failure modes.
+pub fn rollback_partial_forge(script_path: &Path, capability: &str, reason: &str) {
+    if script_path.exists() {
+        if let Err(e) = std::fs::remove_file(script_path) {
+            log::warn!(
+                "[tool_forge] rollback: failed to remove orphan script {}: {e}",
+                script_path.display()
+            );
+        } else {
+            log::info!(
+                "[tool_forge] rollback: removed orphan script {}",
+                script_path.display()
+            );
+        }
+    }
+    let _ = crate::evolution::evolution_log_capability_gap(
+        capability.to_string(),
+        format!("prior_attempt_failed=true reason={}", crate::safe_slice(reason, 200)),
+    );
+}
 
 /// Phase 22 Plan 22-03 (v1.3) — Voyager skill-write token-budget estimator.
 ///
@@ -372,7 +407,7 @@ pub async fn forge_tool(capability: &str) -> Result<ForgedTool, String> {
     let now = chrono::Utc::now().timestamp();
     let params_json = serde_json::to_string(&parameters).unwrap_or_else(|_| "[]".to_string());
 
-    conn.execute(
+    if let Err(e) = conn.execute(
         "INSERT INTO forged_tools \
          (id, name, description, language, script_path, usage, parameters, test_output, created_at, last_used, use_count, forged_from) \
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, NULL, 0, ?10)",
@@ -388,8 +423,17 @@ pub async fn forge_tool(capability: &str) -> Result<ForgedTool, String> {
             now,
             capability,
         ],
-    )
-    .map_err(|e| format!("DB insert error: {}", e))?;
+    ) {
+        // Phase 22 Plan 22-04 (v1.3) — failure recovery (VOYAGER-08).
+        // Script is already on disk + skill_written event already emitted.
+        // DB insert failed → orphan script. Roll back the script file and
+        // re-log the capability gap with prior_attempt_failed so the next
+        // forge attempt has signal that this didn't land cleanly.
+        rollback_partial_forge(&script_path, capability, &format!("DB insert error: {e}"));
+        return Err(format!(
+            "[tool_forge] DB insert error after script write (script rolled back): {e}"
+        ));
+    }
 
     log::info!("Tool Forge: created '{}' ({})", name, language);
 
@@ -683,5 +727,38 @@ mod tests {
         let huge = "x".repeat(1_000_000);
         let _ = estimate_skill_write_tokens(&huge);
         // Just confirm it returns without overflow panic
+    }
+
+    fn temp_dir(tag: &str) -> PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let p = std::env::temp_dir().join(format!("blade-tool-forge-test-{tag}-{nanos}"));
+        std::fs::create_dir_all(&p).unwrap();
+        p
+    }
+
+    #[test]
+    fn rollback_removes_existing_script() {
+        let dir = temp_dir("rollback-existing");
+        let script_path = dir.join("orphan.py");
+        std::fs::write(&script_path, "noop").unwrap();
+        assert!(script_path.is_file());
+
+        rollback_partial_forge(&script_path, "test capability", "synthetic reason");
+        assert!(!script_path.exists(), "orphan script should be removed");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn rollback_silent_on_missing_script() {
+        let dir = temp_dir("rollback-missing");
+        let script_path = dir.join("never_existed.py");
+        // Don't panic when the script isn't there
+        rollback_partial_forge(&script_path, "test capability", "synthetic reason");
+        assert!(!script_path.exists());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
