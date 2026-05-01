@@ -23,10 +23,56 @@ pub struct SessionHandoff {
     pub last_commands: Vec<String>, // what was run
     pub pending_items: Vec<String>, // what was left open
     pub generated_at: i64,
+    /// Phase 24 (v1.3) DREAM-04 — flat snapshot of all skills (forged +
+    /// bundled + user + archived) at session-write time, used by
+    /// `skill_validator list --diff <session_id>` to compute the
+    /// added/archived/consolidated buckets between two sessions. Defaults
+    /// to empty vec for back-compat with pre-Phase-24 session_handoff.json
+    /// files (#[serde(default)]).
+    #[serde(default)]
+    pub skills_snapshot: Vec<crate::skills::SkillRef>,
 }
 
 fn handoff_path() -> PathBuf {
     crate::config::blade_config_dir().join("session_handoff.json")
+}
+
+/// Phase 24 (v1.3) — per-session archive directory at
+/// `<config_dir>/sessions/`, sibling to the singular `session_handoff.json`.
+/// Created on first use. Capped at 30 entries by mtime sweep on every
+/// `write_session_handoff` invocation.
+fn sessions_dir() -> PathBuf {
+    let dir = crate::config::blade_config_dir().join("sessions");
+    let _ = std::fs::create_dir_all(&dir);
+    dir
+}
+
+/// Sweep the per-session archive at `sessions_dir()`, deleting all but
+/// the most recent `cap` entries by mtime. Best-effort; errors are silent.
+fn sweep_sessions_to_cap(cap: usize) {
+    let dir = sessions_dir();
+    let mut entries: Vec<(std::path::PathBuf, std::time::SystemTime)> = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(&dir) {
+        for e in rd.flatten() {
+            let p = e.path();
+            if !p.is_file() {
+                continue;
+            }
+            if p.extension().and_then(|x| x.to_str()) != Some("json") {
+                continue;
+            }
+            let mt = e.metadata().and_then(|m| m.modified()).unwrap_or(std::time::UNIX_EPOCH);
+            entries.push((p, mt));
+        }
+    }
+    if entries.len() <= cap {
+        return;
+    }
+    // Sort newest first.
+    entries.sort_by(|a, b| b.1.cmp(&a.1));
+    for (path, _) in entries.into_iter().skip(cap) {
+        let _ = std::fs::remove_file(path);
+    }
 }
 
 // Cache the handoff for the current session (cleared on new conversation)
@@ -108,10 +154,18 @@ pub fn write_session_handoff() {
         last_commands: cmd_summaries.drain(..cmd_summaries.len().min(10)).collect(),
         pending_items: pending,
         generated_at: chrono::Utc::now().timestamp(),
+        // Phase 24 (v1.3) — populate the skills snapshot at session-write time.
+        skills_snapshot: crate::skills::list_skills_snapshot(),
     };
 
     if let Ok(json) = serde_json::to_string_pretty(&handoff) {
-        let _ = std::fs::write(handoff_path(), json);
+        // Existing single-file latest write — preserved per 24-RESEARCH §"CLI Subcommand Surface".
+        let _ = std::fs::write(handoff_path(), &json);
+        // Phase 24 (v1.3) — per-session archive copy keyed by generated_at.
+        let archived_path = sessions_dir().join(format!("{}.json", handoff.generated_at));
+        let _ = std::fs::write(&archived_path, &json);
+        // Cap last 30 sessions by mtime.
+        sweep_sessions_to_cap(30);
     }
 }
 
@@ -158,4 +212,58 @@ pub fn session_handoff_write() {
 #[tauri::command]
 pub fn session_handoff_get() -> Option<SessionHandoff> {
     load_last_handoff()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::skills::SkillRef;
+
+    #[test]
+    fn skills_snapshot_serde_roundtrip() {
+        let original = SessionHandoff {
+            summary: "test".to_string(),
+            last_commands: vec!["ls".to_string()],
+            pending_items: vec!["TODO: x".to_string()],
+            generated_at: 1234567890,
+            skills_snapshot: vec![
+                SkillRef {
+                    name: "foo".to_string(),
+                    source: "forged".to_string(),
+                    last_used: Some(1234567000),
+                    forged_from: Some("cap".to_string()),
+                },
+                SkillRef {
+                    name: "bundled-one".to_string(),
+                    source: "bundled".to_string(),
+                    last_used: None,
+                    forged_from: None,
+                },
+            ],
+        };
+        let json = serde_json::to_string(&original).unwrap();
+        let round: SessionHandoff = serde_json::from_str(&json).unwrap();
+        assert_eq!(round.skills_snapshot.len(), 2);
+        assert_eq!(round.skills_snapshot[0].name, "foo");
+        assert_eq!(round.skills_snapshot[0].source, "forged");
+        assert_eq!(round.skills_snapshot[0].last_used, Some(1234567000));
+        assert_eq!(round.skills_snapshot[0].forged_from.as_deref(), Some("cap"));
+        assert_eq!(round.skills_snapshot[1].source, "bundled");
+        assert_eq!(round.skills_snapshot[1].last_used, None);
+    }
+
+    #[test]
+    fn skills_snapshot_default_for_old_json() {
+        // Pre-Phase-24 session_handoff.json has NO `skills_snapshot` key.
+        // #[serde(default)] must tolerate the missing field cleanly.
+        let old_json = r#"{
+            "summary": "old session",
+            "last_commands": ["cargo build"],
+            "pending_items": ["TODO: foo"],
+            "generated_at": 1700000000
+        }"#;
+        let handoff: SessionHandoff = serde_json::from_str(old_json).unwrap();
+        assert_eq!(handoff.summary, "old session");
+        assert!(handoff.skills_snapshot.is_empty(), "expected default empty Vec for missing field");
+    }
 }
