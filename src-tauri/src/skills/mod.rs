@@ -38,6 +38,7 @@ pub mod loader;
 pub mod parser;
 pub mod resolver;
 pub mod types;
+pub mod validator;
 
 pub use activate::{
     activate, body_bytes_loaded, load_reference, reference_bytes_loaded,
