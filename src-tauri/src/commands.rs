@@ -709,6 +709,11 @@ pub(crate) async fn send_message_stream_inline(
     }
     let _inflight = InflightGuard;
 
+    // Phase 23 / REWARD-04 — per-turn tool-call accumulator. Lives on the
+    // stack for the duration of this turn; consumed at the singular
+    // happy-path return at line 1821 by the reward orchestrator.
+    let turn_acc = crate::reward::TurnAccumulator::new();
+
     // Reset cancel flag at the start of every new request
     CHAT_CANCEL.store(false, Ordering::SeqCst);
 
@@ -1818,6 +1823,12 @@ pub(crate) async fn send_message_stream_inline(
                 });
             }
 
+            // Composite reward + jsonl persist (OOD gate added in Plan 23-08).
+            // MUST run on the same task as chat_done (Pitfall 3), NOT in a tokio::spawn —
+            // the CHAT_INFLIGHT guard holds until _inflight drops, guaranteeing serial
+            // jsonl appends across rapid-fire messages.
+            // Phase 23 / REWARD-04
+            let _ = crate::reward::compute_and_persist_turn_reward(&app, turn_acc).await;
             return Ok(());
         }
 
@@ -2152,6 +2163,20 @@ pub(crate) async fn send_message_stream_inline(
                     crate::knowledge_graph::grow_graph_from_conversation(&snippet).await;
                 });
             }
+
+            // Phase 23 / REWARD-04 — record this tool call into the turn accumulator
+            // BEFORE the conversation.push below moves tool_call.id and tool_call.name.
+            // This is the canonical post-dispatch happy-path push (line 2156); the
+            // 4 earlier push sites in this loop body are error/short-circuit branches
+            // that already `continue` past this point, so we record exactly once
+            // per tool_call iteration here.
+            turn_acc.record_tool_call(crate::reward::ToolCallTrace {
+                tool_name:      tool_call.name.clone(),
+                args_str:       serde_json::to_string(&tool_call.arguments).unwrap_or_default(),
+                result_content: crate::safe_slice(&content, 500).to_string(),
+                is_error,
+                timestamp_ms:   chrono::Utc::now().timestamp_millis(),
+            });
 
             conversation.push(ConversationMessage::Tool {
                 tool_call_id: tool_call.id,
