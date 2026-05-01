@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Self-extending Agent Substrate
 status: in_progress
-last_updated: "2026-04-30T22:30:00.000Z"
+last_updated: "2026-05-01T10:30:00.000Z"
 progress:
   total_phases: 7
   completed_phases: 2
@@ -23,10 +23,10 @@ progress:
 
 ## Current Position
 
-Phase: 23 (verifiable reward + OOD eval) — pending plan
+Phase: 23 (verifiable reward + OOD eval) — context captured, pending research + plan
 Plan: —
-Status: Phase 22 ✅ closed; Phase 23 pre-plan
-Last activity: 2026-05-01T~12:30Z — Phase 22 ✅ shipped autonomously (8 plans 22-01..22-08 + RESEARCH + CONTEXT); 28 unit tests + 2 fixture/property tests; 1 new verify gate (`verify:voyager-loop`); chain 32 → 33; canonical `youtube_transcript` fixture closes the Voyager loop deterministically.
+Status: Phase 22 ✅ closed; Phase 23 CONTEXT.md ✅ landed (commit `dfa527c`)
+Last activity: 2026-05-01 — `/gsd-discuss-phase 23` ran interactive: 4 gray areas surfaced (acceptance proxy / penalty enforcement / OOD eval scope / doctor surface shape); 2 user-explicit picks (OOD: hand-curate inline + bootstrap suppression; Doctor: new SignalClass::RewardTrend variant); 2 user-delegated picks ("your call") locked to recommended (acceptance: heuristic stub + weight=0; penalty: tool-call-trace inspection). Substrate-only scope per chat-first pivot anchor. Resume file: `.planning/phases/23-verifiable-reward-ood-eval/23-CONTEXT.md`. Next: `/gsd-plan-phase 23`.
 
 ---
 
