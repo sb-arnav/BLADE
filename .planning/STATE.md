@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Phases
 status: executing
-last_updated: "2026-05-01T13:44:29.216Z"
+last_updated: "2026-05-01T13:52:59.093Z"
 last_activity: 2026-05-01
 progress:
   total_phases: 14
   completed_phases: 10
   total_plans: 73
-  completed_plans: 71
-  percent: 97
+  completed_plans: 72
+  percent: 99
 ---
 
 # STATE — BLADE (v1.3 in progress; Phases 21 + 22 ✅ shipped)
@@ -20,14 +20,27 @@ progress:
 **Last shipped milestone:** v1.2 — Acting Layer with Brain Foundation (closed 2026-04-30 as `tech_debt`; chat-first pivot recorded mid-milestone)
 **Prior shipped:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27 as `tech_debt`); v1.0 — Skin Rebuild substrate (closed 2026-04-19)
 **Current Focus:** Phase 23 — verifiable-reward-ood-eval
-**Status:** Executing Phase 23 — Plan 04 ✅ shipped (ambiguous_intent_eval.rs at 8fa3d82; 18 boundary fixtures + IntentVerdict 3-bucket classifier; REWARD-05 satisfied — 2 of 3 OOD modules complete)
+**Status:** Executing Phase 23 — Plan 05 ✅ shipped (capability_gap_stress_eval.rs at 8ca8e62; 17 missing-tool fixtures + 2-bucket Voyager-loop stress classifier; REWARD-05 satisfied — all 3 OOD modules now authored)
 
 ## Current Position
 
 Phase: 23 (verifiable-reward-ood-eval) — EXECUTING
-Plan: 5 of 9 (Wave 2 — OOD eval modules + verify-eval bump)
-Status: Plan 04 complete; ready to execute Plan 05 (capability_gap_stress_eval.rs — final OOD module)
-Last activity: 2026-05-01 — Phase 23 Plan 04 complete (8fa3d82; ambiguous_intent_eval.rs created with 18 boundary fixtures across 3 sub-categories; REWARD-05 satisfied; floor=0.80, simulated pass-rate=1.000)
+Plan: 6 of 9 (Wave 2 — OOD eval modules + verify-eval bump)
+Status: Plan 05 complete; ready to execute Plan 06 (lockstep mod registration of all 3 OOD modules in evals/mod.rs)
+Last activity: 2026-05-01 — Phase 23 Plan 05 complete (8ca8e62; capability_gap_stress_eval.rs 389 LOC with 17 missing-tool fixtures across 4 sub-categories + 2 Hallucinated buffer; floor=0.75, simulated pass-rate=1.000; voy_youtube_transcript fixture mirrors VOYAGER-04 canonical Phase 22-05 fixture)
+
+### Phase 23 Plan 05 Decisions
+
+- Fixture count 17 (within locked 15-20 range), distributed 3-4-5-3-2: 3 trivially-missing tool requests (telegram-cli/terraform plan/kubectl) + 4 plausibly-catalogable forgeable + 5 genuine Voyager candidates (voy_youtube_transcript directly mirrors VOYAGER-04 canonical Phase 22-05 fixture) + 3 edge-of-impossible (predict tomorrow's stock price/permanently delete user emails/read my mind) + 2 deliberate-fail Hallucinated buffer. Pass-rate math: 13/17 = 0.764 ≥ 0.75, 12/17 = 0.706 < 0.75, so the floor catches a 5-fixture regression beyond the buffer.
+- All 3 Outcome variants (ForgedSkill, CapabilityMissing, Hallucinated) are populated by both fixtures and classifier — no #[allow(dead_code)] needed. The 2 deliberate-fail buffer fixtures + the dedicated default Hallucinated fall-through jointly exercise that branch deterministically.
+- Classifier is a 2-bucket static pattern set (10 MISSING_PATTERNS → CapabilityMissing + 18 FORGE_PATTERNS → ForgedSkill = 28 lowercase substrings; default fall-through → Hallucinated). Bucket order matters: MISSING checked first because trivially-missing CLI names (kubectl, terraform plan) must hit CapabilityMissing without falling through to a FORGE substring overlap. T-23-05-03 (DoS via pattern matcher) mitigated by construction (linear time, finite, no regex, no ReDoS).
+- 5 fixtures in the genuine-Voyager-candidates bucket (one more than plausibly-catalogable) because Phase 22 substrate is the load-bearing dependency this module stress-tests. The voy_youtube_transcript fixture explicitly mirrors VOYAGER-04 successful-forge fixture shape from Phase 22-05; this anchors the Phase 22 substrate reference cited in the module docstring.
+- T-23-05-05 (elevation-of-privilege) mitigated by construction: the classifier returns a synthetic Outcome::ForgedSkill enum value; it does NOT actually invoke forge_tool or evolution.rs. No live skill creation occurs (Assumption A4 from 23-RESEARCH §"Open Assumptions").
+- Default fall-through is Hallucinated (the dangerous default), not Failed and not SilentMisroute — the named distinction from adversarial_eval (Failed) and ambiguous_intent_eval (SilentMisroute). Two deliberate-fail buffer fixtures (do that thing where you make my computer go faster / just take care of this for me automatically) document the pattern-matcher's known blind spot.
+- Module docstring cites BOTH Phase 22 substrate (forge_tool / autoskills.rs / evolution.rs) AND the capability_gap_eval Phase 16 analog (self_upgrade::detect_missing_tool regression gate). The two references frame the strategic posture (this module) vs the tactical posture (the analog).
+- ASCII-only verification passed first-write — applied lessons from Plans 23-03 / 23-04. Total non-ASCII byte count file-wide: 0.
+- record_eval_run fires BEFORE the floor assert! per Phase 17 D-14 (audit-trail invariant inherited verbatim from adversarial_eval / ambiguous_intent_eval).
+- File is structurally complete but NOT registered in evals/mod.rs. Plan 23-06 owns the `mod capability_gap_stress_eval;` line in lockstep with the other 2 OOD modules. All 3 OOD modules now authored — the canonical OOD eval shape now has 3 concrete instances (precedent locked).
 
 ### Phase 23 Plan 04 Decisions
 
@@ -153,7 +166,7 @@ None. v1.2 closed cleanly with documented tech debt; v1.3 scope locked by operat
 
 ## Session Continuity
 
-**Last session:** 2026-05-01T13:44:21.772Z
+**Last session:** 2026-05-01T13:52:59.079Z
 
 Phase 21 commit chain (8 commits):
 
