@@ -26,6 +26,7 @@ mod journal;
 mod pulse;
 mod reminders;
 mod skill_engine;
+mod skills;             // Phase 21 v1.3 — agentskills.io SKILL.md format substrate
 mod telegram;
 mod thread;
 mod tts;
