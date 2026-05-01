@@ -1823,6 +1823,32 @@ pub(crate) async fn send_message_stream_inline(
                 });
             }
 
+            // Phase 24 (v1.3) DREAM-03 — capture the turn's tool-call sequence to the
+            // turn_traces SQLite table for the dream_mode skill-from-trace generator
+            // to mine. Captured BEFORE the turn_acc moves into compute_and_persist_turn_reward.
+            {
+                let calls = turn_acc.snapshot_calls();
+                let tool_names: Vec<String> = calls.iter().map(|t| t.tool_name.clone()).collect();
+                let any_error = calls.iter().any(|t| t.is_error);
+                let forged_names: std::collections::HashSet<String> = crate::tool_forge::get_forged_tools()
+                    .into_iter()
+                    .map(|t| t.name)
+                    .collect();
+                let forged_used: Option<String> = tool_names
+                    .iter()
+                    .find(|n| forged_names.contains(*n))
+                    .cloned();
+                let tool_names_json = serde_json::to_string(&tool_names).unwrap_or_else(|_| "[]".to_string());
+                let now_ts = chrono::Utc::now().timestamp();
+                let db_path = crate::config::blade_config_dir().join("blade.db");
+                if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                    let _ = conn.execute(
+                        "INSERT INTO turn_traces (turn_ts, tool_names, forged_tool_used, success) VALUES (?1, ?2, ?3, ?4)",
+                        rusqlite::params![now_ts, tool_names_json, forged_used, if any_error { 0i64 } else { 1i64 }],
+                    );
+                }
+            }
+
             // Composite reward + jsonl persist (OOD gate added in Plan 23-08).
             // MUST run on the same task as chat_done (Pitfall 3), NOT in a tokio::spawn —
             // the CHAT_INFLIGHT guard holds until _inflight drops, guaranteeing serial
@@ -2177,6 +2203,28 @@ pub(crate) async fn send_message_stream_inline(
                 is_error,
                 timestamp_ms:   chrono::Utc::now().timestamp_millis(),
             });
+
+            // Phase 24 (v1.3) D-24-B / DREAM-02 — Pitfall 2 mitigation:
+            // record_tool_use was unwired pre-Phase-24 (zero internal callers).
+            // We now funnel forged-tool invocations through it so the
+            // forged_tools_invocations log accumulates per-turn trace_hashes
+            // for the consolidation pass to read. Cheap name-set lookup against
+            // the live forged_tools registry; non-forged tools (native, MCP)
+            // are no-ops here and continue uninstrumented.
+            {
+                let forged_names: std::collections::HashSet<String> = crate::tool_forge::get_forged_tools()
+                    .into_iter()
+                    .map(|t| t.name)
+                    .collect();
+                if forged_names.contains(&tool_call.name) {
+                    let turn_tool_names: Vec<String> = turn_acc
+                        .snapshot_calls()
+                        .into_iter()
+                        .map(|t| t.tool_name)
+                        .collect();
+                    crate::tool_forge::record_tool_use(&tool_call.name, &turn_tool_names);
+                }
+            }
 
             conversation.push(ConversationMessage::Tool {
                 tool_call_id: tool_call.id,
