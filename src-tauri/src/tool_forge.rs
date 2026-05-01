@@ -329,6 +329,9 @@ pub async fn forge_tool(capability: &str) -> Result<ForgedTool, String> {
             .ok();
     }
 
+    // Phase 22 (v1.3) — Voyager loop step 2 of 4: script artifact on disk.
+    crate::voyager_log::skill_written(&name, &script_path_str);
+
     // Smoke-test
     let test_output = test_tool(&script_path_str, &language)
         .await
@@ -360,7 +363,7 @@ pub async fn forge_tool(capability: &str) -> Result<ForgedTool, String> {
 
     log::info!("Tool Forge: created '{}' ({})", name, language);
 
-    Ok(ForgedTool {
+    let forged = ForgedTool {
         id,
         name,
         description,
@@ -373,7 +376,38 @@ pub async fn forge_tool(capability: &str) -> Result<ForgedTool, String> {
         last_used: None,
         use_count: 0,
         forged_from: capability.to_string(),
-    })
+    };
+
+    // Phase 22 (v1.3) Plan 22-01 — export to agentskills.io SKILL.md at the
+    // user tier so the Phase 21 Catalog::resolve path can find this skill +
+    // ecosystem validators can ingest it. Coexists with the existing
+    // <blade_config_dir>/tools/<name>.<ext> artifact + forged_tools row.
+    //
+    // Non-fatal: a name that doesn't sanitize to agentskills.io-compliant
+    // form (or a missing source script — shouldn't happen here since we
+    // just wrote it) logs a warning and the loop continues. The forge
+    // succeeded; the SKILL.md export is a discoverability bonus.
+    let user_skills_root = crate::skills::user_root();
+    let skill_md_path = match crate::skills::export::export_to_user_tier(&forged, &user_skills_root) {
+        Ok(crate::skills::export::ExportOutcome::Written { skill_md_path, .. }) => {
+            Some(skill_md_path.to_string_lossy().to_string())
+        }
+        Ok(crate::skills::export::ExportOutcome::NonCompliantName { reason }) => {
+            log::warn!("[tool_forge] SKILL.md export skipped: {reason}");
+            None
+        }
+        Err(e) => {
+            log::warn!("[tool_forge] SKILL.md export failed: {e}");
+            None
+        }
+    };
+
+    // Phase 22 (v1.3) — Voyager loop step 3 of 4: skill is now resolvable
+    // (DB row + optional SKILL.md). Emits AFTER the export attempt so the
+    // payload can carry skill_md_path on success.
+    crate::voyager_log::skill_registered(&forged.name, &forged.id, skill_md_path.as_deref());
+
+    Ok(forged)
 }
 
 /// Load all forged tools from the DB, sorted by use_count descending.
@@ -485,6 +519,11 @@ pub async fn forge_if_needed(user_request: &str, error_message: &str) -> Option<
 }
 
 /// Increment `use_count` and set `last_used` timestamp for the named tool.
+///
+/// Phase 22 (v1.3) — also emits the Voyager loop step 4 of 4 (`skill_used`)
+/// to ActivityStrip per the M-07 contract. Currently called by zero
+/// internal sites; tracked as a forward-pointer for the chat tool-loop
+/// branch to call when a forged tool is actually invoked.
 #[allow(dead_code)]
 pub fn record_tool_use(name: &str) {
     let conn = match open_db() {
@@ -498,6 +537,8 @@ pub fn record_tool_use(name: &str) {
         params![now, name],
     )
     .ok();
+
+    crate::voyager_log::skill_used(name);
 }
 
 // ── Tauri commands ────────────────────────────────────────────────────────────
