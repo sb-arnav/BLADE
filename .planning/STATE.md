@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Phases
-status: verifying
-last_updated: "2026-05-01T11:28:07.373Z"
-last_activity: "2026-05-01 — `/gsd-discuss-phase 23` ran interactive: 4 gray areas surfaced (acceptance proxy / penalty enforcement / OOD eval scope / doctor surface shape); 2 user-explicit picks (OOD: hand-curate inline + bootstrap suppression; Doctor: new SignalClass::RewardTrend variant); 2 user-delegated picks ("your call") locked to recommended (acceptance: heuristic stub + weight=0; penalty: tool-call-trace inspection). Substrate-only scope per chat-first pivot anchor. Resume file: `.planning/phases/23-verifiable-reward-ood-eval/23-CONTEXT.md`. Next: `/gsd-plan-phase 23`."
+status: executing
+last_updated: "2026-05-01T12:15:53.874Z"
+last_activity: 2026-05-01
 progress:
   total_phases: 14
   completed_phases: 10
   total_plans: 73
-  completed_plans: 67
-  percent: 92
+  completed_plans: 68
+  percent: 93
 ---
 
 # STATE — BLADE (v1.3 in progress; Phases 21 + 22 ✅ shipped)
@@ -19,15 +19,15 @@ progress:
 **Current milestone:** v1.3 — Self-extending Agent Substrate (started 2026-04-30; target ship ~2026-05-11)
 **Last shipped milestone:** v1.2 — Acting Layer with Brain Foundation (closed 2026-04-30 as `tech_debt`; chat-first pivot recorded mid-milestone)
 **Prior shipped:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27 as `tech_debt`); v1.0 — Skin Rebuild substrate (closed 2026-04-19)
-**Current Focus:** Phase 21 (Skills v2 / agentskills.io adoption) ✅ shipped + Phase 22 (Voyager loop closure) ✅ shipped, both 2026-05-01. 16 plans landed, ~94 unit tests added across the morning, verify chain 31 → 33 gates. Phase 23 (verifiable reward + OOD eval) ahead — Voyager substrate is now end-to-end verifiable; next milestone work is RLVR-style composite reward + adversarial eval module additions.
-**Status:** Phase 22 closed end-to-end. The v1.3 thesis claim "BLADE writes its own tools, two installs diverge over time" now has a `verify:voyager-loop` gate behind it. Voyager loop is shipped substrate, not theater — `forge_tool_from_fixture` + `youtube_transcript_fixture` exercise the full `evolution.rs → tool_forge → SKILL.md → catalog` path deterministically in <2s without LLM/network. Phase 23 unblocked.
+**Current Focus:** Phase 23 — verifiable-reward-ood-eval
+**Status:** Executing Phase 23 — Plan 01 ✅ shipped (RewardWeights + reward.rs Wave-1 substrate)
 
 ## Current Position
 
-Phase: 23 (verifiable reward + OOD eval) — context captured, pending research + plan
-Plan: —
-Status: Phase 22 ✅ closed; Phase 23 CONTEXT.md ✅ landed (commit `dfa527c`)
-Last activity: 2026-05-01 — `/gsd-discuss-phase 23` ran interactive: 4 gray areas surfaced (acceptance proxy / penalty enforcement / OOD eval scope / doctor surface shape); 2 user-explicit picks (OOD: hand-curate inline + bootstrap suppression; Doctor: new SignalClass::RewardTrend variant); 2 user-delegated picks ("your call") locked to recommended (acceptance: heuristic stub + weight=0; penalty: tool-call-trace inspection). Substrate-only scope per chat-first pivot anchor. Resume file: `.planning/phases/23-verifiable-reward-ood-eval/23-CONTEXT.md`. Next: `/gsd-plan-phase 23`.
+Phase: 23 (verifiable-reward-ood-eval) — EXECUTING
+Plan: 2 of 9 (Wave 2 — penalty + OOD modules)
+Status: Plan 01 complete; ready to execute Plan 02
+Last activity: 2026-05-01 -- Phase 23 Plan 01 complete (44a48ef + e6771cd + 27d997b; 11 unit tests green)
 
 ---
 
@@ -127,7 +127,7 @@ None. v1.2 closed cleanly with documented tech debt; v1.3 scope locked by operat
 
 ## Session Continuity
 
-**Last session:** 2026-05-01T~10:00Z (Phase 21 ✅ SHIPPED + Phase 22 Wave 1 ✅ shipped — full morning autonomous push after "this is morning bro I said keep going you could have gotten so much done"). 12 atomic commits across 2 phases.
+**Last session:** 2026-05-01T12:15:53Z
 
 Phase 21 commit chain (8 commits):
 
