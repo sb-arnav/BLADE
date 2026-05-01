@@ -179,6 +179,64 @@ fn default_ecosystem_observe_only() -> bool { true }
 // runaway token spend.
 fn default_voyager_skill_write_budget_tokens() -> u64 { 50_000 }
 
+// ---------------------------------------------------------------------
+// Phase 23 Plan 23-01 (v1.3) — Composite reward weights (REWARD-01).
+// Per D-23-01, the v1.3 default sums to 0.9 because the acceptance
+// component is silenced via weight=0.0 (no regenerate UI on chat surface
+// today; v1.4 will flip acceptance back to 0.1). validate() therefore
+// tolerates sums in [0.0, 1.0+1e-3] rather than == 1.0.
+// ---------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct RewardWeights {
+    pub skill_success: f32,
+    pub eval_gate:     f32,
+    pub acceptance:    f32,
+    pub completion:    f32,
+}
+
+impl Default for RewardWeights {
+    fn default() -> Self {
+        // v1.3 default: 0.5/0.3/0.0/0.1 (sum 0.9). Acceptance silenced via
+        // weight=0.0 per D-23-01 — formula stays computable; v1.4 flips
+        // acceptance to 0.1 when the regenerate UI lands, restoring sum=1.0.
+        Self { skill_success: 0.5, eval_gate: 0.3, acceptance: 0.0, completion: 0.1 }
+    }
+}
+
+impl RewardWeights {
+    /// Sum of all four weights. v1.3 default = 0.9. Validation accepts
+    /// `[0.0, 1.0 + 1e-3]` — the 1e-3 epsilon is float-roundoff slack, not
+    /// a semantic allowance for >1.0 sums.
+    pub fn sum(&self) -> f32 {
+        self.skill_success + self.eval_gate + self.acceptance + self.completion
+    }
+
+    /// Validate every weight is in `[0.0, 1.0]` AND the sum is in
+    /// `[0.0, 1.0 + 1e-3]`. Called as the FIRST executable statement of
+    /// `save_config` so a corrupt sum is hard-rejected before any keychain
+    /// write. Read-side soft-clamp lives in Wave 3 hook (Pitfall 5).
+    pub fn validate(&self) -> Result<(), String> {
+        for (name, v) in [
+            ("skill_success", self.skill_success),
+            ("eval_gate",     self.eval_gate),
+            ("acceptance",    self.acceptance),
+            ("completion",    self.completion),
+        ] {
+            if v < 0.0 || v > 1.0 {
+                return Err(format!("reward_weights.{} out of [0,1]: {}", name, v));
+            }
+        }
+        let s = self.sum();
+        if s < 0.0 || s > 1.0 + 1e-3 {
+            return Err(format!("reward_weights sum out of [0,1]: {}", s));
+        }
+        Ok(())
+    }
+}
+
+fn default_reward_weights() -> RewardWeights { RewardWeights::default() }
+
 /// Config as stored on disk — api_key is NOT stored here anymore
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct DiskConfig {
@@ -298,6 +356,9 @@ struct DiskConfig {
     // Phase 22 Plan 22-03 (v1.3) — Voyager skill-write budget cap (VOYAGER-07)
     #[serde(default = "default_voyager_skill_write_budget_tokens")]
     voyager_skill_write_budget_tokens: u64,
+    // Phase 23 Plan 23-01 (v1.3) — Composite reward weight tuple (REWARD-01)
+    #[serde(default = "default_reward_weights")]
+    reward_weights: RewardWeights,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -377,6 +438,7 @@ impl Default for DiskConfig {
             ecosystem_tentacles: vec![],
             ecosystem_observe_only: true,
             voyager_skill_write_budget_tokens: default_voyager_skill_write_budget_tokens(),
+            reward_weights: default_reward_weights(),
             api_key: None,
         }
     }
@@ -514,6 +576,11 @@ pub struct BladeConfig {
     /// forge_tool` refuses the LLM call. Default 50_000.
     #[serde(default = "default_voyager_skill_write_budget_tokens")]
     pub voyager_skill_write_budget_tokens: u64,
+    /// Phase 23 Plan 23-01 (v1.3) — Composite reward weight tuple per D-23-01 (REWARD-01).
+    /// Default `0.5 / 0.3 / 0.0 / 0.1` (acceptance silenced via weight=0 until v1.4 lands
+    /// regenerate UI). Sum-to-1.0 validation tolerates `[0.0, 1.0+1e-3]` per Pitfall 5.
+    #[serde(default = "default_reward_weights")]
+    pub reward_weights: RewardWeights,
 }
 
 impl BladeConfig {
@@ -579,6 +646,7 @@ impl Default for BladeConfig {
             ecosystem_tentacles: vec![],
             ecosystem_observe_only: true,
             voyager_skill_write_budget_tokens: default_voyager_skill_write_budget_tokens(),
+            reward_weights: default_reward_weights(),
         }
     }
 }
@@ -738,10 +806,16 @@ pub fn load_config() -> BladeConfig {
         ecosystem_tentacles: disk.ecosystem_tentacles,
         ecosystem_observe_only: disk.ecosystem_observe_only,
         voyager_skill_write_budget_tokens: disk.voyager_skill_write_budget_tokens,
+        reward_weights: disk.reward_weights.clone(),
     }
 }
 
 pub fn save_config(config: &BladeConfig) -> Result<(), String> {
+    // Phase 23 Plan 23-01 (REWARD-01) — hard-reject corrupt reward weights
+    // BEFORE any keychain write. Sum tolerance is `[0.0, 1.0 + 1e-3]` to
+    // accommodate the v1.3 default sum=0.9 (acceptance silenced).
+    config.reward_weights.validate()?;
+
     // Store API key in keyring, not on disk
     set_api_key_in_keyring(&config.provider, &config.api_key)?;
 
@@ -799,6 +873,7 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         ecosystem_tentacles: config.ecosystem_tentacles.clone(),
         ecosystem_observe_only: config.ecosystem_observe_only,
         voyager_skill_write_budget_tokens: config.voyager_skill_write_budget_tokens,
+        reward_weights: config.reward_weights.clone(),
         api_key: None,
     };
 
@@ -1240,5 +1315,165 @@ mod tests {
         assert!(classes.mru);
         assert!(classes.bookmarks);
         assert!(classes.which_sweep);
+    }
+
+    // ---------------------------------------------------------------------
+    // Phase 23 Plan 23-01 — RewardWeights tests (REWARD-01).
+    //
+    // The 5 tests below lock D-23-01:
+    //   - default returns 0.5/0.3/0.0/0.1 (sum 0.9; acceptance silenced)
+    //   - per-component out-of-[0,1] is rejected by validate()
+    //   - sum-out-of-[0,1+1e-3] is rejected by validate()
+    //   - non-default weights round-trip through DiskConfig serde
+    //   - save_config gate rejects corrupt sums BEFORE any keyring write
+    // ---------------------------------------------------------------------
+
+    #[test]
+    fn reward_weights_default_validates() {
+        let w = RewardWeights::default();
+        assert_eq!(w.skill_success, 0.5);
+        assert_eq!(w.eval_gate,     0.3);
+        assert_eq!(w.acceptance,    0.0);
+        assert_eq!(w.completion,    0.1);
+        // v1.3 default sum is 0.9 (NOT 1.0) per D-23-01.
+        assert!((w.sum() - 0.9).abs() < 1e-6, "default sum should be 0.9, got {}", w.sum());
+        assert!(w.validate().is_ok(), "default weights must pass validate(): {:?}", w.validate());
+    }
+
+    #[test]
+    fn reward_weights_rejects_per_component_out_of_range() {
+        let w = RewardWeights { skill_success: 1.5, eval_gate: 0.3, acceptance: 0.0, completion: 0.1 };
+        let err = w.validate().expect_err("must reject skill_success > 1.0");
+        assert!(
+            err.contains("reward_weights.skill_success out of [0,1]"),
+            "error did not match expected prefix: {}",
+            err
+        );
+
+        let w_neg = RewardWeights { skill_success: -0.1, eval_gate: 0.3, acceptance: 0.0, completion: 0.1 };
+        let err_neg = w_neg.validate().expect_err("must reject negative skill_success");
+        assert!(err_neg.contains("reward_weights.skill_success out of [0,1]"), "got: {}", err_neg);
+    }
+
+    #[test]
+    fn reward_weights_rejects_sum_out_of_range() {
+        // Sum = 0.6 + 0.6 + 0.0 + 0.0 = 1.2 — exceeds 1.0+1e-3 tolerance.
+        let w = RewardWeights { skill_success: 0.6, eval_gate: 0.6, acceptance: 0.0, completion: 0.0 };
+        let err = w.validate().expect_err("must reject sum > 1.0+1e-3");
+        assert!(
+            err.contains("reward_weights sum out of [0,1]"),
+            "error did not match expected prefix: {}",
+            err
+        );
+    }
+
+    /// Round-trip a non-default `RewardWeights` through `DiskConfig` serde.
+    /// This guards the DiskConfig field + DiskConfig::default() + #[serde(default)]
+    /// helper wiring (sites 2 + 3) — if any of the 6 places drifts, this test fails.
+    #[test]
+    fn reward_weights_round_trip() {
+        let mut cfg = BladeConfig::default();
+        cfg.reward_weights = RewardWeights {
+            skill_success: 0.4,
+            eval_gate:     0.4,
+            acceptance:    0.1,
+            completion:    0.1,
+        };
+        // Sanity: this non-default weight tuple must validate (sum=1.0 exactly).
+        assert!(cfg.reward_weights.validate().is_ok());
+
+        // Build the equivalent DiskConfig snapshot and round-trip it through
+        // serde_json (the same codec save_disk_config uses). This exercises
+        // the same wire format the on-disk config sees.
+        let disk = DiskConfig {
+            provider: cfg.provider.clone(),
+            model: cfg.model.clone(),
+            onboarded: cfg.onboarded,
+            mcp_servers: cfg.mcp_servers.clone(),
+            window_state: cfg.window_state.clone(),
+            token_efficient: cfg.token_efficient,
+            user_name: cfg.user_name.clone(),
+            work_mode: cfg.work_mode.clone(),
+            response_style: cfg.response_style.clone(),
+            blade_email: cfg.blade_email.clone(),
+            base_url: cfg.base_url.clone(),
+            god_mode: cfg.god_mode,
+            god_mode_tier: cfg.god_mode_tier.clone(),
+            voice_mode: cfg.voice_mode.clone(),
+            obsidian_vault_path: cfg.obsidian_vault_path.clone(),
+            tts_voice: cfg.tts_voice.clone(),
+            quick_ask_shortcut: cfg.quick_ask_shortcut.clone(),
+            voice_shortcut: cfg.voice_shortcut.clone(),
+            screen_timeline_enabled: cfg.screen_timeline_enabled,
+            timeline_capture_interval: cfg.timeline_capture_interval,
+            timeline_retention_days: cfg.timeline_retention_days,
+            wake_word_enabled: cfg.wake_word_enabled,
+            wake_word_phrase: cfg.wake_word_phrase.clone(),
+            wake_word_sensitivity: cfg.wake_word_sensitivity,
+            active_role: cfg.active_role.clone(),
+            blade_source_path: cfg.blade_source_path.clone(),
+            trusted_ai_delegate: cfg.trusted_ai_delegate.clone(),
+            blade_dedicated_monitor: cfg.blade_dedicated_monitor,
+            task_routing: cfg.task_routing.clone(),
+            background_ai_enabled: cfg.background_ai_enabled,
+            persona_onboarding_complete: cfg.persona_onboarding_complete,
+            fallback_providers: cfg.fallback_providers.clone(),
+            use_local_whisper: cfg.use_local_whisper,
+            whisper_model: cfg.whisper_model.clone(),
+            last_deep_scan: cfg.last_deep_scan,
+            integration_polling_enabled: cfg.integration_polling_enabled,
+            tts_speed: cfg.tts_speed,
+            ha_base_url: cfg.ha_base_url.clone(),
+            audio_capture_enabled: cfg.audio_capture_enabled,
+            ghost_mode_enabled: cfg.ghost_mode_enabled,
+            ghost_mode_position: cfg.ghost_mode_position.clone(),
+            ghost_auto_reply: cfg.ghost_auto_reply,
+            hive_enabled: cfg.hive_enabled,
+            hive_autonomy: cfg.hive_autonomy,
+            provider_capabilities: cfg.provider_capabilities.clone(),
+            vision_provider: cfg.vision_provider.clone(),
+            audio_provider: cfg.audio_provider.clone(),
+            long_context_provider: cfg.long_context_provider.clone(),
+            tools_provider: cfg.tools_provider.clone(),
+            scan_classes_enabled: cfg.scan_classes_enabled.clone(),
+            ecosystem_tentacles: cfg.ecosystem_tentacles.clone(),
+            ecosystem_observe_only: cfg.ecosystem_observe_only,
+            voyager_skill_write_budget_tokens: cfg.voyager_skill_write_budget_tokens,
+            reward_weights: cfg.reward_weights.clone(),
+            api_key: None,
+        };
+
+        let serialized = serde_json::to_string(&disk).expect("serialize DiskConfig");
+        // Field MUST appear on the wire — guards against accidental
+        // #[serde(skip_serializing)] regression.
+        assert!(
+            serialized.contains("\"reward_weights\""),
+            "serialized DiskConfig missing reward_weights field: {}",
+            serialized
+        );
+        let loaded: DiskConfig = serde_json::from_str(&serialized).expect("deserialize DiskConfig");
+        assert_eq!(loaded.reward_weights, cfg.reward_weights);
+    }
+
+    /// `save_config` MUST hard-reject a corrupt sum BEFORE attempting any
+    /// keychain write. We verify by passing a weights tuple that fails
+    /// validation and asserting the error text matches the validate() shape.
+    /// (Per-thread BLADE_CONFIG_DIR isolation is unnecessary because the
+    /// save call short-circuits on validate() before touching disk.)
+    #[test]
+    fn reward_weights_save_config_rejects_corrupt_sum() {
+        let mut cfg = BladeConfig::default();
+        cfg.reward_weights = RewardWeights {
+            skill_success: 0.7,
+            eval_gate:     0.7,
+            acceptance:    0.0,
+            completion:    0.0,
+        };
+        let err = save_config(&cfg).expect_err("save_config must reject sum > 1.0+1e-3");
+        assert!(
+            err.contains("reward_weights sum out of [0,1]"),
+            "save_config rejection text did not match validate() format: {}",
+            err
+        );
     }
 }
