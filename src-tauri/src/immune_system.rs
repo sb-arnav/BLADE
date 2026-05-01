@@ -28,6 +28,9 @@ pub async fn resolve_capability_gap(
     capability: &str,
     user_request: &str,
 ) -> String {
+    // Phase 22 (v1.3) — Voyager loop step 1 of 4: ActivityStrip M-07 contract.
+    crate::voyager_log::gap_detected(capability, user_request);
+
     let _ = app.emit_to("main", "blade_evolving", serde_json::json!({
         "capability": capability,
         "status": "searching",
