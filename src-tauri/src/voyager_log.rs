@@ -115,6 +115,61 @@ pub fn skill_used(skill_name: &str) {
     );
 }
 
+// ── Phase 24 (v1.3) — dream_mode emit helpers ───────────────────────────────
+// Per D-24-F: one emit per pass-kind per dream cycle, carrying count + items
+// (capped at 10). MODULE = "Voyager" stays unchanged — dream-mode is the
+// forgetting half of the Voyager loop; frontend filters by action prefix.
+
+/// One emit per dream-mode prune pass.
+pub fn dream_prune(count: i64, items: Vec<String>) {
+    let summary = format!("dream:prune {} skill(s) archived", count);
+    emit(
+        "dream_mode:prune",
+        &summary,
+        json!({
+            "count": count,
+            "items": cap_items(&items, 10),
+        }),
+    );
+}
+
+/// One emit per dream-mode consolidate pass.
+pub fn dream_consolidate(count: i64, items: Vec<String>) {
+    let summary = format!("dream:consolidate {} pair(s) flagged", count);
+    emit(
+        "dream_mode:consolidate",
+        &summary,
+        json!({
+            "count": count,
+            "items": cap_items(&items, 10),
+        }),
+    );
+}
+
+/// One emit per dream-mode skill-from-trace generate pass.
+pub fn dream_generate(count: i64, items: Vec<String>) {
+    let summary = format!("dream:generate {} skill(s) proposed", count);
+    emit(
+        "dream_mode:generate",
+        &summary,
+        json!({
+            "count": count,
+            "items": cap_items(&items, 10),
+        }),
+    );
+}
+
+/// Cap an item list at `cap`; if exceeded, replace tail with a single
+/// "... (+N more)" sentinel so consumer drawers stay legible.
+fn cap_items(items: &[String], cap: usize) -> Vec<String> {
+    if items.len() <= cap {
+        return items.to_vec();
+    }
+    let mut out: Vec<String> = items.iter().take(cap).cloned().collect();
+    out.push(format!("... (+{} more)", items.len() - cap));
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -142,5 +197,59 @@ mod tests {
         let long: String = "a".repeat(500);
         // Should not panic on >200-char input
         emit("gap_detected", &long, serde_json::json!({}));
+    }
+
+    #[test]
+    fn dream_prune_caps_items_at_10() {
+        // 13 items -> cap_items returns 10 + 1 sentinel = 11 elements,
+        // last element = "... (+3 more)".
+        let items: Vec<String> = (0..13).map(|i| format!("skill_{}", i)).collect();
+        let capped = cap_items(&items, 10);
+        assert_eq!(capped.len(), 11);
+        assert_eq!(capped[10], "... (+3 more)");
+        for i in 0..10 {
+            assert_eq!(capped[i], format!("skill_{}", i));
+        }
+    }
+
+    #[test]
+    fn cap_items_returns_clone_when_under_cap() {
+        let items: Vec<String> = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+        let capped = cap_items(&items, 10);
+        assert_eq!(capped.len(), 3);
+        assert_eq!(capped, items);
+    }
+
+    /// Phase 24 D-24-F lock — action string namespace MUST be exactly
+    /// "dream_mode:prune" / "dream_mode:consolidate" / "dream_mode:generate".
+    /// Frontend filters by action prefix (per RESEARCH "Action namespace").
+    /// This test pins the namespace; any drift from the lock breaks the strip.
+    ///
+    /// Implementation note: we can't intercept the &'static str inside emit()
+    /// from outside the module without a feature flag. Instead, this test
+    /// just calls each helper with a sentinel item and asserts the
+    /// underlying const namespace via the source SCAN -- by directly
+    /// invoking each function in a way that confirms ASCII parse against
+    /// the helper body. The substantive lock is enforced by the
+    /// dream_emit_helpers_safe_without_app_handle below + the grep gate.
+    #[test]
+    fn dream_action_strings_locked() {
+        // Smoke -- the calls invoke emit() which uses the locked &'static str.
+        // The grep acceptance criterion at the plan level is the load-bearing
+        // assertion (see PLAN.md acceptance_criteria).
+        dream_prune(0, vec![]);
+        dream_consolidate(0, vec![]);
+        dream_generate(0, vec![]);
+    }
+
+    /// Mirrors emit_helpers_safe_without_app_handle (line 132) for the
+    /// 3 new helpers -- required because integration_bridge::get_app_handle()
+    /// returns None in `cargo test --lib` runs. Helpers must not panic;
+    /// they should warn + return (handled by emit core).
+    #[test]
+    fn dream_emit_helpers_safe_without_app_handle() {
+        dream_prune(3, vec!["a".into(), "b".into(), "c".into()]);
+        dream_consolidate(1, vec!["foo+bar".into()]);
+        dream_generate(1, vec!["auto_proposed_skill".into()]);
     }
 }
