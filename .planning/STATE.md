@@ -7,26 +7,26 @@ last_updated: "2026-04-30T22:30:00.000Z"
 progress:
   total_phases: 7
   completed_phases: 1
-  total_plans: 8
-  completed_plans: 8
-  percent: 14
+  total_plans: 12
+  completed_plans: 12
+  percent: 22
 ---
 
-# STATE — BLADE (v1.3 in progress; Phase 21 ✅ shipped)
+# STATE — BLADE (v1.3 in progress; Phase 21 ✅ shipped; Phase 22 Wave 1 ✅)
 
 **Project:** BLADE — Desktop JARVIS
 **Current milestone:** v1.3 — Self-extending Agent Substrate (started 2026-04-30; target ship ~2026-05-11)
 **Last shipped milestone:** v1.2 — Acting Layer with Brain Foundation (closed 2026-04-30 as `tech_debt`; chat-first pivot recorded mid-milestone)
 **Prior shipped:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27 as `tech_debt`); v1.0 — Skin Rebuild substrate (closed 2026-04-19)
-**Current Focus:** Phase 21 (Skills v2 / agentskills.io adoption) ✅ shipped 2026-05-01 — 8 plans, 65 unit tests, verify chain 31 → 32 gates. Substrate ready for Phase 22 (Voyager loop closure). Phase 22 is the load-bearing demo moment — wires `evolution.rs → autoskills.rs → tool_forge.rs` end-to-end into the new `mod skills` substrate so BLADE writes its own tools.
-**Status:** Phase 21 closed. Phase 22 ready to begin. 22-CONTEXT.md is next artifact (mirrors 21-CONTEXT shape; pre-plan substrate). Voyager loop is more invasive than Phase 21 (touches existing evolution / autoskills / tool_forge modules); 22-RESEARCH.md needs to map current vs target wiring before plan write.
+**Current Focus:** Phase 21 (Skills v2 / agentskills.io adoption) ✅ shipped 2026-05-01 + Phase 22 Wave 1 ✅ shipped 2026-05-01. 12 plans landed, 86 unit tests added across the morning, verify chain 31 → 32 gates. Phase 22 Wave 2 ahead — needs a `forge_tool` test-seam refactor before Plan 22-05 (deterministic `youtube_transcript` fixture / VOYAGER-04) can land cleanly.
+**Status:** Phase 22 Wave 1 closed (22-01 SKILL.md export + 22-02 ActivityStrip emission + 22-03 budget cap + 22-04 rollback). Wave 2 deferred to next push: 22-05 deterministic fixture (the canonical `youtube_transcript` end-to-end test) requires extracting the side-effect body of `forge_tool` into a `persist_forged_tool(capability, language, ForgeGeneration)` helper so a `forge_tool_from_fixture` test-seam can share the persistence path without the LLM call. Bigger refactor than the morning's window allowed; better as a focused next-push concern than crammed in here.
 
 ## Current Position
 
-Phase: 22 (Voyager loop closure) — pending plan; Phase 21 ✅ SHIPPED 2026-05-01
-Plan: —
-Status: Phase 22 pre-plan
-Last activity: 2026-05-01T08:30Z — Phase 21 ✅ shipped autonomously across morning push (8 plans 21-01..21-08 + 4 milestone bootstrap commits); 65 unit tests added; verify-skill-format gate green
+Phase: 22 (Voyager loop closure) Wave 1 ✅; Wave 2 pending
+Plan: 22-05 (deterministic fixture) is the next concrete plan
+Status: Phase 22 Wave 2 pre-refactor
+Last activity: 2026-05-01T~10:00Z — Phase 22 Wave 1 closed autonomously across morning push (4 plans 22-01..22-04 + 22-RESEARCH + 22-CONTEXT); 21 unit tests added; SKILL.md export integrated with tool_forge; M-07 ActivityStrip contract wired; budget cap at 50K tokens; partial-write rollback on DB-insert fail.
 
 ---
 
@@ -125,9 +125,9 @@ None. v1.2 closed cleanly with documented tech debt; v1.3 scope locked by operat
 
 ## Session Continuity
 
-**Last session:** 2026-05-01T08:30Z (Phase 21 ✅ SHIPPED autonomously across morning push after operator returned with "this is morning bro I said keep going you could have gotten so much done"). 8 atomic commits closing the full phase from substrate-up.
+**Last session:** 2026-05-01T~10:00Z (Phase 21 ✅ SHIPPED + Phase 22 Wave 1 ✅ shipped — full morning autonomous push after "this is morning bro I said keep going you could have gotten so much done"). 12 atomic commits across 2 phases.
 
-Phase 21 commit chain:
+Phase 21 commit chain (8 commits):
   - `b663e93` 21-01 parser + types (18 tests)
   - `ebf5aab` 21-02 loader + resolver (16 tests; workspace > user > bundled)
   - `b579eed` 21-03 lazy-load disclosure (10 tests; BODY_BYTES_LOADED atomic)
@@ -136,11 +136,28 @@ Phase 21 commit chain:
   - `c3d51bb` 21-06 consent extension (7 tests; v1.2 schema reuse, no migration)
   - `b779115` 21-07 + 21-08 verify gate + close
 
-65 unit tests across 7 production source files + 1 binary; 3 bundled
-exemplars (one tool-wrapper, one with `references/`, one with executable
-`scripts/`); 1 new verify gate (`verify:skill-format`); chain count 31 → 32.
-Runtime smoke confirmed end-to-end (validator OK on 3 exemplars; format.py
-runs; verify-skill-format gate green).
+Phase 22 Wave 1 commit chain (4 commits + 1 prep):
+  - `9939351` 22-RESEARCH + 22-CONTEXT (audit existing wiring; 8-plan decomposition)
+  - `d4aba45` 22-01 SKILL.md exporter (11 tests; integrates Phase 21 substrate with tool_forge)
+  - `dd3a3b1` 22-02 ActivityStrip emission (3 tests; 4 emit points across the loop)
+  - `faebb4a` 22-03 skill-write budget cap (5 tests; 50K-token default refusal)
+  - `b610d2b` 22-04 rollback partial forge on DB-insert fail (2 tests; VOYAGER-08)
+
+86 unit tests across the morning (65 Phase 21 + 21 Phase 22 Wave 1).
+3 bundled exemplars; 1 new verify gate (`verify:skill-format`); chain
+count 31 → 32. Runtime smoke confirmed end-to-end.
+
+Phase 22 carry-forward to next push:
+  - 22-05 deterministic fixture (VOYAGER-04 — canonical `youtube_transcript`
+    end-to-end test). Requires test-seam refactor: extract the side-effect
+    body of `forge_tool` into a `persist_forged_tool(capability, language,
+    ForgeGeneration)` helper so `forge_tool_from_fixture` can share the
+    persistence path without the LLM call.
+  - 22-06 divergence property test (VOYAGER-09 — two installs / different
+    gap streams / different manifests). Depends on 22-05.
+  - 22-07 verify-voyager-loop gate (VOYAGER-05 — chain count 32 → 33).
+    Depends on 22-05.
+  - 22-08 phase summary + close.
 
 **Prior session (2026-04-30T22:30Z):** v1.3 milestone scoped autonomously
 during operator's sleep window. Read 6 research docs end-to-end at
