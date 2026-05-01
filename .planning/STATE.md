@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Phases
 status: executing
-last_updated: "2026-05-01T13:52:59.093Z"
+last_updated: "2026-05-01T14:16:15.019Z"
 last_activity: 2026-05-01
 progress:
   total_phases: 14
   completed_phases: 10
   total_plans: 73
-  completed_plans: 72
-  percent: 99
+  completed_plans: 73
+  percent: 100
 ---
 
 # STATE — BLADE (v1.3 in progress; Phases 21 + 22 ✅ shipped)
@@ -20,14 +20,23 @@ progress:
 **Last shipped milestone:** v1.2 — Acting Layer with Brain Foundation (closed 2026-04-30 as `tech_debt`; chat-first pivot recorded mid-milestone)
 **Prior shipped:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27 as `tech_debt`); v1.0 — Skin Rebuild substrate (closed 2026-04-19)
 **Current Focus:** Phase 23 — verifiable-reward-ood-eval
-**Status:** Executing Phase 23 — Plan 05 ✅ shipped (capability_gap_stress_eval.rs at 8ca8e62; 17 missing-tool fixtures + 2-bucket Voyager-loop stress classifier; REWARD-05 satisfied — all 3 OOD modules now authored)
+**Status:** Ready to execute
 
 ## Current Position
 
 Phase: 23 (verifiable-reward-ood-eval) — EXECUTING
-Plan: 6 of 9 (Wave 2 — OOD eval modules + verify-eval bump)
-Status: Plan 05 complete; ready to execute Plan 06 (lockstep mod registration of all 3 OOD modules in evals/mod.rs)
-Last activity: 2026-05-01 — Phase 23 Plan 05 complete (8ca8e62; capability_gap_stress_eval.rs 389 LOC with 17 missing-tool fixtures across 4 sub-categories + 2 Hallucinated buffer; floor=0.75, simulated pass-rate=1.000; voy_youtube_transcript fixture mirrors VOYAGER-04 canonical Phase 22-05 fixture)
+Plan: 7 of 9 (Wave 2 — OOD eval modules + verify-eval bump)
+Status: Ready to execute
+Last activity: 2026-05-01
+
+### Phase 23 Plan 06 Decisions
+
+- 3 OOD eval modules registered in `src-tauri/src/evals/mod.rs` in lockstep — appended after `#[cfg(test)] mod capability_gap_eval;` in MODULE_FLOOR-descending order (adversarial 0.85, ambiguous_intent 0.80, capability_gap_stress 0.75) per PATTERNS.md ordering rule (most-stable first). Pattern matches existing eval registrations exactly: `#[cfg(test)] mod <name>_eval;` (no `pub` qualifier; only `harness` is `pub`).
+- All 3 modules pass their floors at 100% top-1 / 100% top-3 / MRR=1.000 on first invocation — well above the 0.85/0.80/0.75 floors. `tests/evals/history.jsonl` gained `floor_passed:true` rows for each.
+- `cargo test --lib evals` now exercises 8 modules and emits 8 `┌──` EVAL-06 box-drawing tables (verified via `grep -c '┌──' = 8`). Total tests reported: 12 (some modules have multiple `#[test]`s).
+- `verify-eval.sh EXPECTED=5` deliberately NOT bumped here — Plan 23-09 owns the bump per PATTERNS.md §"MOD" §Gotchas. Currently `bash scripts/verify-eval.sh` reports `8/5 scored tables emitted, all floors green` (exit 0) because the script uses `-lt` (at-least), not equality. The bump to 8 in Plan 23-09 will tighten the floor.
+- `cargo build --lib` (production, non-test) finishes cleanly — `#[cfg(test)]` gate enforced by Rust compiler; OOD modules absent from non-test artifact (T-23-06-01 mitigation verified).
+- Initial `cargo test` build took 7m 09s (incremental compile after Plans 23-03/04/05 source additions); subsequent invocations <6s. `cargo build --lib` took 11m 07s on a separate target (test vs dev profiles diverge).
 
 ### Phase 23 Plan 05 Decisions
 
@@ -166,7 +175,7 @@ None. v1.2 closed cleanly with documented tech debt; v1.3 scope locked by operat
 
 ## Session Continuity
 
-**Last session:** 2026-05-01T13:52:59.079Z
+**Last session:** 2026-05-01T14:16:15.001Z
 
 Phase 21 commit chain (8 commits):
 
