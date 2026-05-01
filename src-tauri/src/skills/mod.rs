@@ -33,10 +33,14 @@
 
 #![allow(dead_code, unused_imports)] // Wave 1 lands substrate; Wave 2/3 wires consumers.
 
+pub mod loader;
 pub mod parser;
+pub mod resolver;
 pub mod types;
 
+pub use loader::{bundled_root, scan_tier, user_root, workspace_root};
 pub use parser::parse_skill;
+pub use resolver::Catalog;
 pub use types::{Skill, SkillBody, SkillFrontmatter, SkillStub, SourceTier};
 
 #[cfg(test)]
