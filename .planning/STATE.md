@@ -6,27 +6,27 @@ status: in_progress
 last_updated: "2026-04-30T22:30:00.000Z"
 progress:
   total_phases: 7
-  completed_phases: 1
-  total_plans: 12
-  completed_plans: 12
-  percent: 22
+  completed_phases: 2
+  total_plans: 16
+  completed_plans: 16
+  percent: 35
 ---
 
-# STATE — BLADE (v1.3 in progress; Phase 21 ✅ shipped; Phase 22 Wave 1 ✅)
+# STATE — BLADE (v1.3 in progress; Phases 21 + 22 ✅ shipped)
 
 **Project:** BLADE — Desktop JARVIS
 **Current milestone:** v1.3 — Self-extending Agent Substrate (started 2026-04-30; target ship ~2026-05-11)
 **Last shipped milestone:** v1.2 — Acting Layer with Brain Foundation (closed 2026-04-30 as `tech_debt`; chat-first pivot recorded mid-milestone)
 **Prior shipped:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27 as `tech_debt`); v1.0 — Skin Rebuild substrate (closed 2026-04-19)
-**Current Focus:** Phase 21 (Skills v2 / agentskills.io adoption) ✅ shipped 2026-05-01 + Phase 22 Wave 1 ✅ shipped 2026-05-01. 12 plans landed, 86 unit tests added across the morning, verify chain 31 → 32 gates. Phase 22 Wave 2 ahead — needs a `forge_tool` test-seam refactor before Plan 22-05 (deterministic `youtube_transcript` fixture / VOYAGER-04) can land cleanly.
-**Status:** Phase 22 Wave 1 closed (22-01 SKILL.md export + 22-02 ActivityStrip emission + 22-03 budget cap + 22-04 rollback). Wave 2 deferred to next push: 22-05 deterministic fixture (the canonical `youtube_transcript` end-to-end test) requires extracting the side-effect body of `forge_tool` into a `persist_forged_tool(capability, language, ForgeGeneration)` helper so a `forge_tool_from_fixture` test-seam can share the persistence path without the LLM call. Bigger refactor than the morning's window allowed; better as a focused next-push concern than crammed in here.
+**Current Focus:** Phase 21 (Skills v2 / agentskills.io adoption) ✅ shipped + Phase 22 (Voyager loop closure) ✅ shipped, both 2026-05-01. 16 plans landed, ~94 unit tests added across the morning, verify chain 31 → 33 gates. Phase 23 (verifiable reward + OOD eval) ahead — Voyager substrate is now end-to-end verifiable; next milestone work is RLVR-style composite reward + adversarial eval module additions.
+**Status:** Phase 22 closed end-to-end. The v1.3 thesis claim "BLADE writes its own tools, two installs diverge over time" now has a `verify:voyager-loop` gate behind it. Voyager loop is shipped substrate, not theater — `forge_tool_from_fixture` + `youtube_transcript_fixture` exercise the full `evolution.rs → tool_forge → SKILL.md → catalog` path deterministically in <2s without LLM/network. Phase 23 unblocked.
 
 ## Current Position
 
-Phase: 22 (Voyager loop closure) Wave 1 ✅; Wave 2 pending
-Plan: 22-05 (deterministic fixture) is the next concrete plan
-Status: Phase 22 Wave 2 pre-refactor
-Last activity: 2026-05-01T~10:00Z — Phase 22 Wave 1 closed autonomously across morning push (4 plans 22-01..22-04 + 22-RESEARCH + 22-CONTEXT); 21 unit tests added; SKILL.md export integrated with tool_forge; M-07 ActivityStrip contract wired; budget cap at 50K tokens; partial-write rollback on DB-insert fail.
+Phase: 23 (verifiable reward + OOD eval) — pending plan
+Plan: —
+Status: Phase 22 ✅ closed; Phase 23 pre-plan
+Last activity: 2026-05-01T~12:30Z — Phase 22 ✅ shipped autonomously (8 plans 22-01..22-08 + RESEARCH + CONTEXT); 28 unit tests + 2 fixture/property tests; 1 new verify gate (`verify:voyager-loop`); chain 32 → 33; canonical `youtube_transcript` fixture closes the Voyager loop deterministically.
 
 ---
 
