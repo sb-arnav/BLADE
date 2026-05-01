@@ -37,6 +37,7 @@ pub enum SignalClass {
     TentacleHealth,
     ConfigDrift,
     AutoUpdate,
+    RewardTrend,  // Phase 23 / REWARD-04 — D-23-04 LOCKED
 }
 
 /// Severity tiers (D-04). Wire form is `lowercase` so the UI's
@@ -129,6 +130,14 @@ pub(crate) fn suggested_fix(class: SignalClass, severity: Severity) -> &'static 
             "tauri-plugin-updater is not fully wired. Confirm src-tauri/Cargo.toml lists the dep AND src-tauri/src/lib.rs initializes via tauri_plugin_updater::Builder::new().build().",
         (SignalClass::AutoUpdate, Severity::Red) =>
             "(Reserved — Auto-Update has no Red tier per D-09; if this string ever renders it indicates a bug in doctor.rs severity classification.)",
+
+        // Reward Trend — Phase 23 D-23-04 (verbatim — invokes D-18 lock)
+        (SignalClass::RewardTrend, Severity::Green) =>
+            "Reward trend is steady. Last 7 days of per-turn composite reward computed from tests/evals/reward_history.jsonl.",
+        (SignalClass::RewardTrend, Severity::Amber) =>
+            "Composite reward dropped 10% or more from the prior 7-day rolling mean. Open the payload to see which component (skill_success / eval_gate / acceptance / completion) is regressing and inspect tests/evals/reward_history.jsonl for the inflection point.",
+        (SignalClass::RewardTrend, Severity::Red) =>
+            "Composite reward dropped 20% or more from the prior 7-day rolling mean. This indicates either a Voyager skill regression, an eval-gate breach, or sustained completion penalties. Run bash scripts/verify-eval.sh and check Doctor's EvalScores signal first; if eval_gate is green, inspect skill_success and completion components in tests/evals/reward_history.jsonl.",
     }
 }
 
@@ -734,6 +743,7 @@ fn emit_activity_for_doctor(app: &AppHandle, signal: &DoctorSignal) {
         SignalClass::TentacleHealth  => "TentacleHealth",
         SignalClass::ConfigDrift     => "ConfigDrift",
         SignalClass::AutoUpdate      => "AutoUpdate",
+        SignalClass::RewardTrend     => "RewardTrend",
     };
     let severity_str = match signal.severity {
         Severity::Green => "Green",
@@ -881,13 +891,15 @@ mod tests {
 
     #[test]
     fn suggested_fix_table_is_exhaustive() {
-        // All 15 (class × severity) pairs return a non-empty string.
+        // All 18 (class × severity) pairs return a non-empty string.
+        // Phase 23 D-23-04 added RewardTrend (3 arms): 5×3 + 3 = 18.
         for class in [
             SignalClass::EvalScores,
             SignalClass::CapabilityGaps,
             SignalClass::TentacleHealth,
             SignalClass::ConfigDrift,
             SignalClass::AutoUpdate,
+            SignalClass::RewardTrend,
         ] {
             for severity in [Severity::Green, Severity::Amber, Severity::Red] {
                 let s = suggested_fix(class, severity);
@@ -1215,6 +1227,13 @@ mod tests {
         // Red Auto-Update is "shouldn't happen" per D-09 — sentinel string.
         assert!(
             suggested_fix(SignalClass::AutoUpdate, Severity::Red).contains("(Reserved")
+        );
+
+        // Phase 23 D-23-04 — RewardTrend verbatim lock (REWARD-04 / REWARD-07).
+        // The (RewardTrend, Red) string is the canonical drift sentinel.
+        assert_eq!(
+            suggested_fix(SignalClass::RewardTrend, Severity::Red),
+            "Composite reward dropped 20% or more from the prior 7-day rolling mean. This indicates either a Voyager skill regression, an eval-gate breach, or sustained completion penalties. Run bash scripts/verify-eval.sh and check Doctor's EvalScores signal first; if eval_gate is green, inspect skill_success and completion components in tests/evals/reward_history.jsonl."
         );
     }
 
