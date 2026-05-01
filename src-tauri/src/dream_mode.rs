@@ -28,6 +28,14 @@ pub fn is_dreaming() -> bool {
     DREAMING.load(Ordering::Relaxed)
 }
 
+/// Phase 24 (v1.3) — read the last-activity timestamp without exposing the
+/// `LAST_ACTIVITY` AtomicI64 itself. Used by `proactive_engine` to apply
+/// the 30s idle gate before draining `~/.blade/skills/.pending/` chat-injected
+/// prompts (24-RESEARCH §"Common Pitfalls" Pitfall 6).
+pub fn last_activity_ts() -> i64 {
+    LAST_ACTIVITY.load(Ordering::Relaxed)
+}
+
 // ── Structs ───────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -533,4 +541,19 @@ pub async fn dream_trigger_now(app: tauri::AppHandle) -> Result<DreamSession, St
 #[tauri::command]
 pub fn dream_record_activity() {
     record_user_activity();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn last_activity_ts_reads_static() {
+        // record_user_activity writes now to LAST_ACTIVITY.
+        record_user_activity();
+        let ts = last_activity_ts();
+        let now = chrono::Utc::now().timestamp();
+        // Allow <=2s skew for the SystemTime + atomic-store path.
+        assert!((now - ts).abs() <= 2, "expected ts within 2s of now; got {} vs {}", ts, now);
+    }
 }
