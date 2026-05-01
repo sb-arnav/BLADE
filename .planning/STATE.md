@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Phases
-status: Phase 23 ✅ shipped; Phase 24 next
-last_updated: "2026-05-01T17:37:09.456Z"
-last_activity: 2026-05-01 — Phase 23 closed end-to-end. Plan 23-09 landed verify-eval.sh `EXPECTED=8` bump + REQUIREMENTS.md REWARD-01..07 traceability flips + STATE.md close + 23-PHASE-CLOSE.md milestone-style artifact.
+status: executing
+last_updated: "2026-05-01T18:33:49.031Z"
+last_activity: 2026-05-01
 progress:
   total_phases: 15
   completed_phases: 11
   total_plans: 80
-  completed_plans: 76
-  percent: 95
+  completed_plans: 77
+  percent: 96
 ---
 
 # STATE — BLADE (v1.3 in progress; Phases 21 + 22 + 23 ✅ shipped)
@@ -19,15 +19,31 @@ progress:
 **Current milestone:** v1.3 — Self-extending Agent Substrate (started 2026-04-30; target ship ~2026-05-11; Phases 21 + 22 + 23 ✅ shipped)
 **Last shipped milestone:** v1.2 — Acting Layer with Brain Foundation (closed 2026-04-30 as `tech_debt`; chat-first pivot recorded mid-milestone)
 **Prior shipped:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27 as `tech_debt`); v1.0 — Skin Rebuild substrate (closed 2026-04-19)
-**Current Focus:** Phase 24 — dream_mode skill consolidation (pending context gather)
-**Status:** Phase 23 ✅ shipped; Phase 24 next
+**Current Focus:** Phase 24 — skill-consolidation-dream-mode
+**Status:** Ready to execute
 
 ## Current Position
 
-Phase: 24 (dream_mode skill consolidation) — pending context
-Plan: —
-Status: Phase 23 ✅ shipped (verify chain stays at 33; OOD gate operational; Doctor pane carries 6th RewardTrend row). RLVR-style composite reward shipped at agent layer per M-10 + open-questions-answered Q1. ~52 unit/integration tests added across 9 plans. verify:eval `EXPECTED=5→8` (gate extended; chain count unchanged at 33). DoctorPane row UAT-deferred per chat-first pivot (substrate-only landing).
-Last activity: 2026-05-01 — Phase 23 closed end-to-end. Plan 23-09 landed verify-eval.sh `EXPECTED=8` bump + REQUIREMENTS.md REWARD-01..07 traceability flips + STATE.md close + 23-PHASE-CLOSE.md milestone-style artifact.
+Phase: 24 (skill-consolidation-dream-mode) — EXECUTING
+Plan: 2 of 7
+Status: Ready to execute
+Last activity: 2026-05-01
+
+### Phase 24 Plan 01 Decisions
+
+- Plan 24-01 ships Wave 1 plumbing (DREAM-01 + DREAM-02 + DREAM-03 substrate) in 2 atomic commits: `227d035` (Task 1: tool_forge.rs ensure_table backfill UPDATE — Phase 24 D-24-A — + ensure_invocations_table helper + persist_forged_tool INSERT writes last_used = now via ?10 binding + ForgedTool struct literal `last_used: Some(now)` + record_tool_use(name, &[String]) extended signature wrapping UPDATE + INSERT + DELETE auto-prune in one transaction + new compute_trace_hash function (DefaultHasher; 16 hex chars; sha2-free per 24-RESEARCH A1) + 4 new unit tests in tool_forge::tests) + `386312a` (Task 2: db.rs run_migrations execute_batch literal extended with `CREATE TABLE turn_traces` + `CREATE INDEX idx_tt_ts` + commands.rs dispatch loop hook calling tool_forge::record_tool_use when tool_call.name matches a forged_tools row — the load-bearing Pitfall 2 fix; record_tool_use was unwired pre-Phase-24 — + commands.rs reward hook turn_traces row write before turn_acc moves into compute_and_persist_turn_reward + 1 migration test).
+- Pitfall 1 mitigation verified: `grep -c "last_used: None" src-tauri/src/tool_forge.rs` returns 0 (was 1 pre-plan). Pitfall 2 mitigation verified: `grep -c "tool_forge::record_tool_use" src-tauri/src/commands.rs` returns exactly 1 (single canonical write site per CONTEXT.md "Specific Ideas" lock). Pitfall 3 mitigation verified by code: record_tool_use body wraps UPDATE + INSERT + DELETE in `conn.transaction()` so concurrent readers can't see half-applied state. D-24-A backfill UPDATE landed inside ensure_table execute_batch (idempotent on second launch; second call is no-op since no NULL rows remain).
+- compute_trace_hash uses `std::collections::hash_map::DefaultHasher` per 24-RESEARCH A1 (sha2 not in Cargo.toml — confirmed by grep at plan-time). Output is `format!("{:016x}", hasher.finish())` → 16 lowercase hex chars. Order-sensitive over comma-joined tool-name sequence (`["a","b","c"]` ≠ `["c","b","a"]`). Birthday-paradox collision risk over expected n=100 invocations per tool is negligible per 24-RESEARCH A4. Empty slice produces a stable 16-hex hash (regression-locked in test 2 of 4).
+- forged_tools_invocations auto-prune: `DELETE WHERE id NOT IN (SELECT id ... ORDER BY id DESC LIMIT 100)` inside same transaction as UPDATE + INSERT. Index `idx_fti_tool_id ON forged_tools_invocations(tool_name, id DESC)` keeps the sub-query O(log n). Worst case at 1000 forged tools × 100 invocations ≈ 8MB SQLite file (T-24-01-03 disposition).
+- commands.rs dispatch-loop hook fires only when `forged_names.contains(&tool_call.name)` — set is built from the existing forged_tools table the operator already owns; non-forged tools (native, MCP) are no-ops here and continue uninstrumented (T-24-01-06 disposition). Hook runs AFTER `record_tool_call` (so `snapshot_calls()` returns the position-correct sequence including the just-dispatched tool) and BEFORE `conversation.push` (which moves tool_call.name).
+- commands.rs reward-hook turn_traces write (line 1831-area) uses canonical `rusqlite::Connection::open(blade_config_dir/blade.db)` seam — same opener used 4 other times in commands.rs (lines 1679, 1711, 1803, 2783). No second DB-open pathway introduced. Best-effort write per T-24-01-05 — `if let Ok(conn) = ...` swallows DB unavailability so the reward hook still runs (forensic trail is best-effort by design; canonical reward jsonl owns the audit trail).
+- Migration test posture decision: `db::tests::run_migrations_creates_turn_traces` uses existing in-memory `test_db()` helper (`Connection::open_in_memory + run_migrations`) rather than `init_db + BLADE_CONFIG_DIR` env override — same migration body exercised, no env-state leakage to other tests, no parallel-test races against BLADE_CONFIG_DIR. Plan's <action> step 4 explicitly accommodated this fallback ("If `init_db` is not the public seam ... use whatever public function returns a connection AFTER running migrations").
+- 4 new tool_forge tests (ensure_table_backfills_null_last_used, trace_hash_order_sensitive, record_tool_use_writes_invocation_row, register_forged_tool_sets_last_used_to_created_at) share the existing module-level `ENV_LOCK: std::sync::Mutex<()>` with the Phase 22 voyager_two_installs_diverge + voyager_end_to_end tests. BLADE_CONFIG_DIR is process-global; without this lock, parallel tests would race the override. Same posture as Phase 22 substrate.
+- `#[allow(dead_code)]` count in tool_forge.rs decreased by exactly 1 (3→2): file-level (line 10, kept) + forge_if_needed (kept) + record_tool_use (removed because Task 2 wired it into commands.rs dispatch loop). Acceptance criteria met.
+- Side-benefit warning auto-clear: pre-Plan-24-01 `is_error` field on ToolCallTrace was tagged dead-code; the new commands.rs reward-hook turn_traces write reads `t.is_error` to compute the success flag, so the warning auto-cleared. Only `timestamp_ms` warning remains (pre-existing, untouched by this plan).
+- Pre-existing test failure carry-forward: `db::tests::test_analytics` fails on bare master too (verified via `git stash + cargo test --lib db::tests::test_analytics`; asserts `event_type == "message_sent"` receives `"app_open"`). Out of scope per executor scope-boundary rule (not caused by Phase 24 changes — analytics test code unrelated to turn_traces / forged_tools_invocations / record_tool_use). Logged in 24-01-SUMMARY.md Issues Encountered.
+- Wave 2 unblocked: DREAM-02 consolidation pass (Plan 24-02) can now read trace_hash rows from forged_tools_invocations; DREAM-03 skill-from-trace generator (Plan 24-04) can now read tool_names sequences from turn_traces; DREAM-01 prune pass (Plan 24-03) can now safely query `now() - last_used >= 91*86400` knowing all rows have a non-NULL last_used (D-24-A backfill applied at first launch post-merge).
+- 5 new tests green via `cargo test --lib tool_forge::tests:: db::tests::run_migrations_creates_turn_traces -- --test-threads=1`. All 13 tool_forge tests pass (8 pre-existing + 4 new + 1 unchanged). `cargo check --lib` clean (only pre-existing reward.rs:236 timestamp_ms warning).
 
 ### Phase 23 Plan 09 Decisions
 
