@@ -144,9 +144,29 @@ fn ensure_table(conn: &rusqlite::Connection) -> Result<(), String> {
             last_used INTEGER,
             use_count INTEGER DEFAULT 0,
             forged_from TEXT DEFAULT ''
-        );",
+        );
+        -- Phase 24 (v1.3) D-24-A -- backfill NULL last_used to created_at
+        -- so 91-day prune clock starts at write time uniformly. Idempotent:
+        -- second launch is a no-op since no NULL rows remain.
+        UPDATE forged_tools SET last_used = created_at WHERE last_used IS NULL;",
     )
     .map_err(|e| format!("DB schema error: {}", e))
+}
+
+/// Phase 24 (v1.3) D-24-B / DREAM-02 -- sibling table that records every
+/// forged-tool invocation's order-sensitive trace_hash. Auto-pruned to last
+/// 100 rows per tool inside `record_tool_use`.
+fn ensure_invocations_table(conn: &rusqlite::Connection) -> Result<(), String> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS forged_tools_invocations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tool_name TEXT NOT NULL,
+            ts INTEGER NOT NULL,
+            trace_hash TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_fti_tool_id ON forged_tools_invocations(tool_name, id DESC);",
+    )
+    .map_err(|e| format!("DB schema error (invocations): {}", e))
 }
 
 /// Convert a capability string to a snake_case tool name: first 4 words, lowercased.
@@ -464,7 +484,7 @@ pub async fn persist_forged_tool(
     if let Err(e) = conn.execute(
         "INSERT INTO forged_tools \
          (id, name, description, language, script_path, usage, parameters, test_output, created_at, last_used, use_count, forged_from) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, NULL, 0, ?10)",
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 0, ?11)",
         params![
             id,
             name,
@@ -475,6 +495,7 @@ pub async fn persist_forged_tool(
             params_json,
             test_output,
             now,
+            now,        // Phase 24 D-24-A: last_used = created_at at write time
             capability,
         ],
     ) {
@@ -497,7 +518,7 @@ pub async fn persist_forged_tool(
         parameters: gen.parameters,
         test_output,
         created_at: now,
-        last_used: None,
+        last_used: Some(now),
         use_count: 0,
         forged_from: capability.to_string(),
     };
@@ -684,27 +705,70 @@ pub async fn forge_if_needed(user_request: &str, error_message: &str) -> Option<
     forge_tool(&decision).await.ok()
 }
 
-/// Increment `use_count` and set `last_used` timestamp for the named tool.
+/// Increment `use_count`, set `last_used`, append a per-invocation row to
+/// `forged_tools_invocations` (capped at last 100 per tool), and emit the
+/// Voyager loop step 4 of 4 (`skill_used`) to ActivityStrip.
 ///
-/// Phase 22 (v1.3) — also emits the Voyager loop step 4 of 4 (`skill_used`)
-/// to ActivityStrip per the M-07 contract. Currently called by zero
-/// internal sites; tracked as a forward-pointer for the chat tool-loop
-/// branch to call when a forged tool is actually invoked.
-#[allow(dead_code)]
-pub fn record_tool_use(name: &str) {
-    let conn = match open_db() {
+/// Phase 24 (v1.3) D-24-B / DREAM-02:
+/// - `turn_tool_names` is the order-correct sequence of tool calls in the
+///   chat turn that triggered this invocation (INCLUDING the forged tool
+///   itself, in position-correct order). The trace_hash derived from this
+///   slice is what the consolidation pass compares pairwise.
+/// - Backward-compat: callers without trace data pass `&[]`; the resulting
+///   trace_hash is the hash of the empty string (stable, won't collide
+///   with real sequences but won't aid consolidate either).
+pub fn record_tool_use(name: &str, turn_tool_names: &[String]) {
+    let mut conn = match open_db() {
         Ok(c) => c,
         Err(_) => return,
     };
     ensure_table(&conn).ok();
+    ensure_invocations_table(&conn).ok();
+
     let now = chrono::Utc::now().timestamp();
-    conn.execute(
+    let trace_hash = compute_trace_hash(turn_tool_names);
+
+    // Pitfall 3 -- wrap UPDATE + INSERT + DELETE in one transaction so a
+    // concurrent reader can't see a half-applied state.
+    let tx = match conn.transaction() {
+        Ok(t) => t,
+        Err(_) => return,
+    };
+
+    let _ = tx.execute(
         "UPDATE forged_tools SET use_count = use_count + 1, last_used = ?1 WHERE name = ?2",
         params![now, name],
-    )
-    .ok();
+    );
+    let _ = tx.execute(
+        "INSERT INTO forged_tools_invocations (tool_name, ts, trace_hash) VALUES (?1, ?2, ?3)",
+        params![name, now, trace_hash],
+    );
+    // Auto-prune to last 100 per tool.
+    let _ = tx.execute(
+        "DELETE FROM forged_tools_invocations \
+         WHERE tool_name = ?1 \
+           AND id NOT IN (SELECT id FROM forged_tools_invocations \
+                          WHERE tool_name = ?1 ORDER BY id DESC LIMIT 100)",
+        params![name],
+    );
+
+    let _ = tx.commit();
 
     crate::voyager_log::skill_used(name);
+}
+
+/// Phase 24 (v1.3) -- order-sensitive hash over a comma-joined tool-name
+/// sequence. Uses `std::collections::hash_map::DefaultHasher` (no new dep
+/// needed; sha2 not in Cargo.toml per 24-RESEARCH A1). Output: 16 hex chars
+/// (u64 in lowercase hex). Birthday-paradox collision risk over expected
+/// n=100 invocations per tool is negligible (24-RESEARCH A4).
+fn compute_trace_hash(tool_names: &[String]) -> String {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let joined = tool_names.join(",");
+    let mut hasher = DefaultHasher::new();
+    joined.hash(&mut hasher);
+    format!("{:016x}", hasher.finish())
 }
 
 // ── Tauri commands ────────────────────────────────────────────────────────────
@@ -1053,5 +1117,140 @@ mod tests {
             .iter()
             .map(|s| s.frontmatter.name.clone())
             .collect()
+    }
+
+    // -------------------------------------------------------------------
+    // Phase 24 Plan 24-01 unit tests
+    //
+    // These exercise the D-24-A backfill, D-24-B trace-hash + invocations
+    // table, and the `last_used = Some(now)` write-time invariant. They
+    // share the module-level ENV_LOCK with the Phase 22 voyager_*_diverge
+    // tests because BLADE_CONFIG_DIR is process-global and parallel tests
+    // would race the override. Tempdir-isolated DB; no LLM call; no network.
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn ensure_table_backfills_null_last_used() {
+        let _g = ENV_LOCK.lock().unwrap();
+        let tmp = tempfile::TempDir::new().expect("tempdir");
+        std::env::set_var("BLADE_CONFIG_DIR", tmp.path());
+
+        let conn = open_db().expect("open db");
+        ensure_table(&conn).expect("ensure_table");
+        // Manually insert a row with last_used = NULL to simulate pre-Phase-24 data.
+        conn.execute(
+            "INSERT INTO forged_tools (id, name, description, language, script_path, usage, parameters, test_output, created_at, last_used, use_count, forged_from) \
+             VALUES ('id1','legacy','d','bash','/tmp/x.sh','u','[]','',1234567890, NULL, 0, '')",
+            [],
+        ).unwrap();
+        // Re-run ensure_table: backfill UPDATE fires.
+        ensure_table(&conn).expect("ensure_table 2");
+        let last_used: Option<i64> = conn.query_row(
+            "SELECT last_used FROM forged_tools WHERE name = 'legacy'",
+            [],
+            |r| r.get(0),
+        ).unwrap();
+        assert_eq!(last_used, Some(1234567890));
+        // Idempotent -- third call is no-op.
+        ensure_table(&conn).expect("ensure_table 3");
+        let last_used2: Option<i64> = conn.query_row(
+            "SELECT last_used FROM forged_tools WHERE name = 'legacy'",
+            [],
+            |r| r.get(0),
+        ).unwrap();
+        assert_eq!(last_used2, Some(1234567890));
+        std::env::remove_var("BLADE_CONFIG_DIR");
+    }
+
+    #[test]
+    fn trace_hash_order_sensitive() {
+        let h1 = compute_trace_hash(&["a".into(), "b".into(), "c".into()]);
+        let h2 = compute_trace_hash(&["c".into(), "b".into(), "a".into()]);
+        let h3 = compute_trace_hash(&["a".into(), "b".into(), "c".into()]);
+        let h_empty = compute_trace_hash(&[]);
+        assert_ne!(h1, h2, "different orderings must hash differently");
+        assert_eq!(h1, h3, "same input must hash deterministically");
+        assert_eq!(h_empty.len(), 16, "16 hex chars expected");
+        // Empty slice produces a stable hash -- record it for regression.
+        assert_eq!(h_empty, compute_trace_hash(&[]));
+    }
+
+    #[test]
+    fn record_tool_use_writes_invocation_row() {
+        let _g = ENV_LOCK.lock().unwrap();
+        let tmp = tempfile::TempDir::new().expect("tempdir");
+        std::env::set_var("BLADE_CONFIG_DIR", tmp.path());
+
+        let conn = open_db().expect("open db");
+        ensure_table(&conn).unwrap();
+        ensure_invocations_table(&conn).unwrap();
+        // Seed a forged_tools row directly (avoid LLM path).
+        let now = chrono::Utc::now().timestamp();
+        conn.execute(
+            "INSERT INTO forged_tools (id, name, description, language, script_path, usage, parameters, test_output, created_at, last_used, use_count, forged_from) \
+             VALUES ('id1','foo','d','bash','/tmp/foo.sh','u','[]','',?1,?1, 0, '')",
+            params![now],
+        ).unwrap();
+        drop(conn);
+
+        record_tool_use("foo", &["a".into(), "foo".into()]);
+        let conn = open_db().unwrap();
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM forged_tools_invocations WHERE tool_name = 'foo'",
+            [],
+            |r| r.get(0),
+        ).unwrap();
+        assert_eq!(count, 1);
+
+        let stored_hash: String = conn.query_row(
+            "SELECT trace_hash FROM forged_tools_invocations WHERE tool_name = 'foo'",
+            [],
+            |r| r.get(0),
+        ).unwrap();
+        assert_eq!(stored_hash, compute_trace_hash(&["a".into(), "foo".into()]));
+
+        // Cap test -- 105 calls -> at most 100 retained.
+        drop(conn);
+        for i in 0..104 {
+            record_tool_use("foo", &[format!("call_{}", i)]);
+        }
+        let conn = open_db().unwrap();
+        let count2: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM forged_tools_invocations WHERE tool_name = 'foo'",
+            [],
+            |r| r.get(0),
+        ).unwrap();
+        assert!(count2 <= 100, "expected <=100 rows after auto-prune, got {}", count2);
+        std::env::remove_var("BLADE_CONFIG_DIR");
+    }
+
+    #[tokio::test]
+    async fn register_forged_tool_sets_last_used_to_created_at() {
+        let _g = ENV_LOCK.lock().unwrap();
+        let tmp = tempfile::TempDir::new().expect("tempdir");
+        std::env::set_var("BLADE_CONFIG_DIR", tmp.path());
+
+        // Use forge_tool_from_fixture (no LLM call).
+        let _ = forge_tool_from_fixture(
+            "test capability",
+            "bash",
+            ForgeGeneration {
+                script_code: "#!/usr/bin/env bash\necho hi\n".to_string(),
+                description: "t".to_string(),
+                usage_template: "tool.py".to_string(),
+                parameters: vec![],
+            },
+        )
+        .await
+        .expect("forge_tool_from_fixture should succeed");
+
+        let conn = open_db().unwrap();
+        let row: (Option<i64>, i64) = conn.query_row(
+            "SELECT last_used, created_at FROM forged_tools LIMIT 1",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        ).unwrap();
+        assert_eq!(row.0, Some(row.1), "last_used must equal created_at at write time");
+        std::env::remove_var("BLADE_CONFIG_DIR");
     }
 }
