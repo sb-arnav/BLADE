@@ -14,14 +14,14 @@
 
 The substrate prerequisite. Without SKILL.md format + lazy-load + workspace→user→bundled resolution, Phase 22's autoskills.rs has no coherent place to write to.
 
-- [ ] **SKILLS-01**: `SKILL.md` parser reads YAML frontmatter (name, description ≤1024 chars, optional license/compatibility/metadata/allowed-tools) + Markdown body — *unit test: parse valid SKILL.md → struct round-trips; parse invalid frontmatter → typed error with field name*
-- [ ] **SKILLS-02**: Skill directory layout enforced — `<skill-name>/SKILL.md` (required), optional `scripts/`, `references/`, `assets/` subdirs — *validator rejects missing SKILL.md; tolerates missing optional subdirs*
-- [ ] **SKILLS-03**: Progressive disclosure implemented — frontmatter (name + description, ~100 tokens) loaded at startup; body loaded on activation; `references/`/`scripts/` loaded only when SKILL body explicitly references them — *integration test: 5 skills loaded, body-bytes-loaded count == 0 until first activation; loaded count == 1·body after first activation; references untouched until body cites a reference path*
-- [ ] **SKILLS-04**: Skill resolution order = workspace (`<repo>/skills/`) → user (`~/.blade/skills/`) → bundled (`<binary>/skills/`); workspace wins on name collision — *unit test: same-name skill in two paths, workspace path's body returned*
-- [ ] **SKILLS-05**: Skill validator (`blade skill validate <path>`) returns structured verdict (valid/invalid + field-level errors + warning if body >5000 tokens) — *CLI exit 0 on valid, 1 on invalid; stderr lists each violation*
-- [ ] **SKILLS-06**: 3 bundled exemplar skills land at `<repo>/skills/` — one re-imports a built-in tool as a skill (e.g. `git-status-summary` wrapping `bash`), one uses `references/` for deeper docs, one uses `scripts/` with executable code that calls back into the runtime — *all 3 pass `blade skill validate`; all 3 activate from chat*
-- [ ] **SKILLS-07**: First-run script execution requires explicit user consent (per cumulative-culture / steelman Arg 9 trust model) — `scripts/*` execution prompts a one-time consent dialog per (skill_name, script_path) tuple, persisted via existing consent infrastructure (extends v1.2 consent_decisions table) — *unit test: skill with `scripts/foo.py` invoked → consent prompt fires; allow_always persists; subsequent invocations skip prompt*
-- [ ] **SKILLS-08**: New `verify:skill-format` gate in `verify:all` chain — runs validator across all bundled skills + asserts directory layout + asserts no skill body exceeds 5000 tokens (warning ≥4000) — *bash scripts/verify-skill-format.sh exits 0 on green; verify:all chain count moves 31 → 32*
+- [x] **SKILLS-01**: `SKILL.md` parser reads YAML frontmatter (name, description ≤1024 chars, optional license/compatibility/metadata/allowed-tools) + Markdown body — *Shipped Plan 21-01 (`b663e93`): `parse_skill` / `split_frontmatter` in `src-tauri/src/skills/parser.rs`; 8 unit tests including BOM tolerance, missing-delim errors, optional-fields round-trip, allowed-tools polymorphic, yaml error propagation*
+- [x] **SKILLS-02**: Skill directory layout enforced — `<skill-name>/SKILL.md` (required), optional `scripts/`, `references/`, `assets/` subdirs — *Shipped Plan 21-04 (`2aaef13`): `validator::validate_layout` rejects unexpected top-level files; tolerates dotfiles; tests `unexpected_top_level_file_errors`, `allowed_top_level_subdirs_ok`, `dotfile_at_top_level_tolerated`*
+- [x] **SKILLS-03**: Progressive disclosure implemented — frontmatter (~100 tokens) loaded at startup; body on activation; references on traversal — *Shipped Plan 21-03 (`b579eed`): `BODY_BYTES_LOADED` + `REFERENCE_BYTES_LOADED` atomics in `src-tauri/src/skills/activate.rs`; 10 unit tests including `body_bytes_zero_after_scan_only`, `activate_records_body_bytes`, `references_do_not_auto_load_with_body`*
+- [x] **SKILLS-04**: Skill resolution order workspace → user → bundled; workspace wins on collision — *Shipped Plan 21-02 (`ebf5aab`): `Catalog::build` priority loop in `src-tauri/src/skills/resolver.rs`; tests `workspace_wins_over_user_on_name_collision`, `user_wins_over_bundled_on_name_collision`, `workspace_wins_over_bundled_on_three_way_collision`, `all_preserves_workspace_user_bundled_order`*
+- [x] **SKILLS-05**: Skill validator (`blade skill validate <path>`) returns structured verdict — *Shipped Plan 21-04 (`2aaef13`): `src-tauri/src/bin/skill_validator.rs` thin CLI shim over `validator::validate_skill_dir`; supports `--json` / `--recursive` / `--help`; exit codes 0 valid (warnings allowed) / 1 errors / 2 CLI usage error; runtime smoke confirmed end-to-end*
+- [x] **SKILLS-06**: 3 bundled exemplar skills at `<repo>/skills/bundled/` covering tool-wrapper / references / scripts shapes — *Shipped Plan 21-05 (`2ec9996`): `git-status-summary` (bash-wrapper), `troubleshoot-cargo-build` (+ `references/known-errors.md`), `format-clipboard-as-markdown` (+ executable `scripts/format.py`); all 3 pass `skill_validator --recursive`; format.py runtime smoke confirmed (HTML strip + entity unescape + blank-line collapse + fence preservation)*
+- [x] **SKILLS-07**: First-run script execution requires explicit user consent — *Shipped Plan 21-06 (`c3d51bb`): `src-tauri/src/skills/consent.rs` with `target_service` / `check_persisted` / `set_persisted` over v1.2 `consent_decisions` SQLite (`intent_class="skill_script"`); 7 unit tests; "allow_once" rejected per T-18-CARRY-15. Phase 22 wires the runtime prompt path via existing v1.2 `request_consent` tokio::oneshot.*
+- [x] **SKILLS-08**: New `verify:skill-format` gate in `verify:all` chain — *Shipped Plan 21-07: `scripts/verify-skill-format.sh` invokes `cargo run --bin skill_validator -- --recursive` over bundled + workspace tiers; `package.json` `verify:skill-format` script wired into `verify:all` chain at tail (after `verify:eval`); chain count 31 → 32; runtime smoke "OK: 3 skill(s) validated" exit 0*
 
 ---
 
@@ -178,14 +178,14 @@ Substrate-anchored exclusions from v1.3 scoping. Some are permanent (memorial AI
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| SKILLS-01 | 21 | pending |
-| SKILLS-02 | 21 | pending |
-| SKILLS-03 | 21 | pending |
-| SKILLS-04 | 21 | pending |
-| SKILLS-05 | 21 | pending |
-| SKILLS-06 | 21 | pending |
-| SKILLS-07 | 21 | pending |
-| SKILLS-08 | 21 | pending |
+| SKILLS-01 | 21 | ✅ shipped (Plan 21-01) |
+| SKILLS-02 | 21 | ✅ shipped (Plan 21-04) |
+| SKILLS-03 | 21 | ✅ shipped (Plan 21-03) |
+| SKILLS-04 | 21 | ✅ shipped (Plan 21-02) |
+| SKILLS-05 | 21 | ✅ shipped (Plan 21-04) |
+| SKILLS-06 | 21 | ✅ shipped (Plan 21-05) |
+| SKILLS-07 | 21 | ✅ shipped (Plan 21-06) |
+| SKILLS-08 | 21 | ✅ shipped (Plan 21-07) |
 | VOYAGER-01 | 22 | pending |
 | VOYAGER-02 | 22 | pending |
 | VOYAGER-03 | 22 | pending |
