@@ -33,11 +33,16 @@
 
 #![allow(dead_code, unused_imports)] // Wave 1 lands substrate; Wave 2/3 wires consumers.
 
+pub mod activate;
 pub mod loader;
 pub mod parser;
 pub mod resolver;
 pub mod types;
 
+pub use activate::{
+    activate, body_bytes_loaded, load_reference, reference_bytes_loaded,
+    reset_disclosure_counters, resolve_reference_path,
+};
 pub use loader::{bundled_root, scan_tier, user_root, workspace_root};
 pub use parser::parse_skill;
 pub use resolver::Catalog;
