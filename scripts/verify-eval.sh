@@ -36,7 +36,7 @@ fi
 
 # EVAL-06 grep target: U+250C U+2500 U+2500 — every eval module emits this prefix.
 TABLE_COUNT=$(printf '%s' "$STDOUT" | grep -c '┌──' || true)
-EXPECTED=5  # hybrid_search + real_embedding + kg_integrity + typed_memory + capability_gap
+EXPECTED=8  # hybrid_search + real_embedding + kg_integrity + typed_memory + capability_gap + adversarial + ambiguous_intent + capability_gap_stress (Phase 23 / REWARD-05)
 
 if [ "$TABLE_COUNT" -lt "$EXPECTED" ]; then
   echo "$STDOUT"
