@@ -234,9 +234,16 @@ pub fn forged_name_exists(name: &str) -> bool {
 
 /// Phase 24 DREAM-01 — archive a forged-tool's filesystem dir from
 /// `<user_root>/<sanitized_name>/` to `<user_root>/.archived/<sanitized_name>/`,
-/// then DELETE the forged_tools DB row. On filesystem-move failure, the DB
-/// row is left intact (will be retried next cycle). On collision in the
-/// archive destination, suffix with `_dup<unix_ts>` to preserve both copies.
+/// then DELETE the forged_tools DB row. On collision in the archive
+/// destination, suffix with `_dup<unix_ts>` to preserve both copies.
+///
+/// DB-vs-FS asymmetry (intentional):
+/// - **Rename failure** (src exists, rename fails): returns `Err`, DB row is
+///   left intact, retried next cycle.
+/// - **Orphan row** (src does NOT exist on disk): the rename is skipped but
+///   the DB DELETE still runs — drops the dangling `forged_tools` row that
+///   has no on-disk skill dir. This is intentional cleanup so a missing
+///   directory does not re-flag the same tool every dream cycle.
 ///
 /// Per Pitfall 8 LOCK: only `forged_tools` DB row + `<user_root>/<name>/`
 /// directory are touched. `<user_root>/.archived/`'s parent (`brain_skills`,
@@ -261,9 +268,11 @@ pub fn archive_skill(name: &str) -> Result<PathBuf, String> {
         std::fs::rename(&src, &dest)
             .map_err(|e| format!("rename {} -> {}: {e}", src.display(), dest.display()))?;
     }
-    // DB DELETE — best-effort. If the FS move succeeded but the DB delete
-    // fails, the row will be retried next cycle (already in .archived/ so
-    // FS path is idempotent via _dup suffix).
+    // DB DELETE runs unconditionally (see docstring "DB-vs-FS asymmetry"):
+    // - rename succeeded → DELETE drops the now-archived row
+    // - src was absent (orphan row) → DELETE drops the dangling row so the
+    //   next cycle does not re-flag the same missing tool
+    // - rename failed earlier → we already returned Err above; never reach here
     let conn = crate::tool_forge::open_db_for_lifecycle()
         .map_err(|e| format!("open db: {e}"))?;
     conn.execute(
