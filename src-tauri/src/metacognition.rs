@@ -163,7 +163,10 @@ pub fn assess_cognitive_state(user_query: &str) -> CognitiveState {
     let confidence = (knowledge_score * 0.4 + capability_score * 0.3
         + (1.0 - complexity) * 0.2 + freshness * 0.1).clamp(0.0, 1.0);
 
-    let should_ask = confidence < 0.3 || (complexity > 0.8 && knowledge_score < 0.5);
+    // ── ACH MODULATION: high ACh -> more verification checks (Phase 27 / HORM-06) ──
+    let ach = crate::homeostasis::get_physiology().acetylcholine;
+    let verify_threshold = if ach > 0.6 { 0.4_f32 } else { 0.3_f32 };
+    let should_ask = confidence < verify_threshold || (complexity > 0.8 && knowledge_score < 0.5);
 
     let uncertainty_reason = if knowledge_score < 0.3 {
         format!("Limited knowledge about this topic")
