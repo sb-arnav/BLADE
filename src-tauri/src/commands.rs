@@ -638,6 +638,99 @@ fn find_similar_files(filename: &str, search_dir: &str) -> Vec<String> {
     matches
 }
 
+/// Phase 24 (v1.3) — apply an operator's chat reply to a chat-injected
+/// dream_mode proposal. Returns Ok(confirmation_text) on success or
+/// Err(reason). Side effects:
+///   - "yes" + merge → INSERT merged ForgedTool row (parallel to the
+///                     persist_forged_tool path; merge body skips the
+///                     LLM script-write step because script_path is
+///                     inherited from the lex-smaller source per D-24-E);
+///                     archive both source skills via skills::lifecycle::archive_skill;
+///                     delete .pending/<id>.json
+///   - "yes" + generate → write proposed SKILL.md under
+///                        ~/.blade/skills/<sanitized_name>/ + delete .pending/<id>.json
+///   - "no" / "dismiss" → mark proposal dismissed (no tool changes)
+///
+/// This helper is `pub` so cargo test can drive it directly without
+/// spawning the full chat stream.
+pub async fn apply_proposal_reply(verb: &str, id: &str) -> Result<String, String> {
+    let prop = crate::skills::pending::read_proposal(id)
+        .ok_or_else(|| format!("proposal not found: {}", id))?;
+
+    if verb == "no" || verb == "dismiss" {
+        crate::skills::pending::mark_dismissed(id)?;
+        return Ok(format!("Dismissed proposal `{}` ({}).", id, prop.proposed_name));
+    }
+
+    // "yes" branch — apply per kind.
+    match prop.kind.as_str() {
+        "merge" => {
+            let merged_body = prop.payload.get("merged_body")
+                .ok_or_else(|| "missing merged_body in proposal payload".to_string())?;
+            let merged: crate::tool_forge::ForgedTool = serde_json::from_value(merged_body.clone())
+                .map_err(|e| format!("deserialize merged_body: {e}"))?;
+
+            // Persist the merged ForgedTool. INSERT directly via SQL (parallel
+            // to the persist_forged_tool path) because the merge body skips the
+            // LLM script-write step — script_path is inherited from the
+            // lex-smaller source per D-24-E.
+            {
+                let conn = crate::tool_forge::open_db_for_lifecycle()
+                    .map_err(|e| format!("open db: {e}"))?;
+                let params_json = serde_json::to_string(&merged.parameters).unwrap_or_else(|_| "[]".to_string());
+                conn.execute(
+                    "INSERT INTO forged_tools (id, name, description, language, script_path, usage, parameters, test_output, created_at, last_used, use_count, forged_from) \
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                    rusqlite::params![
+                        merged.id, merged.name, merged.description, merged.language,
+                        merged.script_path, merged.usage, params_json, merged.test_output,
+                        merged.created_at, merged.last_used, merged.use_count, merged.forged_from
+                    ],
+                ).map_err(|e| format!("insert merged tool: {e}"))?;
+            }
+
+            // Archive both source skills. archive_skill sequence: fs::rename
+            // first → DB DELETE on rename success (T-24-04-04 / 05 mitigation).
+            let source_a = prop.payload.get("source_a").and_then(|v| v.as_str()).unwrap_or("");
+            let source_b = prop.payload.get("source_b").and_then(|v| v.as_str()).unwrap_or("");
+            if !source_a.is_empty() {
+                let _ = crate::skills::lifecycle::archive_skill(source_a);
+            }
+            if !source_b.is_empty() {
+                let _ = crate::skills::lifecycle::archive_skill(source_b);
+            }
+
+            crate::skills::pending::delete_proposal(id)?;
+            Ok(format!("Merged `{}` + `{}` -> `{}`. Sources archived.", source_a, source_b, merged.name))
+        }
+        "generate" => {
+            // The proposed_skill_md text in the payload IS the body; land a
+            // SKILL.md directly under <user_root>/<sanitized_name>/.
+            let trace = prop.payload.get("trace")
+                .and_then(|t| t.as_array())
+                .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect::<Vec<_>>())
+                .unwrap_or_default();
+            let sanitized = crate::skills::export::sanitize_name(&prop.proposed_name)
+                .ok_or_else(|| format!("non-compliant proposed_name: {}", prop.proposed_name))?;
+            let skill_dir = crate::skills::loader::user_root().join(&sanitized);
+            std::fs::create_dir_all(&skill_dir).map_err(|e| format!("create_dir_all: {e}"))?;
+            let body = prop.payload.get("proposed_skill_md")
+                .and_then(|v| v.as_str())
+                .unwrap_or("# proposed skill (no body)");
+            let frontmatter = format!(
+                "---\nname: {}\ndescription: Auto-generated from {}-tool trace by dream_mode\n---\n\n{}\n",
+                sanitized, trace.len(), body
+            );
+            std::fs::write(skill_dir.join("SKILL.md"), frontmatter)
+                .map_err(|e| format!("write SKILL.md: {e}"))?;
+
+            crate::skills::pending::delete_proposal(id)?;
+            Ok(format!("Saved proposed skill `{}` to ~/.blade/skills/{}/SKILL.md", sanitized, sanitized))
+        }
+        other => Err(format!("unknown proposal kind: {}", other)),
+    }
+}
+
 /// Phase 4 Plan 04-01 (D-93): #[tauri::command] entry point.
 ///
 /// Thin wrapper around `send_message_stream_inline` that preserves the Phase 3
@@ -875,6 +968,40 @@ pub(crate) async fn send_message_stream_inline(
     // and cap input length to prevent context window abuse.
     let last_user_text = sanitize_input(&last_user_text);
 
+    // ── Phase 24 (v1.3) — chat-injected proposal reply apply path ────────────
+    // intent_router classifies "yes <id>" / "no <id>" / "dismiss <id>" as
+    // IntentClass::ProposalReply. When matched, apply the operator's reply
+    // synchronously here BEFORE the LLM provider call so the model never
+    // sees the proposal_id confirmation. The chat-streaming contract
+    // (CLAUDE.md memory: project_chat_streaming_contract) requires
+    // blade_message_start BEFORE chat_token — emit both, then chat_done,
+    // then early-return to suppress the standard LLM streaming path.
+    {
+        let (proposal_intent, _args) =
+            crate::intent_router::classify_intent(&last_user_text).await;
+        if let crate::intent_router::IntentClass::ProposalReply { verb, id } = &proposal_intent {
+            let confirmation = match apply_proposal_reply(verb, id).await {
+                Ok(text) => text,
+                Err(e) => format!("Could not apply proposal: {}", e),
+            };
+            // Chat-streaming contract: emit blade_message_start FIRST.
+            let msg_id = uuid::Uuid::new_v4().to_string();
+            emit_stream_event(&app, "blade_message_start", serde_json::json!({
+                "message_id": &msg_id,
+                "role": "assistant",
+            }));
+            emit_stream_event(&app, "chat_token", serde_json::json!({
+                "content": confirmation,
+                "is_dream_proposal_apply": true,
+            }));
+            emit_stream_event(&app, "chat_done", ());
+            let _ = app.emit("blade_status", "idle");
+            // Early-return: suppress the LLM provider call entirely so the
+            // operator's "yes 7af3" never leaks to the model.
+            return Ok(());
+        }
+    }
+
     // ── Phase 18 Plan 14 — JARVIS chat → cross-app action ───────────────────
     // intent_router::classify_intent returns (IntentClass, ArgsBag); when
     // ActionRequired, dispatch fires in a background task so the chat reply
@@ -889,6 +1016,11 @@ pub(crate) async fn send_message_stream_inline(
             let (intent, args) = crate::intent_router::classify_intent(&dispatch_msg).await;
             // ChatOnly skips the dispatcher entirely (no log noise).
             if matches!(intent, crate::intent_router::IntentClass::ChatOnly) {
+                return;
+            }
+            // Phase 24 (v1.3) — ProposalReply was already handled above with
+            // an early-return; if we somehow reach here with one, skip.
+            if matches!(intent, crate::intent_router::IntentClass::ProposalReply { .. }) {
                 return;
             }
             let args_json = serde_json::Value::Object(args);
@@ -3046,4 +3178,107 @@ pub async fn quickask_submit(
 
     // Frontend (D-101) handles auto-hide after chat_done; nothing more to do here.
     Ok(())
+}
+
+#[cfg(test)]
+mod phase24_e2e_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn proposal_reply_yes_merge_persists_merged_tool() {
+        let tmp = tempfile::TempDir::new().expect("tempdir");
+        std::env::set_var("BLADE_CONFIG_DIR", tmp.path());
+
+        // Set up forged_tools table + 2 source rows.
+        let conn = rusqlite::Connection::open(tmp.path().join("blade.db")).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS forged_tools (
+                id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, description TEXT NOT NULL,
+                language TEXT NOT NULL, script_path TEXT NOT NULL, usage TEXT NOT NULL,
+                parameters TEXT DEFAULT '[]', test_output TEXT DEFAULT '',
+                created_at INTEGER NOT NULL, last_used INTEGER, use_count INTEGER DEFAULT 0,
+                forged_from TEXT DEFAULT ''
+            );"
+        ).unwrap();
+        for n in &["foo", "bar"] {
+            conn.execute(
+                "INSERT INTO forged_tools (id, name, description, language, script_path, usage, created_at, last_used) \
+                 VALUES (?1, ?2, 'd', 'bash', ?3, 'u', 100, 100)",
+                rusqlite::params![format!("id-{}", n), n, format!("/tmp/{}.sh", n)],
+            ).unwrap();
+        }
+        drop(conn);
+
+        // Build a sample merged ForgedTool body and write the proposal.
+        let merged = crate::tool_forge::ForgedTool {
+            id: "merged-id".to_string(),
+            name: "foo_merged".to_string(),
+            description: "merged d".to_string(),
+            language: "bash".to_string(),
+            script_path: "/tmp/foo.sh".to_string(),
+            usage: "merged usage".to_string(),
+            parameters: vec![],
+            test_output: "merged test".to_string(),
+            created_at: 200,
+            last_used: Some(200),
+            use_count: 0,
+            forged_from: "merge:foo+bar".to_string(),
+        };
+        let payload = serde_json::json!({
+            "source_a": "foo",
+            "source_b": "bar",
+            "merged_body": serde_json::to_value(&merged).unwrap(),
+        });
+        let prop = crate::skills::pending::Proposal {
+            id: "abc12345".to_string(),
+            kind: "merge".to_string(),
+            proposed_name: "foo_merged".to_string(),
+            payload,
+            created_at: chrono::Utc::now().timestamp(),
+            dismissed: false,
+            content_hash: "hash1".to_string(),
+        };
+        crate::skills::pending::write_proposal(&prop).unwrap();
+
+        // Apply.
+        let result = apply_proposal_reply("yes", "abc12345").await.unwrap();
+        assert!(result.contains("foo_merged"), "got: {}", result);
+
+        // Verify merged tool exists in forged_tools.
+        let conn = rusqlite::Connection::open(tmp.path().join("blade.db")).unwrap();
+        let names: Vec<String> = conn.prepare("SELECT name FROM forged_tools").unwrap()
+            .query_map([], |r| r.get::<_, String>(0)).unwrap()
+            .filter_map(|r| r.ok()).collect();
+        assert!(names.contains(&"foo_merged".to_string()), "expected foo_merged; got {:?}", names);
+
+        // Verify .pending/abc12345.json was deleted.
+        assert!(crate::skills::pending::read_proposal("abc12345").is_none());
+
+        std::env::remove_var("BLADE_CONFIG_DIR");
+    }
+
+    #[tokio::test]
+    async fn proposal_reply_dismiss_marks_proposal() {
+        let tmp = tempfile::TempDir::new().expect("tempdir");
+        std::env::set_var("BLADE_CONFIG_DIR", tmp.path());
+
+        let prop = crate::skills::pending::Proposal {
+            id: "dismiss01".to_string(),
+            kind: "merge".to_string(),
+            proposed_name: "x_merged".to_string(),
+            payload: serde_json::json!({}),
+            created_at: chrono::Utc::now().timestamp(),
+            dismissed: false,
+            content_hash: "h".to_string(),
+        };
+        crate::skills::pending::write_proposal(&prop).unwrap();
+
+        let result = apply_proposal_reply("dismiss", "dismiss01").await.unwrap();
+        assert!(result.contains("Dismissed"), "got: {}", result);
+
+        let after = crate::skills::pending::read_proposal("dismiss01").unwrap();
+        assert!(after.dismissed);
+
+        std::env::remove_var("BLADE_CONFIG_DIR");
+    }
 }
