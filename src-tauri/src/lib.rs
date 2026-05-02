@@ -1374,6 +1374,7 @@ pub fn run() {
             body_registry::body_get_summary,
             consequence::consequence_predict,
             metacognition::metacognition_assess,
+            metacognition::metacognition_get_state,
             social_cognition::social_get_advice,
             show_engine::show_record_request,
             show_engine::show_dismiss,
