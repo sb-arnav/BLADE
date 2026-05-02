@@ -428,6 +428,63 @@ async fn task_skill_from_trace(_app: tauri::AppHandle) -> String {
     format!("dream:generate {} skill(s) proposed", count)
 }
 
+/// Hippocampal replay — consolidate high-prediction-error events into typed memory.
+/// Per D-12: runs as task 5 in dream session, BEFORE skill_prune.
+/// Per D-13: queries prediction_error_log for error > 0.5, top 10 by magnitude.
+/// Per D-14: replay = re-extract facts/patterns via typed_memory::store_typed_memory.
+async fn task_prediction_replay() -> String {
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    let records = match rusqlite::Connection::open(&db_path) {
+        Ok(conn) => {
+            let mut stmt = match conn.prepare(
+                "SELECT platform, aggregate_error, top_signal, timestamp
+                 FROM prediction_error_log
+                 WHERE aggregate_error > 0.5
+                 ORDER BY aggregate_error DESC
+                 LIMIT 10"
+            ) {
+                Ok(s) => s,
+                Err(_) => return "prediction_replay: no error log table yet".to_string(),
+            };
+            let rows: Vec<(String, f64, String, i64)> = stmt
+                .query_map([], |row| {
+                    Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+                })
+                .ok()
+                .map(|iter| iter.filter_map(|r| r.ok()).collect())
+                .unwrap_or_default();
+            rows
+        }
+        Err(_) => return "prediction_replay: db open failed".to_string(),
+    };
+
+    if records.is_empty() {
+        return "prediction_replay: no high-error records to replay".to_string();
+    }
+
+    let mut replayed = 0u32;
+    for (platform, error, top_signal, ts) in &records {
+        if !DREAMING.load(Ordering::Relaxed) {
+            break;
+        }
+        let content = format!(
+            "High prediction error on {}: aggregate={:.3}, top_signal={}, at={}. \
+             This means BLADE's world model was significantly wrong about {} activity. \
+             Future predictions should account for this pattern.",
+            platform, error, top_signal, ts, platform
+        );
+        let _ = crate::typed_memory::store_typed_memory(
+            crate::typed_memory::MemoryCategory::Decision,
+            &content,
+            "prediction_replay",
+            Some((*error).min(1.0) as f64),
+        );
+        replayed += 1;
+    }
+
+    format!("prediction_replay: replayed {} high-error events into typed memory", replayed)
+}
+
 /// Task 5 — Code health scan.
 async fn task_code_health_scan() -> String {
     // Find recently changed Rust and TypeScript files in the cwd.
@@ -613,6 +670,9 @@ pub async fn run_dream_session(app: tauri::AppHandle) -> DreamSession {
 
     // Task 4 — Skill synthesis
     run_task!("skill_synthesis", task_skill_synthesis(app.clone()));
+
+    // Phase 28 / AINF-05 — Hippocampal replay: high-error events → typed memory
+    run_task!("prediction_replay", task_prediction_replay());
 
     // Phase 24 (v1.3) — Voyager forgetting half: prune → consolidate → from_trace.
     // Order matters per Pitfall 5 (consolidate selects from post-prune state).
