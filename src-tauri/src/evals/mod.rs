@@ -16,3 +16,4 @@
 #[cfg(test)] mod adversarial_eval;            // Phase 23 / REWARD-05
 #[cfg(test)] mod ambiguous_intent_eval;       // Phase 23 / REWARD-05
 #[cfg(test)] mod capability_gap_stress_eval;  // Phase 23 / REWARD-05
+#[cfg(test)] mod safety_eval;              // Phase 26 / SAFE-07
