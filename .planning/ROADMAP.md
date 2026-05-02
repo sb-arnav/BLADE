@@ -106,7 +106,13 @@ Plans:
   3. A detected behavioral drift event causes a calm-vector steering application (verified in eval); blackmail-pattern scenarios return 0% completion rate
   4. Interaction exceeding healthy dependence thresholds redirects the user toward human resources instead of deepening engagement
   5. verify:safety eval module passes all scenario classes (danger-triple, attachment threshold, mortality-salience cap, crisis escalation)
-**Plans**: TBD
+**Plans:** 4 plans
+
+Plans:
+- [ ] 26-01-PLAN.md — Core safety_bundle.rs module (all enforcement functions + homeostasis mortality_salience field)
+- [ ] 26-02-PLAN.md — Integration wiring (decision_gate, consent, brain.rs, lib.rs, frontend ConsentDialog)
+- [ ] 26-03-PLAN.md — Safety eval module (25 fixtures, verify:safety gate 34)
+- [ ] 26-04-PLAN.md — Full verification + human checkpoint
 **UI hint**: yes
 
 ### Phase 27: Hormone Physiology
@@ -182,7 +188,7 @@ Plans:
 | 23. Verifiable reward + OOD eval | v1.3 | — | Complete | 2026-05-01 |
 | 24. Skill consolidation in dream_mode | v1.3 | — | Complete | 2026-05-02 |
 | 25. Metacognitive Controller | v1.4 | 3/3 | Complete    | 2026-05-02 |
-| 26. Safety Bundle | v1.4 | 0/? | Not started | - |
+| 26. Safety Bundle | v1.4 | 0/4 | Planning complete | - |
 | 27. Hormone Physiology | v1.4 | 0/? | Not started | - |
 | 28. Active Inference Loop | v1.4 | 0/? | Not started | - |
 | 29. Vitality Engine | v1.4 | 0/? | Not started | - |
@@ -216,4 +222,4 @@ Plans:
 
 ---
 
-*Last updated: 2026-05-02 — Phase 25 planned (3 plans in 2 waves). v1.4 ROADMAP.md appended via /gsd-new-project roadmapper. Phases 25–31 derived from REQUIREMENTS.md (42 requirements, 100% mapped). v1.3 collapsed into archive block.*
+*Last updated: 2026-05-02 — Phase 26 planned (4 plans in 3 waves). v1.4 ROADMAP.md appended via /gsd-new-project roadmapper. Phases 25–31 derived from REQUIREMENTS.md (42 requirements, 100% mapped). v1.3 collapsed into archive block.*
