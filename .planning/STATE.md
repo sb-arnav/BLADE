@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Phases
-status: executing
-last_updated: "2026-05-02T02:01:10.558Z"
+status: verifying
+last_updated: "2026-05-02T02:56:55.151Z"
 last_activity: 2026-05-02
 progress:
   total_phases: 15
-  completed_phases: 11
+  completed_phases: 12
   total_plans: 80
-  completed_plans: 82
+  completed_plans: 83
   percent: 100
 ---
 
@@ -20,14 +20,35 @@ progress:
 **Last shipped milestone:** v1.2 — Acting Layer with Brain Foundation (closed 2026-04-30 as `tech_debt`; chat-first pivot recorded mid-milestone)
 **Prior shipped:** v1.1 — Functionality, Wiring, Accessibility (closed 2026-04-27 as `tech_debt`); v1.0 — Skin Rebuild substrate (closed 2026-04-19)
 **Current Focus:** Phase 24 — skill-consolidation-dream-mode
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 
 ## Current Position
 
-Phase: 24 (skill-consolidation-dream-mode) — EXECUTING
-Plan: 7 of 7
-Status: Ready to execute
+Phase: 24 (skill-consolidation-dream-mode) — COMPLETE
+Plan: 7 of 7 — landed
+Status: Phase 24 closed — all 7 plans shipped, all 6 DREAM-IDs complete; ready for milestone verification
 Last activity: 2026-05-02
+
+### Phase 24 Plan 07 Decisions
+
+- Plan 24-07 ships Wave 3 close (chat-injected operator-confirmation route end-to-end) in 3 atomic commits: `245eb4c` (Task 1: intent_router.rs `IntentClass::ProposalReply { verb, id }` variant + `match_proposal_reply` Tier-1 regex detector with `OnceLock<regex::Regex>` for `(?i)\b(yes|no|dismiss)\s+([a-f0-9]{4,})\b` + classify_intent_class wired to call ProposalReply matcher BEFORE match_heuristic + jarvis_dispatch.rs defensive `ProposalReply { .. } => NotApplicable` arm + 4 unit tests in intent_router::tests) + `fb89a0e` (Task 2: proactive_engine.rs `pub fn should_drain_now(now_ts) -> bool` 30s LAST_ACTIVITY idle gate via dream_mode::last_activity_ts() + `pub async fn drain_pending_proposals(&app)` async helper that reads .pending/, gates on idle, routes non-dismissed proposals through decision_gate::evaluate_and_record with source "dream_mode_proposal", emits proactive_action with proposal_id literally embedded in prompt text per Pitfall 7; wired at TOP of proactive_loop tick BEFORE existing run_detector! invocations + 2 tests in proactive_engine::phase24_tests) + `767daba` (Task 3: commands.rs `pub async fn apply_proposal_reply(verb, id)` helper handling merge / generate / dismiss branches + synchronous ProposalReply branch in send_message_stream_inline BEFORE existing JARVIS dispatch tokio::spawn block, emitting blade_message_start → chat_token → chat_done per chat-streaming contract then early-returning to suppress LLM provider call + defensive ProposalReply skip inside the JARVIS dispatch tokio::spawn closure as backstop + 2 e2e tests in commands::phase24_e2e_tests).
+- Wave 3 close gate met: dream-mode → operator → apply loop closed end-to-end. The forgetting half of the Voyager loop is now operationally complete — idle ≥1200s triggers dream_mode (Plan 24-02 substrate + 24-05 task wiring) → prune/consolidate/from_trace passes write to .pending/ (24-04 lifecycle + 24-05) → idle ≥30s after dream pass triggers proactive_engine drain through decision_gate, emitting chat-injected prompt with literal proposal_id (24-07) → operator types `yes <id>` / `no <id>` / `dismiss <id>` → intent_router classifies as ProposalReply → commands.rs apply_proposal_reply runs synchronously BEFORE LLM call → merged ForgedTool persisted (or proposed SKILL.md written, or proposal mark_dismissed) → confirmation in chat stream → skill_validator list --diff <prev_session_id> shows the deltas (Plan 24-06).
+- All 6 DREAM-IDs (DREAM-01..06) have a passing test trail across plans 24-01..07. DREAM-02 + DREAM-03 marked complete in REQUIREMENTS by this plan (frontmatter `requirements: [DREAM-02, DREAM-03]`). DREAM-01 + DREAM-05 marked complete by Plan 24-05; DREAM-04 by Plan 24-06; DREAM-06 by Plan 24-02.
+- match_proposal_reply runs BEFORE match_heuristic in classify_intent_class per Tier-1 ordering lock (must_haves.truths line 18). Threat T-24-07-03 (regex overmatch on 'yes 1234 the report') mitigated by `[a-f0-9]{4,}` hex constraint — natural-text matches with 4+ hex chars after a yes/no/dismiss verb are rare; combined with D-24-B's cap-2 simultaneously-active proposals, accidental overmatch only matters if the random hex run happens to match an active proposal id.
+- ProposalReply variant uses owned `String` fields (not `&str`) to match the existing `ActionRequired { service: String, action: String }` pattern. The `serde(tag = "kind", rename_all = "snake_case")` derive expects owned strings for serialization. id is the 8-char prefix of a uuid_v4 from skills::pending::write_proposal — pinned in the doc comment.
+- OnceLock<regex::Regex> for compile-once regex; pattern compiles ONCE at first call, lives statically for process lifetime, then re.captures(lower) reuses the compiled regex on every call. (?i) flag is defense-in-depth — input is already lower-cased before the call but the regex is case-insensitive too.
+- should_drain_now(now_ts) accepts an explicit timestamp parameter so tests can drive deterministic time. Production callers pass chrono::Utc::now().timestamp(). The `last == 0` guard (LAST_ACTIVITY never written) returns true so a fresh process can drain on first proactive tick rather than blocking forever waiting for activity that may never arrive.
+- drain_pending_proposals constructs prompt text with literal proposal_id embedded twice ('Reply yes <id> or dismiss <id>') per Pitfall 7. With D-24-B's cap of 1 merge + 1 generate per cycle = ≤2 simultaneously-active proposals, operator's reply is unambiguous — the regex on the reply side captures the specific id.
+- Drain wired at TOP of proactive_loop tick BEFORE existing run_detector! invocations (must_haves.truths line 22). Cooldown gate enforced INSIDE drain_pending_proposals (via should_drain_now) so the wire-site is unconditional; gate logic stays colocated with drain logic.
+- Synchronous ProposalReply branch in send_message_stream_inline runs BEFORE the existing JARVIS dispatch tokio::spawn block. Synchronous because we need the early-return to actually skip the rest of the function — tokio::spawn would fire-and-forget, letting the LLM provider call still happen. Synchronous + early-return + emit blade_message_start → chat_token → chat_done is the only way to surface confirmation in the chat stream WITHOUT also calling the LLM.
+- Chat-streaming contract preserved end-to-end. The new branch emits blade_message_start BEFORE chat_token per CLAUDE.md memory `project_chat_streaming_contract` ('Every Rust streaming branch must emit blade_message_start before chat_token; missed once = silent drop'). Verified by code review of the inserted block at lines ~973-1000 of commands.rs.
+- Merge apply path INSERTs directly via SQL rather than going through tool_forge::persist_forged_tool because the latter expects an LLM-generated ToolSpec and runs the script-write step. Merge body skips both — script_path is inherited from the lex-smaller source per D-24-E; usage/parameters/test_output are deterministic unions per Plan 24-04's deterministic_merge_body. Direct INSERT respects existing forged_tools schema (12 columns).
+- Generate apply path writes SKILL.md directly under <user_root>/<sanitized_name>/ rather than going through skills::export::export_to_user_tier because the latter expects a ForgedTool struct as input — generate proposal carries proposed_skill_md TEXT, not a forged_tools row. Apply path constructs YAML frontmatter inline + writes body verbatim. sanitize_name is the policy gate (Plan 21 substrate) — non-compliant proposed_name returns Err.
+- Both archive_skill calls use `let _ = ...` to discard Result. Per Plan 24-04's archive_skill contract, fs::rename failures (cross-device, permissions) leave source row live so next dream cycle re-flags the merge. Apply confirmation message emitted regardless — operator sees 'Merged foo + bar -> foo_merged. Sources archived.' even if one rename failed; underlying state is self-correcting.
+- jarvis_dispatch::jarvis_dispatch_action gains defensive `IntentClass::ProposalReply { .. } => Ok(DispatchResult::NotApplicable)` arm. Match was exhaustive over old IntentClass; adding new variant requires arm or build fails (Rule 3 — blocking issue auto-fix). Production path early-returns BEFORE dispatcher invoked; this arm unreachable in practice but MUST exist for build to succeed.
+- 8 new tests green across 3 files: 4 in intent_router::tests (proposal_reply_yes_matches, proposal_reply_dismiss_uppercase_normalised, proposal_reply_takes_precedence_over_action_required, bare_yes_falls_through_to_chat_only) + 2 in proactive_engine::phase24_tests (drain_skips_when_recent_activity, drain_pending_filters_dismissed_proposals) + 2 in commands::phase24_e2e_tests (proposal_reply_yes_merge_persists_merged_tool, proposal_reply_dismiss_marks_proposal). Full cargo test --lib reports 435 passed; 5 pre-existing failures (db::tests::test_analytics + 3 deep_scan + 1 router tier-2 routing) verified out-of-scope on stashed master.
+- cargo build --lib clean (1 carry-forward warning: reward.rs:236 timestamp_ms — pre-existing). The `last_activity_ts is never used` warning carried since Plan 24-02 is now CLEARED because proactive_engine::should_drain_now consumes it via dream_mode::last_activity_ts(). Plan 24-06's skill_validator binary still builds clean (`cargo build --bin skill_validator` exits 0).
+- Phase 24 close gate met: 7/7 plans landed; cargo test --lib reports 0 NEW failures vs pre-Phase-24 master; cargo build --lib + skill_validator binary both clean. Operator-deferred runtime UAT for chat-injected proactive prompts (chat-first pivot anchor) is the gate before milestone close.
 
 ### Phase 24 Plan 05 Decisions
 
@@ -275,7 +296,7 @@ None. v1.2 closed cleanly with documented tech debt; v1.3 scope locked by operat
 
 ## Session Continuity
 
-**Last session:** 2026-05-02T02:01:10.542Z
+**Last session:** 2026-05-02T02:56:55.122Z
 
 Phase 23 commit chain (~18 commits across 9 plans):
 
