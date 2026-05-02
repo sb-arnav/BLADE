@@ -1388,6 +1388,7 @@ pub fn run() {
             homeostasis::homeostasis_get_directive,
             homeostasis::homeostasis_get_circadian,
             homeostasis::homeostasis_relearn_circadian,
+            homeostasis::homeostasis_get_physiology,
             prefrontal::prefrontal_get,
             prefrontal::prefrontal_clear,
             proactive_vision::proactive_get_cards,
