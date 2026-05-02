@@ -121,11 +121,18 @@ Plans:
 **Depends on**: Phase 26
 **Requirements**: HORM-01, HORM-02, HORM-03, HORM-04, HORM-05, HORM-06, HORM-07, HORM-08, HORM-09
 **Success Criteria** (what must be TRUE):
-  1. After a high-stress exchange (≥3 failure responses), cortisol rises measurably and subsequent replies are noticeably terser and action-focused compared to baseline
+  1. After a high-stress exchange (��3 failure responses), cortisol rises measurably and subsequent replies are noticeably terser and action-focused compared to baseline
   2. The emotion classifier runs on every response ≥50 tokens, emitting valence/arousal/cluster, and updates the hormone bus with α=0.05 smoothing — visible in ActivityStrip
   3. High dopamine state produces more aggressive Voyager-loop exploration; low dopamine produces conservative skill reuse — the difference is testable via dopamine-pinned fixture
   4. Hormone values survive a process restart and are visible in the UI with current levels and recent history
-**Plans**: TBD
+**Plans:** 5 plans
+
+Plans:
+- [ ] 27-01-PLAN.md — PhysiologicalState foundation: struct, global, decay, persistence, pituitary blend, ActivityStrip emission
+- [ ] 27-02-PLAN.md — Emotion classifier + commands.rs call site: lexicon-based classifier, alpha=0.05 smoothed update
+- [ ] 27-03-PLAN.md — Behavioral modulation: cortisol/oxytocin in brain.rs, dopamine/NE in evolution.rs, ACh in metacognition.rs
+- [ ] 27-04-PLAN.md — DoctorPane signal: SignalClass::Hormones in doctor.rs + frontend registration
+- [ ] 27-05-PLAN.md — Eval module + verify:hormone gate + human checkpoint
 **UI hint**: yes
 
 ### Phase 28: Active Inference Loop
@@ -188,8 +195,8 @@ Plans:
 | 23. Verifiable reward + OOD eval | v1.3 | — | Complete | 2026-05-01 |
 | 24. Skill consolidation in dream_mode | v1.3 | — | Complete | 2026-05-02 |
 | 25. Metacognitive Controller | v1.4 | 3/3 | Complete    | 2026-05-02 |
-| 26. Safety Bundle | v1.4 | 0/4 | Planning complete | - |
-| 27. Hormone Physiology | v1.4 | 0/? | Not started | - |
+| 26. Safety Bundle | v1.4 | 4/4 | Complete | 2026-05-02 |
+| 27. Hormone Physiology | v1.4 | 0/5 | Planning complete | - |
 | 28. Active Inference Loop | v1.4 | 0/? | Not started | - |
 | 29. Vitality Engine | v1.4 | 0/? | Not started | - |
 | 30. Organism Eval | v1.4 | 0/? | Not started | - |
@@ -222,4 +229,4 @@ Plans:
 
 ---
 
-*Last updated: 2026-05-02 — Phase 26 planned (4 plans in 3 waves). v1.4 ROADMAP.md appended via /gsd-new-project roadmapper. Phases 25–31 derived from REQUIREMENTS.md (42 requirements, 100% mapped). v1.3 collapsed into archive block.*
+*Last updated: 2026-05-02 — Phase 27 planned (5 plans in 3 waves). v1.4 ROADMAP.md updated. Phases 25-31 derived from REQUIREMENTS.md (42 requirements, 100% mapped). v1.3 collapsed into archive block.*
