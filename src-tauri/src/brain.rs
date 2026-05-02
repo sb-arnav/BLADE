@@ -534,6 +534,14 @@ fn build_system_prompt_inner(
         parts.push(role_injection);
     }
 
+    // ── SAFETY MODULATION (priority 2.5 — Phase 26 / SAFE-03, SAFE-05) ───────
+    let safety_mods = crate::safety_bundle::get_prompt_modulations();
+    for mod_text in safety_mods {
+        if !mod_text.trim().is_empty() {
+            parts.push(mod_text);
+        }
+    }
+
     // ── IDENTITY EXTENSION (priority 3) ──────────────────────────────────────
     // Deep scan identity + user model merged into one section.
     // Only inject if at least one has content. Avoids duplicating what's in

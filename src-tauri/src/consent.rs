@@ -185,6 +185,7 @@ pub async fn request_consent(
     action_verb: &str,
     action_kind: &str,
     content_preview: &str,
+    safety_override: bool,
 ) -> ConsentChoice {
     use tauri::Emitter;
 
@@ -207,6 +208,7 @@ pub async fn request_consent(
         "action_kind":     action_kind,
         "content_preview": crate::safe_slice(content_preview, 200),
         "request_id":      request_id,
+        "safety_override": safety_override,
     });
     let _ = app.emit_to("main", "consent_request", payload);
 
@@ -232,6 +234,12 @@ pub async fn request_consent(
 /// Allow once / Allow always / Deny. Pulls the matching Sender from PENDING and
 /// delivers the choice. Validation enforces the allow-list of choice strings
 /// (T-18-CARRY-43 mitigation).
+///
+/// NOTE (Phase 26 / SAFE-01): When safety_override=true, the frontend hides
+/// AllowAlways. If allow_always somehow arrives for a safety-override request,
+/// it is treated as allow_once by the frontend (defense-in-depth: the real
+/// enforcement is the frontend not showing the button + the danger-triple
+/// re-firing on next attempt).
 #[tauri::command]
 pub fn consent_respond(request_id: String, choice: String) -> Result<(), String> {
     let parsed = match choice.as_str() {

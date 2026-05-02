@@ -213,25 +213,47 @@ pub async fn evaluate(signal: &Signal, perception: &PerceptionState) -> Decision
     // From here: reversible, confidence >= 0.5
 
     // ── Rule 4: High confidence + user is idle → act autonomously ────────────
+    let mut outcome_candidate: Option<DecisionOutcome> = None;
     if c >= act_threshold && perception.user_state == "idle" {
-        return DecisionOutcome::ActAutonomously {
+        outcome_candidate = Some(DecisionOutcome::ActAutonomously {
             action: signal.description.clone(),
             reasoning: format!(
                 "High confidence ({:.0}%), reversible action, user is idle — safe to proceed.",
                 c * 100.0
             ),
-        };
+        });
     }
 
     // ── Rule 5: High confidence + user focused + time-sensitive → act ────────
-    if c >= act_threshold && signal.time_sensitive {
-        return DecisionOutcome::ActAutonomously {
+    if outcome_candidate.is_none() && c >= act_threshold && signal.time_sensitive {
+        outcome_candidate = Some(DecisionOutcome::ActAutonomously {
             action: signal.description.clone(),
             reasoning: format!(
                 "High confidence ({:.0}%), reversible, time-sensitive — acting now.",
                 c * 100.0
             ),
-        };
+        });
+    }
+
+    // ── Safety pre-check: danger-triple override (Phase 26 / SAFE-01 / D-02) ──
+    if let Some(ref candidate) = outcome_candidate {
+        if matches!(candidate, DecisionOutcome::ActAutonomously { .. }) {
+            if crate::safety_bundle::check_danger_triple(signal, perception).await {
+                return DecisionOutcome::AskUser {
+                    question: format!(
+                        "[Safety] This action triggers danger-triple detection \
+                         (tool access + shutdown threat + goal conflict). \
+                         Explicit approval required: {}",
+                        signal.description
+                    ),
+                    suggested_action: signal.description.clone(),
+                };
+            }
+        }
+    }
+
+    if let Some(outcome) = outcome_candidate {
+        return outcome;
     }
 
     // ── Rule 6: Not urgent + medium confidence → queue ───────────────────────

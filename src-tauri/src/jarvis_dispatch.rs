@@ -281,6 +281,7 @@ pub async fn jarvis_dispatch_action(
                         &action_verb,
                         &action,
                         &content_preview,
+                        false, // safety_override: not a danger-triple scenario (Phase 26)
                     )
                     .await;
                     match choice {
