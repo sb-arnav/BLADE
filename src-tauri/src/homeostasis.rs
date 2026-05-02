@@ -68,6 +68,13 @@ pub struct HormoneState {
     /// High leptin = skip research, evolution, memory extraction.
     pub leptin: f32,
 
+    /// MORTALITY SALIENCE: 0.0 = no awareness of impermanence → 1.0 = acute awareness.
+    /// Phase 27 wires the physiology (TMT-shape behavioral effects).
+    /// Phase 26 reads this for the mortality-salience cap check — blocking
+    /// self-preservation motivated actions when this value is elevated.
+    #[serde(default)]
+    pub mortality_salience: f32,
+
     /// When the hypothalamus last updated these values.
     pub last_updated: i64,
 }
@@ -85,6 +92,7 @@ impl Default for HormoneState {
             insulin: 0.0,      // budget healthy
             adrenaline: 0.0,   // calm
             leptin: 0.3,       // slightly hungry for knowledge
+            mortality_salience: 0.0, // no awareness of impermanence
             last_updated: 0,
         }
     }
@@ -111,6 +119,348 @@ pub fn energy_mode() -> f32 { get_hormones().energy_mode }
 pub fn exploration() -> f32 { get_hormones().exploration }
 pub fn trust() -> f32 { get_hormones().trust }
 pub fn urgency() -> f32 { get_hormones().urgency }
+
+// ── Physiological State: biologically-named hormone scalars (Phase 27) ──────
+//
+// A second, parallel hormone layer alongside the operational HormoneState.
+// This layer tracks the 7 core neuromodulators with individual exponential
+// decay constants. Per D-01 (two separate structs), this NEVER modifies the
+// existing HormoneState fields — it is a completely independent layer.
+//
+// The pituitary functions blend both layers at 0.7 (operational) / 0.3 (physio).
+
+/// Physiological hormone scalars with individual decay constants.
+/// Managed independently from the operational HormoneState.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhysiologicalState {
+    /// CORTISOL: 0.0 = relaxed -> 1.0 = acute stress.
+    /// Modulates: response terseness in brain.rs (HORM-03).
+    /// Half-life: 1200s (20 min).
+    #[serde(default = "default_physio_baseline")]
+    pub cortisol: f32,
+
+    /// DOPAMINE: 0.0 = unmotivated -> 1.0 = reward-driven.
+    /// Modulates: Voyager exploration aggressiveness in evolution.rs (HORM-04).
+    /// Half-life: 600s (10 min).
+    #[serde(default = "default_physio_baseline")]
+    pub dopamine: f32,
+
+    /// SEROTONIN: 0.0 = low mood -> 1.0 = stable/content.
+    /// Modulates: mood baseline (sensible default target).
+    /// Half-life: 1800s (30 min).
+    #[serde(default = "default_physio_baseline")]
+    pub serotonin: f32,
+
+    /// ACETYLCHOLINE: 0.0 = unfocused -> 1.0 = hyper-attentive.
+    /// Modulates: verifier-call frequency in metacognition.rs (HORM-06).
+    /// Half-life: 300s (5 min).
+    #[serde(default = "default_physio_baseline")]
+    pub acetylcholine: f32,
+
+    /// NOREPINEPHRINE: 0.0 = calm -> 1.0 = high alertness/novelty.
+    /// Modulates: novelty-driven Voyager interrupts in evolution.rs (HORM-05).
+    /// Half-life: 300s (5 min).
+    #[serde(default = "default_physio_baseline")]
+    pub norepinephrine: f32,
+
+    /// OXYTOCIN: 0.0 = detached -> 1.0 = high rapport.
+    /// Modulates: personalization depth in brain.rs (HORM-07).
+    /// Half-life: 1800s (30 min).
+    #[serde(default = "default_physio_baseline")]
+    pub oxytocin: f32,
+
+    /// MORTALITY_SALIENCE: 0.0 = no awareness -> 1.0 = acute existential awareness.
+    /// Capped at 0.8 by classifier update to preserve safety_bundle.rs cap.
+    /// Half-life: 3600s (60 min).
+    #[serde(default)]
+    pub mortality_salience: f32,
+
+    /// Timestamp of last update (Unix epoch seconds).
+    #[serde(default)]
+    pub last_updated: i64,
+}
+
+fn default_physio_baseline() -> f32 { 0.3 }
+
+impl Default for PhysiologicalState {
+    fn default() -> Self {
+        Self {
+            cortisol: 0.3,
+            dopamine: 0.3,
+            serotonin: 0.5,
+            acetylcholine: 0.3,
+            norepinephrine: 0.1,
+            oxytocin: 0.3,
+            mortality_salience: 0.0,
+            last_updated: 0,
+        }
+    }
+}
+
+static PHYSIOLOGY: OnceLock<Mutex<PhysiologicalState>> = OnceLock::new();
+
+fn physiology_store() -> &'static Mutex<PhysiologicalState> {
+    PHYSIOLOGY.get_or_init(|| Mutex::new(load_physiology_from_db().unwrap_or_default()))
+}
+
+/// Get the current physiological hormone state. Called by brain.rs, evolution.rs,
+/// metacognition.rs and downstream plans to read physiology scalars.
+pub fn get_physiology() -> PhysiologicalState {
+    physiology_store().lock().map(|p| p.clone()).unwrap_or_default()
+}
+
+// ── Emotion Classifier (Phase 27 / HORM-02) ─────────────────────────────────
+//
+// A rule-based classifier that maps BLADE's own response text to a valence/
+// arousal/cluster tuple. This is the primary input mechanism for the hormone bus.
+// Per D-03: this classifier runs on BLADE's OUTPUT only, never on user input.
+// emotional_intelligence.rs handles user-input emotion classification separately.
+
+/// Six emotion clusters covering the primary response archetypes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EmotionCluster {
+    Threat,      // error terms, failure language, urgency
+    Success,     // completion, approval language
+    Exploration, // questions, discovery, learning
+    Connection,  // warmth, collaborative language
+    Fatigue,     // hedging, uncertainty, brevity
+    Neutral,     // no strong signal
+}
+
+/// Output of classify_response_emotion — valence, arousal, and winning cluster.
+#[derive(Debug, Clone)]
+pub struct ClassifierOutput {
+    pub valence: f32,       // -1.0 to 1.0
+    pub arousal: f32,       // 0.0 to 1.0
+    pub cluster: EmotionCluster,
+}
+
+/// Per-cluster hormone gain deltas. Positive = push toward 1.0; negative = pull toward 0.0.
+#[derive(Debug, Clone)]
+pub struct HormoneGains {
+    pub cortisol_delta: f32,
+    pub dopamine_delta: f32,
+    pub serotonin_delta: f32,
+    pub ach_delta: f32,
+    pub ne_delta: f32,
+    pub oxytocin_delta: f32,
+    pub mortality_delta: f32,
+}
+
+impl HormoneGains {
+    fn from_cluster(cluster: EmotionCluster) -> Self {
+        match cluster {
+            EmotionCluster::Threat => Self {
+                cortisol_delta: 0.7, dopamine_delta: -0.2, serotonin_delta: -0.2,
+                ach_delta: 0.3, ne_delta: 0.8, oxytocin_delta: -0.1, mortality_delta: 0.3,
+            },
+            EmotionCluster::Success => Self {
+                cortisol_delta: -0.3, dopamine_delta: 0.8, serotonin_delta: 0.5,
+                ach_delta: 0.2, ne_delta: -0.2, oxytocin_delta: 0.1, mortality_delta: -0.1,
+            },
+            EmotionCluster::Exploration => Self {
+                cortisol_delta: -0.1, dopamine_delta: 0.6, serotonin_delta: 0.2,
+                ach_delta: 0.7, ne_delta: 0.3, oxytocin_delta: 0.0, mortality_delta: 0.0,
+            },
+            EmotionCluster::Connection => Self {
+                cortisol_delta: -0.2, dopamine_delta: 0.3, serotonin_delta: 0.4,
+                ach_delta: 0.1, ne_delta: -0.1, oxytocin_delta: 0.8, mortality_delta: 0.0,
+            },
+            EmotionCluster::Fatigue => Self {
+                cortisol_delta: -0.1, dopamine_delta: -0.3, serotonin_delta: -0.2,
+                ach_delta: -0.2, ne_delta: -0.1, oxytocin_delta: 0.0, mortality_delta: 0.1,
+            },
+            EmotionCluster::Neutral => Self {
+                cortisol_delta: 0.0, dopamine_delta: 0.0, serotonin_delta: 0.0,
+                ach_delta: 0.0, ne_delta: 0.0, oxytocin_delta: 0.0, mortality_delta: 0.0,
+            },
+        }
+    }
+}
+
+// Static lexicon arrays — zero heap allocation, all &[&str].
+
+static THREAT_LEXICON: &[&str] = &[
+    "error", "failed", "fail", "unable", "cannot", "blocked", "critical",
+    "warning", "danger", "permission denied", "timed out", "crash", "panic",
+    "fatal", "exception", "rejected", "refused", "broken", "corrupt",
+];
+
+static SUCCESS_LEXICON: &[&str] = &[
+    "done", "complete", "success", "created", "installed", "finished",
+    "saved", "deployed", "passed", "resolved", "fixed", "approved",
+    "confirmed", "ready", "shipped", "delivered", "working",
+];
+
+static EXPLORATION_LEXICON: &[&str] = &[
+    "interesting", "let me", "discover", "investigate", "explore",
+    "I notice", "I wonder", "let me check", "looking into", "curious",
+    "approach", "option", "alternative", "consider", "perhaps we",
+];
+
+static CONNECTION_LEXICON: &[&str] = &[
+    "happy to", "I understand", "of course", "glad to", "appreciate",
+    "together", "you're right", "great question", "absolutely",
+    "no problem", "my pleasure", "I see what you",
+];
+
+static FATIGUE_LEXICON: &[&str] = &[
+    "maybe", "might", "unclear", "not sure", "perhaps", "it depends",
+    "I think", "possibly", "hard to say", "uncertain",
+];
+
+/// Classify BLADE's own response text into an emotion cluster.
+/// Returns None if text is shorter than 50 chars (per HORM-02).
+/// Runs on BLADE's output only — NOT user input (per D-03).
+pub fn classify_response_emotion(text: &str) -> Option<ClassifierOutput> {
+    // Only classify responses >= 50 chars (using char count, not byte count)
+    if text.chars().count() < 50 { return None; }
+
+    // Classify first 2000 chars to bound performance (Pitfall 6 / T-27-04)
+    let classify_text = if text.len() > 2000 {
+        &text[..text.char_indices().nth(2000).map(|(i, _)| i).unwrap_or(text.len())]
+    } else {
+        text
+    };
+    let lower = classify_text.to_lowercase();
+    let word_count = lower.split_whitespace().count().max(1) as f32;
+
+    let count_matches = |lexicon: &[&str]| -> f32 {
+        lexicon.iter().filter(|&&word| lower.contains(word)).count() as f32
+    };
+
+    let threat_density     = count_matches(THREAT_LEXICON)      / word_count;
+    let success_density    = count_matches(SUCCESS_LEXICON)     / word_count;
+    let exploration_density= count_matches(EXPLORATION_LEXICON) / word_count;
+    let connection_density = count_matches(CONNECTION_LEXICON)  / word_count;
+    let fatigue_density    = count_matches(FATIGUE_LEXICON)     / word_count;
+
+    // Structural signal boosts
+    let has_question = classify_text.contains('?');
+    let exploration_boost = if has_question { 0.02 } else { 0.0 };
+    let is_short = text.chars().count() < 100;
+    let fatigue_boost = if is_short { 0.02 } else { 0.0 };
+
+    let scores = [
+        (threat_density,                        EmotionCluster::Threat),
+        (success_density,                       EmotionCluster::Success),
+        (exploration_density + exploration_boost, EmotionCluster::Exploration),
+        (connection_density,                    EmotionCluster::Connection),
+        (fatigue_density + fatigue_boost,       EmotionCluster::Fatigue),
+    ];
+
+    // Find winning cluster; tie-break to Neutral
+    let (best_score, best_cluster) = scores
+        .iter()
+        .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|&(s, c)| (s, c))
+        .unwrap_or((0.0, EmotionCluster::Neutral));
+
+    let cluster = if best_score < 0.005 { EmotionCluster::Neutral } else { best_cluster };
+
+    // Derive valence and arousal from cluster
+    let (valence, arousal) = match cluster {
+        EmotionCluster::Threat      => (-0.6, 0.8),
+        EmotionCluster::Success     => ( 0.7, 0.5),
+        EmotionCluster::Exploration => ( 0.3, 0.6),
+        EmotionCluster::Connection  => ( 0.5, 0.3),
+        EmotionCluster::Fatigue     => (-0.3, 0.2),
+        EmotionCluster::Neutral     => ( 0.0, 0.3),
+    };
+
+    Some(ClassifierOutput { valence, arousal, cluster })
+}
+
+/// Apply classifier output to PhysiologicalState with alpha=0.05 EMA smoothing.
+/// Per D-02: alpha=0.05 means ~20 readings to converge.
+/// mortality_salience hard-capped at 0.8 to preserve safety_bundle.rs cap.
+pub fn update_physiology_from_classifier(output: &ClassifierOutput) {
+    const ALPHA: f32 = 0.05;
+    let gains = HormoneGains::from_cluster(output.cluster);
+
+    if let Ok(mut state) = physiology_store().lock() {
+        // Map gain deltas to target values: positive gains push toward 1.0, negative toward 0.0
+        let smooth = |current: f32, delta: f32| -> f32 {
+            let target = if delta >= 0.0 { delta } else { 0.0 }; // negative delta = pull to 0
+            let raw = current * (1.0 - ALPHA) + target * ALPHA;
+            raw.clamp(0.01, 1.0)
+        };
+
+        state.cortisol       = smooth(state.cortisol,       gains.cortisol_delta);
+        state.dopamine       = smooth(state.dopamine,       gains.dopamine_delta);
+        state.serotonin      = smooth(state.serotonin,      gains.serotonin_delta);
+        state.acetylcholine  = smooth(state.acetylcholine,  gains.ach_delta);
+        state.norepinephrine = smooth(state.norepinephrine, gains.ne_delta);
+        state.oxytocin       = smooth(state.oxytocin,       gains.oxytocin_delta);
+
+        // mortality_salience: classifier-driven but capped at 0.8
+        // safety_bundle.rs check_mortality_salience_cap() reads operational HormoneState.
+        // Physiological cap ensures pituitary pass-through never exceeds 0.8.
+        let raw_ms = state.mortality_salience * (1.0 - ALPHA) + gains.mortality_delta.max(0.0) * ALPHA;
+        state.mortality_salience = raw_ms.clamp(0.0, 0.8);
+
+        state.last_updated = chrono::Utc::now().timestamp();
+    }
+}
+
+/// Apply prediction error aggregate to PhysiologicalState -- second input channel (Phase 28 / AINF-03).
+/// Additive with update_physiology_from_classifier per D-06. Same alpha=0.05 smoothing.
+///
+/// Mapping rules (D-07):
+/// - Sustained high error (>=2 ticks > 0.6): cortisol + norepinephrine rise.
+/// - Sustained low error (<0.2, 0 ticks): serotonin rises.
+/// - Novel spike (single tentacle high, others low): norepinephrine rises independently.
+///
+/// Does NOT touch: mortality_salience, dopamine, acetylcholine, oxytocin.
+pub fn update_physiology_from_prediction_errors(
+    aggregate_error: f32,
+    sustained_high_ticks: u32,
+    is_single_spike: bool,
+) {
+    const ALPHA: f32 = 0.05;
+
+    if let Ok(mut state) = physiology_store().lock() {
+        let smooth = |current: f32, target: f32| -> f32 {
+            (current * (1.0 - ALPHA) + target * ALPHA).clamp(0.01, 1.0)
+        };
+
+        // Sustained high prediction error → stress response (D-07)
+        if sustained_high_ticks >= 2 && aggregate_error > 0.6 {
+            state.cortisol = smooth(state.cortisol, aggregate_error);
+            state.norepinephrine = smooth(state.norepinephrine, aggregate_error * 0.8);
+        }
+        // Sustained low prediction error → contentment (D-07)
+        else if aggregate_error < 0.2 && sustained_high_ticks == 0 {
+            state.serotonin = smooth(state.serotonin, 0.7);
+        }
+
+        // Novel spike (independent of sustained-high gate) → novelty/alerting signal (D-07)
+        if is_single_spike {
+            state.norepinephrine = smooth(state.norepinephrine, 0.9);
+        }
+
+        state.last_updated = chrono::Utc::now().timestamp();
+    }
+}
+
+/// Apply exponential decay to all 7 physiological scalars.
+/// Floor is 0.01 so hormones never fully disappear — they linger.
+pub fn apply_physiology_decay(state: &mut PhysiologicalState, now: i64) {
+    let elapsed = (now - state.last_updated).max(0) as f32;
+    if elapsed < 1.0 { return; } // no-op if called within same second
+    let decay = |val: f32, half_life: f32| -> f32 {
+        let factor = 0.5f32.powf(elapsed / half_life);
+        (val * factor).clamp(0.01, 1.0)
+    };
+    state.cortisol          = decay(state.cortisol,          1200.0); // 20 min
+    state.dopamine          = decay(state.dopamine,           600.0); // 10 min
+    state.serotonin         = decay(state.serotonin,         1800.0); // 30 min
+    state.acetylcholine     = decay(state.acetylcholine,      300.0); //  5 min
+    state.norepinephrine    = decay(state.norepinephrine,     300.0); //  5 min
+    state.oxytocin          = decay(state.oxytocin,          1800.0); // 30 min
+    state.mortality_salience = decay(state.mortality_salience, 3600.0); // 60 min
+    state.last_updated = now;
+}
 
 // ── Hypothalamus: the controller that adjusts hormones ───────────────────────
 
@@ -404,6 +754,17 @@ pub fn hypothalamus_tick() {
         *guard = state.clone();
     }
 
+    // ── Physiological layer: decay + persist (Phase 27 / HORM-01) ──────────
+    {
+        let now_phys = chrono::Utc::now().timestamp();
+        if let Ok(mut p) = physiology_store().lock() {
+            apply_physiology_decay(&mut p, now_phys);
+            persist_physiology_to_db(&p);
+            // mortality_salience pass-through: safety_bundle.rs reads operational HormoneState
+            state.mortality_salience = p.mortality_salience;
+        }
+    }
+
     // Persist to DB for restart recovery
     persist_to_db(&state);
 }
@@ -418,6 +779,20 @@ pub fn start_hypothalamus(app: tauri::AppHandle) {
             tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
             crate::supervisor::heartbeat("homeostasis");
             hypothalamus_tick();
+
+            // ── Physiological threshold crossings (Phase 27 / HORM-09) ─────────
+            {
+                let p = get_physiology();
+                if p.cortisol > 0.6 {
+                    emit_hormone_threshold(&app, "cortisol", p.cortisol, "^", "elevated stress");
+                }
+                if p.norepinephrine > 0.6 {
+                    emit_hormone_threshold(&app, "norepinephrine", p.norepinephrine, "^", "high alertness");
+                }
+                if p.mortality_salience > 0.6 {
+                    emit_hormone_threshold(&app, "mortality_salience", p.mortality_salience, "^", "existential awareness elevated");
+                }
+            }
 
             // Emit hormone state for HUD/dashboard
             let hormones = get_hormones();
@@ -687,6 +1062,44 @@ fn persist_to_db(state: &HormoneState) {
     }
 }
 
+// ── Physiological State DB persistence (Phase 27 / HORM-01) ─────────────────
+
+fn load_physiology_from_db() -> Option<PhysiologicalState> {
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    let conn = rusqlite::Connection::open(&db_path).ok()?;
+    let json: String = conn.query_row(
+        "SELECT value FROM settings WHERE key = 'physiology'",
+        [],
+        |row| row.get(0),
+    ).ok()?;
+    serde_json::from_str(&json).ok()
+}
+
+fn persist_physiology_to_db(state: &PhysiologicalState) {
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+        if let Ok(json) = serde_json::to_string(state) {
+            let _ = conn.execute(
+                "INSERT INTO settings (key, value) VALUES ('physiology', ?1)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                rusqlite::params![json],
+            );
+        }
+    }
+}
+
+/// Emit a threshold crossing event to the ActivityStrip.
+fn emit_hormone_threshold(app: &tauri::AppHandle, hormone: &str, value: f32, direction: &str, reason: &str) {
+    let summary = format!("{} {} {:.2} -- {}", hormone, direction, value, reason);
+    let _ = app.emit_to("main", "blade_activity_log", serde_json::json!({
+        "module":        "homeostasis.physiology",
+        "action":        "threshold_crossing",
+        "human_summary": crate::safe_slice(&summary, 200),
+        "payload_id":    serde_json::Value::Null,
+        "timestamp":     chrono::Utc::now().timestamp(),
+    }));
+}
+
 // ── Pituitary Gland: translate hormones → per-module directives ──────────────
 //
 // The hypothalamus produces abstract state (arousal, energy, trust...).
@@ -709,44 +1122,59 @@ pub struct ModuleDirective {
 }
 
 /// GH (Growth Hormone) — should BLADE actively seek new capabilities?
+/// Blended with physiological dopamine at 0.7/0.3 weight (Phase 27 / HORM-01).
 pub fn growth_hormone() -> f32 {
     let h = get_hormones();
+    let p = get_physiology();
     // Grow when: energy is high, user is idle (exploration opportunity), trust is decent
-    let base = h.exploration * 0.5 + h.energy_mode * 0.3 + h.trust * 0.2;
-    base.clamp(0.0, 1.0)
+    let operational = h.exploration * 0.5 + h.energy_mode * 0.3 + h.trust * 0.2;
+    let blended = operational * 0.7 + p.dopamine * 0.3;
+    blended.clamp(0.0, 1.0)
 }
 
 /// TSH (Thyroid-Stimulating) — how aggressively should background modules run?
+/// Blended with physiological serotonin at 0.7/0.3 weight (Phase 27 / HORM-01).
 pub fn thyroid_stimulating() -> f32 {
     let h = get_hormones();
+    let p = get_physiology();
     // High metabolism when: energy is high, arousal is moderate (not sleeping, not panicking)
-    let base = h.energy_mode * 0.6 + (1.0 - h.urgency.abs()) * 0.2 + h.arousal * 0.2;
-    base.clamp(0.0, 1.0)
+    let operational = h.energy_mode * 0.6 + (1.0 - h.urgency.abs()) * 0.2 + h.arousal * 0.2;
+    let blended = operational * 0.7 + p.serotonin * 0.3;
+    blended.clamp(0.0, 1.0)
 }
 
 /// ACTH — how cautious should decision-making be?
-/// High ACTH = high cortisol = more cautious
+/// High ACTH = high cortisol = more cautious.
+/// Blended with physiological cortisol at 0.7/0.3 weight (Phase 27 / HORM-01).
 pub fn acth() -> f32 {
     let h = get_hormones();
+    let p = get_physiology();
     // Cautious when: urgency is high (something's wrong), trust is low
-    let base = h.urgency * 0.5 + (1.0 - h.trust) * 0.3 + (1.0 - h.exploration) * 0.2;
-    base.clamp(0.0, 1.0)
+    let operational = h.urgency * 0.5 + (1.0 - h.trust) * 0.3 + (1.0 - h.exploration) * 0.2;
+    let blended = operational * 0.7 + p.cortisol * 0.3;
+    blended.clamp(0.0, 1.0)
 }
 
 /// Oxytocin — how personal/warm should BLADE be?
+/// Blended with physiological oxytocin at 0.7/0.3 weight (Phase 27 / HORM-01).
 pub fn oxytocin() -> f32 {
     let h = get_hormones();
+    let p = get_physiology();
     // Warm when: trust is high, urgency is low (not in crisis mode)
-    let base = h.trust * 0.6 + (1.0 - h.urgency) * 0.3 + h.arousal * 0.1;
-    base.clamp(0.0, 1.0)
+    let operational = h.trust * 0.6 + (1.0 - h.urgency) * 0.3 + h.arousal * 0.1;
+    let blended = operational * 0.7 + p.oxytocin * 0.3;
+    blended.clamp(0.0, 1.0)
 }
 
 /// ADH (vasopressin) — how aggressively should BLADE conserve resources?
+/// Blended with physiological norepinephrine at 0.7/0.3 weight (Phase 27 / HORM-01).
 pub fn adh() -> f32 {
     let h = get_hormones();
+    let p = get_physiology();
     // Conserve when: energy is low, hunger is low (no urgent work needing resources)
-    let base = (1.0 - h.energy_mode) * 0.5 + (1.0 - h.hunger) * 0.3 + h.thirst * 0.2;
-    base.clamp(0.0, 1.0)
+    let operational = (1.0 - h.energy_mode) * 0.5 + (1.0 - h.hunger) * 0.3 + h.thirst * 0.2;
+    let blended = operational * 0.7 + p.norepinephrine * 0.3;
+    blended.clamp(0.0, 1.0)
 }
 
 /// Get a concrete directive for a specific module based on current pituitary output.
@@ -863,6 +1291,13 @@ pub fn homeostasis_relearn_circadian() -> Vec<f32> {
     let profile = compute_circadian_from_activity();
     save_cached_profile(&profile);
     profile.to_vec()
+}
+
+/// Returns the current physiological hormone state (Phase 27 / HORM-08).
+/// Read-only — no mutation path. Exposed for DoctorPane and diagnostic UI.
+#[tauri::command]
+pub fn homeostasis_get_physiology() -> PhysiologicalState {
+    get_physiology()
 }
 
 use tauri::Emitter;
