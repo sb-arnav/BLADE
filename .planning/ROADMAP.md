@@ -88,7 +88,12 @@
   2. When BLADE cannot answer confidently, it says "I'm not confident about X — want me to observe first?" instead of hallucinating or silently refusing
   3. Identified gaps appear in SQLite and are retrievable by evolution.rs for Voyager-loop skill generation
   4. DoctorPane shows a metacognitive signal row with current confidence, uncertainty count, and gap count
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 25-01-PLAN.md — MetacognitiveState foundation: struct, persistence, gap log table, public API
+- [ ] 25-02-PLAN.md — Reasoning engine integration: confidence-delta detection, secondary verifier, initiative phrasing, tool-loop fallback
+- [ ] 25-03-PLAN.md — DoctorPane signal: SignalClass::Metacognitive in Rust + TypeScript, compute function, display config
 
 ### Phase 26: Safety Bundle
 
@@ -176,7 +181,7 @@
 | 22. Voyager loop closure | v1.3 | — | Complete | 2026-05-01 |
 | 23. Verifiable reward + OOD eval | v1.3 | — | Complete | 2026-05-01 |
 | 24. Skill consolidation in dream_mode | v1.3 | — | Complete | 2026-05-02 |
-| 25. Metacognitive Controller | v1.4 | 0/? | Not started | - |
+| 25. Metacognitive Controller | v1.4 | 0/3 | In progress | - |
 | 26. Safety Bundle | v1.4 | 0/? | Not started | - |
 | 27. Hormone Physiology | v1.4 | 0/? | Not started | - |
 | 28. Active Inference Loop | v1.4 | 0/? | Not started | - |
@@ -211,4 +216,4 @@
 
 ---
 
-*Last updated: 2026-05-02 — v1.4 ROADMAP.md appended via /gsd-new-project roadmapper. Phases 25–31 derived from REQUIREMENTS.md (42 requirements, 100% mapped). v1.3 collapsed into archive block.*
+*Last updated: 2026-05-02 — Phase 25 planned (3 plans in 2 waves). v1.4 ROADMAP.md appended via /gsd-new-project roadmapper. Phases 25–31 derived from REQUIREMENTS.md (42 requirements, 100% mapped). v1.3 collapsed into archive block.*
