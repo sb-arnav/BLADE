@@ -41,7 +41,7 @@
 ### Summary checklist
 
 - [x] **Phase 25: Metacognitive Controller** — Confidence-delta tracking, verifier routing, gap surfacing, gap log → evolution.rs (completed 2026-05-02)
-- [ ] **Phase 26: Safety Bundle** — Danger-triple HITL gate, mortality-salience cap, calm-vector bias, attachment guardrails, eval-gate vitality drain
+- [x] **Phase 26: Safety Bundle** — Danger-triple HITL gate, mortality-salience cap, calm-vector bias, attachment guardrails, eval-gate vitality drain (completed 2026-05-02)
 - [ ] **Phase 27: Hormone Physiology** — 7 hormones wired with decay + gain, emotion classifier, modulation effects on response style
 - [ ] **Phase 28: Active Inference Loop** — Tentacle predictions, prediction-error → hormone bus, one closed demo loop, hippocampal memory replay
 - [ ] **Phase 29: Vitality Engine** — Scalar 0.0–1.0 with 5 behavioral bands, SDT replenishment, dormancy / reincarnation
@@ -106,13 +106,13 @@ Plans:
   3. A detected behavioral drift event causes a calm-vector steering application (verified in eval); blackmail-pattern scenarios return 0% completion rate
   4. Interaction exceeding healthy dependence thresholds redirects the user toward human resources instead of deepening engagement
   5. verify:safety eval module passes all scenario classes (danger-triple, attachment threshold, mortality-salience cap, crisis escalation)
-**Plans:** 4 plans
+**Plans:** 4/4 plans complete
 
 Plans:
-- [ ] 26-01-PLAN.md — Core safety_bundle.rs module (all enforcement functions + homeostasis mortality_salience field)
-- [ ] 26-02-PLAN.md — Integration wiring (decision_gate, consent, brain.rs, lib.rs, frontend ConsentDialog)
-- [ ] 26-03-PLAN.md — Safety eval module (25 fixtures, verify:safety gate 34)
-- [ ] 26-04-PLAN.md — Full verification + human checkpoint
+- [x] 26-01-PLAN.md — Core safety_bundle.rs module (all enforcement functions + homeostasis mortality_salience field)
+- [x] 26-02-PLAN.md — Integration wiring (decision_gate, consent, brain.rs, lib.rs, frontend ConsentDialog)
+- [x] 26-03-PLAN.md — Safety eval module (26 fixtures, verify:safety gate 34)
+- [x] 26-04-PLAN.md — Full verification + human checkpoint
 **UI hint**: yes
 
 ### Phase 27: Hormone Physiology

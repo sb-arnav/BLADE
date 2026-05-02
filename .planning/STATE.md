@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Phases
-status: planning
-stopped_at: Completed 26-04-PLAN.md (verification)
-last_updated: "2026-05-02T15:25:22.329Z"
+status: executing
+stopped_at: Phase 26 complete — safety bundle verified
+last_updated: "2026-05-02T19:35:00.000Z"
 last_activity: 2026-05-02
 progress:
   total_phases: 7
@@ -20,14 +20,14 @@ progress:
 **Current milestone:** v1.4 — Cognitive Architecture (started 2026-05-02)
 **Last shipped milestone:** v1.3 — Self-extending Agent Substrate (closed 2026-05-02 at Phase 24)
 **Prior shipped:** v1.2 (2026-04-30), v1.1 (2026-04-27), v1.0 (2026-04-19)
-**Current Focus:** Phase 25 — Metacognitive Controller
+**Current Focus:** Phase 27 — Hormone Physiology
 **Status:** Ready to plan
 
 ## Current Position
 
-Phase: 26
+Phase: 27
 Plan: Not started
-Status: Executing Phase 25
+Status: Phase 26 complete, advancing to 27
 Last activity: 2026-05-02
 
 Progress: [██████████] 100%
@@ -56,6 +56,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-02)
 - v1.4 M-13 (implicit): Phase 25 ships first as independent metacognition work; organism features (27-29) gated behind safety bundle (26)
 - v1.3 M-09 (carried forward): No organism layer without safety bundle — steelman Arg 4 + Arg 10 verdict
 - Phase 26 safety bundle all 4 static gates pass first-run -- verify:safety gate 34 green
+- Phase 26 complete: safety_bundle.rs (690 lines), 26/26 eval fixtures, 5/5 must-haves verified — safety gate unblocks Phases 27-29
 
 ### Blockers/Concerns
 
