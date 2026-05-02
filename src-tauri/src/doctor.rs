@@ -1376,6 +1376,17 @@ mod tests {
         assert_eq!(classify_drift(true, None), Severity::Red);
     }
 
+    // META-05 test stub -- uncomment after Plan 03 adds SignalClass::Metacognitive:
+    // #[test]
+    // fn test_metacognitive_signal() {
+    //     let class = SignalClass::Metacognitive;
+    //     let json = serde_json::to_string(&class).unwrap();
+    //     assert_eq!(json, "\"metacognitive\"");
+    //     // After compute_metacognitive_signal is implemented:
+    //     // let signal = compute_metacognitive_signal().unwrap();
+    //     // assert_eq!(signal.class, SignalClass::Metacognitive);
+    // }
+
     // ── Plan 17-04: suggested_fix verbatim lock (D-18 / UI-SPEC § 15) ────────
 
     #[test]
