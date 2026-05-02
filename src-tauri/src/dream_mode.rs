@@ -474,11 +474,11 @@ async fn task_prediction_replay() -> String {
             platform, error, top_signal, ts, platform
         );
         let _ = crate::typed_memory::store_typed_memory(
-            "Decision",
+            crate::typed_memory::MemoryCategory::Decision,
             &content,
-            (*error).min(1.0),
             "prediction_replay",
-        ).await;
+            Some((*error).min(1.0) as f64),
+        );
         replayed += 1;
     }
 
