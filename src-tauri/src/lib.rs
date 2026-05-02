@@ -17,7 +17,7 @@ mod health;
 mod indexer;
 mod self_upgrade;
 mod pentest;
-mod session_handoff;
+pub mod session_handoff; // Phase 24 v1.3 — pub for skill_validator bin (list --diff reads SessionHandoff)
 mod computer_use;
 mod deeplearn;
 mod discord;
@@ -54,7 +54,7 @@ mod capability_probe;
 mod character;
 mod clipboard;
 mod commands;
-mod config;
+pub mod config; // Phase 24 v1.3 — pub for skill_validator bin (list --diff reads blade_config_dir)
 mod context;
 mod crypto;
 mod db;
