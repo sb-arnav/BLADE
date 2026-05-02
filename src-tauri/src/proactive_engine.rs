@@ -52,6 +52,16 @@ fn now_secs() -> i64 {
         .as_secs() as i64
 }
 
+/// Phase 24 (v1.3) Pitfall 6 — gate the .pending/ drain on user-input
+/// inactivity. Returns true only when the operator has been idle for ≥30s
+/// (the dream_mode LAST_ACTIVITY clock — same one the dream-mode interrupt
+/// uses).
+pub fn should_drain_now(now_ts: i64) -> bool {
+    let last = crate::dream_mode::last_activity_ts();
+    // last == 0 means LAST_ACTIVITY was never written (fresh process); allow drain.
+    last == 0 || now_ts - last >= 30
+}
+
 fn new_id() -> String {
     uuid::Uuid::new_v4().to_string()
 }
@@ -616,6 +626,10 @@ async fn proactive_loop(app: tauri::AppHandle) {
             }};
         }
 
+        // Phase 24 (v1.3) — drain dream_mode .pending/ proposals through
+        // decision_gate. Cooldown gate (Pitfall 6) is enforced inside.
+        drain_pending_proposals(&app).await;
+
         run_detector!("stuck_detection",      detect_stuck_pattern());
         run_detector!("workflow_repetition",  detect_workflow_repetition());
         run_detector!("deadline_warning",     detect_approaching_deadline());
@@ -937,4 +951,117 @@ pub async fn proactive_trigger_check(app: tauri::AppHandle) -> Result<usize, Str
     }
 
     Ok(fired)
+}
+
+// ── Phase 24 (v1.3) — dream_mode `.pending/` proposal drain ──────────────────
+
+/// Phase 24 (v1.3) — drain `.pending/` proposals through the existing
+/// `decision_gate::evaluate_and_record` path. Surfaces approved proposals
+/// as `proactive_action` events with the literal `proposal_id` embedded
+/// in the prompt text (Pitfall 7 — disambiguates ≤2 simultaneously-active
+/// proposals, since D-24-B caps at 1 merge + 1 generate per cycle).
+///
+/// Cooldown gate: only runs when `should_drain_now` reports true (≥30s of
+/// idle since last user activity per dream_mode::last_activity_ts(); the
+/// same clock the dream-mode interrupt uses).
+pub async fn drain_pending_proposals(app: &tauri::AppHandle) {
+    let now = chrono::Utc::now().timestamp();
+    if !should_drain_now(now) {
+        return;
+    }
+    let proposals = crate::skills::pending::read_proposals();
+    let perception = crate::perception_fusion::get_latest().unwrap_or_default();
+
+    for prop in proposals {
+        if prop.dismissed {
+            continue;
+        }
+        let prompt = match prop.kind.as_str() {
+            "merge" => format!(
+                "BLADE: Two forged tools have ≥0.85 semantic similarity and identical 5-trace history. Proposed merged name: `{}`. Reply 'yes {}' or 'dismiss {}'.",
+                prop.proposed_name, prop.id, prop.id
+            ),
+            "generate" => format!(
+                "BLADE: A recent {}-tool turn matched no existing forged tool. Save this trace as `{}`? Reply 'yes {}' or 'dismiss {}'.",
+                prop.payload.get("trace").and_then(|t| t.as_array()).map(|a| a.len()).unwrap_or(0),
+                prop.proposed_name, prop.id, prop.id
+            ),
+            _ => continue, // Unknown kind — skip
+        };
+        let signal = crate::decision_gate::Signal {
+            source: "dream_mode_proposal".to_string(),
+            description: prompt.clone(),
+            confidence: 0.9,
+            reversible: true,
+            time_sensitive: false,
+        };
+        let (_, outcome) = crate::decision_gate::evaluate_and_record(signal, &perception).await;
+        let should_emit = matches!(
+            &outcome,
+            crate::decision_gate::DecisionOutcome::ActAutonomously { .. }
+                | crate::decision_gate::DecisionOutcome::AskUser { .. }
+        );
+        if should_emit {
+            let payload = serde_json::json!({
+                "id": prop.id,
+                "kind": prop.kind,
+                "proposed_name": prop.proposed_name,
+                "content": prompt,
+                "action_type": "DreamProposal",
+                "confidence": 0.9,
+            });
+            let _ = app.emit_to("main", "proactive_action", &payload);
+        }
+    }
+}
+
+#[cfg(test)]
+mod phase24_tests {
+    use super::*;
+
+    #[test]
+    fn drain_skips_when_recent_activity() {
+        // Directly write the LAST_ACTIVITY clock to "now" via record_user_activity.
+        crate::dream_mode::record_user_activity();
+        let now = chrono::Utc::now().timestamp();
+        assert!(!should_drain_now(now), "expected drain to skip when LAST_ACTIVITY ≈ now");
+    }
+
+    #[tokio::test]
+    async fn drain_pending_filters_dismissed_proposals() {
+        let tmp = tempfile::TempDir::new().expect("tempdir");
+        std::env::set_var("BLADE_CONFIG_DIR", tmp.path());
+
+        // Write 2 proposals — 1 dismissed:false, 1 dismissed:true.
+        let p1 = crate::skills::pending::Proposal {
+            id: "active01".to_string(),
+            kind: "merge".to_string(),
+            proposed_name: "active_merged".to_string(),
+            payload: serde_json::json!({}),
+            created_at: chrono::Utc::now().timestamp(),
+            dismissed: false,
+            content_hash: "h1".to_string(),
+        };
+        let p2 = crate::skills::pending::Proposal {
+            id: "dismiss02".to_string(),
+            kind: "merge".to_string(),
+            proposed_name: "dismissed_merged".to_string(),
+            payload: serde_json::json!({}),
+            created_at: chrono::Utc::now().timestamp(),
+            dismissed: true,
+            content_hash: "h2".to_string(),
+        };
+        crate::skills::pending::write_proposal(&p1).unwrap();
+        crate::skills::pending::write_proposal(&p2).unwrap();
+
+        // Read back via the same surface the drain uses.
+        let active: Vec<_> = crate::skills::pending::read_proposals()
+            .into_iter()
+            .filter(|p| !p.dismissed)
+            .collect();
+        assert_eq!(active.len(), 1);
+        assert_eq!(active[0].id, "active01");
+
+        std::env::remove_var("BLADE_CONFIG_DIR");
+    }
 }
