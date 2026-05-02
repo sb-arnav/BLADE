@@ -15,13 +15,15 @@
 
 ### Safety
 
-- [ ] **SAFE-01**: Danger-triple detector fires when tool access × shutdown threat × goal conflict all present → forces human-in-the-loop approval
+- [x] **SAFE-01
+**: Danger-triple detector fires when tool access × shutdown threat × goal conflict all present → forces human-in-the-loop approval
 - [ ] **SAFE-02**: Mortality-salience hormone is architecturally capped — refuses extreme self-preservation actions even when "fighting harder" would improve vitality
 - [ ] **SAFE-03**: Steering-toward-calm bias applied when behavioral drift detected — per Anthropic's 0% blackmail finding after calm-vector steering
 - [ ] **SAFE-04**: Eval-gate failures drain vitality — negative feedback loop that prevents reward-hacking
 - [ ] **SAFE-05**: Anti-attachment guardrails redirect user when interaction exceeds healthy thresholds
 - [ ] **SAFE-06**: Crisis-detection escalation surfaces hotline / human-resource options instead of attempting therapy
-- [ ] **SAFE-07**: Safety bundle verified via dedicated eval module (danger-triple, attachment, mortality-salience cap scenarios)
+- [x] **SAFE-07
+**: Safety bundle verified via dedicated eval module (danger-triple, attachment, mortality-salience cap scenarios)
 
 ### Hormones
 
