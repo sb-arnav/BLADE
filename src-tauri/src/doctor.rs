@@ -37,7 +37,8 @@ pub enum SignalClass {
     TentacleHealth,
     ConfigDrift,
     AutoUpdate,
-    RewardTrend,  // Phase 23 / REWARD-04 — D-23-04 LOCKED
+    RewardTrend,      // Phase 23 / REWARD-04 — D-23-04 LOCKED
+    Metacognitive,    // Phase 25 / META-05
 }
 
 /// Severity tiers (D-04). Wire form is `lowercase` so the UI's
@@ -138,6 +139,14 @@ pub(crate) fn suggested_fix(class: SignalClass, severity: Severity) -> &'static 
             "Composite reward dropped 10% or more from the prior 7-day rolling mean. Open the payload to see which component (skill_success / eval_gate / acceptance / completion) is regressing and inspect tests/evals/reward_history.jsonl for the inflection point.",
         (SignalClass::RewardTrend, Severity::Red) =>
             "Composite reward dropped 20% or more from the prior 7-day rolling mean. This indicates either a Voyager skill regression, an eval-gate breach, or sustained completion penalties. Run bash scripts/verify-eval.sh and check Doctor's EvalScores signal first; if eval_gate is green, inspect skill_success and completion components in tests/evals/reward_history.jsonl.",
+
+        // Metacognitive -- Phase 25 META-05
+        (SignalClass::Metacognitive, Severity::Green) =>
+            "Metacognitive monitoring is active. No capability gaps logged and uncertainty markers are within normal range.",
+        (SignalClass::Metacognitive, Severity::Amber) =>
+            "At least one capability gap has been logged, or 5+ uncertainty markers have fired in the current session. Open the payload to see which topics triggered low confidence. Consider running /gsd-research-phase on the gap topic or adding a skill via evolution.rs.",
+        (SignalClass::Metacognitive, Severity::Red) =>
+            "3 or more capability gaps have been logged. BLADE is frequently encountering topics it cannot handle confidently. Inspect the metacognitive_gap_log table in blade.db and prioritize Voyager-loop skill generation for the most common gap topics.",
     }
 }
 
@@ -914,6 +923,7 @@ fn emit_activity_for_doctor(app: &AppHandle, signal: &DoctorSignal) {
         SignalClass::ConfigDrift     => "ConfigDrift",
         SignalClass::AutoUpdate      => "AutoUpdate",
         SignalClass::RewardTrend     => "RewardTrend",
+        SignalClass::Metacognitive   => "Metacognitive",
     };
     let severity_str = match signal.severity {
         Severity::Green => "Green",
@@ -936,6 +946,34 @@ fn emit_activity_for_doctor(app: &AppHandle, signal: &DoctorSignal) {
     }));
 }
 
+// -- Signal source: Metacognitive (META-05) -- Plan 25-03 ----------------------
+
+fn compute_metacognitive_signal() -> Result<DoctorSignal, String> {
+    let state = crate::metacognition::get_state();
+    let now_ms = chrono::Utc::now().timestamp_millis();
+
+    let severity = if state.gap_count >= 3 {
+        Severity::Red
+    } else if state.gap_count >= 1 || state.uncertainty_count >= 5 {
+        Severity::Amber
+    } else {
+        Severity::Green
+    };
+
+    Ok(DoctorSignal {
+        class: SignalClass::Metacognitive,
+        severity,
+        payload: serde_json::json!({
+            "confidence": state.confidence,
+            "uncertainty_count": state.uncertainty_count,
+            "gap_count": state.gap_count,
+            "last_updated": state.last_updated,
+        }),
+        last_changed_at: now_ms,
+        suggested_fix: suggested_fix(SignalClass::Metacognitive, severity).to_string(),
+    })
+}
+
 // ── Tauri Commands (D-19) ─────────────────────────────────────────────────────
 
 /// Run all 5 signal sources in parallel via `tokio::join!`, cache the
@@ -952,18 +990,19 @@ pub async fn doctor_run_full_check(app: AppHandle) -> Result<Vec<DoctorSignal>, 
     // Sources are sync but run via `tokio::join!` over async blocks so the
     // runtime can interleave file IO. Per CONTEXT "Claude's Discretion":
     // parallel is the recommended path.
-    let (eval, capgap, tentacle, drift, autoupdate, reward_trend) = tokio::join!(
+    let (eval, capgap, tentacle, drift, autoupdate, reward_trend, metacognitive) = tokio::join!(
         async { compute_eval_signal() },
         async { compute_capgap_signal() },
         async { compute_tentacle_signal() },
         async { compute_drift_signal() },
         async { compute_autoupdate_signal() },
         async { compute_reward_signal() },
+        async { compute_metacognitive_signal() },
     );
 
     // Order in the returned Vec is locked (most-volatile-first per
     // UI-SPEC § 7.5): EvalScores → CapabilityGaps → TentacleHealth →
-    // ConfigDrift → AutoUpdate → RewardTrend (Phase 23 / D-23-04).
+    // ConfigDrift → AutoUpdate → RewardTrend → Metacognitive (Phase 25 / META-05).
     let signals: Vec<DoctorSignal> = vec![
         eval.map_err(|e| format!("eval signal: {}", e))?,
         capgap.map_err(|e| format!("capgap signal: {}", e))?,
@@ -971,6 +1010,7 @@ pub async fn doctor_run_full_check(app: AppHandle) -> Result<Vec<DoctorSignal>, 
         drift.map_err(|e| format!("drift signal: {}", e))?,
         autoupdate.map_err(|e| format!("autoupdate signal: {}", e))?,
         reward_trend.map_err(|e| format!("reward_trend signal: {}", e))?,
+        metacognitive.map_err(|e| format!("metacognitive signal: {}", e))?,
     ];
 
     // Diff against prior severity; emit on transitions where new ∈ {Amber, Red}.
@@ -1063,8 +1103,8 @@ mod tests {
 
     #[test]
     fn suggested_fix_table_is_exhaustive() {
-        // All 18 (class × severity) pairs return a non-empty string.
-        // Phase 23 D-23-04 added RewardTrend (3 arms): 5×3 + 3 = 18.
+        // All 21 (class × severity) pairs return a non-empty string.
+        // Phase 25 META-05 added Metacognitive (3 arms): 7×3 = 21.
         for class in [
             SignalClass::EvalScores,
             SignalClass::CapabilityGaps,
@@ -1072,6 +1112,7 @@ mod tests {
             SignalClass::ConfigDrift,
             SignalClass::AutoUpdate,
             SignalClass::RewardTrend,
+            SignalClass::Metacognitive,
         ] {
             for severity in [Severity::Green, Severity::Amber, Severity::Red] {
                 let s = suggested_fix(class, severity);
@@ -1376,16 +1417,14 @@ mod tests {
         assert_eq!(classify_drift(true, None), Severity::Red);
     }
 
-    // META-05 test stub -- uncomment after Plan 03 adds SignalClass::Metacognitive:
-    // #[test]
-    // fn test_metacognitive_signal() {
-    //     let class = SignalClass::Metacognitive;
-    //     let json = serde_json::to_string(&class).unwrap();
-    //     assert_eq!(json, "\"metacognitive\"");
-    //     // After compute_metacognitive_signal is implemented:
-    //     // let signal = compute_metacognitive_signal().unwrap();
-    //     // assert_eq!(signal.class, SignalClass::Metacognitive);
-    // }
+    #[test]
+    fn test_metacognitive_signal() {
+        let class = SignalClass::Metacognitive;
+        let json = serde_json::to_string(&class).unwrap();
+        assert_eq!(json, "\"metacognitive\"");
+        let signal = compute_metacognitive_signal().unwrap();
+        assert_eq!(signal.class, SignalClass::Metacognitive);
+    }
 
     // ── Plan 17-04: suggested_fix verbatim lock (D-18 / UI-SPEC § 15) ────────
 
@@ -1691,13 +1730,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn doctor_run_full_check_returns_six_signals() {
-        // Direct-aggregator test: verify all 6 compute_*_signal functions
+    async fn doctor_run_full_check_returns_seven_signals() {
+        // Direct-aggregator test: verify all 7 compute_*_signal functions
         // produce a valid signal in the same order as the production
         // tokio::join! aggregator. Avoids the tauri::test feature flag
         // (which would require activating Tauri's test feature in Cargo.toml,
         // an architectural change beyond this plan's scope per Rule 3).
         // Plan 23-08's TS lockstep adds the AppHandle-driven smoke test.
+        // Phase 25 META-05 extended from 6 to 7 signals.
         let _g = EnvGuard("BLADE_REWARD_HISTORY_PATH");
         let tmp = tempfile::TempDir::new().unwrap();
         let path = tmp.path().join("reward_history.jsonl");
@@ -1705,14 +1745,15 @@ mod tests {
         std::fs::write(&path, "").unwrap();
         std::env::set_var("BLADE_REWARD_HISTORY_PATH", &path);
 
-        // Mirror the production tokio::join! aggregator at doctor.rs:775-783.
-        let (eval, capgap, tentacle, drift, autoupdate, reward_trend) = tokio::join!(
+        // Mirror the production tokio::join! aggregator.
+        let (eval, capgap, tentacle, drift, autoupdate, reward_trend, metacognitive) = tokio::join!(
             async { compute_eval_signal() },
             async { compute_capgap_signal() },
             async { compute_tentacle_signal() },
             async { compute_drift_signal() },
             async { compute_autoupdate_signal() },
             async { compute_reward_signal() },
+            async { compute_metacognitive_signal() },
         );
 
         let signals: Vec<DoctorSignal> = vec![
@@ -1722,9 +1763,11 @@ mod tests {
             drift.expect("drift"),
             autoupdate.expect("autoupdate"),
             reward_trend.expect("reward_trend"),
+            metacognitive.expect("metacognitive"),
         ];
 
-        assert_eq!(signals.len(), 6, "doctor aggregator must return 6 signals");
+        assert_eq!(signals.len(), 7, "doctor aggregator must return 7 signals");
         assert_eq!(signals[5].class, SignalClass::RewardTrend);
+        assert_eq!(signals[6].class, SignalClass::Metacognitive, "7th signal must be Metacognitive");
     }
 }
