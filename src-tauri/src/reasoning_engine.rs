@@ -51,6 +51,12 @@ struct StepEvent {
     step: ReasoningStep,
 }
 
+// ── META-01 threshold ──────────────────────────────────────────────────────────
+
+/// META-01: confidence drop threshold that triggers uncertainty marking.
+/// Locked at 0.3 per REQUIREMENTS.md META-01.
+const CONFIDENCE_DELTA_THRESHOLD: f32 = 0.3;
+
 // ── Database helpers ───────────────────────────────────────────────────────────
 
 fn db_path() -> std::path::PathBuf {
@@ -588,6 +594,85 @@ Respond ONLY as JSON: {{"quality": 7.5}}"#,
     }
 }
 
+// ── META-02: Secondary verifier ───────────────────────────────────────────────
+
+/// META-02: Secondary verifier -- cheap LLM call to validate a low-confidence answer.
+/// Returns (verified: bool, concern: String). Fails open (returns true) on API error.
+async fn secondary_verifier_call(
+    question: &str,
+    answer: &str,
+    concerns: &[String],
+) -> (bool, String) {
+    let config = crate::config::load_config();
+    if config.api_key.is_empty() && config.provider != "ollama" {
+        return (true, String::new()); // fail open
+    }
+    let cheap_model = crate::config::cheap_model_for_provider(&config.provider, &config.model);
+    let system = "You are a strict answer verifier. Evaluate whether the proposed answer is reliable given the concerns raised during reasoning. Return JSON only: {\"verified\": true/false, \"concern\": \"one sentence if not verified\"}".to_string();
+    let user_msg = format!(
+        "Question: {}\nProposed answer: {}\nConcerns raised during reasoning: {}",
+        crate::safe_slice(question, 200),
+        crate::safe_slice(answer, 500),
+        concerns.join("; ")
+    );
+    let msgs = vec![
+        crate::providers::ConversationMessage::System(system),
+        crate::providers::ConversationMessage::User(user_msg),
+    ];
+    match crate::providers::complete_turn(
+        &config.provider,
+        &config.api_key,
+        &cheap_model,
+        &msgs,
+        &crate::providers::no_tools(),
+        config.base_url.as_deref(),
+    )
+    .await
+    {
+        Ok(turn) => {
+            let content = turn.content.trim();
+            // Try to parse JSON response
+            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(content) {
+                let verified = parsed.get("verified").and_then(|v| v.as_bool()).unwrap_or(true);
+                let concern = parsed.get("concern").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                (verified, concern)
+            } else {
+                // If LLM didn't return valid JSON, check for keywords
+                let lower = content.to_lowercase();
+                if lower.contains("\"verified\": false") || lower.contains("\"verified\":false") {
+                    (false, content.to_string())
+                } else {
+                    (true, String::new()) // fail open on parse error
+                }
+            }
+        }
+        Err(_) => (true, String::new()), // fail open on API error
+    }
+}
+
+// ── META-03: Initiative phrasing ──────────────────────────────────────────────
+
+/// META-03: Build the initiative phrasing when BLADE is not confident.
+/// Exact wording per ROADMAP.md success criteria section 2.
+fn build_initiative_response(topic: &str) -> String {
+    format!(
+        "I'm not confident about {} \u{2014} want me to observe first?",
+        crate::safe_slice(topic, 120)
+    )
+}
+
+/// Extract a short topic descriptor from the question for initiative phrasing.
+fn extract_topic(question: &str) -> String {
+    // Use first meaningful clause (up to ~60 chars) as the topic
+    let trimmed = question.trim();
+    let topic = if let Some(pos) = trimmed.find(|c: char| c == '?' || c == '.' || c == '\n') {
+        &trimmed[..pos.min(trimmed.len())]
+    } else {
+        trimmed
+    };
+    crate::safe_slice(topic, 60).to_string()
+}
+
 // ── Main reasoning pipeline ────────────────────────────────────────────────────
 
 /// Full System 2 reasoning pipeline.
@@ -623,6 +708,9 @@ pub async fn reason_through(
 
     let mut steps: Vec<ReasoningStep> = Vec::new();
     let mut step_num = 1i32;
+    // META-01: track uncertainty flags across steps
+    let mut any_uncertainty_flag = false;
+    let mut uncertainty_concerns: Vec<String> = Vec::new();
 
     // Step 2: for each sub-problem, analyze → critique → maybe revise
     for sub_problem in &sub_problems {
@@ -641,6 +729,21 @@ pub async fn reason_through(
 
         steps.push(step.clone());
 
+        // META-01: confidence-delta detection
+        if steps.len() >= 2 {
+            let prior_conf = steps[steps.len() - 2].confidence;
+            let delta = prior_conf - step.confidence; // positive = confidence dropped
+            if delta > CONFIDENCE_DELTA_THRESHOLD {
+                any_uncertainty_flag = true;
+                uncertainty_concerns.push(format!(
+                    "Step {} confidence dropped {:.2} (from {:.2} to {:.2}): {}",
+                    step.step_num, delta, prior_conf, step.confidence,
+                    crate::safe_slice(&step.thought, 80)
+                ));
+                crate::metacognition::record_uncertainty_marker(&step.thought, delta);
+            }
+        }
+
         // Emit event so the frontend can show live progress
         let _ = app.emit_to("main", "blade_reasoning_step",
             &StepEvent {
@@ -653,7 +756,36 @@ pub async fn reason_through(
     }
 
     // Step 3: synthesize
-    let (final_answer, total_confidence) = synthesize_answer(&full_question, &steps).await;
+    let (synth_answer, synth_confidence) = synthesize_answer(&full_question, &steps).await;
+
+    // META-02 / META-03: secondary verifier gate
+    let (final_answer, total_confidence) = if any_uncertainty_flag || synth_confidence < 0.5 {
+        let (verified, concern) = secondary_verifier_call(
+            &full_question,
+            &synth_answer,
+            &uncertainty_concerns,
+        ).await;
+        if !verified || synth_confidence < 0.5 {
+            let topic = extract_topic(&full_question);
+            let meta_state = crate::metacognition::get_state();
+            crate::metacognition::log_gap(
+                &topic,
+                question,
+                synth_confidence,
+                meta_state.uncertainty_count,
+            );
+            let initiative = build_initiative_response(&topic);
+            if !concern.is_empty() {
+                (format!("{}\n\n(Verifier concern: {})", initiative, crate::safe_slice(&concern, 200)), synth_confidence)
+            } else {
+                (initiative, synth_confidence)
+            }
+        } else {
+            (synth_answer, synth_confidence)
+        }
+    } else {
+        (synth_answer, synth_confidence)
+    };
 
     // Emit a conclude step
     let conclude_step = ReasoningStep {
