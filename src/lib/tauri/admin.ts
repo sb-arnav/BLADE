@@ -1822,6 +1822,7 @@ export function forgeTestTool(id: string): Promise<string> {
 // Severity uses #[serde(rename_all = "lowercase")]. The literal unions
 // below MUST stay in lockstep with the Rust enum variants.
 // Phase 25 added 'metacognitive' (META-05).
+// Phase 27 added 'hormones' (HORM-08).
 // ═══════════════════════════════════════════════════════════════════════════
 
 export type SignalClass =
@@ -1831,7 +1832,8 @@ export type SignalClass =
   | 'config_drift'
   | 'auto_update'
   | 'reward_trend'
-  | 'metacognitive';
+  | 'metacognitive'
+  | 'hormones';           // Phase 27 / HORM-08
 
 export type Severity = 'green' | 'amber' | 'red';
 

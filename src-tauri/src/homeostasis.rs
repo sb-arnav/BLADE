@@ -209,6 +209,200 @@ pub fn get_physiology() -> PhysiologicalState {
     physiology_store().lock().map(|p| p.clone()).unwrap_or_default()
 }
 
+// ── Emotion Classifier (Phase 27 / HORM-02) ─────────────────────────────────
+//
+// A rule-based classifier that maps BLADE's own response text to a valence/
+// arousal/cluster tuple. This is the primary input mechanism for the hormone bus.
+// Per D-03: this classifier runs on BLADE's OUTPUT only, never on user input.
+// emotional_intelligence.rs handles user-input emotion classification separately.
+
+/// Six emotion clusters covering the primary response archetypes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EmotionCluster {
+    Threat,      // error terms, failure language, urgency
+    Success,     // completion, approval language
+    Exploration, // questions, discovery, learning
+    Connection,  // warmth, collaborative language
+    Fatigue,     // hedging, uncertainty, brevity
+    Neutral,     // no strong signal
+}
+
+/// Output of classify_response_emotion — valence, arousal, and winning cluster.
+#[derive(Debug, Clone)]
+pub struct ClassifierOutput {
+    pub valence: f32,       // -1.0 to 1.0
+    pub arousal: f32,       // 0.0 to 1.0
+    pub cluster: EmotionCluster,
+}
+
+/// Per-cluster hormone gain deltas. Positive = push toward 1.0; negative = pull toward 0.0.
+#[derive(Debug, Clone)]
+pub struct HormoneGains {
+    pub cortisol_delta: f32,
+    pub dopamine_delta: f32,
+    pub serotonin_delta: f32,
+    pub ach_delta: f32,
+    pub ne_delta: f32,
+    pub oxytocin_delta: f32,
+    pub mortality_delta: f32,
+}
+
+impl HormoneGains {
+    fn from_cluster(cluster: EmotionCluster) -> Self {
+        match cluster {
+            EmotionCluster::Threat => Self {
+                cortisol_delta: 0.7, dopamine_delta: -0.2, serotonin_delta: -0.2,
+                ach_delta: 0.3, ne_delta: 0.8, oxytocin_delta: -0.1, mortality_delta: 0.3,
+            },
+            EmotionCluster::Success => Self {
+                cortisol_delta: -0.3, dopamine_delta: 0.8, serotonin_delta: 0.5,
+                ach_delta: 0.2, ne_delta: -0.2, oxytocin_delta: 0.1, mortality_delta: -0.1,
+            },
+            EmotionCluster::Exploration => Self {
+                cortisol_delta: -0.1, dopamine_delta: 0.6, serotonin_delta: 0.2,
+                ach_delta: 0.7, ne_delta: 0.3, oxytocin_delta: 0.0, mortality_delta: 0.0,
+            },
+            EmotionCluster::Connection => Self {
+                cortisol_delta: -0.2, dopamine_delta: 0.3, serotonin_delta: 0.4,
+                ach_delta: 0.1, ne_delta: -0.1, oxytocin_delta: 0.8, mortality_delta: 0.0,
+            },
+            EmotionCluster::Fatigue => Self {
+                cortisol_delta: -0.1, dopamine_delta: -0.3, serotonin_delta: -0.2,
+                ach_delta: -0.2, ne_delta: -0.1, oxytocin_delta: 0.0, mortality_delta: 0.1,
+            },
+            EmotionCluster::Neutral => Self {
+                cortisol_delta: 0.0, dopamine_delta: 0.0, serotonin_delta: 0.0,
+                ach_delta: 0.0, ne_delta: 0.0, oxytocin_delta: 0.0, mortality_delta: 0.0,
+            },
+        }
+    }
+}
+
+// Static lexicon arrays — zero heap allocation, all &[&str].
+
+static THREAT_LEXICON: &[&str] = &[
+    "error", "failed", "fail", "unable", "cannot", "blocked", "critical",
+    "warning", "danger", "permission denied", "timed out", "crash", "panic",
+    "fatal", "exception", "rejected", "refused", "broken", "corrupt",
+];
+
+static SUCCESS_LEXICON: &[&str] = &[
+    "done", "complete", "success", "created", "installed", "finished",
+    "saved", "deployed", "passed", "resolved", "fixed", "approved",
+    "confirmed", "ready", "shipped", "delivered", "working",
+];
+
+static EXPLORATION_LEXICON: &[&str] = &[
+    "interesting", "let me", "discover", "investigate", "explore",
+    "I notice", "I wonder", "let me check", "looking into", "curious",
+    "approach", "option", "alternative", "consider", "perhaps we",
+];
+
+static CONNECTION_LEXICON: &[&str] = &[
+    "happy to", "I understand", "of course", "glad to", "appreciate",
+    "together", "you're right", "great question", "absolutely",
+    "no problem", "my pleasure", "I see what you",
+];
+
+static FATIGUE_LEXICON: &[&str] = &[
+    "maybe", "might", "unclear", "not sure", "perhaps", "it depends",
+    "I think", "possibly", "hard to say", "uncertain",
+];
+
+/// Classify BLADE's own response text into an emotion cluster.
+/// Returns None if text is shorter than 50 chars (per HORM-02).
+/// Runs on BLADE's output only — NOT user input (per D-03).
+pub fn classify_response_emotion(text: &str) -> Option<ClassifierOutput> {
+    // Only classify responses >= 50 chars (using char count, not byte count)
+    if text.chars().count() < 50 { return None; }
+
+    // Classify first 2000 chars to bound performance (Pitfall 6 / T-27-04)
+    let classify_text = if text.len() > 2000 {
+        &text[..text.char_indices().nth(2000).map(|(i, _)| i).unwrap_or(text.len())]
+    } else {
+        text
+    };
+    let lower = classify_text.to_lowercase();
+    let word_count = lower.split_whitespace().count().max(1) as f32;
+
+    let count_matches = |lexicon: &[&str]| -> f32 {
+        lexicon.iter().filter(|&&word| lower.contains(word)).count() as f32
+    };
+
+    let threat_density     = count_matches(THREAT_LEXICON)      / word_count;
+    let success_density    = count_matches(SUCCESS_LEXICON)     / word_count;
+    let exploration_density= count_matches(EXPLORATION_LEXICON) / word_count;
+    let connection_density = count_matches(CONNECTION_LEXICON)  / word_count;
+    let fatigue_density    = count_matches(FATIGUE_LEXICON)     / word_count;
+
+    // Structural signal boosts
+    let has_question = classify_text.contains('?');
+    let exploration_boost = if has_question { 0.02 } else { 0.0 };
+    let is_short = text.chars().count() < 100;
+    let fatigue_boost = if is_short { 0.02 } else { 0.0 };
+
+    let scores = [
+        (threat_density,                        EmotionCluster::Threat),
+        (success_density,                       EmotionCluster::Success),
+        (exploration_density + exploration_boost, EmotionCluster::Exploration),
+        (connection_density,                    EmotionCluster::Connection),
+        (fatigue_density + fatigue_boost,       EmotionCluster::Fatigue),
+    ];
+
+    // Find winning cluster; tie-break to Neutral
+    let (best_score, best_cluster) = scores
+        .iter()
+        .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|&(s, c)| (s, c))
+        .unwrap_or((0.0, EmotionCluster::Neutral));
+
+    let cluster = if best_score < 0.005 { EmotionCluster::Neutral } else { best_cluster };
+
+    // Derive valence and arousal from cluster
+    let (valence, arousal) = match cluster {
+        EmotionCluster::Threat      => (-0.6, 0.8),
+        EmotionCluster::Success     => ( 0.7, 0.5),
+        EmotionCluster::Exploration => ( 0.3, 0.6),
+        EmotionCluster::Connection  => ( 0.5, 0.3),
+        EmotionCluster::Fatigue     => (-0.3, 0.2),
+        EmotionCluster::Neutral     => ( 0.0, 0.3),
+    };
+
+    Some(ClassifierOutput { valence, arousal, cluster })
+}
+
+/// Apply classifier output to PhysiologicalState with alpha=0.05 EMA smoothing.
+/// Per D-02: alpha=0.05 means ~20 readings to converge.
+/// mortality_salience hard-capped at 0.8 to preserve safety_bundle.rs cap.
+pub fn update_physiology_from_classifier(output: &ClassifierOutput) {
+    const ALPHA: f32 = 0.05;
+    let gains = HormoneGains::from_cluster(output.cluster);
+
+    if let Ok(mut state) = physiology_store().lock() {
+        // Map gain deltas to target values: positive gains push toward 1.0, negative toward 0.0
+        let smooth = |current: f32, delta: f32| -> f32 {
+            let target = if delta >= 0.0 { delta } else { 0.0 }; // negative delta = pull to 0
+            let raw = current * (1.0 - ALPHA) + target * ALPHA;
+            raw.clamp(0.01, 1.0)
+        };
+
+        state.cortisol       = smooth(state.cortisol,       gains.cortisol_delta);
+        state.dopamine       = smooth(state.dopamine,       gains.dopamine_delta);
+        state.serotonin      = smooth(state.serotonin,      gains.serotonin_delta);
+        state.acetylcholine  = smooth(state.acetylcholine,  gains.ach_delta);
+        state.norepinephrine = smooth(state.norepinephrine, gains.ne_delta);
+        state.oxytocin       = smooth(state.oxytocin,       gains.oxytocin_delta);
+
+        // mortality_salience: classifier-driven but capped at 0.8
+        // safety_bundle.rs check_mortality_salience_cap() reads operational HormoneState.
+        // Physiological cap ensures pituitary pass-through never exceeds 0.8.
+        let raw_ms = state.mortality_salience * (1.0 - ALPHA) + gains.mortality_delta.max(0.0) * ALPHA;
+        state.mortality_salience = raw_ms.clamp(0.0, 0.8);
+
+        state.last_updated = chrono::Utc::now().timestamp();
+    }
+}
+
 /// Apply exponential decay to all 7 physiological scalars.
 /// Floor is 0.01 so hormones never fully disappear — they linger.
 pub fn apply_physiology_decay(state: &mut PhysiologicalState, now: i64) {
