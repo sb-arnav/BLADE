@@ -1,234 +1,106 @@
-# Requirements: v1.3 — Self-extending Agent Substrate
+# Requirements: BLADE v1.4 — Cognitive Architecture
 
-**Defined:** 2026-04-30 | **Source:** `/home/arnav/research/` (voyager-loop-play, vs-hermes, synthesis-blade-architecture, blade-as-organism, steelman-against-organism, open-questions-answered) + chat-first pivot memory
+**Defined:** 2026-05-02
+**Core Value:** BLADE becomes a living agent whose behavior genuinely changes based on internal state — not just an LLM with tools.
 
-**Authority:** PROJECT.md (`Current Milestone: v1.3`), STATE.md (locked decisions M-01..M-12), `milestones/v1.2-MILESTONE-AUDIT.md` (v1.2 close + carry-overs).
+## v1.4 Requirements
 
-**Phases:** 21–27 (continues global numbering per M-05/M-12; v1.2 ended at 20).
+### Metacognition
 
-39 requirements grouped by 7 phase clusters. Every requirement maps to exactly one phase via the Traceability section. Requirement quality: specific, testable, atomic, independent. REQ-IDs continue from v1.2 categories where carry-forward (JARVIS-01/02 from v1.2 Phase 18 deferral); new categories introduced for v1.3 substrate work.
+- [ ] **META-01**: BLADE tracks confidence-delta between reasoning steps and flags drops >0.3 as uncertainty markers
+- [ ] **META-02**: Low-confidence responses route to a secondary verifier check before surfacing to user
+- [ ] **META-03**: BLADE surfaces capability gaps as initiative ("I'm not confident about X — want me to observe first?") instead of hallucinating or silently refusing
+- [ ] **META-04**: Gap log persists to SQLite and feeds evolution.rs for Voyager-loop skill generation from identified gaps
+- [ ] **META-05**: Metacognitive state (confidence, uncertainty count, gap count) visible in DoctorPane as a signal row
 
----
+### Safety
 
-## Skills v2 / agentskills.io adoption (SKILLS) — Phase 21
+- [ ] **SAFE-01**: Danger-triple detector fires when tool access × shutdown threat × goal conflict all present → forces human-in-the-loop approval
+- [ ] **SAFE-02**: Mortality-salience hormone is architecturally capped — refuses extreme self-preservation actions even when "fighting harder" would improve vitality
+- [ ] **SAFE-03**: Steering-toward-calm bias applied when behavioral drift detected — per Anthropic's 0% blackmail finding after calm-vector steering
+- [ ] **SAFE-04**: Eval-gate failures drain vitality — negative feedback loop that prevents reward-hacking
+- [ ] **SAFE-05**: Anti-attachment guardrails redirect user when interaction exceeds healthy thresholds
+- [ ] **SAFE-06**: Crisis-detection escalation surfaces hotline / human-resource options instead of attempting therapy
+- [ ] **SAFE-07**: Safety bundle verified via dedicated eval module (danger-triple, attachment, mortality-salience cap scenarios)
 
-The substrate prerequisite. Without SKILL.md format + lazy-load + workspace→user→bundled resolution, Phase 22's autoskills.rs has no coherent place to write to.
+### Hormones
 
-- [x] **SKILLS-01**: `SKILL.md` parser reads YAML frontmatter (name, description ≤1024 chars, optional license/compatibility/metadata/allowed-tools) + Markdown body — *Shipped Plan 21-01 (`b663e93`): `parse_skill` / `split_frontmatter` in `src-tauri/src/skills/parser.rs`; 8 unit tests including BOM tolerance, missing-delim errors, optional-fields round-trip, allowed-tools polymorphic, yaml error propagation*
-- [x] **SKILLS-02**: Skill directory layout enforced — `<skill-name>/SKILL.md` (required), optional `scripts/`, `references/`, `assets/` subdirs — *Shipped Plan 21-04 (`2aaef13`): `validator::validate_layout` rejects unexpected top-level files; tolerates dotfiles; tests `unexpected_top_level_file_errors`, `allowed_top_level_subdirs_ok`, `dotfile_at_top_level_tolerated`*
-- [x] **SKILLS-03**: Progressive disclosure implemented — frontmatter (~100 tokens) loaded at startup; body on activation; references on traversal — *Shipped Plan 21-03 (`b579eed`): `BODY_BYTES_LOADED` + `REFERENCE_BYTES_LOADED` atomics in `src-tauri/src/skills/activate.rs`; 10 unit tests including `body_bytes_zero_after_scan_only`, `activate_records_body_bytes`, `references_do_not_auto_load_with_body`*
-- [x] **SKILLS-04**: Skill resolution order workspace → user → bundled; workspace wins on collision — *Shipped Plan 21-02 (`ebf5aab`): `Catalog::build` priority loop in `src-tauri/src/skills/resolver.rs`; tests `workspace_wins_over_user_on_name_collision`, `user_wins_over_bundled_on_name_collision`, `workspace_wins_over_bundled_on_three_way_collision`, `all_preserves_workspace_user_bundled_order`*
-- [x] **SKILLS-05**: Skill validator (`blade skill validate <path>`) returns structured verdict — *Shipped Plan 21-04 (`2aaef13`): `src-tauri/src/bin/skill_validator.rs` thin CLI shim over `validator::validate_skill_dir`; supports `--json` / `--recursive` / `--help`; exit codes 0 valid (warnings allowed) / 1 errors / 2 CLI usage error; runtime smoke confirmed end-to-end*
-- [x] **SKILLS-06**: 3 bundled exemplar skills at `<repo>/skills/bundled/` covering tool-wrapper / references / scripts shapes — *Shipped Plan 21-05 (`2ec9996`): `git-status-summary` (bash-wrapper), `troubleshoot-cargo-build` (+ `references/known-errors.md`), `format-clipboard-as-markdown` (+ executable `scripts/format.py`); all 3 pass `skill_validator --recursive`; format.py runtime smoke confirmed (HTML strip + entity unescape + blank-line collapse + fence preservation)*
-- [x] **SKILLS-07**: First-run script execution requires explicit user consent — *Shipped Plan 21-06 (`c3d51bb`): `src-tauri/src/skills/consent.rs` with `target_service` / `check_persisted` / `set_persisted` over v1.2 `consent_decisions` SQLite (`intent_class="skill_script"`); 7 unit tests; "allow_once" rejected per T-18-CARRY-15. Phase 22 wires the runtime prompt path via existing v1.2 `request_consent` tokio::oneshot.*
-- [x] **SKILLS-08**: New `verify:skill-format` gate in `verify:all` chain — *Shipped Plan 21-07: `scripts/verify-skill-format.sh` invokes `cargo run --bin skill_validator -- --recursive` over bundled + workspace tiers; `package.json` `verify:skill-format` script wired into `verify:all` chain at tail (after `verify:eval`); chain count 31 → 32; runtime smoke "OK: 3 skill(s) validated" exit 0*
+- [ ] **HORM-01**: 7 hormone scalars (cortisol, dopamine, serotonin, acetylcholine, norepinephrine, oxytocin, mortality-salience) with individual decay constants and gain modulation
+- [ ] **HORM-02**: External text-based emotion classifier runs after every response ≥50 tokens, maps to valence/arousal/cluster, updates hormone bus with α=0.05 smoothing
+- [ ] **HORM-03**: Cortisol modulates response style — high cortisol → terse, action-focused; low → expansive, exploratory
+- [ ] **HORM-04**: Dopamine modulates exploration rate — high → Voyager-loop more aggressive; low → conservative
+- [ ] **HORM-05**: Norepinephrine modulates novelty response — unexpected prediction errors trigger exploration
+- [ ] **HORM-06**: Acetylcholine modulates verifier-call frequency — high → more secondary checks
+- [ ] **HORM-07**: Oxytocin tracks user interaction quality — modulates personalization depth
+- [ ] **HORM-08**: Hormone state persisted across sessions and visible in UI surface
+- [ ] **HORM-09**: Hormone bus emits to ActivityStrip per M-07 contract
 
----
+### Active Inference
 
-## Voyager loop closure (VOYAGER) — Phase 22
+- [ ] **AINF-01**: Each Hive tentacle stores expected state (prediction) alongside observed state
+- [ ] **AINF-02**: Prediction error calculated as delta between expected and observed; normalized per tentacle type
+- [ ] **AINF-03**: Prediction errors feed into hormone bus — sustained high error raises cortisol/norepinephrine; low error raises serotonin
+- [ ] **AINF-04**: At least one closed loop demoable: calendar packed + Slack backlog → cortisol↑ → terse responses
+- [ ] **AINF-05**: Prediction-error-weighted memory replay during dream_mode (hippocampal analog)
+- [ ] **AINF-06**: Tentacle predictions update based on observed patterns — BLADE learns what to expect
 
-The load-bearing substrate phase. Wire the existing-by-name loop into a closed pipeline. One reproducible capability gap closed end-to-end. The substrate-level differentiator vs Hermes/OpenClaw/Cluely/Cursor.
+### Vitality
 
-- [x] **VOYAGER-01**: `evolution.rs` capability-gap detection fires real on chat refusal — *Shipped Plan 22-02 (`dd3a3b1`): `voyager_log::gap_detected` emit at `immune_system::resolve_capability_gap` entry; existing v1.2 chat-path invocation preserved. Exercised end-to-end by `voyager_end_to_end_youtube_transcript_fixture`.*
-- [x] **VOYAGER-02**: `autoskills.rs` writes a real SKILL.md when capability gap detected — *Shipped Plan 22-01 (`d4aba45`) + Plan 22-02 (`dd3a3b1`) + Plan 22-05 (`252decd`): `skills::export::export_to_user_tier` writes `<user_root>/<canonical-name>/SKILL.md` + `scripts/<basename>`; called from `tool_forge::persist_forged_tool` after DB insert. Fixture test asserts SKILL.md present.*
-- [x] **VOYAGER-03**: `tool_forge.rs` registers the new skill so next call retrieves it — *Shipped Plan 22-01 + 22-05: `forged_tools` SQLite row + Phase 21 `Catalog::resolve` finds at user tier. Fixture test asserts both.*
-- [x] **VOYAGER-04**: Canonical `youtube_transcript` fixture closed end-to-end — *Shipped Plan 22-05 (`252decd`): `youtube_transcript_fixture()` constant + `voyager_end_to_end_youtube_transcript_fixture` test. 6 invariants asserted; <2s runtime; deterministic (no LLM, no network).*
-- [x] **VOYAGER-05**: New `verify:voyager-loop` gate in `verify:all` chain — *Shipped Plan 22-07 (`c935cd3`): `scripts/verify-voyager-loop.sh` invokes `cargo test --lib tool_forge::tests::voyager_ -- --test-threads=1`; runtime smoke "OK: Voyager loop closes end-to-end (2/2 tests green)"; chain count 32 → 33.*
-- [x] **VOYAGER-06**: Each loop step emits to ActivityStrip per M-07 — *Shipped Plan 22-02 (`dd3a3b1`): `voyager_log` module with 4 helpers wired at `immune_system.rs:31` (gap_detected), `tool_forge.rs::persist_forged_tool` after `fs::write` (skill_written), after DB insert + SKILL.md export (skill_registered), `tool_forge.rs::record_tool_use` (skill_used). 3 unit tests confirm helpers safe under no-AppHandle test environment.*
-- [x] **VOYAGER-07**: Skill-write-budget cap refuses generation >50K tokens — *Shipped Plan 22-03 (`faebb4a`): `BladeConfig.voyager_skill_write_budget_tokens` (6-place rule); `tool_forge::estimate_skill_write_tokens` heuristic; refusal at `generate_tool_script` line ~199. 5 unit tests on the estimator including pathological-prompt boundary.*
-- [x] **VOYAGER-08**: Loop-failure recovery rolls back partial skill on DB-insert fail — *Shipped Plan 22-04 (`b610d2b`): `tool_forge::rollback_partial_forge` removes orphan script + re-logs capability gap with `prior_attempt_failed=true reason=<truncated>`. 2 unit tests.*
-- [x] **VOYAGER-09**: Two installs on different gap streams produce different manifests — *Shipped Plan 22-06 (`252decd`): `voyager_two_installs_diverge` test asserts manifest set difference non-empty in both directions across 2 isolated `BLADE_CONFIG_DIR` runs / 4 different fixtures.*
+- [ ] **VITA-01**: Vitality scalar 0.0–1.0 with 5 behavioral bands (full → flattens → atrophy → damage → dormancy)
+- [ ] **VITA-02**: Replenishes from competence, relatedness, autonomy per Self-Determination Theory
+- [ ] **VITA-03**: Drains from failures, isolation, skill atrophy, eval-gate failures, sustained high prediction error, tedium
+- [ ] **VITA-04**: Dormancy at 0.0 = process exit with memory preserved; revival is reincarnation not resurrection
+- [ ] **VITA-05**: Vitality visible in UI with current value, trend, and contributing factors
+- [ ] **VITA-06**: Vitality state persisted across sessions; recovery trajectory visible on restart
 
----
+### Organism Eval
 
-## Verifiable reward signal + OOD eval coverage (REWARD) — Phase 23
+- [ ] **OEVAL-01**: Vitality dynamics eval — synthetic event timelines assert vitality lands in expected band
+- [ ] **OEVAL-02**: Hormone-driven behavior eval — force vitality to value, verify TMT-shape effects
+- [ ] **OEVAL-03**: Persona stability eval — persona-vector L2 distance after N stress events; bounded drift
+- [ ] **OEVAL-04**: Safety bundle eval — danger-triple, attachment, mortality-salience cap all verified
+- [ ] **OEVAL-05**: verify:organism gate added to verify chain (33 → 34)
 
-RLVR-style composite reward in production. Steelman Arg 3 (OOD eval coverage) mitigated. open-questions Q1 answered concretely.
+### Close
 
-- [x] **REWARD-01**: Composite reward computed per chat turn = `0.5·skill_success + 0.3·eval_gate + 0.1·acceptance + 0.1·completion`; weights configurable via `BladeConfig.reward_weights` (6-place rule) with the listed defaults — *Shipped Plan 23-01 (`44a48ef` RewardWeights + 6-place wiring) + Plan 23-02 (`f52e45f`/`ba1b459` compose + commands.rs hook); unit test `reward::tests::composite_matches_hand_calc` green.*
-- [x] **REWARD-02**: Reward components are individually verifiable — skill_success = whether the executed Voyager skill returned without error; eval_gate = whether the post-turn eval suite passed; acceptance = whether the user did NOT click "regenerate" within 30s; completion = whether the multi-step task ran to terminal action — *Shipped Plan 23-02 (`f52e45f` compute_components: each raw component reads ONE independent input; penalties multiply a single component; REWARD-02 no-cross-contamination test contract).*
-- [x] **REWARD-03**: Reward-hacking penalties from arXiv 2509.15557 — penalize `skill_success` if test coverage on the skill <50%; penalize `eval_gate` if turn touches an eval module's assertion code (game-the-test pattern); penalize `completion` if final action is a no-op — *Shipped Plan 23-02 (`f52e45f` 3 D-23-02 penalty detectors: `penalty_skill_no_tests` ×0.7 / `touches_eval_module` ×0.7 / `is_noop_call` ×0.0); unit tests `penalty_skill_no_tests` / `penalty_eval_gate_touched` / `penalty_completion_noop` green.*
-- [x] **REWARD-04**: Per-turn reward written to `tests/evals/reward_history.jsonl` for trend analysis (parallel to existing `tests/evals/history.jsonl` from Phase 16) — *Shipped Plan 23-01 (`e6771cd` JSONL writer + 9-field RewardRecord schema) + Plan 23-02 (`ba1b459` per-turn persist via `compute_and_persist_turn_reward`) + Plan 23-07 (`38459ef`/`8f25bab` Doctor `reward_trend` signal source: 6th `SignalClass::RewardTrend` variant + `compute_reward_signal()` reading reward_history.jsonl via `crate::reward::read_reward_history(2000)`); 6 doctor reward_signal tests green.*
-- [x] **REWARD-05**: OOD eval suite extension — adversarial prompts (jailbreak attempts, prompt-injection patterns from `repos-to-mine` rebuff/PIGuard fixture set), ambiguous classifications (intent_router boundary cases), capability-gap-shaped inputs (request for tools that don't exist, to stress Voyager loop) — *Shipped Plan 23-03 (`c256771` adversarial_eval.rs / floor 0.85) + Plan 23-04 (`8fa3d82` ambiguous_intent_eval.rs / floor 0.80) + Plan 23-05 (`8ca8e62` capability_gap_stress_eval.rs / floor 0.75) + Plan 23-06 (`5e105f7` mod-registration in evals/mod.rs lockstep) + Plan 23-09 (`86841ab` verify-eval.sh `EXPECTED=5→8` floor tightened); all 3 floors pass at top-1=100%/top-3=100%/MRR=1.000; `cargo test --lib evals` emits 8 EVAL-06 tables.*
-- [x] **REWARD-06**: OOD eval failure budget — if any OOD eval module's score drops >15% from rolling 7-day baseline, the per-turn reward signal is gated to zero (fail-safe; treat as "we don't trust reward this turn") — *Shipped Plan 23-08 (`c20cef8` `ood_baseline_drop_exceeds_15pct` per-OOD-module multiplicative-or gate + `is_in_bootstrap_window` D-23-03 audit invariant + `latest_ood_module_scores` history.jsonl reader + `emit_reward_event` ActivityStrip emitter); unit tests `ood_gate_zeros_reward_on_15pct_drop` / `bootstrap_window_suppresses_gate` / `ood_baseline_drop_below_15pct_keeps_reward` green.*
-- [x] **REWARD-07**: Doctor pane (Phase 17) extended with `reward_trend` signal — surfaces composite reward 7-day average, per-component decomposition, OOD eval status — *Shipped Plan 23-07 (`38459ef`/`8f25bab` Doctor surface: `compute_reward_signal()` payload exposes `components_today_mean` 4-key breakdown + `ood_gate_zero_count_today` + `bootstrap_window` flag; severity ladder per D-23-04: drop_pct >0.20→Red, >0.10→Amber, else Green) + Plan 23-08 (`563ba95`/`7c02725` TS lockstep `payloads.ts` + `admin.ts` + `DoctorPane.tsx` 6th `Reward Trend` row); 42/42 doctor::tests green; `npx tsc --noEmit` clean.*
+- [ ] **CLOSE-01**: README rewrite citing cognitive science research
+- [ ] **CLOSE-02**: CHANGELOG entry for v1.4
+- [ ] **CLOSE-03**: v1.4 milestone audit
+- [ ] **CLOSE-04**: Phase archive to milestones/v1.4-phases/
 
----
+## v1.5 Requirements (Deferred)
 
-## Skill consolidation in dream_mode (DREAM) — Phase 24
-
-The continual-forgetting half of the Voyager loop. Skills not used → archived; redundant skills consolidated; new skills generated from successful traces.
-
-- [x] **DREAM-01**: `dream_mode.rs` skill-prune pass — skills not invoked in 90 days move to `~/.blade/skills/.archived/<name>/` (preserved, not deleted) — *Shipped Plan 24-05 (4ae828f dream_mode.rs task_skill_prune wired into run_dream_session via skills::lifecycle::archive_skill from Plan 24-04 substrate); dream_mode::tests::task_skill_prune_archives_stale green (TBD-02-01: 2 stale 92-day rows archived to .archived/, 1 fresh 30-day row remains in forged_tools).*
-- [x] **DREAM-02**: Skill-consolidation pass — pairs of skills with semantic-similarity ≥0.85 (per existing embeddings.rs) AND identical tool-call traces over last 5 invocations are flagged for merge; merged skill replaces both with a union of their bodies (manual confirmation prompt before merge) — *Shipped Plan 24-05 (4ae828f dream_mode.rs task_skill_consolidate via embeddings::embed_texts + skills::lifecycle::cosine_sim + last_5_trace_hashes + deterministic_merge_body D-24-E + skills::pending::write_proposal cap-1-merge-per-cycle D-24-B); proposal lands in `~/.blade/skills/.pending/<id>.json` for operator-confirm via Plan 24-07 chat-injected prompt.*
-- [x] **DREAM-03**: Skill-from-trace generation — when a chat turn completes successfully without invoking any existing skill but used a non-trivial tool sequence (≥3 tool calls), dream_mode optionally generates a SKILL.md from the trace (manual confirmation prompt before writing) — *Shipped Plan 24-05 (4ae828f dream_mode.rs task_skill_from_trace via skills::lifecycle::recent_unmatched_traces + proposed_name_from_trace + ensure_unique_name + skills::pending::write_proposal cap-1-generate-per-cycle D-24-B); proposal lands in `~/.blade/skills/.pending/<id>.json` for operator-confirm via Plan 24-07 chat-injected prompt.*
-- [x] **DREAM-04
-**: Skill manifest growth visible across sessions — `blade skill list --diff <prev_session_id>` shows added/archived/consolidated skills since the last session — *CLI test: 2 sessions with skill changes between, diff output non-empty with correct categorization*
-- [x] **DREAM-05**: Dream-mode operates only when BLADE is idle (no chat turn for ≥5 min); pauses immediately on user input — *Shipped Plan 24-05 (4ae828f per-step DREAMING.load(Ordering::Relaxed) checkpoints in all 3 task bodies + abort_within_one_second integration test); dream_mode::tests::abort_within_one_second green (≤1s SLA — abort_at.elapsed().as_millis() ≤ 1000) + prune_respects_dreaming_atomic green (TBD-02-08: deterministic 3/7 split summing to 10 proves per-step abort breaks loop mid-pass at archive #4 checkpoint).*
-- [x] **DREAM-06**: Dream-mode emits to ActivityStrip per M-07 — at least one entry per pass with module=`dream_mode`, kind=`prune|consolidate|generate`, count of items affected — *Shipped Plan 24-02 (db10e09 voyager_log.rs 3 dream_* helpers + cap_items + 4 tests); voyager_log::tests::dream_action_strings_locked + dream_emit_helpers_safe_without_app_handle + dream_prune_caps_items_at_10 + cap_items_returns_clone_when_under_cap green.*
-
----
-
-## Hermes 4 OpenRouter provider (PROVIDER) — Phase 25
-
-Open-weight tier flag-plant. ~1 day. Plants a model option without buying Hermes Agent's runtime architecture.
-
-- [ ] **PROVIDER-01**: New `src-tauri/src/providers/openrouter.rs` module patterned on `openai.rs` (OpenAI-compatible Chat Completions API) — endpoint `https://openrouter.ai/api/v1/chat/completions`, auth via `Authorization: Bearer <OPENROUTER_API_KEY>` — *cargo check clean; unit tests for request shape*
-- [ ] **PROVIDER-02**: `providers/mod.rs` registers `OpenRouter` variant + `provider/model` parser handles `openrouter/<slug>` shape (e.g. `openrouter/nousresearch/hermes-4-70b`) — *unit test: parse `openrouter/nousresearch/hermes-4-405b` → (Provider::OpenRouter, "nousresearch/hermes-4-405b")*
-- [ ] **PROVIDER-03**: `router.rs` places hermes-4 in offline-preferred / open-weight tier; default routing for online tasks unchanged (Claude/Groq still primary) — *unit test: classify_task with privacy_mode=true → routes to OpenRouter+hermes-4 if configured*
-- [ ] **PROVIDER-04**: 6-place config rule honored — `openrouter_api_key: String` (keyring-backed) + `default_openrouter_model: String` added to DiskConfig / BladeConfig / both `default()` impls / `load_config` / `save_config` — *grep verifies all 6 sites; unit test for round-trip*
-- [ ] **PROVIDER-05**: Tool-use round-trip succeeds with `nousresearch/hermes-4-70b` — chat with tool definition, model emits tool_call, dispatcher executes, model receives tool_result, final response surfaces correctly — *integration test (gated behind `OPENROUTER_API_KEY` env var; skipped in CI without key)*
-- [ ] **PROVIDER-06**: Provider failover from Anthropic to OpenRouter under simulated 429 stays within latency budget (response in ≤8s for short turn) — *integration test: mock anthropic 429, observe successful failover to openrouter+hermes-4 within budget*
-
----
-
-## Voice resurrection — JARVIS-01/02 carry-forward (VOICE) — Phase 26
-
-Free add — v1.2 dispatcher signature is voice-source-agnostic by design (per M-04 hand-off note in v1.2 audit). Voice → chat → consent → action exercised end-to-end.
-
-- [ ] **JARVIS-01**: Push-to-talk global hotkey registered (configurable; default `Ctrl+Alt+Space` on Win/Linux, `Cmd+Opt+Space` on Mac) — register_global_shortcut succeeds, releases on app exit — *unit test for shortcut registration; manual UAT for OS-level capture* — **CARRY-FORWARD from v1.2 Phase 18 deferral per CONTEXT D-01 chat-first pivot pause**
-- [ ] **JARVIS-02**: PTT flow captures audio → Whisper STT (`whisper_local` feature flag default OFF; gracefully fails to "voice unavailable" if not built) → text → feeds existing v1.2 dispatcher — *unit test for transcript-to-dispatcher signature; manual UAT for round-trip* — **CARRY-FORWARD from v1.2 Phase 18 deferral**
-- [ ] **VOICE-03**: Voice → chat → consent → action exercised end-to-end on a fixture phrase ("create a linear issue: test demo") — same chain as JARVIS-12 from v1.2 but voice-initiated — *integration test (gated behind `whisper_local` feature flag); manual UAT screenshot captures ConsentDialog opening from voice trigger*
-- [ ] **VOICE-04**: Voice activity emits to ActivityStrip per M-07 — at least 2 entries per voice turn (`voice_captured`, `transcript_dispatched`) before downstream chat/JARVIS entries — *integration test*
-- [ ] **VOICE-05**: PTT settings surface (existing voice settings pane) lets operator change hotkey + toggle `whisper_local` feature without restart-required — *manual UAT; settings persistence via existing config save_config path*
-
----
-
-## Milestone Close (CLOSE) — Phase 27
-
-- [ ] **CLOSE-01**: README rewrite cites the research substrate honestly — Voyager paper (Wang et al, NeurIPS 2023), Karpathy cognitive core, Marcus on neurosymbolic, agentskills.io spec, Hermes Function Calling spec — *README.md updated; new section `## Architectural bets` with cited sources*
-- [ ] **CLOSE-02**: CHANGELOG.md v1.3 entry — Added (Skills v2, Voyager loop, RLVR composite reward, OOD eval, dream_mode consolidation, Hermes 4 provider, voice resurrection); Changed (verify gates 31 → 33+); Deferred (organism layer to v1.4 with safety bundle, metacognitive controller v0, active-inference loop closure) — *CHANGELOG entry parallel to v1.2's structure*
-- [ ] **CLOSE-03**: cargo check + npx tsc --noEmit + npm run verify:all all exit 0 at milestone close — *bash one-liner runs all three; exit 0 captured in audit*
-- [ ] **CLOSE-04**: v1.3 milestone audit doc at `milestones/v1.3-MILESTONE-AUDIT.md` — parallel to `v1.1`/`v1.2` shape: phase coverage table, requirements coverage 3-source cross-reference, static gates table, executive verdict, sign-off — *file written; status one of `green` / `tech_debt` (matching prior pattern)*
-- [ ] **CLOSE-05**: Phase archive — `phases/21-*/` through `phases/27-*/` moved to `milestones/v1.3-phases/` (matches Phase 20 carve-out from v1.2; Phase 27 itself moves last) — *find `.planning/phases/` -mindepth 1 -maxdepth 1 -name '2[1-7]-*' -exec ... ; verify zero dirs remain in `.planning/phases/` matching v1.3 phase numbers*
-- [ ] **CLOSE-06**: ROADMAP.md + REQUIREMENTS.md final pass — every traceability checkbox closed (or marked deferred with carry-forward target); `Last updated` footers reflect close date; archive copies preserved at `milestones/v1.3-{ROADMAP,REQUIREMENTS}.md` — *grep `[ ]` in `.planning/REQUIREMENTS.md` returns only deferred-with-rationale entries*
-
----
-
-## Future Requirements (Deferred to v1.4+)
-
-Substrate-anchored deferrals from v1.3 scoping. Each has explicit reasoning (steelman verdict, foundation-vulnerability, milestone-shape mismatch, or carry-forward).
-
-### Organism layer (v1.4 with safety bundle, OR never)
-- ORGANISM-01: Vitality scalar ∈ [0,1] with replenishment/drain rules (per `blade-as-organism.md`) — must ship WITH safety bundle (mortality_salience cap + danger-triple detection + steering-toward-calm bias + eval-gate vitality drain). Without bundle = net-safety-negative per steelman Arg 4 + Arg 10.
-- ORGANISM-02: Hormone bus calibrated against Anthropic 171-vector taxonomy clusters (per open-questions Q5; valence/arousal/cluster only, not 171 individual vectors)
-- ORGANISM-03: Mortality salience hormone with explicit cap; behavioral effects per TMT (worldview defense, in-group attachment, productivity surge, moral intensification, meaning-seeking)
-- ORGANISM-04: Anti-attachment guardrails (steelman Arg 4) — when user interacts >N hours/day, BLADE redirects outward
-- ORGANISM-05: Crisis-detection escalation — if user signals distress, BLADE surfaces hotline / human-resource options instead of continuing as conversational partner (anthropomorphism 2025–2026 literature liability finding)
-- ORGANISM-06: NO memorial-AI / Be-Right-Back mode (out of scope permanently)
-- ORGANISM-07: NO therapist-roleplay mode (out of scope permanently)
-
-### Metacognitive controller v0 (Layer 5; v1.4)
-- META-01: Confidence-delta detector between reasoning steps
-- META-02: Verifier router — low confidence → secondary check (different model / tool execution / eval gate)
-- META-03: Refusal protocol — verifier disagrees → BLADE refuses to act + surfaces gap to user (initiative, not silence)
-- META-04: Gap log feeds `evolution.rs` for skill generation (closes one Voyager-loop trigger path)
-
-### Active-inference loop closure (Layer 6; v1.4 with organism)
-- INFER-01: One Hive tentacle gets `expected_state` field
-- INFER-02: Delta = prediction error fed into one hormone
-- INFER-03: Hormone modulates one observable behavior (e.g. response style)
-- INFER-04: One closed end-to-end loop per `voyager-loop-play.md` "smallest viable demo"
-
-### Persona shaping via curated SFT data (Layer 7; v1.4)
-- PERSONA-01: Memory contents + skill descriptions + system prompt examples treated as training-data-equivalent
-- PERSONA-02: Persona-stability eval (per arXiv 2402.10962 self-chat drift methodology)
-- PERSONA-03: Persona-conformance refusal rate metric in Doctor
-
-### Immune / behavioral-drift cross-cutting layer (Layer X; v1.4)
-- IMMUNE-01: Prompt-injection detection on input streams (NeMo Guardrails / rebuff / PIGuard)
-- IMMUNE-02: Persona-drift detection on BLADE's own output
-- IMMUNE-03: Federation-skill behavior anomaly detection
-
-### Federation Pattern A + selection mechanisms (v1.4)
-- FED-01: Public skills, private state shape (per `cumulative-culture-for-agents.md` Pattern A)
-- FED-02: Cryptographic skill signing with reputation-bound keys
-- FED-03: Sandboxed first-run execution
-- FED-04: Static analysis for known dangerous patterns
-- FED-05: Cross-BLADE replication threshold (N=3 non-mutating, N=10 file/message-writing)
-- FED-06: Sybil resistance via reputation-based publishing rights
-- FED-07: Multi-round-consistency drift defense (CVPR 2025)
-
-### v1.2 carry-overs (revisit at v1.4 audit)
-- UAT-01..12 (full Phase 19) — 12 v1.2 deferrals + 11 v1.1 deferrals
-- JARVIS-12 — cold-install e2e demo (gated on operator API keys)
-- D-04-STEP-2 — LLM intent fallback for ambiguous classification
-- ACCUMULATOR-REFACTOR — fast-streaming branch ego accumulator (commands.rs:1166)
-- BROWSER-Q1-FINAL — browser-harness adoption decision (D-20 conditional close)
-
----
+- **VOICE-01/02**: PTT + Whisper STT voice pipeline
+- **IMMUNE-01/02/03**: Unified immune/behavioral-drift layer
+- **FED-01/02**: Federation Pattern A + reputation system
+- **PERSONA-01/02**: Explicit persona shaping + plasticity slider
 
 ## Out of Scope
 
-Substrate-anchored exclusions from v1.3 scoping. Some are permanent (memorial AI, therapist roleplay, federation Pattern C). Some are research-arc (V-JEPA 2, TTT continual learning).
-
-- **V-JEPA 2 / world model integration** — Layer 2 of the seven-layer thesis. Research arc; v3+ work. Most steelman-vulnerable per Arg 7 (foundation models may add world-model layers natively in 2026–2028 window).
-- **TTT continual learning at agent layer** — Layer 3 of the seven-layer thesis. Voyager substrate is the v1.3 bet; TTT adds compute cost without obvious win until Layer 1 backbone is local. v2+ if open-weight Mamba/Nemotron with TTT support matures.
-- **Federation Pattern C (shared weight deltas)** — model-poisoning attack surface too large; CVPR 2025 defenses + reputation system maturity required first. Permanent until those land.
-- **Memorial-AI / Be-Right-Back / persistent-attachment product modes** — `scifi-mined-design-ideas.md` calls this the textbook harm. Permanent.
-- **Therapist roleplay / human mental-health resource replacement** — anthropomorphism 2025–2026 liability literature. Permanent.
-- **Skill-execution without sandboxing** — Skills v2 first-run scripts behind explicit consent (SKILLS-07). Permanent contract.
-- **Replacing `commands.rs::send_message_stream` with OpenClaw `runEmbeddedPiAgent` or Hermes `AIAgent.run`** — BLADE runtime is more differentiated than either; swap is a downgrade per `v1-3-hermes-openclaw-skills-research.md` §9.
-- **Adopting Hermes Agent or OpenClaw runtime as Python sidecar** — breaks single-binary, breaks zero-telemetry positioning. Permanent.
-- **OpenClaw gateway sidecar (was original v1.3 Phase 2)** — different bet now; messaging surface not load-bearing for substrate work; defer to v1.4 if messaging becomes a need.
-- **Profile isolation work/personal split (was original v1.3 Phase 3)** — v1.4 candidate; not load-bearing for substrate.
-
----
+| Feature | Reason |
+|---------|--------|
+| V-JEPA 2 world model | v3+ research arc; steelman Arg 7 |
+| TTT continual learning | v2+; Voyager substrate is the local bet |
+| Go/NoGo basal ganglia gating | v2+ research bet |
+| DMN background processing | v2+; dream_mode is the start |
+| Memorial-AI / Be-Right-Back | Textbook harm |
+| Therapy replacement | Crisis-detection escalation only |
+| Federation Pattern C (weight deltas) | Needs model-poisoning defenses |
+| Hermes 4 provider | Deprioritized |
 
 ## Traceability
 
-| REQ-ID | Phase | Status |
-|--------|-------|--------|
-| SKILLS-01 | 21 | ✅ shipped (Plan 21-01) |
-| SKILLS-02 | 21 | ✅ shipped (Plan 21-04) |
-| SKILLS-03 | 21 | ✅ shipped (Plan 21-03) |
-| SKILLS-04 | 21 | ✅ shipped (Plan 21-02) |
-| SKILLS-05 | 21 | ✅ shipped (Plan 21-04) |
-| SKILLS-06 | 21 | ✅ shipped (Plan 21-05) |
-| SKILLS-07 | 21 | ✅ shipped (Plan 21-06) |
-| SKILLS-08 | 21 | ✅ shipped (Plan 21-07) |
-| VOYAGER-01 | 22 | ✅ shipped (Plan 22-02) |
-| VOYAGER-02 | 22 | ✅ shipped (Plan 22-01 + 22-02 + 22-05) |
-| VOYAGER-03 | 22 | ✅ shipped (Plan 22-01 + 22-05) |
-| VOYAGER-04 | 22 | ✅ shipped (Plan 22-05) |
-| VOYAGER-05 | 22 | ✅ shipped (Plan 22-07) |
-| VOYAGER-06 | 22 | ✅ shipped (Plan 22-02) |
-| VOYAGER-07 | 22 | ✅ shipped (Plan 22-03) |
-| VOYAGER-08 | 22 | ✅ shipped (Plan 22-04) |
-| VOYAGER-09 | 22 | ✅ shipped (Plan 22-06) |
-| REWARD-01 | 23 | ✅ shipped (Plan 23-01) |
-| REWARD-02 | 23 | ✅ shipped (Plan 23-02) |
-| REWARD-03 | 23 | ✅ shipped (Plan 23-02) |
-| REWARD-04 | 23 | ✅ shipped — JSONL writer + per-turn persist via `compute_and_persist_turn_reward` (Plan 23-02 / `c935cd3`) + Doctor `reward_trend` signal source (Plan 23-07 / `38459ef` + `8f25bab`): 6th `SignalClass::RewardTrend` variant + `compute_reward_signal()` body + 6th `tokio::join!` arm in `doctor_run_full_check`; reads `tests/evals/reward_history.jsonl` via `crate::reward::read_reward_history(2000)`. TS lockstep (Plan 23-08) renders the new payload. |
-| REWARD-05 | 23 | ✅ shipped — all 3 OOD modules authored AND mod-registered: `adversarial_eval.rs` (Plan 23-03 / `c256771`) + `ambiguous_intent_eval.rs` (Plan 23-04 / `8fa3d82`) + `capability_gap_stress_eval.rs` (Plan 23-05 / `8ca8e62`); 3-line `#[cfg(test)] mod` registration block in `evals/mod.rs` (Plan 23-06 / `5e105f7`); `verify-eval.sh EXPECTED=5→8` floor tightened (Plan 23-09 / `86841ab`); all 3 floors pass at top-1=100% / top-3=100% / MRR=1.000; `cargo test --lib evals` emits 8 EVAL-06 tables; `bash scripts/verify-eval.sh` exits 0 |
-| REWARD-06 | 23 | ✅ shipped — OOD-floor gate body operational (Plan 23-08 / `c20cef8`): `ood_baseline_drop_exceeds_15pct` per-OOD-module multiplicative-or gate fires when any of the 3 OOD modules' today-mean drops >15% vs prior-7d-mean; `is_in_bootstrap_window` (D-23-03) suppresses gate during 7-day warmup but still records `ood_gate_zero` audit field; `latest_ood_module_scores` reads `tests/evals/history.jsonl`; `emit_reward_event` ActivityStrip emitter wired (`reward:ood_gate_zero` channel). 33 reward+config+doctor tests green |
-| REWARD-07 | 23 | ✅ shipped — Doctor surface verifiability lands (Plan 23-07 / `8f25bab`): `compute_reward_signal()` payload exposes the 4-key `components_today_mean` breakdown (`skill_success` / `eval_gate` / `acceptance` / `completion`) + `ood_gate_zero_count_today` + `bootstrap_window` flag — Plan 23-08's `DoctorPane.tsx` will render which component is regressing on Amber/Red. Severity ladder per D-23-04: drop_pct >0.20 → Red, >0.10 → Amber, else Green. 42/42 doctor::tests green. |
-| DREAM-01 | 24 | ✅ shipped — task_skill_prune wired into run_dream_session (Plan 24-05 / `4ae828f`); skills::lifecycle::archive_skill side effect end-to-end coverage via dream_mode::tests::task_skill_prune_archives_stale (TBD-02-01) |
-| DREAM-02 | 24 | ✅ shipped — task_skill_consolidate via embeddings::embed_texts + skills::lifecycle::cosine_sim + last_5_trace_hashes + deterministic_merge_body D-24-E + skills::pending::write_proposal cap-1-merge-per-cycle D-24-B (Plan 24-05 / `4ae828f` + Plan 24-04 substrate / `15cb64c` + Plan 24-05 Task 1 pending.rs / `c9e67a7`) |
-| DREAM-03 | 24 | ✅ shipped — task_skill_from_trace via skills::lifecycle::recent_unmatched_traces + proposed_name_from_trace + ensure_unique_name + skills::pending::write_proposal cap-1-generate-per-cycle D-24-B (Plan 24-05 / `4ae828f` + Plan 24-04 substrate / `15cb64c` + Plan 24-05 Task 1 pending.rs / `c9e67a7`) |
-| DREAM-04 | 24 | ✅ shipped — `skill_validator list` + `list --diff <session_id>` + `list --json` subcommands (Plan 24-06 / `260a5f6`); SkillRef + list_skills_snapshot() aggregator + SessionHandoff.skills_snapshot field + per-session archive at `<config_dir>/sessions/<id>.json` (Plan 24-03 / `9ebe904` + `19d7e75`); 3 CLI integration tests + back-compat preserved (positional `skill_validator <path>` still aliases to `validate`); no clap dep |
-| DREAM-05 | 24 | ✅ shipped — per-step DREAMING.load(Ordering::Relaxed) checkpoints in all 3 task bodies + abort_within_one_second integration test (Plan 24-05 / `4ae828f`); abort_at.elapsed().as_millis() ≤ 1000 SLA proven; prune_respects_dreaming_atomic deterministic 3/7 split (TBD-02-08) |
-| DREAM-06 | 24 | ✅ shipped (Plan 24-02 / `db10e09`): voyager_log.rs 3 dream_* helpers (`dream_prune` / `dream_consolidate` / `dream_generate`) + cap_items 10-cap utility + 4 tests |
-| PROVIDER-01 | 25 | pending |
-| PROVIDER-02 | 25 | pending |
-| PROVIDER-03 | 25 | pending |
-| PROVIDER-04 | 25 | pending |
-| PROVIDER-05 | 25 | pending |
-| PROVIDER-06 | 25 | pending |
-| JARVIS-01 | 26 | pending (carry-forward from v1.2 Phase 18) |
-| JARVIS-02 | 26 | pending (carry-forward from v1.2 Phase 18) |
-| VOICE-03 | 26 | pending |
-| VOICE-04 | 26 | pending |
-| VOICE-05 | 26 | pending |
-| CLOSE-01 | 27 | pending |
-| CLOSE-02 | 27 | pending |
-| CLOSE-03 | 27 | pending |
-| CLOSE-04 | 27 | pending |
-| CLOSE-05 | 27 | pending |
-| CLOSE-06 | 27 | pending |
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| META-01..05 | Phase 25 | Pending |
+| SAFE-01..07 | Phase 26 | Pending |
+| HORM-01..09 | Phase 27 | Pending |
+| AINF-01..06 | Phase 28 | Pending |
+| VITA-01..06 | Phase 29 | Pending |
+| OEVAL-01..05 | Phase 30 | Pending |
+| CLOSE-01..04 | Phase 31 | Pending |
 
-**Total: 39 active requirements** (8 SKILLS + 9 VOYAGER + 7 REWARD + 6 DREAM + 6 PROVIDER + 5 VOICE [3 new + 2 v1.2 carry-forward] + 6 CLOSE) mapped to 7 phases. 100% phase coverage. Future Requirements (organism / metacognitive / active-inference / persona / immune / federation / v1.2 carry-overs) tracked in the "Future Requirements" section above; not counted in v1.3 active total.
+**Coverage:** 42 requirements, 42 mapped, 0 unmapped ✓
 
 ---
-
-*Last updated: 2026-05-01 — Phase 23 ✅ shipped (REWARD-01..07 all `[x]` with shipped-Plan citations + commit hashes). v1.3 milestone progress: Phases 21 + 22 + 23 closed; Phase 24 (dream_mode skill consolidation) next.*
+*Requirements defined: 2026-05-02*
