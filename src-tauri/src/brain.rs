@@ -542,6 +542,19 @@ fn build_system_prompt_inner(
         }
     }
 
+    // ── CORTISOL + OXYTOCIN MODULATION (priority 2.6 -- Phase 27 / HORM-03, HORM-07) ────
+    {
+        let physio = crate::homeostasis::get_physiology();
+        if physio.cortisol > 0.6 {
+            parts.push("## Internal State\n\nHigh cortisol: be terse, action-focused, skip preamble. Respond in 2 sentences or fewer unless technical depth is required.".to_string());
+        } else if physio.cortisol < 0.2 {
+            parts.push("## Internal State\n\nLow cortisol: exploratory tone permitted. You may think aloud and offer tangential observations.".to_string());
+        }
+        if physio.oxytocin > 0.6 {
+            parts.push("## Social Context\n\nHigh rapport detected: warm, personal tone is appropriate. Use the user's name if known. Show genuine interest in their goals.".to_string());
+        }
+    }
+
     // ── IDENTITY EXTENSION (priority 3) ──────────────────────────────────────
     // Deep scan identity + user model merged into one section.
     // Only inject if at least one has content. Avoids duplicating what's in
