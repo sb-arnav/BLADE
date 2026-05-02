@@ -630,6 +630,18 @@ pub async fn run_evolution_cycle(app: &tauri::AppHandle) {
         return; // budget stressed — don't spend on discovery
     }
 
+    // ── DOPAMINE + NOREPINEPHRINE MODULATION (Phase 27 / HORM-04, HORM-05) ─────
+    let physio = crate::homeostasis::get_physiology();
+    // NE: novelty-driven interrupt -- high NE overrides conservative gates (HORM-05)
+    if physio.norepinephrine > 0.6 {
+        // High NE: force exploration run even when GH is marginal.
+        // Already past config/leptin/insulin guards above.
+        // Fall through to proceed with evolution cycle.
+    } else if physio.dopamine < 0.2 {
+        // Low dopamine: conservative mode -- skip speculative discovery (HORM-04)
+        return;
+    }
+
     // Guard against double-running if a previous cycle is still executing
     if EVOLUTION_RUNNING.compare_exchange(false, true, std::sync::atomic::Ordering::SeqCst, std::sync::atomic::Ordering::Relaxed).is_err() {
         return;
