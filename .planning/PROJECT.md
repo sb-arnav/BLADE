@@ -47,32 +47,40 @@ BLADE is a desktop AI that lives on your machine — a "body" of 204+ Rust modul
 - ✓ LOG — persistent ActivityStrip + ActivityDrawer + 500-entry localStorage ring buffer; emit_activity_with_id signature wired into 6 ecosystem observer loops — v1.1 (LOG-04 time-range filter advisory; runtime UAT operator-owned)
 - ✓ DENSITY — spacing-ladder gate (0 violations across 39 CSS files); 18-file empty-state copy rewrite; 4-tier top-bar hierarchy with 1280/1100 responsive guardrails; RightNowHero with 4 live-signal chips — v1.1 (5-wallpaper + cold-install + 50-route UAT operator-owned)
 
-### Current Milestone: v1.3 — Self-extending Agent Substrate
+### Validated (v1.3 — Self-extending Agent Substrate, closed 2026-05-02 at Phase 24)
 
-**Goal:** BLADE writes its own tools. Close the Voyager loop in production: capability gap → autoskills writes executable code → tool_forge registers a SKILL.md → next call retrieves and runs. Two installs of BLADE genuinely diverge after running on different gaps. Substrate-level differentiator no consumer agent has shipped (Hermes has procedural skill memory; Cluely records; Cursor edits; Open Interpreter dispatches — none generate executable code from gaps and reuse it).
+- ✓ SKILLS — agentskills.io SKILL.md format (YAML+MD), progressive disclosure, workspace→user→bundled resolution, validator + 3 bundled exemplars — v1.3 Phase 21 (65 tests)
+- ✓ VOYAGER — evolution.rs → autoskills.rs → tool_forge.rs end-to-end, verify:voyager-loop gate, deterministic fixture (youtube_transcript) — v1.3 Phase 22 (21 tests)
+- ✓ REWARD — RLVR-style composite reward (0.5·skill_success + 0.3·eval_gate + 0.1·acceptance + 0.1·completion), 3 OOD eval modules (adversarial/ambiguous/capability-gap), DoctorPane RewardTrend row, verify:eval extended to 8 modules — v1.3 Phase 23 (45 tests)
+- ✓ DREAM — dream_mode.rs skill consolidation (prune >90d, consolidate redundant, generate from traces), .pending/ proposal queue, chat-injected operator confirmation, skill_validator CLI — v1.3 Phase 24 (435 tests total at close)
 
-**Target features (7 phases, 21–27):**
+### Current Milestone: v1.4 — Cognitive Architecture
 
-- [ ] **SKILLS** *(Phase 21)* — agentskills.io adoption: `SKILL.md` (YAML frontmatter + Markdown body) replaces v1.2's JSON-shaped skill thinking. Progressive disclosure (metadata always loaded; body on activation; references on traversal). Workspace → user → bundled resolution order. Validator + 3 bundled exemplars. Substrate for everything that follows.
-- [ ] **VOYAGER** *(Phase 22)* — load-bearing substrate phase. Wire `evolution.rs` capability-gap firing → `autoskills.rs` writes SKILL.md (with executable code in `scripts/`) → `tool_forge.rs` registers it for next-call retrieval. One reproducible gap (e.g. `youtube_transcript`) closed end-to-end. New `verify:voyager-loop` gate enforces deterministic closure on a fixture. Falsifiable: ask → fail → wait → ask again → success; skill file present that wasn't.
-- [ ] **REWARD** *(Phase 23)* — RLVR-style verifiable reward signal in production. Composite = 0.5·skill_success + 0.3·eval_gate + 0.1·acceptance + 0.1·completion (per research/ai-substrate/open-questions Q1). Reward-hacking penalties from arXiv 2509.15557. OOD eval extension: adversarial / ambiguous / capability-gap-shaped fixtures (steelman Arg 3 mitigation). `verify:all` 31 → 32+. The point: BLADE has a verifiable reward signal it can self-improve on, today, without waiting on Anthropic to solve continual learning at the foundation level.
-- [ ] **DREAM** *(Phase 24)* — skill consolidation in `dream_mode.rs` (substrate exists). Prunes unused skills (>90 days), consolidates redundant skills, generates new skills from successful traces. Continual learning ↔ continual forgetting — both halves needed. Skill manifest grows visibly between sessions. Falsifiable: sleep, wake, diff manifest.
-- [ ] **PROVIDER** *(Phase 25)* — Hermes 4 via OpenRouter. `providers/openrouter.rs` patterned on `openai.rs`, model `nousresearch/hermes-4-70b`, router places hermes-4 in offline-preferred tier. ~1 day, plants a flag at the open-weight tier without buying Hermes' architecture.
-- [ ] **VOICE** *(Phase 26)* — JARVIS-01/02 voice resurrection (v1.2 carry-forward). PTT global hotkey + Whisper STT wired to existing v1.2 dispatcher (signature is voice-source-agnostic by design — zero-rework hand-off). Voice → chat → consent → action exercised end-to-end.
-- [ ] **CLOSE** *(Phase 27)* — README rewrite citing the research (Voyager, Karpathy cognitive core, Marcus on neurosymbolic, agentskills.io spec), CHANGELOG, v1.3 milestone audit parallel to `v1.1`/`v1.2`, cargo + tsc + verify clean, phase archive to `milestones/v1.3-phases/`.
+**Goal:** BLADE becomes a living agent whose behavior genuinely changes based on internal state. Active inference drives adaptation from prediction errors. Hormones modulate response style. Confidence gaps surface as initiative instead of hallucination. Vitality creates real stakes. No consumer AI agent has shipped any of these loops in production. Grounded in cognitive science (Friston active inference, SDT intrinsic motivation, TMT mortality salience, Butlin/Long/Chalmers consciousness indicators, MEDLEY-BENCH metacognition gap).
 
-**Explicitly deferred to v1.4+:**
-- Vitality / hormones / mortality salience (Layer 0 + 6 organism layer) — must ship WITH safety bundle (mortality_salience cap, danger-triple detection, steering-toward-calm bias, eval-gate vitality drain) per steelman Arg 4 + Arg 10. Without bundle = net-safety-negative. v1.4 milestone or never.
-- Metacognitive controller v0 (Layer 5 — confidence-delta detector, verifier router, refusal protocol) — v1.4
-- Active-inference loop closure (one Hive tentacle: expected − observed = error → hormone → behavior) — v1.4 with organism layer
-- Persona shaping via curated SFT data (Layer 7) — v1.4
-- Immune / behavioral-drift cross-cutting layer (prompt-injection + persona-drift + federation-anomaly detection) — v1.4
-- Federation Pattern A + selection mechanisms (per cumulative-culture research + steelman Arg 9) — v1.4
+**Target features (7 phases, 25–31):**
+
+- [ ] **META** *(Phase 25)* — Metacognitive controller v0. Confidence-delta detection between reasoning steps; verifier routing (low confidence → secondary check); gap surfacing to user ("I'm not confident about X — want me to observe first?"); gap log feeds evolution.rs. Closes MEDLEY-BENCH knowing-doing gap. Independent of organism layer — ships first.
+- [ ] **SAFETY** *(Phase 26)* — Safety bundle. Danger-triple detection (tool access × shutdown threat × goal conflict → force HITL); mortality-salience cap (refuses extreme self-preservation); steering-toward-calm bias (per Anthropic 0% blackmail finding); eval-gate vitality drain (negative feedback loop); anti-attachment guardrails (redirect on excessive dependence). Non-negotiable gate for organism features.
+- [ ] **HORMONE** *(Phase 27)* — Hormone physiology + emotion classifier. Wire 7 hormones (cortisol, dopamine, serotonin, acetylcholine, norepinephrine, oxytocin, mortality-salience) with decay constants and gain modulation. External text-based emotion classifier (~60-70% zero-shot) maps response text → valence/arousal/cluster → hormone update with α=0.05 smoothing. Hormones actually modulate: cortisol→terse responses, dopamine→exploration rate, norepinephrine→Voyager-loop triggers, acetylcholine→verifier-call frequency.
+- [ ] **INFERENCE** *(Phase 28)* — Active inference loop. Each Hive tentacle gets expected state (prediction); observation produces delta (prediction error); error modulates hormone bus; hormone modulates behavior. One closed loop demoable: calendar packed + Slack backlog → cortisol↑ → terse, action-focused responses. Prediction-error-weighted memory replay (hippocampal analog) extends dream_mode.
+- [ ] **VITALITY** *(Phase 29)* — Vitality engine. Scalar 0.0–1.0 with behavioral consequences: ≥0.6 full personality, 0.4–0.6 personality flattens, 0.2–0.4 skill atrophy, 0.1–0.2 cognitive damage (BLADE notices), 0.0 dormancy (process exits, memory preserved, reincarnation not resurrection). Replenishes from competence/relatedness/autonomy (SDT). Drains from failures, isolation, tedium.
+- [ ] **EVAL** *(Phase 30)* — Organism eval suite. Novel eval families: vitality dynamics (synthetic event timelines → assert vitality lands in expected band), hormone-driven behavior (force vitality to value → verify TMT-shape effects), persona stability under stress (persona-vector L2 distance after N events). Validates the organism layer works. verify:organism gate.
+- [ ] **CLOSE** *(Phase 31)* — README rewrite citing research (Friston, Wang Voyager, Butlin/Long/Chalmers, MEDLEY-BENCH, SDT, TMT), CHANGELOG, v1.4 milestone audit, phase archive to milestones/v1.4-phases/.
+
+**Explicitly deferred to v1.5+:**
+- Hermes 4 via OpenRouter (was v1.3 Phase 25) — deprioritized; user picks their model via existing provider system
+- JARVIS-01/02 voice resurrection (was v1.3 Phase 26) — UX feature, not cognitive architecture; v1.5
+- Persona shaping via curated SFT data (Layer 7) — v1.5
+- Immune / behavioral-drift cross-cutting layer (prompt-injection + persona-drift + federation-anomaly detection) — v1.5
+- Federation Pattern A + selection mechanisms (per cumulative-culture research + steelman Arg 9) — v1.5
+- Go/NoGo decision gating (basal ganglia architecture; replace single confidence scalar with competing approach/avoid channels) — v2+ research bet
+- DMN-style background processing (continuous low-cost loop during waking hours) — v2+ research bet
+- NREM/REM dual-phase dream-mode redesign — v2+ research bet
 - V-JEPA 2 world model integration (Layer 2) — v3+ (research arc; vulnerable per steelman Arg 7)
-- TTT continual learning at agent layer (Layer 3) — v2+ (Voyager substrate is the local bet; TTT adds compute cost without obvious win until Layer 1 backbone is local)
-- Phase 19 UAT close (12 v1.2 + 11 v1.1 carry-overs) — defer per chat-first pivot; revisit at v1.4 milestone-audit time
-- OpenClaw gateway sidecar (was original v1.3 Phase 2) — different bet now; messaging surface not load-bearing for substrate work
-- Profile isolation work/personal split (was original v1.3 Phase 3) — v1.4
+- TTT continual learning at agent layer (Layer 3) — v2+ (Voyager substrate is the local bet)
+- Phase 19 UAT close (12 v1.2 + 11 v1.1 carry-overs) — defer per chat-first pivot
+- Profile isolation work/personal split — v1.5
 - Browser-harness Q1 decision (per JARVIS-09 deferral) — pull as dependency arises in chat-action work
 - D-04 Step 2 LLM intent fallback, fast-streaming branch ego accumulator refactor — chat-spine carry-overs; pull as Voyager loop work surfaces them
 
