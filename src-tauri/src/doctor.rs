@@ -943,6 +943,7 @@ fn emit_activity_for_doctor(app: &AppHandle, signal: &DoctorSignal) {
         SignalClass::RewardTrend     => "RewardTrend",
         SignalClass::Metacognitive   => "Metacognitive",
         SignalClass::Hormones        => "Hormones",
+        SignalClass::ActiveInference => "ActiveInference",
     };
     let severity_str = match signal.severity {
         Severity::Green => "Green",
