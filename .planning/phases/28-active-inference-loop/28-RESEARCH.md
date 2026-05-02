@@ -557,7 +557,7 @@ CREATE TABLE IF NOT EXISTS prediction_error_log (
 | A2 | The "backlog_size" Slack signal can be inferred from the total unread minus mentions | Code Examples (signal extraction) | If backlog_size is not derivable from existing Slack report fields, a third Slack API call is needed |
 | A3 | Adding `task_prediction_replay()` at position 5 (after skill_synthesis, before skill_prune) does not violate any task dependency within dream_mode | Architecture Patterns (dream task order) | Low risk — dream tasks are independent; the macro handles timeout/abort for each |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Calendar tentacle gap**
    - What we know: integration_bridge.rs has `poll_calendar()` returning `Vec<CalendarEvent>` with title, start_ts, minutes_until. IntegrationState has `upcoming_events: Vec<CalendarEvent>`.
