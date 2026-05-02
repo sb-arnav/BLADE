@@ -2463,6 +2463,11 @@ pub async fn hive_tick(app: &AppHandle) {
         }
     }
 
+    // ── Active inference: compute prediction errors from this tick's reports (Phase 28 / AINF-04) ──
+    if !all_reports.is_empty() {
+        crate::active_inference::compute_prediction_errors(&app, &all_reports).await;
+    }
+
     // ── Auto-fix pipeline: trigger on CI failures ─────────────────────────────
     // For trivial CI failures (lint/format/clippy), emit an event that the
     // proactive engine can pick up and suggest a fix command to the user.
