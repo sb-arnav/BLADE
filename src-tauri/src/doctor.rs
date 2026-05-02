@@ -39,6 +39,7 @@ pub enum SignalClass {
     AutoUpdate,
     RewardTrend,      // Phase 23 / REWARD-04 — D-23-04 LOCKED
     Metacognitive,    // Phase 25 / META-05
+    Hormones,         // Phase 27 / HORM-08
 }
 
 /// Severity tiers (D-04). Wire form is `lowercase` so the UI's
@@ -147,6 +148,14 @@ pub(crate) fn suggested_fix(class: SignalClass, severity: Severity) -> &'static 
             "At least one capability gap has been logged, or 5+ uncertainty markers have fired in the current session. Open the payload to see which topics triggered low confidence. Consider running /gsd-research-phase on the gap topic or adding a skill via evolution.rs.",
         (SignalClass::Metacognitive, Severity::Red) =>
             "3 or more capability gaps have been logged. BLADE is frequently encountering topics it cannot handle confidently. Inspect the metacognitive_gap_log table in blade.db and prioritize Voyager-loop skill generation for the most common gap topics.",
+
+        // Hormones -- Phase 27 HORM-08
+        (SignalClass::Hormones, Severity::Green) =>
+            "Physiological hormone bus is stable. All 7 scalars within normal range. Decay constants active.",
+        (SignalClass::Hormones, Severity::Amber) =>
+            "One or more physiological hormones elevated (cortisol >0.6 or NE >0.6). Check recent tool-call failure rate or error density in responses.",
+        (SignalClass::Hormones, Severity::Red) =>
+            "Physiological state dysregulated: cortisol and NE both elevated >0.7, or mortality_salience approaching cap. Review recent exchange quality and allow idle time for decay.",
     }
 }
 
@@ -974,6 +983,35 @@ fn compute_metacognitive_signal() -> Result<DoctorSignal, String> {
     })
 }
 
+// -- Signal source: Hormones (HORM-08) -- Plan 27-04 --------------------------
+
+fn compute_hormones_signal() -> Result<DoctorSignal, String> {
+    let p = crate::homeostasis::get_physiology();
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    let severity = if p.cortisol > 0.7 && p.norepinephrine > 0.7 {
+        Severity::Red
+    } else if p.cortisol > 0.6 || p.norepinephrine > 0.6 || p.mortality_salience > 0.6 {
+        Severity::Amber
+    } else {
+        Severity::Green
+    };
+    Ok(DoctorSignal {
+        class: SignalClass::Hormones,
+        severity,
+        payload: serde_json::json!({
+            "cortisol": p.cortisol,
+            "dopamine": p.dopamine,
+            "serotonin": p.serotonin,
+            "acetylcholine": p.acetylcholine,
+            "norepinephrine": p.norepinephrine,
+            "oxytocin": p.oxytocin,
+            "mortality_salience": p.mortality_salience,
+        }),
+        last_changed_at: now_ms,
+        suggested_fix: suggested_fix(SignalClass::Hormones, severity).to_string(),
+    })
+}
+
 // ── Tauri Commands (D-19) ─────────────────────────────────────────────────────
 
 /// Run all 5 signal sources in parallel via `tokio::join!`, cache the
@@ -990,7 +1028,7 @@ pub async fn doctor_run_full_check(app: AppHandle) -> Result<Vec<DoctorSignal>, 
     // Sources are sync but run via `tokio::join!` over async blocks so the
     // runtime can interleave file IO. Per CONTEXT "Claude's Discretion":
     // parallel is the recommended path.
-    let (eval, capgap, tentacle, drift, autoupdate, reward_trend, metacognitive) = tokio::join!(
+    let (eval, capgap, tentacle, drift, autoupdate, reward_trend, metacognitive, hormones) = tokio::join!(
         async { compute_eval_signal() },
         async { compute_capgap_signal() },
         async { compute_tentacle_signal() },
@@ -998,6 +1036,7 @@ pub async fn doctor_run_full_check(app: AppHandle) -> Result<Vec<DoctorSignal>, 
         async { compute_autoupdate_signal() },
         async { compute_reward_signal() },
         async { compute_metacognitive_signal() },
+        async { compute_hormones_signal() },
     );
 
     // Order in the returned Vec is locked (most-volatile-first per
@@ -1011,6 +1050,7 @@ pub async fn doctor_run_full_check(app: AppHandle) -> Result<Vec<DoctorSignal>, 
         autoupdate.map_err(|e| format!("autoupdate signal: {}", e))?,
         reward_trend.map_err(|e| format!("reward_trend signal: {}", e))?,
         metacognitive.map_err(|e| format!("metacognitive signal: {}", e))?,
+        hormones.map_err(|e| format!("hormones signal: {}", e))?,
     ];
 
     // Diff against prior severity; emit on transitions where new ∈ {Amber, Red}.
@@ -1103,8 +1143,8 @@ mod tests {
 
     #[test]
     fn suggested_fix_table_is_exhaustive() {
-        // All 21 (class × severity) pairs return a non-empty string.
-        // Phase 25 META-05 added Metacognitive (3 arms): 7×3 = 21.
+        // All 24 (class × severity) pairs return a non-empty string.
+        // Phase 27 HORM-08 added Hormones (3 arms): 8×3 = 24.
         for class in [
             SignalClass::EvalScores,
             SignalClass::CapabilityGaps,
@@ -1113,6 +1153,7 @@ mod tests {
             SignalClass::AutoUpdate,
             SignalClass::RewardTrend,
             SignalClass::Metacognitive,
+            SignalClass::Hormones,
         ] {
             for severity in [Severity::Green, Severity::Amber, Severity::Red] {
                 let s = suggested_fix(class, severity);
