@@ -1821,6 +1821,7 @@ export function forgeTestTool(id: string): Promise<string> {
 // Wire form: SignalClass uses #[serde(rename_all = "snake_case")];
 // Severity uses #[serde(rename_all = "lowercase")]. The literal unions
 // below MUST stay in lockstep with the Rust enum variants.
+// Phase 25 added 'metacognitive' (META-05).
 // ═══════════════════════════════════════════════════════════════════════════
 
 export type SignalClass =
@@ -1829,7 +1830,8 @@ export type SignalClass =
   | 'tentacle_health'
   | 'config_drift'
   | 'auto_update'
-  | 'reward_trend';
+  | 'reward_trend'
+  | 'metacognitive';
 
 export type Severity = 'green' | 'amber' | 'red';
 
