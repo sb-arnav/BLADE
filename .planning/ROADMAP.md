@@ -42,7 +42,7 @@
 
 - [x] **Phase 25: Metacognitive Controller** — Confidence-delta tracking, verifier routing, gap surfacing, gap log → evolution.rs (completed 2026-05-02)
 - [x] **Phase 26: Safety Bundle** — Danger-triple HITL gate, mortality-salience cap, calm-vector bias, attachment guardrails, eval-gate vitality drain (completed 2026-05-02)
-- [ ] **Phase 27: Hormone Physiology** — 7 hormones wired with decay + gain, emotion classifier, modulation effects on response style
+- [x] **Phase 27: Hormone Physiology** — 7 hormones wired with decay + gain, emotion classifier, modulation effects on response style (completed 2026-05-02)
 - [ ] **Phase 28: Active Inference Loop** — Tentacle predictions, prediction-error → hormone bus, one closed demo loop, hippocampal memory replay
 - [ ] **Phase 29: Vitality Engine** — Scalar 0.0–1.0 with 5 behavioral bands, SDT replenishment, dormancy / reincarnation
 - [ ] **Phase 30: Organism Eval** — Vitality dynamics, hormone-behavior, persona-stability, safety bundle evals; verify:organism gate
@@ -125,14 +125,14 @@ Plans:
   2. The emotion classifier runs on every response ≥50 tokens, emitting valence/arousal/cluster, and updates the hormone bus with α=0.05 smoothing — visible in ActivityStrip
   3. High dopamine state produces more aggressive Voyager-loop exploration; low dopamine produces conservative skill reuse — the difference is testable via dopamine-pinned fixture
   4. Hormone values survive a process restart and are visible in the UI with current levels and recent history
-**Plans:** 5 plans
+**Plans:** 5/5 plans complete
 
 Plans:
-- [ ] 27-01-PLAN.md — PhysiologicalState foundation: struct, global, decay, persistence, pituitary blend, ActivityStrip emission
-- [ ] 27-02-PLAN.md — Emotion classifier + commands.rs call site: lexicon-based classifier, alpha=0.05 smoothed update
-- [ ] 27-03-PLAN.md — Behavioral modulation: cortisol/oxytocin in brain.rs, dopamine/NE in evolution.rs, ACh in metacognition.rs
-- [ ] 27-04-PLAN.md — DoctorPane signal: SignalClass::Hormones in doctor.rs + frontend registration
-- [ ] 27-05-PLAN.md — Eval module + verify:hormone gate + human checkpoint
+- [x] 27-01-PLAN.md — PhysiologicalState foundation: struct, global, decay, persistence, pituitary blend, ActivityStrip emission
+- [x] 27-02-PLAN.md — Emotion classifier + commands.rs call site: lexicon-based classifier, alpha=0.05 smoothed update
+- [x] 27-03-PLAN.md — Behavioral modulation: cortisol/oxytocin in brain.rs, dopamine/NE in evolution.rs, ACh in metacognition.rs
+- [x] 27-04-PLAN.md — DoctorPane signal: SignalClass::Hormones in doctor.rs + frontend registration
+- [x] 27-05-PLAN.md — Eval module + verify:hormone gate + human checkpoint
 **UI hint**: yes
 
 ### Phase 28: Active Inference Loop
@@ -196,7 +196,7 @@ Plans:
 | 24. Skill consolidation in dream_mode | v1.3 | — | Complete | 2026-05-02 |
 | 25. Metacognitive Controller | v1.4 | 3/3 | Complete    | 2026-05-02 |
 | 26. Safety Bundle | v1.4 | 4/4 | Complete | 2026-05-02 |
-| 27. Hormone Physiology | v1.4 | 0/5 | Planning complete | - |
+| 27. Hormone Physiology | v1.4 | 5/5 | Complete    | 2026-05-02 |
 | 28. Active Inference Loop | v1.4 | 0/? | Not started | - |
 | 29. Vitality Engine | v1.4 | 0/? | Not started | - |
 | 30. Organism Eval | v1.4 | 0/? | Not started | - |

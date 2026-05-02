@@ -27,15 +27,15 @@
 
 ### Hormones
 
-- [ ] **HORM-01**: 7 hormone scalars (cortisol, dopamine, serotonin, acetylcholine, norepinephrine, oxytocin, mortality-salience) with individual decay constants and gain modulation
-- [ ] **HORM-02**: External text-based emotion classifier runs after every response ≥50 tokens, maps to valence/arousal/cluster, updates hormone bus with α=0.05 smoothing
-- [ ] **HORM-03**: Cortisol modulates response style — high cortisol → terse, action-focused; low → expansive, exploratory
-- [ ] **HORM-04**: Dopamine modulates exploration rate — high → Voyager-loop more aggressive; low → conservative
-- [ ] **HORM-05**: Norepinephrine modulates novelty response — unexpected prediction errors trigger exploration
-- [ ] **HORM-06**: Acetylcholine modulates verifier-call frequency — high → more secondary checks
-- [ ] **HORM-07**: Oxytocin tracks user interaction quality — modulates personalization depth
-- [ ] **HORM-08**: Hormone state persisted across sessions and visible in UI surface
-- [ ] **HORM-09**: Hormone bus emits to ActivityStrip per M-07 contract
+- [x] **HORM-01**: 7 hormone scalars (cortisol, dopamine, serotonin, acetylcholine, norepinephrine, oxytocin, mortality-salience) with individual decay constants and gain modulation
+- [x] **HORM-02**: External text-based emotion classifier runs after every response ≥50 tokens, maps to valence/arousal/cluster, updates hormone bus with α=0.05 smoothing
+- [x] **HORM-03**: Cortisol modulates response style — high cortisol → terse, action-focused; low → expansive, exploratory
+- [x] **HORM-04**: Dopamine modulates exploration rate — high → Voyager-loop more aggressive; low → conservative
+- [x] **HORM-05**: Norepinephrine modulates novelty response — unexpected prediction errors trigger exploration
+- [x] **HORM-06**: Acetylcholine modulates verifier-call frequency — high → more secondary checks
+- [x] **HORM-07**: Oxytocin tracks user interaction quality — modulates personalization depth
+- [x] **HORM-08**: Hormone state persisted across sessions and visible in UI surface
+- [x] **HORM-09**: Hormone bus emits to ActivityStrip per M-07 contract
 
 ### Active Inference
 
@@ -106,15 +106,15 @@
 | SAFE-05 | Phase 26 | Pending |
 | SAFE-06 | Phase 26 | Pending |
 | SAFE-07 | Phase 26 | Pending |
-| HORM-01 | Phase 27 | Pending |
-| HORM-02 | Phase 27 | Pending |
-| HORM-03 | Phase 27 | Pending |
-| HORM-04 | Phase 27 | Pending |
-| HORM-05 | Phase 27 | Pending |
-| HORM-06 | Phase 27 | Pending |
-| HORM-07 | Phase 27 | Pending |
-| HORM-08 | Phase 27 | Pending |
-| HORM-09 | Phase 27 | Pending |
+| HORM-01 | Phase 27 | Complete |
+| HORM-02 | Phase 27 | Complete |
+| HORM-03 | Phase 27 | Complete |
+| HORM-04 | Phase 27 | Complete |
+| HORM-05 | Phase 27 | Complete |
+| HORM-06 | Phase 27 | Complete |
+| HORM-07 | Phase 27 | Complete |
+| HORM-08 | Phase 27 | Complete |
+| HORM-09 | Phase 27 | Complete |
 | AINF-01 | Phase 28 | Pending |
 | AINF-02 | Phase 28 | Pending |
 | AINF-03 | Phase 28 | Pending |
