@@ -245,6 +245,12 @@ pub async fn jarvis_dispatch_action(
 ) -> Result<DispatchResult, String> {
     match intent {
         IntentClass::ChatOnly => Ok(DispatchResult::NotApplicable),
+        // Phase 24 (v1.3) — ProposalReply is handled by commands.rs's
+        // apply_proposal_reply path BEFORE the dispatcher is invoked. If
+        // it ever reaches here (defensive), short-circuit as NotApplicable
+        // — the chat-injected proposal apply path doesn't go through the
+        // jarvis tentacle/MCP/native chain.
+        IntentClass::ProposalReply { .. } => Ok(DispatchResult::NotApplicable),
         IntentClass::ActionRequired { service, action } => {
             // GATE 1 — consent (T-18-01 mitigation; ASVS V2.6).
             match consent_check(D17_INTENT_LABEL, &service) {

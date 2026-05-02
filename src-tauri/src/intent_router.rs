@@ -19,6 +19,10 @@ use serde::{Deserialize, Serialize};
 pub enum IntentClass {
     ChatOnly,
     ActionRequired { service: String, action: String },
+    /// Phase 24 (v1.3) — operator reply to a chat-injected dream_mode
+    /// proposal (`yes <id>` / `no <id>` / `dismiss <id>`). The id is the
+    /// 8-char prefix of a uuid_v4 written by skills::pending::write_proposal.
+    ProposalReply { verb: String, id: String },
 }
 
 /// ArgsBag — opaque key/value extracted heuristically from the user message.
@@ -49,6 +53,7 @@ pub async fn classify_intent(message: &str) -> (IntentClass, ArgsBag) {
         IntentClass::ActionRequired { service, action } => {
             extract_args(message, service, action)
         }
+        IntentClass::ProposalReply { .. } => serde_json::Map::new(),
     };
     (intent, args)
 }
@@ -57,6 +62,13 @@ pub async fn classify_intent(message: &str) -> (IntentClass, ArgsBag) {
 /// classification logic without args extraction noise.
 async fn classify_intent_class(message: &str) -> IntentClass {
     let lower = message.to_lowercase();
+
+    // Phase 24 (v1.3) Tier-1 — proposal reply MUST run before action_required
+    // because patterns like "yes 1234 send slack message" would otherwise
+    // miss-match the slack action verb.
+    if let Some((verb, id)) = match_proposal_reply(&lower) {
+        return IntentClass::ProposalReply { verb, id };
+    }
 
     // Tier 1: heuristic — action verb AND service token must both be present.
     if let Some((verb, service)) = match_heuristic(&lower) {
@@ -85,6 +97,21 @@ fn match_heuristic(lower: &str) -> Option<(&'static str, &'static str)> {
         }
     }
     None
+}
+
+/// Phase 24 (v1.3) — Tier-1 detector for chat-injected proposal replies.
+/// Pattern: `\b(yes|no|dismiss)\s+([a-f0-9]{4,})\b`. Lowercases the verb
+/// + id; falls through (returns None) if the message doesn't match.
+fn match_proposal_reply(lower: &str) -> Option<(String, String)> {
+    use std::sync::OnceLock;
+    static RE: OnceLock<regex::Regex> = OnceLock::new();
+    let re = RE.get_or_init(|| {
+        regex::Regex::new(r"(?i)\b(yes|no|dismiss)\s+([a-f0-9]{4,})\b").unwrap()
+    });
+    let captures = re.captures(lower)?;
+    let verb = captures.get(1)?.as_str().to_lowercase();
+    let id = captures.get(2)?.as_str().to_lowercase();
+    Some((verb, id))
 }
 
 /// Tier-2 LLM-fallback. Phase 18 ships a stub that returns None unconditionally.
@@ -494,5 +521,35 @@ mod tests {
         let (intent, args) = classify_intent("hello there").await;
         assert!(matches!(intent, IntentClass::ChatOnly));
         assert!(args.is_empty());
+    }
+
+    // ── Phase 24 (v1.3) — ProposalReply Tier-1 detector tests ───────────────
+
+    #[tokio::test]
+    async fn proposal_reply_yes_matches() {
+        let intent = classify_intent_class("yes 7af3").await;
+        assert_eq!(intent, IntentClass::ProposalReply { verb: "yes".into(), id: "7af3".into() });
+    }
+
+    #[tokio::test]
+    async fn proposal_reply_dismiss_uppercase_normalised() {
+        let intent = classify_intent_class("Dismiss ABC12345").await;
+        assert_eq!(intent, IntentClass::ProposalReply { verb: "dismiss".into(), id: "abc12345".into() });
+    }
+
+    #[tokio::test]
+    async fn proposal_reply_takes_precedence_over_action_required() {
+        let intent = classify_intent_class("yes 1234 send slack message").await;
+        assert!(matches!(intent, IntentClass::ProposalReply { .. }), "got {:?}", intent);
+        if let IntentClass::ProposalReply { verb, id } = intent {
+            assert_eq!(verb, "yes");
+            assert_eq!(id, "1234");
+        }
+    }
+
+    #[tokio::test]
+    async fn bare_yes_falls_through_to_chat_only() {
+        let intent = classify_intent_class("yes").await;
+        assert_eq!(intent, IntentClass::ChatOnly);
     }
 }
