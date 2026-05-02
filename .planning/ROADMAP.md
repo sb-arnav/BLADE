@@ -121,7 +121,7 @@ Plans:
 **Depends on**: Phase 26
 **Requirements**: HORM-01, HORM-02, HORM-03, HORM-04, HORM-05, HORM-06, HORM-07, HORM-08, HORM-09
 **Success Criteria** (what must be TRUE):
-  1. After a high-stress exchange (��3 failure responses), cortisol rises measurably and subsequent replies are noticeably terser and action-focused compared to baseline
+  1. After a high-stress exchange (3+ failure responses), cortisol rises measurably and subsequent replies are noticeably terser and action-focused compared to baseline
   2. The emotion classifier runs on every response ≥50 tokens, emitting valence/arousal/cluster, and updates the hormone bus with α=0.05 smoothing — visible in ActivityStrip
   3. High dopamine state produces more aggressive Voyager-loop exploration; low dopamine produces conservative skill reuse — the difference is testable via dopamine-pinned fixture
   4. Hormone values survive a process restart and are visible in the UI with current levels and recent history
@@ -145,7 +145,13 @@ Plans:
   2. A tentacle that observes a deviation from its prediction produces a nonzero error value; that error is reflected in the hormone bus within the same cycle
   3. During dream_mode, high-prediction-error memories are replayed before low-error ones — the hippocampal weighting is verifiable via replay log
   4. A tentacle that observes consistent patterns updates its expected state — BLADE's predictions for a calendar tentacle improve after 5 repeated observations
-**Plans**: TBD
+**Plans:** 4 plans
+
+Plans:
+- [ ] 28-01-PLAN.md — Foundation: active_inference.rs core module, TentaclePrediction structs, OnceLock state, signal extraction, normalization, EMA learning, SQLite tables, homeostasis.rs update function
+- [ ] 28-02-PLAN.md — Integration wiring: hive_tick hook for prediction error computation, dream_mode hippocampal replay task
+- [ ] 28-03-PLAN.md — DoctorPane signal: SignalClass::ActiveInference in doctor.rs with compute function and exhaustiveness test update
+- [ ] 28-04-PLAN.md — Eval suite: 6 deterministic fixtures (AINF-01..06), verify-inference.sh Gate 36, verify:all chain update
 
 ### Phase 29: Vitality Engine
 
@@ -197,7 +203,7 @@ Plans:
 | 25. Metacognitive Controller | v1.4 | 3/3 | Complete    | 2026-05-02 |
 | 26. Safety Bundle | v1.4 | 4/4 | Complete | 2026-05-02 |
 | 27. Hormone Physiology | v1.4 | 5/5 | Complete    | 2026-05-02 |
-| 28. Active Inference Loop | v1.4 | 0/? | Not started | - |
+| 28. Active Inference Loop | v1.4 | 0/4 | Planned | - |
 | 29. Vitality Engine | v1.4 | 0/? | Not started | - |
 | 30. Organism Eval | v1.4 | 0/? | Not started | - |
 | 31. Close | v1.4 | 0/? | Not started | - |
@@ -229,4 +235,4 @@ Plans:
 
 ---
 
-*Last updated: 2026-05-02 — Phase 27 planned (5 plans in 3 waves). v1.4 ROADMAP.md updated. Phases 25-31 derived from REQUIREMENTS.md (42 requirements, 100% mapped). v1.3 collapsed into archive block.*
+*Last updated: 2026-05-02 — Phase 28 planned (4 plans in 3 waves). v1.4 ROADMAP.md updated. Phases 25-31 derived from REQUIREMENTS.md (42 requirements, 100% mapped). v1.3 collapsed into archive block.*
