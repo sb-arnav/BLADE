@@ -1779,6 +1779,12 @@ pub(crate) async fn send_message_stream_inline(
             let user_text = last_user_text.clone();
             // Use clean_content for downstream processing so tags don't pollute memory
             let assistant_text = clean_content.clone();
+
+            // ── PHYSIOLOGY CLASSIFIER: classify BLADE's own output, update PhysiologicalState (Phase 27 / HORM-02) ──
+            if let Some(emotion_output) = crate::homeostasis::classify_response_emotion(&assistant_text) {
+                crate::homeostasis::update_physiology_from_classifier(&emotion_output);
+            }
+
             let store_clone = vector_store.clone();
             // Collect tool names used in this loop for skill pattern recording
             let tools_used: Vec<String> = conversation.iter().filter_map(|m| {
