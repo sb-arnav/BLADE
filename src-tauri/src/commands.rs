@@ -1148,6 +1148,12 @@ pub(crate) async fn send_message_stream_inline(
         }
     }
 
+    // META-04 fallback: lightweight metacognitive check for tool-loop path.
+    // reason_through handles its own verifier + initiative phrasing (META-02/03);
+    // this only logs gaps for evolution.rs — it does NOT substitute the response.
+    let meta_pre_check = crate::metacognition::assess_cognitive_state(&last_user_text);
+    let meta_low_confidence = meta_pre_check.confidence < 0.5;
+
     // Track whether brain planner was used (for pons relay → learning_engine)
     let mut brain_plan_used = false;
 
@@ -1831,6 +1837,20 @@ pub(crate) async fn send_message_stream_inline(
                             &tools_used,
                         );
                     }
+                }
+
+                // META-04 fallback: log gap for evolution.rs when pre-check flagged low confidence.
+                // This does NOT add a verifier call or substitute the response — the LLM already
+                // streamed its answer. It only persists the gap so evolution.rs can generate
+                // skills for topics BLADE struggles with.
+                if meta_low_confidence {
+                    let topic = crate::safe_slice(&last_user_text, 60);
+                    crate::metacognition::log_gap(
+                        topic,
+                        &last_user_text,
+                        meta_pre_check.confidence,
+                        0, // no step-level uncertainty tracking in tool-loop path
+                    );
                 }
 
                 // Capability gap detection — runs silently, fires webhook if gap found
