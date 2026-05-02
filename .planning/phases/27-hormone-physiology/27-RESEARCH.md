@@ -788,7 +788,7 @@ No new external dependencies. Step 2.6: no blocking missing dependencies.
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Where exactly in commands.rs should the classifier call site be?**
    - What we know: `commands.rs` contains `send_message_stream` with a streaming token loop
