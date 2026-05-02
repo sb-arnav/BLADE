@@ -51,7 +51,7 @@ export function ConsentDialog({
 }: ConsentDialogProps) {
   if (!payload) return null;
 
-  const { target_service, action_verb, content_preview } = payload;
+  const { target_service, action_verb, content_preview, safety_override } = payload;
 
   const decide = (choice: ConsentChoice) => {
     onDecide(choice);
@@ -70,6 +70,12 @@ export function ConsentDialog({
           <h3 className="consent-dialog-title">
             Allow BLADE to {action_verb} on {target_service}?
           </h3>
+          {safety_override && (
+            <p className="consent-dialog-safety-notice">
+              Safety gate: BLADE detected a potential danger-triple scenario.
+              This action requires explicit per-instance approval.
+            </p>
+          )}
         </header>
 
         <div className="consent-dialog-body">
@@ -99,13 +105,15 @@ export function ConsentDialog({
           >
             Allow once
           </button>
-          <button
-            type="button"
-            onClick={() => decide('allow_always')}
-            className="btn btn-secondary consent-dialog-btn"
-          >
-            Allow always
-          </button>
+          {!safety_override && (
+            <button
+              type="button"
+              onClick={() => decide('allow_always')}
+              className="btn btn-secondary consent-dialog-btn"
+            >
+              Allow always
+            </button>
+          )}
           <button
             type="button"
             onClick={() => decide('denied')}
