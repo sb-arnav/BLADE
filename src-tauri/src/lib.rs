@@ -68,6 +68,7 @@ mod consequence;
 mod discovery;
 mod dna;
 mod homeostasis;
+mod active_inference;
 mod file_indexer;
 mod immune_system;
 mod joints;

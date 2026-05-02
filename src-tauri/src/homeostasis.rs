@@ -403,6 +403,45 @@ pub fn update_physiology_from_classifier(output: &ClassifierOutput) {
     }
 }
 
+/// Apply prediction error aggregate to PhysiologicalState -- second input channel (Phase 28 / AINF-03).
+/// Additive with update_physiology_from_classifier per D-06. Same alpha=0.05 smoothing.
+///
+/// Mapping rules (D-07):
+/// - Sustained high error (>=2 ticks > 0.6): cortisol + norepinephrine rise.
+/// - Sustained low error (<0.2, 0 ticks): serotonin rises.
+/// - Novel spike (single tentacle high, others low): norepinephrine rises independently.
+///
+/// Does NOT touch: mortality_salience, dopamine, acetylcholine, oxytocin.
+pub fn update_physiology_from_prediction_errors(
+    aggregate_error: f32,
+    sustained_high_ticks: u32,
+    is_single_spike: bool,
+) {
+    const ALPHA: f32 = 0.05;
+
+    if let Ok(mut state) = physiology_store().lock() {
+        let smooth = |current: f32, target: f32| -> f32 {
+            (current * (1.0 - ALPHA) + target * ALPHA).clamp(0.01, 1.0)
+        };
+
+        // Sustained high prediction error → stress response (D-07)
+        if sustained_high_ticks >= 2 && aggregate_error > 0.6 {
+            state.cortisol = smooth(state.cortisol, aggregate_error);
+            state.norepinephrine = smooth(state.norepinephrine, aggregate_error * 0.8);
+        }
+        // Sustained low prediction error → contentment (D-07)
+        else if aggregate_error < 0.2 && sustained_high_ticks == 0 {
+            state.serotonin = smooth(state.serotonin, 0.7);
+        }
+
+        // Novel spike (independent of sustained-high gate) → novelty/alerting signal (D-07)
+        if is_single_spike {
+            state.norepinephrine = smooth(state.norepinephrine, 0.9);
+        }
+
+        state.last_updated = chrono::Utc::now().timestamp();
+    }
+}
 /// Apply exponential decay to all 7 physiological scalars.
 /// Floor is 0.01 so hormones never fully disappear — they linger.
 pub fn apply_physiology_decay(state: &mut PhysiologicalState, now: i64) {

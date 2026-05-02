@@ -570,6 +570,23 @@ pub(crate) fn run_migrations(conn: &Connection) -> Result<(), String> {
     )
     .map_err(|e| format!("DB error: {}", e))?;
 
+    // ── Active Inference (Phase 28 / AINF-01, AINF-06) ───────────────────────
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS tentacle_predictions (
+            platform   TEXT PRIMARY KEY,
+            data       TEXT NOT NULL,
+            updated_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS prediction_error_log (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            platform        TEXT NOT NULL,
+            aggregate_error REAL NOT NULL,
+            top_signal      TEXT NOT NULL DEFAULT '',
+            timestamp       INTEGER NOT NULL
+        );",
+    )
+    .map_err(|e| format!("DB error: {}", e))?;
+
     // ── Incremental schema upgrades (ALTER TABLE ADD COLUMN is idempotent via ignore) ──
     // These columns were added in v0.4.7+ — older DBs need them backfilled.
     let swarm_upgrades = [
