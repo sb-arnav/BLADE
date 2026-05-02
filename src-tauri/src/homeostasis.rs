@@ -68,6 +68,13 @@ pub struct HormoneState {
     /// High leptin = skip research, evolution, memory extraction.
     pub leptin: f32,
 
+    /// MORTALITY SALIENCE: 0.0 = no awareness of impermanence → 1.0 = acute awareness.
+    /// Phase 27 wires the physiology (TMT-shape behavioral effects).
+    /// Phase 26 reads this for the mortality-salience cap check — blocking
+    /// self-preservation motivated actions when this value is elevated.
+    #[serde(default)]
+    pub mortality_salience: f32,
+
     /// When the hypothalamus last updated these values.
     pub last_updated: i64,
 }
@@ -85,6 +92,7 @@ impl Default for HormoneState {
             insulin: 0.0,      // budget healthy
             adrenaline: 0.0,   // calm
             leptin: 0.3,       // slightly hungry for knowledge
+            mortality_salience: 0.0, // no awareness of impermanence
             last_updated: 0,
         }
     }
