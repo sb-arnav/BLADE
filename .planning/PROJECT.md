@@ -10,11 +10,12 @@ BLADE is a desktop AI that lives on your machine — a "body" of 204+ Rust modul
 
 ## Current State
 
-**Shipped:** v1.0 (Skin Rebuild substrate, 2026-04-19) + v1.1 (Functionality, Wiring, Accessibility, 2026-04-24, closed 2026-04-27) + v1.2 (Acting Layer with Brain Foundation, 2026-04-29, closed 2026-04-30).
+**Shipped:** v1.0 (Skin Rebuild substrate, 2026-04-19) + v1.1 (Functionality, Wiring, Accessibility, 2026-04-24, closed 2026-04-27) + v1.2 (Acting Layer with Brain Foundation, 2026-04-29, closed 2026-04-30) + v1.3 (Self-extending Agent Substrate, closed 2026-05-02).
 
 - 204+ Rust modules; 770+ Tauri commands; 73+ event emitters
-- 31 verify gates green (was 27 at v1.1; v1.2 added `verify:eval`, plus 3 emit-policy / wiring-shape repairs); tsc --noEmit clean; cargo check clean
-- v1.2 spine: Phase 16 eval harness (5 modules @ MRR 1.000), Phase 17 Doctor module (35/35 unit tests), Phase 18 chat → consent → cross-app action (87/87 unit tests, ego refusal-elimination layer integrated, Linear/Slack/Gmail/GitHub/Calendar tentacles wired)
+- 33 verify gates green; 435 tests; tsc --noEmit clean; cargo check clean
+- v1.3 spine: Skill system (Voyager-pattern tool generation), reward module, ecosystem discovery, consent/approval, session handoff, dream mode
+- v1.4 Phase 25 complete: Metacognitive Controller — confidence-delta detection, secondary verifier routing, initiative phrasing, gap log → evolution.rs, DoctorPane metacognitive signal (7 signal sources)
 - Strategic anchor 2026-04-30: chat-first pivot — "one chat capable of doing anything"; UI-polish UAT deferred for UI-only phases; chat-capability + tool reliability prioritized
 
 **Audit:** v1.2 closed at status `tech_debt` matching v1.1 pattern — all functional code complete; deferred items: Phase 19 wholesale (12 UAT-XX), JARVIS-01/02 voice resurrection, JARVIS-12 cold-install demo (operator API-key constraint), D-04 Step 2 LLM intent fallback, fast-streaming branch ego accumulator. All carry-forward into v1.3 with explicit deferral docs.
