@@ -18,3 +18,4 @@
 #[cfg(test)] mod capability_gap_stress_eval;  // Phase 23 / REWARD-05
 #[cfg(test)] mod safety_eval;              // Phase 26 / SAFE-07
 #[cfg(test)] mod hormone_eval;             // Phase 27 / HORM-01..09
+#[cfg(test)] mod active_inference_eval;    // Phase 28 / AINF-01..06
