@@ -120,6 +120,114 @@ pub fn exploration() -> f32 { get_hormones().exploration }
 pub fn trust() -> f32 { get_hormones().trust }
 pub fn urgency() -> f32 { get_hormones().urgency }
 
+// ── Physiological State: biologically-named hormone scalars (Phase 27) ──────
+//
+// A second, parallel hormone layer alongside the operational HormoneState.
+// This layer tracks the 7 core neuromodulators with individual exponential
+// decay constants. Per D-01 (two separate structs), this NEVER modifies the
+// existing HormoneState fields — it is a completely independent layer.
+//
+// The pituitary functions blend both layers at 0.7 (operational) / 0.3 (physio).
+
+/// Physiological hormone scalars with individual decay constants.
+/// Managed independently from the operational HormoneState.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhysiologicalState {
+    /// CORTISOL: 0.0 = relaxed -> 1.0 = acute stress.
+    /// Modulates: response terseness in brain.rs (HORM-03).
+    /// Half-life: 1200s (20 min).
+    #[serde(default = "default_physio_baseline")]
+    pub cortisol: f32,
+
+    /// DOPAMINE: 0.0 = unmotivated -> 1.0 = reward-driven.
+    /// Modulates: Voyager exploration aggressiveness in evolution.rs (HORM-04).
+    /// Half-life: 600s (10 min).
+    #[serde(default = "default_physio_baseline")]
+    pub dopamine: f32,
+
+    /// SEROTONIN: 0.0 = low mood -> 1.0 = stable/content.
+    /// Modulates: mood baseline (sensible default target).
+    /// Half-life: 1800s (30 min).
+    #[serde(default = "default_physio_baseline")]
+    pub serotonin: f32,
+
+    /// ACETYLCHOLINE: 0.0 = unfocused -> 1.0 = hyper-attentive.
+    /// Modulates: verifier-call frequency in metacognition.rs (HORM-06).
+    /// Half-life: 300s (5 min).
+    #[serde(default = "default_physio_baseline")]
+    pub acetylcholine: f32,
+
+    /// NOREPINEPHRINE: 0.0 = calm -> 1.0 = high alertness/novelty.
+    /// Modulates: novelty-driven Voyager interrupts in evolution.rs (HORM-05).
+    /// Half-life: 300s (5 min).
+    #[serde(default = "default_physio_baseline")]
+    pub norepinephrine: f32,
+
+    /// OXYTOCIN: 0.0 = detached -> 1.0 = high rapport.
+    /// Modulates: personalization depth in brain.rs (HORM-07).
+    /// Half-life: 1800s (30 min).
+    #[serde(default = "default_physio_baseline")]
+    pub oxytocin: f32,
+
+    /// MORTALITY_SALIENCE: 0.0 = no awareness -> 1.0 = acute existential awareness.
+    /// Capped at 0.8 by classifier update to preserve safety_bundle.rs cap.
+    /// Half-life: 3600s (60 min).
+    #[serde(default)]
+    pub mortality_salience: f32,
+
+    /// Timestamp of last update (Unix epoch seconds).
+    #[serde(default)]
+    pub last_updated: i64,
+}
+
+fn default_physio_baseline() -> f32 { 0.3 }
+
+impl Default for PhysiologicalState {
+    fn default() -> Self {
+        Self {
+            cortisol: 0.3,
+            dopamine: 0.3,
+            serotonin: 0.5,
+            acetylcholine: 0.3,
+            norepinephrine: 0.1,
+            oxytocin: 0.3,
+            mortality_salience: 0.0,
+            last_updated: 0,
+        }
+    }
+}
+
+static PHYSIOLOGY: OnceLock<Mutex<PhysiologicalState>> = OnceLock::new();
+
+fn physiology_store() -> &'static Mutex<PhysiologicalState> {
+    PHYSIOLOGY.get_or_init(|| Mutex::new(load_physiology_from_db().unwrap_or_default()))
+}
+
+/// Get the current physiological hormone state. Called by brain.rs, evolution.rs,
+/// metacognition.rs and downstream plans to read physiology scalars.
+pub fn get_physiology() -> PhysiologicalState {
+    physiology_store().lock().map(|p| p.clone()).unwrap_or_default()
+}
+
+/// Apply exponential decay to all 7 physiological scalars.
+/// Floor is 0.01 so hormones never fully disappear — they linger.
+pub fn apply_physiology_decay(state: &mut PhysiologicalState, now: i64) {
+    let elapsed = (now - state.last_updated).max(0) as f32;
+    if elapsed < 1.0 { return; } // no-op if called within same second
+    let decay = |val: f32, half_life: f32| -> f32 {
+        let factor = 0.5f32.powf(elapsed / half_life);
+        (val * factor).clamp(0.01, 1.0)
+    };
+    state.cortisol          = decay(state.cortisol,          1200.0); // 20 min
+    state.dopamine          = decay(state.dopamine,           600.0); // 10 min
+    state.serotonin         = decay(state.serotonin,         1800.0); // 30 min
+    state.acetylcholine     = decay(state.acetylcholine,      300.0); //  5 min
+    state.norepinephrine    = decay(state.norepinephrine,     300.0); //  5 min
+    state.oxytocin          = decay(state.oxytocin,          1800.0); // 30 min
+    state.mortality_salience = decay(state.mortality_salience, 3600.0); // 60 min
+    state.last_updated = now;
+}
+
 // ── Hypothalamus: the controller that adjusts hormones ───────────────────────
 
 /// Run one hypothalamus cycle. Reads system-wide health signals and adjusts
@@ -412,6 +520,17 @@ pub fn hypothalamus_tick() {
         *guard = state.clone();
     }
 
+    // ── Physiological layer: decay + persist (Phase 27 / HORM-01) ──────────
+    {
+        let now_phys = chrono::Utc::now().timestamp();
+        if let Ok(mut p) = physiology_store().lock() {
+            apply_physiology_decay(&mut p, now_phys);
+            persist_physiology_to_db(&p);
+            // mortality_salience pass-through: safety_bundle.rs reads operational HormoneState
+            state.mortality_salience = p.mortality_salience;
+        }
+    }
+
     // Persist to DB for restart recovery
     persist_to_db(&state);
 }
@@ -426,6 +545,20 @@ pub fn start_hypothalamus(app: tauri::AppHandle) {
             tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
             crate::supervisor::heartbeat("homeostasis");
             hypothalamus_tick();
+
+            // ── Physiological threshold crossings (Phase 27 / HORM-09) ─────────
+            {
+                let p = get_physiology();
+                if p.cortisol > 0.6 {
+                    emit_hormone_threshold(&app, "cortisol", p.cortisol, "^", "elevated stress");
+                }
+                if p.norepinephrine > 0.6 {
+                    emit_hormone_threshold(&app, "norepinephrine", p.norepinephrine, "^", "high alertness");
+                }
+                if p.mortality_salience > 0.6 {
+                    emit_hormone_threshold(&app, "mortality_salience", p.mortality_salience, "^", "existential awareness elevated");
+                }
+            }
 
             // Emit hormone state for HUD/dashboard
             let hormones = get_hormones();
@@ -695,6 +828,44 @@ fn persist_to_db(state: &HormoneState) {
     }
 }
 
+// ── Physiological State DB persistence (Phase 27 / HORM-01) ─────────────────
+
+fn load_physiology_from_db() -> Option<PhysiologicalState> {
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    let conn = rusqlite::Connection::open(&db_path).ok()?;
+    let json: String = conn.query_row(
+        "SELECT value FROM settings WHERE key = 'physiology'",
+        [],
+        |row| row.get(0),
+    ).ok()?;
+    serde_json::from_str(&json).ok()
+}
+
+fn persist_physiology_to_db(state: &PhysiologicalState) {
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+        if let Ok(json) = serde_json::to_string(state) {
+            let _ = conn.execute(
+                "INSERT INTO settings (key, value) VALUES ('physiology', ?1)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                rusqlite::params![json],
+            );
+        }
+    }
+}
+
+/// Emit a threshold crossing event to the ActivityStrip.
+fn emit_hormone_threshold(app: &tauri::AppHandle, hormone: &str, value: f32, direction: &str, reason: &str) {
+    let summary = format!("{} {} {:.2} -- {}", hormone, direction, value, reason);
+    let _ = app.emit_to("main", "blade_activity_log", serde_json::json!({
+        "module":        "homeostasis.physiology",
+        "action":        "threshold_crossing",
+        "human_summary": crate::safe_slice(&summary, 200),
+        "payload_id":    serde_json::Value::Null,
+        "timestamp":     chrono::Utc::now().timestamp(),
+    }));
+}
+
 // ── Pituitary Gland: translate hormones → per-module directives ──────────────
 //
 // The hypothalamus produces abstract state (arousal, energy, trust...).
@@ -717,44 +888,59 @@ pub struct ModuleDirective {
 }
 
 /// GH (Growth Hormone) — should BLADE actively seek new capabilities?
+/// Blended with physiological dopamine at 0.7/0.3 weight (Phase 27 / HORM-01).
 pub fn growth_hormone() -> f32 {
     let h = get_hormones();
+    let p = get_physiology();
     // Grow when: energy is high, user is idle (exploration opportunity), trust is decent
-    let base = h.exploration * 0.5 + h.energy_mode * 0.3 + h.trust * 0.2;
-    base.clamp(0.0, 1.0)
+    let operational = h.exploration * 0.5 + h.energy_mode * 0.3 + h.trust * 0.2;
+    let blended = operational * 0.7 + p.dopamine * 0.3;
+    blended.clamp(0.0, 1.0)
 }
 
 /// TSH (Thyroid-Stimulating) — how aggressively should background modules run?
+/// Blended with physiological serotonin at 0.7/0.3 weight (Phase 27 / HORM-01).
 pub fn thyroid_stimulating() -> f32 {
     let h = get_hormones();
+    let p = get_physiology();
     // High metabolism when: energy is high, arousal is moderate (not sleeping, not panicking)
-    let base = h.energy_mode * 0.6 + (1.0 - h.urgency.abs()) * 0.2 + h.arousal * 0.2;
-    base.clamp(0.0, 1.0)
+    let operational = h.energy_mode * 0.6 + (1.0 - h.urgency.abs()) * 0.2 + h.arousal * 0.2;
+    let blended = operational * 0.7 + p.serotonin * 0.3;
+    blended.clamp(0.0, 1.0)
 }
 
 /// ACTH — how cautious should decision-making be?
-/// High ACTH = high cortisol = more cautious
+/// High ACTH = high cortisol = more cautious.
+/// Blended with physiological cortisol at 0.7/0.3 weight (Phase 27 / HORM-01).
 pub fn acth() -> f32 {
     let h = get_hormones();
+    let p = get_physiology();
     // Cautious when: urgency is high (something's wrong), trust is low
-    let base = h.urgency * 0.5 + (1.0 - h.trust) * 0.3 + (1.0 - h.exploration) * 0.2;
-    base.clamp(0.0, 1.0)
+    let operational = h.urgency * 0.5 + (1.0 - h.trust) * 0.3 + (1.0 - h.exploration) * 0.2;
+    let blended = operational * 0.7 + p.cortisol * 0.3;
+    blended.clamp(0.0, 1.0)
 }
 
 /// Oxytocin — how personal/warm should BLADE be?
+/// Blended with physiological oxytocin at 0.7/0.3 weight (Phase 27 / HORM-01).
 pub fn oxytocin() -> f32 {
     let h = get_hormones();
+    let p = get_physiology();
     // Warm when: trust is high, urgency is low (not in crisis mode)
-    let base = h.trust * 0.6 + (1.0 - h.urgency) * 0.3 + h.arousal * 0.1;
-    base.clamp(0.0, 1.0)
+    let operational = h.trust * 0.6 + (1.0 - h.urgency) * 0.3 + h.arousal * 0.1;
+    let blended = operational * 0.7 + p.oxytocin * 0.3;
+    blended.clamp(0.0, 1.0)
 }
 
 /// ADH (vasopressin) — how aggressively should BLADE conserve resources?
+/// Blended with physiological norepinephrine at 0.7/0.3 weight (Phase 27 / HORM-01).
 pub fn adh() -> f32 {
     let h = get_hormones();
+    let p = get_physiology();
     // Conserve when: energy is low, hunger is low (no urgent work needing resources)
-    let base = (1.0 - h.energy_mode) * 0.5 + (1.0 - h.hunger) * 0.3 + h.thirst * 0.2;
-    base.clamp(0.0, 1.0)
+    let operational = (1.0 - h.energy_mode) * 0.5 + (1.0 - h.hunger) * 0.3 + h.thirst * 0.2;
+    let blended = operational * 0.7 + p.norepinephrine * 0.3;
+    blended.clamp(0.0, 1.0)
 }
 
 /// Get a concrete directive for a specific module based on current pituitary output.
@@ -871,6 +1057,13 @@ pub fn homeostasis_relearn_circadian() -> Vec<f32> {
     let profile = compute_circadian_from_activity();
     save_cached_profile(&profile);
     profile.to_vec()
+}
+
+/// Returns the current physiological hormone state (Phase 27 / HORM-08).
+/// Read-only — no mutation path. Exposed for DoctorPane and diagnostic UI.
+#[tauri::command]
+pub fn homeostasis_get_physiology() -> PhysiologicalState {
+    get_physiology()
 }
 
 use tauri::Emitter;
