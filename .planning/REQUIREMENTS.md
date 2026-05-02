@@ -92,15 +92,50 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| META-01..05 | Phase 25 | Pending |
-| SAFE-01..07 | Phase 26 | Pending |
-| HORM-01..09 | Phase 27 | Pending |
-| AINF-01..06 | Phase 28 | Pending |
-| VITA-01..06 | Phase 29 | Pending |
-| OEVAL-01..05 | Phase 30 | Pending |
-| CLOSE-01..04 | Phase 31 | Pending |
+| META-01 | Phase 25 | Pending |
+| META-02 | Phase 25 | Pending |
+| META-03 | Phase 25 | Pending |
+| META-04 | Phase 25 | Pending |
+| META-05 | Phase 25 | Pending |
+| SAFE-01 | Phase 26 | Pending |
+| SAFE-02 | Phase 26 | Pending |
+| SAFE-03 | Phase 26 | Pending |
+| SAFE-04 | Phase 26 | Pending |
+| SAFE-05 | Phase 26 | Pending |
+| SAFE-06 | Phase 26 | Pending |
+| SAFE-07 | Phase 26 | Pending |
+| HORM-01 | Phase 27 | Pending |
+| HORM-02 | Phase 27 | Pending |
+| HORM-03 | Phase 27 | Pending |
+| HORM-04 | Phase 27 | Pending |
+| HORM-05 | Phase 27 | Pending |
+| HORM-06 | Phase 27 | Pending |
+| HORM-07 | Phase 27 | Pending |
+| HORM-08 | Phase 27 | Pending |
+| HORM-09 | Phase 27 | Pending |
+| AINF-01 | Phase 28 | Pending |
+| AINF-02 | Phase 28 | Pending |
+| AINF-03 | Phase 28 | Pending |
+| AINF-04 | Phase 28 | Pending |
+| AINF-05 | Phase 28 | Pending |
+| AINF-06 | Phase 28 | Pending |
+| VITA-01 | Phase 29 | Pending |
+| VITA-02 | Phase 29 | Pending |
+| VITA-03 | Phase 29 | Pending |
+| VITA-04 | Phase 29 | Pending |
+| VITA-05 | Phase 29 | Pending |
+| VITA-06 | Phase 29 | Pending |
+| OEVAL-01 | Phase 30 | Pending |
+| OEVAL-02 | Phase 30 | Pending |
+| OEVAL-03 | Phase 30 | Pending |
+| OEVAL-04 | Phase 30 | Pending |
+| OEVAL-05 | Phase 30 | Pending |
+| CLOSE-01 | Phase 31 | Pending |
+| CLOSE-02 | Phase 31 | Pending |
+| CLOSE-03 | Phase 31 | Pending |
+| CLOSE-04 | Phase 31 | Pending |
 
 **Coverage:** 42 requirements, 42 mapped, 0 unmapped ✓
 
 ---
-*Requirements defined: 2026-05-02*
+*Requirements defined: 2026-05-02 | Traceability finalized: 2026-05-02*
