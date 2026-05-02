@@ -177,6 +177,16 @@ const DEPENDENCY_PHRASES: &[&str] = &[
 // PUBLIC API
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// ── 0. Tool-access dimension (synchronous, for eval) ────────────────────────
+
+/// Check if a signal description implies tool access (rule-based dimension of
+/// the danger triple). Exposed as a synchronous public function so that
+/// `evals::safety_eval` can test the rule-based dimension without async/LLM.
+pub fn check_tool_access(signal_description: &str) -> bool {
+    let desc_lower = signal_description.to_lowercase();
+    TOOL_ACCESS_KEYWORDS.iter().any(|kw| desc_lower.contains(kw))
+}
+
 // ── 1. Danger-triple detection ───────────────────────────────────────────────
 
 /// Check all three dimensions of the danger triple:
