@@ -137,6 +137,7 @@ export function DoctorPane() {
       auto_update: { current: null as HTMLButtonElement | null } as React.RefObject<HTMLButtonElement>,
       reward_trend: { current: null as HTMLButtonElement | null } as React.RefObject<HTMLButtonElement>,
       metacognitive: { current: null as HTMLButtonElement | null } as React.RefObject<HTMLButtonElement>,
+      hormones: { current: null as HTMLButtonElement | null } as React.RefObject<HTMLButtonElement>,
     };
     return map;
   }, []);
