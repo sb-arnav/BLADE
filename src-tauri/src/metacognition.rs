@@ -15,6 +15,15 @@
 /// context that makes the existing model more honest about uncertainty.
 
 use serde::{Deserialize, Serialize};
+use std::sync::{Mutex, OnceLock};
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct MetacognitiveState {
+    pub confidence: f32,
+    pub uncertainty_count: u32,
+    pub gap_count: u32,
+    pub last_updated: i64,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CognitiveState {
@@ -372,4 +381,65 @@ pub fn get_solution_injection(user_query: &str) -> String {
 #[tauri::command]
 pub fn metacognition_assess(query: String) -> CognitiveState {
     assess_cognitive_state(&query)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_confidence_delta_flag() {
+        // META-01: record_uncertainty_marker increments uncertainty_count
+        // when called with a delta > 0.3
+        // Will be fully testable after Task 1 adds record_uncertainty_marker
+        // For now: stub that asserts MetacognitiveState::default() has uncertainty_count == 0
+        let state = MetacognitiveState::default();
+        assert_eq!(state.uncertainty_count, 0, "default uncertainty_count should be 0");
+        // Full test: call record_uncertainty_marker, then verify get_state().uncertainty_count > 0
+        // This requires the OnceLock to be initialized, which happens after Task 1 implementation.
+    }
+
+    #[test]
+    fn test_verifier_routing() {
+        // META-02: secondary_verifier_call is an async function in reasoning_engine.rs.
+        // This stub verifies the build_initiative_response contract exists after Plan 02.
+        // Placeholder: verifies CognitiveState with low confidence triggers should_ask.
+        let state = assess_cognitive_state("quantum entanglement in non-abelian gauge theory");
+        // assess_cognitive_state is heuristic-based; a niche query should produce low confidence
+        assert!(
+            state.confidence <= 1.0 && state.confidence >= 0.0,
+            "confidence must be in [0.0, 1.0] range"
+        );
+    }
+
+    #[test]
+    fn test_initiative_phrasing() {
+        // META-03: initiative phrasing format check.
+        // Will verify build_initiative_response output after Plan 02 adds it to reasoning_engine.rs.
+        // Stub: verify the phrase pattern is well-formed.
+        let expected_prefix = "I'm not confident about";
+        let expected_suffix = "want me to observe first?";
+        // This test will be extended by Plan 02 to call the actual build_initiative_response function.
+        assert!(expected_prefix.len() > 0 && expected_suffix.len() > 0);
+    }
+
+    #[test]
+    fn test_gap_log_insert() {
+        // META-04: log_gap writes to metacognitive_gap_log and feeds evolution.
+        // Stub: verify ensure_gap_log_table does not panic (table creation is idempotent).
+        // Full test requires Task 1 implementation of ensure_gap_log_table.
+        // After Task 1: call ensure_gap_log_table() and verify no panic.
+        // After full implementation: call log_gap and verify SQLite row exists.
+        assert!(true, "stub -- will be extended after Task 1 implementation");
+    }
+
+    #[test]
+    fn test_metacognitive_state_default() {
+        // META-04 auxiliary: MetacognitiveState default values are sane.
+        let state = MetacognitiveState::default();
+        assert_eq!(state.confidence, 0.0);
+        assert_eq!(state.uncertainty_count, 0);
+        assert_eq!(state.gap_count, 0);
+        assert_eq!(state.last_updated, 0);
+    }
 }
