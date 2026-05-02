@@ -703,12 +703,21 @@ pub fn dream_is_active() -> bool {
 
 #[tauri::command]
 pub async fn dream_trigger_now(app: tauri::AppHandle) -> Result<DreamSession, String> {
-    if DREAMING.swap(true, Ordering::SeqCst) {
-        return Err("Dream session already in progress".to_string());
-    }
+    // Atomically claim DREAMING — mirrors the auto-loop spawn at line 681
+    // (compare_exchange instead of swap/store) so a manual trigger can never
+    // stomp the auto-loop's atomic state if both fire near-simultaneously.
+    DREAMING
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::Relaxed)
+        .map_err(|_| "Dream session already in progress".to_string())?;
     let _ = app.emit_to("main", "dream_mode_start", serde_json::json!({ "idle_secs": 0, "manual": true }));
     let session = run_dream_session(app.clone()).await;
-    DREAMING.store(false, Ordering::SeqCst);
+    // Release DREAMING only if we still own it. The user-activity interrupt
+    // path may have already flipped it to false; in that case the CAS fails
+    // and we leave the state alone (a parallel auto-trigger could legitimately
+    // be holding it true).
+    DREAMING
+        .compare_exchange(true, false, Ordering::SeqCst, Ordering::Relaxed)
+        .ok();
     let _ = app.emit_to("main", "dream_mode_end",
         serde_json::json!({
             "status": session.status,
