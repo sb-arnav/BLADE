@@ -40,6 +40,7 @@ pub enum SignalClass {
     RewardTrend,      // Phase 23 / REWARD-04 — D-23-04 LOCKED
     Metacognitive,    // Phase 25 / META-05
     Hormones,         // Phase 27 / HORM-08
+    ActiveInference,  // Phase 28 / AINF-01
 }
 
 /// Severity tiers (D-04). Wire form is `lowercase` so the UI's
@@ -156,6 +157,14 @@ pub(crate) fn suggested_fix(class: SignalClass, severity: Severity) -> &'static 
             "One or more physiological hormones elevated (cortisol >0.6 or NE >0.6). Check recent tool-call failure rate or error density in responses.",
         (SignalClass::Hormones, Severity::Red) =>
             "Physiological state dysregulated: cortisol and NE both elevated >0.7, or mortality_salience approaching cap. Review recent exchange quality and allow idle time for decay.",
+
+        // Active Inference — Phase 28 / AINF-01..06
+        (SignalClass::ActiveInference, Severity::Green) =>
+            "Prediction errors are low across all tentacles. BLADE's world-model is well-calibrated.",
+        (SignalClass::ActiveInference, Severity::Amber) =>
+            "Aggregate prediction error elevated (>0.4). One or more tentacles showing unexpected activity. Check the payload for top_tentacle.",
+        (SignalClass::ActiveInference, Severity::Red) =>
+            "Sustained high prediction error (>0.6 for 2+ ticks). Cortisol and norepinephrine are rising. Review the active tentacles and allow idle time for EMA recalibration.",
     }
 }
 
@@ -1013,6 +1022,32 @@ fn compute_hormones_signal() -> Result<DoctorSignal, String> {
     })
 }
 
+// -- Signal source: Active Inference (AINF-01) -- Plan 28-03 ----------------
+
+fn compute_active_inference_signal() -> Result<DoctorSignal, String> {
+    let state = crate::active_inference::get_active_inference_state();
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    let severity = if state.aggregate_error > 0.7 {
+        Severity::Red
+    } else if state.aggregate_error > 0.4 {
+        Severity::Amber
+    } else {
+        Severity::Green
+    };
+    Ok(DoctorSignal {
+        class: SignalClass::ActiveInference,
+        severity,
+        payload: serde_json::json!({
+            "aggregate_error": state.aggregate_error,
+            "top_tentacle": state.top_tentacle,
+            "tracked_count": state.tracked_count,
+            "demo_loop_active": state.demo_loop_active,
+        }),
+        last_changed_at: now_ms,
+        suggested_fix: suggested_fix(SignalClass::ActiveInference, severity).to_string(),
+    })
+}
+
 // ── Tauri Commands (D-19) ─────────────────────────────────────────────────────
 
 /// Run all 5 signal sources in parallel via `tokio::join!`, cache the
@@ -1029,7 +1064,7 @@ pub async fn doctor_run_full_check(app: AppHandle) -> Result<Vec<DoctorSignal>, 
     // Sources are sync but run via `tokio::join!` over async blocks so the
     // runtime can interleave file IO. Per CONTEXT "Claude's Discretion":
     // parallel is the recommended path.
-    let (eval, capgap, tentacle, drift, autoupdate, reward_trend, metacognitive, hormones) = tokio::join!(
+    let (eval, capgap, tentacle, drift, autoupdate, reward_trend, metacognitive, hormones, active_inference) = tokio::join!(
         async { compute_eval_signal() },
         async { compute_capgap_signal() },
         async { compute_tentacle_signal() },
@@ -1038,6 +1073,7 @@ pub async fn doctor_run_full_check(app: AppHandle) -> Result<Vec<DoctorSignal>, 
         async { compute_reward_signal() },
         async { compute_metacognitive_signal() },
         async { compute_hormones_signal() },
+        async { compute_active_inference_signal() },
     );
 
     // Order in the returned Vec is locked (most-volatile-first per
@@ -1052,6 +1088,7 @@ pub async fn doctor_run_full_check(app: AppHandle) -> Result<Vec<DoctorSignal>, 
         reward_trend.map_err(|e| format!("reward_trend signal: {}", e))?,
         metacognitive.map_err(|e| format!("metacognitive signal: {}", e))?,
         hormones.map_err(|e| format!("hormones signal: {}", e))?,
+        active_inference.map_err(|e| format!("active_inference signal: {}", e))?,
     ];
 
     // Diff against prior severity; emit on transitions where new ∈ {Amber, Red}.
@@ -1144,8 +1181,8 @@ mod tests {
 
     #[test]
     fn suggested_fix_table_is_exhaustive() {
-        // All 24 (class × severity) pairs return a non-empty string.
-        // Phase 27 HORM-08 added Hormones (3 arms): 8×3 = 24.
+        // All 27 (class × severity) pairs return a non-empty string.
+        // Phase 28 AINF-01 added ActiveInference (3 arms): 9×3 = 27.
         for class in [
             SignalClass::EvalScores,
             SignalClass::CapabilityGaps,
@@ -1155,6 +1192,7 @@ mod tests {
             SignalClass::RewardTrend,
             SignalClass::Metacognitive,
             SignalClass::Hormones,
+            SignalClass::ActiveInference,
         ] {
             for severity in [Severity::Green, Severity::Amber, Severity::Red] {
                 let s = suggested_fix(class, severity);
