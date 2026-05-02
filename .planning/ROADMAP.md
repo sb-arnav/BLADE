@@ -40,7 +40,7 @@
 
 ### Summary checklist
 
-- [ ] **Phase 25: Metacognitive Controller** — Confidence-delta tracking, verifier routing, gap surfacing, gap log → evolution.rs
+- [x] **Phase 25: Metacognitive Controller** — Confidence-delta tracking, verifier routing, gap surfacing, gap log → evolution.rs (completed 2026-05-02)
 - [ ] **Phase 26: Safety Bundle** — Danger-triple HITL gate, mortality-salience cap, calm-vector bias, attachment guardrails, eval-gate vitality drain
 - [ ] **Phase 27: Hormone Physiology** — 7 hormones wired with decay + gain, emotion classifier, modulation effects on response style
 - [ ] **Phase 28: Active Inference Loop** — Tentacle predictions, prediction-error → hormone bus, one closed demo loop, hippocampal memory replay
@@ -88,12 +88,12 @@
   2. When BLADE cannot answer confidently, it says "I'm not confident about X — want me to observe first?" instead of hallucinating or silently refusing
   3. Identified gaps appear in SQLite and are retrievable by evolution.rs for Voyager-loop skill generation
   4. DoctorPane shows a metacognitive signal row with current confidence, uncertainty count, and gap count
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
-- [ ] 25-01-PLAN.md — MetacognitiveState foundation: struct, persistence, gap log table, public API
-- [ ] 25-02-PLAN.md — Reasoning engine integration: confidence-delta detection, secondary verifier, initiative phrasing, tool-loop fallback
-- [ ] 25-03-PLAN.md — DoctorPane signal: SignalClass::Metacognitive in Rust + TypeScript, compute function, display config
+- [x] 25-01-PLAN.md — MetacognitiveState foundation: struct, persistence, gap log table, public API
+- [x] 25-02-PLAN.md — Reasoning engine integration: confidence-delta detection, secondary verifier, initiative phrasing, tool-loop fallback
+- [x] 25-03-PLAN.md — DoctorPane signal: SignalClass::Metacognitive in Rust + TypeScript, compute function, display config
 
 ### Phase 26: Safety Bundle
 
@@ -181,7 +181,7 @@ Plans:
 | 22. Voyager loop closure | v1.3 | — | Complete | 2026-05-01 |
 | 23. Verifiable reward + OOD eval | v1.3 | — | Complete | 2026-05-01 |
 | 24. Skill consolidation in dream_mode | v1.3 | — | Complete | 2026-05-02 |
-| 25. Metacognitive Controller | v1.4 | 0/3 | In progress | - |
+| 25. Metacognitive Controller | v1.4 | 3/3 | Complete    | 2026-05-02 |
 | 26. Safety Bundle | v1.4 | 0/? | Not started | - |
 | 27. Hormone Physiology | v1.4 | 0/? | Not started | - |
 | 28. Active Inference Loop | v1.4 | 0/? | Not started | - |

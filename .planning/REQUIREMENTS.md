@@ -7,11 +7,11 @@
 
 ### Metacognition
 
-- [ ] **META-01**: BLADE tracks confidence-delta between reasoning steps and flags drops >0.3 as uncertainty markers
-- [ ] **META-02**: Low-confidence responses route to a secondary verifier check before surfacing to user
-- [ ] **META-03**: BLADE surfaces capability gaps as initiative ("I'm not confident about X — want me to observe first?") instead of hallucinating or silently refusing
-- [ ] **META-04**: Gap log persists to SQLite and feeds evolution.rs for Voyager-loop skill generation from identified gaps
-- [ ] **META-05**: Metacognitive state (confidence, uncertainty count, gap count) visible in DoctorPane as a signal row
+- [x] **META-01**: BLADE tracks confidence-delta between reasoning steps and flags drops >0.3 as uncertainty markers
+- [x] **META-02**: Low-confidence responses route to a secondary verifier check before surfacing to user
+- [x] **META-03**: BLADE surfaces capability gaps as initiative ("I'm not confident about X — want me to observe first?") instead of hallucinating or silently refusing
+- [x] **META-04**: Gap log persists to SQLite and feeds evolution.rs for Voyager-loop skill generation from identified gaps
+- [x] **META-05**: Metacognitive state (confidence, uncertainty count, gap count) visible in DoctorPane as a signal row
 
 ### Safety
 
@@ -92,11 +92,11 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| META-01 | Phase 25 | Pending |
-| META-02 | Phase 25 | Pending |
-| META-03 | Phase 25 | Pending |
-| META-04 | Phase 25 | Pending |
-| META-05 | Phase 25 | Pending |
+| META-01 | Phase 25 | Complete |
+| META-02 | Phase 25 | Complete |
+| META-03 | Phase 25 | Complete |
+| META-04 | Phase 25 | Complete |
+| META-05 | Phase 25 | Complete |
 | SAFE-01 | Phase 26 | Pending |
 | SAFE-02 | Phase 26 | Pending |
 | SAFE-03 | Phase 26 | Pending |
