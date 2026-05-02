@@ -45,6 +45,7 @@ const DISPLAY_NAME: Record<SignalClass, string> = {
   auto_update: 'Auto-Update',
   reward_trend: 'Reward Trend',
   metacognitive: 'Metacognitive',
+  hormones: 'Hormones',
 };
 
 // UI-SPEC § 7.5 — fixed most-volatile-first order. RewardTrend appended at
@@ -58,6 +59,7 @@ const ROW_ORDER: SignalClass[] = [
   'auto_update',
   'reward_trend',
   'metacognitive',
+  'hormones',
 ];
 
 // UI-SPEC § 5.4 — badge tone mapping
