@@ -159,11 +159,18 @@ Plans:
 **Depends on**: Phase 27, Phase 28
 **Requirements**: VITA-01, VITA-02, VITA-03, VITA-04, VITA-05, VITA-06
 **Success Criteria** (what must be TRUE):
-  1. At vitality ≥0.6 BLADE exhibits full personality; at 0.4–0.6 responses flatten; at 0.2–0.4 skill generation atrophies — each band transition is observable without code inspection
+  1. At vitality >=0.6 BLADE exhibits full personality; at 0.4-0.6 responses flatten; at 0.2-0.4 skill generation atrophies — each band transition is observable without code inspection
   2. A session of successful, autonomous, user-approved actions increases vitality (competence + autonomy SDT sources); a session of ignored prompts and failures decreases it
   3. At vitality 0.0 the process exits cleanly with all memory preserved; on next launch a reincarnation path (not restoration) is taken and vitality starts at non-zero
   4. The UI shows current vitality value, trend arrow, and the top contributing factors (what's draining, what's replenishing)
-**Plans**: TBD
+**Plans:** 5 plans
+
+Plans:
+- [ ] 29-01-PLAN.md — Core vitality_engine.rs module: VitalityState, VitalityBand, SDT computation, drain computation, hysteretic bands, dormancy/reincarnation, SQLite persistence, lib.rs registration
+- [ ] 29-02-PLAN.md — Behavioral integration: hypothalamus_tick wiring, safety_eval_drain, brain.rs band injection, persona dampening, evolution gate, dream_mode gate, metacognition threshold
+- [ ] 29-03-PLAN.md — DoctorPane signal: SignalClass::Vitality in doctor.rs (4 sites), TypeScript union fix (active_inference + vitality), DoctorPane DISPLAY_NAME/ROW_ORDER
+- [ ] 29-04-PLAN.md — Frontend: VitalityIndicator.tsx, event payloads (dormancy/reincarnation/update), BLADE_EVENTS registry
+- [ ] 29-05-PLAN.md — Eval suite: 6 deterministic fixtures (VITA-01..06), verify-vitality.sh Gate 37, human checkpoint
 **UI hint**: yes
 
 ### Phase 30: Organism Eval
@@ -204,7 +211,7 @@ Plans:
 | 26. Safety Bundle | v1.4 | 4/4 | Complete | 2026-05-02 |
 | 27. Hormone Physiology | v1.4 | 5/5 | Complete    | 2026-05-02 |
 | 28. Active Inference Loop | v1.4 | 4/4 | Complete    | 2026-05-03 |
-| 29. Vitality Engine | v1.4 | 0/? | Not started | - |
+| 29. Vitality Engine | v1.4 | 0/5 | Planned | - |
 | 30. Organism Eval | v1.4 | 0/? | Not started | - |
 | 31. Close | v1.4 | 0/? | Not started | - |
 
@@ -235,4 +242,4 @@ Plans:
 
 ---
 
-*Last updated: 2026-05-02 — Phase 28 planned (4 plans in 3 waves). v1.4 ROADMAP.md updated. Phases 25-31 derived from REQUIREMENTS.md (42 requirements, 100% mapped). v1.3 collapsed into archive block.*
+*Last updated: 2026-05-03 — Phase 29 planned (5 plans in 3 waves). v1.4 ROADMAP.md updated.*
