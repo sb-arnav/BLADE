@@ -67,6 +67,10 @@ Every AI tool on the market runs one agent at a time, forgets everything between
 | Any LLM provider + local (Ollama) | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ |
 | Zero telemetry, fully local | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ |
 | Free and open source | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ |
+| Metacognitive uncertainty routing | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Hormone-modulated personality | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Active inference (prediction error → behavior change) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Vitality with real stakes (dormancy) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 
 ---
 
@@ -245,7 +249,7 @@ BLADE/
 │       ├── useScreenTimeline.ts      # Timeline browse + semantic search
 │       ├── useVoiceMode.ts           # Conversational voice state
 │       └── ...                       # 90+ hooks
-└── src-tauri/src/                    # Rust backend (140+ modules)
+└── src-tauri/src/                    # Rust backend (204+ modules)
     ├── swarm.rs                      # SwarmTask DAG — parallel orchestration
     ├── swarm_commands.rs             # Coordinator loop + agent spawning
     ├── swarm_planner.rs              # LLM goal decomposition + DAG synthesis
