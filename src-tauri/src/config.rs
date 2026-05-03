@@ -237,6 +237,67 @@ impl RewardWeights {
 
 fn default_reward_weights() -> RewardWeights { RewardWeights::default() }
 
+// ---------------------------------------------------------------------
+// Phase 32 Plan 32-01 (CTX-07) — Context Management runtime knobs.
+//
+// Locked decisions (32-CONTEXT.md):
+//   - smart_injection_enabled (default true) is the CTX-07 escape hatch.
+//     Flag off = unconditional naive injection (pre-Phase-32 behaviour).
+//   - relevance_gate (default 0.2) is the threshold passed to
+//     `score_context_relevance` gates. Sections inject when score > gate.
+//   - compaction_trigger_pct (default 0.80) — fraction of model context
+//     window at which `compress_conversation_smart` fires.
+//   - tool_output_cap_tokens (default 4000) — per-tool-output cap;
+//     outputs above this are truncated head + tail + summary.
+//
+// Six-place rule (CLAUDE.md): every BladeConfig field MUST land in
+// DiskConfig struct, DiskConfig::default, BladeConfig struct,
+// BladeConfig::default, load_config, and save_config.
+//
+// Backward compatibility: `#[serde(default)]` on the field allows old
+// user config.json files (without a `context` key) to load with
+// `ContextConfig::default()`. Per-field `#[serde(default = "fn")]`
+// guards against partial JSON (missing sub-fields).
+// ---------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct ContextConfig {
+    /// CTX-07 escape hatch. true = smart selective injection enabled.
+    /// false = unconditional naive injection (pre-Phase-32 behavior).
+    #[serde(default = "default_smart_injection_enabled")]
+    pub smart_injection_enabled: bool,
+    /// Threshold passed to `score_context_relevance` gates. Sections
+    /// inject when score > relevance_gate. Default 0.2 matches the
+    /// existing low-water mark in `thalamus_threshold`.
+    #[serde(default = "default_relevance_gate")]
+    pub relevance_gate: f32,
+    /// Fraction of model context window at which compaction fires.
+    /// Default 0.80.
+    #[serde(default = "default_compaction_trigger_pct")]
+    pub compaction_trigger_pct: f32,
+    /// Per-tool-output cap in tokens. Outputs exceeding this are
+    /// truncated head + tail + summary. Default 4000 tokens.
+    #[serde(default = "default_tool_output_cap_tokens")]
+    pub tool_output_cap_tokens: usize,
+}
+
+fn default_smart_injection_enabled() -> bool { true }
+fn default_relevance_gate() -> f32 { 0.2 }
+fn default_compaction_trigger_pct() -> f32 { 0.80 }
+fn default_tool_output_cap_tokens() -> usize { 4000 }
+
+impl Default for ContextConfig {
+    fn default() -> Self {
+        Self {
+            smart_injection_enabled: default_smart_injection_enabled(),
+            relevance_gate: default_relevance_gate(),
+            compaction_trigger_pct: default_compaction_trigger_pct(),
+            tool_output_cap_tokens: default_tool_output_cap_tokens(),
+        }
+    }
+}
+
 /// Config as stored on disk — api_key is NOT stored here anymore
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct DiskConfig {
@@ -359,6 +420,10 @@ struct DiskConfig {
     // Phase 23 Plan 23-01 (v1.3) — Composite reward weight tuple (REWARD-01)
     #[serde(default = "default_reward_weights")]
     reward_weights: RewardWeights,
+    // Phase 32 Plan 32-01 — Context Management runtime knobs (CTX-07 escape hatch +
+    // CTX-01/04/05 tunables). #[serde(default)] keeps legacy configs loadable.
+    #[serde(default)]
+    context: ContextConfig,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -439,6 +504,7 @@ impl Default for DiskConfig {
             ecosystem_observe_only: true,
             voyager_skill_write_budget_tokens: default_voyager_skill_write_budget_tokens(),
             reward_weights: default_reward_weights(),
+            context: ContextConfig::default(),
             api_key: None,
         }
     }
@@ -581,6 +647,11 @@ pub struct BladeConfig {
     /// regenerate UI). Sum-to-1.0 validation tolerates `[0.0, 1.0+1e-3]` per Pitfall 5.
     #[serde(default = "default_reward_weights")]
     pub reward_weights: RewardWeights,
+    /// Phase 32 Plan 32-01 — Context Management runtime knobs (CTX-07 escape hatch +
+    /// CTX-01/04/05 tunables). Defaults: smart_injection_enabled=true, relevance_gate=0.2,
+    /// compaction_trigger_pct=0.80, tool_output_cap_tokens=4000. See `ContextConfig`.
+    #[serde(default)]
+    pub context: ContextConfig,
 }
 
 impl BladeConfig {
@@ -647,6 +718,7 @@ impl Default for BladeConfig {
             ecosystem_observe_only: true,
             voyager_skill_write_budget_tokens: default_voyager_skill_write_budget_tokens(),
             reward_weights: default_reward_weights(),
+            context: ContextConfig::default(),
         }
     }
 }
@@ -807,6 +879,7 @@ pub fn load_config() -> BladeConfig {
         ecosystem_observe_only: disk.ecosystem_observe_only,
         voyager_skill_write_budget_tokens: disk.voyager_skill_write_budget_tokens,
         reward_weights: disk.reward_weights.clone(),
+        context: disk.context,
     }
 }
 
@@ -874,6 +947,7 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         ecosystem_observe_only: config.ecosystem_observe_only,
         voyager_skill_write_budget_tokens: config.voyager_skill_write_budget_tokens,
         reward_weights: config.reward_weights.clone(),
+        context: config.context.clone(),
         api_key: None,
     };
 
@@ -1440,6 +1514,7 @@ mod tests {
             ecosystem_observe_only: cfg.ecosystem_observe_only,
             voyager_skill_write_budget_tokens: cfg.voyager_skill_write_budget_tokens,
             reward_weights: cfg.reward_weights.clone(),
+            context: cfg.context.clone(),
             api_key: None,
         };
 
@@ -1475,5 +1550,80 @@ mod tests {
             "save_config rejection text did not match validate() format: {}",
             err
         );
+    }
+
+    // ---------------------------------------------------------------------
+    // Phase 32 Plan 32-01 — ContextConfig tests (CTX-07 + tunables).
+    //
+    // These three tests lock the six-place config wire-up:
+    //   - default_values: ContextConfig::default() returns the locked
+    //     CTX-01/04/05/07 defaults (true / 0.2 / 0.80 / 4000).
+    //   - round_trip: a non-default ContextConfig survives serialization
+    //     through DiskConfig (mirrors save_config -> load_config wire format).
+    //   - missing_in_disk_uses_defaults: legacy config.json without a
+    //     `context` key MUST load with ContextConfig::default()
+    //     (#[serde(default)] on the field — non-negotiable per CLAUDE.md).
+    // ---------------------------------------------------------------------
+
+    #[test]
+    fn phase32_context_config_default_values() {
+        let c = ContextConfig::default();
+        assert_eq!(c.smart_injection_enabled, true,
+            "CTX-07 escape hatch defaults to enabled (smart path on)");
+        assert!((c.relevance_gate - 0.2).abs() < 1e-6,
+            "default relevance_gate must be 0.2, got {}", c.relevance_gate);
+        assert!((c.compaction_trigger_pct - 0.80).abs() < 1e-6,
+            "default compaction_trigger_pct must be 0.80, got {}", c.compaction_trigger_pct);
+        assert_eq!(c.tool_output_cap_tokens, 4000,
+            "default tool_output_cap_tokens must be 4000");
+    }
+
+    #[test]
+    fn phase32_context_config_round_trip() {
+        // Build BladeConfig with non-default context values to verify all
+        // four fields survive byte-for-byte through the DiskConfig wire format.
+        let mut cfg = BladeConfig::default();
+        cfg.context = ContextConfig {
+            smart_injection_enabled: false,
+            relevance_gate: 0.5,
+            compaction_trigger_pct: 0.65,
+            tool_output_cap_tokens: 8000,
+        };
+
+        // Mirror the save_config DiskConfig snapshot — reuse DiskConfig::default()
+        // for the unrelated fields and overlay the context we care about.
+        let mut disk = DiskConfig::default();
+        disk.context = cfg.context.clone();
+
+        let json = serde_json::to_string(&disk).expect("serialize DiskConfig");
+        // Field MUST appear on the wire — guards against accidental
+        // #[serde(skip_serializing)] regression on the new field.
+        assert!(
+            json.contains("\"context\""),
+            "serialized DiskConfig missing context field: {}",
+            json
+        );
+
+        let parsed: DiskConfig = serde_json::from_str(&json).expect("parse DiskConfig");
+        assert_eq!(parsed.context, cfg.context,
+            "ContextConfig round-trip lost data");
+    }
+
+    #[test]
+    fn phase32_context_config_missing_in_disk_uses_defaults() {
+        // An old user's config.json that predates Phase 32 has no `context`
+        // key. The #[serde(default)] on DiskConfig.context MUST fall back to
+        // ContextConfig::default() rather than failing the load. This is the
+        // CLAUDE.md backward-compat invariant — every existing user must
+        // upgrade without a manual config edit.
+        let legacy_json = r#"{
+            "provider": "anthropic",
+            "model": "claude-sonnet-4",
+            "onboarded": true
+        }"#;
+        let parsed: DiskConfig = serde_json::from_str(legacy_json)
+            .expect("legacy config without context key must parse with defaults");
+        assert_eq!(parsed.context, ContextConfig::default(),
+            "missing context key must fall back to ContextConfig::default()");
     }
 }
