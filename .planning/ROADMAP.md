@@ -163,14 +163,15 @@ Plans:
   2. A session of successful, autonomous, user-approved actions increases vitality (competence + autonomy SDT sources); a session of ignored prompts and failures decreases it
   3. At vitality 0.0 the process exits cleanly with all memory preserved; on next launch a reincarnation path (not restoration) is taken and vitality starts at non-zero
   4. The UI shows current vitality value, trend arrow, and the top contributing factors (what's draining, what's replenishing)
-**Plans:** 5 plans
+**Plans:** 6 plans
 
 Plans:
-- [ ] 29-01-PLAN.md — Core vitality_engine.rs module: VitalityState, VitalityBand, SDT computation, drain computation, hysteretic bands, dormancy/reincarnation, SQLite persistence, lib.rs registration
-- [ ] 29-02-PLAN.md — Behavioral integration: hypothalamus_tick wiring, safety_eval_drain, brain.rs band injection, persona dampening, evolution gate, dream_mode gate, metacognition threshold
+- [ ] 29-00-PLAN.md — Wave 0: skeleton vitality_engine.rs types + eval fixture stubs + verify-vitality.sh Gate 37 + evals/mod.rs registration
+- [ ] 29-01-PLAN.md — Core vitality_engine.rs module: full implementation of VitalityState, SDT computation, drain, hysteretic bands, dormancy/reincarnation, SQLite persistence, lib.rs registration
+- [ ] 29-02-PLAN.md — Behavioral integration: hypothalamus_tick, safety_eval_drain, brain.rs, persona, evolution, dream_mode (session + skill synthesis), metacognition, proactive_engine, screen_timeline, integration_bridge
 - [ ] 29-03-PLAN.md — DoctorPane signal: SignalClass::Vitality in doctor.rs (4 sites), TypeScript union fix (active_inference + vitality), DoctorPane DISPLAY_NAME/ROW_ORDER
-- [ ] 29-04-PLAN.md — Frontend: VitalityIndicator.tsx, event payloads (dormancy/reincarnation/update), BLADE_EVENTS registry
-- [ ] 29-05-PLAN.md — Eval suite: 6 deterministic fixtures (VITA-01..06), verify-vitality.sh Gate 37, human checkpoint
+- [ ] 29-04-PLAN.md — Frontend: VitalityIndicator.tsx mounted in ChatPanel, event payloads, BLADE_EVENTS, reincarnation system message in useChat.tsx (D-23)
+- [ ] 29-05-PLAN.md — Eval suite: 6 concrete fixture implementations, Gate 37 assertion, human checkpoint
 **UI hint**: yes
 
 ### Phase 30: Organism Eval
@@ -211,7 +212,7 @@ Plans:
 | 26. Safety Bundle | v1.4 | 4/4 | Complete | 2026-05-02 |
 | 27. Hormone Physiology | v1.4 | 5/5 | Complete    | 2026-05-02 |
 | 28. Active Inference Loop | v1.4 | 4/4 | Complete    | 2026-05-03 |
-| 29. Vitality Engine | v1.4 | 0/5 | Planned | - |
+| 29. Vitality Engine | v1.4 | 0/6 | Planned | - |
 | 30. Organism Eval | v1.4 | 0/? | Not started | - |
 | 31. Close | v1.4 | 0/? | Not started | - |
 
@@ -242,4 +243,4 @@ Plans:
 
 ---
 
-*Last updated: 2026-05-03 — Phase 29 planned (5 plans in 3 waves). v1.4 ROADMAP.md updated.*
+*Last updated: 2026-05-03 — Phase 29 revised (6 plans in 4 waves: Wave 0 test scaffolding + 3 implementation waves). v1.4 ROADMAP.md updated.*
