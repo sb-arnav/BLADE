@@ -1833,7 +1833,9 @@ export type SignalClass =
   | 'auto_update'
   | 'reward_trend'
   | 'metacognitive'
-  | 'hormones';           // Phase 27 / HORM-08
+  | 'hormones'            // Phase 27 / HORM-08
+  | 'active_inference'    // Phase 28 / AINF-01 (was missing from TS)
+  | 'vitality';           // Phase 29 / VITA-05
 
 export type Severity = 'green' | 'amber' | 'red';
 

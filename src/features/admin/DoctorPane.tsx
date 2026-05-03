@@ -46,6 +46,8 @@ const DISPLAY_NAME: Record<SignalClass, string> = {
   reward_trend: 'Reward Trend',
   metacognitive: 'Metacognitive',
   hormones: 'Hormones',
+  active_inference: 'Active Inference',   // Phase 28 gap fix
+  vitality: 'Vitality',                   // Phase 29
 };
 
 // UI-SPEC § 7.5 — fixed most-volatile-first order. RewardTrend appended at
@@ -60,6 +62,8 @@ const ROW_ORDER: SignalClass[] = [
   'reward_trend',
   'metacognitive',
   'hormones',
+  'active_inference',   // Phase 28 gap fix
+  'vitality',           // Phase 29
 ];
 
 // UI-SPEC § 5.4 — badge tone mapping
@@ -138,6 +142,8 @@ export function DoctorPane() {
       reward_trend: { current: null as HTMLButtonElement | null } as React.RefObject<HTMLButtonElement>,
       metacognitive: { current: null as HTMLButtonElement | null } as React.RefObject<HTMLButtonElement>,
       hormones: { current: null as HTMLButtonElement | null } as React.RefObject<HTMLButtonElement>,
+      active_inference: { current: null as HTMLButtonElement | null } as React.RefObject<HTMLButtonElement>,
+      vitality: { current: null as HTMLButtonElement | null } as React.RefObject<HTMLButtonElement>,
     };
     return map;
   }, []);
