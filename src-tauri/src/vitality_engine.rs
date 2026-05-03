@@ -277,13 +277,15 @@ pub fn vitality_tick() {
     let sdt = compute_replenishment();
 
     // Step 2: Compute drain (needs mutable access to read pending_eval_drain)
-    let (drain, old_scalar, old_band) = {
+    // compute_drain returns (DrainSignals, DrainDeferred) -- deferred fields
+    // are written back in Step 7 to avoid re-entrant lock deadlock (T-29-15 fix).
+    let (drain, drain_deferred, old_scalar, old_band) = {
         let guard = match vitality_store().lock() {
             Ok(g) => g,
             Err(_) => return,
         };
-        let d = compute_drain(&guard);
-        (d, guard.scalar, guard.band)
+        let (d, deferred) = compute_drain(&guard);
+        (d, deferred, guard.scalar, guard.band)
     };
 
     // Step 3: Apply net delta
@@ -344,6 +346,13 @@ pub fn vitality_tick() {
         guard.drain = drain.clone();
         guard.last_updated = now;
         guard.consecutive_floor_ticks = floor_ticks;
+        guard.sustained_high_error_ticks = drain_deferred.sustained_high_error_ticks;
+
+        // Write back tedium embedding cache (deferred from compute_tedium_drain)
+        if let Some((hash, embeddings)) = drain_deferred.tedium_cache {
+            guard.last_tedium_hash = hash;
+            guard.cached_tedium_embeddings = Some(embeddings);
+        }
 
         // Reset pending_eval_drain (consumed by compute_drain)
         guard.pending_eval_drain = 0.0;
@@ -560,25 +569,37 @@ fn compute_relatedness() -> f32 {
 
 // ── Drain computation (D-14, D-15, D-16) ─────────────────────────────────────
 
-fn compute_drain(state: &VitalityState) -> DrainSignals {
+/// Deferred state updates from compute_drain -- written back after lock release.
+struct DrainDeferred {
+    sustained_high_error_ticks: u32,
+    tedium_cache: Option<(u64, Vec<Vec<f32>>)>,
+}
+
+/// Returns (DrainSignals, DrainDeferred).
+/// The caller must write deferred fields back into state AFTER releasing the lock
+/// (compute_drain is called while the VITALITY mutex is held, so it cannot
+/// re-acquire the lock -- doing so would deadlock; T-29-15 fix).
+fn compute_drain(state: &VitalityState) -> (DrainSignals, DrainDeferred) {
     let failure = compute_failure_drain();
     let eval_failure = state.pending_eval_drain.clamp(0.0, 1.0);
     let isolation = compute_isolation_drain();
-    let prediction_error = compute_prediction_error_drain(state);
-    let tedium = compute_tedium_drain(state);
+    let (prediction_error, new_sustained) = compute_prediction_error_drain(state);
+    let (tedium, tedium_cache) = compute_tedium_drain(state);
 
     let raw_net = failure + eval_failure + isolation + prediction_error + tedium;
-    // Scale so max drain per tick ~0.01 (via DRAIN_SCALE applied in vitality_tick)
     let net = raw_net;
 
-    DrainSignals {
+    (DrainSignals {
         failure,
         eval_failure,
         isolation,
         prediction_error,
         tedium,
         net: net.clamp(0.0, f32::MAX), // unbounded sum, clamped at tick level
-    }
+    }, DrainDeferred {
+        sustained_high_error_ticks: new_sustained,
+        tedium_cache,
+    })
 }
 
 /// Failure drain: last reward composite < 0.3 => drain proportional to (0.3 - score).
@@ -619,38 +640,38 @@ fn compute_isolation_drain() -> f32 {
 }
 
 /// Prediction error drain: aggregate_error > 0.6 sustained > 5 ticks.
-/// Maintains its own tick counter in VitalityState (active_inference's counter is private).
-fn compute_prediction_error_drain(state: &VitalityState) -> f32 {
+/// Returns (drain_value, new_sustained_high_error_ticks).
+/// The caller writes new_sustained back into state after releasing the lock
+/// to avoid re-entrant lock deadlock (T-29-15 fix).
+fn compute_prediction_error_drain(state: &VitalityState) -> (f32, u32) {
     let ai_state = crate::active_inference::get_active_inference_state();
 
-    // Update sustained tick count (will be written back in vitality_tick)
+    // Update sustained tick count
     let sustained = if ai_state.aggregate_error > 0.6 {
         state.sustained_high_error_ticks + 1
     } else {
         0
     };
 
-    // Update the counter in global state
-    if let Ok(mut guard) = vitality_store().lock() {
-        guard.sustained_high_error_ticks = sustained;
-    }
-
     // Only drain after 5 sustained ticks
-    if sustained > 5 {
+    let drain = if sustained > 5 {
         let excess = (sustained - 5).min(5) as f32;
         0.01 * excess
     } else {
         0.0
-    }
+    };
+
+    (drain, sustained)
 }
 
 /// Tedium drain: if last 5 user messages have avg pairwise cosine similarity > 0.85.
-/// Caches embeddings in VitalityState to avoid recomputing when messages unchanged.
-fn compute_tedium_drain(state: &VitalityState) -> f32 {
+/// Returns (drain_value, Option<(hash, embeddings)>) -- the caller writes the cache
+/// back into state after releasing the lock to avoid re-entrant deadlock (T-29-15 fix).
+fn compute_tedium_drain(state: &VitalityState) -> (f32, Option<(u64, Vec<Vec<f32>>)>) {
     let db_path = crate::config::blade_config_dir().join("blade.db");
     let conn = match rusqlite::Connection::open(&db_path) {
         Ok(c) => c,
-        Err(_) => return 0.0,
+        Err(_) => return (0.0, None),
     };
 
     // Get last 5 user messages
@@ -658,7 +679,7 @@ fn compute_tedium_drain(state: &VitalityState) -> f32 {
         "SELECT content FROM messages WHERE role = 'user' ORDER BY timestamp DESC LIMIT 5",
     ) {
         Ok(s) => s,
-        Err(_) => return 0.0,
+        Err(_) => return (0.0, None),
     };
 
     let messages: Vec<String> = stmt
@@ -669,7 +690,7 @@ fn compute_tedium_drain(state: &VitalityState) -> f32 {
 
     // Guard: need at least 2 messages for pairwise comparison
     if messages.len() < 2 {
-        return 0.0;
+        return (0.0, None);
     }
 
     // Hash messages to check if cache is valid
@@ -693,21 +714,15 @@ fn compute_tedium_drain(state: &VitalityState) -> f32 {
         } else {
             match crate::embeddings::embed_texts(&safe_messages) {
                 Ok(e) => e,
-                Err(_) => return 0.0,
+                Err(_) => return (0.0, None),
             }
         }
     } else {
         match crate::embeddings::embed_texts(&safe_messages) {
             Ok(e) => e,
-            Err(_) => return 0.0,
+            Err(_) => return (0.0, None),
         }
     };
-
-    // Update cache
-    if let Ok(mut guard) = vitality_store().lock() {
-        guard.last_tedium_hash = hash;
-        guard.cached_tedium_embeddings = Some(embeddings.clone());
-    }
 
     // Compute average pairwise cosine similarity
     let n = embeddings.len();
@@ -721,16 +736,13 @@ fn compute_tedium_drain(state: &VitalityState) -> f32 {
     }
 
     if pairs == 0 {
-        return 0.0;
+        return (0.0, Some((hash, embeddings)));
     }
 
     let avg_sim = total_sim / pairs as f32;
 
-    if avg_sim > 0.85 {
-        0.005
-    } else {
-        0.0
-    }
+    let drain = if avg_sim > 0.85 { 0.005 } else { 0.0 };
+    (drain, Some((hash, embeddings)))
 }
 
 // ── Dormancy sequence (D-17) ─────────────────────────────────────────────────
