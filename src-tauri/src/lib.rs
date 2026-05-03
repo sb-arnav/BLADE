@@ -69,6 +69,7 @@ mod discovery;
 mod dna;
 mod homeostasis;
 mod active_inference;
+mod vitality_engine;    // Phase 29 v1.4 — vitality scalar + 5 behavioral bands (VITA-01..06)
 mod file_indexer;
 mod immune_system;
 mod joints;
