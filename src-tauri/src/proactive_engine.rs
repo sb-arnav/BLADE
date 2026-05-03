@@ -565,6 +565,19 @@ async fn proactive_loop(app: tauri::AppHandle) {
             continue;
         }
 
+        // Phase 29: vitality band gating (D-07 Waning halves, D-08 Declining disables)
+        let vitality = crate::vitality_engine::get_vitality();
+        if vitality.scalar < 0.4 {
+            // Declining/Critical/Dormant: proactive engine disabled entirely (D-08)
+            log::debug!("[proactive] vitality={:.2} < 0.4 -- proactive engine disabled", vitality.scalar);
+            continue;
+        }
+        if vitality.scalar < 0.6 {
+            // Waning band: halve frequency by adding an extra sleep to double the interval
+            log::debug!("[proactive] vitality={:.2} Waning -- halving proactive frequency", vitality.scalar);
+            tokio::time::sleep(Duration::from_secs(300)).await; // extra 5-min sleep = 10 min total
+        }
+
         let conn = match open_conn() {
             Some(c) => c,
             None => continue,

@@ -344,6 +344,15 @@ pub fn start_timeline_capture_loop(app: tauri::AppHandle) {
 
         loop {
             crate::supervisor::heartbeat("screen_timeline");
+
+            // Phase 29: Critical band disables timeline capture (D-09)
+            let vitality = crate::vitality_engine::get_vitality();
+            if vitality.scalar < 0.2 {
+                log::debug!("[screen_timeline] vitality={:.2} Critical -- skipping capture", vitality.scalar);
+                tokio::time::sleep(tokio::time::Duration::from_secs(CAPTURE_INTERVAL_SECS)).await;
+                continue;
+            }
+
             capture_timeline_tick(&app).await;
 
             // Context-switch detection: check if app or window changed

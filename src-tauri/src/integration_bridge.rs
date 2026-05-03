@@ -316,6 +316,13 @@ pub async fn start_integration_polling(app: AppHandle) {
             // Tick every 15 seconds — fine-grained enough for short intervals
             tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
             run_due_polls().await;
+
+            // Phase 29: Critical band doubles polling interval (D-09)
+            let vitality = crate::vitality_engine::get_vitality();
+            if vitality.scalar < 0.2 {
+                log::debug!("[integration_bridge] vitality={:.2} Critical -- doubling poll interval", vitality.scalar);
+                tokio::time::sleep(tokio::time::Duration::from_secs(15)).await; // extra 15s = 30s total
+            }
         }
     });
 }
