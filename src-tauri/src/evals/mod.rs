@@ -20,3 +20,4 @@
 #[cfg(test)] mod hormone_eval;             // Phase 27 / HORM-01..09
 #[cfg(test)] mod active_inference_eval;    // Phase 28 / AINF-01..06
 #[cfg(test)] mod vitality_eval;            // Phase 29 / VITA-01..06
+#[cfg(test)] mod organism_eval;            // Phase 30 / OEVAL-01..05

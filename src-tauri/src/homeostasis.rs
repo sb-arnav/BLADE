@@ -209,6 +209,26 @@ pub fn get_physiology() -> PhysiologicalState {
     physiology_store().lock().map(|p| p.clone()).unwrap_or_default()
 }
 
+/// Test-only: set the entire physiological state for deterministic fixtures.
+/// Mirrors set_vitality_for_test in vitality_engine.rs -- same OnceLock/Mutex pattern.
+/// Used by organism_eval OEVAL-02 fixtures to force hormone scalars.
+#[cfg(test)]
+pub fn set_physiology_for_test(state: PhysiologicalState) {
+    if let Ok(mut guard) = physiology_store().lock() {
+        *guard = state;
+    }
+}
+
+/// Test-only: set the entire operational hormone state for deterministic fixtures.
+/// Required for OEVAL-02 Fixture D (TMT acceptance): get_prompt_modulations() reads
+/// get_hormones().mortality_salience (HORMONES store), not PHYSIOLOGY store.
+#[cfg(test)]
+pub fn set_hormones_for_test(state: HormoneState) {
+    if let Ok(mut guard) = hormone_store().lock() {
+        *guard = state;
+    }
+}
+
 // ── Emotion Classifier (Phase 27 / HORM-02) ─────────────────────────────────
 //
 // A rule-based classifier that maps BLADE's own response text to a valence/
