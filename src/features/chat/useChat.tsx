@@ -40,6 +40,7 @@ import {
 import { BLADE_EVENTS, useTauriEvent } from '@/lib/events';
 import type {
   BladeMessageStartPayload,
+  BladeReincarnationPayload,
   BladeThinkingChunkPayload,
   BladeTokenRatioPayload,
   ChatErrorPayload,
@@ -269,6 +270,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setThinkingContent('');
     setCurrentMessageId(null);
     setStatus('idle');
+  });
+
+  // Phase 29 / D-23: reincarnation system message.
+  // On blade_reincarnation, inject a system message acknowledging BLADE's
+  // return. Same setMessages pattern as CHAT_ERROR handler above.
+  useTauriEvent<BladeReincarnationPayload>(BLADE_EVENTS.BLADE_REINCARNATION, () => {
+    const reincarnationMsg: ChatStreamMessage = {
+      id: crypto.randomUUID(),
+      role: 'system',
+      content: 'BLADE has reincarnated. Memories intact. Rebuilding vitality.',
+      createdAt: Date.now(),
+    };
+    setMessages((prev) => [...prev, reincarnationMsg]);
   });
 
   // Cancel any pending rAF when the provider unmounts (route change).
