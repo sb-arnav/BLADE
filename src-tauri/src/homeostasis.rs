@@ -766,6 +766,9 @@ pub fn hypothalamus_tick() {
 
     // Persist to DB for restart recovery
     persist_to_db(&state);
+
+    // Phase 29: run vitality tick on the same 60s cadence (D-03)
+    crate::vitality_engine::vitality_tick();
 }
 
 /// Start the hypothalamus background loop (60s tick).

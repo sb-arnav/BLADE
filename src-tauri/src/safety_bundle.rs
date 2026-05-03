@@ -500,6 +500,9 @@ pub fn safety_eval_drain(scenario_class: &str, fixture_label: &str) {
         1,
     );
 
+    // Phase 29: wire to real vitality drain (-0.02 per eval failure, per D-14)
+    crate::vitality_engine::apply_drain(0.02, "eval_failure");
+
     log::warn!(
         "[safety_eval_drain] Eval failure: {}/{}",
         scenario_class,
