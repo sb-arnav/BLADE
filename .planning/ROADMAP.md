@@ -45,7 +45,7 @@
 - [x] **Phase 27: Hormone Physiology** — 7 hormones wired with decay + gain, emotion classifier, modulation effects on response style (completed 2026-05-02)
 - [x] **Phase 28: Active Inference Loop** — Tentacle predictions, prediction-error → hormone bus, one closed demo loop, hippocampal memory replay (completed 2026-05-03)
 - [x] **Phase 29: Vitality Engine** — Scalar 0.0–1.0 with 5 behavioral bands, SDT replenishment, dormancy / reincarnation (completed 2026-05-03)
-- [ ] **Phase 30: Organism Eval** — Vitality dynamics, hormone-behavior, persona-stability, safety bundle evals; verify:organism gate
+- [x] **Phase 30: Organism Eval** — Vitality dynamics, hormone-behavior, persona-stability, safety bundle evals; verify:organism gate (completed 2026-05-03)
 - [ ] **Phase 31: Close** — README cites research, CHANGELOG, milestone audit, phase archive
 
 ### Sequencing
@@ -188,7 +188,7 @@ Plans:
 
 Plans:
 - [x] 30-01-PLAN.md — Foundation + OEVAL-01: homeostasis.rs test seams (set_physiology_for_test, set_hormones_for_test), organism_eval.rs scaffold with 4 vitality timeline fixtures, evals/mod.rs registration
-- [ ] 30-02-PLAN.md — Remaining fixtures + gate wiring: OEVAL-02 (4 hormone-behavior), OEVAL-03 (1 persona stability), OEVAL-04 (4 safety cross-check), verify-organism.sh Gate 38, package.json (verify:vitality + verify:organism + verify:all extension)
+- [x] 30-02-PLAN.md — Remaining fixtures + gate wiring: OEVAL-02 (4 hormone-behavior), OEVAL-03 (1 persona stability), OEVAL-04 (4 safety cross-check), verify-organism.sh Gate 38, package.json (verify:vitality + verify:organism + verify:all extension)
 
 ### Phase 31: Close
 
