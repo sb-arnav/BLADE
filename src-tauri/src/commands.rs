@@ -3308,3 +3308,90 @@ mod phase24_e2e_tests {
         std::env::remove_var("BLADE_CONFIG_DIR");
     }
 }
+
+// ---------------------------------------------------------------------------
+// Phase 32 Plan 32-02 — context management test harness.
+//
+// Fixture utilities used by Wave 2 plans (32-03 selective injection,
+// 32-04 compaction trigger, 32-05 tool-output cap). Centralised here so each
+// downstream plan does NOT scaffold its own conversation builder.
+//
+// `build_test_conversation(n)` returns Vec<ConversationMessage> with 1 system
+// message + n alternating user/assistant turns (each turn ~210 chars body).
+// `build_test_conversation_with_token_target(t)` sizes n so the conversation's
+// `estimate_tokens()` lands roughly at `t` (loose ±50% tolerance — fixture is
+// approximate; compaction triggers operate on rough estimates anyway).
+// ---------------------------------------------------------------------------
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+
+    /// Phase 32 fixture — build a synthetic conversation with `n` user/assistant
+    /// turns plus 1 system message. Each turn carries ~180 chars of body so
+    /// total chars/turn ≈ 210 (≈52 tokens per turn at chars/4).
+    /// Used by Plans 32-03, 32-04, 32-05.
+    pub fn build_test_conversation(n: usize) -> Vec<ConversationMessage> {
+        let mut conv = Vec::with_capacity(n + 1);
+        conv.push(ConversationMessage::System(
+            "You are BLADE. ".repeat(10),
+        ));
+        for i in 0..n {
+            if i % 2 == 0 {
+                conv.push(ConversationMessage::User(
+                    format!("user message {} {}", i, "x".repeat(180)),
+                ));
+            } else {
+                conv.push(ConversationMessage::Assistant {
+                    content: format!("assistant reply {} {}", i, "y".repeat(180)),
+                    tool_calls: vec![],
+                });
+            }
+        }
+        conv
+    }
+
+    /// Build a conversation whose estimated token count is approximately
+    /// `target_tokens`. Used by Plan 32-04 (compaction trigger).
+    ///
+    /// `estimate_tokens` uses chars/4. Per-turn body ≈ 210 chars ≈ 52 tokens.
+    /// Tolerance is intentionally wide (±50%) — compaction trigger operates on
+    /// rough estimates, and fixture-precision is not a phase-32 requirement.
+    pub fn build_test_conversation_with_token_target(
+        target_tokens: usize,
+    ) -> Vec<ConversationMessage> {
+        let target_chars = target_tokens * 4;
+        let per_turn_chars = 200usize;
+        let n = (target_chars / per_turn_chars).max(2);
+        build_test_conversation(n)
+    }
+
+    #[test]
+    fn phase32_build_test_conversation_shape() {
+        let c = build_test_conversation(10);
+        assert_eq!(c.len(), 11, "expected 1 system + 10 turns, got {}", c.len());
+        assert!(matches!(&c[0], ConversationMessage::System(_)),
+            "first message must be System");
+        // Verify alternation: index 1 = User, index 2 = Assistant, etc.
+        assert!(matches!(&c[1], ConversationMessage::User(_)),
+            "index 1 must be User (i=0, even)");
+        assert!(matches!(&c[2], ConversationMessage::Assistant { .. }),
+            "index 2 must be Assistant (i=1, odd)");
+        let toks = estimate_tokens(&c);
+        assert!(toks > 0, "estimated tokens should be positive, got {}", toks);
+    }
+
+    #[test]
+    fn phase32_build_test_conversation_token_aware() {
+        let c = build_test_conversation_with_token_target(100_000);
+        let toks = estimate_tokens(&c);
+        // Wide tolerance — fixture is approximate. Compaction triggers don't
+        // need exact token counts; they need "roughly the target order".
+        let lower = (100_000.0 * 0.5) as usize;
+        let upper = (100_000.0 * 1.5) as usize;
+        assert!(
+            toks >= lower && toks <= upper,
+            "expected ~100k tokens, got {} (allowed range {}..={})",
+            toks, lower, upper
+        );
+    }
+}
