@@ -587,6 +587,37 @@ pub(crate) fn run_migrations(conn: &Connection) -> Result<(), String> {
     )
     .map_err(|e| format!("DB error: {}", e))?;
 
+    // ── Vitality Engine (Phase 29 / VITA-01..06) ───────────────────────────
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS vitality_state (
+            id                  INTEGER PRIMARY KEY CHECK (id = 1),
+            scalar              REAL    NOT NULL DEFAULT 0.8,
+            band                TEXT    NOT NULL DEFAULT 'Thriving',
+            trend               REAL    NOT NULL DEFAULT 0.0,
+            sdt_signals         TEXT    NOT NULL DEFAULT '{}',
+            drain_signals       TEXT    NOT NULL DEFAULT '{}',
+            reincarnation_count INTEGER NOT NULL DEFAULT 0,
+            last_dormancy_at    INTEGER,
+            updated_at          INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS vitality_history (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp  INTEGER NOT NULL,
+            scalar     REAL    NOT NULL,
+            band       TEXT    NOT NULL,
+            top_factor TEXT    NOT NULL DEFAULT ''
+        );
+        CREATE TABLE IF NOT EXISTS dormancy_records (
+            id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp               INTEGER NOT NULL,
+            descent_history         TEXT    NOT NULL DEFAULT '[]',
+            top_drain_factors       TEXT    NOT NULL DEFAULT '[]',
+            session_count           INTEGER NOT NULL DEFAULT 0,
+            reincarnation_completed INTEGER NOT NULL DEFAULT 0
+        );",
+    )
+    .map_err(|e| format!("DB error: {}", e))?;
+
     // ── Incremental schema upgrades (ALTER TABLE ADD COLUMN is idempotent via ignore) ──
     // These columns were added in v0.4.7+ — older DBs need them backfilled.
     let swarm_upgrades = [
