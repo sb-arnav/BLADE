@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Phases
 status: executing
-stopped_at: Completed 29-00 (Wave 0 scaffolding)
-last_updated: "2026-05-03T09:01:53Z"
-last_activity: 2026-05-03 -- Phase 29 Plan 00 complete
+stopped_at: Completed 29-01 (Core computation + persistence + lib.rs wiring)
+last_updated: "2026-05-03T09:15:12Z"
+last_activity: 2026-05-03 -- Phase 29 Plan 01 complete (vitality engine core)
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 22
-  completed_plans: 17
-  percent: 77
+  completed_plans: 18
+  percent: 82
 ---
 
 # STATE — BLADE (v1.4 — Cognitive Architecture)
@@ -26,11 +26,11 @@ progress:
 ## Current Position
 
 Phase: 29 (Vitality Engine) — EXECUTING
-Plan: 2 of 6
-Status: Plan 00 complete, Plan 01 next
-Last activity: 2026-05-03 -- Phase 29 Plan 00 complete (Wave 0 scaffolding)
+Plan: 3 of 6
+Status: Plan 01 complete, Plan 02 next
+Last activity: 2026-05-03 -- Phase 29 Plan 01 complete (vitality engine core computation)
 
-Progress: [█████████░] 77%
+Progress: [████████░░] 82%
 
 ## Project Reference
 
@@ -57,6 +57,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-02)
 - v1.3 M-09 (carried forward): No organism layer without safety bundle — steelman Arg 4 + Arg 10 verdict
 - Phase 26 safety bundle all 4 static gates pass first-run -- verify:safety gate 34 green
 - Phase 26 complete: safety_bundle.rs (690 lines), 26/26 eval fixtures, 5/5 must-haves verified — safety gate unblocks Phases 27-29
+- Phase 29 Plan 01: vitality_engine.rs core computation complete (1071 lines). brain_reactions polarity is INTEGER not TEXT -- queries adapted. Drain scale 0.025 / replenishment scale 0.01 calibrated for 2+ hour drain floor.
 
 ### Blockers/Concerns
 
@@ -64,8 +65,8 @@ None at roadmap stage.
 
 ## Session Continuity
 
-Last session: 2026-05-03T09:01:53Z
-Stopped at: Completed 29-00-PLAN.md (Wave 0 scaffolding)
-Resume file: .planning/phases/29-vitality-engine/29-01-PLAN.md
+Last session: 2026-05-03T09:15:12Z
+Stopped at: Completed 29-01-PLAN.md (Core computation + persistence + lib.rs wiring)
+Resume file: .planning/phases/29-vitality-engine/29-02-PLAN.md
 
-**Planned Phase:** 29 (Vitality Engine) — 6 plans — Plan 00 complete, 5 remaining
+**Planned Phase:** 29 (Vitality Engine) — 6 plans — Plans 00-01 complete, 4 remaining

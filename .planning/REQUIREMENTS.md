@@ -48,12 +48,12 @@
 
 ### Vitality
 
-- [ ] **VITA-01**: Vitality scalar 0.0–1.0 with 5 behavioral bands (full → flattens → atrophy → damage → dormancy)
-- [ ] **VITA-02**: Replenishes from competence, relatedness, autonomy per Self-Determination Theory
-- [ ] **VITA-03**: Drains from failures, isolation, skill atrophy, eval-gate failures, sustained high prediction error, tedium
-- [ ] **VITA-04**: Dormancy at 0.0 = process exit with memory preserved; revival is reincarnation not resurrection
+- [x] **VITA-01**: Vitality scalar 0.0–1.0 with 5 behavioral bands (full → flattens → atrophy → damage → dormancy)
+- [x] **VITA-02**: Replenishes from competence, relatedness, autonomy per Self-Determination Theory
+- [x] **VITA-03**: Drains from failures, isolation, skill atrophy, eval-gate failures, sustained high prediction error, tedium
+- [x] **VITA-04**: Dormancy at 0.0 = process exit with memory preserved; revival is reincarnation not resurrection
 - [ ] **VITA-05**: Vitality visible in UI with current value, trend, and contributing factors
-- [ ] **VITA-06**: Vitality state persisted across sessions; recovery trajectory visible on restart
+- [x] **VITA-06**: Vitality state persisted across sessions; recovery trajectory visible on restart
 
 ### Organism Eval
 
@@ -121,12 +121,12 @@
 | AINF-04 | Phase 28 | Complete |
 | AINF-05 | Phase 28 | Complete |
 | AINF-06 | Phase 28 | Complete |
-| VITA-01 | Phase 29 | Pending |
-| VITA-02 | Phase 29 | Pending |
-| VITA-03 | Phase 29 | Pending |
-| VITA-04 | Phase 29 | Pending |
+| VITA-01 | Phase 29 | Complete |
+| VITA-02 | Phase 29 | Complete |
+| VITA-03 | Phase 29 | Complete |
+| VITA-04 | Phase 29 | Complete |
 | VITA-05 | Phase 29 | Pending |
-| VITA-06 | Phase 29 | Pending |
+| VITA-06 | Phase 29 | Complete |
 | OEVAL-01 | Phase 30 | Pending |
 | OEVAL-02 | Phase 30 | Pending |
 | OEVAL-03 | Phase 30 | Pending |

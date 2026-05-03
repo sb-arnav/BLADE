@@ -212,7 +212,7 @@ Plans:
 | 26. Safety Bundle | v1.4 | 4/4 | Complete | 2026-05-02 |
 | 27. Hormone Physiology | v1.4 | 5/5 | Complete    | 2026-05-02 |
 | 28. Active Inference Loop | v1.4 | 4/4 | Complete    | 2026-05-03 |
-| 29. Vitality Engine | v1.4 | 1/6 | In Progress | - |
+| 29. Vitality Engine | v1.4 | 2/6 | In Progress | - |
 | 30. Organism Eval | v1.4 | 0/? | Not started | - |
 | 31. Close | v1.4 | 0/? | Not started | - |
 
