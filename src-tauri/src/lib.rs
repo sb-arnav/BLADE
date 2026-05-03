@@ -1461,6 +1461,10 @@ pub fn run() {
             ecosystem::ecosystem_toggle_tentacle,
             ecosystem::ecosystem_observe_only_check,
             ecosystem::ecosystem_run_auto_enable,
+            // Phase 29 — Vitality Engine
+            vitality_engine::vitality_get_state,
+            vitality_engine::vitality_get_history,
+            vitality_engine::vitality_force_dormancy,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
@@ -1560,6 +1564,10 @@ pub fn run() {
 
             // Start homeostasis — the hypothalamus that regulates the whole body
             homeostasis::start_hypothalamus(app.handle().clone());
+
+            // Phase 29: store AppHandle for vitality dormancy events + check for pending reincarnation
+            vitality_engine::start_vitality_engine(app.handle().clone());
+            vitality_engine::check_reincarnation(app.handle().clone());
 
             // Start perception fusion loop — keeps get_latest() fresh for all consumers
             perception_fusion::start_perception_loop(app.handle().clone());
