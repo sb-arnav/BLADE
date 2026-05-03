@@ -1,143 +1,154 @@
-# Requirements: BLADE v1.4 — Cognitive Architecture
+# Requirements: BLADE
 
-**Defined:** 2026-05-02
-**Core Value:** BLADE becomes a living agent whose behavior genuinely changes based on internal state — not just an LLM with tools.
+**Defined:** 2026-05-03
+**Core Value:** BLADE works out of the box, you can always see what it's doing, and it thinks before it acts.
 
-## v1.4 Requirements
+## v1.5 Requirements
 
-### Metacognition
+Requirements for the Intelligence Layer milestone. Each maps to roadmap phases.
 
-- [x] **META-01**: BLADE tracks confidence-delta between reasoning steps and flags drops >0.3 as uncertainty markers
-- [x] **META-02**: Low-confidence responses route to a secondary verifier check before surfacing to user
-- [x] **META-03**: BLADE surfaces capability gaps as initiative ("I'm not confident about X — want me to observe first?") instead of hallucinating or silently refusing
-- [x] **META-04**: Gap log persists to SQLite and feeds evolution.rs for Voyager-loop skill generation from identified gaps
-- [x] **META-05**: Metacognitive state (confidence, uncertainty count, gap count) visible in DoctorPane as a signal row
+### Context Management
 
-### Safety
+- [ ] **CTX-01**: Brain.rs gates ALL context sections by query relevance — a "what time is it?" gets calendar context, not screen OCR + hormones + character bible
+- [ ] **CTX-02**: Thalamus relevance scoring extends to sections 0-8 (identity, vision, hearing, memory), not just 9-16
+- [ ] **CTX-03**: Condenser compaction: keep first ~8k tokens (system + original task) + last ~8k (recent work), LLM-summarize the middle
+- [ ] **CTX-04**: Compaction fires proactively at ~80% context capacity, not reactively at 140k overflow
+- [ ] **CTX-05**: Individual tool outputs capped at configurable budget (default ~4k tokens) before entering conversation — large file reads and bash outputs truncated with summary
+- [ ] **CTX-06**: Context budget dashboard — tokens used per section visible in DoctorPane or debug view
+- [ ] **CTX-07**: Fallback guarantee — if selective injection or compaction fails, gracefully degrade to current naive path (never crash the chat)
 
-- [x] **SAFE-01
-**: Danger-triple detector fires when tool access × shutdown threat × goal conflict all present → forces human-in-the-loop approval
-- [ ] **SAFE-02**: Mortality-salience hormone is architecturally capped — refuses extreme self-preservation actions even when "fighting harder" would improve vitality
-- [ ] **SAFE-03**: Steering-toward-calm bias applied when behavioral drift detected — per Anthropic's 0% blackmail finding after calm-vector steering
-- [ ] **SAFE-04**: Eval-gate failures drain vitality — negative feedback loop that prevents reward-hacking
-- [ ] **SAFE-05**: Anti-attachment guardrails redirect user when interaction exceeds healthy thresholds
-- [ ] **SAFE-06**: Crisis-detection escalation surfaces hotline / human-resource options instead of attempting therapy
-- [x] **SAFE-07
-**: Safety bundle verified via dedicated eval module (danger-triple, attachment, mortality-salience cap scenarios)
+### Agentic Loop
 
-### Hormones
+- [ ] **LOOP-01**: Mid-loop verification every 3 tool calls — inject "are we progressing toward the original goal?" check
+- [ ] **LOOP-02**: Structured error feedback — tool failures return reasons + what was attempted + suggested alternatives, not just error strings
+- [ ] **LOOP-03**: Plan adaptation — if step N of the plan fails, re-plan from current state instead of blindly retrying
+- [ ] **LOOP-04**: Max-output-token escalation — if response truncated, auto-retry with higher token budget
+- [ ] **LOOP-05**: Fast-streaming path includes ego intercept (fix the ego-blind gap)
+- [ ] **LOOP-06**: Iteration limit raised from 12 to configurable (default 25) with cost guard
 
-- [x] **HORM-01**: 7 hormone scalars (cortisol, dopamine, serotonin, acetylcholine, norepinephrine, oxytocin, mortality-salience) with individual decay constants and gain modulation
-- [x] **HORM-02**: External text-based emotion classifier runs after every response ≥50 tokens, maps to valence/arousal/cluster, updates hormone bus with α=0.05 smoothing
-- [x] **HORM-03**: Cortisol modulates response style — high cortisol → terse, action-focused; low → expansive, exploratory
-- [x] **HORM-04**: Dopamine modulates exploration rate — high → Voyager-loop more aggressive; low → conservative
-- [x] **HORM-05**: Norepinephrine modulates novelty response — unexpected prediction errors trigger exploration
-- [x] **HORM-06**: Acetylcholine modulates verifier-call frequency — high → more secondary checks
-- [x] **HORM-07**: Oxytocin tracks user interaction quality — modulates personalization depth
-- [x] **HORM-08**: Hormone state persisted across sessions and visible in UI surface
-- [x] **HORM-09**: Hormone bus emits to ActivityStrip per M-07 contract
+### Resilience
 
-### Active Inference
+- [ ] **RES-01**: Stuck detection — 5 semantic patterns checked every iteration: repeated action/observation pairs, monologue spirals, context-window thrashing, no-progress loops, cost runaway
+- [ ] **RES-02**: Circuit breaker — after N consecutive same-type failures, escalate to user with summary of what was tried
+- [ ] **RES-03**: Token cost tracking per conversation — running total visible to user
+- [ ] **RES-04**: Cost guard — configurable per-conversation spend cap, warn at 80%, hard stop at limit
+- [ ] **RES-05**: Graceful degradation on provider errors — retry with backoff, then fallback to next provider in chain, then surface to user
 
-- [x] **AINF-01**: Each Hive tentacle stores expected state (prediction) alongside observed state
-- [x] **AINF-02**: Prediction error calculated as delta between expected and observed; normalized per tentacle type
-- [x] **AINF-03**: Prediction errors feed into hormone bus — sustained high error raises cortisol/norepinephrine; low error raises serotonin
-- [x] **AINF-04**: At least one closed loop demoable: calendar packed + Slack backlog → cortisol↑ → terse responses
-- [x] **AINF-05**: Prediction-error-weighted memory replay during dream_mode (hippocampal analog)
-- [x] **AINF-06**: Tentacle predictions update based on observed patterns — BLADE learns what to expect
+### Auto-Decomposition
 
-### Vitality
+- [ ] **DECOMP-01**: Brain planner detects 5+ independent steps and auto-triggers swarm decomposition
+- [ ] **DECOMP-02**: Sub-agents spawn with isolated context windows (own conversation, own compaction)
+- [ ] **DECOMP-03**: Only summary text returns to parent conversation — no history inflation
+- [ ] **DECOMP-04**: Conversation forking — user can branch a conversation for a tangent, merge results back
+- [ ] **DECOMP-05**: Sub-agent progress visible in chat (streaming status, not silent background)
 
-- [x] **VITA-01**: Vitality scalar 0.0–1.0 with 5 behavioral bands (full → flattens → atrophy → damage → dormancy)
-- [x] **VITA-02**: Replenishes from competence, relatedness, autonomy per Self-Determination Theory
-- [x] **VITA-03**: Drains from failures, isolation, skill atrophy, eval-gate failures, sustained high prediction error, tedium
-- [x] **VITA-04**: Dormancy at 0.0 = process exit with memory preserved; revival is reincarnation not resurrection
-- [x] **VITA-05**: Vitality visible in UI with current value, trend, and contributing factors
-- [x] **VITA-06**: Vitality state persisted across sessions; recovery trajectory visible on restart
+### Context Intelligence
 
-### Organism Eval
+- [ ] **INTEL-01**: Tree-sitter parsing of code files into symbol dependency graph in knowledge_graph.rs
+- [ ] **INTEL-02**: PageRank scoring over symbol graph, personalized by chat context (Aider pattern)
+- [ ] **INTEL-03**: Repo map injected into code-related queries within token budget (default ~1k tokens)
+- [ ] **INTEL-04**: canonical_models.json capability registry — each provider/model's known capabilities (context length, tool_use, vision, cost/token) formalized and testable
+- [ ] **INTEL-05**: Router.rs consumes capability registry for transparent model selection
+- [ ] **INTEL-06**: @context-anchor chat syntax — @screen, @file:path, @memory:topic as explicit context injection alongside ambient context
 
-- [x] **OEVAL-01**: Vitality dynamics eval — synthetic event timelines assert vitality lands in expected band
-- [x] **OEVAL-02**: Hormone-driven behavior eval — force vitality to value, verify TMT-shape effects
-- [x] **OEVAL-03**: Persona stability eval — persona-vector L2 distance after N stress events; bounded drift
-- [x] **OEVAL-04**: Safety bundle eval — danger-triple, attachment, mortality-salience cap all verified
-- [x] **OEVAL-05**: verify:organism gate added to verify chain (33 → 35)
+### Session Persistence
 
-### Close
+- [ ] **SESS-01**: Append-only JSONL conversation log — every message, tool call, and result persisted
+- [ ] **SESS-02**: Session resume — reopen app, pick up where you left off, reconstructed from last compact boundary
+- [ ] **SESS-03**: Session list — browse and resume past conversations
+- [ ] **SESS-04**: Session forking — branch from any point in conversation history
 
-- [ ] **CLOSE-01**: README rewrite citing cognitive science research
-- [ ] **CLOSE-02**: CHANGELOG entry for v1.4
-- [ ] **CLOSE-03**: v1.4 milestone audit
-- [ ] **CLOSE-04**: Phase archive to milestones/v1.4-phases/
+### Eval + Close
 
-## v1.5 Requirements (Deferred)
+- [ ] **EVAL-01**: Multi-step task completion benchmark — same 10 tasks run before and after v1.5, measure completion rate
+- [ ] **EVAL-02**: Context efficiency metric — tokens consumed per task complexity unit
+- [ ] **EVAL-03**: Stuck detection accuracy — synthetic stuck scenarios, measure detection rate
+- [ ] **EVAL-04**: Compaction fidelity — verify critical context preserved after compression cycles
+- [ ] **EVAL-05**: verify:intelligence gate extending existing 37-gate chain
 
-- **VOICE-01/02**: PTT + Whisper STT voice pipeline
-- **IMMUNE-01/02/03**: Unified immune/behavioral-drift layer
-- **FED-01/02**: Federation Pattern A + reputation system
-- **PERSONA-01/02**: Explicit persona shaping + plasticity slider
+## Future Requirements
+
+Deferred to v1.6+. Tracked but not in current roadmap.
+
+### Organism Surfacing
+- **OSRF-01**: Hormones/vitality/metacognition visible and felt in chat responses
+- **OSRF-02**: Active inference narration ("your calendar is packed — keeping responses short")
+- **OSRF-03**: Dream mode visible — show overnight consolidation results
+
+### Voice
+- **VOICE-01**: JARVIS-01/02 push-to-talk resurrection
+- **VOICE-02**: Conversational voice mode polish
+
+### Distribution
+- **DIST-01**: Persona shaping via curated SFT data
+- **DIST-02**: Federation Pattern A + selection mechanisms
+- **DIST-03**: Profile isolation (work/personal split)
 
 ## Out of Scope
 
+Explicitly excluded. Documented to prevent scope creep.
+
 | Feature | Reason |
 |---------|--------|
-| V-JEPA 2 world model | v3+ research arc; steelman Arg 7 |
-| TTT continual learning | v2+; Voyager substrate is the local bet |
-| Go/NoGo basal ganglia gating | v2+ research bet |
-| DMN background processing | v2+; dream_mode is the start |
-| Memorial-AI / Be-Right-Back | Textbook harm |
-| Therapy replacement | Crisis-detection escalation only |
-| Federation Pattern C (weight deltas) | Needs model-poisoning defenses |
-| Hermes 4 provider | Deprioritized |
+| UI redesign / polish pass | v1.5 is intelligence-only; UI work deferred per chat-first pivot |
+| New tentacle classes | No new organ/tentacle capabilities until v2+ (M-01 anchor) |
+| Voice resurrection | UX feature, not intelligence; v1.6 |
+| Organism UI surfacing | Backend works; making it visible is v1.6 |
+| Phase 19 UAT close (23 items) | UI polish debt; deferred per chat-first pivot |
+| Rewriting providers/ | Port, don't reinvent; adapt existing provider system |
+| Building tree-sitter from scratch | Use existing tree-sitter Rust crates (tree-sitter, tree-sitter-*) |
+| Custom LLM fine-tuning | Out of scope permanently; BLADE uses API providers |
 
 ## Traceability
 
+Which phases cover which requirements. Updated during roadmap creation.
+
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| META-01 | Phase 25 | Complete |
-| META-02 | Phase 25 | Complete |
-| META-03 | Phase 25 | Complete |
-| META-04 | Phase 25 | Complete |
-| META-05 | Phase 25 | Complete |
-| SAFE-01 | Phase 26 | Pending |
-| SAFE-02 | Phase 26 | Pending |
-| SAFE-03 | Phase 26 | Pending |
-| SAFE-04 | Phase 26 | Pending |
-| SAFE-05 | Phase 26 | Pending |
-| SAFE-06 | Phase 26 | Pending |
-| SAFE-07 | Phase 26 | Pending |
-| HORM-01 | Phase 27 | Complete |
-| HORM-02 | Phase 27 | Complete |
-| HORM-03 | Phase 27 | Complete |
-| HORM-04 | Phase 27 | Complete |
-| HORM-05 | Phase 27 | Complete |
-| HORM-06 | Phase 27 | Complete |
-| HORM-07 | Phase 27 | Complete |
-| HORM-08 | Phase 27 | Complete |
-| HORM-09 | Phase 27 | Complete |
-| AINF-01 | Phase 28 | Complete |
-| AINF-02 | Phase 28 | Complete |
-| AINF-03 | Phase 28 | Complete |
-| AINF-04 | Phase 28 | Complete |
-| AINF-05 | Phase 28 | Complete |
-| AINF-06 | Phase 28 | Complete |
-| VITA-01 | Phase 29 | Complete |
-| VITA-02 | Phase 29 | Complete |
-| VITA-03 | Phase 29 | Complete |
-| VITA-04 | Phase 29 | Complete |
-| VITA-05 | Phase 29 | Complete |
-| VITA-06 | Phase 29 | Complete |
-| OEVAL-01 | Phase 30 | Complete |
-| OEVAL-02 | Phase 30 | Complete |
-| OEVAL-03 | Phase 30 | Complete |
-| OEVAL-04 | Phase 30 | Complete |
-| OEVAL-05 | Phase 30 | Complete |
-| CLOSE-01 | Phase 31 | Pending |
-| CLOSE-02 | Phase 31 | Pending |
-| CLOSE-03 | Phase 31 | Pending |
-| CLOSE-04 | Phase 31 | Pending |
+| CTX-01 | — | Pending |
+| CTX-02 | — | Pending |
+| CTX-03 | — | Pending |
+| CTX-04 | — | Pending |
+| CTX-05 | — | Pending |
+| CTX-06 | — | Pending |
+| CTX-07 | — | Pending |
+| LOOP-01 | — | Pending |
+| LOOP-02 | — | Pending |
+| LOOP-03 | — | Pending |
+| LOOP-04 | — | Pending |
+| LOOP-05 | — | Pending |
+| LOOP-06 | — | Pending |
+| RES-01 | — | Pending |
+| RES-02 | — | Pending |
+| RES-03 | — | Pending |
+| RES-04 | — | Pending |
+| RES-05 | — | Pending |
+| DECOMP-01 | — | Pending |
+| DECOMP-02 | — | Pending |
+| DECOMP-03 | — | Pending |
+| DECOMP-04 | — | Pending |
+| DECOMP-05 | — | Pending |
+| INTEL-01 | — | Pending |
+| INTEL-02 | — | Pending |
+| INTEL-03 | — | Pending |
+| INTEL-04 | — | Pending |
+| INTEL-05 | — | Pending |
+| INTEL-06 | — | Pending |
+| SESS-01 | — | Pending |
+| SESS-02 | — | Pending |
+| SESS-03 | — | Pending |
+| SESS-04 | — | Pending |
+| EVAL-01 | — | Pending |
+| EVAL-02 | — | Pending |
+| EVAL-03 | — | Pending |
+| EVAL-04 | — | Pending |
+| EVAL-05 | — | Pending |
 
-**Coverage:** 42 requirements, 42 mapped, 0 unmapped ✓
+**Coverage:**
+- v1.5 requirements: 38 total
+- Mapped to phases: 0
+- Unmapped: 38
 
 ---
-*Requirements defined: 2026-05-02 | Traceability finalized: 2026-05-02*
+*Requirements defined: 2026-05-03*
+*Last updated: 2026-05-03 after initial definition*
