@@ -338,7 +338,7 @@ fn compute_vitality_signal() -> Result<DoctorSignal, String> {
 
 | Problem | Don't Build | Use Instead | Why |
 |---------|-------------|-------------|-----|
-| Cosine similarity for tedium drain | Custom dot product | `embeddings::embed_texts()` + the existing cosine_similarity function (or a new pub wrapper) | Already handles zero vectors and length mismatch |
+| Cosine similarity for tedium drain | Custom dot product | `embeddings::embed_texts()` for vectors + inline cosine similarity computation in vitality_engine.rs (see Open Questions Q2 resolution) | The function is 5 lines of dot product / magnitude math; inlining avoids modifying embeddings.rs |
 | EMA smoothing | Custom running average | Inline `current * (1.0 - alpha) + new_val * alpha` — 1-liner used by update_physiology_from_classifier | Genuinely trivial; no library needed |
 | Reward history reading | Re-implement JSONL parsing | `reward::read_reward_history(10)` — returns Vec<RewardRecord> | Handles missing file, parse errors, empty history |
 | Decision log reading | Re-query SQLite | `decision_gate::get_decision_log()` — returns from in-memory ring buffer | Already fast |
@@ -586,10 +586,10 @@ if band_changed {
 | A1 | `read_reward_history(n)` returns Vec<RewardRecord> with `.reward: f32` field | Code Examples | Competence signal computation fails silently. Verify: `grep -n "pub reward" src-tauri/src/reward.rs` |
 | A2 | `get_active_inference_state()` does NOT expose the sustained_high_ticks counter | Common Pitfalls 7 | If field is already exposed, use it instead of local counter in VitalityState |
 | A3 | `evolution.rs::run_evolution_cycle()` is the sole entry point for Voyager exploration gating | Code Examples — evolution gate | If exploration triggers from multiple entry points, all must be gated |
-| A4 | `cosine_similarity` in embeddings.rs is a private `fn` (not `pub fn`) | Don't Hand-Roll | If already public, use it directly; if private, add pub(crate) wrapper |
-| A5 | character.rs does not currently expose a queryable positive feedback count | SDT Relatedness | If it does, use existing API; if not, add `pub fn get_positive_feedback_count(window_secs: i64) -> u32` or query DB directly |
+| A4 | `cosine_similarity` in embeddings.rs is a private `fn` (not `pub fn`) | Don't Hand-Roll | CONFIRMED: `fn cosine_similarity` at line 33 (no pub). Resolution: inline in vitality_engine.rs. |
+| A5 | character.rs does not currently expose a queryable positive feedback count | SDT Relatedness | CONFIRMED: character.rs uses `brain_reactions` table via db.rs. Resolution: query `brain_reactions` directly with `polarity = 'positive'`. |
 | A6 | DoctorPane ROW_ORDER currently ends at 'hormones' and lacks 'active_inference' | Common Pitfalls 5 | If Phase 28 already added it, only 'vitality' needs to be added |
-| A7 | AppHandle is not accessible inside synchronous hypothalamus_tick() | Architecture — dormancy events | If it is accessible (e.g. captured in closure), no static AppHandle storage needed |
+| A7 | AppHandle is not accessible inside synchronous hypothalamus_tick() | Architecture — dormancy events | CONFIRMED: resolved via VITALITY_APP OnceLock pattern. |
 
 **Pre-planning verification commands:**
 ```bash
@@ -603,22 +603,23 @@ grep -n "active_inference\|ROW_ORDER" /home/arnav/blade/src/features/admin/Docto
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **AppHandle availability for dormancy event emission inside hypothalamus_tick()**
    - What we know: `start_hypothalamus(app: AppHandle)` captures the handle in the async closure; `hypothalamus_tick()` is a no-arg sync function called inside that closure
    - What's unclear: Whether the vitality tick (called from hypothalamus_tick) can access the AppHandle for event emission on dormancy
    - Recommendation: Store AppHandle in `static VITALITY_APP: OnceLock<tauri::AppHandle>` set by `start_vitality_engine(app)`. Alternatively, dormancy event emission can happen inside the start_hypothalamus async loop after calling vitality_tick(), with a return value signaling "dormancy triggered" from vitality_tick().
+   - **RESOLVED:** Plan 00 and Plan 01 use the `VITALITY_APP: OnceLock<AppHandle>` pattern. `start_vitality_engine(app)` is called from lib.rs alongside `start_hypothalamus()`. The AppHandle is stored in vitality_engine.rs's module-level static and accessed by `trigger_dormancy()` and event emission functions. This follows the established pattern in the codebase (e.g., `MCP_APP` in mcp.rs).
 
 2. **cosine_similarity visibility in embeddings.rs**
-   - What we know: Function exists at line 32 of embeddings.rs
-   - What's unclear: `pub fn` vs `fn` (research read 60 lines, function was at line 32 but visibility keyword needs verification)
-   - Recommendation: Before writing tedium drain code, run `grep -n "^fn cosine\|^pub fn cosine" src-tauri/src/embeddings.rs`. If private, add `pub(crate)` or write a new `pub fn compute_message_similarity(msgs: &[String]) -> f32` wrapper.
+   - What we know: Function exists at line 33 of embeddings.rs as `fn cosine_similarity(a: &[f32], b: &[f32]) -> f32` (CONFIRMED private via grep)
+   - What's unclear: ~~`pub fn` vs `fn`~~ Confirmed private.
+   - **RESOLVED:** The `cosine_similarity` function in embeddings.rs is private (`fn`, not `pub fn`). Rather than modifying embeddings.rs (which would require adding it to a plan's files_modified), vitality_engine.rs will **inline an identical cosine similarity function** within the module. The function is trivially small (5 lines: dot product, magnitudes, division with zero-guard). This approach: (a) avoids touching embeddings.rs, (b) keeps the tedium drain self-contained within vitality_engine.rs, (c) the function handles zero vectors and length mismatch identically to embeddings.rs. The embeddings are still obtained via the public `embeddings::embed_texts()` API; only the similarity computation is inlined. Plan 01 Phase D (tedium drain) specifies this approach.
 
 3. **character.rs feedback signal accessibility**
    - What we know: character.rs stores CharacterBible and runs LLM analysis; D-12 says "positive feedback signals from character.rs (thumbs up count in trailing window)"
-   - What's unclear: Whether thumbs-up feedback is tracked in character.rs or in a different module (character.rs as read tracks CharacterBible content, not session feedback)
-   - Recommendation: Search `grep -rn "thumbs\|positive_feedback\|feedback_count" src-tauri/src/` before implementing relatedness signal. The thumbs up tracking may be in `reward.rs` (acceptance score) rather than character.rs.
+   - What's unclear: ~~Whether thumbs-up feedback is tracked in character.rs or in a different module~~ Confirmed: feedback stored in `brain_reactions` SQLite table.
+   - **RESOLVED:** Positive feedback is stored in the `brain_reactions` table (db.rs line 345) with columns `id, message_id, polarity, content, context_json, created_at`. The `polarity` field indicates thumbs-up vs thumbs-down. character.rs reads these via `db::brain_get_reactions()` for consolidation. For the relatedness SDT signal, vitality_engine.rs will query `brain_reactions` directly with `SELECT COUNT(*) FROM brain_reactions WHERE polarity = 'positive' AND created_at > ?1` (trailing 1-hour window). This avoids adding a new public function to character.rs and uses the same db connection pattern as vitality's other SQLite reads.
 
 ---
 
@@ -703,7 +704,7 @@ Note: vitality_eval.rs must use `--test-threads=1` (same constraint as hormone_e
 - `src-tauri/src/reward.rs` [VERIFIED: header read, RewardComponents struct] — public read_reward_history API
 - `src-tauri/src/decision_gate.rs` [VERIFIED: full struct read] — get_decision_log(), DecisionRecord, DecisionOutcome types
 - `src-tauri/src/persona_engine.rs` [VERIFIED: get_persona_context() read] — confidence threshold filtering at line 309
-- `src-tauri/src/embeddings.rs` [VERIFIED: header read to line 60] — embed_texts() pub, cosine_similarity private fn
+- `src-tauri/src/embeddings.rs` [VERIFIED: header read to line 60] — embed_texts() pub, cosine_similarity private fn at line 33
 - `src-tauri/src/lib.rs` [VERIFIED: module list] — registration pattern, existing module declarations
 - `src/lib/tauri/admin.ts` [VERIFIED: SignalClass section] — type union ends at 'hormones', missing 'active_inference'
 - `src/features/admin/DoctorPane.tsx` [VERIFIED: ROW_ORDER] — ROW_ORDER ends at 'hormones', missing 'active_inference'
@@ -712,6 +713,7 @@ Note: vitality_eval.rs must use `--test-threads=1` (same constraint as hormone_e
 - `.planning/phases/27-hormone-physiology/27-CONTEXT.md` [VERIFIED: full read] — hormone integration patterns
 - `.planning/phases/28-active-inference-loop/28-CONTEXT.md` [VERIFIED: full read] — active inference integration patterns
 - `scripts/verify-hormone.sh`, `scripts/verify-inference.sh` [VERIFIED: full read] — Gate 37 template
+- `src-tauri/src/db.rs` [VERIFIED: brain_reactions table at line 345] — feedback reactions table structure for relatedness signal
 
 ### Secondary (MEDIUM confidence)
 - None applicable — all relevant claims verified from codebase inspection
