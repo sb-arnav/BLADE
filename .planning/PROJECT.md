@@ -2,11 +2,11 @@
 
 ## What This Is
 
-BLADE is a desktop AI that lives on your machine — a "body" of 204+ Rust modules (brain, organs, tentacles, DNA, nervous and immune systems) plus a Liquid-Glass-native React skin across 5 windows and 50+ routes. **v1.0** shipped the substrate. **v1.1** wired it into something a first-time user can actually use. **v1.2** added the chat-capability spine — Doctor module + JARVIS chat → consent → cross-app action with refusal-elimination ego layer. **v1.3** ships the substrate-level differentiator no consumer agent has shipped: BLADE writes its own tools.
+BLADE is a desktop AI that lives on your machine — 204+ Rust modules (brain, organs, tentacles, DNA, nervous and immune systems) plus a Liquid-Glass-native React skin across 5 windows and 50+ routes. **v1.0** shipped the substrate. **v1.1** wired it. **v1.2** added chat → consent → cross-app action. **v1.3** shipped self-extending tools (Voyager pattern). **v1.4** shipped the organism layer (hormones, vitality, active inference, safety bundle). **v1.5** fixes the actual brain — the agentic loop that ties all 204 modules together is currently a naive 12-iteration for-loop. v1.5 replaces it with genuine intelligence: selective context, progressive compaction, verification, self-correction, and auto-decomposition, ported from the best open-source agents.
 
 ## Core Value
 
-**BLADE works out of the box, you can always see what it's doing, and it extends itself.** Paste a key, the smart scan reads 8 source classes, observer tentacles auto-enable behind a runtime guardrail, every backend capability is reachable, and the persistent activity-log strip surfaces every cross-module action. v1.2 added: chat → consent → cross-app write with hard-coded refusal-elimination ego. v1.3 adds the load-bearing piece: when BLADE encounters a capability gap, it **writes new executable code, registers it as a Skill, and uses it next time** — Voyager-pattern (Wang et al, NeurIPS 2023) shipped on a personal computer. Two installs of BLADE diverge over time.
+**BLADE works out of the box, you can always see what it's doing, and it thinks before it acts.** Paste a key, smart scan reads 8 source classes, observer tentacles auto-enable behind a runtime guardrail, every backend capability is reachable, the activity-log strip surfaces every action. v1.2 added chat → consent → cross-app write. v1.3 added self-extending tools (Voyager pattern — two installs diverge over time). v1.4 added the organism layer (hormones modulate behavior, vitality creates stakes, active inference drives adaptation). v1.5 adds the missing piece: the agentic loop itself — selective context, progressive compaction, mid-loop verification, stuck detection, and auto-decomposition into parallel sub-agents. The brain that drives 204 modules needs to actually think.
 
 ## Current State
 
@@ -55,44 +55,54 @@ BLADE is a desktop AI that lives on your machine — a "body" of 204+ Rust modul
 - ✓ REWARD — RLVR-style composite reward (0.5·skill_success + 0.3·eval_gate + 0.1·acceptance + 0.1·completion), 3 OOD eval modules (adversarial/ambiguous/capability-gap), DoctorPane RewardTrend row, verify:eval extended to 8 modules — v1.3 Phase 23 (45 tests)
 - ✓ DREAM — dream_mode.rs skill consolidation (prune >90d, consolidate redundant, generate from traces), .pending/ proposal queue, chat-injected operator confirmation, skill_validator CLI — v1.3 Phase 24 (435 tests total at close)
 
-### Current Milestone: v1.4 — Cognitive Architecture
+### Validated (v1.4 — Cognitive Architecture, closed 2026-05-03 at Phase 31)
 
-**Goal:** BLADE becomes a living agent whose behavior genuinely changes based on internal state. Active inference drives adaptation from prediction errors. Hormones modulate response style. Confidence gaps surface as initiative instead of hallucination. Vitality creates real stakes. No consumer AI agent has shipped any of these loops in production. Grounded in cognitive science (Friston active inference, SDT intrinsic motivation, TMT mortality salience, Butlin/Long/Chalmers consciousness indicators, MEDLEY-BENCH metacognition gap).
+- ✓ META — Metacognitive controller v0: confidence-delta detection, verifier routing, gap surfacing, gap log → evolution.rs, DoctorPane metacognitive signal (7 signal sources) — v1.4 Phase 25
+- ✓ SAFETY — Safety bundle: danger-triple detection, mortality-salience cap, steering-toward-calm bias, eval-gate vitality drain, anti-attachment guardrails — v1.4 Phase 26
+- ✓ HORMONE — Hormone physiology + emotion classifier: 7 hormones with decay/gain, text→valence/arousal→hormone with α=0.05 smoothing, behavioral modulation (cortisol→terse, dopamine→exploration, etc.) — v1.4 Phase 27
+- ✓ INFERENCE — Active inference loop: tentacle predictions, prediction error → hormone bus → behavior, calendar+Slack demo loop, prediction-error-weighted memory replay — v1.4 Phase 28
+- ✓ VITALITY — Vitality engine: 0.0–1.0 scalar with 5 behavioral bands, SDT replenishment, drain from failures/isolation/tedium, dormancy at 0.0 — v1.4 Phase 29
+- ✓ EVAL — Organism eval suite: vitality dynamics, hormone-driven behavior, persona stability under stress, 13/13 organism eval fixtures, verify:organism gate — v1.4 Phase 30
+- ✓ CLOSE — README rewrite, CHANGELOG, v1.4 milestone audit, phase archive — v1.4 Phase 31 (37 verify gates, 435+ tests, zero debt)
 
-**Target features (7 phases, 25–31):**
+### Current Milestone: v1.5 — Intelligence Layer
 
-- [ ] **META** *(Phase 25)* — Metacognitive controller v0. Confidence-delta detection between reasoning steps; verifier routing (low confidence → secondary check); gap surfacing to user ("I'm not confident about X — want me to observe first?"); gap log feeds evolution.rs. Closes MEDLEY-BENCH knowing-doing gap. Independent of organism layer — ships first.
-- [ ] **SAFETY** *(Phase 26)* — Safety bundle. Danger-triple detection (tool access × shutdown threat × goal conflict → force HITL); mortality-salience cap (refuses extreme self-preservation); steering-toward-calm bias (per Anthropic 0% blackmail finding); eval-gate vitality drain (negative feedback loop); anti-attachment guardrails (redirect on excessive dependence). Non-negotiable gate for organism features.
-- [ ] **HORMONE** *(Phase 27)* — Hormone physiology + emotion classifier. Wire 7 hormones (cortisol, dopamine, serotonin, acetylcholine, norepinephrine, oxytocin, mortality-salience) with decay constants and gain modulation. External text-based emotion classifier (~60-70% zero-shot) maps response text → valence/arousal/cluster → hormone update with α=0.05 smoothing. Hormones actually modulate: cortisol→terse responses, dopamine→exploration rate, norepinephrine→Voyager-loop triggers, acetylcholine→verifier-call frequency.
-- [ ] **INFERENCE** *(Phase 28)* — Active inference loop. Each Hive tentacle gets expected state (prediction); observation produces delta (prediction error); error modulates hormone bus; hormone modulates behavior. One closed loop demoable: calendar packed + Slack backlog → cortisol↑ → terse, action-focused responses. Prediction-error-weighted memory replay (hippocampal analog) extends dream_mode.
-- [ ] **VITALITY** *(Phase 29)* — Vitality engine. Scalar 0.0–1.0 with behavioral consequences: ≥0.6 full personality, 0.4–0.6 personality flattens, 0.2–0.4 skill atrophy, 0.1–0.2 cognitive damage (BLADE notices), 0.0 dormancy (process exits, memory preserved, reincarnation not resurrection). Replenishes from competence/relatedness/autonomy (SDT). Drains from failures, isolation, tedium.
-- [ ] **EVAL** *(Phase 30)* — Organism eval suite. Novel eval families: vitality dynamics (synthetic event timelines → assert vitality lands in expected band), hormone-driven behavior (force vitality to value → verify TMT-shape effects), persona stability under stress (persona-vector L2 distance after N events). Validates the organism layer works. verify:organism gate.
-- [ ] **CLOSE** *(Phase 31)* — README rewrite citing research (Friston, Wang Voyager, Butlin/Long/Chalmers, MEDLEY-BENCH, SDT, TMT), CHANGELOG, v1.4 milestone audit, phase archive to milestones/v1.4-phases/.
+**Goal:** Transform BLADE's naive 12-iteration tool loop into a genuine agentic intelligence. Selective context injection, progressive compaction, mid-loop verification, self-correction, stuck detection, auto-decomposition into sub-agents, and battle-tested patterns ported from the best open-source agents (Claude Code, Aider, OpenHands, Goose). The organism layer exists — now the brain that drives it needs to actually think.
 
-**Explicitly deferred to v1.5+:**
-- Hermes 4 via OpenRouter (was v1.3 Phase 25) — deprioritized; user picks their model via existing provider system
-- JARVIS-01/02 voice resurrection (was v1.3 Phase 26) — UX feature, not cognitive architecture; v1.5
-- Persona shaping via curated SFT data (Layer 7) — v1.5
-- Immune / behavioral-drift cross-cutting layer (prompt-injection + persona-drift + federation-anomaly detection) — v1.5
-- Federation Pattern A + selection mechanisms (per cumulative-culture research + steelman Arg 9) — v1.5
-- Go/NoGo decision gating (basal ganglia architecture; replace single confidence scalar with competing approach/avoid channels) — v2+ research bet
-- DMN-style background processing (continuous low-cost loop during waking hours) — v2+ research bet
+**Target features (phases 32–38):**
+
+- [ ] **CTX** *(Phase 32)* — Selective context injection + progressive compaction. Gate ALL brain.rs context by query relevance (not just items 9-16). Implement condenser pattern: keep first ~8k tokens (system + task) + last ~8k (recent work), LLM-summarize the middle. Replace reactive 140k hard truncation. Thalamus becomes the real gatekeeper.
+- [ ] **LOOP** *(Phase 33)* — Agentic loop rewrite. Mid-loop verification ("are we progressing toward the goal?") every 3 tool calls. Structured error feedback (tool failures return reasons + suggested alternatives, not just error strings). Plan adaptation: if step N fails, re-plan from current state instead of retrying. Max-output-token escalation on truncation.
+- [ ] **STUCK** *(Phase 34)* — Stuck detection + cost awareness. 5 semantic patterns checked every iteration: repeated action/observation pairs, monologue spirals, context-window thrashing, no-progress loops, cost runaway. Circuit-breaker: after N consecutive same-type failures, escalate to user instead of looping. Token cost tracking per conversation.
+- [ ] **DECOMP** *(Phase 35)* — Auto-decomposition. Wire swarm into the main chat loop. When brain_planner detects 5+ independent steps, auto-spawn sub-agents with isolated context windows. Only summary returns to parent conversation. Conversation forking for sub-tasks. "This task would be faster in parallel" → automatic.
+- [ ] **REPO** *(Phase 36)* — Context intelligence. Aider-style tree-sitter + PageRank repo map for code tasks (extend knowledge_graph.rs with symbol dependency graph). Goose-style canonical_models.json capability registry for multi-provider routing (formalize router.rs). @context-anchor explicit injection (@screen, @file, @memory:topic) alongside ambient context.
+- [ ] **EVAL** *(Phase 37)* — Intelligence eval suite. Agentic loop benchmarks: multi-step task completion rate, context efficiency (tokens used vs task complexity), stuck-detection accuracy, decomposition quality, plan adaptation success rate. Compare before/after on same task set. verify:intelligence gate.
+- [ ] **CLOSE** *(Phase 38)* — Close. README update with architecture citations (Claude Code arxiv 2604.14228, Aider repo map, OpenHands condenser, Goose capability registry, mini-SWE-agent simplicity proof). CHANGELOG. v1.5 milestone audit. Phase archive.
+
+**Explicitly deferred to v1.6+:**
+- Organism surfacing (hormones/vitality/metacognition visible in chat UI) — backend works, needs UI surface; v1.6
+- JARVIS-01/02 voice resurrection — UX feature, not intelligence; v1.6
+- Persona shaping via curated SFT data (Layer 7) — v1.6
+- Immune / behavioral-drift cross-cutting layer — v1.6
+- Federation Pattern A + selection mechanisms — v1.6
+- Profile isolation work/personal split — v1.6
+- Phase 19 UAT close (23 carry-overs) — v1.6
+- Browser-harness Q1 decision — pull as dependency arises
+- D-04 Step 2 LLM intent fallback, fast-streaming ego accumulator refactor — pull if loop rewrite surfaces them
+- Go/NoGo decision gating (basal ganglia) — v2+ research bet
+- DMN-style background processing — v2+ research bet
 - NREM/REM dual-phase dream-mode redesign — v2+ research bet
-- V-JEPA 2 world model integration (Layer 2) — v3+ (research arc; vulnerable per steelman Arg 7)
-- TTT continual learning at agent layer (Layer 3) — v2+ (Voyager substrate is the local bet)
-- Phase 19 UAT close (12 v1.2 + 11 v1.1 carry-overs) — defer per chat-first pivot
-- Profile isolation work/personal split — v1.5
-- Browser-harness Q1 decision (per JARVIS-09 deferral) — pull as dependency arises in chat-action work
-- D-04 Step 2 LLM intent fallback, fast-streaming branch ego accumulator refactor — chat-spine carry-overs; pull as Voyager loop work surfaces them
+- V-JEPA 2 world model integration — v3+
+- TTT continual learning — v2+
 
-**Reconciliation note:** This scope re-bases off the 2026-04-30 research push at `/home/arnav/research/ai-substrate/` (synthesis-blade-architecture, blade-as-organism, steelman-against-organism, open-questions-answered) + `/home/arnav/research/blade/voyager-loop-play.md`. The prior `notes/v1-3-hermes-openclaw-skills-research.md` (Skills v2 + Hermes 4 provider + messaging sidecar + profile isolation) is superseded as v1.3 lead — Skills v2 + Hermes 4 carry forward, voyager-loop-closure becomes the load-bearing centerpiece, sidecar + profile isolation defer to v1.4.
-
-Locked inputs:
-- `/home/arnav/research/blade/voyager-loop-play.md` (research, 2026-04-30) — Voyager loop demo target + sources
-- `/home/arnav/research/ai-substrate/synthesis-blade-architecture.md` (working thesis, 2026-04-30) — seven-layer architecture; v1.3 carves Layer 4 deepest
-- `/home/arnav/research/ai-substrate/steelman-against-organism.md` (stress-test, 2026-04-30) — design implications: aggressive prioritization, OOD coverage, no organism layer without safety bundle
-- `/home/arnav/research/ai-substrate/open-questions-answered.md` (Q&A, 2026-04-30) — Q1 verifiable composite reward; Q4 cross-cutting layers (deferred); Q5 hormone-bus calibration (deferred)
-- `/home/arnav/.claude/projects/-home-arnav-blade/memory/feedback_chat_first_pivot.md` (2026-04-30) — chat-capability over UI polish; UI-only-phase UAT deferral pattern operator-blessed
+**Research inputs:**
+- arxiv 2604.14228 (Claude Code architecture) — 5-layer compaction, sub-agent isolation, TAOR loop, failure-returns-reasons
+- Aider repo map (aider-chat/aider) — tree-sitter + PageRank for context selection
+- OpenHands condenser (OpenHands/OpenHands) — keep-edges-summarize-middle, stuck detection, event-stream-as-truth
+- Goose capability registry (block/goose) — canonical_models.json, Rust agent core, MCP-first
+- mini-SWE-agent (SWE-agent/mini-swe-agent) — 100 lines, 74% SWE-bench; proof that loop simplicity > module count
+- Screenpipe (mediar-ai/screenpipe) — optimized local capture pipeline, MIT
+- Competitive landscape audit 2026-05-03: no shipped product combines local-first + memory + desktop control + ambient perception + voice + autonomy + self-extending. Closest: Claude Cowork (cloud-only), Screenpipe (passive-only). BLADE is alone in the full stack.
 
 ### Out of Scope
 
@@ -116,20 +126,22 @@ New for v1.3 (substrate-anchored exclusions):
 
 ## Context
 
-- v1.0 substrate is shipped; v1.1 wiring is shipped. The body works *and* it's reachable.
-- 27 verify gates green (v1.0=18 + v1.1=9 new); tsc --noEmit clean; CI green on Linux/macOS/Windows.
-- Cold-install dev environment: WSL2 on Windows 11. Mac smoke (M-01..M-46) and physical-display UAT operator-owned per HANDOFF-TO-MAC.md.
-- Tester pass #1 grievances all addressed in v1.1: silent chat fail (4ab464c), 1-repo scan (Phase 12), empty dashboard (Phase 14), no activity surface (Phase 14), cluttered UI (Phase 15), unreachable options (Phase 14), Groq+llama routing miss (Phase 11).
-- Activity log is now load-bearing — every cross-module action emits to it; the strip is the trust surface for "is BLADE doing anything?"
+- v1.0–v1.4 shipped. 204+ Rust modules, 770+ Tauri commands, 37 verify gates green, 435+ tests, tsc --noEmit clean, cargo check clean.
+- v1.4 Cognitive Architecture complete: metacognition, safety bundle, hormones, active inference, vitality, organism eval (13/13 fixtures, MRR 1.000). Zero debt at close.
+- The bottleneck is now the agentic loop itself. 204 modules of smart infrastructure wrapped around a naive 12-iteration for-loop. Context bloated (everything injected every turn), no verification, no stuck detection, no auto-decomposition, no plan adaptation. This is why BLADE doesn't feel like AI.
+- Competitive landscape (audited 2026-05-03): no product combines local-first + memory + desktop control + ambient perception + voice + autonomy + self-extending + organism. Closest: Claude Cowork (cloud-only), Screenpipe (passive). Rewind/Limitless dead, Humane/Rabbit dead. BLADE is alone in the full stack — but the loop quality lags dedicated tools like Claude Code, Aider, OpenHands.
+- Cold-install dev environment: WSL2 on Windows 11. Mac smoke operator-owned per HANDOFF-TO-MAC.md.
+- Activity log remains load-bearing — every cross-module action emits to it.
 
 ## Constraints
 
 - **Tech stack:** unchanged. React 19 + TypeScript + Vite 7 + Tauri 2.10 + Tailwind v4. No runtime CSS-in-JS, no motion lib, no state lib beyond React primitives.
-- **Observe-only guardrail (v1.1 hard rule):** every auto-enabled tentacle from the ecosystem phase is read-only via runtime `OBSERVE_ONLY: AtomicBool`. v1.2 acting work will flip this guardrail per-tentacle behind explicit user consent + trust-tier escalation, never silently.
-- **No backend rewrites beyond wiring gaps.** Net-new organ/tentacle capabilities belong to v2+. v1.2 may add per-tentacle acting paths but does not add new tentacle classes.
-- **Activity log remains load-bearing.** Every cross-module action in v1.2 must continue to emit. The strip is the v1.1 contract.
-- **Performance budgets:** Dashboard first paint ≤200ms on integrated GPU, Voice Orb 60fps through all 4 phase transitions, max 3 backdrop-filter per viewport, blur caps 20/12/8px.
-- **Verify gates extend, not replace.** v1.2 will add to the 27-gate chain; regressions in any existing gate fail the phase.
+- **Observe-only guardrail (v1.1 hard rule):** auto-enabled tentacles are read-only via `OBSERVE_ONLY: AtomicBool`. Acting paths require explicit user consent.
+- **Activity log remains load-bearing.** Every cross-module action must continue to emit.
+- **Performance budgets:** Dashboard first paint ≤200ms, Voice Orb 60fps, max 3 backdrop-filter per viewport, blur caps 20/12/8px.
+- **Verify gates extend, not replace.** v1.5 adds to the 37-gate chain; regressions in any existing gate fail the phase.
+- **Loop changes must not break existing chat.** The agentic loop rewrite (v1.5) must keep the current simple chat path working — selective context and compaction are additive, not replacements. If the smart path fails, fall back to the current naive loop.
+- **Port, don't reinvent.** Where battle-tested open-source patterns exist (Aider repo map, OpenHands condenser, Goose capability registry), adapt them rather than building from scratch. MIT/Apache only.
 
 ## Key Decisions
 
@@ -179,4 +191,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-*Last updated: 2026-04-30 — v1.3 milestone scoped via /gsd-new-milestone after autonomous re-read of `/home/arnav/research/` (synthesis-blade-architecture, blade-as-organism, voyager-loop-play, steelman-against-organism, open-questions-answered). Locked shape: 7 phases (21–27): Skills v2 → Voyager loop closure → verifiable reward + OOD eval → dream_mode skill consolidation → Hermes 4 OpenRouter provider → JARVIS-01/02 voice resurrection → close. Organism layer (vitality/hormones/mortality) explicitly deferred to v1.4+ with safety bundle per steelman verdict. v1.2 closed 2026-04-30 as `tech_debt` matching v1.1 pattern. Substrate-anchored, not launch-anchored — May 11 ship is downstream consequence, not goal.*
+*Last updated: 2026-05-03 — v1.5 milestone scoped via /gsd-new-milestone. v1.4 Cognitive Architecture closed clean (7 phases, 37 gates, zero debt). v1.5 Intelligence Layer: fix the agentic loop (selective context, compaction, verification, stuck detection, auto-decomposition) + port proven patterns (Aider repo map, OpenHands condenser, Goose capability registry). Competitive audit confirmed BLADE is alone in the full-stack desktop agent space — but loop quality lags dedicated tools.*
