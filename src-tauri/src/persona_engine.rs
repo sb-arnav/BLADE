@@ -306,9 +306,16 @@ pub fn get_persona_context() -> String {
     lines.push(format!("Relationship depth: {:.0}/100. {}", rel.intimacy_score, tone_note));
     lines.push(format!("Trust level: {:.0}/100", rel.trust_score));
 
-    // High-confidence traits only (confidence > 0.3)
+    // Phase 29: vitality Waning band raises threshold, muting lower-confidence traits (D-07)
+    let vitality_scalar = crate::vitality_engine::get_vitality().scalar;
+    let confidence_threshold = if vitality_scalar >= 0.4 && vitality_scalar < 0.6 {
+        // Waning band: at vitality 0.5, threshold = 0.3 / 0.5 = 0.6 (fewer traits surface)
+        (0.3 / vitality_scalar.max(0.01)).min(1.0)
+    } else {
+        0.3 // normal threshold for Thriving / Declining / Critical bands
+    };
     let notable: Vec<&PersonaTrait> = traits.iter()
-        .filter(|t| t.confidence > 0.3)
+        .filter(|t| t.confidence > confidence_threshold)
         .collect();
 
     if !notable.is_empty() {

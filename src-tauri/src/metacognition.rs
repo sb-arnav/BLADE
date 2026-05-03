@@ -163,9 +163,16 @@ pub fn assess_cognitive_state(user_query: &str) -> CognitiveState {
     let confidence = (knowledge_score * 0.4 + capability_score * 0.3
         + (1.0 - complexity) * 0.2 + freshness * 0.1).clamp(0.0, 1.0);
 
-    // ── ACH MODULATION: high ACh -> more verification checks (Phase 27 / HORM-06) ──
+    // ── ACH + VITALITY MODULATION (Phase 27 / HORM-06, Phase 29 / D-09) ──
     let ach = crate::homeostasis::get_physiology().acetylcholine;
-    let verify_threshold = if ach > 0.6 { 0.4_f32 } else { 0.3_f32 };
+    let vitality_scalar = crate::vitality_engine::get_vitality().scalar;
+    let verify_threshold = if vitality_scalar < 0.2 {
+        0.15_f32 // Phase 29: Critical band -- heightened sensitivity (D-09)
+    } else if ach > 0.6 {
+        0.4_f32  // Phase 27: high ACh
+    } else {
+        0.3_f32  // normal
+    };
     let should_ask = confidence < verify_threshold || (complexity > 0.8 && knowledge_score < 0.5);
 
     let uncertainty_reason = if knowledge_score < 0.3 {

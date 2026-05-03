@@ -618,6 +618,13 @@ pub async fn run_evolution_cycle(app: &tauri::AppHandle) {
         return; // body is conserving — not the time for growth
     }
 
+    // Phase 29: Declining/Critical/Dormant bands disable exploration (D-08)
+    let vitality = crate::vitality_engine::get_vitality();
+    if vitality.scalar < 0.4 {
+        log::debug!("[evolution] vitality={:.2} < 0.4 -- skipping exploration cycle", vitality.scalar);
+        return;
+    }
+
     // Leptin: skip evolution when knowledge-satiated
     let leptin = crate::homeostasis::get_hormones().leptin;
     if leptin > 0.8 {
