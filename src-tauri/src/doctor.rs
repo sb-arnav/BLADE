@@ -41,6 +41,7 @@ pub enum SignalClass {
     Metacognitive,    // Phase 25 / META-05
     Hormones,         // Phase 27 / HORM-08
     ActiveInference,  // Phase 28 / AINF-01
+    Vitality,         // Phase 29 / VITA-05
 }
 
 /// Severity tiers (D-04). Wire form is `lowercase` so the UI's
@@ -165,6 +166,14 @@ pub(crate) fn suggested_fix(class: SignalClass, severity: Severity) -> &'static 
             "Aggregate prediction error elevated (>0.4). One or more tentacles showing unexpected activity. Check the payload for top_tentacle.",
         (SignalClass::ActiveInference, Severity::Red) =>
             "Sustained high prediction error (>0.6 for 2+ ticks). Cortisol and norepinephrine are rising. Review the active tentacles and allow idle time for EMA recalibration.",
+
+        // Vitality — Phase 29 / VITA-05
+        (SignalClass::Vitality, Severity::Green) =>
+            "Vitality is in Thriving or Waning band. SDT signals are healthy.",
+        (SignalClass::Vitality, Severity::Amber) =>
+            "Vitality is in Declining band (0.2-0.4). Proactive engine disabled, exploration paused. Check failure rate or isolation signals.",
+        (SignalClass::Vitality, Severity::Red) =>
+            "Vitality is Critical or Dormant. All non-essential systems paused. Engage BLADE with substantive tasks to restore competence signal.",
     }
 }
 
@@ -944,6 +953,7 @@ fn emit_activity_for_doctor(app: &AppHandle, signal: &DoctorSignal) {
         SignalClass::Metacognitive   => "Metacognitive",
         SignalClass::Hormones        => "Hormones",
         SignalClass::ActiveInference => "ActiveInference",
+        SignalClass::Vitality        => "Vitality",
     };
     let severity_str = match signal.severity {
         Severity::Green => "Green",
@@ -1049,6 +1059,32 @@ fn compute_active_inference_signal() -> Result<DoctorSignal, String> {
     })
 }
 
+// -- Signal source: Vitality (VITA-05) -- Plan 29-03 --------------------------
+
+fn compute_vitality_signal() -> Result<DoctorSignal, String> {
+    let v = crate::vitality_engine::get_vitality();
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    let severity = match v.band {
+        crate::vitality_engine::VitalityBand::Thriving  => Severity::Green,
+        crate::vitality_engine::VitalityBand::Waning    => Severity::Green,
+        crate::vitality_engine::VitalityBand::Declining => Severity::Amber,
+        crate::vitality_engine::VitalityBand::Critical  => Severity::Red,
+        crate::vitality_engine::VitalityBand::Dormant   => Severity::Red,
+    };
+    Ok(DoctorSignal {
+        class: SignalClass::Vitality,
+        severity,
+        payload: serde_json::json!({
+            "scalar": v.scalar,
+            "band": format!("{:?}", v.band),
+            "trend": v.trend,
+            "reincarnation_count": v.reincarnation_count,
+        }),
+        last_changed_at: now_ms,
+        suggested_fix: suggested_fix(SignalClass::Vitality, severity).to_string(),
+    })
+}
+
 // ── Tauri Commands (D-19) ─────────────────────────────────────────────────────
 
 /// Run all 5 signal sources in parallel via `tokio::join!`, cache the
@@ -1065,7 +1101,7 @@ pub async fn doctor_run_full_check(app: AppHandle) -> Result<Vec<DoctorSignal>, 
     // Sources are sync but run via `tokio::join!` over async blocks so the
     // runtime can interleave file IO. Per CONTEXT "Claude's Discretion":
     // parallel is the recommended path.
-    let (eval, capgap, tentacle, drift, autoupdate, reward_trend, metacognitive, hormones, active_inference) = tokio::join!(
+    let (eval, capgap, tentacle, drift, autoupdate, reward_trend, metacognitive, hormones, active_inference, vitality) = tokio::join!(
         async { compute_eval_signal() },
         async { compute_capgap_signal() },
         async { compute_tentacle_signal() },
@@ -1075,6 +1111,7 @@ pub async fn doctor_run_full_check(app: AppHandle) -> Result<Vec<DoctorSignal>, 
         async { compute_metacognitive_signal() },
         async { compute_hormones_signal() },
         async { compute_active_inference_signal() },
+        async { compute_vitality_signal() },
     );
 
     // Order in the returned Vec is locked (most-volatile-first per
@@ -1090,6 +1127,7 @@ pub async fn doctor_run_full_check(app: AppHandle) -> Result<Vec<DoctorSignal>, 
         metacognitive.map_err(|e| format!("metacognitive signal: {}", e))?,
         hormones.map_err(|e| format!("hormones signal: {}", e))?,
         active_inference.map_err(|e| format!("active_inference signal: {}", e))?,
+        vitality.map_err(|e| format!("vitality signal: {}", e))?,
     ];
 
     // Diff against prior severity; emit on transitions where new ∈ {Amber, Red}.
@@ -1182,8 +1220,8 @@ mod tests {
 
     #[test]
     fn suggested_fix_table_is_exhaustive() {
-        // All 27 (class × severity) pairs return a non-empty string.
-        // Phase 28 AINF-01 added ActiveInference (3 arms): 9×3 = 27.
+        // All 30 (class × severity) pairs return a non-empty string.
+        // Phase 29 VITA-05 added Vitality (3 arms): 10×3 = 30.
         for class in [
             SignalClass::EvalScores,
             SignalClass::CapabilityGaps,
@@ -1194,6 +1232,7 @@ mod tests {
             SignalClass::Metacognitive,
             SignalClass::Hormones,
             SignalClass::ActiveInference,
+            SignalClass::Vitality,     // Phase 29
         ] {
             for severity in [Severity::Green, Severity::Amber, Severity::Red] {
                 let s = suggested_fix(class, severity);
