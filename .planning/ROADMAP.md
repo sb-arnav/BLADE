@@ -187,7 +187,7 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 30-01-PLAN.md — Foundation + OEVAL-01: homeostasis.rs test seams (set_physiology_for_test, set_hormones_for_test), organism_eval.rs scaffold with 4 vitality timeline fixtures, evals/mod.rs registration
+- [x] 30-01-PLAN.md — Foundation + OEVAL-01: homeostasis.rs test seams (set_physiology_for_test, set_hormones_for_test), organism_eval.rs scaffold with 4 vitality timeline fixtures, evals/mod.rs registration
 - [ ] 30-02-PLAN.md — Remaining fixtures + gate wiring: OEVAL-02 (4 hormone-behavior), OEVAL-03 (1 persona stability), OEVAL-04 (4 safety cross-check), verify-organism.sh Gate 38, package.json (verify:vitality + verify:organism + verify:all extension)
 
 ### Phase 31: Close

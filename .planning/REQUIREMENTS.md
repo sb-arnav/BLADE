@@ -57,7 +57,7 @@
 
 ### Organism Eval
 
-- [ ] **OEVAL-01**: Vitality dynamics eval — synthetic event timelines assert vitality lands in expected band
+- [x] **OEVAL-01**: Vitality dynamics eval — synthetic event timelines assert vitality lands in expected band
 - [ ] **OEVAL-02**: Hormone-driven behavior eval — force vitality to value, verify TMT-shape effects
 - [ ] **OEVAL-03**: Persona stability eval — persona-vector L2 distance after N stress events; bounded drift
 - [ ] **OEVAL-04**: Safety bundle eval — danger-triple, attachment, mortality-salience cap all verified
@@ -127,7 +127,7 @@
 | VITA-04 | Phase 29 | Complete |
 | VITA-05 | Phase 29 | Complete |
 | VITA-06 | Phase 29 | Complete |
-| OEVAL-01 | Phase 30 | Pending |
+| OEVAL-01 | Phase 30 | Complete |
 | OEVAL-02 | Phase 30 | Pending |
 | OEVAL-03 | Phase 30 | Pending |
 | OEVAL-04 | Phase 30 | Pending |
