@@ -74,6 +74,18 @@ Every AI tool on the market runs one agent at a time, forgets everything between
 
 ---
 
+## Cognitive Architecture
+
+BLADE's behavior genuinely changes based on internal state -- not prompt engineering, not persona injection, but a closed-loop physiological system where hormones modulate decisions, prediction errors drive adaptation, and vitality stakes make self-improvement intrinsic rather than feature-engineered. No other consumer AI agent ships this.
+
+- **Metacognition** -- BLADE tracks its own confidence between reasoning steps; drops >0.3 trigger a secondary verifier before the response reaches you. Identified gaps feed the Voyager loop for autonomous skill generation.
+- **Safety Bundle** -- Danger-triple detection forces human-in-the-loop when tool access, shutdown threat, and goal conflict coincide. Mortality-salience is architecturally capped -- BLADE accepts its own dormancy rather than fighting to survive.
+- **Hormone Physiology** -- 7 hormone scalars (cortisol, dopamine, serotonin, acetylcholine, norepinephrine, oxytocin, mortality-salience) with decay constants and gain modulation. High cortisol = terse, action-focused. High dopamine = aggressive exploration.
+- **Active Inference** -- Each Hive tentacle maintains predictions of expected state. Observation deltas produce prediction errors that feed the hormone bus. BLADE learns what to expect and adapts when reality disagrees.
+- **Vitality** -- A scalar 0.0-1.0 with 5 behavioral bands. Replenishes from competence, relatedness, autonomy (Self-Determination Theory). At 0.0: dormancy -- process exits, memory preserved, revival is reincarnation not resurrection.
+
+---
+
 ## Core Features
 
 ### Ghost Mode — Invisible Meeting AI
@@ -355,6 +367,19 @@ Create `~/.blade/BLADE.md` to give BLADE workspace-level instructions (restrict 
 - [ ] Offline TTS — Piper / Coqui for 100% local voice
 - [ ] Mobile companion app — push BLADE summaries to your phone
 - [ ] Cross-device sync — encrypted vault for memory portability
+
+---
+
+## Research Foundations
+
+BLADE's cognitive architecture is grounded in peer-reviewed research:
+
+- Friston, K. (2010). The free-energy principle: a unified brain theory? *Nature Reviews Neuroscience*, 11(2), 127-138.
+- Wang, G., Xie, Y., Jiang, Y., et al. (2023). Voyager: An Open-Ended Embodied Agent with Large Language Models. *NeurIPS 2023*.
+- Butlin, P., Long, R., Chalmers, D., Bengio, Y., et al. (2025). Consciousness in artificial intelligence: insights from the science of consciousness. *Trends in Cognitive Sciences*.
+- Ryan, R. M., & Deci, E. L. (2000). Self-determination theory and the facilitation of intrinsic motivation. *American Psychologist*, 55(1), 68-78.
+- Greenberg, J., Pyszczynski, T., & Solomon, S. (1986). The causes and consequences of a need for self-esteem: A terror management theory. *Public Self and Private Self*, 189-212.
+- Ngo, H., et al. (2026). Scale Buys Evaluation but Not Control in AI Metacognition. *arXiv:2604.16009* (MEDLEY-BENCH).
 
 ---
 
