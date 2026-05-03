@@ -14,7 +14,7 @@
 | v1.1 | Functionality, Wiring, Accessibility | ✅ Shipped (tech_debt) | 10–15 | 2026-04-27 |
 | v1.2 | Acting Layer with Brain Foundation | ✅ Shipped (tech_debt) | 16–20 | 2026-04-30 |
 | v1.3 | Self-extending Agent Substrate | ✅ Shipped | 21–24 | 2026-05-02 |
-| **v1.4** | **Cognitive Architecture** | 🚧 **Active** | **25–31** | — |
+| **v1.4** | **Cognitive Architecture** | ✅ Shipped | **25–31** | 2026-05-03 |
 
 ---
 
@@ -46,7 +46,7 @@
 - [x] **Phase 28: Active Inference Loop** — Tentacle predictions, prediction-error → hormone bus, one closed demo loop, hippocampal memory replay (completed 2026-05-03)
 - [x] **Phase 29: Vitality Engine** — Scalar 0.0–1.0 with 5 behavioral bands, SDT replenishment, dormancy / reincarnation (completed 2026-05-03)
 - [x] **Phase 30: Organism Eval** — Vitality dynamics, hormone-behavior, persona-stability, safety bundle evals; verify:organism gate (completed 2026-05-03)
-- [ ] **Phase 31: Close** — README cites research, CHANGELOG, milestone audit, phase archive
+- [x] **Phase 31: Close** — README cites research, CHANGELOG, milestone audit, phase archive (completed 2026-05-03)
 
 ### Sequencing
 
@@ -200,13 +200,13 @@ Plans:
   2. CHANGELOG v1.4 entry lists all delivered features and the verify gate count change (33 → 34)
   3. `milestones/v1.4-MILESTONE-AUDIT.md` is written with phase coverage, requirements 3-source cross-reference, static gates, and executive verdict
   4. Phase 25–31 directories archived to `milestones/v1.4-phases/`; cargo check + tsc --noEmit + verify:all all exit 0
-**Plans:** 4 plans
+**Plans:** 4/4 plans complete
 
 Plans:
-- [ ] 31-01-PLAN.md — README cognitive architecture + research citations
-- [ ] 31-02-PLAN.md — CHANGELOG v1.2/v1.3/v1.4 entries
-- [ ] 31-03-PLAN.md — Milestone audits + frozen snapshots
-- [ ] 31-04-PLAN.md — Phase archive + state update + verification
+- [x] 31-01-PLAN.md — README cognitive architecture + research citations
+- [x] 31-02-PLAN.md — CHANGELOG v1.2/v1.3/v1.4 entries
+- [x] 31-03-PLAN.md — Milestone audits + frozen snapshots
+- [x] 31-04-PLAN.md — Phase archive + state update + verification
 
 ---
 
@@ -223,8 +223,8 @@ Plans:
 | 27. Hormone Physiology | v1.4 | 5/5 | Complete    | 2026-05-02 |
 | 28. Active Inference Loop | v1.4 | 4/4 | Complete    | 2026-05-03 |
 | 29. Vitality Engine | v1.4 | 6/6 | Complete    | 2026-05-03 |
-| 30. Organism Eval | v1.4 | 0/2 | Planned | - |
-| 31. Close | v1.4 | 0/? | Not started | - |
+| 30. Organism Eval | v1.4 | 2/2 | Complete | 2026-05-03 |
+| 31. Close | v1.4 | 4/4 | Complete | 2026-05-03 |
 
 ---
 
@@ -253,4 +253,4 @@ Plans:
 
 ---
 
-*Last updated: 2026-05-03 — Phase 30 planned (2 plans in 2 waves). v1.4 ROADMAP.md updated.*
+*Last updated: 2026-05-03 — v1.4 milestone closed. All 7 phases (25-31) shipped. Phase archive complete.*
