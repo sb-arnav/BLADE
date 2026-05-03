@@ -198,6 +198,37 @@ fn enforce_budget(parts: &mut Vec<String>, keep: usize) {
     }
 }
 
+// ── Phase 32 / CTX-06: Context Breakdown wire type ────────────────────────────
+// Returned by the `get_context_breakdown` Tauri command (added in Plan 32-06).
+// Records per-section token contribution from the most recent
+// `build_system_prompt_inner` invocation so the DoctorPane can render a
+// per-turn budget panel.
+//
+// `sections` is keyed by stable section labels: "blade_md", "identity_supplement",
+// "memory_l0", "character_bible", "role", "safety", "hormones",
+// "identity_extension", "vision", "hearing", "memory_recall", "schedule",
+// "code", "security", "health", "system", "financial", "context_now",
+// "integrations", "git", "world_model", "misc", "scaffold", "tools".
+//
+// Token counts are estimated as `chars / 4` (matches commands.rs estimate_tokens).
+// This is the wire-format contract — Plan 32-03 populates `sections` during
+// build_system_prompt_inner; Plan 32-06 exposes it via the Tauri command.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct ContextBreakdown {
+    /// 16-char hex prefix of SHA-256(query) — for log correlation only.
+    pub query_hash: String,
+    /// Model context window from capability_probe (e.g. 200_000 for Claude Sonnet 4).
+    pub model_context_window: u32,
+    /// Sum of all section token counts (excluding tools/messages).
+    pub total_tokens: usize,
+    /// Per-section token tally. Stable label set documented above.
+    pub sections: std::collections::HashMap<String, usize>,
+    /// total_tokens / model_context_window * 100.0. Clamped to 100.0.
+    pub percent_used: f32,
+    /// Unix epoch milliseconds when the breakdown was captured.
+    pub timestamp_ms: i64,
+}
+
 // ── Smart context relevance scoring ──────────────────────────────────────────
 //
 // Returns a 0.0–1.0 score for how relevant a context block type is to the
@@ -1898,4 +1929,70 @@ pub fn get_context() -> String {
 pub fn set_context(content: String) -> Result<(), String> {
     let path = context_path();
     write_blade_file(&path, &content)
+}
+
+// ---------------------------------------------------------------------------
+// Phase 32 Plan 32-01 — ContextBreakdown wire-type tests.
+//
+// These two tests lock the serialization contract that Plan 32-06's
+// `get_context_breakdown` Tauri command will return. Plan 32-03 will
+// populate the `sections` map during `build_system_prompt_inner`; this
+// substrate plan only verifies the type round-trips cleanly.
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn phase32_context_breakdown_default() {
+        let b = ContextBreakdown::default();
+        assert_eq!(b.total_tokens, 0,
+            "default total_tokens must be 0");
+        assert!(b.sections.is_empty(),
+            "default sections map must be empty");
+        assert_eq!(b.model_context_window, 0,
+            "default model_context_window must be 0");
+        assert_eq!(b.percent_used, 0.0,
+            "default percent_used must be 0.0");
+        assert_eq!(b.query_hash, "",
+            "default query_hash must be empty");
+        assert_eq!(b.timestamp_ms, 0,
+            "default timestamp_ms must be 0");
+    }
+
+    #[test]
+    fn phase32_context_breakdown_serializes() {
+        let mut b = ContextBreakdown::default();
+        b.sections.insert("identity".to_string(), 1234);
+        b.sections.insert("vision".to_string(), 0);
+        b.total_tokens = 1234;
+        b.model_context_window = 200_000;
+        b.percent_used = 0.617;
+        b.query_hash = "abcdef0123456789".to_string();
+        b.timestamp_ms = 1_700_000_000_000;
+
+        let json = serde_json::to_string(&b).expect("serialize ContextBreakdown");
+        // Per-section keys must appear in the wire output — DoctorPane reads
+        // them as a HashMap<String, usize>. Order is not guaranteed (HashMap),
+        // so we check for substrings.
+        assert!(json.contains("\"identity\":1234"),
+            "missing identity key in {}", json);
+        assert!(json.contains("\"vision\":0"),
+            "missing vision key in {}", json);
+        assert!(json.contains("\"total_tokens\":1234"),
+            "missing total_tokens in {}", json);
+        assert!(json.contains("\"model_context_window\":200000"),
+            "missing model_context_window in {}", json);
+        assert!(json.contains("\"query_hash\":\"abcdef0123456789\""),
+            "missing query_hash in {}", json);
+
+        // Round-trip: deserialize and verify the sections map survives.
+        let parsed: ContextBreakdown = serde_json::from_str(&json)
+            .expect("deserialize ContextBreakdown");
+        assert_eq!(parsed.sections.get("identity"), Some(&1234));
+        assert_eq!(parsed.sections.get("vision"), Some(&0));
+        assert_eq!(parsed.total_tokens, 1234);
+        assert_eq!(parsed.model_context_window, 200_000);
+    }
 }
