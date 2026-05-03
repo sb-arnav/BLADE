@@ -9,6 +9,54 @@ Versioning: [Semantic Versioning 2.0](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing yet.
+
+---
+
+## [1.4.0] -- 2026-05-03
+
+### Added (v1.4 -- Cognitive Architecture)
+
+> Shipped 2026-05-03 across phases 25-30 (6 feature phases + 1 close phase). Static gates: `cargo check` clean . `npx tsc --noEmit` clean . `npm run verify:all` 37/37 sub-gates green.
+
+[v1.4 content filled by Task 2]
+
+---
+
+## [1.3.0] -- 2026-05-02
+
+### Added (v1.3 -- Self-extending Agent Substrate)
+
+> Shipped 2026-05-02 across phases 21-24 (4 feature phases). Static gates: `cargo check` clean . `npx tsc --noEmit` clean . `npm run verify:all` 33/33 sub-gates green . 435 Rust tests.
+
+**Phase 21 -- Skills v2 / agentskills.io adoption** *(shipped 2026-05-01)*
+- SKILL.md declarative format with progressive disclosure (simple → intermediate → advanced blocks).
+- 3-tier resolution: workspace skills → user skills → bundled skills. Validator enforces format on load.
+- 3 bundled exemplar skills demonstrating the format (shipped with binary).
+- 8/8 SKILLS-XX requirements satisfied.
+
+**Phase 22 -- Voyager Loop Closure** *(shipped 2026-05-01)*
+- End-to-end wiring: `evolution.rs` → `autoskills.rs` → `tool_forge.rs` — gap detection → skill generation → tool registration.
+- One reproducible gap closed: `youtube_transcript` skill generated from capability-gap fixture, registered, and invocable.
+- verify:voyager gate added (chain count 32→33).
+- 9/9 VOYAGER-XX requirements satisfied.
+
+**Phase 23 -- Verifiable Reward + OOD Eval** *(shipped 2026-05-01)*
+- RLVR-style composite reward signal in production (`reward.rs`): tool-success, user-approval, gap-closure, and novelty components.
+- Adversarial eval fixtures: ambiguous queries, capability-gap probes, reward-hacking attempts.
+- OOD (out-of-distribution) detection: confidence-calibrated refusal on queries outside training distribution.
+- 7/7 REWARD-XX requirements satisfied.
+
+**Phase 24 -- Skill Consolidation in dream_mode** *(shipped 2026-05-02)*
+- Prune: unused skills (zero invocations over N cycles) flagged and archived.
+- Consolidate: redundant skills merged (semantic similarity threshold) with provenance tracking.
+- Generate: successful multi-step traces in dream_mode produce new candidate skills.
+- 6/6 DREAM-XX requirements satisfied.
+
+---
+
+## [1.2.0] -- 2026-04-30
+
 ### Added (v1.2 — Acting Layer with Brain Foundation)
 
 > Shipped 2026-04-30 across phases 16–20 (5 phases planned; 19 deferred to v1.3 under operator chat-first pivot). 89 commits since 2026-04-29. Static gates: `cargo check` clean · `npx tsc --noEmit` clean · `npm run verify:all` 31/31 sub-gates green · `bash scripts/verify-eval.sh` 5/5 floors green.
