@@ -52,7 +52,7 @@
 - [x] **VITA-02**: Replenishes from competence, relatedness, autonomy per Self-Determination Theory
 - [x] **VITA-03**: Drains from failures, isolation, skill atrophy, eval-gate failures, sustained high prediction error, tedium
 - [x] **VITA-04**: Dormancy at 0.0 = process exit with memory preserved; revival is reincarnation not resurrection
-- [ ] **VITA-05**: Vitality visible in UI with current value, trend, and contributing factors
+- [x] **VITA-05**: Vitality visible in UI with current value, trend, and contributing factors
 - [x] **VITA-06**: Vitality state persisted across sessions; recovery trajectory visible on restart
 
 ### Organism Eval
@@ -125,7 +125,7 @@
 | VITA-02 | Phase 29 | Complete |
 | VITA-03 | Phase 29 | Complete |
 | VITA-04 | Phase 29 | Complete |
-| VITA-05 | Phase 29 | Pending |
+| VITA-05 | Phase 29 | Complete |
 | VITA-06 | Phase 29 | Complete |
 | OEVAL-01 | Phase 30 | Pending |
 | OEVAL-02 | Phase 30 | Pending |

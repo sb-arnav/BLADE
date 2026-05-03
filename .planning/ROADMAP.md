@@ -44,7 +44,7 @@
 - [x] **Phase 26: Safety Bundle** — Danger-triple HITL gate, mortality-salience cap, calm-vector bias, attachment guardrails, eval-gate vitality drain (completed 2026-05-02)
 - [x] **Phase 27: Hormone Physiology** — 7 hormones wired with decay + gain, emotion classifier, modulation effects on response style (completed 2026-05-02)
 - [x] **Phase 28: Active Inference Loop** — Tentacle predictions, prediction-error → hormone bus, one closed demo loop, hippocampal memory replay (completed 2026-05-03)
-- [ ] **Phase 29: Vitality Engine** — Scalar 0.0–1.0 with 5 behavioral bands, SDT replenishment, dormancy / reincarnation
+- [x] **Phase 29: Vitality Engine** — Scalar 0.0–1.0 with 5 behavioral bands, SDT replenishment, dormancy / reincarnation (completed 2026-05-03)
 - [ ] **Phase 30: Organism Eval** — Vitality dynamics, hormone-behavior, persona-stability, safety bundle evals; verify:organism gate
 - [ ] **Phase 31: Close** — README cites research, CHANGELOG, milestone audit, phase archive
 
@@ -163,15 +163,15 @@ Plans:
   2. A session of successful, autonomous, user-approved actions increases vitality (competence + autonomy SDT sources); a session of ignored prompts and failures decreases it
   3. At vitality 0.0 the process exits cleanly with all memory preserved; on next launch a reincarnation path (not restoration) is taken and vitality starts at non-zero
   4. The UI shows current vitality value, trend arrow, and the top contributing factors (what's draining, what's replenishing)
-**Plans:** 6 plans
+**Plans:** 6/6 plans complete
 
 Plans:
 - [x] 29-00-PLAN.md — Wave 0: skeleton vitality_engine.rs types + eval fixture stubs + verify-vitality.sh Gate 37 + evals/mod.rs registration
-- [ ] 29-01-PLAN.md — Core vitality_engine.rs module: full implementation of VitalityState, SDT computation, drain, hysteretic bands, dormancy/reincarnation, SQLite persistence, lib.rs registration
-- [ ] 29-02-PLAN.md — Behavioral integration: hypothalamus_tick, safety_eval_drain, brain.rs, persona, evolution, dream_mode (session + skill synthesis), metacognition, proactive_engine, screen_timeline, integration_bridge
-- [ ] 29-03-PLAN.md — DoctorPane signal: SignalClass::Vitality in doctor.rs (4 sites), TypeScript union fix (active_inference + vitality), DoctorPane DISPLAY_NAME/ROW_ORDER
-- [ ] 29-04-PLAN.md — Frontend: VitalityIndicator.tsx mounted in ChatPanel, event payloads, BLADE_EVENTS, reincarnation system message in useChat.tsx (D-23)
-- [ ] 29-05-PLAN.md — Eval suite: 6 concrete fixture implementations, Gate 37 assertion, human checkpoint
+- [x] 29-01-PLAN.md — Core vitality_engine.rs module: full implementation of VitalityState, SDT computation, drain, hysteretic bands, dormancy/reincarnation, SQLite persistence, lib.rs registration
+- [x] 29-02-PLAN.md — Behavioral integration: hypothalamus_tick, safety_eval_drain, brain.rs, persona, evolution, dream_mode (session + skill synthesis), metacognition, proactive_engine, screen_timeline, integration_bridge
+- [x] 29-03-PLAN.md — DoctorPane signal: SignalClass::Vitality in doctor.rs (4 sites), TypeScript union fix (active_inference + vitality), DoctorPane DISPLAY_NAME/ROW_ORDER
+- [x] 29-04-PLAN.md — Frontend: VitalityIndicator.tsx mounted in ChatPanel, event payloads, BLADE_EVENTS, reincarnation system message in useChat.tsx (D-23)
+- [x] 29-05-PLAN.md — Eval suite: 6 concrete fixture implementations, Gate 37 assertion, human checkpoint
 **UI hint**: yes
 
 ### Phase 30: Organism Eval
@@ -212,7 +212,7 @@ Plans:
 | 26. Safety Bundle | v1.4 | 4/4 | Complete | 2026-05-02 |
 | 27. Hormone Physiology | v1.4 | 5/5 | Complete    | 2026-05-02 |
 | 28. Active Inference Loop | v1.4 | 4/4 | Complete    | 2026-05-03 |
-| 29. Vitality Engine | v1.4 | 2/6 | In Progress | - |
+| 29. Vitality Engine | v1.4 | 6/6 | Complete    | 2026-05-03 |
 | 30. Organism Eval | v1.4 | 0/? | Not started | - |
 | 31. Close | v1.4 | 0/? | Not started | - |
 
