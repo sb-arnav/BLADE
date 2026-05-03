@@ -361,6 +361,31 @@ pub fn score_context_relevance(query: &str, context_type: &str) -> f32 {
             &["source", "link", "url", "web", "online"],
             &[],
         ),
+        // ── Phase 32 / CTX-02: identity / vision / hearing gates ─────────────
+        // Added by Plan 32-03 to extend score_context_relevance to brain.rs
+        // sections 0–8 (character bible, OCR, hormones, meeting transcripts).
+        // Keyword sets are verbatim from 32-RESEARCH.md §CTX-02.
+        "identity" => (
+            &["who are you", "your name", "your purpose", "remember me",
+              "what do you know about me", "tell me about yourself", "your story",
+              "what are you", "who am i to you", "your character"],
+            &["you", "your", "yourself", "i", "me", "my"],
+            &[],
+        ),
+        "vision" => (
+            &["screen", "see", "looking at", "visible", "showing", "display",
+              "on my screen", "what's on", "this page", "this app", "this window",
+              "ocr", "read this", "what i'm looking at", "active app", "screenshot"],
+            &["this", "that", "here", "above", "below"],
+            &[],
+        ),
+        "hearing" => (
+            &["meeting", "conversation", "they said", "what was discussed",
+              "transcript", "audio", "call", "spoken", "heard", "listened",
+              "voice", "podcast"],
+            &["talked", "told", "saying", "speak"],
+            &[],
+        ),
         _ => (&[] as &[&str], &[] as &[&str], &[] as &[&str]),
     };
 
@@ -2088,5 +2113,57 @@ mod tests {
             result.is_err(),
             "expected panic to propagate via catch_unwind"
         );
+    }
+
+    // ── Phase 32 Plan 32-03 — score_context_relevance new types ─────────────
+    //
+    // Verify the three new keyword sets (identity / vision / hearing) score
+    // their high-keyword queries above the 0.6 threshold and unrelated
+    // queries at 0.0. Each test resets `CTX_SCORE_OVERRIDE` defensively so a
+    // sibling test's override leak cannot poison this assertion.
+
+    #[test]
+    fn phase32_score_identity_high() {
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        let s = score_context_relevance("who are you really", "identity");
+        assert!(s >= 0.6, "expected high score, got {}", s);
+    }
+
+    #[test]
+    fn phase32_score_identity_low() {
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        // Chosen to avoid both high keywords AND any medium keyword
+        // ("you", "your", "yourself", "i", "me", "my"). "calculate" / "sqrt"
+        // / "of" / "144" contain none of those substrings.
+        let s = score_context_relevance("calculate sqrt of 144", "identity");
+        assert_eq!(s, 0.0, "no keyword should produce 0.0, got {}", s);
+    }
+
+    #[test]
+    fn phase32_score_vision_high() {
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        let s = score_context_relevance("what's on my screen right now", "vision");
+        assert!(s >= 0.6, "expected high score, got {}", s);
+    }
+
+    #[test]
+    fn phase32_score_vision_low() {
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        let s = score_context_relevance("calculate the integral of x squared", "vision");
+        assert_eq!(s, 0.0);
+    }
+
+    #[test]
+    fn phase32_score_hearing_high() {
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        let s = score_context_relevance("what was discussed in the meeting", "hearing");
+        assert!(s >= 0.6, "expected high score, got {}", s);
+    }
+
+    #[test]
+    fn phase32_score_unknown_type_returns_zero() {
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        let s = score_context_relevance("anything goes here", "totally-fake-type-name");
+        assert_eq!(s, 0.0);
     }
 }
