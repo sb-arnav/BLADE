@@ -184,7 +184,11 @@ Plans:
   2. Hormone-driven behavior eval forces vitality to a specific value and verifies TMT-shape effects (mortality-salience modulation) are detectable
   3. Persona stability eval measures persona-vector L2 distance after N stress events; distance is below the bounded-drift threshold
   4. verify:organism gate is green and the verify chain count increments from 33 to 34
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 30-01-PLAN.md — Foundation + OEVAL-01: homeostasis.rs test seams (set_physiology_for_test, set_hormones_for_test), organism_eval.rs scaffold with 4 vitality timeline fixtures, evals/mod.rs registration
+- [ ] 30-02-PLAN.md — Remaining fixtures + gate wiring: OEVAL-02 (4 hormone-behavior), OEVAL-03 (1 persona stability), OEVAL-04 (4 safety cross-check), verify-organism.sh Gate 38, package.json (verify:vitality + verify:organism + verify:all extension)
 
 ### Phase 31: Close
 
@@ -213,7 +217,7 @@ Plans:
 | 27. Hormone Physiology | v1.4 | 5/5 | Complete    | 2026-05-02 |
 | 28. Active Inference Loop | v1.4 | 4/4 | Complete    | 2026-05-03 |
 | 29. Vitality Engine | v1.4 | 6/6 | Complete    | 2026-05-03 |
-| 30. Organism Eval | v1.4 | 0/? | Not started | - |
+| 30. Organism Eval | v1.4 | 0/2 | Planned | - |
 | 31. Close | v1.4 | 0/? | Not started | - |
 
 ---
@@ -243,4 +247,4 @@ Plans:
 
 ---
 
-*Last updated: 2026-05-03 — Phase 29 revised (6 plans in 4 waves: Wave 0 test scaffolding + 3 implementation waves). v1.4 ROADMAP.md updated.*
+*Last updated: 2026-05-03 — Phase 30 planned (2 plans in 2 waves). v1.4 ROADMAP.md updated.*
