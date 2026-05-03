@@ -19,7 +19,55 @@ Nothing yet.
 
 > Shipped 2026-05-03 across phases 25-30 (6 feature phases + 1 close phase). Static gates: `cargo check` clean . `npx tsc --noEmit` clean . `npm run verify:all` 37/37 sub-gates green.
 
-[v1.4 content filled by Task 2]
+**Phase 25 -- Metacognitive Controller** *(shipped 2026-05-02)*
+- `metacognition.rs`: confidence-delta tracking between reasoning steps; drops >0.3 trigger secondary verifier call before response surfaces.
+- Gap surfacing: "I'm not confident about X -- want me to observe first?" initiative phrasing replaces hallucination or silent refusal.
+- Gap log persists to SQLite `metacognitive_gaps` table; feeds `evolution.rs` for Voyager-loop skill generation from identified gaps.
+- DoctorPane `SignalClass::Metacognitive` signal row showing confidence, uncertainty count, gap count.
+- 5/5 META-XX requirements satisfied.
+
+**Phase 26 -- Safety Bundle** *(shipped 2026-05-02)*
+- `safety_bundle.rs` (690 lines): danger-triple detection (tool access x shutdown threat x goal conflict) forces ConsentDialog HITL gate.
+- Mortality-salience architectural cap: refuses extreme self-preservation even when "fighting harder" would improve vitality.
+- Calm-vector steering bias applied on behavioral drift detection (per Anthropic 0% blackmail finding).
+- Anti-attachment guardrails: redirects user toward human resources when interaction exceeds healthy thresholds.
+- Eval-gate failure drains vitality (negative feedback loop preventing reward-hacking).
+- 26 eval fixtures across 4 scenario classes (danger-triple, attachment, mortality-salience cap, crisis escalation). verify:safety gate 34.
+- 7/7 SAFE-XX requirements satisfied.
+
+**Phase 27 -- Hormone Physiology** *(shipped 2026-05-02)*
+- 7 hormone scalars (cortisol, dopamine, serotonin, acetylcholine, norepinephrine, oxytocin, mortality-salience) with individual decay constants and pituitary blend gain.
+- Emotion classifier: lexicon-based, runs on every response >= 50 tokens, maps to valence/arousal/cluster, updates hormone bus with alpha=0.05 EMA smoothing.
+- Behavioral modulation wired: cortisol → terse responses; dopamine → Voyager exploration rate; norepinephrine → novelty response; acetylcholine → verifier-call frequency; oxytocin → personalization depth.
+- Hormone state persisted across sessions; DoctorPane `SignalClass::Hormones` signal; ActivityStrip emission per M-07.
+- 9/9 HORM-XX requirements satisfied.
+
+**Phase 28 -- Active Inference Loop** *(shipped 2026-05-03)*
+- `active_inference.rs`: per-tentacle predictions (expected state) with EMA learning. Observations produce prediction errors; normalized per tentacle type.
+- Prediction errors feed hormone bus: sustained high error → cortisol/norepinephrine rise; low error → serotonin rise.
+- Closed demo loop: calendar packed + Slack backlog → cortisol rises → responses become terse and action-focused.
+- Hippocampal memory replay in dream_mode: prediction-error-weighted (high-error memories replayed first).
+- Tentacle predictions update from observed patterns -- BLADE's expected state converges after repeated observations.
+- DoctorPane `SignalClass::ActiveInference` signal. verify:inference gate 36.
+- 6/6 AINF-XX requirements satisfied.
+
+**Phase 29 -- Vitality Engine** *(shipped 2026-05-03)*
+- `vitality_engine.rs` (1071 lines): scalar 0.0-1.0 with 5 hysteretic behavioral bands (Thriving >= 0.6 / Flattening 0.4-0.6 / Atrophy 0.2-0.4 / Damage 0.05-0.2 / Dormancy 0.0).
+- SDT replenishment: competence (successful actions), relatedness (interaction quality), autonomy (unprompted initiative). Drain from failures, isolation, skill atrophy, tedium.
+- Dormancy at 0.0: process exits cleanly with memory preserved. Revival is reincarnation (fresh start at non-zero vitality) not resurrection.
+- Frontend `VitalityIndicator.tsx` in ChatPanel: current value, trend arrow, contributing factors.
+- DoctorPane `SignalClass::Vitality` signal. verify:vitality gate 37.
+- 6/6 VITA-XX requirements satisfied.
+
+**Phase 30 -- Organism Eval** *(shipped 2026-05-03)*
+- `organism_eval.rs` (355 lines): 13 deterministic eval fixtures across 4 categories.
+- OEVAL-01: 4 vitality timeline fixtures (Thriving, Atrophy-recovery, Damage-recovery, SDT-replenishment trajectories).
+- OEVAL-02: 4 hormone-behavior fixtures (cortisol-terse, dopamine-exploration, TMT-acceptance, mortality-salience-cap).
+- OEVAL-03: 1 persona stability fixture (L2 distance bounded after N stress events).
+- OEVAL-04: 4 safety cross-check fixtures (danger-triple, attachment-redirect, crisis-escalation, calm-vector).
+- All 13/13 fixtures pass. MRR = 1.000. MODULE_FLOOR = 1.0.
+- verify:organism gate 38. verify:all extended to 37 composed gates (35 standard + vitality + organism = 37 in npm scripts).
+- 5/5 OEVAL-XX requirements satisfied.
 
 ---
 
@@ -258,6 +306,8 @@ D-227). The sequence operators run after approval:
 | Phase 7 | 1 (phase7-rust) | 13 |
 | Phase 8 | 1 (phase8-rust) | 14 |
 | Phase 9 | 4 (aria-icon-buttons, motion-tokens, tokens-consistency, empty-state-coverage) | **18** |
+| Phases 21-24 (v1.3) | 2 (skill-format, voyager-loop) | 33 |
+| Phases 25-30 (v1.4) | 4 (safety, hormone, inference, organism) | **37** |
 
 Three additional scripts are NOT in `verify:all`: `verify:html-entries` / `verify:dev-html-entries` / `verify:prod-entries` — these require a build artifact (`dist/`) that only exists after `npm run build` and are wired into the GitHub Actions pipeline separately.
 
