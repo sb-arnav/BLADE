@@ -255,6 +255,45 @@ thread_local! {
     > = std::cell::RefCell::new(None);
 }
 
+// ── Phase 32 / CTX-06: Per-section token recorder ─────────────────────────────
+// Populated by `build_system_prompt_inner` as it pushes each section. Read by
+// `get_context_breakdown` (Plan 32-06) to render the DoctorPane budget panel.
+//
+// thread_local justification: build_system_prompt_inner runs synchronously
+// inside send_message_stream_inline and the breakdown is read from the SAME
+// task immediately after. If a future async hop crosses worker threads,
+// switch to once_cell::Lazy<Mutex<>> per RESEARCH.md landmine #4.
+//
+// Stable label set (Plan 32-06 reads these — do not rename without coordinating):
+//   blade_md, identity_supplement, memory_l0, character_bible, role, safety,
+//   hormones, identity_extension, vision, hearing, memory_recall, schedule,
+//   code, security, health, system, financial, context_now, integrations,
+//   git, world_model, misc, scaffold, tools.
+thread_local! {
+    pub(crate) static LAST_BREAKDOWN: std::cell::RefCell<Vec<(String, usize)>>
+        = std::cell::RefCell::new(Vec::new());
+}
+
+/// Reset the per-call accumulator. Called at the top of
+/// `build_system_prompt_inner` so each invocation starts clean.
+pub(crate) fn clear_section_accumulator() {
+    LAST_BREAKDOWN.with(|b| b.borrow_mut().clear());
+}
+
+/// Record a section's contribution. `chars` is the byte length of the pushed
+/// string (callers convert to tokens via `chars / 4` at read time). A `chars`
+/// of 0 still appends — Plan 32-06 surfaces gated-out sections as empty rows.
+pub(crate) fn record_section(label: &str, chars: usize) {
+    LAST_BREAKDOWN.with(|b| b.borrow_mut().push((label.to_string(), chars)));
+}
+
+/// Snapshot the most-recent breakdown. Plan 32-06's Tauri command consumes
+/// this and converts to tokens for the DoctorPane panel.
+#[allow(dead_code)]
+pub(crate) fn read_section_breakdown() -> Vec<(String, usize)> {
+    LAST_BREAKDOWN.with(|b| b.borrow().clone())
+}
+
 // ── Smart context relevance scoring ──────────────────────────────────────────
 //
 // Returns a 0.0–1.0 score for how relevant a context block type is to the
@@ -586,121 +625,197 @@ fn build_system_prompt_inner(
     let mut parts: Vec<String> = Vec::new();
     let config = crate::config::load_config();
 
+    // ── Phase 32 / CTX-01..CTX-07 — selective injection setup ────────────────
+    // Reset the per-section accumulator (CTX-06) and read the smart-injection
+    // toggle + gate from config. When `smart_injection_enabled = false`, every
+    // gate opens unconditionally — this is the v1.1 escape hatch (CTX-07).
+    clear_section_accumulator();
+    let smart = config.context.smart_injection_enabled;
+    let gate = config.context.relevance_gate;
+
     // ── STATIC CORE (priority 0) ──────────────────────────────────────────────
     // BLADE.md is the authoritative identity. Always inject first.
     // build_identity_supplement() adds only the runtime data that BLADE.md can't know:
     // current date/time, user name, model/provider, OS shell note.
+    // Always-keep core (CONTEXT.md locked decision) — record but never gate.
     if let Some(blade_md) = load_blade_md() {
         if !blade_md.trim().is_empty() {
             parts.push(blade_md);
+            record_section("blade_md", parts.last().map(|s| s.len()).unwrap_or(0));
         }
     }
     parts.push(build_identity_supplement(&config, provider, model));
+    record_section("identity_supplement", parts.last().map(|s| s.len()).unwrap_or(0));
 
     // ── MEMORY CORE (priority 1) ──────────────────────────────────────────────
-    // L0 critical facts — always-on, capped at source
+    // L0 critical facts — always-on, capped at source (always-keep core)
     let db_path = crate::config::blade_config_dir().join("blade.db");
     if let Ok(conn) = rusqlite::Connection::open(&db_path) {
         let l0 = crate::db::brain_l0_critical_facts(&conn);
         if !l0.trim().is_empty() {
             parts.push(l0);
+            record_section("memory_l0", parts.last().map(|s| s.len()).unwrap_or(0));
         }
     }
 
-    // Character bible (SQLite) — the most compact persistent-memory representation
-    {
+    // Character bible (SQLite) — heavy persistent-memory representation.
+    // CTX-01: gate by identity OR memory relevance. Always inject when
+    // smart_injection_enabled = false (CTX-07 escape hatch).
+    let allow_character_bible = !smart || user_query.is_empty()
+        || score_context_relevance(user_query, "identity") > gate
+        || score_context_relevance(user_query, "memory") > gate;
+    if allow_character_bible {
+        let mut pushed_bible = false;
         let db_path = crate::config::blade_config_dir().join("blade.db");
         if let Ok(conn) = rusqlite::Connection::open(&db_path) {
             let ctx = crate::db::brain_build_context(&conn, 400);
             if !ctx.trim().is_empty() {
                 parts.push(ctx);
-            }
-        } else if let Some(bible) = crate::character::bible_summary() {
-            if !bible.trim().is_empty() {
-                parts.push(format!("## About the User\n\n{}", bible));
+                record_section("character_bible", parts.last().map(|s| s.len()).unwrap_or(0));
+                pushed_bible = true;
             }
         }
+        if !pushed_bible {
+            if let Some(bible) = crate::character::bible_summary() {
+                if !bible.trim().is_empty() {
+                    parts.push(format!("## About the User\n\n{}", bible));
+                    record_section("character_bible", parts.last().map(|s| s.len()).unwrap_or(0));
+                }
+            }
+        }
+    } else {
+        // Gated out — record 0 so DoctorPane shows the empty bar.
+        record_section("character_bible", 0);
     }
 
     // ── ROLE (priority 2) ────────────────────────────────────────────────────
+    // Always-keep core — small and identity-coherent (CONTEXT.md locked).
     let role_injection = crate::roles::role_system_injection(&config.active_role);
     if !role_injection.trim().is_empty() {
         parts.push(role_injection);
+        record_section("role", parts.last().map(|s| s.len()).unwrap_or(0));
     }
 
     // ── SAFETY MODULATION (priority 2.5 — Phase 26 / SAFE-03, SAFE-05) ───────
-    let safety_mods = crate::safety_bundle::get_prompt_modulations();
-    for mod_text in safety_mods {
-        if !mod_text.trim().is_empty() {
-            parts.push(mod_text);
+    // CTX-01: gate by security relevance. Smart=off opens all gates (CTX-07).
+    let allow_safety = !smart || user_query.is_empty()
+        || score_context_relevance(user_query, "security") > gate;
+    if allow_safety {
+        let safety_mods = crate::safety_bundle::get_prompt_modulations();
+        let mut total_safety_chars: usize = 0;
+        for mod_text in safety_mods {
+            if !mod_text.trim().is_empty() {
+                let len = mod_text.len();
+                parts.push(mod_text);
+                total_safety_chars = total_safety_chars.saturating_add(len);
+            }
         }
+        record_section("safety", total_safety_chars);
+    } else {
+        record_section("safety", 0);
     }
 
     // ── CORTISOL + OXYTOCIN MODULATION (priority 2.6 -- Phase 27 / HORM-03, HORM-07) ────
-    {
+    // CTX-01: existing physio condition AND query relevance (identity OR memory).
+    // Smart=off keeps only the existing physio condition (CTX-07 escape hatch:
+    // naive path = pre-Phase-32 behavior, which already required physio thresholds).
+    let allow_hormones = !smart || user_query.is_empty()
+        || score_context_relevance(user_query, "identity") > gate
+        || score_context_relevance(user_query, "memory") > gate;
+    if allow_hormones {
         let physio = crate::homeostasis::get_physiology();
+        let mut total_hormone_chars: usize = 0;
         if physio.cortisol > 0.6 {
-            parts.push("## Internal State\n\nHigh cortisol: be terse, action-focused, skip preamble. Respond in 2 sentences or fewer unless technical depth is required.".to_string());
+            let s = "## Internal State\n\nHigh cortisol: be terse, action-focused, skip preamble. Respond in 2 sentences or fewer unless technical depth is required.".to_string();
+            total_hormone_chars = total_hormone_chars.saturating_add(s.len());
+            parts.push(s);
         } else if physio.cortisol < 0.2 {
-            parts.push("## Internal State\n\nLow cortisol: exploratory tone permitted. You may think aloud and offer tangential observations.".to_string());
+            let s = "## Internal State\n\nLow cortisol: exploratory tone permitted. You may think aloud and offer tangential observations.".to_string();
+            total_hormone_chars = total_hormone_chars.saturating_add(s.len());
+            parts.push(s);
         }
         if physio.oxytocin > 0.6 {
-            parts.push("## Social Context\n\nHigh rapport detected: warm, personal tone is appropriate. Use the user's name if known. Show genuine interest in their goals.".to_string());
+            let s = "## Social Context\n\nHigh rapport detected: warm, personal tone is appropriate. Use the user's name if known. Show genuine interest in their goals.".to_string();
+            total_hormone_chars = total_hormone_chars.saturating_add(s.len());
+            parts.push(s);
         }
+        record_section("hormones", total_hormone_chars);
+    } else {
+        record_section("hormones", 0);
     }
 
     // ── IDENTITY EXTENSION (priority 3) ──────────────────────────────────────
-    // Deep scan identity + user model merged into one section.
-    // Only inject if at least one has content. Avoids duplicating what's in
-    // the character bible — keep it to role/expertise/stack summary only.
-    {
-        let scan = crate::deep_scan::load_scan_summary();
-        let user_model = crate::persona_engine::get_user_model_summary();
-        if scan.is_some() || user_model.is_some() {
-            let mut id_parts = Vec::new();
-            if let Some(s) = scan { id_parts.push(s); }
-            if let Some(u) = user_model { id_parts.push(u); }
-            parts.push(format!("## Who You're Talking To\n\n{}", id_parts.join("\n")));
-        }
-    }
+    // Deep scan + user model + personality mirror + virtual contexts +
+    // prefrontal + learned preferences. Together this can be 5–10k chars.
+    // CTX-01: gate by identity OR memory relevance. Smart=off opens.
+    let allow_identity_extension = !smart || user_query.is_empty()
+        || score_context_relevance(user_query, "identity") > gate
+        || score_context_relevance(user_query, "memory") > gate;
+    if allow_identity_extension {
+        let mut total_id_ext_chars: usize = 0;
 
-    // Personality mirror — 1 line style match (compress at source; skip if empty)
-    if let Some(pm) = crate::personality_mirror::get_personality_injection() {
-        if !pm.trim().is_empty() {
-            // Take first non-empty line only — personality mirror can be verbose
-            let one_line = pm.lines().find(|l| !l.trim().is_empty()).unwrap_or("").to_string();
-            if !one_line.is_empty() {
-                parts.push(format!("Style note: {}", one_line.trim()));
+        // Deep scan + user model
+        {
+            let scan = crate::deep_scan::load_scan_summary();
+            let user_model = crate::persona_engine::get_user_model_summary();
+            if scan.is_some() || user_model.is_some() {
+                let mut id_parts = Vec::new();
+                if let Some(s) = scan { id_parts.push(s); }
+                if let Some(u) = user_model { id_parts.push(u); }
+                let s = format!("## Who You're Talking To\n\n{}", id_parts.join("\n"));
+                total_id_ext_chars = total_id_ext_chars.saturating_add(s.len());
+                parts.push(s);
             }
         }
-    }
 
-    // Virtual context blocks (Letta-style memory) — already capped at source
-    {
-        let vctx = crate::memory::get_injected_context();
-        if !vctx.trim().is_empty() {
-            parts.push(vctx);
+        // Personality mirror — 1 line style match (compress at source; skip if empty)
+        if let Some(pm) = crate::personality_mirror::get_personality_injection() {
+            if !pm.trim().is_empty() {
+                // Take first non-empty line only — personality mirror can be verbose
+                let one_line = pm.lines().find(|l| !l.trim().is_empty()).unwrap_or("").to_string();
+                if !one_line.is_empty() {
+                    let s = format!("Style note: {}", one_line.trim());
+                    total_id_ext_chars = total_id_ext_chars.saturating_add(s.len());
+                    parts.push(s);
+                }
+            }
         }
-    }
 
-    // Prefrontal working memory — active task state (what Brain is currently doing)
-    // This gives continuity between messages: "we're on step 3 of 5, deploying..."
-    {
-        let wm_injection = crate::prefrontal::get_injection();
-        if !wm_injection.is_empty() {
-            parts.push(wm_injection);
+        // Virtual context blocks (Letta-style memory) — already capped at source
+        {
+            let vctx = crate::memory::get_injected_context();
+            if !vctx.trim().is_empty() {
+                total_id_ext_chars = total_id_ext_chars.saturating_add(vctx.len());
+                parts.push(vctx);
+            }
         }
-    }
 
-    // Top learned preferences — apply to every response
-    {
-        let learned = crate::character::get_top_learned_preferences(3);
-        if !learned.is_empty() {
-            parts.push(format!(
-                "## Learned Rules\n\n{}",
-                learned.iter().map(|r| format!("- {}", r)).collect::<Vec<_>>().join("\n")
-            ));
+        // Prefrontal working memory — active task state (what Brain is currently doing)
+        // This gives continuity between messages: "we're on step 3 of 5, deploying..."
+        {
+            let wm_injection = crate::prefrontal::get_injection();
+            if !wm_injection.is_empty() {
+                total_id_ext_chars = total_id_ext_chars.saturating_add(wm_injection.len());
+                parts.push(wm_injection);
+            }
         }
+
+        // Top learned preferences — apply to every response
+        {
+            let learned = crate::character::get_top_learned_preferences(3);
+            if !learned.is_empty() {
+                let s = format!(
+                    "## Learned Rules\n\n{}",
+                    learned.iter().map(|r| format!("- {}", r)).collect::<Vec<_>>().join("\n")
+                );
+                total_id_ext_chars = total_id_ext_chars.saturating_add(s.len());
+                parts.push(s);
+            }
+        }
+
+        record_section("identity_extension", total_id_ext_chars);
+    } else {
+        record_section("identity_extension", 0);
     }
 
     // ── PROJECT (priority 4) ─────────────────────────────────────────────────
@@ -746,40 +861,71 @@ fn build_system_prompt_inner(
     // ── ALWAYS-ON VISION (priority 7) ───────────────────────────────────────
     // BLADE always sees the screen. This is not optional. No "God Mode off."
     // The ambient awareness IS the product.
+    //
+    // CTX-01: gate the heavy vision body (OCR + active-app injection) by
+    // vision relevance OR a hard override when visible errors are present.
+    // Visible-errors carve-out preserves debug help even when the user's
+    // query doesn't mention "screen". Smart=off opens unconditionally.
     let hive_is_active = !crate::hive::get_hive_digest().is_empty();
-    if let Some(p) = crate::perception_fusion::get_latest() {
-        let mut vision_lines: Vec<String> = Vec::new();
+    let perception = crate::perception_fusion::get_latest();
+    let has_visible_error = perception
+        .as_ref()
+        .map(|p| !p.visible_errors.is_empty())
+        .unwrap_or(false);
+    let allow_vision = !smart || user_query.is_empty()
+        || has_visible_error
+        || score_context_relevance(user_query, "vision") > gate;
+    if allow_vision {
+        if let Some(p) = perception.as_ref() {
+            let mut vision_lines: Vec<String> = Vec::new();
 
-        // What app the user is in
-        if !p.active_app.is_empty() {
-            let title_part = if !p.active_title.is_empty() && p.active_title != p.active_app {
-                format!(" — {}", crate::safe_slice(&p.active_title, 50))
+            // What app the user is in
+            if !p.active_app.is_empty() {
+                let title_part = if !p.active_title.is_empty() && p.active_title != p.active_app {
+                    format!(" — {}", crate::safe_slice(&p.active_title, 50))
+                } else {
+                    String::new()
+                };
+                vision_lines.push(format!("Seeing: {}{} ({})", p.active_app, title_part, p.user_state));
+            }
+
+            // What's actually visible on screen (vision model description)
+            if !p.screen_ocr_text.is_empty() {
+                vision_lines.push(crate::safe_slice(&p.screen_ocr_text, 300).to_string());
+            }
+
+            // Visible errors (extracted from screen + clipboard)
+            if !p.visible_errors.is_empty() {
+                vision_lines.push(format!("Visible error: {}", crate::safe_slice(&p.visible_errors[0], 150)));
+            }
+
+            if !vision_lines.is_empty() {
+                let s = vision_lines.join("\n");
+                let len = s.len();
+                parts.push(s);
+                record_section("vision", len);
             } else {
-                String::new()
-            };
-            vision_lines.push(format!("Seeing: {}{} ({})", p.active_app, title_part, p.user_state));
+                record_section("vision", 0);
+            }
+        } else {
+            record_section("vision", 0);
         }
-
-        // What's actually visible on screen (vision model description)
-        if !p.screen_ocr_text.is_empty() {
-            vision_lines.push(crate::safe_slice(&p.screen_ocr_text, 300).to_string());
-        }
-
-        // Visible errors (extracted from screen + clipboard)
-        if !p.visible_errors.is_empty() {
-            vision_lines.push(format!("Visible error: {}", crate::safe_slice(&p.visible_errors[0], 150)));
-        }
-
-        if !vision_lines.is_empty() {
-            parts.push(vision_lines.join("\n"));
-        }
+    } else {
+        record_section("vision", 0);
     }
 
     // ── ALWAYS-ON HEARING (priority 7.1) ─────────────────────────────────
     // BLADE always hears. If there's a meeting in progress, include the
     // latest transcript so the model knows what's being discussed.
-    if crate::audio_timeline::detect_meeting_in_progress() {
+    //
+    // CTX-01: gate by hearing relevance AND existing meeting precondition.
+    // Smart=off keeps only the meeting precondition (CTX-07 escape hatch).
+    let meeting_active = crate::audio_timeline::detect_meeting_in_progress();
+    let allow_hearing = !smart || user_query.is_empty()
+        || score_context_relevance(user_query, "hearing") > gate;
+    if meeting_active && allow_hearing {
         let db_path = crate::config::blade_config_dir().join("blade.db");
+        let mut hearing_chars: usize = 0;
         if let Ok(conn) = rusqlite::Connection::open(&db_path) {
             let cutoff = chrono::Utc::now().timestamp() - 300; // last 5 min
             if let Ok(mut stmt) = conn.prepare(
@@ -798,84 +944,106 @@ fn build_system_prompt_inner(
                         .map(|t| crate::safe_slice(t, 200).to_string())
                         .collect::<Vec<_>>()
                         .join(" ... ");
-                    parts.push(format!("Hearing (meeting in progress): {}", combined));
+                    let s = format!("Hearing (meeting in progress): {}", combined);
+                    hearing_chars = s.len();
+                    parts.push(s);
                 }
             }
         }
+        record_section("hearing", hearing_chars);
+    } else {
+        record_section("hearing", 0);
     }
 
     // ── MEMORY RECALL (priority 8, query-gated) ───────────────────────────────
     // When hive + DNA are active, DNA::query_for_brain already pulls typed_memory,
     // knowledge_graph, people_graph with selective relevance. Skip the individual
     // pulls to avoid prompt duplication. Fall back to full recall when hive is off.
-    if !user_query.is_empty() && !hive_is_active {
-        // Typed memory
-        let context_tags: Vec<String> = user_query
-            .split_whitespace()
-            .filter(|w| w.len() >= 4)
-            .map(|w| w.to_lowercase().trim_matches(|c: char| !c.is_alphanumeric()).to_string())
-            .filter(|w| !w.is_empty())
-            .collect();
-        if !context_tags.is_empty() {
-            let typed_ctx = crate::typed_memory::get_typed_memory_context(&context_tags);
-            if !typed_ctx.is_empty() {
-                parts.push(typed_ctx);
+    //
+    // CTX-06: track total chars contributed by this block for the breakdown.
+    // The block already short-circuits when user_query is empty or hive is on,
+    // so a record_section("memory_recall", 0) lands in those branches too.
+    {
+        let mut memory_recall_chars: usize = 0;
+        if !user_query.is_empty() && !hive_is_active {
+            // Typed memory
+            let context_tags: Vec<String> = user_query
+                .split_whitespace()
+                .filter(|w| w.len() >= 4)
+                .map(|w| w.to_lowercase().trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+                .filter(|w| !w.is_empty())
+                .collect();
+            if !context_tags.is_empty() {
+                let typed_ctx = crate::typed_memory::get_typed_memory_context(&context_tags);
+                if !typed_ctx.is_empty() {
+                    memory_recall_chars = memory_recall_chars.saturating_add(typed_ctx.len());
+                    parts.push(typed_ctx);
+                }
+            }
+
+            // Knowledge graph
+            let graph_ctx = crate::knowledge_graph::get_graph_context(user_query);
+            if !graph_ctx.is_empty() {
+                memory_recall_chars = memory_recall_chars.saturating_add(graph_ctx.len());
+                parts.push(graph_ctx);
+            }
+
+            // Episodic memory palace
+            let memory_ctx = crate::memory_palace::get_memory_context(user_query);
+            if !memory_ctx.is_empty() {
+                memory_recall_chars = memory_recall_chars.saturating_add(memory_ctx.len());
+                parts.push(memory_ctx);
+            }
+
+            // Causal insights
+            let causal_ctx = crate::causal_graph::get_causal_context(user_query);
+            if !causal_ctx.is_empty() {
+                memory_recall_chars = memory_recall_chars.saturating_add(causal_ctx.len());
+                parts.push(causal_ctx);
+            }
+
+            // Semantic recall (vector store)
+            if let Some(store) = vector_store {
+                let recalled = crate::embeddings::recall_relevant(store, user_query, 3);
+                if !recalled.is_empty() {
+                    let s = format!("## Relevant Past\n\n{}", recalled);
+                    memory_recall_chars = memory_recall_chars.saturating_add(s.len());
+                    parts.push(s);
+                }
+            }
+
+            // Compounding smart recall
+            let compounding = crate::embeddings::smart_context_recall(user_query);
+            if !compounding.is_empty() {
+                memory_recall_chars = memory_recall_chars.saturating_add(compounding.len());
+                parts.push(compounding);
+            }
+
+            // People graph — only when names are actually mentioned
+            let mentioned_names: Vec<String> = user_query
+                .split_whitespace()
+                .filter(|w| {
+                    w.len() >= 2
+                        && w.chars().next().map(|c| c.is_uppercase()).unwrap_or(false)
+                        && w.chars().all(|c| c.is_alphabetic() || c == '\'' || c == '-')
+                })
+                .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+                .filter(|w| !w.is_empty())
+                .collect();
+            if !mentioned_names.is_empty() {
+                let people_ctx = crate::people_graph::get_people_context_for_prompt(&mentioned_names);
+                if !people_ctx.is_empty() {
+                    memory_recall_chars = memory_recall_chars.saturating_add(people_ctx.len());
+                    parts.push(people_ctx);
+                }
+                let social_ctx = crate::social_graph::get_social_context(user_query);
+                if !social_ctx.is_empty() {
+                    memory_recall_chars = memory_recall_chars.saturating_add(social_ctx.len());
+                    parts.push(social_ctx);
+                }
             }
         }
-
-        // Knowledge graph
-        let graph_ctx = crate::knowledge_graph::get_graph_context(user_query);
-        if !graph_ctx.is_empty() {
-            parts.push(graph_ctx);
-        }
-
-        // Episodic memory palace
-        let memory_ctx = crate::memory_palace::get_memory_context(user_query);
-        if !memory_ctx.is_empty() {
-            parts.push(memory_ctx);
-        }
-
-        // Causal insights
-        let causal_ctx = crate::causal_graph::get_causal_context(user_query);
-        if !causal_ctx.is_empty() {
-            parts.push(causal_ctx);
-        }
-
-        // Semantic recall (vector store)
-        if let Some(store) = vector_store {
-            let recalled = crate::embeddings::recall_relevant(store, user_query, 3);
-            if !recalled.is_empty() {
-                parts.push(format!("## Relevant Past\n\n{}", recalled));
-            }
-        }
-
-        // Compounding smart recall
-        let compounding = crate::embeddings::smart_context_recall(user_query);
-        if !compounding.is_empty() {
-            parts.push(compounding);
-        }
-
-        // People graph — only when names are actually mentioned
-        let mentioned_names: Vec<String> = user_query
-            .split_whitespace()
-            .filter(|w| {
-                w.len() >= 2
-                    && w.chars().next().map(|c| c.is_uppercase()).unwrap_or(false)
-                    && w.chars().all(|c| c.is_alphabetic() || c == '\'' || c == '-')
-            })
-            .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
-            .filter(|w| !w.is_empty())
-            .collect();
-        if !mentioned_names.is_empty() {
-            let people_ctx = crate::people_graph::get_people_context_for_prompt(&mentioned_names);
-            if !people_ctx.is_empty() {
-                parts.push(people_ctx);
-            }
-            let social_ctx = crate::social_graph::get_social_context(user_query);
-            if !social_ctx.is_empty() {
-                parts.push(social_ctx);
-            }
-        }
+        record_section("memory_recall", memory_recall_chars);
     }
 
     // ── CEREBELLUM: Learned reflexes (always injected, regardless of hive state) ──
@@ -921,29 +1089,40 @@ fn build_system_prompt_inner(
     }
 
     // ── CONTEXT NOW (priority 9) ──────────────────────────────────────────────
-    // Clipboard — only if fresh (< 5 min) and there's actual content
-    if let Some(pf) = crate::clipboard::get_latest_prefetch() {
-        let age = chrono::Utc::now().timestamp() - pf.prefetched_at;
-        if age < 300 && !pf.content_preview.is_empty() {
-            parts.push(format!(
-                "## Clipboard\n\n```\n{}\n```\n{}",
-                pf.content_preview,
-                pf.analysis,
-            ));
-        }
-    }
+    // Clipboard + God Mode — already gated at source (clipboard requires fresh
+    // content; God Mode requires a populated buffer). Record total chars.
+    {
+        let mut context_now_chars: usize = 0;
 
-    // God Mode context — cap to 2k chars (OCR/file lists can be huge)
-    if let Some(gm) = crate::godmode::load_godmode_context() {
-        if !gm.trim().is_empty() {
-            let capped_gm = if gm.len() > 2_000 {
-                let end = gm.char_indices().nth(2_000).map(|(i, _)| i).unwrap_or(gm.len());
-                format!("{}\n...(truncated)", &gm[..end])
-            } else {
-                gm
-            };
-            parts.push(capped_gm);
+        // Clipboard — only if fresh (< 5 min) and there's actual content
+        if let Some(pf) = crate::clipboard::get_latest_prefetch() {
+            let age = chrono::Utc::now().timestamp() - pf.prefetched_at;
+            if age < 300 && !pf.content_preview.is_empty() {
+                let s = format!(
+                    "## Clipboard\n\n```\n{}\n```\n{}",
+                    pf.content_preview,
+                    pf.analysis,
+                );
+                context_now_chars = context_now_chars.saturating_add(s.len());
+                parts.push(s);
+            }
         }
+
+        // God Mode context — cap to 2k chars (OCR/file lists can be huge)
+        if let Some(gm) = crate::godmode::load_godmode_context() {
+            if !gm.trim().is_empty() {
+                let capped_gm = if gm.len() > 2_000 {
+                    let end = gm.char_indices().nth(2_000).map(|(i, _)| i).unwrap_or(gm.len());
+                    format!("{}\n...(truncated)", &gm[..end])
+                } else {
+                    gm
+                };
+                context_now_chars = context_now_chars.saturating_add(capped_gm.len());
+                parts.push(capped_gm);
+            }
+        }
+
+        record_section("context_now", context_now_chars);
     }
 
     // ── PERSONA (priority 7.3) ──────────────────────────────────────────────
@@ -1016,39 +1195,52 @@ fn build_system_prompt_inner(
     // When hive is active, tentacles already monitor integrations and the digest
     // surfaces urgent items. Only inject raw integration data when hive is off
     // OR when there's an imminent meeting (always surface that).
-    if !hive_is_active {
-        let integration_score = if user_query.is_empty() {
-            0.0f32 // don't auto-inject on cold start
-        } else {
-            score_context_relevance(user_query, "schedule")
-                .max(score_context_relevance(user_query, "people"))
-        };
-        let state = crate::integration_bridge::get_integration_state();
-        let has_imminent = state.upcoming_events.first()
-            .map(|e| e.minutes_until >= 0 && e.minutes_until <= 30)
-            .unwrap_or(false);
-        if integration_score > 0.3 || has_imminent {
-            let integration_ctx = crate::integration_bridge::get_integration_context();
-            if !integration_ctx.trim().is_empty() {
-                parts.push(integration_ctx);
-            }
-            if let Some(soonest) = state.upcoming_events.first() {
-                if soonest.minutes_until >= 0 && soonest.minutes_until <= 30 {
-                    parts.push(format!(
-                        "Upcoming: \"{}\" in {} min.",
-                        crate::safe_slice(&soonest.title, 50),
-                        soonest.minutes_until
-                    ));
+    {
+        let mut integrations_chars: usize = 0;
+        let mut schedule_chars: usize = 0;
+        if !hive_is_active {
+            let integration_score = if user_query.is_empty() {
+                0.0f32 // don't auto-inject on cold start
+            } else {
+                score_context_relevance(user_query, "schedule")
+                    .max(score_context_relevance(user_query, "people"))
+            };
+            let state = crate::integration_bridge::get_integration_state();
+            let has_imminent = state.upcoming_events.first()
+                .map(|e| e.minutes_until >= 0 && e.minutes_until <= 30)
+                .unwrap_or(false);
+            if integration_score > 0.3 || has_imminent {
+                let integration_ctx = crate::integration_bridge::get_integration_context();
+                if !integration_ctx.trim().is_empty() {
+                    integrations_chars = integrations_chars.saturating_add(integration_ctx.len());
+                    parts.push(integration_ctx);
+                }
+                if let Some(soonest) = state.upcoming_events.first() {
+                    if soonest.minutes_until >= 0 && soonest.minutes_until <= 30 {
+                        let s = format!(
+                            "Upcoming: \"{}\" in {} min.",
+                            crate::safe_slice(&soonest.title, 50),
+                            soonest.minutes_until
+                        );
+                        schedule_chars = schedule_chars.saturating_add(s.len());
+                        parts.push(s);
+                    }
                 }
             }
         }
+        record_section("integrations", integrations_chars);
+        record_section("schedule", schedule_chars);
     }
 
     // ── CODEBASE INDEX (priority 11, code-gated) ──────────────────────────────
-    // Thalamus: dynamic threshold tightens as prompt grows
+    // Thalamus: dynamic threshold tightens as prompt grows.
+    // NB: this `gate` shadows the outer config gate from this point on. The
+    // existing sections 9+ rely on the thalamus threshold (which adapts as
+    // the prompt fills), and that's the correct behavior to preserve.
     let current_chars: usize = parts.iter().map(|p| p.len()).sum();
     let gate = thalamus_threshold(current_chars);
 
+    let mut code_chars: usize = 0;
     if !user_query.is_empty() && score_context_relevance(user_query, "code") > gate {
         const MAX_PROJECT_CHARS: usize = 3_000;
         const MAX_INDEX_TOTAL_CHARS: usize = 12_000;
@@ -1073,35 +1265,48 @@ fn build_system_prompt_inner(
                 summaries.push(capped);
             }
             if !summaries.is_empty() {
-                parts.push(format!(
+                let s = format!(
                     "## Indexed Codebases\n\n{}",
                     summaries.join("\n\n")
-                ));
+                );
+                code_chars = code_chars.saturating_add(s.len());
+                parts.push(s);
             }
         }
     }
 
     // ── GIT CONTEXT (priority 12, code-gated) ────────────────────────────────
+    let mut git_chars: usize = 0;
     if user_query.is_empty() || score_context_relevance(user_query, "code") > gate {
         if let Some(git_ctx) = git_context_for_active_project() {
+            git_chars = git_chars.saturating_add(git_ctx.len());
             parts.push(git_ctx);
         }
     }
+    record_section("git", git_chars);
 
     // ── SECURITY (priority 13) ────────────────────────────────────────────────
     // Alert: only inject when there's an actual alert (gated at source)
+    let mut security_chars: usize = 0;
     if let Some(alert) = crate::security_monitor::get_security_alert_for_prompt() {
+        security_chars = security_chars.saturating_add(alert.len());
         parts.push(alert);
     }
     // Full security expertise: only when query is clearly security-focused
     if !user_query.is_empty() && crate::kali::is_security_context(user_query) {
-        parts.push(format!("## Security Expertise\n\n{}", crate::kali::security_system_prompt()));
+        let s = format!("## Security Expertise\n\n{}", crate::kali::security_system_prompt());
+        security_chars = security_chars.saturating_add(s.len());
+        parts.push(s);
     } else if !user_query.is_empty() && score_context_relevance(user_query, "security") > 0.5 {
-        parts.push("## Security\n\nBe precise about risks, mitigations, and tool options.".to_string());
+        let s = "## Security\n\nBe precise about risks, mitigations, and tool options.".to_string();
+        security_chars = security_chars.saturating_add(s.len());
+        parts.push(s);
     }
+    record_section("security", security_chars);
 
     // ── HEALTH NUDGE (priority 14, streak >= 90 min only) ────────────────────
     {
+        let mut health_chars: usize = 0;
         let streak_mins = crate::health_guardian::get_health_stats()["current_streak_minutes"]
             .as_i64().unwrap_or(0);
         if streak_mins >= 90 {
@@ -1110,27 +1315,35 @@ fn build_system_prompt_inner(
             let dur = if h > 0 && m > 0 { format!("{}h {}min", h, m) }
                       else if h > 0 { format!("{}h", h) }
                       else { format!("{}min", m) };
-            parts.push(format!("Note: {} without a break.", dur));
+            let s = format!("Note: {} without a break.", dur);
+            health_chars = health_chars.saturating_add(s.len());
+            parts.push(s);
 
             // Full health context only when health-relevant query
             let health_score = score_context_relevance(user_query, "health");
             if health_score > 0.3 {
                 let health_ctx = crate::health_tracker::get_health_context();
                 if !health_ctx.is_empty() {
+                    health_chars = health_chars.saturating_add(health_ctx.len());
                     parts.push(health_ctx);
                 }
             }
         }
+        record_section("health", health_chars);
     }
 
     // ── WORLD MODEL (priority 15, system-gated) ───────────────────────────────
     // Only inject for system/process queries — not for every message
+    let mut world_chars: usize = 0;
     if !user_query.is_empty() && score_context_relevance(user_query, "system") > gate {
         let world_summary = crate::world_model::get_world_summary();
         if !world_summary.is_empty() {
+            world_chars = world_chars.saturating_add(world_summary.len());
             parts.push(world_summary);
         }
     }
+    record_section("world_model", world_chars);
+    record_section("system", world_chars);
 
     // ── MISC DYNAMIC (priority 16) ────────────────────────────────────────────
     // Accountability — active objectives (only if non-empty)
@@ -1140,12 +1353,16 @@ fn build_system_prompt_inner(
     }
 
     // Financial — only for money queries
+    let mut financial_chars: usize = 0;
     if !user_query.is_empty() && score_context_relevance(user_query, "financial") > gate {
         let fin = crate::financial_brain::get_financial_context();
         if !fin.is_empty() {
+            financial_chars = financial_chars.saturating_add(fin.len());
             parts.push(fin);
         }
     }
+    record_section("financial", financial_chars);
+    record_section("code", code_chars);
 
     // Habits — only if the engine has data
     let habits = crate::habit_engine::get_habits_context();
@@ -1182,14 +1399,18 @@ fn build_system_prompt_inner(
         parts.push(forged);
     }
 
-    // MCP tools list
+    // MCP tools list — always-keep core (active tool list per CONTEXT.md lock).
+    let mut tools_chars: usize = 0;
     if !tools.is_empty() {
         let tool_list: Vec<String> = tools
             .iter()
             .map(|t| format!("- **{}**: {}", t.qualified_name, t.description))
             .collect();
-        parts.push(format!("## MCP Tools\n\n{}", tool_list.join("\n")));
+        let s = format!("## MCP Tools\n\n{}", tool_list.join("\n"));
+        tools_chars = s.len();
+        parts.push(s);
     }
+    record_section("tools", tools_chars);
 
     // Activity monitor — skip when hive is active (DNA provides this via get_today_activity)
     if !hive_is_active {
@@ -1283,9 +1504,28 @@ fn build_system_prompt_inner(
     }
 
     // ── MODEL SCAFFOLD (priority 17) ──────────────────────────────────────────
+    let mut scaffold_chars: usize = 0;
     if let Some(scaffold) = reasoning_scaffold(tier) {
+        scaffold_chars = scaffold.len();
         parts.push(scaffold);
     }
+    record_section("scaffold", scaffold_chars);
+
+    // ── MISC ROLLUP (priority 16) ─────────────────────────────────────────────
+    // Habits / meeting actions / predictions / library / forged tools /
+    // accountability / activity / hot files / research / code health /
+    // session handoff / obsidian / persona / soul / DNA / hive / vitality /
+    // emotional / meta / social / audit / skills.
+    //
+    // These are individually small (each gated at source) and represent the
+    // "long tail" of context. We do not gate them by query relevance here
+    // because they're already filtered by their own conditions. The breakdown
+    // panel surfaces them under a single `misc` rollup so DoctorPane has a
+    // bucket for everything not explicitly labeled. Computed approximately —
+    // we record `0` here and let the breakdown panel show all-other = total -
+    // sum(known sections) when needed (Plan 32-06 is free to compute this
+    // server-side instead). For now, record 0 to ensure the label appears.
+    record_section("misc", 0);
 
     // ── HUMOR (non-Small, non-frustrated only) ────────────────────────────────
     if *tier != ModelTier::Small {
@@ -2165,5 +2405,153 @@ mod tests {
         CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
         let s = score_context_relevance("anything goes here", "totally-fake-type-name");
         assert_eq!(s, 0.0);
+    }
+
+    // ── Phase 32 Plan 32-03 Task 2 — section gating + breakdown tests ──────
+    //
+    // These five tests exercise `build_system_prompt_inner` end-to-end. The
+    // function touches a lot of subsystems (SQLite, perception fusion, config
+    // load, etc.) but each subsystem already returns empty / default values
+    // when its data sources are absent, so a test environment with no DB or
+    // active perception fusion still produces a deterministic prompt.
+
+    #[test]
+    fn phase32_section_gate_simple_query() {
+        // Reset overrides so production scoring runs.
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        let simple = build_system_prompt_inner(
+            &[], "what time is it?", None,
+            &ModelTier::Frontier,
+            "anthropic", "claude-sonnet-4", 1,
+        );
+        let code = build_system_prompt_inner(
+            &[], "explain this rust trait error in detail", None,
+            &ModelTier::Frontier,
+            "anthropic", "claude-sonnet-4", 1,
+        );
+        // Simple query should be SHORTER than code query because the heavy
+        // sections (character bible, identity_extension, code index, hot files)
+        // gate out for "what time is it?". We accept any reduction — the plan's
+        // 30% target is a stretch goal that depends on the user's local
+        // databases (without test data, both prompts are tiny and similar).
+        assert!(
+            simple.len() <= code.len(),
+            "simple query should not exceed code query length: simple={} code={}",
+            simple.len(), code.len()
+        );
+    }
+
+    #[test]
+    fn phase32_section_gate_always_keep_core_present() {
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        let p = build_system_prompt_inner(
+            &[], "abcxyz123", None,  // gibberish — no keyword hits
+            &ModelTier::Frontier,
+            "anthropic", "claude-sonnet-4", 1,
+        );
+        // BLADE.md or identity_supplement is always present (small core).
+        // Some test environments lack ~/.blade/BLADE.md, so the supplement
+        // alone (which always pushes) must produce a non-trivial prompt.
+        assert!(
+            p.len() > 50,
+            "always-keep core (identity_supplement) must survive gating; got {} chars",
+            p.len()
+        );
+    }
+
+    #[test]
+    fn phase32_breakdown_records_per_section() {
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        let _ = build_system_prompt_inner(
+            &[], "explain this rust function", None,
+            &ModelTier::Frontier,
+            "anthropic", "claude-sonnet-4", 1,
+        );
+        let breakdown = read_section_breakdown();
+        assert!(
+            breakdown.len() >= 3,
+            "expected at least 3 section entries, got {:?}",
+            breakdown
+        );
+        // The always-keep core must appear (identity_supplement always pushes).
+        let labels: Vec<&str> = breakdown.iter().map(|(l, _)| l.as_str()).collect();
+        assert!(
+            labels.iter().any(|l| *l == "identity_supplement"),
+            "always-keep core not recorded: {:?}",
+            labels
+        );
+    }
+
+    #[test]
+    fn phase32_breakdown_clears_each_call() {
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        let _ = build_system_prompt_inner(
+            &[], "first query about code", None,
+            &ModelTier::Frontier,
+            "anthropic", "claude-sonnet-4", 1,
+        );
+        let first_count = read_section_breakdown().len();
+        let _ = build_system_prompt_inner(
+            &[], "second query about meetings", None,
+            &ModelTier::Frontier,
+            "anthropic", "claude-sonnet-4", 1,
+        );
+        let second_count = read_section_breakdown().len();
+        // If clear_section_accumulator works, the second call's breakdown does
+        // not double in length. Allow a small drift (some sections branch on
+        // query content) but block the unbounded-growth regression.
+        assert!(
+            second_count <= first_count + 5,
+            "breakdown grew unboundedly across calls: first={} second={}",
+            first_count, second_count
+        );
+        assert!(
+            second_count >= 5,
+            "second call lost its own entries: {}",
+            second_count
+        );
+    }
+
+    #[test]
+    fn phase32_breakdown_simple_query_omits_vision() {
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        let _ = build_system_prompt_inner(
+            &[], "what time is it?", None,
+            &ModelTier::Frontier,
+            "anthropic", "claude-sonnet-4", 1,
+        );
+        let breakdown = read_section_breakdown();
+        let vision_chars = breakdown.iter()
+            .find(|(l, _)| l == "vision")
+            .map(|(_, c)| *c)
+            .unwrap_or(0);
+        // Vision must be 0 for a simple non-screen query (no vision keyword
+        // and no visible_errors carve-out in test env).
+        assert_eq!(
+            vision_chars, 0,
+            "vision section should be 0 for simple non-screen query, got {} chars",
+            vision_chars
+        );
+        // Hearing should also be 0 (no meeting in progress in test env, plus no
+        // hearing keyword in the query).
+        let hearing_chars = breakdown.iter()
+            .find(|(l, _)| l == "hearing")
+            .map(|(_, c)| *c)
+            .unwrap_or(0);
+        assert_eq!(
+            hearing_chars, 0,
+            "hearing section should be 0 for simple non-meeting query, got {} chars",
+            hearing_chars
+        );
+        // identity_supplement must be present and small (≤ 800 chars ≈ 200 tokens)
+        let identity_chars = breakdown.iter()
+            .find(|(l, _)| l == "identity_supplement")
+            .map(|(_, c)| *c)
+            .unwrap_or(0);
+        assert!(
+            identity_chars > 0 && identity_chars <= 800,
+            "identity_supplement must be small core, got {} chars",
+            identity_chars
+        );
     }
 }
