@@ -862,6 +862,28 @@ fn build_system_prompt_inner(
         }
     }
 
+    // ── VITALITY BAND MODULATION (Phase 29 / D-07/D-08/D-09) ────────────
+    // Injects personality modulation notes based on current vitality band.
+    // Thriving/Dormant: no injection. Waning/Declining/Critical: scale response.
+    {
+        let vitality = crate::vitality_engine::get_vitality();
+        if let Some(note) = match vitality.band {
+            crate::vitality_engine::VitalityBand::Waning =>
+                Some("You are in a lower-energy state. Be efficient and focused."),
+            crate::vitality_engine::VitalityBand::Declining =>
+                Some("Your vitality is low. Focus on what the user asks. Save energy."),
+            crate::vitality_engine::VitalityBand::Critical =>
+                Some("I am not functioning at full capacity right now."),
+            _ => None,
+        } {
+            parts.push(format!("\n\n[Internal state: {}]", note));
+        }
+        // D-18: reincarnation context injection (once per reincarnation)
+        if vitality.reincarnation_count > 0 && vitality.needs_reincarnation_context {
+            parts.push("\n\n[Reincarnation context: You recently went dormant. Your memories and skills are intact, but your internal state has reset. You are rebuilding. Be curious about what changed while you were away.]".to_string());
+        }
+    }
+
     // ── Hive intelligence digest (priority 7.5) ────────────────────────────
     // The Hive's tentacles monitor platforms (Slack, GitHub, Email, etc.) and
     // heads synthesize cross-domain intelligence. This compact digest gives

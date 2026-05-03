@@ -249,6 +249,12 @@ async fn task_goal_strategy_review() -> String {
 
 /// Task 4 — Skill synthesis.
 async fn task_skill_synthesis(app: tauri::AppHandle) -> String {
+    // Phase 29: Declining band skips skill generation (D-08)
+    let vitality = crate::vitality_engine::get_vitality();
+    if vitality.scalar < 0.4 {
+        log::debug!("[dream_mode] vitality={:.2} < 0.4 -- skipping skill_synthesis (D-08)", vitality.scalar);
+        return "Skill synthesis skipped (low vitality)".to_string();
+    }
     crate::skill_engine::maybe_synthesize_skills(app).await;
     "Reviewed skill patterns".to_string()
 }
@@ -264,6 +270,11 @@ async fn task_skill_synthesis(app: tauri::AppHandle) -> String {
 /// Phase 24 — DREAM-01 prune pass.
 /// Sweeps .pending/ housekeeping first (Discretion item 4 LOCK).
 async fn task_skill_prune(_app: tauri::AppHandle) -> String {
+    // Phase 29: Declining band skips skill lifecycle tasks (D-08)
+    let vitality = crate::vitality_engine::get_vitality();
+    if vitality.scalar < 0.4 {
+        return "Skill prune skipped (low vitality)".to_string();
+    }
     let now = chrono::Utc::now().timestamp();
 
     // Top-of-cycle .pending/ housekeeping — 7-day mark + 30-day purge.
@@ -291,6 +302,11 @@ async fn task_skill_prune(_app: tauri::AppHandle) -> String {
 /// Phase 24 — DREAM-02 consolidation pass.
 /// Cap: 1 merge proposal per cycle (D-24-B).
 async fn task_skill_consolidate(_app: tauri::AppHandle) -> String {
+    // Phase 29: Declining band skips skill lifecycle tasks (D-08)
+    let vitality = crate::vitality_engine::get_vitality();
+    if vitality.scalar < 0.4 {
+        return "Skill consolidate skipped (low vitality)".to_string();
+    }
     let rows = crate::tool_forge::get_forged_tools();
     if rows.len() < 2 {
         crate::voyager_log::dream_consolidate(0, vec![]);
@@ -376,6 +392,11 @@ async fn task_skill_consolidate(_app: tauri::AppHandle) -> String {
 /// Phase 24 — DREAM-03 skill-from-trace pass.
 /// Cap: 1 generate proposal per cycle (D-24-B).
 async fn task_skill_from_trace(_app: tauri::AppHandle) -> String {
+    // Phase 29: Declining band skips skill lifecycle tasks (D-08)
+    let vitality = crate::vitality_engine::get_vitality();
+    if vitality.scalar < 0.4 {
+        return "Skill from-trace skipped (low vitality)".to_string();
+    }
     let now = chrono::Utc::now().timestamp();
     let traces = crate::skills::lifecycle::recent_unmatched_traces(now);
     let mut proposed: Vec<String> = Vec::new();
@@ -621,6 +642,20 @@ pub async fn run_dream_session(app: tauri::AppHandle) -> DreamSession {
             tasks_completed: Vec::new(),
             insights: Vec::new(),
             status: "skipped".to_string(),
+        };
+    }
+
+    // Phase 29: Critical/Dormant bands skip dream consolidation (D-19)
+    let vitality = crate::vitality_engine::get_vitality();
+    if vitality.scalar < 0.2 {
+        log::info!("[dream_mode] vitality={:.2} < 0.2 -- skipping dream session (conserving)", vitality.scalar);
+        return DreamSession {
+            id: uuid_v4(),
+            started_at: now_secs(),
+            ended_at: Some(now_secs()),
+            tasks_completed: Vec::new(),
+            insights: Vec::new(),
+            status: "skipped_low_vitality".to_string(),
         };
     }
 
