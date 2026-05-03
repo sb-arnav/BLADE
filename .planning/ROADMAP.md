@@ -166,7 +166,7 @@ Plans:
 **Plans:** 6 plans
 
 Plans:
-- [ ] 29-00-PLAN.md — Wave 0: skeleton vitality_engine.rs types + eval fixture stubs + verify-vitality.sh Gate 37 + evals/mod.rs registration
+- [x] 29-00-PLAN.md — Wave 0: skeleton vitality_engine.rs types + eval fixture stubs + verify-vitality.sh Gate 37 + evals/mod.rs registration
 - [ ] 29-01-PLAN.md — Core vitality_engine.rs module: full implementation of VitalityState, SDT computation, drain, hysteretic bands, dormancy/reincarnation, SQLite persistence, lib.rs registration
 - [ ] 29-02-PLAN.md — Behavioral integration: hypothalamus_tick, safety_eval_drain, brain.rs, persona, evolution, dream_mode (session + skill synthesis), metacognition, proactive_engine, screen_timeline, integration_bridge
 - [ ] 29-03-PLAN.md — DoctorPane signal: SignalClass::Vitality in doctor.rs (4 sites), TypeScript union fix (active_inference + vitality), DoctorPane DISPLAY_NAME/ROW_ORDER
@@ -212,7 +212,7 @@ Plans:
 | 26. Safety Bundle | v1.4 | 4/4 | Complete | 2026-05-02 |
 | 27. Hormone Physiology | v1.4 | 5/5 | Complete    | 2026-05-02 |
 | 28. Active Inference Loop | v1.4 | 4/4 | Complete    | 2026-05-03 |
-| 29. Vitality Engine | v1.4 | 0/6 | Planned | - |
+| 29. Vitality Engine | v1.4 | 1/6 | In Progress | - |
 | 30. Organism Eval | v1.4 | 0/? | Not started | - |
 | 31. Close | v1.4 | 0/? | Not started | - |
 
