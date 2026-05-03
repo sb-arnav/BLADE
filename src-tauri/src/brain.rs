@@ -229,6 +229,32 @@ pub struct ContextBreakdown {
     pub timestamp_ms: i64,
 }
 
+// ── Phase 32 / CTX-07 regression seam ─────────────────────────────────────────
+// Test-only override of `score_context_relevance`. Production builds compile this
+// out entirely (`#[cfg(test)]`). Mirrors the `TEST_KEYRING_OVERRIDES` pattern at
+// config.rs:89-105.
+//
+// Usage from a test:
+//     CTX_SCORE_OVERRIDE.with(|cell| {
+//         *cell.borrow_mut() = Some(Box::new(|_q, _t| panic!("forced panic")));
+//     });
+//     // ... exercise build_system_prompt_inner; the gating must catch_unwind ...
+//     CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+//
+// Plan 32-07 uses this seam to enforce the v1.1 "smart path must never crash chat"
+// regression invariant (CTX-07).
+//
+// Caveat: tests run in parallel by default. Resetting the override to `None` at
+// the END of each test is critical — thread_local is per-thread and Rust's test
+// runner spawns one thread per test, so cross-test bleed is unusual but possible.
+// If flakes appear, switch to `serial_test` crate.
+#[cfg(test)]
+thread_local! {
+    pub static CTX_SCORE_OVERRIDE: std::cell::RefCell<
+        Option<Box<dyn Fn(&str, &str) -> f32>>
+    > = std::cell::RefCell::new(None);
+}
+
 // ── Smart context relevance scoring ──────────────────────────────────────────
 //
 // Returns a 0.0–1.0 score for how relevant a context block type is to the
@@ -247,6 +273,18 @@ pub struct ContextBreakdown {
 //   "system"      — world model, active processes, system info
 //   "research"    — ambient research, document library
 pub fn score_context_relevance(query: &str, context_type: &str) -> f32 {
+    // CTX-07 regression seam — consults thread_local override if set (test only).
+    // Production builds compile this entire block out via `#[cfg(test)]`.
+    #[cfg(test)]
+    {
+        let overridden = CTX_SCORE_OVERRIDE.with(|cell| {
+            cell.borrow().as_ref().map(|f| f(query, context_type))
+        });
+        if let Some(v) = overridden {
+            return v;
+        }
+    }
+
     let q = query.to_lowercase();
 
     // Keyword sets per context type
@@ -1994,5 +2032,61 @@ mod tests {
         assert_eq!(parsed.sections.get("vision"), Some(&0));
         assert_eq!(parsed.total_tokens, 1234);
         assert_eq!(parsed.model_context_window, 200_000);
+    }
+
+    // ── Phase 32 Plan 32-02 — CTX_SCORE_OVERRIDE seam tests ──────────────────
+    //
+    // These three tests prove the CTX-07 regression seam (Plan 32-07 uses it):
+    //   1. Default behavior is unchanged when no override is set.
+    //   2. An override returns a fixed value, bypassing the keyword scorer.
+    //   3. An override that panics is catchable via std::panic::catch_unwind,
+    //      which is the contract Plan 32-07's regression fixture relies on.
+    //
+    // CRITICAL: Each test resets `CTX_SCORE_OVERRIDE` to `None` BEFORE its
+    // assertion so a panic in this test doesn't poison sibling tests. Tests
+    // run in parallel and thread_local is per-thread, but defensive resets
+    // are cheap insurance.
+
+    #[test]
+    fn phase32_score_override_default_passthrough() {
+        // No override set — production keyword path runs.
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        let score = score_context_relevance("fix this rust compile error", "code");
+        assert!(
+            score >= 0.6,
+            "expected high score for rust+code keywords, got {}",
+            score
+        );
+    }
+
+    #[test]
+    fn phase32_score_override_returns_fixed_value() {
+        CTX_SCORE_OVERRIDE.with(|cell| {
+            *cell.borrow_mut() = Some(Box::new(|_q, _t| 0.42));
+        });
+        let score = score_context_relevance("anything at all", "totally-unknown-context-type");
+        // Reset BEFORE asserting so a failure here doesn't poison sibling tests.
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        assert!(
+            (score - 0.42).abs() < 1e-6,
+            "override not honored, got {}",
+            score
+        );
+    }
+
+    #[test]
+    fn phase32_score_override_can_panic_safely() {
+        CTX_SCORE_OVERRIDE.with(|cell| {
+            *cell.borrow_mut() = Some(Box::new(|_q, _t| panic!("forced override panic")));
+        });
+        let result = std::panic::catch_unwind(|| {
+            score_context_relevance("anything", "code")
+        });
+        // Reset BEFORE asserting so a failure here doesn't poison sibling tests.
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        assert!(
+            result.is_err(),
+            "expected panic to propagate via catch_unwind"
+        );
     }
 }
