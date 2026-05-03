@@ -803,3 +803,38 @@ export interface ConsentRequestPayload {
   request_id: string;                                  // correlation id for the consent response channel
   safety_override?: boolean;                           // Phase 26 — when true, AllowAlways must NOT be offered
 }
+
+// ---------------------------------------------------------------------------
+// Vitality engine (src-tauri/src/vitality_engine.rs -- Phase 29)
+// ---------------------------------------------------------------------------
+
+/** Mirrors Rust emit at `src-tauri/src/vitality_engine.rs` (blade_vitality_update).
+ *  Fires on band transitions or significant scalar changes (delta > 0.05).
+ *  VitalityIndicator in chat header subscribes for at-a-glance organism health.
+ *  @see .planning/phases/29-vitality-engine/29-CONTEXT.md §D-22 */
+export interface BladeVitalityUpdatePayload {
+  scalar: number;
+  band: 'Thriving' | 'Waning' | 'Declining' | 'Critical' | 'Dormant';
+  trend: number;
+  top_factor: string;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/vitality_engine.rs` (blade_dormancy).
+ *  Fires when vitality reaches 0.0 and dormancy sequence initiates.
+ *  @see .planning/phases/29-vitality-engine/29-CONTEXT.md §D-17 */
+export interface BladeDormancyPayload {
+  reincarnation_count: number;
+  top_drain_factors: string[];
+  total_uptime_secs: number;
+  vitality_at_dormancy: number;
+}
+
+/** Mirrors Rust emit at `src-tauri/src/vitality_engine.rs` (blade_reincarnation).
+ *  Fires on next launch after dormancy when reincarnation path completes.
+ *  Chat injects system message per D-23: "BLADE has reincarnated."
+ *  @see .planning/phases/29-vitality-engine/29-CONTEXT.md §D-18, §D-23 */
+export interface BladeReincarnationPayload {
+  reincarnation_count: number;
+  vitality_start: number;  // always 0.3
+  memories_intact: boolean;
+}

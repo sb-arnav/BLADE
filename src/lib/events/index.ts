@@ -216,6 +216,14 @@ export const BLADE_EVENTS = {
   // Payload: JarvisInterceptPayload (see ./payloads.ts).
   JARVIS_INTERCEPT: 'jarvis_intercept',
 
+  // ───── Phase 29 — Vitality Engine (VITA-05) ──────────────────────────────
+  // Emitted by vitality_engine.rs on band transitions, significant scalar
+  // changes, dormancy initiation, and reincarnation completion. Values match
+  // the Rust emit strings verbatim.
+  BLADE_VITALITY_UPDATE: 'blade_vitality_update',   // vitality_engine.rs — scalar/band/trend tick
+  BLADE_DORMANCY:        'blade_dormancy',           // vitality_engine.rs — dormancy sequence initiated
+  BLADE_REINCARNATION:   'blade_reincarnation',      // vitality_engine.rs — reincarnation completed on startup
+
   // ───── Phase 18 — JARVIS Consent Request (JARVIS-05) ─────────────────────
   // Emitted by jarvis_dispatch::emit_consent_request when consent_check returns
   // NeedsPrompt for a (intent_class, target_service) tuple. ChatPanel opens
