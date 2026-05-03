@@ -49,6 +49,7 @@ import { InputBar } from './InputBar';
 import { MessageList } from './MessageList';
 import { ToolApprovalDialog } from './ToolApprovalDialog';
 import { useChatCtx } from './useChat';
+import { VitalityIndicator } from './VitalityIndicator';
 
 export function ChatPanel() {
   const { routing, status } = useChatCtx();
@@ -94,6 +95,7 @@ export function ChatPanel() {
         ) : (
           <Pill>—</Pill>
         )}
+        <VitalityIndicator />
       </header>
       <CompactingIndicator />
       <MessageList />
