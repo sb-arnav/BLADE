@@ -43,7 +43,7 @@
 - [x] **Phase 25: Metacognitive Controller** — Confidence-delta tracking, verifier routing, gap surfacing, gap log → evolution.rs (completed 2026-05-02)
 - [x] **Phase 26: Safety Bundle** — Danger-triple HITL gate, mortality-salience cap, calm-vector bias, attachment guardrails, eval-gate vitality drain (completed 2026-05-02)
 - [x] **Phase 27: Hormone Physiology** — 7 hormones wired with decay + gain, emotion classifier, modulation effects on response style (completed 2026-05-02)
-- [ ] **Phase 28: Active Inference Loop** — Tentacle predictions, prediction-error → hormone bus, one closed demo loop, hippocampal memory replay
+- [x] **Phase 28: Active Inference Loop** — Tentacle predictions, prediction-error → hormone bus, one closed demo loop, hippocampal memory replay (completed 2026-05-03)
 - [ ] **Phase 29: Vitality Engine** — Scalar 0.0–1.0 with 5 behavioral bands, SDT replenishment, dormancy / reincarnation
 - [ ] **Phase 30: Organism Eval** — Vitality dynamics, hormone-behavior, persona-stability, safety bundle evals; verify:organism gate
 - [ ] **Phase 31: Close** — README cites research, CHANGELOG, milestone audit, phase archive
@@ -145,13 +145,13 @@ Plans:
   2. A tentacle that observes a deviation from its prediction produces a nonzero error value; that error is reflected in the hormone bus within the same cycle
   3. During dream_mode, high-prediction-error memories are replayed before low-error ones — the hippocampal weighting is verifiable via replay log
   4. A tentacle that observes consistent patterns updates its expected state — BLADE's predictions for a calendar tentacle improve after 5 repeated observations
-**Plans:** 4 plans
+**Plans:** 4/4 plans complete
 
 Plans:
-- [ ] 28-01-PLAN.md — Foundation: active_inference.rs core module, TentaclePrediction structs, OnceLock state, signal extraction, normalization, EMA learning, SQLite tables, homeostasis.rs update function
-- [ ] 28-02-PLAN.md — Integration wiring: hive_tick hook for prediction error computation, dream_mode hippocampal replay task
-- [ ] 28-03-PLAN.md — DoctorPane signal: SignalClass::ActiveInference in doctor.rs with compute function and exhaustiveness test update
-- [ ] 28-04-PLAN.md — Eval suite: 6 deterministic fixtures (AINF-01..06), verify-inference.sh Gate 36, verify:all chain update
+- [x] 28-01-PLAN.md — Foundation: active_inference.rs core module, TentaclePrediction structs, OnceLock state, signal extraction, normalization, EMA learning, SQLite tables, homeostasis.rs update function
+- [x] 28-02-PLAN.md — Integration wiring: hive_tick hook for prediction error computation, dream_mode hippocampal replay task
+- [x] 28-03-PLAN.md — DoctorPane signal: SignalClass::ActiveInference in doctor.rs with compute function and exhaustiveness test update
+- [x] 28-04-PLAN.md — Eval suite: 6 deterministic fixtures (AINF-01..06), verify-inference.sh Gate 36, verify:all chain update
 
 ### Phase 29: Vitality Engine
 
@@ -203,7 +203,7 @@ Plans:
 | 25. Metacognitive Controller | v1.4 | 3/3 | Complete    | 2026-05-02 |
 | 26. Safety Bundle | v1.4 | 4/4 | Complete | 2026-05-02 |
 | 27. Hormone Physiology | v1.4 | 5/5 | Complete    | 2026-05-02 |
-| 28. Active Inference Loop | v1.4 | 0/4 | Planned | - |
+| 28. Active Inference Loop | v1.4 | 4/4 | Complete    | 2026-05-03 |
 | 29. Vitality Engine | v1.4 | 0/? | Not started | - |
 | 30. Organism Eval | v1.4 | 0/? | Not started | - |
 | 31. Close | v1.4 | 0/? | Not started | - |

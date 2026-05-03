@@ -39,12 +39,12 @@
 
 ### Active Inference
 
-- [ ] **AINF-01**: Each Hive tentacle stores expected state (prediction) alongside observed state
-- [ ] **AINF-02**: Prediction error calculated as delta between expected and observed; normalized per tentacle type
-- [ ] **AINF-03**: Prediction errors feed into hormone bus — sustained high error raises cortisol/norepinephrine; low error raises serotonin
-- [ ] **AINF-04**: At least one closed loop demoable: calendar packed + Slack backlog → cortisol↑ → terse responses
-- [ ] **AINF-05**: Prediction-error-weighted memory replay during dream_mode (hippocampal analog)
-- [ ] **AINF-06**: Tentacle predictions update based on observed patterns — BLADE learns what to expect
+- [x] **AINF-01**: Each Hive tentacle stores expected state (prediction) alongside observed state
+- [x] **AINF-02**: Prediction error calculated as delta between expected and observed; normalized per tentacle type
+- [x] **AINF-03**: Prediction errors feed into hormone bus — sustained high error raises cortisol/norepinephrine; low error raises serotonin
+- [x] **AINF-04**: At least one closed loop demoable: calendar packed + Slack backlog → cortisol↑ → terse responses
+- [x] **AINF-05**: Prediction-error-weighted memory replay during dream_mode (hippocampal analog)
+- [x] **AINF-06**: Tentacle predictions update based on observed patterns — BLADE learns what to expect
 
 ### Vitality
 
@@ -115,12 +115,12 @@
 | HORM-07 | Phase 27 | Complete |
 | HORM-08 | Phase 27 | Complete |
 | HORM-09 | Phase 27 | Complete |
-| AINF-01 | Phase 28 | Pending |
-| AINF-02 | Phase 28 | Pending |
-| AINF-03 | Phase 28 | Pending |
-| AINF-04 | Phase 28 | Pending |
-| AINF-05 | Phase 28 | Pending |
-| AINF-06 | Phase 28 | Pending |
+| AINF-01 | Phase 28 | Complete |
+| AINF-02 | Phase 28 | Complete |
+| AINF-03 | Phase 28 | Complete |
+| AINF-04 | Phase 28 | Complete |
+| AINF-05 | Phase 28 | Complete |
+| AINF-06 | Phase 28 | Complete |
 | VITA-01 | Phase 29 | Pending |
 | VITA-02 | Phase 29 | Pending |
 | VITA-03 | Phase 29 | Pending |
