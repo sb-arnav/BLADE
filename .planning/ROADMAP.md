@@ -200,7 +200,13 @@ Plans:
   2. CHANGELOG v1.4 entry lists all delivered features and the verify gate count change (33 → 34)
   3. `milestones/v1.4-MILESTONE-AUDIT.md` is written with phase coverage, requirements 3-source cross-reference, static gates, and executive verdict
   4. Phase 25–31 directories archived to `milestones/v1.4-phases/`; cargo check + tsc --noEmit + verify:all all exit 0
-**Plans**: TBD
+**Plans:** 4 plans
+
+Plans:
+- [ ] 31-01-PLAN.md — README cognitive architecture + research citations
+- [ ] 31-02-PLAN.md — CHANGELOG v1.2/v1.3/v1.4 entries
+- [ ] 31-03-PLAN.md — Milestone audits + frozen snapshots
+- [ ] 31-04-PLAN.md — Phase archive + state update + verification
 
 ---
 
