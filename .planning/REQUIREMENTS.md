@@ -105,50 +105,50 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CTX-01 | — | Pending |
-| CTX-02 | — | Pending |
-| CTX-03 | — | Pending |
-| CTX-04 | — | Pending |
-| CTX-05 | — | Pending |
-| CTX-06 | — | Pending |
-| CTX-07 | — | Pending |
-| LOOP-01 | — | Pending |
-| LOOP-02 | — | Pending |
-| LOOP-03 | — | Pending |
-| LOOP-04 | — | Pending |
-| LOOP-05 | — | Pending |
-| LOOP-06 | — | Pending |
-| RES-01 | — | Pending |
-| RES-02 | — | Pending |
-| RES-03 | — | Pending |
-| RES-04 | — | Pending |
-| RES-05 | — | Pending |
-| DECOMP-01 | — | Pending |
-| DECOMP-02 | — | Pending |
-| DECOMP-03 | — | Pending |
-| DECOMP-04 | — | Pending |
-| DECOMP-05 | — | Pending |
-| INTEL-01 | — | Pending |
-| INTEL-02 | — | Pending |
-| INTEL-03 | — | Pending |
-| INTEL-04 | — | Pending |
-| INTEL-05 | — | Pending |
-| INTEL-06 | — | Pending |
-| SESS-01 | — | Pending |
-| SESS-02 | — | Pending |
-| SESS-03 | — | Pending |
-| SESS-04 | — | Pending |
-| EVAL-01 | — | Pending |
-| EVAL-02 | — | Pending |
-| EVAL-03 | — | Pending |
-| EVAL-04 | — | Pending |
-| EVAL-05 | — | Pending |
+| CTX-01 | Phase 32 | Pending |
+| CTX-02 | Phase 32 | Pending |
+| CTX-03 | Phase 32 | Pending |
+| CTX-04 | Phase 32 | Pending |
+| CTX-05 | Phase 32 | Pending |
+| CTX-06 | Phase 32 | Pending |
+| CTX-07 | Phase 32 | Pending |
+| LOOP-01 | Phase 33 | Pending |
+| LOOP-02 | Phase 33 | Pending |
+| LOOP-03 | Phase 33 | Pending |
+| LOOP-04 | Phase 33 | Pending |
+| LOOP-05 | Phase 33 | Pending |
+| LOOP-06 | Phase 33 | Pending |
+| RES-01 | Phase 34 | Pending |
+| RES-02 | Phase 34 | Pending |
+| RES-03 | Phase 34 | Pending |
+| RES-04 | Phase 34 | Pending |
+| RES-05 | Phase 34 | Pending |
+| SESS-01 | Phase 34 | Pending |
+| SESS-02 | Phase 34 | Pending |
+| SESS-03 | Phase 34 | Pending |
+| SESS-04 | Phase 34 | Pending |
+| DECOMP-01 | Phase 35 | Pending |
+| DECOMP-02 | Phase 35 | Pending |
+| DECOMP-03 | Phase 35 | Pending |
+| DECOMP-04 | Phase 35 | Pending |
+| DECOMP-05 | Phase 35 | Pending |
+| INTEL-01 | Phase 36 | Pending |
+| INTEL-02 | Phase 36 | Pending |
+| INTEL-03 | Phase 36 | Pending |
+| INTEL-04 | Phase 36 | Pending |
+| INTEL-05 | Phase 36 | Pending |
+| INTEL-06 | Phase 36 | Pending |
+| EVAL-01 | Phase 37 | Pending |
+| EVAL-02 | Phase 37 | Pending |
+| EVAL-03 | Phase 37 | Pending |
+| EVAL-04 | Phase 37 | Pending |
+| EVAL-05 | Phase 37 | Pending |
 
 **Coverage:**
 - v1.5 requirements: 38 total
-- Mapped to phases: 0
-- Unmapped: 38
+- Mapped to phases: 38
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-03*
-*Last updated: 2026-05-03 after initial definition*
+*Last updated: 2026-05-03 — traceability filled after roadmap creation (phases 32–38)*

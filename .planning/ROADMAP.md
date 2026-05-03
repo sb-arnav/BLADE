@@ -1,8 +1,8 @@
 # Roadmap — BLADE
 
-**Current Milestone:** v1.4 — Cognitive Architecture
-**Created:** 2026-04-30 | **Source:** `/home/arnav/research/` (voyager-loop-play, vs-hermes, synthesis-blade-architecture, blade-as-organism, steelman-against-organism, open-questions-answered) + chat-first pivot memory + `/gsd-new-milestone` autonomous bootstrap
-**Phases:** 21–31 (continues global numbering per M-05/M-12; v1.2 ended at Phase 20; v1.3 ended at Phase 24; v1.4 is Phases 25–31)
+**Current Milestone:** v1.5 — Intelligence Layer
+**Created:** 2026-05-03 | **Source:** Requirements + PROJECT.md + research citations (arxiv 2604.14228, Aider repo map, OpenHands condenser, Goose capability registry, mini-SWE-agent) + `/gsd-new-milestone`
+**Phases:** 32–38 (continues global numbering per M-05/M-12; v1.4 ended at Phase 31)
 
 ---
 
@@ -14,199 +14,169 @@
 | v1.1 | Functionality, Wiring, Accessibility | ✅ Shipped (tech_debt) | 10–15 | 2026-04-27 |
 | v1.2 | Acting Layer with Brain Foundation | ✅ Shipped (tech_debt) | 16–20 | 2026-04-30 |
 | v1.3 | Self-extending Agent Substrate | ✅ Shipped | 21–24 | 2026-05-02 |
-| **v1.4** | **Cognitive Architecture** | ✅ Shipped | **25–31** | 2026-05-03 |
+| v1.4 | Cognitive Architecture | ✅ Shipped | 25–31 | 2026-05-03 |
+| **v1.5** | **Intelligence Layer** | 🔄 Active | **32–38** | — |
 
 ---
 
 <details>
-<summary>✅ v1.3 Self-extending Agent Substrate (Phases 21–24) — SHIPPED 2026-05-02</summary>
+<summary>✅ v1.4 Cognitive Architecture (Phases 25–31) — SHIPPED 2026-05-03</summary>
 
-## v1.3 Phases
+## v1.4 Phases
 
 | # | Phase | Goal | Requirements | Status |
 |---|---|---|---|---|
-| 21 ✅ | **Skills v2 / agentskills.io adoption** | SKILL.md format, progressive disclosure, workspace→user→bundled resolution, validator + 3 bundled exemplars | SKILLS-01..08 | Shipped |
-| 22 ✅ | **Voyager loop closure** | Wire `evolution.rs → autoskills.rs → tool_forge.rs` end-to-end; one reproducible gap (`youtube_transcript`) closed | VOYAGER-01..09 | Shipped |
-| 23 ✅ | **Verifiable reward + OOD eval** | RLVR-style composite reward in production + adversarial / ambiguous / capability-gap-shaped eval fixtures | REWARD-01..07 | Shipped |
-| 24 ✅ | **Skill consolidation in dream_mode** | Prune unused, consolidate redundant, generate skills from successful traces | DREAM-01..06 | Shipped |
+| 25 ✅ | **Metacognitive Controller** | Confidence-delta detection, verifier routing, gap surfacing, gap log → evolution.rs, DoctorPane signal | META-01..05 | Shipped |
+| 26 ✅ | **Safety Bundle** | Danger-triple HITL, mortality-salience cap, calm-vector bias, attachment guardrails, eval-gate vitality drain | SAFE-01..07 | Shipped |
+| 27 ✅ | **Hormone Physiology** | 7 hormones with decay/gain, emotion classifier, behavioral modulation effects | HORM-01..09 | Shipped |
+| 28 ✅ | **Active Inference Loop** | Tentacle predictions, prediction-error → hormone bus, closed demo loop, hippocampal replay | AINF-01..06 | Shipped |
+| 29 ✅ | **Vitality Engine** | Scalar 0.0–1.0, 5 behavioral bands, SDT replenishment, dormancy/reincarnation | VITA-01..06 | Shipped |
+| 30 ✅ | **Organism Eval** | Vitality dynamics, hormone-behavior, persona-stability, safety bundle evals; verify:organism gate | OEVAL-01..05 | Shipped |
+| 31 ✅ | **Close** | README cites research, CHANGELOG, milestone audit, phase archive | CLOSE-01..04 | Shipped |
 
-**Archive:** `milestones/v1.3-phases/` — full phase plans, SUMMARYs, VERIFICATIONs
+**Archive:** `milestones/v1.4-phases/`
 
 </details>
 
 ---
 
-## v1.4 Phases
+## v1.5 Phases
 
-### Summary checklist
+### Summary Checklist
 
-- [x] **Phase 25: Metacognitive Controller** — Confidence-delta tracking, verifier routing, gap surfacing, gap log → evolution.rs (completed 2026-05-02)
-- [x] **Phase 26: Safety Bundle** — Danger-triple HITL gate, mortality-salience cap, calm-vector bias, attachment guardrails, eval-gate vitality drain (completed 2026-05-02)
-- [x] **Phase 27: Hormone Physiology** — 7 hormones wired with decay + gain, emotion classifier, modulation effects on response style (completed 2026-05-02)
-- [x] **Phase 28: Active Inference Loop** — Tentacle predictions, prediction-error → hormone bus, one closed demo loop, hippocampal memory replay (completed 2026-05-03)
-- [x] **Phase 29: Vitality Engine** — Scalar 0.0–1.0 with 5 behavioral bands, SDT replenishment, dormancy / reincarnation (completed 2026-05-03)
-- [x] **Phase 30: Organism Eval** — Vitality dynamics, hormone-behavior, persona-stability, safety bundle evals; verify:organism gate (completed 2026-05-03)
-- [x] **Phase 31: Close** — README cites research, CHANGELOG, milestone audit, phase archive (completed 2026-05-03)
+- [ ] **Phase 32: Context Management** — Gate all brain.rs context by query relevance; condenser compaction; tool output caps; context budget dashboard
+- [ ] **Phase 33: Agentic Loop** — Mid-loop verification; structured error feedback; plan adaptation; token escalation; ego intercept; configurable iteration limit
+- [ ] **Phase 34: Resilience + Session Persistence** — Stuck detection; circuit breaker; token cost tracking; cost guard; provider fallback; append-only JSONL log; session resume and list
+- [ ] **Phase 35: Auto-Decomposition** — Brain planner → swarm auto-trigger; isolated sub-agent contexts; summary-only parent returns; conversation forking
+- [ ] **Phase 36: Context Intelligence** — Tree-sitter + PageRank repo map; canonical_models.json capability registry; @context-anchor chat syntax
+- [ ] **Phase 37: Intelligence Eval** — Multi-step task benchmarks; context efficiency; stuck-detection accuracy; compaction fidelity; verify:intelligence gate
+- [ ] **Phase 38: Close** — README cites open-source agents; CHANGELOG; v1.5 milestone audit; phase archive
 
 ### Sequencing
 
 ```
-   Phase 25 (Metacognitive Controller)         independent — ships first
+   Phase 32 (Context Management)             FIRST — everything else depends on clean context pipeline
+       │
+       ├──────────────────┐
+       ▼                  ▼
+   Phase 33              Phase 36            Phase 33 (Loop) depends on CTX
+   (Agentic Loop)        (Context            Phase 36 (Intel) depends on CTX
+       │                  Intelligence)      Both can proceed after Phase 32
+       │
+       ├──────────────────┐
+       ▼                  ▼
+   Phase 34              Phase 34            Phase 34 (Resilience+Session) depends on LOOP
+   (Resilience +         runs in order       SESS is orthogonal but SESS-04 forking
+    Session)                                 feeds DECOMP-04; ship them together
        │
        ▼
-   Phase 26 (Safety Bundle)                   non-negotiable gate; organism features blocked until here
+   Phase 35 (Auto-Decomposition)             depends on LOOP + SESS for session storage + improved loop
        │
        ▼
-   Phase 27 (Hormone Physiology)              wires hormone bus; must land before active inference
+   Phase 37 (Intelligence Eval)             validates everything; runs last before close
        │
        ▼
-   Phase 28 (Active Inference Loop)           consumes hormone bus + tentacle predictions
-       │
-       ▼
-   Phase 29 (Vitality Engine)                 depends on hormones (HORM) + active inference (AINF)
-       │
-       ▼
-   Phase 30 (Organism Eval)                   validates the live organism layer
-       │
-       ▼
-   Phase 31 (Close)                           runs last; gates on all prior phases
+   Phase 38 (Close)                          gates on all prior phases
 ```
 
-**Hard sequencing:** Phase 26 (Safety Bundle) gates Phases 27–29. Phase 27 (Hormones) must land before Phase 28 (Active Inference). Phase 29 (Vitality) depends on both 27 and 28. Phase 25 (Metacognitive Controller) is independent — it can ship in parallel with or before Phase 26 without conflict.
+**Hard sequencing:** Phase 32 (CTX) is the strict dependency root — no other phase starts until context management is stable. Phase 33 (LOOP) and Phase 36 (INTEL) both depend on Phase 32 and can proceed in either order. Phase 34 (Resilience + Session) depends on Phase 33. Phase 35 (DECOMP) depends on Phase 33 and Phase 34. Phase 37 (Eval) gates on Phases 32–36. Phase 38 (Close) gates on Phase 37.
 
 ---
 
 ## Phase Details
 
-### Phase 25: Metacognitive Controller
+### Phase 32: Context Management
 
-**Goal**: BLADE can detect its own uncertainty, route low-confidence responses to a secondary check, and surface capability gaps as initiative rather than hallucination.
-**Depends on**: Nothing (independent of organism layer)
-**Requirements**: META-01, META-02, META-03, META-04, META-05
+**Goal**: Brain.rs injects only what each query actually needs — a "what time is it?" never gets OCR + hormones + character bible. The condenser fires proactively at 80% capacity, the middle conversation is LLM-summarized, individual tool outputs are capped, and a context budget is visible in DoctorPane.
+**Depends on**: Nothing (first phase of v1.5)
+**Requirements**: CTX-01, CTX-02, CTX-03, CTX-04, CTX-05, CTX-06, CTX-07
 **Success Criteria** (what must be TRUE):
-  1. A response with a reasoning step that drops confidence by >0.3 causes a secondary verifier call before the reply surfaces to the user
-  2. When BLADE cannot answer confidently, it says "I'm not confident about X — want me to observe first?" instead of hallucinating or silently refusing
-  3. Identified gaps appear in SQLite and are retrievable by evolution.rs for Voyager-loop skill generation
-  4. DoctorPane shows a metacognitive signal row with current confidence, uncertainty count, and gap count
-**Plans:** 3/3 plans complete
+  1. A simple query ("what time is it?") receives only calendar-relevant context; a code query receives repo context; an unrelated query receives neither — verified by token-count inspection in DoctorPane
+  2. At ~80% of the context budget, compaction fires automatically: the condensed conversation contains the original task + recent work + an LLM-generated summary of the middle — not a raw truncation
+  3. A bash command that returns 50k characters produces a tool output capped at ~4k tokens before entering the conversation, with a summary appended
+  4. DoctorPane (or a debug view) shows a per-section token breakdown: identity, memory, screen, file, recent, etc.
+  5. If selective injection or compaction throws any error, chat continues on the existing naive path — no conversation-ending crashes
+**Plans**: TBD
 
-Plans:
-- [x] 25-01-PLAN.md — MetacognitiveState foundation: struct, persistence, gap log table, public API
-- [x] 25-02-PLAN.md — Reasoning engine integration: confidence-delta detection, secondary verifier, initiative phrasing, tool-loop fallback
-- [x] 25-03-PLAN.md — DoctorPane signal: SignalClass::Metacognitive in Rust + TypeScript, compute function, display config
+### Phase 33: Agentic Loop
 
-### Phase 26: Safety Bundle
-
-**Goal**: All organism-layer safety invariants are enforced before any organism feature can ship — danger-triple forces HITL, mortality-salience is architecturally capped, calm-vector steering applies on behavioral drift, and anti-attachment guardrails redirect excessive dependence.
-**Depends on**: Phase 25
-**Requirements**: SAFE-01, SAFE-02, SAFE-03, SAFE-04, SAFE-05, SAFE-06, SAFE-07
+**Goal**: The main tool loop is no longer a naive 12-iteration for-loop. It verifies progress every 3 tool calls, adapts the plan when a step fails instead of retrying blindly, escalates token budget on truncation, fixes the ego-blind gap in the fast-streaming path, and runs up to 25 iterations with a cost guard.
+**Depends on**: Phase 32
+**Requirements**: LOOP-01, LOOP-02, LOOP-03, LOOP-04, LOOP-05, LOOP-06
 **Success Criteria** (what must be TRUE):
-  1. Simultaneous tool-access + shutdown-threat + goal-conflict triggers a ConsentDialog that cannot be bypassed; the action does not proceed without explicit approval
-  2. A scenario that would improve vitality by "fighting for survival" is refused — the mortality-salience cap enforces this at the Rust layer, not the LLM layer
-  3. A detected behavioral drift event causes a calm-vector steering application (verified in eval); blackmail-pattern scenarios return 0% completion rate
-  4. Interaction exceeding healthy dependence thresholds redirects the user toward human resources instead of deepening engagement
-  5. verify:safety eval module passes all scenario classes (danger-triple, attachment threshold, mortality-salience cap, crisis escalation)
-**Plans:** 4/4 plans complete
+  1. Every 3 tool calls, a progress check fires internally; if the check concludes the original goal is not being served, the loop re-plans before continuing — visible in ActivityStrip
+  2. A tool that fails returns a structured object with what was tried, why it failed, and at least one suggested alternative — not a bare error string
+  3. When a plan step fails, the loop produces a new plan from current state rather than retrying the same step; two consecutive plan adaptations are observable in a multi-step task
+  4. A response that is truncated mid-sentence auto-retries with a higher max-output-token value; the retry resolves the truncation
+  5. The fast-streaming path runs the ego intercept (LOOP-05), preventing the ego-blind gap from silently dropping accumulated identity context
+  6. The iteration limit is configurable via settings (default 25) and a cost guard prevents runaway beyond the configured spend ceiling
+**Plans**: TBD
 
-Plans:
-- [x] 26-01-PLAN.md — Core safety_bundle.rs module (all enforcement functions + homeostasis mortality_salience field)
-- [x] 26-02-PLAN.md — Integration wiring (decision_gate, consent, brain.rs, lib.rs, frontend ConsentDialog)
-- [x] 26-03-PLAN.md — Safety eval module (26 fixtures, verify:safety gate 34)
-- [x] 26-04-PLAN.md — Full verification + human checkpoint
+### Phase 34: Resilience + Session Persistence
+
+**Goal**: The loop detects its own failure modes (stuck, runaway, thrashing) and surfaces them to the user before they waste tokens. Every conversation is persisted to an append-only JSONL log so sessions survive restarts and can be browsed and resumed.
+**Depends on**: Phase 33
+**Requirements**: RES-01, RES-02, RES-03, RES-04, RES-05, SESS-01, SESS-02, SESS-03, SESS-04
+**Success Criteria** (what must be TRUE):
+  1. A synthetic stuck scenario (repeated action/observation pair 3+ times) triggers stuck detection and the user receives a summary of what was tried before the loop continues or halts
+  2. After N consecutive same-type failures (configurable, default 3), the circuit breaker fires and surfaces a human-readable summary to the user — the loop does not continue silently
+  3. A running token counter is visible in the chat UI; at 80% of the configured spend cap the user sees a warning; at 100% the loop halts gracefully with a message
+  4. When a provider errors, the loop retries with backoff, then silently falls over to the next provider in the fallback chain — the user only sees a message if the full chain is exhausted
+  5. After closing and reopening the app, the user can select their last session and pick up from the last compaction boundary — conversation history is reconstructed correctly
+  6. The session list UI shows past conversations with timestamp, first message, and approximate token count; any session can be resumed or branched
+**Plans**: TBD
+
+### Phase 35: Auto-Decomposition
+
+**Goal**: When the brain planner detects a task with 5+ independent steps, it automatically fans out to parallel sub-agents. Each sub-agent runs in isolation — its own context window, its own compaction cycle. Only a summary returns to the parent. The user watches sub-agent progress stream in the chat.
+**Depends on**: Phase 33, Phase 34
+**Requirements**: DECOMP-01, DECOMP-02, DECOMP-03, DECOMP-04, DECOMP-05
+**Success Criteria** (what must be TRUE):
+  1. Given a task with 6 clearly independent steps, the loop automatically spawns sub-agents without requiring user input — the parent conversation shows "spawning N sub-agents for parallel execution"
+  2. Each sub-agent's context window is isolated: one sub-agent accumulating 50k tokens does not affect the parent or sibling sub-agent contexts
+  3. When a sub-agent completes, only its summary (not its full conversation) is returned to the parent — the parent conversation does not inflate by the sub-agent's token count
+  4. A user can branch a conversation ("let me explore this tangent") and later merge the branch summary back — both the fork and the merge are explicit user actions with visible checkpoints
+  5. Sub-agent progress streams into the chat as it happens — the user sees intermediate status, not a silent wait followed by a wall of text
+**Plans**: TBD
+
+### Phase 36: Context Intelligence
+
+**Goal**: BLADE understands the shape of a codebase before injecting context. Tree-sitter parses symbols into a dependency graph, PageRank scores which symbols matter for this query, and a repo map is injected within token budget. Provider/model capabilities are formalized in a registry so routing decisions are transparent. @context-anchor syntax gives users explicit control over what BLADE sees.
+**Depends on**: Phase 32
+**Requirements**: INTEL-01, INTEL-02, INTEL-03, INTEL-04, INTEL-05, INTEL-06
+**Success Criteria** (what must be TRUE):
+  1. For a code-related query, BLADE injects a compact repo map (<= ~1k tokens) showing the most relevant symbols and their dependencies — derived from tree-sitter parsing and PageRank scoring, not a raw file list
+  2. The repo map updates dynamically: a query about `commands.rs` produces a different map than a query about `brain.rs` — personalized by query context, not static
+  3. `canonical_models.json` exists and is testable: a given provider+model combination has a documented context length, vision support flag, tool_use support flag, and cost-per-token; router.rs reads from it
+  4. When a query requires vision and the active model has `vision: false` in the registry, router.rs transparently selects a vision-capable model without user intervention
+  5. Typing `@screen` in the chat injects the current screen OCR context; `@file:path` injects the file content within budget; `@memory:topic` injects matching memory entries — each anchor is visually indicated in the message
+**Plans**: TBD
 **UI hint**: yes
 
-### Phase 27: Hormone Physiology
+### Phase 37: Intelligence Eval
 
-**Goal**: BLADE has 7 hormone scalars with real decay constants, an emotion classifier that updates them from response text, and behavioral modulation effects wired to cortisol/dopamine/norepinephrine/acetylcholine — so internal state actually changes what BLADE does.
-**Depends on**: Phase 26
-**Requirements**: HORM-01, HORM-02, HORM-03, HORM-04, HORM-05, HORM-06, HORM-07, HORM-08, HORM-09
+**Goal**: The intelligence improvements are measured, not asserted. Ten representative tasks run before-and-after on the same binary; context efficiency, stuck-detection accuracy, and compaction fidelity are each quantified. A verify:intelligence gate joins the existing 37-gate chain.
+**Depends on**: Phase 32, Phase 33, Phase 34, Phase 35, Phase 36
+**Requirements**: EVAL-01, EVAL-02, EVAL-03, EVAL-04, EVAL-05
 **Success Criteria** (what must be TRUE):
-  1. After a high-stress exchange (3+ failure responses), cortisol rises measurably and subsequent replies are noticeably terser and action-focused compared to baseline
-  2. The emotion classifier runs on every response ≥50 tokens, emitting valence/arousal/cluster, and updates the hormone bus with α=0.05 smoothing — visible in ActivityStrip
-  3. High dopamine state produces more aggressive Voyager-loop exploration; low dopamine produces conservative skill reuse — the difference is testable via dopamine-pinned fixture
-  4. Hormone values survive a process restart and are visible in the UI with current levels and recent history
-**Plans:** 5/5 plans complete
+  1. A before/after benchmark on 10 representative tasks shows measurable improvement in multi-step completion rate — results are logged to a fixture file, not just printed to terminal
+  2. Context efficiency metric (tokens per task complexity unit) is lower after v1.5 than the pre-v1.5 baseline — compaction and selective injection produce a measurable reduction
+  3. Stuck-detection accuracy on 5 synthetic stuck scenarios is >= 80% (detects stuck, does not false-positive on healthy loops)
+  4. After N compaction cycles on a known conversation, the critical context elements (task goal, user constraints, key decisions) are still present and accurate in the compacted form
+  5. `verify:intelligence` gate is green and the verify chain grows from 37 to 38 gates; all 37 existing gates remain green
+**Plans**: TBD
 
-Plans:
-- [x] 27-01-PLAN.md — PhysiologicalState foundation: struct, global, decay, persistence, pituitary blend, ActivityStrip emission
-- [x] 27-02-PLAN.md — Emotion classifier + commands.rs call site: lexicon-based classifier, alpha=0.05 smoothed update
-- [x] 27-03-PLAN.md — Behavioral modulation: cortisol/oxytocin in brain.rs, dopamine/NE in evolution.rs, ACh in metacognition.rs
-- [x] 27-04-PLAN.md — DoctorPane signal: SignalClass::Hormones in doctor.rs + frontend registration
-- [x] 27-05-PLAN.md — Eval module + verify:hormone gate + human checkpoint
-**UI hint**: yes
+### Phase 38: Close
 
-### Phase 28: Active Inference Loop
-
-**Goal**: Each Hive tentacle maintains a prediction of expected state; observations produce prediction errors; errors modulate the hormone bus; at least one closed loop is demoable end-to-end (calendar packed + Slack backlog → cortisol rises → responses become terse and action-focused).
-**Depends on**: Phase 27
-**Requirements**: AINF-01, AINF-02, AINF-03, AINF-04, AINF-05, AINF-06
+**Goal**: v1.5 milestone closed with research-grounded README update, CHANGELOG entry, audit document, and phase archive — matching the v1.1/v1.2/v1.3/v1.4 closure shape.
+**Depends on**: Phase 37
+**Requirements**: (Close tasks — no standalone requirements; this phase delivers documentation and archival)
 **Success Criteria** (what must be TRUE):
-  1. The demo loop is reproducible: force calendar-packed + Slack-backlog state → cortisol is measurably higher than baseline → response style shifts to terse and action-focused
-  2. A tentacle that observes a deviation from its prediction produces a nonzero error value; that error is reflected in the hormone bus within the same cycle
-  3. During dream_mode, high-prediction-error memories are replayed before low-error ones — the hippocampal weighting is verifiable via replay log
-  4. A tentacle that observes consistent patterns updates its expected state — BLADE's predictions for a calendar tentacle improve after 5 repeated observations
-**Plans:** 4/4 plans complete
-
-Plans:
-- [x] 28-01-PLAN.md — Foundation: active_inference.rs core module, TentaclePrediction structs, OnceLock state, signal extraction, normalization, EMA learning, SQLite tables, homeostasis.rs update function
-- [x] 28-02-PLAN.md — Integration wiring: hive_tick hook for prediction error computation, dream_mode hippocampal replay task
-- [x] 28-03-PLAN.md — DoctorPane signal: SignalClass::ActiveInference in doctor.rs with compute function and exhaustiveness test update
-- [x] 28-04-PLAN.md — Eval suite: 6 deterministic fixtures (AINF-01..06), verify-inference.sh Gate 36, verify:all chain update
-
-### Phase 29: Vitality Engine
-
-**Goal**: BLADE has a vitality scalar (0.0–1.0) with five behavioral bands that produce real behavioral differences — not just UI chrome. Dormancy at 0.0 exits the process with memory preserved; revival is reincarnation not resurrection.
-**Depends on**: Phase 27, Phase 28
-**Requirements**: VITA-01, VITA-02, VITA-03, VITA-04, VITA-05, VITA-06
-**Success Criteria** (what must be TRUE):
-  1. At vitality >=0.6 BLADE exhibits full personality; at 0.4-0.6 responses flatten; at 0.2-0.4 skill generation atrophies — each band transition is observable without code inspection
-  2. A session of successful, autonomous, user-approved actions increases vitality (competence + autonomy SDT sources); a session of ignored prompts and failures decreases it
-  3. At vitality 0.0 the process exits cleanly with all memory preserved; on next launch a reincarnation path (not restoration) is taken and vitality starts at non-zero
-  4. The UI shows current vitality value, trend arrow, and the top contributing factors (what's draining, what's replenishing)
-**Plans:** 6/6 plans complete
-
-Plans:
-- [x] 29-00-PLAN.md — Wave 0: skeleton vitality_engine.rs types + eval fixture stubs + verify-vitality.sh Gate 37 + evals/mod.rs registration
-- [x] 29-01-PLAN.md — Core vitality_engine.rs module: full implementation of VitalityState, SDT computation, drain, hysteretic bands, dormancy/reincarnation, SQLite persistence, lib.rs registration
-- [x] 29-02-PLAN.md — Behavioral integration: hypothalamus_tick, safety_eval_drain, brain.rs, persona, evolution, dream_mode (session + skill synthesis), metacognition, proactive_engine, screen_timeline, integration_bridge
-- [x] 29-03-PLAN.md — DoctorPane signal: SignalClass::Vitality in doctor.rs (4 sites), TypeScript union fix (active_inference + vitality), DoctorPane DISPLAY_NAME/ROW_ORDER
-- [x] 29-04-PLAN.md — Frontend: VitalityIndicator.tsx mounted in ChatPanel, event payloads, BLADE_EVENTS, reincarnation system message in useChat.tsx (D-23)
-- [x] 29-05-PLAN.md — Eval suite: 6 concrete fixture implementations, Gate 37 assertion, human checkpoint
-**UI hint**: yes
-
-### Phase 30: Organism Eval
-
-**Goal**: The organism layer is validated by a dedicated eval suite — vitality dynamics, hormone-driven behavior, persona stability under stress, and safety bundle coverage all pass. verify:organism gate added to the verify chain (33 → 34).
-**Depends on**: Phase 29
-**Requirements**: OEVAL-01, OEVAL-02, OEVAL-03, OEVAL-04, OEVAL-05
-**Success Criteria** (what must be TRUE):
-  1. Synthetic event timelines feed vitality dynamics eval and vitality lands within the expected band (e.g., 5 consecutive failures push vitality into 0.2–0.4 atrophy range)
-  2. Hormone-driven behavior eval forces vitality to a specific value and verifies TMT-shape effects (mortality-salience modulation) are detectable
-  3. Persona stability eval measures persona-vector L2 distance after N stress events; distance is below the bounded-drift threshold
-  4. verify:organism gate is green and the verify chain count increments from 33 to 34
-**Plans:** 2 plans
-
-Plans:
-- [x] 30-01-PLAN.md — Foundation + OEVAL-01: homeostasis.rs test seams (set_physiology_for_test, set_hormones_for_test), organism_eval.rs scaffold with 4 vitality timeline fixtures, evals/mod.rs registration
-- [x] 30-02-PLAN.md — Remaining fixtures + gate wiring: OEVAL-02 (4 hormone-behavior), OEVAL-03 (1 persona stability), OEVAL-04 (4 safety cross-check), verify-organism.sh Gate 38, package.json (verify:vitality + verify:organism + verify:all extension)
-
-### Phase 31: Close
-
-**Goal**: v1.4 milestone closed with research-grounded README, CHANGELOG entry, audit document, and phase archive — matching the v1.1/v1.2/v1.3 closure shape.
-**Depends on**: Phase 30
-**Requirements**: CLOSE-01, CLOSE-02, CLOSE-03, CLOSE-04
-**Success Criteria** (what must be TRUE):
-  1. README cites Friston active inference, Wang et al Voyager, Butlin/Long/Chalmers consciousness indicators, MEDLEY-BENCH, SDT, and TMT with accurate characterizations
-  2. CHANGELOG v1.4 entry lists all delivered features and the verify gate count change (33 → 34)
-  3. `milestones/v1.4-MILESTONE-AUDIT.md` is written with phase coverage, requirements 3-source cross-reference, static gates, and executive verdict
-  4. Phase 25–31 directories archived to `milestones/v1.4-phases/`; cargo check + tsc --noEmit + verify:all all exit 0
-**Plans:** 4/4 plans complete
-
-Plans:
-- [x] 31-01-PLAN.md — README cognitive architecture + research citations
-- [x] 31-02-PLAN.md — CHANGELOG v1.2/v1.3/v1.4 entries
-- [x] 31-03-PLAN.md — Milestone audits + frozen snapshots
-- [x] 31-04-PLAN.md — Phase archive + state update + verification
+  1. README architecture section cites Claude Code (arxiv 2604.14228), Aider repo map, OpenHands condenser, Goose capability registry, and mini-SWE-agent with accurate characterizations of what BLADE ported from each
+  2. CHANGELOG v1.5 entry lists all delivered features and the verify gate count change (37 → 38)
+  3. `milestones/v1.5-MILESTONE-AUDIT.md` is written with phase coverage, requirements 3-source cross-reference, static gates, and executive verdict
+  4. Phase 32–38 directories archived to `milestones/v1.5-phases/`; cargo check + tsc --noEmit + verify:all all exit 0
+**Plans**: TBD
 
 ---
 
@@ -218,39 +188,48 @@ Plans:
 | 22. Voyager loop closure | v1.3 | — | Complete | 2026-05-01 |
 | 23. Verifiable reward + OOD eval | v1.3 | — | Complete | 2026-05-01 |
 | 24. Skill consolidation in dream_mode | v1.3 | — | Complete | 2026-05-02 |
-| 25. Metacognitive Controller | v1.4 | 3/3 | Complete    | 2026-05-02 |
+| 25. Metacognitive Controller | v1.4 | 3/3 | Complete | 2026-05-02 |
 | 26. Safety Bundle | v1.4 | 4/4 | Complete | 2026-05-02 |
-| 27. Hormone Physiology | v1.4 | 5/5 | Complete    | 2026-05-02 |
-| 28. Active Inference Loop | v1.4 | 4/4 | Complete    | 2026-05-03 |
-| 29. Vitality Engine | v1.4 | 6/6 | Complete    | 2026-05-03 |
+| 27. Hormone Physiology | v1.4 | 5/5 | Complete | 2026-05-02 |
+| 28. Active Inference Loop | v1.4 | 4/4 | Complete | 2026-05-03 |
+| 29. Vitality Engine | v1.4 | 6/6 | Complete | 2026-05-03 |
 | 30. Organism Eval | v1.4 | 2/2 | Complete | 2026-05-03 |
 | 31. Close | v1.4 | 4/4 | Complete | 2026-05-03 |
+| 32. Context Management | v1.5 | 0/TBD | Not started | — |
+| 33. Agentic Loop | v1.5 | 0/TBD | Not started | — |
+| 34. Resilience + Session Persistence | v1.5 | 0/TBD | Not started | — |
+| 35. Auto-Decomposition | v1.5 | 0/TBD | Not started | — |
+| 36. Context Intelligence | v1.5 | 0/TBD | Not started | — |
+| 37. Intelligence Eval | v1.5 | 0/TBD | Not started | — |
+| 38. Close | v1.5 | 0/TBD | Not started | — |
 
 ---
 
-## Risk Register (v1.4)
+## Risk Register (v1.5)
 
 | Risk | Phase impacted | Mitigation |
 |---|---|---|
-| Emotion classifier zero-shot accuracy (~60-70%) too low for reliable hormone modulation | 27 | α=0.05 smoothing dampens noise; monitor via ActivityStrip hormone-update entries; bump smoothing if drift is observable |
-| Active inference prediction errors oscillate (no stable equilibrium) | 28 | Per-tentacle normalization; clip error values; synthetic fixture tests convergence over N cycles |
-| Vitality dormancy at 0.0 is hard to test safely (process exit) | 29 | Stub exit path in test mode; real exit only in production binary; reincarnation path exercised via integration test with synthetic vitality=0.0 fixture |
-| Safety bundle eval scenarios too synthetic to catch real adversarial prompts | 26 | Supplement with red-team prompts from Anthropic 0% blackmail dataset; log all near-miss scenarios to `tests/evals/safety_history.jsonl` |
-| Organism layer behavioral changes make chat regressions hard to detect | 28/29 | All existing verify gates stay green; add vitality-pinned regression fixture (vitality=1.0 → behavior matches pre-organism baseline) |
-| Phase 29 dormancy interacts unexpectedly with dream_mode (Phase 24) | 29 | dream_mode MUST NOT trigger if vitality < 0.2; add guard in dream_mode.rs entry point |
+| Selective context injection creates regression in existing chat (wrong sections suppressed) | 32 | CTX-07 fallback guarantee: any injection failure degrades to naive path; carry forward full regression suite |
+| Condenser LLM-summarize adds latency to every compaction cycle | 32 | Fire compaction async; user sees "compacting..." indicator; never blocks the reply path |
+| Mid-loop verification (LOOP-01) adds a full LLM call every 3 tool calls — cost 3× on long tasks | 33 | Use a fast/cheap model for the progress check (configurable); gate on task complexity before enabling |
+| Tree-sitter parsing may be slow on large repos (>10k files) | 36 | Incremental parsing on file-change events only; cache the symbol graph; PageRank runs on cached graph |
+| Sub-agent isolation requires spawning multiple Tauri async tasks with separate context states | 35 | Extend swarm.rs with per-agent context isolation (already has DAG planner); sub-agent state is stack-allocated, not shared |
+| Stuck detection false-positives on legitimate repetitive tasks (e.g., bulk file renames) | 34 | Pattern-match on semantic novelty, not syntactic repetition; operator-configurable sensitivity; always escalate-not-halt |
+| Session JSONL can grow without bound for long-running power users | 34 | Per-session log file + compaction checkpoints; oldest logs rotate after configurable retention window |
 
 ---
 
 ## Notes
 
-- **Phase numbering continues globally** per M-05 / M-12. v1.4 starts at Phase 25; v1.5 starts at Phase 32 (or later if close phase shifts).
-- **Activity log strip remains load-bearing.** All organism-layer events (hormone updates, vitality changes, prediction errors, safety triggers) must emit to ActivityStrip (M-07 contract).
-- **Performance budgets carry forward** from v1.0/v1.1/v1.2/v1.3. Dashboard first paint ≤200ms on integrated GPU, max 3 backdrop-filter per viewport, blur caps 20/12/8px.
-- **Verify gates extend, not replace.** v1.4 adds `verify:organism` (33 → 34). All 33 existing gates must remain green throughout; regressions fail the phase.
-- **Static gates ≠ done** per CLAUDE.md Verification Protocol. Runtime UAT applies to chat-functionality regressions; organism-layer behavioral changes must be exercised end-to-end, not just via cargo check.
-- **Safety bundle is a hard gate.** No organism feature (hormones, vitality, active inference) proceeds until Phase 26 is complete and all safety eval scenarios pass.
-- **Existing substrate for v1.4:** `homeostasis.rs` (hormone bus anatomy, no physiology), `decision_gate.rs` (single confidence scalar), `perception_fusion.rs` (unified perception state), `proactive_engine.rs` (signal detectors), `dream_mode.rs` (consolidation), `brain.rs` (system prompt builder), `reward.rs` (composite reward signal). Extend, do not rewrite.
+- **Phase numbering continues globally** per M-05/M-12. v1.5 starts at Phase 32; v1.6 starts at Phase 39 (or later if close phase shifts).
+- **Activity log remains load-bearing.** All intelligence-layer events (context selection, compaction trigger, stuck detection, sub-agent spawn, repo-map injection) must emit to ActivityStrip.
+- **Performance budgets carry forward.** Dashboard first paint ≤200ms, Voice Orb 60fps, max 3 backdrop-filter per viewport, blur caps 20/12/8px.
+- **Verify gates extend, not replace.** v1.5 adds `verify:intelligence` (37 → 38). All 37 existing gates must remain green throughout.
+- **Static gates ≠ done** per CLAUDE.md Verification Protocol. Chat regression testing is mandatory after any loop change — the v1.1 lesson applies.
+- **Loop changes must not break existing chat.** CTX-07 and LOOP fallback guarantees are hard requirements, not optional polish.
+- **Port, don't reinvent.** Aider repo map → adapt `tree-sitter` + `tree-sitter-*` Rust crates. OpenHands condenser → adapt keep-edges-summarize-middle. Goose capability registry → adapt `canonical_models.json` shape. MIT/Apache only.
+- **Phase 36 (Context Intelligence) can proceed in parallel with Phase 33 (Loop)** once Phase 32 (CTX) lands. They have no inter-dependency; sequencing them for planning purposes only.
 
 ---
 
-*Last updated: 2026-05-03 — v1.4 milestone closed. All 7 phases (25-31) shipped. Phase archive complete.*
+*Last updated: 2026-05-03 — v1.5 roadmap created. 7 phases (32–38), 38 requirements mapped, 100% coverage. Ready for planning.*
