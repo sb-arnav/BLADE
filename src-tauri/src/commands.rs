@@ -3014,6 +3014,100 @@ pub async fn auto_title_conversation(
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Phase 32 Plan 32-05 / CTX-05 — Tool output cap.
+//
+// `cap_tool_output(content, budget_tokens)` enforces a per-tool-output token
+// budget at the conversation-insertion site. It uses the universal "head + tail
+// + truncation marker" pattern (Claude Code Bash tool, OpenHands, OpenClaw all
+// converge on this shape — see RESEARCH.md §CTX-05).
+//
+// Today, `format_tool_result` hard-truncates at MAX_TOOL_RESULT_CHARS chars
+// without preserving the tail. A bash output ending in a critical error
+// message would lose that error. Plan 32-05 raises MAX_TOOL_RESULT_CHARS to
+// 200_000 (a far safety net) and lets `cap_tool_output` enforce the real
+// per-message budget (default 4000 tokens via config.context.tool_output_cap_tokens).
+//
+// LOAD-BEARING: All char-based slicing inside cap_tool_output uses
+// crate::safe_slice — never `&content[..n]`. CLAUDE.md mandate; v1.1 lesson.
+// ---------------------------------------------------------------------------
+
+/// Phase 32 / CTX-05 — return type from `cap_tool_output`.
+/// Original full content reach-back is a Phase 33+ concern; in Phase 32 the
+/// `storage_id` is just a marker that truncation occurred (used by tests + logs).
+#[derive(Debug, Clone)]
+pub struct ToolOutputCap {
+    /// The (possibly truncated) content destined for the conversation.
+    pub content: String,
+    /// Some(id) when truncation occurred, None otherwise.
+    pub storage_id: Option<String>,
+    /// Approximate token count of the ORIGINAL (untruncated) input. Computed
+    /// as chars / 4 to match estimate_tokens.
+    pub original_tokens: usize,
+}
+
+/// Phase 32 / CTX-05 — cap a single tool output at `budget_tokens`. When the
+/// content fits, returns it unchanged with storage_id=None. When it doesn't,
+/// returns the head (~75% of budget) + a truncation marker + the tail
+/// (~12.5% of budget) so callers can see both ends of the output. The marker
+/// includes a storage_id (for future Phase-33+ reach-back) and the original
+/// token estimate.
+///
+/// MUST use crate::safe_slice for all char-based slicing — `&s[..n]` panics
+/// on non-ASCII boundaries (CLAUDE.md mandate, MEMORY.md
+/// `feedback_uat_evidence` for the v1.1 retraction precedent).
+pub fn cap_tool_output(content: &str, budget_tokens: usize) -> ToolOutputCap {
+    let estimated_tokens = content.chars().count() / 4;
+    if estimated_tokens <= budget_tokens {
+        return ToolOutputCap {
+            content: content.to_string(),
+            storage_id: None,
+            original_tokens: estimated_tokens,
+        };
+    }
+
+    // Budget split: 75% to the head, 12.5% to the tail, ~12.5% reserved for
+    // the truncation marker text. (Universal pattern per RESEARCH.md.)
+    let budget_chars = budget_tokens.saturating_mul(4);
+    let head_chars = (budget_chars as f32 * 0.75) as usize;
+    let tail_chars = (budget_chars as f32 * 0.125) as usize;
+
+    // SAFE-SLICE: never raw [..n]. safe_slice respects char boundaries.
+    let head = crate::safe_slice(content, head_chars);
+
+    // Tail: take the last `tail_chars` characters. char_indices gives us the
+    // boundary at character `total - tail_chars`, then slice from there. If
+    // the boundary computation fails (extremely short tail), fall back to
+    // empty tail rather than panicking.
+    let total_chars = content.chars().count();
+    let tail: &str = if total_chars > tail_chars && tail_chars > 0 {
+        let skip_chars = total_chars.saturating_sub(tail_chars);
+        content
+            .char_indices()
+            .nth(skip_chars)
+            .map(|(byte_idx, _)| &content[byte_idx..])
+            .unwrap_or("")
+    } else if tail_chars == 0 {
+        ""
+    } else {
+        content
+    };
+
+    let omitted_tokens = estimated_tokens.saturating_sub(budget_tokens);
+    let storage_id = format!("tool_out_{}", chrono::Utc::now().timestamp_millis());
+
+    let content_out = format!(
+        "{}\n\n[truncated from {} tokens; ~{} omitted in middle; storage_id {}]\n\n{}",
+        head, estimated_tokens, omitted_tokens, storage_id, tail
+    );
+
+    ToolOutputCap {
+        content: content_out,
+        storage_id: Some(storage_id),
+        original_tokens: estimated_tokens,
+    }
+}
+
 fn format_tool_result(result: &McpToolResult) -> String {
     let parts = result
         .content
@@ -3632,5 +3726,90 @@ pub(crate) mod tests {
         let conv = build_test_conversation(1);
         let keep = compute_keep_recent(&conv, 8, 16_000);
         assert!(keep >= 2, "floor should be 2, got {}", keep);
+    }
+
+    // -----------------------------------------------------------------------
+    // Plan 32-05 / CTX-05 — tool output cap tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn phase32_cap_tool_output_under_budget_passthrough() {
+        let small = "tiny output, well under budget";
+        let r = cap_tool_output(small, 4000);
+        assert_eq!(r.content, small);
+        assert!(r.storage_id.is_none(), "small output got unexpected storage_id");
+        assert!(r.original_tokens < 50, "expected <50 tokens, got {}", r.original_tokens);
+    }
+
+    #[test]
+    fn phase32_cap_tool_output_over_budget_truncates() {
+        let big = "x".repeat(50_000); // ~12_500 tokens (chars/4)
+        let r = cap_tool_output(&big, 4000);
+        // Output is shaped roughly like: head(12k chars) + marker(~150 chars) + tail(2k chars) ≈ 14k chars.
+        assert!(
+            r.content.len() < 20_000,
+            "result should be under ~5000 tokens, got {} chars (~{} tokens)",
+            r.content.len(),
+            r.content.len() / 4
+        );
+        assert!(
+            r.content.contains("[truncated from"),
+            "missing truncation marker; result starts with: {}",
+            crate::safe_slice(&r.content, 200)
+        );
+        assert!(r.storage_id.is_some(), "over-budget output missing storage_id");
+        assert!(
+            r.original_tokens >= 10_000,
+            "expected ≥10k original tokens, got {}",
+            r.original_tokens
+        );
+    }
+
+    #[test]
+    fn phase32_cap_tool_output_preserves_head_and_tail() {
+        let mut content = String::from("HEAD_MARKER_X");
+        content.push_str(&"x".repeat(50_000));
+        content.push_str("TAIL_MARKER_Z");
+        let r = cap_tool_output(&content, 4000);
+        assert!(
+            r.content.contains("HEAD_MARKER_X"),
+            "head marker missing — head not preserved"
+        );
+        assert!(
+            r.content.contains("TAIL_MARKER_Z"),
+            "tail marker missing — tail not preserved (this is the bug v1.1 lesson teaches)"
+        );
+    }
+
+    #[test]
+    fn phase32_cap_tool_output_non_ascii_safe() {
+        // 20_000 fire emojis = ~80_000 bytes (each emoji is 4 bytes UTF-8) but
+        // ~20_000 chars and ~5000 tokens. With budget 4000, must truncate.
+        // Critically, must not panic on char-boundary slicing.
+        let emoji = "🔥".repeat(20_000);
+        let r = std::panic::catch_unwind(|| cap_tool_output(&emoji, 4000));
+        assert!(
+            r.is_ok(),
+            "non-ASCII content caused panic — safe_slice not used"
+        );
+        let r = r.unwrap();
+        assert!(
+            r.content.contains("[truncated from"),
+            "non-ASCII over-budget content missing truncation marker"
+        );
+    }
+
+    #[test]
+    fn phase32_cap_tool_output_storage_id_when_truncated() {
+        let small = cap_tool_output("hello", 4000);
+        assert!(small.storage_id.is_none(), "small output got storage_id");
+        let big = cap_tool_output(&"y".repeat(50_000), 4000);
+        assert!(big.storage_id.is_some(), "big output missing storage_id");
+        let id = big.storage_id.unwrap();
+        assert!(
+            id.starts_with("tool_out_"),
+            "storage_id format wrong: {}",
+            id
+        );
     }
 }
