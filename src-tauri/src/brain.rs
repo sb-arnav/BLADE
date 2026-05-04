@@ -532,6 +532,45 @@ pub fn score_context_relevance(query: &str, context_type: &str) -> f32 {
     score.min(1.0)
 }
 
+/// Phase 32 / CTX-07 — panic-resistant wrapper around `score_context_relevance`.
+///
+/// If scoring panics (e.g. NaN-related arithmetic, future code changes that
+/// regress the function, or test-injected panics via `CTX_SCORE_OVERRIDE`),
+/// returns the `safe_default` value. Default 1.0 means "inject this section" —
+/// i.e. degrade to the pre-Phase-32 naive path. This is the v1.1 lesson
+/// incarnate: the smart path must NEVER crash the dumb path.
+///
+/// Also degrades to the safe default when scoring returns a non-finite value
+/// (NaN or ±inf). NaN is particularly dangerous because `NaN > gate` is always
+/// false — a silent gate-closure that would omit sections without surfacing
+/// any error. We treat non-finite as "broken scorer, fall back to naive".
+///
+/// Failures are logged via `log::warn!` with a `[CTX-07]` prefix so Phase 37
+/// EVAL can grep for them. We do NOT surface the failure to the user — the
+/// fallback IS the feature; surfacing a banner would defeat the purpose.
+pub fn score_or_default(query: &str, context_type: &str, safe_default: f32) -> f32 {
+    let result = std::panic::catch_unwind(|| {
+        score_context_relevance(query, context_type)
+    });
+    match result {
+        Ok(score) if score.is_finite() => score,
+        Ok(non_finite) => {
+            log::warn!(
+                "[CTX-07] score_context_relevance returned non-finite ({}) for type='{}'; falling back to default {}",
+                non_finite, context_type, safe_default
+            );
+            safe_default
+        }
+        Err(_) => {
+            log::warn!(
+                "[CTX-07] score_context_relevance panicked for type='{}'; falling back to default {} (smart path → naive path)",
+                context_type, safe_default
+            );
+            safe_default
+        }
+    }
+}
+
 /// Thalamus attention gate — dynamic threshold that gets stricter as the
 /// prompt grows. When there's plenty of budget left, let more context through
 /// (threshold 0.2). When the prompt is getting large, only let high-relevance
@@ -743,8 +782,8 @@ fn build_system_prompt_inner(
     // CTX-01: gate by identity OR memory relevance. Always inject when
     // smart_injection_enabled = false (CTX-07 escape hatch).
     let allow_character_bible = !smart || user_query.is_empty()
-        || score_context_relevance(user_query, "identity") > gate
-        || score_context_relevance(user_query, "memory") > gate;
+        || score_or_default(user_query, "identity", 1.0) > gate
+        || score_or_default(user_query, "memory", 1.0) > gate;
     if allow_character_bible {
         let mut pushed_bible = false;
         let db_path = crate::config::blade_config_dir().join("blade.db");
@@ -780,7 +819,7 @@ fn build_system_prompt_inner(
     // ── SAFETY MODULATION (priority 2.5 — Phase 26 / SAFE-03, SAFE-05) ───────
     // CTX-01: gate by security relevance. Smart=off opens all gates (CTX-07).
     let allow_safety = !smart || user_query.is_empty()
-        || score_context_relevance(user_query, "security") > gate;
+        || score_or_default(user_query, "security", 1.0) > gate;
     if allow_safety {
         let safety_mods = crate::safety_bundle::get_prompt_modulations();
         let mut total_safety_chars: usize = 0;
@@ -801,8 +840,8 @@ fn build_system_prompt_inner(
     // Smart=off keeps only the existing physio condition (CTX-07 escape hatch:
     // naive path = pre-Phase-32 behavior, which already required physio thresholds).
     let allow_hormones = !smart || user_query.is_empty()
-        || score_context_relevance(user_query, "identity") > gate
-        || score_context_relevance(user_query, "memory") > gate;
+        || score_or_default(user_query, "identity", 1.0) > gate
+        || score_or_default(user_query, "memory", 1.0) > gate;
     if allow_hormones {
         let physio = crate::homeostasis::get_physiology();
         let mut total_hormone_chars: usize = 0;
@@ -830,8 +869,8 @@ fn build_system_prompt_inner(
     // prefrontal + learned preferences. Together this can be 5–10k chars.
     // CTX-01: gate by identity OR memory relevance. Smart=off opens.
     let allow_identity_extension = !smart || user_query.is_empty()
-        || score_context_relevance(user_query, "identity") > gate
-        || score_context_relevance(user_query, "memory") > gate;
+        || score_or_default(user_query, "identity", 1.0) > gate
+        || score_or_default(user_query, "memory", 1.0) > gate;
     if allow_identity_extension {
         let mut total_id_ext_chars: usize = 0;
 
@@ -955,7 +994,7 @@ fn build_system_prompt_inner(
         .unwrap_or(false);
     let allow_vision = !smart || user_query.is_empty()
         || has_visible_error
-        || score_context_relevance(user_query, "vision") > gate;
+        || score_or_default(user_query, "vision", 1.0) > gate;
     if allow_vision {
         if let Some(p) = perception.as_ref() {
             let mut vision_lines: Vec<String> = Vec::new();
@@ -1003,7 +1042,7 @@ fn build_system_prompt_inner(
     // Smart=off keeps only the meeting precondition (CTX-07 escape hatch).
     let meeting_active = crate::audio_timeline::detect_meeting_in_progress();
     let allow_hearing = !smart || user_query.is_empty()
-        || score_context_relevance(user_query, "hearing") > gate;
+        || score_or_default(user_query, "hearing", 1.0) > gate;
     if meeting_active && allow_hearing {
         let db_path = crate::config::blade_config_dir().join("blade.db");
         let mut hearing_chars: usize = 0;
@@ -1283,8 +1322,8 @@ fn build_system_prompt_inner(
             let integration_score = if user_query.is_empty() {
                 0.0f32 // don't auto-inject on cold start
             } else {
-                score_context_relevance(user_query, "schedule")
-                    .max(score_context_relevance(user_query, "people"))
+                score_or_default(user_query, "schedule", 1.0)
+                    .max(score_or_default(user_query, "people", 1.0))
             };
             let state = crate::integration_bridge::get_integration_state();
             let has_imminent = state.upcoming_events.first()
@@ -1322,7 +1361,7 @@ fn build_system_prompt_inner(
     let gate = thalamus_threshold(current_chars);
 
     let mut code_chars: usize = 0;
-    if !user_query.is_empty() && score_context_relevance(user_query, "code") > gate {
+    if !user_query.is_empty() && score_or_default(user_query, "code", 1.0) > gate {
         const MAX_PROJECT_CHARS: usize = 3_000;
         const MAX_INDEX_TOTAL_CHARS: usize = 12_000;
         let known_projects = crate::indexer::list_indexed_projects();
@@ -1358,7 +1397,7 @@ fn build_system_prompt_inner(
 
     // ── GIT CONTEXT (priority 12, code-gated) ────────────────────────────────
     let mut git_chars: usize = 0;
-    if user_query.is_empty() || score_context_relevance(user_query, "code") > gate {
+    if user_query.is_empty() || score_or_default(user_query, "code", 1.0) > gate {
         if let Some(git_ctx) = git_context_for_active_project() {
             git_chars = git_chars.saturating_add(git_ctx.len());
             parts.push(git_ctx);
@@ -1378,7 +1417,7 @@ fn build_system_prompt_inner(
         let s = format!("## Security Expertise\n\n{}", crate::kali::security_system_prompt());
         security_chars = security_chars.saturating_add(s.len());
         parts.push(s);
-    } else if !user_query.is_empty() && score_context_relevance(user_query, "security") > 0.5 {
+    } else if !user_query.is_empty() && score_or_default(user_query, "security", 1.0) > 0.5 {
         let s = "## Security\n\nBe precise about risks, mitigations, and tool options.".to_string();
         security_chars = security_chars.saturating_add(s.len());
         parts.push(s);
@@ -1401,7 +1440,7 @@ fn build_system_prompt_inner(
             parts.push(s);
 
             // Full health context only when health-relevant query
-            let health_score = score_context_relevance(user_query, "health");
+            let health_score = score_or_default(user_query, "health", 1.0);
             if health_score > 0.3 {
                 let health_ctx = crate::health_tracker::get_health_context();
                 if !health_ctx.is_empty() {
@@ -1416,7 +1455,7 @@ fn build_system_prompt_inner(
     // ── WORLD MODEL (priority 15, system-gated) ───────────────────────────────
     // Only inject for system/process queries — not for every message
     let mut world_chars: usize = 0;
-    if !user_query.is_empty() && score_context_relevance(user_query, "system") > gate {
+    if !user_query.is_empty() && score_or_default(user_query, "system", 1.0) > gate {
         let world_summary = crate::world_model::get_world_summary();
         if !world_summary.is_empty() {
             world_chars = world_chars.saturating_add(world_summary.len());
@@ -1435,7 +1474,7 @@ fn build_system_prompt_inner(
 
     // Financial — only for money queries
     let mut financial_chars: usize = 0;
-    if !user_query.is_empty() && score_context_relevance(user_query, "financial") > gate {
+    if !user_query.is_empty() && score_or_default(user_query, "financial", 1.0) > gate {
         let fin = crate::financial_brain::get_financial_context();
         if !fin.is_empty() {
             financial_chars = financial_chars.saturating_add(fin.len());
@@ -1521,7 +1560,7 @@ fn build_system_prompt_inner(
     }
 
     // Hot files — only for code/file queries
-    if !user_query.is_empty() && (score_context_relevance(user_query, "code") > gate || user_query.to_lowercase().contains("file")) {
+    if !user_query.is_empty() && (score_or_default(user_query, "code", 1.0) > gate || user_query.to_lowercase().contains("file")) {
         let hot = crate::tentacles::filesystem_watch::get_hot_files(4);
         if !hot.is_empty() {
             let lines: Vec<String> = hot
@@ -1545,7 +1584,7 @@ fn build_system_prompt_inner(
     }
 
     // Code health
-    if !user_query.is_empty() && score_context_relevance(user_query, "code") > gate {
+    if !user_query.is_empty() && score_or_default(user_query, "code", 1.0) > gate {
         let health_summaries = crate::health::health_summary_all();
         if !health_summaries.is_empty() {
             parts.push(format!("## Code Health\n\n{}", health_summaries.join("\n")));
@@ -2708,4 +2747,150 @@ mod tests {
             "total_tokens should reflect synthetic overflow, got {}",
             snap.total_tokens);
     }
+
+    // ── Phase 32 Plan 32-07 — score_or_default panic-resistance ──────────────
+    //
+    // The v1.1 lesson incarnate: a panic anywhere in the smart path must NOT
+    // crash the dumb path. These tests prove `score_or_default` returns the
+    // configured `safe_default` whenever scoring panics or returns a
+    // non-finite value (NaN / inf), and that the surrounding callers in
+    // `build_system_prompt_inner` survive a forced panic via this contract.
+    //
+    // Each test resets `CTX_SCORE_OVERRIDE` BEFORE its assertion so a panic
+    // in this test cannot poison sibling tests.
+
+    #[test]
+    fn phase32_score_or_default_returns_score_normally() {
+        // No override — production keyword path runs through the wrapper.
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        let s = score_or_default("rust compile error", "code", 1.0);
+        assert!(
+            s >= 0.6,
+            "expected high score for code query (no override, no panic), got {}",
+            s
+        );
+    }
+
+    #[test]
+    fn phase32_score_or_default_returns_safe_default_on_panic() {
+        // Force the scorer to panic via the CTX_SCORE_OVERRIDE seam.
+        CTX_SCORE_OVERRIDE.with(|cell| {
+            *cell.borrow_mut() = Some(Box::new(|_q, _t| panic!("forced panic for CTX-07")));
+        });
+        let s = score_or_default("anything", "code", 1.0);
+        // Reset BEFORE asserting so failure here doesn't poison sibling tests.
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        assert_eq!(
+            s, 1.0,
+            "panic must degrade to safe_default 1.0 (naive-path / inject-everything)"
+        );
+    }
+
+    #[test]
+    fn phase32_score_or_default_returns_safe_default_on_nan() {
+        // NaN > gate is always false — a silent gate-closure that would omit
+        // sections without surfacing any error. The wrapper degrades to the
+        // safe default to prevent this.
+        CTX_SCORE_OVERRIDE.with(|cell| {
+            *cell.borrow_mut() = Some(Box::new(|_q, _t| f32::NAN));
+        });
+        let s = score_or_default("anything", "code", 1.0);
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        assert_eq!(
+            s, 1.0,
+            "NaN must degrade to safe_default — NaN > gate would silently omit"
+        );
+    }
+
+    #[test]
+    fn phase32_score_or_default_returns_safe_default_on_infinity() {
+        // ±inf is also non-finite. Same fallback contract as NaN.
+        CTX_SCORE_OVERRIDE.with(|cell| {
+            *cell.borrow_mut() = Some(Box::new(|_q, _t| f32::INFINITY));
+        });
+        let s = score_or_default("anything", "code", 1.0);
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        assert_eq!(
+            s, 1.0,
+            "+inf must degrade to safe_default — non-finite scorer is broken"
+        );
+    }
+
+    #[test]
+    fn phase32_build_system_prompt_survives_panic_in_scoring() {
+        // THE v1.1 regression fixture. With CTX_SCORE_OVERRIDE forcing every
+        // scoring call to panic, build_system_prompt_inner must STILL produce
+        // a non-empty prompt — every `score_or_default` call in the function
+        // catches the panic and falls back to safe_default = 1.0 = inject.
+        // The always-keep core (BLADE.md, identity_supplement) is unconditional
+        // and survives regardless. This test fails if any code path in
+        // build_system_prompt_inner regresses to call `score_context_relevance`
+        // directly (without the wrapper).
+        CTX_SCORE_OVERRIDE.with(|cell| {
+            *cell.borrow_mut() = Some(Box::new(|_q, _t| panic!("forced panic CTX-07 regression")));
+        });
+        // catch_unwind around the entire call so a regression surfaces as a
+        // legible test failure rather than a poisoned mutex / corrupted
+        // thread_local that breaks every subsequent test.
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            build_system_prompt_inner(
+                &[], "what time is it?", None,
+                &ModelTier::Frontier,
+                "anthropic", "claude-sonnet-4", 1,
+            )
+        }));
+        // Reset BEFORE assertion so failure doesn't poison sibling tests.
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        assert!(
+            result.is_ok(),
+            "build_system_prompt_inner panicked despite score_or_default catch_unwind wrappers — \
+             v1.1 regression: smart path crashed dumb path"
+        );
+        let prompt = result.expect("build_system_prompt_inner must not panic");
+        assert!(
+            !prompt.is_empty(),
+            "build_system_prompt_inner returned empty string under forced panic — \
+             always-keep core should survive every gate failure"
+        );
+        // Always-keep core (BLADE.md, identity_supplement, role) must survive.
+        // identity_supplement alone is typically 100-300 chars; 100 is a safe floor.
+        assert!(
+            prompt.len() > 100,
+            "fallback prompt unexpectedly short ({}b); always-keep core appears to have dropped",
+            prompt.len()
+        );
+    }
+
+    // ── Phase 32 Plan 32-07 — smart_injection_enabled toggle ─────────────────
+    //
+    // The CTX-07 escape hatch — when `smart_injection_enabled = false`, every
+    // `let allow_X = !smart || ...` short-circuits to TRUE so every gate opens
+    // unconditionally. We DO NOT exercise this at the unit-test level because:
+    //
+    //   1. `load_config()` reads from disk with no in-process override seam.
+    //      The only way to inject `smart=false` is via BLADE_CONFIG_DIR env-var
+    //      manipulation, which is process-global and pollutes parallel tests.
+    //      (Observed: setting BLADE_CONFIG_DIR in this test caused
+    //      `phase32_section_gate_simple_query` to fail because the parallel
+    //      runner saw the toggled-off config mid-flight.)
+    //
+    //   2. The toggle's effect — heavy sections inject — requires populated
+    //      perception_fusion / audio_timeline / character bible state to
+    //      actually surface in the prompt. At the unit-test level those
+    //      databases are empty, so vision/hearing rows stay 0 chars even with
+    //      smart=false.
+    //
+    // The runtime UAT (Plan 32-07 Task 2 Step 6) is the authoritative check.
+    // The serde round-trip of the toggle field is verified at the integration
+    // boundary in `tests/context_management_integration.rs`
+    // (`phase32_chat_survives_forced_panic_in_score_context_relevance`).
+    //
+    // The branch logic itself — `!smart || score_or_default(...) > gate` — is
+    // exercised by the panic-injection regression test below
+    // (`phase32_build_system_prompt_survives_panic_in_scoring`): with the
+    // scorer forced to panic, `score_or_default` returns 1.0 (> any gate), so
+    // every gate opens. This is the same logical path the !smart short-circuit
+    // takes. If `score_or_default` is ever removed from a gate, this test
+    // panics. Together with the integration-test serde round-trip, the toggle
+    // contract is covered without parallel-test fragility.
 }

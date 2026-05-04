@@ -2526,18 +2526,43 @@ pub(crate) async fn send_message_stream_inline(
             // rewrites) is included in the cap accounting. CTX-07 escape
             // hatch: when smart_injection_enabled = false, leave content
             // unchanged (legacy path).
+            //
+            // Phase 32 Plan 32-07 / CTX-07 — `cap_tool_output` is fallible in
+            // theory (integer overflow on pathological budgets, future
+            // regressions). On panic, fall through with the original content.
+            // `format_tool_result`'s 200k safety ceiling (Plan 32-05) is the
+            // outer bound; the chat does NOT crash. The v1.1 lesson incarnate:
+            // smart-path code must NEVER take down the dumb path.
+            //
+            // `AssertUnwindSafe` is required because the captured `content`
+            // and `tool_call.name` references make the closure non-auto-
+            // `UnwindSafe`. We do NOT depend on broken invariants after the
+            // panic — `content` is read-only and rebound below.
             let content = if config.context.smart_injection_enabled {
-                let _capped = cap_tool_output(&content, config.context.tool_output_cap_tokens);
-                if _capped.storage_id.is_some() {
-                    log::info!(
-                        "[CTX-05] tool '{}' output capped: ~{} → ~{} tokens (storage_id {})",
-                        tool_call.name,
-                        _capped.original_tokens,
-                        _capped.content.chars().count() / 4,
-                        _capped.storage_id.as_deref().unwrap_or("?"),
-                    );
+                let cap_attempt = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    cap_tool_output(&content, config.context.tool_output_cap_tokens)
+                }));
+                match cap_attempt {
+                    Ok(_capped) => {
+                        if _capped.storage_id.is_some() {
+                            log::info!(
+                                "[CTX-05] tool '{}' output capped: ~{} → ~{} tokens (storage_id {})",
+                                tool_call.name,
+                                _capped.original_tokens,
+                                _capped.content.chars().count() / 4,
+                                _capped.storage_id.as_deref().unwrap_or("?"),
+                            );
+                        }
+                        _capped.content
+                    }
+                    Err(_) => {
+                        log::warn!(
+                            "[CTX-07] cap_tool_output panicked on tool '{}'; falling through to original content (smart path → naive path)",
+                            tool_call.name
+                        );
+                        content
+                    }
                 }
-                _capped.content
             } else {
                 content
             };
