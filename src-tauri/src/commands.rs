@@ -152,6 +152,21 @@ fn estimate_tokens(conversation: &[ConversationMessage]) -> usize {
     }).sum()
 }
 
+/// Phase 32 / CTX-04 — return the model's context window in tokens.
+///
+/// Wraps `capability_probe::infer_capabilities` and returns just the 5th
+/// tuple element (context_window). Falls back to 8_192 (capability_probe's
+/// all_false default) for unknown provider/model pairs — this guarantees
+/// the compaction trigger is never zero or negative.
+///
+/// Used by the proactive compaction trigger so every model triggers
+/// compaction at exactly the same percentage of its real context window.
+pub fn model_context_window(provider: &str, model: &str) -> u32 {
+    let (_, _, _, _, ctx) =
+        crate::capability_probe::infer_capabilities(provider, model, None);
+    if ctx < 8_192 { 8_192 } else { ctx }
+}
+
 /// Truncate conversation to fit within token budget.
 /// Keeps: System prompt (always), last user message (always), drops oldest middle messages.
 /// Inserts a marker so the model knows history was removed (prevents hallucinated continuity).
@@ -1482,15 +1497,43 @@ pub(crate) async fn send_message_stream_inline(
 
     // Tools configured → non-streaming tool loop
     let mut conversation = conversation;
-    // Proactive compression before entering the loop — keep under 140k tokens
-    compress_conversation_smart(
-        &mut conversation,
-        140_000,
-        &config.provider,
-        &config.api_key,
-        &config.model,
-        config.base_url.as_deref(),
-    ).await;
+    // Phase 32 / CTX-04 — proactive compression at config.context.compaction_trigger_pct
+    // (default 0.80) of the model's real context window. Honors the CTX-07
+    // escape hatch: when smart_injection_enabled is false, the legacy literal
+    // is used as the safety net (naive path).
+    {
+        let smart = config.context.smart_injection_enabled;
+        let trigger = if smart {
+            (model_context_window(&config.provider, &config.model) as f32
+                * config.context.compaction_trigger_pct) as usize
+        } else {
+            140_000 // legacy literal — naive path
+        };
+        let pre_tokens = estimate_tokens(&conversation);
+        if pre_tokens > trigger {
+            // Emit BEFORE the await so the UI can surface a "compacting…"
+            // spinner immediately. Wrapped in `let _ =` because emit may fail
+            // in non-Tauri contexts (unit tests).
+            let _ = app.emit("blade_status", "compacting");
+            emit_stream_event(&app, "blade_notification", serde_json::json!({
+                "type": "info",
+                "message": format!(
+                    "Compacting earlier conversation (~{} tokens of {} budget)",
+                    pre_tokens, trigger
+                )
+            }));
+        }
+        compress_conversation_smart(
+            &mut conversation,
+            trigger,
+            &config.provider,
+            &config.api_key,
+            &config.model,
+            config.base_url.as_deref(),
+        ).await;
+        // Restore status so subsequent stream events show the right indicator.
+        let _ = app.emit("blade_status", "processing");
+    }
 
     let mut last_tool_signature = String::new();
     let mut repeat_count = 0u8;
@@ -1529,11 +1572,22 @@ pub(crate) async fn send_message_stream_inline(
                         emit_stream_event(&app, "blade_notification", serde_json::json!({
                             "type": "info", "message": "Context too long — compressing conversation and retrying"
                         }));
+                        // Phase 32 / CTX-04 — recovery path: compress to a more
+                        // aggressive 65% of the model's context window so the
+                        // retry has headroom. Honors the smart-injection toggle.
+                        let smart = config.context.smart_injection_enabled;
+                        let recovery_trigger = if smart {
+                            (model_context_window(&config.provider, &config.model) as f32 * 0.65) as usize
+                        } else {
+                            120_000 // legacy literal — naive path
+                        };
+                        let _ = app.emit("blade_status", "compacting");
                         compress_conversation_smart(
-                            &mut conversation, 120_000,
+                            &mut conversation, recovery_trigger,
                             &config.provider, &config.api_key, &config.model,
                             config.base_url.as_deref(),
                         ).await;
+                        let _ = app.emit("blade_status", "processing");
                         let retry = providers::complete_turn(
                             &config.provider,
                             &config.api_key,
@@ -3392,6 +3446,58 @@ pub(crate) mod tests {
             toks >= lower && toks <= upper,
             "expected ~100k tokens, got {} (allowed range {}..={})",
             toks, lower, upper
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Plan 32-04 / CTX-04 — model-aware compaction trigger tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn phase32_compaction_trigger_anthropic_200k() {
+        let ctx = model_context_window("anthropic", "claude-sonnet-4");
+        assert!(ctx >= 200_000, "expected 200k+ for Claude Sonnet 4, got {}", ctx);
+        let trigger = (ctx as f32 * 0.80) as usize;
+        assert!(
+            trigger >= 160_000 && trigger <= 200_000,
+            "expected ~160k trigger, got {}", trigger
+        );
+    }
+
+    #[test]
+    fn phase32_compaction_trigger_openai_128k() {
+        let ctx = model_context_window("openai", "gpt-4o");
+        // gpt-4o is 128k context; capability_probe should return 128_000
+        assert!(
+            ctx >= 100_000 && ctx <= 200_000,
+            "expected ~128k for gpt-4o, got {}", ctx
+        );
+        let trigger = (ctx as f32 * 0.80) as usize;
+        assert!(
+            trigger > 80_000 && trigger < ctx as usize,
+            "expected trigger between 80k and ctx_window, got {}", trigger
+        );
+    }
+
+    #[test]
+    fn phase32_compaction_trigger_unknown_model_safe_default() {
+        let ctx = model_context_window("not-a-real-provider", "not-a-real-model");
+        assert!(
+            ctx >= 8_192,
+            "unknown model must return ≥ 8192 to keep trigger non-zero, got {}", ctx
+        );
+    }
+
+    #[test]
+    fn phase32_compaction_trigger_pct_respects_config() {
+        let ctx = model_context_window("anthropic", "claude-sonnet-4");
+        let trigger_80 = (ctx as f32 * 0.80) as usize;
+        let trigger_65 = (ctx as f32 * 0.65) as usize;
+        let delta = trigger_80.saturating_sub(trigger_65);
+        let expected = (ctx as f32 * 0.15) as usize;
+        assert!(
+            (delta as i64 - expected as i64).abs() < 100,
+            "expected ~15% delta, got {} (expected {})", delta, expected
         );
     }
 }
