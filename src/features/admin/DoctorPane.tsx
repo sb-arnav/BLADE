@@ -22,6 +22,8 @@ import {
 } from 'react';
 import {
   doctorRunFullCheck,
+  getContextBreakdown,
+  type ContextBreakdown,
   type DoctorSignal,
   type SignalClass,
   type Severity,
@@ -89,6 +91,121 @@ function formatTimestamp(unixMs: number): string {
   const d = new Date(unixMs);
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())} · ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// ── Phase 32 Plan 32-06 / CTX-06 ─────────────────────────────────────────────
+// ContextBudgetSection renders a per-section token breakdown of the most
+// recent build_system_prompt_inner call. Subscribes to `chat_done` so the
+// breakdown refreshes per chat turn (no polling).
+//
+// CONTEXT.md lock: "ship a monospace table inside an existing dialog/drawer"
+// — no bespoke design system work. The chat-first pivot defers UI design
+// effort here. This is a debug surface, not production polish.
+//
+// CTX-07 spirit: if the backend command throws, the section renders nothing
+// rather than breaking the rest of DoctorPane. The error path is silent.
+function ContextBudgetSection() {
+  const [breakdown, setBreakdown] = useState<ContextBreakdown | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const b = await getContextBreakdown();
+      setBreakdown(b);
+      setError(null);
+    } catch (e) {
+      // CTX-07 fallback: never crash the page on a backend hiccup.
+      setError(typeof e === 'string' ? e : String(e));
+      setBreakdown(null);
+    }
+  }, []);
+
+  // Initial fetch on mount.
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  // Refresh on chat_done event — no polling. The handler is stored in a ref
+  // by useTauriEvent so a fresh closure here doesn't churn listeners (P-06).
+  useTauriEvent<unknown>(BLADE_EVENTS.CHAT_DONE, () => {
+    void refresh();
+  });
+
+  // Soft-fail per CTX-07 spirit — render nothing rather than break the page.
+  if (error) {
+    return null;
+  }
+
+  if (!breakdown) {
+    return (
+      <section className="diagnostics-section" style={{ marginTop: 'var(--s-3)' }}>
+        <h4 className="diagnostics-section-title">Context Budget</h4>
+        <p className="doctor-row-meta">Loading…</p>
+      </section>
+    );
+  }
+
+  // Empty accumulator (no prompt built this session yet) → zero state.
+  // Hide the table until at least one section is recorded.
+  if (breakdown.total_tokens === 0 || Object.keys(breakdown.sections).length === 0) {
+    return (
+      <section className="diagnostics-section" style={{ marginTop: 'var(--s-3)' }}>
+        <h4 className="diagnostics-section-title">Context Budget</h4>
+        <p className="doctor-row-meta">
+          No prompt built this session yet — send a chat message to populate.
+        </p>
+      </section>
+    );
+  }
+
+  // Sort sections by token count descending — biggest budget consumers first.
+  const sortedSections = Object.entries(breakdown.sections).sort(
+    ([, a], [, b]) => b - a,
+  );
+
+  return (
+    <section className="diagnostics-section" style={{ marginTop: 'var(--s-3)' }}>
+      <h4 className="diagnostics-section-title">Context Budget</h4>
+      <div className="doctor-row-meta" style={{ marginBottom: 'var(--s-2)' }}>
+        {breakdown.total_tokens.toLocaleString()} tokens of{' '}
+        {breakdown.model_context_window.toLocaleString()} budget (
+        {breakdown.percent_used.toFixed(1)}%) — estimate, chars/4 heuristic
+      </div>
+      <table
+        style={{
+          width: '100%',
+          fontFamily: 'var(--font-mono, monospace)',
+          fontSize: '12px',
+          borderCollapse: 'collapse',
+        }}
+      >
+        <thead>
+          <tr style={{ textAlign: 'left' }}>
+            <th>Section</th>
+            <th style={{ textAlign: 'right' }}>Tokens</th>
+            <th style={{ textAlign: 'right' }}>% of total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sortedSections.map(([label, tokens]) => {
+            const pct =
+              breakdown.total_tokens > 0
+                ? (tokens / breakdown.total_tokens) * 100
+                : 0;
+            return (
+              <tr key={label}>
+                <td>{label}</td>
+                <td style={{ textAlign: 'right' }}>
+                  {tokens.toLocaleString()}
+                </td>
+                <td style={{ textAlign: 'right' }}>{pct.toFixed(1)}%</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </section>
+  );
 }
 
 function DoctorRow({
@@ -208,19 +325,23 @@ export function DoctorPane() {
   // Page-level error state
   if (error && !loading) {
     return (
-      <section className="diagnostics-section">
-        <h4 className="diagnostics-section-title">Doctor</h4>
-        <EmptyState
-          label="Doctor unavailable"
-          description={`Could not run full check. Tauri command failed: ${error}`}
-          actionLabel="Retry"
-          onAction={() => refresh(false)}
-        />
-      </section>
+      <>
+        <section className="diagnostics-section">
+          <h4 className="diagnostics-section-title">Doctor</h4>
+          <EmptyState
+            label="Doctor unavailable"
+            description={`Could not run full check. Tauri command failed: ${error}`}
+            actionLabel="Retry"
+            onAction={() => refresh(false)}
+          />
+        </section>
+        <ContextBudgetSection />
+      </>
     );
   }
 
   return (
+    <>
     <section className="diagnostics-section">
       <h4 className="diagnostics-section-title">Doctor</h4>
 
@@ -314,5 +435,7 @@ export function DoctorPane() {
         </Dialog>
       )}
     </section>
+    <ContextBudgetSection />
+    </>
   );
 }

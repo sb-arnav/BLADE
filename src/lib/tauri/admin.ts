@@ -2062,3 +2062,47 @@ export function consentSetDecision(
 export function consentRevokeAll(): Promise<void> {
   return invokeTyped<void>('consent_revoke_all');
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// brain.rs — Context Budget Breakdown (Phase 32 / CTX-06)
+//
+// @see src-tauri/src/brain.rs::ContextBreakdown (struct)
+// @see src-tauri/src/brain.rs::get_context_breakdown (Tauri command)
+// @see .planning/phases/32-context-management/32-06-PLAN.md
+//
+// DoctorPane's ContextBudgetSection consumes this command after every
+// `chat_done` event to render the per-section token tally for the most
+// recent build_system_prompt_inner call.
+//
+// Wire shape: struct ContextBreakdown derives Serialize with default field
+// names (no rename_all). All fields are snake_case verbatim.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** @see src-tauri/src/brain.rs:217 ContextBreakdown */
+export type ContextBreakdown = {
+  /** 16-char hex prefix of SHA-256(query). May be "" if not populated. */
+  query_hash: string;
+  /** Model context window from capability_probe (e.g. 200_000 for Claude Sonnet 4). */
+  model_context_window: number;
+  /** Sum of all section token counts (excluding tools/messages). */
+  total_tokens: number;
+  /** Per-section token tally. Stable label set documented in brain.rs. */
+  sections: Record<string, number>;
+  /** total_tokens / model_context_window * 100. Clamped to [0, 100]. */
+  percent_used: number;
+  /** Unix epoch milliseconds when the breakdown was captured. */
+  timestamp_ms: number;
+};
+
+/**
+ * @see src-tauri/src/brain.rs::get_context_breakdown
+ * Rust signature: `get_context_breakdown() -> Result<ContextBreakdown, String>`.
+ *
+ * Returns the per-section token breakdown of the most recent
+ * `build_system_prompt_inner` invocation. If no prompt has been built yet,
+ * returns a zeroed-out breakdown (sections empty, total_tokens 0). The
+ * DoctorPane Context Budget panel calls this after every `chat_done` event.
+ */
+export function getContextBreakdown(): Promise<ContextBreakdown> {
+  return invokeTyped<ContextBreakdown>('get_context_breakdown');
+}
