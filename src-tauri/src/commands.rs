@@ -188,9 +188,81 @@ fn truncate_to_budget(conversation: &mut Vec<ConversationMessage>, max_tokens: u
     }
 }
 
-/// Smart context compression — inspired by MemPalace's AAAK pattern.
+/// Phase 32 / CTX-03 — token-aware safety cap on the keep_recent suffix.
+///
+/// RESEARCH.md notes that 8 messages × 50k-token bash outputs each = 400k
+/// tokens preserved verbatim, defeating compaction. This helper bounds the
+/// recent-message count by BOTH a message count cap (default 8) AND a token
+/// budget (default 16k), whichever fires first. Always returns at least 2
+/// so the most-recent user/assistant exchange is always preserved.
+///
+/// Pure / synchronous / unit-testable — extracted from compress_conversation_smart
+/// so it can be exercised directly without a network call.
+pub(crate) fn compute_keep_recent(
+    conversation: &[ConversationMessage],
+    max_messages: usize,
+    token_budget: usize,
+) -> usize {
+    let mut total: usize = 0;
+    let mut count: usize = 0;
+    for msg in conversation.iter().rev() {
+        let msg_tokens = match msg {
+            ConversationMessage::System(_) => 0, // system messages are not "recent"
+            ConversationMessage::User(s) => s.len() / 4,
+            ConversationMessage::UserWithImage { text, .. } => text.len() / 4 + 250,
+            ConversationMessage::Assistant { content, .. } => content.len() / 4,
+            ConversationMessage::Tool { content, .. } => content.len() / 4,
+        };
+        if total + msg_tokens > token_budget || count >= max_messages {
+            break;
+        }
+        total += msg_tokens;
+        count += 1;
+    }
+    count.max(2) // floor — always keep the most-recent exchange
+}
+
+/// Phase 32 / CTX-03 — OpenHands v7610 structured summary prompt.
+///
+/// Verbatim port of the prompt from PR #7610 (csmith49) on OpenHands. Replaces
+/// the previous "summarize in 3-6 sentences" generic prompt. The structured
+/// shape (USER_CONTEXT / COMPLETED / PENDING / CURRENT_STATE / CODE_STATE /
+/// TESTS / CHANGES / DEPS / INTENT / VC_STATUS) gives the cheap-summary model
+/// scaffolding that produces measurably better recall fidelity (Phase 37
+/// EVAL-04 will quantify).
+///
+/// Pure / synchronous / unit-testable — extracted from compress_conversation_smart
+/// so the prompt construction can be asserted without invoking a real LLM.
+pub(crate) fn build_compaction_summary_prompt(events: &[String]) -> String {
+    format!(
+        "You are maintaining a context-aware state summary for an interactive agent. \
+         You will be given a list of events corresponding to actions taken by the agent, \
+         and the most recent previous summary if one exists. Track:\n\n\
+         USER_CONTEXT: (Preserve essential user requirements, problem descriptions, and clarifications in concise form)\n\
+         COMPLETED: (Tasks completed so far, with brief results)\n\
+         PENDING: (Tasks that still need to be done)\n\
+         CURRENT_STATE: (Current variables, data structures, or relevant state)\n\n\
+         For code-specific tasks, also include:\n\
+         CODE_STATE: {{File paths, function signatures, data structures}}\n\
+         TESTS: {{Failing cases, error messages, outputs}}\n\
+         CHANGES: {{Code edits, variable updates}}\n\
+         DEPS: {{Dependencies, imports, external calls}}\n\
+         INTENT: {{Why changes were made, acceptance criteria}}\n\
+         VC_STATUS: {{Repository state, current branch, PR status, commit history}}\n\n\
+         PRIORITIZE:\n\
+         1. Adapt tracking format to match the actual task type\n\
+         2. Capture key user requirements and goals\n\
+         3. Distinguish between completed and pending tasks\n\
+         4. Keep all sections concise and relevant\n\n\
+         SKIP: Tracking irrelevant details for the current task type\n\n\
+         Events:\n{}",
+        events.join("\n")
+    )
+}
+
+/// Smart context compression — inspired by MemPalace's AAAK pattern + OpenHands v7610.
 /// Instead of dropping old turns, summarizes them into a compact block.
-/// Keeps: system prompt + compressed summary + last 8 turns verbatim.
+/// Keeps: system prompt + compressed summary + last ~8 turns (token-bounded) verbatim.
 async fn compress_conversation_smart(
     conversation: &mut Vec<ConversationMessage>,
     max_tokens: usize,
@@ -203,7 +275,13 @@ async fn compress_conversation_smart(
         return;
     }
 
-    let keep_recent = 8usize;
+    // Phase 32 / CTX-03 — token-aware keep_recent. RESEARCH.md notes a
+    // pathological 50k-token bash output in the last-8 would defeat compaction.
+    // KEEP_RECENT_TOKEN_BUDGET (16k) bounds the recent suffix by tokens too;
+    // compute_keep_recent floors at 2 so the most-recent exchange is always
+    // preserved.
+    const KEEP_RECENT_TOKEN_BUDGET: usize = 16_000;
+    let keep_recent = compute_keep_recent(conversation, 8, KEEP_RECENT_TOKEN_BUDGET);
     let system_count = conversation.iter()
         .filter(|m| matches!(m, ConversationMessage::System(_)))
         .count();
@@ -243,12 +321,8 @@ async fn compress_conversation_smart(
         return;
     }
 
-    let summary_prompt = format!(
-        "Summarize this earlier conversation in 3-6 sentences. Preserve: key decisions made, \
-         code written or changed, errors encountered and resolved, facts established. \
-         Be dense and specific — this replaces the full history.\n\n{}",
-        to_compress.join("\n")
-    );
+    // Phase 32 / CTX-03 — OpenHands v7610 structured summary prompt
+    let summary_prompt = build_compaction_summary_prompt(&to_compress);
 
     // Use cheapest model for compression
     let cheap = crate::config::cheap_model_for_provider(provider, model);
@@ -260,7 +334,7 @@ async fn compress_conversation_smart(
     ).await {
         Ok(t) => t.content,
         Err(_) => {
-            // Compression failed — fall back to hard truncation
+            // Compression failed — fall back to hard truncation (CTX-07 fallback path)
             truncate_to_budget(conversation, max_tokens);
             return;
         }
@@ -3499,5 +3573,64 @@ pub(crate) mod tests {
             (delta as i64 - expected as i64).abs() < 100,
             "expected ~15% delta, got {} (expected {})", delta, expected
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // Plan 32-04 / CTX-03 — OpenHands v7610 prompt + token-aware keep_recent
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn phase32_compress_summary_prompt_includes_v7610_keys() {
+        let events = vec![
+            "User: hello".to_string(),
+            "Assistant: hi there".to_string(),
+        ];
+        let prompt = build_compaction_summary_prompt(&events);
+        for key in &["USER_CONTEXT", "COMPLETED", "PENDING", "CURRENT_STATE", "CODE_STATE"] {
+            assert!(prompt.contains(key), "missing key {} in prompt", key);
+        }
+        assert!(
+            prompt.contains("hello"),
+            "events not interpolated into prompt"
+        );
+    }
+
+    #[test]
+    fn phase32_compress_keep_recent_normal_case() {
+        // 1 system + 20 turns of ~210 chars each → ~52 tokens each → 8 turns ≈ 420 tokens
+        // Should hit the 8-message cap before the 16k token budget.
+        let conv = build_test_conversation(20);
+        let keep = compute_keep_recent(&conv, 8, 16_000);
+        assert_eq!(
+            keep, 8,
+            "expected 8-message cap to apply, got {}", keep
+        );
+    }
+
+    #[test]
+    fn phase32_compress_keep_recent_token_aware() {
+        // 1 system + 7 normal + 1 huge 100k-char tool message at the end.
+        // The huge tool message alone is ~25k tokens, exceeding the 16k budget,
+        // so keep_recent should bottom out at the .max(2) floor.
+        let mut conv = build_test_conversation(7);
+        conv.push(ConversationMessage::Tool {
+            tool_call_id: "x".to_string(),
+            tool_name: "bash".to_string(),
+            content: "x".repeat(100_000), // ~25k tokens
+            is_error: false,
+        });
+        let keep = compute_keep_recent(&conv, 8, 16_000);
+        assert!(
+            keep <= 2,
+            "huge message should cap keep_recent, got {}", keep
+        );
+    }
+
+    #[test]
+    fn phase32_compress_keep_recent_floor() {
+        // Tiny conversation, ensure floor at 2.
+        let conv = build_test_conversation(1);
+        let keep = compute_keep_recent(&conv, 8, 16_000);
+        assert!(keep >= 2, "floor should be 2, got {}", keep);
     }
 }
