@@ -294,6 +294,87 @@ pub(crate) fn read_section_breakdown() -> Vec<(String, usize)> {
     LAST_BREAKDOWN.with(|b| b.borrow().clone())
 }
 
+// ── Phase 32 / CTX-06 — Breakdown snapshot + Tauri command ───────────────────
+//
+// `build_breakdown_snapshot` is the pure (non-Tauri) breakdown computation,
+// callable from `mod tests`. The `get_context_breakdown` Tauri command is a
+// thin wrapper that loads BladeConfig and forwards to this function.
+//
+// Algorithm:
+//   1. Read raw `(label, char_count)` entries from LAST_BREAKDOWN.
+//   2. Aggregate per-label char counts (record_section may push multiple
+//      entries with the same label — sum them).
+//   3. Convert chars → tokens using the chars/4 heuristic (same estimator
+//      commands.rs uses elsewhere — keeps DoctorPane numbers consistent
+//      with the chat pipeline's token accounting).
+//   4. Look up the model's context window via capability_probe.
+//   5. Compute percent_used, clamped to [0.0, 100.0]. NaN/inf-safe: if
+//      ctx_window is 0 (unknown provider/model), percent_used = 0.0.
+//
+// CTX-07 spirit: this function is panic-free by construction (HashMap +
+// saturating arithmetic + checked div via the ctx_window == 0 branch). If
+// the LAST_BREAKDOWN accumulator is empty (no prompt built yet),
+// total_tokens == 0 and sections is empty — DoctorPane handles this as the
+// "Loading…" / first-turn state.
+//
+/// Phase 32 / CTX-06 — pure breakdown computation, callable from tests.
+/// The Tauri wrapper `get_context_breakdown` is a one-line shim around this.
+pub fn build_breakdown_snapshot(provider: &str, model: &str) -> ContextBreakdown {
+    let raw = read_section_breakdown(); // Vec<(String, usize)> char counts
+    let mut sections: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
+    let mut total_chars: usize = 0;
+    for (label, chars) in raw.iter() {
+        *sections.entry(label.clone()).or_insert(0) += chars;
+        total_chars = total_chars.saturating_add(*chars);
+    }
+    // chars / 4 = tokens (matches commands.rs estimate_tokens heuristic).
+    let total_tokens = total_chars / 4;
+    let sections_tokens: std::collections::HashMap<String, usize> = sections
+        .into_iter()
+        .map(|(k, v)| (k, v / 4))
+        .collect();
+
+    // capability_probe::infer_capabilities returns (vision, audio, tools,
+    // long_context, ctx_window). We only care about the ctx_window here.
+    let (_, _, _, _, ctx_window) =
+        crate::capability_probe::infer_capabilities(provider, model, None);
+
+    let percent_used = if ctx_window == 0 {
+        0.0
+    } else {
+        ((total_tokens as f32 / ctx_window as f32) * 100.0).min(100.0)
+    };
+
+    ContextBreakdown {
+        // query_hash: not populated here — the breakdown is keyed by "most
+        // recent prompt build", and the query string is not retained on the
+        // accumulator. Plan 32-07 may wire it through if needed.
+        query_hash: String::new(),
+        model_context_window: ctx_window,
+        total_tokens,
+        sections: sections_tokens,
+        percent_used,
+        timestamp_ms: chrono::Utc::now().timestamp_millis(),
+    }
+}
+
+/// Phase 32 / CTX-06 — Tauri command. Returns the per-section token
+/// breakdown of the most recent `build_system_prompt_inner` call. Reads
+/// the active config to determine `model_context_window` for the active
+/// provider/model.
+///
+/// CTX-07 contract: this command is best-effort. If the breakdown
+/// accumulator is empty (no prompt built yet), it returns a zeroed-out
+/// ContextBreakdown rather than erroring — DoctorPane treats that as the
+/// first-turn state and renders nothing visible until a real prompt
+/// build populates the accumulator.
+#[tauri::command]
+pub async fn get_context_breakdown() -> Result<ContextBreakdown, String> {
+    let cfg = crate::config::load_config();
+    Ok(build_breakdown_snapshot(&cfg.provider, &cfg.model))
+}
+
 // ── Smart context relevance scoring ──────────────────────────────────────────
 //
 // Returns a 0.0–1.0 score for how relevant a context block type is to the
@@ -2553,5 +2634,78 @@ mod tests {
             "identity_supplement must be small core, got {} chars",
             identity_chars
         );
+    }
+
+    // ── Phase 32 Plan 32-06 — get_context_breakdown / build_breakdown_snapshot ─
+    //
+    // These three tests exercise the breakdown computation that backs the
+    // `get_context_breakdown` Tauri command (the DoctorPane Context Budget
+    // panel). The pure `build_breakdown_snapshot` is tested directly; the
+    // Tauri wrapper is a one-line shim that loads config and forwards.
+
+    #[test]
+    fn phase32_get_context_breakdown_after_prompt_build() {
+        // Build a prompt to populate LAST_BREAKDOWN.
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        let _ = build_system_prompt_inner(
+            &[], "explain this rust function", None,
+            &ModelTier::Frontier,
+            "anthropic", "claude-sonnet-4", 1,
+        );
+        let snap = build_breakdown_snapshot("anthropic", "claude-sonnet-4");
+        assert!(!snap.sections.is_empty(),
+            "expected at least one recorded section, got {:?}", snap.sections);
+        assert!(snap.total_tokens > 0,
+            "expected total_tokens > 0, got {}", snap.total_tokens);
+        assert!(snap.model_context_window >= 100_000,
+            "expected anthropic context_window ≥ 100k, got {}",
+            snap.model_context_window);
+        assert!(snap.percent_used >= 0.0 && snap.percent_used <= 100.0,
+            "percent_used out of bounds: {}", snap.percent_used);
+        assert!(snap.percent_used.is_finite(),
+            "percent_used must be finite, got {}", snap.percent_used);
+        assert!(snap.timestamp_ms > 0,
+            "timestamp_ms should be populated, got {}", snap.timestamp_ms);
+    }
+
+    #[test]
+    fn phase32_get_context_breakdown_empty_when_no_prompt_built() {
+        // Reset override + clear the accumulator → simulate "no prompt built yet".
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        clear_section_accumulator();
+        let snap = build_breakdown_snapshot("anthropic", "claude-sonnet-4");
+        assert!(snap.sections.is_empty(),
+            "sections must be empty when accumulator is empty, got {:?}",
+            snap.sections);
+        assert_eq!(snap.total_tokens, 0,
+            "total_tokens must be 0 when accumulator is empty");
+        assert_eq!(snap.percent_used, 0.0,
+            "percent_used must be 0.0 when total_tokens is 0");
+        // model_context_window is still populated even with an empty
+        // accumulator — capability_probe runs unconditionally.
+        assert!(snap.model_context_window > 0,
+            "model_context_window must be populated regardless of accumulator state");
+    }
+
+    #[test]
+    fn phase32_get_context_breakdown_percent_used_clamped() {
+        // Force a huge synthetic breakdown that would overflow any real
+        // context window. percent_used must clamp to ≤ 100 — never NaN, never
+        // +inf.
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        clear_section_accumulator();
+        // 4_000_000 chars = 1_000_000 tokens — exceeds anthropic's 200k window.
+        record_section("synthetic_overflow", 4_000_000);
+        let snap = build_breakdown_snapshot("anthropic", "claude-sonnet-4");
+        assert!(snap.percent_used <= 100.0,
+            "percent_used must clamp to ≤ 100, got {}", snap.percent_used);
+        assert!(snap.percent_used.is_finite(),
+            "percent_used must be finite, got {}", snap.percent_used);
+        assert!(snap.percent_used >= 99.0,
+            "with 1M tokens overflowing 200k window, percent_used should be near 100, got {}",
+            snap.percent_used);
+        assert_eq!(snap.total_tokens, 1_000_000,
+            "total_tokens should reflect synthetic overflow, got {}",
+            snap.total_tokens);
     }
 }
