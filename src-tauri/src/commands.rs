@@ -422,7 +422,14 @@ fn safe_fallback_model(provider: &str) -> &'static str {
         _             => "gpt-4o-mini", // OpenAI-compat default
     }
 }
-const MAX_TOOL_RESULT_CHARS: usize = 12_000;
+// Phase 32 Plan 32-05 / CTX-05: raised from 12_000 to 200_000. The 12k value
+// was silently dropping the TAIL of every long tool output before
+// `cap_tool_output` (the real per-message budget enforcer) could see it — a
+// bash output ending in a critical error would lose that error. The 4k-token
+// (~16k char) per-message budget is now enforced by `cap_tool_output` at the
+// conversation-insertion site; `format_tool_result` is a SAFETY net for
+// truly pathological multi-MB outputs only.
+const MAX_TOOL_RESULT_CHARS: usize = 200_000;
 
 /// Try to complete a turn using a free/fallback model when the primary is rate-limited.
 /// Attempts OpenRouter free tier first, then Groq, then Ollama.
@@ -2512,6 +2519,29 @@ pub(crate) async fn send_message_stream_inline(
                 }
             }
 
+            // Phase 32 Plan 32-05 / CTX-05 — cap the tool output at the
+            // configured per-message budget (default 4000 tokens) BEFORE
+            // inserting into the conversation. The cap runs LAST so any
+            // upstream enrichment (explain_tool_failure, immune-system
+            // rewrites) is included in the cap accounting. CTX-07 escape
+            // hatch: when smart_injection_enabled = false, leave content
+            // unchanged (legacy path).
+            let content = if config.context.smart_injection_enabled {
+                let _capped = cap_tool_output(&content, config.context.tool_output_cap_tokens);
+                if _capped.storage_id.is_some() {
+                    log::info!(
+                        "[CTX-05] tool '{}' output capped: ~{} → ~{} tokens (storage_id {})",
+                        tool_call.name,
+                        _capped.original_tokens,
+                        _capped.content.chars().count() / 4,
+                        _capped.storage_id.as_deref().unwrap_or("?"),
+                    );
+                }
+                _capped.content
+            } else {
+                content
+            };
+
             conversation.push(ConversationMessage::Tool {
                 tool_call_id: tool_call.id,
                 tool_name: tool_call.name,
@@ -3810,6 +3840,56 @@ pub(crate) mod tests {
             id.starts_with("tool_out_"),
             "storage_id format wrong: {}",
             id
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Plan 32-05 / CTX-05 — format_tool_result regression tests.
+    //
+    // Old behavior: MAX_TOOL_RESULT_CHARS = 12_000, format_tool_result
+    // silently truncated bash output tails before cap_tool_output (the real
+    // budget enforcer) could see them. New behavior: MAX_TOOL_RESULT_CHARS =
+    // 200_000 — format_tool_result is a SAFETY net for multi-MB pathological
+    // outputs only. The 4000-token per-message budget lives in
+    // cap_tool_output at the conversation-insertion site.
+    // -----------------------------------------------------------------------
+
+    fn make_mcp_result(text: &str, is_error: bool) -> crate::mcp::McpToolResult {
+        crate::mcp::McpToolResult {
+            content: vec![crate::mcp::McpContent {
+                content_type: "text".to_string(),
+                text: Some(text.to_string()),
+            }],
+            is_error,
+        }
+    }
+
+    #[test]
+    fn phase32_format_tool_result_no_longer_truncates_at_12k() {
+        let big = "y".repeat(50_000);
+        let r = make_mcp_result(&big, false);
+        let formatted = format_tool_result(&r);
+        // Old behavior: hard-truncated at 12_000 chars + ~50 chars of marker.
+        // New behavior: passes 50_000 through (under the new 200_000 ceiling).
+        assert!(
+            formatted.len() >= 30_000,
+            "format_tool_result should no longer truncate small-MB outputs (got {} chars)",
+            formatted.len()
+        );
+    }
+
+    #[test]
+    fn phase32_format_tool_result_still_caps_at_safety_ceiling() {
+        let huge = "z".repeat(500_000);
+        let r = make_mcp_result(&huge, false);
+        let formatted = format_tool_result(&r);
+        // 200k ceiling + ~80 chars marker ≈ 200_080 chars. Bound generously
+        // at 250_000 — the property under test is "still has an outer
+        // safety ceiling", not the exact value.
+        assert!(
+            formatted.len() <= 250_000,
+            "format_tool_result must still have an outer safety ceiling (got {} chars)",
+            formatted.len()
         );
     }
 }
