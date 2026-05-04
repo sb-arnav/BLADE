@@ -682,6 +682,7 @@ pub fn run() {
             brain::get_context,
             brain::brain_extract_from_exchange,
             brain::set_context,
+            brain::get_context_breakdown, // Phase 32 / CTX-06
             clipboard::get_clipboard,
             clipboard::set_clipboard,
             clipboard::get_clipboard_prefetch,
