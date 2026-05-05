@@ -230,6 +230,13 @@ export const BLADE_EVENTS = {
   // ConsentDialog and awaits user decision (max 60s, then assumed deny).
   // Payload: ConsentRequestPayload (see ./payloads.ts).
   CONSENT_REQUEST: 'consent_request',
+
+  // ───── Phase 33 — Agentic Loop lifecycle (LOOP-01..06) ───────────────────
+  // Emitted by src-tauri/src/loop_engine.rs on verification_fired (33-04),
+  // replanning (33-05), token_escalated (33-06), and halted (33-08).
+  // Payload: BladeLoopEventPayload (see ./payloads.ts).
+  // ActivityStrip subscribes via useActivityLog (see src/features/activity-log/index.tsx).
+  BLADE_LOOP_EVENT: 'blade_loop_event',
 } as const;
 
 /** Literal union of every string in BLADE_EVENTS. */
