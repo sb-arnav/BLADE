@@ -1367,7 +1367,11 @@ pub(crate) async fn send_message_stream_inline(
 
     // Capture message count before build_conversation moves the Vec.
     let input_message_count = messages.len();
-    let conversation = providers::build_conversation(messages, Some(system_prompt));
+    // Phase 33 / LOOP-05 — `mut` (was immutable) so the fast-path branch can
+    // inject `build_fast_path_supplement` at index 0. The tool-loop branch's
+    // shadow-rebind below (was `let mut conversation = conversation;`) is now
+    // redundant.
+    let mut conversation = providers::build_conversation(messages, Some(system_prompt));
 
     // Check if any message has an image (vision request).
     // Used by the fast-path heuristic: image-only queries are conversational
@@ -1442,17 +1446,48 @@ pub(crate) async fn send_message_stream_inline(
     let is_short_conversation = input_message_count <= 6;
 
     if tools.is_empty() || (only_native_tools && is_conversational && is_short_conversation) {
-        // Phase 18 — KNOWN GAP (Pitfall 3 / Plan 18-10): the fast-streaming branch emits
-        // tokens directly via providers::stream_text without server-side accumulation.
-        // ego::intercept_assistant_output requires the FULL transcript and runs in the
-        // tool-loop branch only (l.~1517). Refusals on this branch are NOT caught by ego.
-        // This branch only fires for short conversational queries (`is_conversational &&
-        // is_short_conversation`), so refusal-eliciting prompts rarely land here.
-        // Workaround: when a refusal is observed in the fast path, re-issue the message
-        // with a hint that forces only_native_tools=false (routes to tool-loop).
-        // Full coverage requires an accumulator refactor — deferred to v1.3
-        // (RESEARCH § Pitfall 3, 18-CONTEXT.md D-11..D-15).
+        // Phase 33 / LOOP-05 — gap closed (was Phase 18 KNOWN GAP at this
+        // location). The fast-streaming branch now receives an identity
+        // supplement built from the Phase 32-03 always-keep core. See
+        // `brain::build_fast_path_supplement` and 33-07-PLAN.md for details.
         //
+        // CTX-07 fallback discipline: panic in supplement-build → fall back
+        // to no supplement (legacy fast-path verbatim). The supplement is
+        // only injected when `config.r#loop.smart_loop_enabled = true`.
+        //
+        // Streaming contract (MEMORY.md `project_chat_streaming_contract`):
+        // `blade_message_start` MUST emit before the first `chat_token`. The
+        // emit below stays in place; supplement injection happens BEFORE that
+        // emit. Plan 33-07 acceptance: the actual emit_stream_event call
+        // count is unchanged from pre-Phase-33.
+        //
+        // ego::intercept_assistant_output is NOT yet wired on the fast path —
+        // server-side accumulation of streamed tokens would require a deeper
+        // providers/mod.rs refactor (deferred to v1.6+). The supplement alone
+        // closes the "identity-blind" half of the original gap; full ego
+        // parity remains a follow-up.
+
+        // LOOP-05 — inject identity supplement at index 0 so the provider
+        // sees it before any user content. catch_unwind keeps a panic in
+        // supplement build from breaking the chat (CTX-07 fallback discipline).
+        // AssertUnwindSafe is required because &BladeConfig carries types
+        // that aren't UnwindSafe — same pattern Phase 32-07 used at the
+        // smart-path call sites.
+        if config.r#loop.smart_loop_enabled {
+            let supplement = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                crate::brain::build_fast_path_supplement(
+                    &config,
+                    &config.provider,
+                    &config.model,
+                    &last_user_text,
+                )
+            }))
+            .unwrap_or_default();
+            if !supplement.is_empty() {
+                conversation.insert(0, ConversationMessage::System(supplement));
+            }
+        }
+
         // Phase 3 WIRE-03 contract (P-UAT-1): emit blade_message_start BEFORE
         // streaming so the frontend (src/features/chat/useChat.tsx) sets
         // currentMessageIdRef and commits the assistant reply on chat_done.
@@ -1579,8 +1614,9 @@ pub(crate) async fn send_message_stream_inline(
         return result;
     }
 
-    // Tools configured → non-streaming tool loop
-    let mut conversation = conversation;
+    // Tools configured → non-streaming tool loop.
+    // (`conversation` is already `mut` from L1374 — Phase 33 / LOOP-05 lifted
+    // mutability up so the fast-path branch could insert the supplement.)
     // Phase 32 / CTX-04 — proactive compression at config.context.compaction_trigger_pct
     // (default 0.80) of the model's real context window. Honors the CTX-07
     // escape hatch: when smart_injection_enabled is false, the legacy literal
