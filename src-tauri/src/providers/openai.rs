@@ -199,10 +199,20 @@ pub async fn complete_ext(
     // We store it under the unified `stop_reason` field on AssistantTurn.
     let stop_reason = choice["finish_reason"].as_str().map(|s| s.to_string());
 
+    // Phase 33 / LOOP-06 — surface usage counts for cost-guard accumulation.
+    // OpenAI / OpenRouter / Groq all return `usage.prompt_tokens` /
+    // `usage.completion_tokens` at the top level. Some custom OpenAI-
+    // compatible gateways strip `usage`; default to 0 in that case (no cost
+    // accumulated, no false halt).
+    let tokens_in = json["usage"]["prompt_tokens"].as_u64().unwrap_or(0).min(u32::MAX as u64) as u32;
+    let tokens_out = json["usage"]["completion_tokens"].as_u64().unwrap_or(0).min(u32::MAX as u64) as u32;
+
     Ok(AssistantTurn {
         content,
         tool_calls,
         stop_reason,
+        tokens_in,
+        tokens_out,
     })
 }
 

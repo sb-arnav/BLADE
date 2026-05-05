@@ -166,10 +166,19 @@ pub async fn complete_ext(
     // Anthropic values: "end_turn" | "max_tokens" | "stop_sequence" | "tool_use".
     let stop_reason = json["stop_reason"].as_str().map(|s| s.to_string());
 
+    // Phase 33 / LOOP-06 — surface usage counts for cost-guard accumulation.
+    // Anthropic returns `usage.input_tokens` / `usage.output_tokens` at the
+    // top level of the response. Saturate to u32 (counts in practice are
+    // well under 4 B; saturate is defensive).
+    let tokens_in = json["usage"]["input_tokens"].as_u64().unwrap_or(0).min(u32::MAX as u64) as u32;
+    let tokens_out = json["usage"]["output_tokens"].as_u64().unwrap_or(0).min(u32::MAX as u64) as u32;
+
     Ok(AssistantTurn {
         content,
         tool_calls,
         stop_reason,
+        tokens_in,
+        tokens_out,
     })
 }
 

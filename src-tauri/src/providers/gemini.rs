@@ -171,10 +171,24 @@ pub async fn complete_ext(
     // Values include "STOP" | "MAX_TOKENS" | "SAFETY" | "RECITATION" | "OTHER".
     let stop_reason = json["candidates"][0]["finishReason"].as_str().map(|s| s.to_string());
 
+    // Phase 33 / LOOP-06 — Gemini reports usage at `usageMetadata`:
+    //   promptTokenCount / candidatesTokenCount / totalTokenCount.
+    // Map to our (tokens_in, tokens_out) pair.
+    let tokens_in = json["usageMetadata"]["promptTokenCount"]
+        .as_u64()
+        .unwrap_or(0)
+        .min(u32::MAX as u64) as u32;
+    let tokens_out = json["usageMetadata"]["candidatesTokenCount"]
+        .as_u64()
+        .unwrap_or(0)
+        .min(u32::MAX as u64) as u32;
+
     Ok(AssistantTurn {
         content,
         tool_calls,
         stop_reason,
+        tokens_in,
+        tokens_out,
     })
 }
 

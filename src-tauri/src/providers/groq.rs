@@ -235,10 +235,17 @@ async fn groq_request(
     // "stop" | "length" | "tool_calls" | "content_filter".
     let stop_reason = choice["finish_reason"].as_str().map(|s| s.to_string());
 
+    // Phase 33 / LOOP-06 — Groq is OpenAI-compatible; usage.prompt_tokens /
+    // usage.completion_tokens. Used by loop_engine cost-guard accumulation.
+    let tokens_in = json["usage"]["prompt_tokens"].as_u64().unwrap_or(0).min(u32::MAX as u64) as u32;
+    let tokens_out = json["usage"]["completion_tokens"].as_u64().unwrap_or(0).min(u32::MAX as u64) as u32;
+
     Ok(AssistantTurn {
         content,
         tool_calls,
         stop_reason,
+        tokens_in,
+        tokens_out,
     })
 }
 

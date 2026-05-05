@@ -2191,7 +2191,7 @@ pub async fn auto_title_conversation(
         config.base_url.as_deref(),
     )
     .await
-    .unwrap_or_else(|_| crate::providers::AssistantTurn { content: String::new(), tool_calls: vec![], stop_reason: None });
+    .unwrap_or_else(|_| crate::providers::AssistantTurn { content: String::new(), tool_calls: vec![], stop_reason: None, tokens_in: 0, tokens_out: 0 });
 
     let title = turn.content.trim().trim_matches('"').trim().to_string();
     if title.is_empty() || title.len() > 80 {

@@ -173,6 +173,16 @@ pub struct AssistantTurn {
     /// per-provider mapping (e.g. anthropic "max_tokens" + openai "length"
     /// both indicate output truncation).
     pub stop_reason: Option<String>,
+    /// Phase 33 / LOOP-06 — provider-reported input (prompt) token count.
+    /// Populated from each provider's `usage` field; 0 when the provider does
+    /// not surface usage (some Ollama builds, custom OpenAI-compatible
+    /// gateways with usage stripped). Consumed by `loop_engine::run_loop` to
+    /// accumulate `LoopState.cumulative_cost_usd` via
+    /// `providers::price_per_million(provider, model)`.
+    pub tokens_in: u32,
+    /// Phase 33 / LOOP-06 — provider-reported output (completion) token count.
+    /// Same posture as `tokens_in`: 0 when the provider does not report.
+    pub tokens_out: u32,
 }
 
 pub fn build_conversation(
@@ -327,6 +337,50 @@ pub fn max_output_tokens_for(provider: &str, model: &str) -> u32 {
         ("gemini", _)                                        => 8_192,
         ("ollama", _)                                        => 4_096,
         _                                                    => 4_096,
+    }
+}
+
+/// Phase 33 / LOOP-06 — per-provider, per-model token pricing in USD.
+///
+/// Returns `(input_per_million_usd, output_per_million_usd)`. Used by
+/// `loop_engine::run_loop` to accumulate `LoopState.cumulative_cost_usd`
+/// after each `complete_turn` (and by Plan 33-06's truncation-retry
+/// cost-guard interlock to project escalation cost before doubling
+/// `max_tokens`).
+///
+/// Sourced from each provider's public pricing pages as of 2026-05.
+/// Recommended quarterly review against actual Anthropic/OpenAI/Groq/Gemini
+/// account billing. CONTEXT lock §Iteration Limit & Cost Guard: this is the
+/// SINGLE source of truth for token cost — `trace.rs` does not duplicate
+/// (today it does not log cost at all; if it ever wants to, it should
+/// delegate to this fn).
+///
+/// Arithmetic posture: f32 multiplies, no rounding. The cost-guard error
+/// budget is in cents; sub-cent IEEE 754 imprecision is irrelevant.
+///
+/// Default fallback: `(1.00, 3.00)` — non-zero so unknown providers do NOT
+/// silently bypass the cost guard (T-33-28 mitigation: prevent surprise
+/// free-tier passes via spoofed provider names).
+pub fn price_per_million(provider: &str, model: &str) -> (f32, f32) {
+    match (provider, model) {
+        ("anthropic", m) if m.starts_with("claude-sonnet-4")  => (3.00, 15.00),
+        ("anthropic", m) if m.starts_with("claude-opus-4")    => (15.00, 75.00),
+        ("anthropic", m) if m.starts_with("claude-haiku-4-5") => (0.80, 4.00),
+        ("anthropic", m) if m.starts_with("claude-haiku")     => (0.80, 4.00),
+        ("anthropic", _)                                      => (3.00, 15.00),
+
+        ("openai", m) if m.starts_with("gpt-4o-mini")         => (0.15, 0.60),
+        ("openai", m) if m.starts_with("gpt-4o")              => (2.50, 10.00),
+        ("openai", m) if m.starts_with("o1-mini")             => (3.00, 12.00),
+        ("openai", m) if m.starts_with("o1")                  => (15.00, 60.00),
+        ("openai", m) if m.starts_with("gpt-3.5")             => (0.50, 1.50),
+        ("openai", _)                                         => (2.50, 10.00),
+
+        ("groq", _)                                           => (0.05, 0.08),
+        ("gemini", _)                                         => (0.10, 0.40),
+        ("openrouter", _)                                     => (1.00, 3.00),
+        ("ollama", _)                                         => (0.00, 0.00),
+        _                                                     => (1.00, 3.00),
     }
 }
 
@@ -1027,5 +1081,106 @@ mod tests {
         assert_eq!(empty.len(), 0);
         // The async retry loop's for-loop over `override_chain.iter()`
         // produces zero iterations — no compile error, no panic.
+    }
+
+    // ─── Phase 33 Plan 33-08 (LOOP-06) — price_per_million tests ──────────
+    //
+    // Locks the per-provider, per-model pricing table. Cost-guard arithmetic
+    // in `loop_engine::run_loop` reads these values; a future edit that
+    // accidentally drops a provider arm or zeroes a non-Ollama row would
+    // silently bypass the cost guard for that provider.
+
+    #[test]
+    fn phase33_loop_06_price_anthropic_sonnet_4() {
+        let (in_p, out_p) = price_per_million("anthropic", "claude-sonnet-4-20250514");
+        assert!((in_p - 3.00).abs() < 0.01, "anthropic sonnet-4 input price drift: {}", in_p);
+        assert!((out_p - 15.00).abs() < 0.01, "anthropic sonnet-4 output price drift: {}", out_p);
+    }
+
+    #[test]
+    fn phase33_loop_06_price_anthropic_haiku_4_5() {
+        let (in_p, out_p) = price_per_million("anthropic", "claude-haiku-4-5-20251001");
+        assert!((in_p - 0.80).abs() < 0.01, "anthropic haiku-4-5 input price drift: {}", in_p);
+        assert!((out_p - 4.00).abs() < 0.01, "anthropic haiku-4-5 output price drift: {}", out_p);
+    }
+
+    #[test]
+    fn phase33_loop_06_price_openai_gpt_4o_mini() {
+        let (in_p, out_p) = price_per_million("openai", "gpt-4o-mini");
+        assert!((in_p - 0.15).abs() < 0.001, "openai gpt-4o-mini input price drift: {}", in_p);
+        assert!((out_p - 0.60).abs() < 0.001, "openai gpt-4o-mini output price drift: {}", out_p);
+    }
+
+    #[test]
+    fn phase33_loop_06_price_openai_gpt_4o() {
+        let (in_p, out_p) = price_per_million("openai", "gpt-4o-2024-08-06");
+        assert!((in_p - 2.50).abs() < 0.01);
+        assert!((out_p - 10.00).abs() < 0.01);
+    }
+
+    #[test]
+    fn phase33_loop_06_price_groq_is_low() {
+        let (in_p, out_p) = price_per_million("groq", "llama-3.1-8b-instant");
+        // Groq is heavily-discounted; we lock the conservative defaults.
+        assert!(in_p < 1.0, "groq input price must be << $1/M (got {})", in_p);
+        assert!(out_p < 1.0, "groq output price must be << $1/M (got {})", out_p);
+    }
+
+    #[test]
+    fn phase33_loop_06_price_gemini_2_flash() {
+        let (in_p, out_p) = price_per_million("gemini", "gemini-2.0-flash");
+        assert!((in_p - 0.10).abs() < 0.001);
+        assert!((out_p - 0.40).abs() < 0.001);
+    }
+
+    #[test]
+    fn phase33_loop_06_price_openrouter_default() {
+        let (in_p, out_p) = price_per_million("openrouter", "meta-llama/llama-3.3-70b-instruct:free");
+        // OpenRouter is pass-through, so we can't know the per-route price;
+        // a conservative default is locked.
+        assert!(in_p > 0.0, "openrouter default input price must be > 0 (no surprise free passes)");
+        assert!(out_p > 0.0, "openrouter default output price must be > 0");
+    }
+
+    #[test]
+    fn phase33_loop_06_price_ollama_is_zero() {
+        // Ollama is a local provider — by construction, no per-token cost.
+        let (in_p, out_p) = price_per_million("ollama", "llama3.1");
+        assert_eq!(in_p, 0.0, "ollama is local; input price MUST be 0");
+        assert_eq!(out_p, 0.0, "ollama is local; output price MUST be 0");
+    }
+
+    #[test]
+    fn phase33_loop_06_price_unknown_uses_safe_default() {
+        // Default is (1.00, 3.00) — non-zero so an unknown provider name does
+        // NOT silently bypass the cost guard. T-33-28 mitigation: prevent
+        // surprise free-tier passes via spoofed provider names.
+        let (in_p, out_p) = price_per_million("unknown_provider", "weird_model");
+        assert!(in_p > 0.0, "default provider price must be > 0 (no surprise free passes)");
+        assert!(out_p > 0.0);
+        assert!((in_p - 1.00).abs() < 0.01);
+        assert!((out_p - 3.00).abs() < 0.01);
+    }
+
+    #[test]
+    fn phase33_loop_06_assistant_turn_carries_token_counts() {
+        // AssistantTurn now has tokens_in / tokens_out fields populated by
+        // each provider's response parser. This test locks the field shape
+        // (Default::default() must produce zeros — used as the safe fallback
+        // for providers that don't surface usage).
+        let t = AssistantTurn::default();
+        assert_eq!(t.tokens_in, 0);
+        assert_eq!(t.tokens_out, 0);
+
+        // Direct field assignment (matches the way provider parsers write to it).
+        let t2 = AssistantTurn {
+            content: "ok".to_string(),
+            tool_calls: vec![],
+            stop_reason: Some("end_turn".to_string()),
+            tokens_in: 1234,
+            tokens_out: 567,
+        };
+        assert_eq!(t2.tokens_in, 1234);
+        assert_eq!(t2.tokens_out, 567);
     }
 }
