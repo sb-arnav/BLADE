@@ -365,6 +365,52 @@ impl Default for LoopConfig {
     }
 }
 
+impl LoopConfig {
+    /// Phase 33 / 33-NN-FIX (BL-01) — hard-reject corrupt loop knobs BEFORE any
+    /// keychain write (mirrors `RewardWeights::validate()` at config.rs:219 and
+    /// is invoked as the first executable statement of `save_config`).
+    ///
+    /// The bug this guards against: `verification_every_n: 0` causes an
+    /// integer-modulo panic at the firing site
+    /// (`(iteration as u32) % verification_every_n`) at iter 1, killing the
+    /// run_loop Tokio task with no `chat_done`/`chat_error` — chat appears to
+    /// hang. The default is 3 so the happy path is fine, but a hostile config
+    /// edit, a future migration that defaults the field to 0, or an
+    /// off-by-one in a legacy upgrade path would all DoS the chat task.
+    ///
+    /// Fields validated:
+    ///   - `verification_every_n` MUST be >= 1 (zero panics on `%`)
+    ///   - `max_iterations`       MUST be >= 1 (zero would skip the loop body
+    ///     entirely; safe but pointless — reject as a clear-error signal)
+    ///   - `cost_guard_dollars`   MUST be >= 0.0 (negative values invert the
+    ///     `cumulative > cap` halt check)
+    ///
+    /// The firing site at `loop_engine.rs:537` ALSO carries an in-line
+    /// zero-guard (defense in depth) — `validate()` is the strict gate, the
+    /// firing-site guard is a safety net for any state that bypassed validate
+    /// (e.g. an in-memory edit in tests, or a future deserialize path that
+    /// skips `save_config`).
+    pub fn validate(&self) -> Result<(), String> {
+        if self.verification_every_n == 0 {
+            return Err(
+                "loop.verification_every_n must be >= 1 (zero panics on integer modulo at the verification firing site)".to_string()
+            );
+        }
+        if self.max_iterations == 0 {
+            return Err(
+                "loop.max_iterations must be >= 1 (zero would skip the loop body)".to_string()
+            );
+        }
+        if self.cost_guard_dollars < 0.0 {
+            return Err(format!(
+                "loop.cost_guard_dollars must be >= 0.0, got {}",
+                self.cost_guard_dollars
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Config as stored on disk — api_key is NOT stored here anymore
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct DiskConfig {
@@ -969,6 +1015,14 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
     // BEFORE any keychain write. Sum tolerance is `[0.0, 1.0 + 1e-3]` to
     // accommodate the v1.3 default sum=0.9 (acceptance silenced).
     config.reward_weights.validate()?;
+
+    // Phase 33 / 33-NN-FIX (BL-01) — hard-reject corrupt loop knobs BEFORE
+    // any keychain write. Mirrors the RewardWeights gate above. Most
+    // importantly, rejects `verification_every_n = 0` which would integer-
+    // modulo-panic the chat task at iter 1 (see LoopConfig::validate()
+    // doc for the failure mode). Defense-in-depth: the firing site at
+    // loop_engine.rs:537 also carries an in-line zero-guard.
+    config.r#loop.validate()?;
 
     // Store API key in keyring, not on disk
     set_api_key_in_keyring(&config.provider, &config.api_key)?;

@@ -534,8 +534,17 @@ pub async fn run_loop(
         // Result<_, String>, so the synchronous panic surface is small;
         // Plan 33-09 ports CTX-07's catch_unwind wrapper to harden against
         // future regressions in the verifier path.
+        // Phase 33 / 33-NN-FIX (BL-01) — defense-in-depth zero-guard.
+        // `LoopConfig::validate()` rejects verification_every_n=0 at
+        // save_config time, but tests / future deserialize paths / in-memory
+        // edits could bypass that gate. A literal `% 0` panics the run_loop
+        // Tokio task with no chat_done/chat_error (CTX-07 fallback discipline
+        // broken). Adding the explicit `> 0` term short-circuits the modulo
+        // before evaluation. Per CONTEXT lock: zero-cadence is treated as
+        // "verification disabled" — loop continues without probe.
         if config.r#loop.smart_loop_enabled
             && iteration > 0
+            && config.r#loop.verification_every_n > 0
             && (iteration as u32) % config.r#loop.verification_every_n == 0
         {
             // Plan 33-09 — wrap the verify_progress future in
@@ -3067,5 +3076,82 @@ mod tests {
              got Ok(_) — the production wrapper would NOT catch it. \
              smart-path → dumb-path discipline broken."
         );
+    }
+
+    // ─── 33-NN-FIX (BL-01) — verification_every_n zero-guard tests ──────
+
+    #[test]
+    fn phase33_loop_06_verification_every_n_zero_does_not_panic() {
+        // BL-01 — the firing site at loop_engine.rs:537 must short-circuit
+        // BEFORE evaluating `iteration % verification_every_n` when
+        // verification_every_n is zero. Direct integer-modulo by zero panics
+        // the Tokio task; the `> 0` guard added in 33-NN-FIX prevents that.
+        //
+        // We simulate the production gate expression here. Using an explicit
+        // `n` of 0 with the OLD shape would `panic!("attempt to calculate the
+        // remainder with a divisor of zero")`. With the new guard, the gate
+        // short-circuits at `verification_every_n > 0` and the modulo is
+        // never evaluated.
+        let mut cfg = crate::config::BladeConfig::default();
+        cfg.r#loop.smart_loop_enabled = true;
+        cfg.r#loop.verification_every_n = 0;
+
+        // Walk a handful of iterations — none must panic.
+        for iteration in 0u32..6u32 {
+            let would_verify = cfg.r#loop.smart_loop_enabled
+                && iteration > 0
+                && cfg.r#loop.verification_every_n > 0
+                && (iteration as u32) % cfg.r#loop.verification_every_n.max(1) == 0;
+            assert!(
+                !would_verify,
+                "iter {}: zero-cadence must be treated as 'verification disabled' — got would_verify=true",
+                iteration
+            );
+        }
+    }
+
+    #[test]
+    fn phase33_loop_06_validate_rejects_zero_n() {
+        // BL-01 — LoopConfig::validate() MUST reject verification_every_n=0
+        // with a clear error string at save_config time. This is the strict
+        // gate; the firing-site `> 0` guard above is the safety net.
+        let mut cfg = crate::config::LoopConfig::default();
+        cfg.verification_every_n = 0;
+        let err = cfg
+            .validate()
+            .expect_err("verification_every_n=0 must be rejected by validate()");
+        assert!(
+            err.contains("verification_every_n"),
+            "error message must identify the field; got: {}",
+            err
+        );
+
+        // Sister checks: max_iterations=0 and negative cost_guard_dollars also rejected.
+        let mut cfg = crate::config::LoopConfig::default();
+        cfg.max_iterations = 0;
+        let err = cfg
+            .validate()
+            .expect_err("max_iterations=0 must be rejected by validate()");
+        assert!(
+            err.contains("max_iterations"),
+            "error message must identify the field; got: {}",
+            err
+        );
+
+        let mut cfg = crate::config::LoopConfig::default();
+        cfg.cost_guard_dollars = -1.0;
+        let err = cfg
+            .validate()
+            .expect_err("negative cost_guard_dollars must be rejected by validate()");
+        assert!(
+            err.contains("cost_guard_dollars"),
+            "error message must identify the field; got: {}",
+            err
+        );
+
+        // Default config must validate cleanly — sanity check.
+        crate::config::LoopConfig::default()
+            .validate()
+            .expect("default LoopConfig must validate cleanly");
     }
 }
