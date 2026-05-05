@@ -259,39 +259,44 @@ thread_local! {
 // Populated by `build_system_prompt_inner` as it pushes each section. Read by
 // `get_context_breakdown` (Plan 32-06) to render the DoctorPane budget panel.
 //
-// thread_local justification: build_system_prompt_inner runs synchronously
-// inside send_message_stream_inline and the breakdown is read from the SAME
-// task immediately after. If a future async hop crosses worker threads,
-// switch to once_cell::Lazy<Mutex<>> per RESEARCH.md landmine #4.
+// Process-global Mutex (was thread_local in initial Plan 32-06 land — but
+// build_system_prompt_inner runs on the chat-streaming Tokio task and the
+// Tauri command get_context_breakdown is dispatched on a separate worker.
+// thread_local meant the reader saw an empty TLS slot on most reads, shipping
+// CTX-06 dead-on-arrival. Switched to once_cell::sync::Lazy<Mutex<>> per
+// RESEARCH.md landmine #4. The Mutex is held only for fast clone()/clear()/
+// push() operations — never across an await — so contention is bounded.
 //
 // Stable label set (Plan 32-06 reads these — do not rename without coordinating):
 //   blade_md, identity_supplement, memory_l0, character_bible, role, safety,
 //   hormones, identity_extension, vision, hearing, memory_recall, schedule,
 //   code, security, health, system, financial, context_now, integrations,
 //   git, world_model, misc, scaffold, tools.
-thread_local! {
-    pub(crate) static LAST_BREAKDOWN: std::cell::RefCell<Vec<(String, usize)>>
-        = std::cell::RefCell::new(Vec::new());
-}
+pub(crate) static LAST_BREAKDOWN: once_cell::sync::Lazy<std::sync::Mutex<Vec<(String, usize)>>>
+    = once_cell::sync::Lazy::new(|| std::sync::Mutex::new(Vec::new()));
 
 /// Reset the per-call accumulator. Called at the top of
 /// `build_system_prompt_inner` so each invocation starts clean.
 pub(crate) fn clear_section_accumulator() {
-    LAST_BREAKDOWN.with(|b| b.borrow_mut().clear());
+    if let Ok(mut g) = LAST_BREAKDOWN.lock() {
+        g.clear();
+    }
 }
 
 /// Record a section's contribution. `chars` is the byte length of the pushed
 /// string (callers convert to tokens via `chars / 4` at read time). A `chars`
 /// of 0 still appends — Plan 32-06 surfaces gated-out sections as empty rows.
 pub(crate) fn record_section(label: &str, chars: usize) {
-    LAST_BREAKDOWN.with(|b| b.borrow_mut().push((label.to_string(), chars)));
+    if let Ok(mut g) = LAST_BREAKDOWN.lock() {
+        g.push((label.to_string(), chars));
+    }
 }
 
 /// Snapshot the most-recent breakdown. Plan 32-06's Tauri command consumes
 /// this and converts to tokens for the DoctorPane panel.
 #[allow(dead_code)]
 pub(crate) fn read_section_breakdown() -> Vec<(String, usize)> {
-    LAST_BREAKDOWN.with(|b| b.borrow().clone())
+    LAST_BREAKDOWN.lock().map(|g| g.clone()).unwrap_or_default()
 }
 
 // ── Phase 32 / CTX-06 — Breakdown snapshot + Tauri command ───────────────────
@@ -1329,7 +1334,8 @@ fn build_system_prompt_inner(
             let has_imminent = state.upcoming_events.first()
                 .map(|e| e.minutes_until >= 0 && e.minutes_until <= 30)
                 .unwrap_or(false);
-            if integration_score > 0.3 || has_imminent {
+            // CTX-07 escape hatch: when smart=false, skip the relevance gate
+            if !smart || integration_score > 0.3 || has_imminent {
                 let integration_ctx = crate::integration_bridge::get_integration_context();
                 if !integration_ctx.trim().is_empty() {
                     integrations_chars = integrations_chars.saturating_add(integration_ctx.len());
@@ -1361,7 +1367,7 @@ fn build_system_prompt_inner(
     let gate = thalamus_threshold(current_chars);
 
     let mut code_chars: usize = 0;
-    if !user_query.is_empty() && score_or_default(user_query, "code", 1.0) > gate {
+    if !smart || (!user_query.is_empty() && score_or_default(user_query, "code", 1.0) > gate) {
         const MAX_PROJECT_CHARS: usize = 3_000;
         const MAX_INDEX_TOTAL_CHARS: usize = 12_000;
         let known_projects = crate::indexer::list_indexed_projects();
@@ -1397,7 +1403,7 @@ fn build_system_prompt_inner(
 
     // ── GIT CONTEXT (priority 12, code-gated) ────────────────────────────────
     let mut git_chars: usize = 0;
-    if user_query.is_empty() || score_or_default(user_query, "code", 1.0) > gate {
+    if !smart || user_query.is_empty() || score_or_default(user_query, "code", 1.0) > gate {
         if let Some(git_ctx) = git_context_for_active_project() {
             git_chars = git_chars.saturating_add(git_ctx.len());
             parts.push(git_ctx);
@@ -1417,7 +1423,7 @@ fn build_system_prompt_inner(
         let s = format!("## Security Expertise\n\n{}", crate::kali::security_system_prompt());
         security_chars = security_chars.saturating_add(s.len());
         parts.push(s);
-    } else if !user_query.is_empty() && score_or_default(user_query, "security", 1.0) > 0.5 {
+    } else if !smart || (!user_query.is_empty() && score_or_default(user_query, "security", 1.0) > 0.5) {
         let s = "## Security\n\nBe precise about risks, mitigations, and tool options.".to_string();
         security_chars = security_chars.saturating_add(s.len());
         parts.push(s);
@@ -1441,7 +1447,7 @@ fn build_system_prompt_inner(
 
             // Full health context only when health-relevant query
             let health_score = score_or_default(user_query, "health", 1.0);
-            if health_score > 0.3 {
+            if !smart || health_score > 0.3 {
                 let health_ctx = crate::health_tracker::get_health_context();
                 if !health_ctx.is_empty() {
                     health_chars = health_chars.saturating_add(health_ctx.len());
@@ -1455,15 +1461,20 @@ fn build_system_prompt_inner(
     // ── WORLD MODEL (priority 15, system-gated) ───────────────────────────────
     // Only inject for system/process queries — not for every message
     let mut world_chars: usize = 0;
-    if !user_query.is_empty() && score_or_default(user_query, "system", 1.0) > gate {
+    if !smart || (!user_query.is_empty() && score_or_default(user_query, "system", 1.0) > gate) {
         let world_summary = crate::world_model::get_world_summary();
         if !world_summary.is_empty() {
             world_chars = world_chars.saturating_add(world_summary.len());
             parts.push(world_summary);
         }
     }
+    // CTX-06 review M-02: record once under the canonical "world_model" label.
+    // Previously also recorded under "system" — caused double-counting in
+    // total_tokens and percent_used. Per the stable label set comment above,
+    // "system" is reserved for genuine system-info contributions (none in this
+    // section) so we emit a 0-row placeholder for budget panel completeness.
     record_section("world_model", world_chars);
-    record_section("system", world_chars);
+    record_section("system", 0);
 
     // ── MISC DYNAMIC (priority 16) ────────────────────────────────────────────
     // Accountability — active objectives (only if non-empty)
@@ -1474,7 +1485,7 @@ fn build_system_prompt_inner(
 
     // Financial — only for money queries
     let mut financial_chars: usize = 0;
-    if !user_query.is_empty() && score_or_default(user_query, "financial", 1.0) > gate {
+    if !smart || (!user_query.is_empty() && score_or_default(user_query, "financial", 1.0) > gate) {
         let fin = crate::financial_brain::get_financial_context();
         if !fin.is_empty() {
             financial_chars = financial_chars.saturating_add(fin.len());
@@ -2367,6 +2378,14 @@ pub fn set_context(content: String) -> Result<(), String> {
 mod tests {
     use super::*;
 
+    /// Serializes tests that exercise the global LAST_BREAKDOWN accumulator.
+    /// Plan 32-06's CTX-06 review (HIGH-01) moved LAST_BREAKDOWN from
+    /// thread_local to a process-global Mutex so the Tauri command worker
+    /// can read what the chat-streaming task wrote. Side effect: cargo's
+    /// default parallel test runner now races on it. Tests that build a
+    /// prompt and inspect the breakdown afterward must hold this lock.
+    static BREAKDOWN_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn phase32_context_breakdown_default() {
         let b = ContextBreakdown::default();
@@ -2537,6 +2556,7 @@ mod tests {
 
     #[test]
     fn phase32_section_gate_simple_query() {
+        let _g = BREAKDOWN_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         // Reset overrides so production scoring runs.
         CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
         let simple = build_system_prompt_inner(
@@ -2563,6 +2583,7 @@ mod tests {
 
     #[test]
     fn phase32_section_gate_always_keep_core_present() {
+        let _g = BREAKDOWN_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
         let p = build_system_prompt_inner(
             &[], "abcxyz123", None,  // gibberish — no keyword hits
@@ -2581,6 +2602,7 @@ mod tests {
 
     #[test]
     fn phase32_breakdown_records_per_section() {
+        let _g = BREAKDOWN_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
         let _ = build_system_prompt_inner(
             &[], "explain this rust function", None,
@@ -2604,6 +2626,7 @@ mod tests {
 
     #[test]
     fn phase32_breakdown_clears_each_call() {
+        let _g = BREAKDOWN_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
         let _ = build_system_prompt_inner(
             &[], "first query about code", None,
@@ -2634,6 +2657,7 @@ mod tests {
 
     #[test]
     fn phase32_breakdown_simple_query_omits_vision() {
+        let _g = BREAKDOWN_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
         let _ = build_system_prompt_inner(
             &[], "what time is it?", None,
@@ -2684,6 +2708,7 @@ mod tests {
 
     #[test]
     fn phase32_get_context_breakdown_after_prompt_build() {
+        let _g = BREAKDOWN_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         // Build a prompt to populate LAST_BREAKDOWN.
         CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
         let _ = build_system_prompt_inner(
@@ -2709,6 +2734,7 @@ mod tests {
 
     #[test]
     fn phase32_get_context_breakdown_empty_when_no_prompt_built() {
+        let _g = BREAKDOWN_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         // Reset override + clear the accumulator → simulate "no prompt built yet".
         CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
         clear_section_accumulator();
@@ -2728,6 +2754,7 @@ mod tests {
 
     #[test]
     fn phase32_get_context_breakdown_percent_used_clamped() {
+        let _g = BREAKDOWN_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         // Force a huge synthetic breakdown that would overflow any real
         // context window. percent_used must clamp to ≤ 100 — never NaN, never
         // +inf.
@@ -2818,6 +2845,7 @@ mod tests {
 
     #[test]
     fn phase32_build_system_prompt_survives_panic_in_scoring() {
+        let _g = BREAKDOWN_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         // THE v1.1 regression fixture. With CTX_SCORE_OVERRIDE forcing every
         // scoring call to panic, build_system_prompt_inner must STILL produce
         // a non-empty prompt — every `score_or_default` call in the function
