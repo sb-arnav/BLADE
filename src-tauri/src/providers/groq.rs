@@ -5,6 +5,7 @@ fn build_body(
     model: &str,
     messages: &[ConversationMessage],
     tools: &[ToolDefinition],
+    max_tokens_override: Option<u32>,
 ) -> serde_json::Value {
     let mut msgs: Vec<serde_json::Value> = messages.iter().map(serialize_message).collect();
 
@@ -45,6 +46,14 @@ fn build_body(
         "messages": msgs,
         "stream": false
     });
+
+    // Phase 33 / LOOP-04 — when the smart-loop truncation retry path forces a
+    // higher max_tokens, surface it. Default behaviour (no override) leaves
+    // the field unset so Groq applies the per-model default — preserves
+    // existing behaviour for non-LOOP-04 callers.
+    if let Some(max) = max_tokens_override {
+        body["max_tokens"] = serde_json::Value::from(max);
+    }
 
     if !tool_payload.is_empty() {
         body["tools"] = serde_json::Value::Array(tool_payload);
@@ -159,10 +168,23 @@ pub async fn complete(
     messages: &[ConversationMessage],
     tools: &[ToolDefinition],
 ) -> Result<AssistantTurn, String> {
+    complete_ext(api_key, model, messages, tools, None).await
+}
+
+/// Phase 33 / LOOP-04 — extended `complete` accepting an explicit
+/// `max_tokens_override` from the smart-loop truncation retry path. When
+/// `None`, Groq's per-model default applies.
+pub async fn complete_ext(
+    api_key: &str,
+    model: &str,
+    messages: &[ConversationMessage],
+    tools: &[ToolDefinition],
+    max_tokens_override: Option<u32>,
+) -> Result<AssistantTurn, String> {
     let client = super::http_client();
 
     // First attempt: with tools.
-    let result = groq_request(&client, api_key, build_body(model, messages, tools)).await;
+    let result = groq_request(&client, api_key, build_body(model, messages, tools, max_tokens_override)).await;
 
     match result {
         Ok(turn) => return Ok(turn),
@@ -170,7 +192,7 @@ pub async fn complete(
             // Groq/Llama failed to generate a valid tool call — retry without
             // tools so the user gets a text response instead of a hard error.
             let no_tools: Vec<super::ToolDefinition> = vec![];
-            groq_request(&client, api_key, build_body(model, messages, &no_tools)).await
+            groq_request(&client, api_key, build_body(model, messages, &no_tools, max_tokens_override)).await
         }
         Err(e) => Err(e),
     }
@@ -202,16 +224,21 @@ async fn groq_request(
     }
 
     let json: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
-    let message = &json["choices"][0]["message"];
+    let choice = &json["choices"][0];
+    let message = &choice["message"];
     let content = message["content"].as_str().unwrap_or_default().to_string();
     let tool_calls = message["tool_calls"]
         .as_array()
         .map(|v| parse_tool_calls(v))
         .unwrap_or_default();
+    // Phase 33 / LOOP-04 — Groq is OpenAI-compatible; finish_reason values are
+    // "stop" | "length" | "tool_calls" | "content_filter".
+    let stop_reason = choice["finish_reason"].as_str().map(|s| s.to_string());
 
     Ok(AssistantTurn {
         content,
         tool_calls,
+        stop_reason,
     })
 }
 

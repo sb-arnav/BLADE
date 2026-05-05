@@ -20,6 +20,7 @@ fn build_body(
     model: &str,
     messages: &[ConversationMessage],
     tools: &[ToolDefinition],
+    max_tokens_override: Option<u32>,
 ) -> serde_json::Value {
     let msgs: Vec<serde_json::Value> = messages.iter().filter_map(serialize_message).collect();
     let tool_payload: Vec<serde_json::Value> = tools
@@ -36,11 +37,15 @@ fn build_body(
         })
         .collect();
 
+    // Phase 33 / LOOP-04 — caller may force a higher max_tokens (truncation
+    // retry path). Default of 4096 is unchanged for every existing call site.
+    let max_tokens = max_tokens_override.unwrap_or(4096);
+
     let mut body = serde_json::json!({
         "model": model,
         "messages": msgs,
         "stream": false,
-        "max_tokens": 4096
+        "max_tokens": max_tokens
     });
 
     if !tool_payload.is_empty() {
@@ -137,8 +142,22 @@ pub async fn complete(
     tools: &[ToolDefinition],
     base_url: Option<&str>,
 ) -> Result<AssistantTurn, String> {
+    complete_ext(api_key, model, messages, tools, base_url, None).await
+}
+
+/// Phase 33 / LOOP-04 — extended `complete` accepting an explicit
+/// `max_tokens_override` from the smart-loop truncation retry path. When
+/// `None`, the legacy 4096 default applies.
+pub async fn complete_ext(
+    api_key: &str,
+    model: &str,
+    messages: &[ConversationMessage],
+    tools: &[ToolDefinition],
+    base_url: Option<&str>,
+    max_tokens_override: Option<u32>,
+) -> Result<AssistantTurn, String> {
     let client = super::http_client();
-    let body = build_body(model, messages, tools);
+    let body = build_body(model, messages, tools, max_tokens_override);
     let url = chat_url(base_url);
 
     let response = client
@@ -167,16 +186,23 @@ pub async fn complete(
     }
 
     let json: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
-    let message = &json["choices"][0]["message"];
+    let choice = &json["choices"][0];
+    let message = &choice["message"];
     let content = message["content"].as_str().unwrap_or_default().to_string();
     let tool_calls = message["tool_calls"]
         .as_array()
         .map(|v| parse_tool_calls(v))
         .unwrap_or_default();
+    // Phase 33 / LOOP-04 — surface finish_reason for truncation detection.
+    // OpenAI / OpenRouter / Groq all use this name with values:
+    // "stop" | "length" | "tool_calls" | "content_filter" | "function_call".
+    // We store it under the unified `stop_reason` field on AssistantTurn.
+    let stop_reason = choice["finish_reason"].as_str().map(|s| s.to_string());
 
     Ok(AssistantTurn {
         content,
         tool_calls,
+        stop_reason,
     })
 }
 

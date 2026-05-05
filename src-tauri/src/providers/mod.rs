@@ -157,10 +157,22 @@ pub enum ConversationMessage {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct AssistantTurn {
     pub content: String,
     pub tool_calls: Vec<ToolCall>,
+    /// Phase 33 / LOOP-04 — provider-reported stop/finish reason, normalized to
+    /// the raw string each provider returns. Per-provider naming varies:
+    ///   - Anthropic:  "end_turn" | "max_tokens" | "stop_sequence" | "tool_use"
+    ///   - OpenAI:     "stop" | "length" | "tool_calls" | "content_filter"
+    ///   - OpenRouter: same as OpenAI (compatible API)
+    ///   - Groq:       same as OpenAI (compatible API)
+    ///   - Gemini:     "STOP" | "MAX_TOKENS" | "SAFETY" | …
+    ///   - Ollama:     surfaces `done_reason` when present, else None
+    /// Truncation detection in `loop_engine::detect_truncation` does the
+    /// per-provider mapping (e.g. anthropic "max_tokens" + openai "length"
+    /// both indicate output truncation).
+    pub stop_reason: Option<String>,
 }
 
 pub fn build_conversation(
@@ -210,6 +222,42 @@ pub async fn complete_turn(
     tools: &[ToolDefinition],
     base_url: Option<&str>,
 ) -> Result<AssistantTurn, String> {
+    complete_turn_inner(provider, api_key, model, messages, tools, base_url, None).await
+}
+
+/// Phase 33 / LOOP-04 — sibling of `complete_turn` that lets the caller force
+/// a specific `max_tokens` ceiling on the provider request. Used by
+/// `loop_engine::run_loop` to retry a truncated turn with a doubled max.
+///
+/// Existing call sites of `complete_turn` are unchanged — they continue to
+/// use each provider's hardcoded default (4096 for both Anthropic and OpenAI).
+/// Only the smart-loop truncation-retry path threads an override.
+pub async fn complete_turn_with_max_tokens(
+    provider: &str,
+    api_key: &str,
+    model: &str,
+    messages: &[ConversationMessage],
+    tools: &[ToolDefinition],
+    base_url: Option<&str>,
+    max_tokens_override: u32,
+) -> Result<AssistantTurn, String> {
+    complete_turn_inner(
+        provider, api_key, model, messages, tools, base_url,
+        Some(max_tokens_override),
+    ).await
+}
+
+/// Private impl shared by `complete_turn` (override=None → provider default)
+/// and `complete_turn_with_max_tokens` (override=Some(N) → cap at N).
+async fn complete_turn_inner(
+    provider: &str,
+    api_key: &str,
+    model: &str,
+    messages: &[ConversationMessage],
+    tools: &[ToolDefinition],
+    base_url: Option<&str>,
+    max_tokens_override: Option<u32>,
+) -> Result<AssistantTurn, String> {
     // Resolve provider/model from the model string (supports "provider/model" prefix).
     let (resolved_provider, bare_model, resolved_key) =
         resolve_provider_model(model, provider, api_key);
@@ -221,26 +269,26 @@ pub async fn complete_turn(
     // If a custom base_url is set, always use the OpenAI-compatible client —
     // Vercel AI Gateway, Cloudflare AI Gateway, Azure, etc. all speak OpenAI format.
     if base_url.is_some() && provider != "ollama" {
-        let result = openai::complete(api_key, model, messages, tools, base_url).await;
+        let result = openai::complete_ext(api_key, model, messages, tools, base_url, max_tokens_override).await;
         // Some custom endpoints (NVIDIA NIM, etc.) return 404 when tools are sent to a
         // model that doesn't support function calling. Retry without tools in that case.
         if !tools.is_empty() {
             if let Err(ref e) = result {
                 if e.contains("404") {
                     let no_tools: &[ToolDefinition] = Default::default();
-                    return openai::complete(api_key, model, messages, no_tools, base_url).await;
+                    return openai::complete_ext(api_key, model, messages, no_tools, base_url, max_tokens_override).await;
                 }
             }
         }
         return result;
     }
     let result = match provider {
-        "gemini"     => gemini::complete(api_key, model, messages, tools).await,
-        "groq"       => groq::complete(api_key, model, messages, tools).await,
-        "openai"     => openai::complete(api_key, model, messages, tools, base_url).await,
-        "anthropic"  => anthropic::complete(api_key, model, messages, tools).await,
+        "gemini"     => gemini::complete_ext(api_key, model, messages, tools, max_tokens_override).await,
+        "groq"       => groq::complete_ext(api_key, model, messages, tools, max_tokens_override).await,
+        "openai"     => openai::complete_ext(api_key, model, messages, tools, base_url, max_tokens_override).await,
+        "anthropic"  => anthropic::complete_ext(api_key, model, messages, tools, max_tokens_override).await,
         "ollama"     => ollama::complete(model, messages).await,
-        "openrouter" => openai::complete(api_key, model, messages, tools, Some(OPENROUTER_BASE_URL)).await,
+        "openrouter" => openai::complete_ext(api_key, model, messages, tools, Some(OPENROUTER_BASE_URL), max_tokens_override).await,
         _            => Err(format!("Unknown provider: {}", provider)),
     };
 
@@ -248,6 +296,38 @@ pub async fn complete_turn(
     crate::cardiovascular::on_provider_call_complete(provider, model, result.is_ok());
 
     result
+}
+
+/// Phase 33 / LOOP-04 — per-model output-token cap.
+///
+/// Returns the documented `max_tokens` ceiling for the (provider, model) pair.
+/// Reused by `loop_engine::escalate_max_tokens` to bound the doubled retry.
+/// Keeping this as a small explicit table is cheaper than threading metadata
+/// through the existing capability_probe — values are static per model.
+///
+/// Anthropic ceiling is 8192 (default); the 64000 ceiling requires the
+/// extended-output beta header (anthropic-beta: output-128k-2025-02-19).
+/// Phase 33 sticks to 8192 to avoid header juggling — when the eventual
+/// Phase 34/35 work needs the higher cap, the table moves to 64000 and the
+/// header is set conditionally.
+pub fn max_output_tokens_for(provider: &str, model: &str) -> u32 {
+    match (provider, model) {
+        ("anthropic", m) if m.starts_with("claude-sonnet-4") => 8_192,
+        ("anthropic", m) if m.starts_with("claude-haiku")    => 8_192,
+        ("anthropic", _)                                     => 8_192,
+
+        ("openai", m) if m.starts_with("gpt-4o-mini")        => 16_384,
+        ("openai", m) if m.starts_with("gpt-4o")             => 16_384,
+        ("openai", m) if m.starts_with("o1")                 => 32_768,
+        ("openai", m) if m.starts_with("gpt-3.5")            => 4_096,
+        ("openai", _)                                        => 4_096,
+
+        ("groq", _)                                          => 8_192,
+        ("openrouter", _)                                    => 8_192,
+        ("gemini", _)                                        => 8_192,
+        ("ollama", _)                                        => 4_096,
+        _                                                    => 4_096,
+    }
 }
 
 /// Phase 33 / LOOP-01 — one-shot text completion. Used by the verification

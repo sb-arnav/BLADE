@@ -1,6 +1,10 @@
 use super::{AssistantTurn, ConversationMessage, ToolCall, ToolDefinition};
 
-fn build_body(messages: &[ConversationMessage], tools: &[ToolDefinition]) -> serde_json::Value {
+fn build_body(
+    messages: &[ConversationMessage],
+    tools: &[ToolDefinition],
+    max_tokens_override: Option<u32>,
+) -> serde_json::Value {
     let system_instruction = messages.iter().find_map(|message| match message {
         ConversationMessage::System(content) => Some(serde_json::json!({
             "parts": [{"text": content}]
@@ -28,6 +32,14 @@ fn build_body(messages: &[ConversationMessage], tools: &[ToolDefinition]) -> ser
 
     if !declarations.is_empty() {
         body["tools"] = serde_json::json!([{ "functionDeclarations": declarations }]);
+    }
+
+    // Phase 33 / LOOP-04 — Gemini calls the field `maxOutputTokens` and nests
+    // it under `generationConfig`. Only set it when the smart-loop truncation
+    // retry path forces an override; otherwise leave Gemini's per-model
+    // default in place (preserves existing behaviour for legacy callers).
+    if let Some(max) = max_tokens_override {
+        body["generationConfig"] = serde_json::json!({ "maxOutputTokens": max });
     }
 
     body
@@ -95,13 +107,26 @@ pub async fn complete(
     messages: &[ConversationMessage],
     tools: &[ToolDefinition],
 ) -> Result<AssistantTurn, String> {
+    complete_ext(api_key, model, messages, tools, None).await
+}
+
+/// Phase 33 / LOOP-04 — extended `complete` accepting an explicit
+/// `max_tokens_override` from the smart-loop truncation retry path. Plumbed
+/// into Gemini's `generationConfig.maxOutputTokens` field.
+pub async fn complete_ext(
+    api_key: &str,
+    model: &str,
+    messages: &[ConversationMessage],
+    tools: &[ToolDefinition],
+    max_tokens_override: Option<u32>,
+) -> Result<AssistantTurn, String> {
     let client = super::http_client();
     let encoded_model = urlencoding::encode(model);
     let url = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
         encoded_model, api_key
     );
-    let body = build_body(messages, tools);
+    let body = build_body(messages, tools, max_tokens_override);
 
     let response = client
         .post(&url)
@@ -142,9 +167,14 @@ pub async fn complete(
         }
     }
 
+    // Phase 33 / LOOP-04 — Gemini reports finishReason at the candidate level.
+    // Values include "STOP" | "MAX_TOKENS" | "SAFETY" | "RECITATION" | "OTHER".
+    let stop_reason = json["candidates"][0]["finishReason"].as_str().map(|s| s.to_string());
+
     Ok(AssistantTurn {
         content,
         tool_calls,
+        stop_reason,
     })
 }
 
