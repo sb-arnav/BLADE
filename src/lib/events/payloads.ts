@@ -838,3 +838,38 @@ export interface BladeReincarnationPayload {
   vitality_start: number;  // always 0.3
   memories_intact: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 33 — Agentic Loop events (LOOP-01..06)
+// ---------------------------------------------------------------------------
+
+/** Phase 33 / LOOP-01..06 — agentic loop lifecycle events.
+ *
+ *  Discriminated union over `kind`. ActivityStrip subscribes via the
+ *  existing useActivityLog hook and renders chips with short labels:
+ *  "verifying" | "replanning" | "token bump" | "halted: cost cap" |
+ *  "halted: iteration cap".
+ *
+ *  Most-recent-only display per CONTEXT lock §ActivityStrip; no new timer
+ *  system — entries flow through the same activity-log ring buffer that
+ *  blade_status / blade_notification use.
+ *
+ *  See `src-tauri/src/loop_engine.rs` for the emit sites:
+ *    - verification_fired   — verify_progress() result (Plan 33-04)
+ *    - replanning           — third-same-tool reject_plan trigger (Plan 33-05)
+ *    - token_escalated      — max_tokens doubled retry fires (Plan 33-06)
+ *    - halted               — loop exits on cost cap or iteration cap (Plan 33-08)
+ *
+ *  @see .planning/phases/33-agentic-loop/33-CONTEXT.md §ActivityStrip Integration
+ */
+export type BladeLoopEventPayload =
+  | { kind: 'verification_fired'; verdict: 'YES' | 'NO' | 'REPLAN' }
+  | { kind: 'replanning'; count: number }
+  | { kind: 'token_escalated'; new_max: number }
+  | {
+      kind: 'halted';
+      reason: 'cost_exceeded' | 'iteration_cap';
+      spent_usd?: number;
+      cap_usd?: number;
+    };
+

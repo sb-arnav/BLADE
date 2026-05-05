@@ -14,6 +14,7 @@ import {
   type ReactNode,
 } from 'react';
 import { BLADE_EVENTS, useTauriEvent, type Event } from '@/lib/events';
+import type { BladeLoopEventPayload } from '@/lib/events/payloads';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -90,6 +91,68 @@ export function ActivityLogProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useTauriEvent<ActivityLogEntry>(BLADE_EVENTS.ACTIVITY_LOG, handleEvent);
+
+  // ─── Phase 33 / Plan 33-08 — agentic-loop lifecycle subscription ─────────
+  //
+  // Maps blade_loop_event into an ActivityLogEntry shape so it flows through
+  // the same ring buffer + ActivityStrip surface as blade_activity_log.
+  // Most-recent-only display is handled by ActivityStrip reading log[0].
+  // No new timer system — the entry is a normal log row that ages out as
+  // new entries arrive (matches CONTEXT lock §ActivityStrip Integration:
+  // "no new timer; reuse existing toast-fade timing").
+  //
+  // human_summary maps the discriminated union:
+  //   verification_fired → "verifying" / "verifying (off-track)" / "verifying (replan)"
+  //   replanning         → "replanning (#N)"
+  //   token_escalated    → "token bump → N"
+  //   halted             → "halted: cost cap ($X of $Y)" / "halted: iteration cap"
+  const handleLoopEvent = useCallback((e: Event<BladeLoopEventPayload>) => {
+    const payload = e.payload;
+    let summary: string;
+    let action: string;
+    switch (payload.kind) {
+      case 'verification_fired':
+        action = 'verification_fired';
+        summary =
+          payload.verdict === 'YES'
+            ? 'verifying'
+            : payload.verdict === 'NO'
+              ? 'verifying (off-track)'
+              : 'verifying (replan)';
+        break;
+      case 'replanning':
+        action = 'replanning';
+        summary = `replanning (#${payload.count})`;
+        break;
+      case 'token_escalated':
+        action = 'token_escalated';
+        summary = `token bump → ${payload.new_max}`;
+        break;
+      case 'halted':
+        action = 'halted';
+        summary =
+          payload.reason === 'cost_exceeded'
+            ? `halted: cost cap ($${(payload.spent_usd ?? 0).toFixed(2)} of $${(payload.cap_usd ?? 0).toFixed(2)})`
+            : 'halted: iteration cap';
+        break;
+    }
+    const entry: ActivityLogEntry = {
+      module: 'loop',
+      action,
+      human_summary: summary,
+      payload_id: null,
+      timestamp: Math.floor(Date.now() / 1000),
+    };
+    const next = [entry, ...logRef.current].slice(0, MAX_ENTRIES);
+    logRef.current = next;
+    setLog(next);
+    saveToStorage(next);
+  }, []);
+
+  useTauriEvent<BladeLoopEventPayload>(
+    BLADE_EVENTS.BLADE_LOOP_EVENT,
+    handleLoopEvent,
+  );
 
   const clearLog = useCallback(() => {
     setLog([]);
