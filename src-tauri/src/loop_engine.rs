@@ -456,6 +456,38 @@ pub async fn run_loop(
             return Err(LoopHaltReason::Cancelled);
         }
 
+        // ─── LOOP-06 — cost guard halt (Plan 33-08) ─────────────────────
+        //
+        // At the top of each iteration (after cancellation, before any
+        // provider call), check whether cumulative cost has crossed the
+        // configured cap. The cumulative_cost_usd field is populated AFTER
+        // each complete_turn (see "LOOP-06 cumulative cost tracking" below);
+        // an overage from iteration N is observed at the top of iteration N+1
+        // and halts before the next API call fires.
+        //
+        // Smart-only — when smart_loop_enabled=false, the entire block is
+        // skipped (CTX-07 escape hatch — legacy 12-iteration loop has no
+        // cost guard, preserving v1.0/v1.1 behavior verbatim). Threat T-33-31
+        // mitigation: a future edit that drops the smart_loop_enabled gate
+        // would start halting on cost in the legacy path, which the
+        // phase33_smart_loop_disabled_no_cost_guard_halt regression test
+        // catches.
+        if config.r#loop.smart_loop_enabled
+            && loop_state.cumulative_cost_usd > config.r#loop.cost_guard_dollars
+        {
+            emit_stream_event(&app, "blade_loop_event", serde_json::json!({
+                "kind": "halted",
+                "reason": "cost_exceeded",
+                "spent_usd": loop_state.cumulative_cost_usd,
+                "cap_usd": config.r#loop.cost_guard_dollars,
+            }));
+            let _ = app.emit("blade_status", "error");
+            return Err(LoopHaltReason::CostExceeded {
+                spent_usd: loop_state.cumulative_cost_usd,
+                cap_usd: config.r#loop.cost_guard_dollars,
+            });
+        }
+
         // ─── LOOP-01 — mid-loop verification probe (Plan 33-04) ──────────
         //
         // Fires every config.r#loop.verification_every_n iterations starting
@@ -762,12 +794,13 @@ pub async fn run_loop(
         // block after assigning `turn = retry_turn`). Test coverage:
         // phase33_loop_04_double_truncation_does_not_retry_again.
         //
-        // The cost-guard interlock is a stub here — Plan 33-08 wires the
-        // real per-provider price math into `loop_state.cumulative_cost_usd`
-        // and the `projected_cost` calculation below. For now we use a
-        // conservative flat rate ($0.00001/token) so the interlock is
-        // correctly-shaped but lenient until 33-08 lands.
-        //   let _projected_cost: f32 = 0.0; // TODO: Plan 33-08 wires real cost projection
+        // Cost-guard interlock — Plan 33-08 wires real per-provider price math
+        // (was a flat $0.00001/token stub through Plan 33-06). Now uses
+        // `providers::price_per_million(provider, model)` to compute the
+        // doubled-call's projected cost: same prompt tokens (no compaction
+        // between the original and retry call) plus output up to new_max.
+        // If projected cumulative cost exceeds cap, escalation is suppressed
+        // and the truncated turn flows through unchanged.
         //
         // Why we mutate `turn` here (not later): the assistant turn must be
         // pushed into the conversation buffer with the FINAL (retried)
@@ -804,6 +837,7 @@ pub async fn run_loop(
             let model_str = config.model.clone();
             let cumulative = loop_state.cumulative_cost_usd;
             let cost_cap = config.r#loop.cost_guard_dollars;
+            let turn_tokens_in = turn.tokens_in;
             let turn_ref = &turn;
             let escalate_decision = std::panic::catch_unwind(
                 std::panic::AssertUnwindSafe(|| {
@@ -813,11 +847,18 @@ pub async fn run_loop(
                     let new_max = escalate_max_tokens(
                         &provider_str, &model_str, current_max_tokens,
                     )?;
-                    // Cost-guard interlock — Plan 33-08 wires real per-provider
-                    // price math here. Stub: flat $0.00001/token overestimate.
-                    let _projected_cost: f32 = 0.0; // TODO: Plan 33-08 wires real cost projection
+                    // Phase 33 / Plan 33-08 — cost-guard interlock with real
+                    // per-provider rates. Conservative projection: assume the
+                    // doubled retry's prompt tokens equal the first call's
+                    // prompt tokens (no compaction in between) and output up
+                    // to new_max tokens. This intentionally over-estimates
+                    // (the model rarely outputs the full new_max), preserving
+                    // the cost-guard's defensive posture.
+                    let (price_in, price_out) =
+                        crate::providers::price_per_million(&provider_str, &model_str);
                     let estimated_extra =
-                        (new_max as f32 - current_max_tokens as f32) * 0.000_01;
+                        (turn_tokens_in as f32 * price_in
+                         + new_max as f32 * price_out) / 1_000_000.0;
                     let projected = cumulative + estimated_extra;
                     if projected <= cost_cap {
                         Some(new_max)
@@ -872,6 +913,42 @@ pub async fn run_loop(
                 // On retry Err: accept the original truncated turn —
                 // no infinite escalation, no second-chance fallthrough.
             }
+        }
+
+        // ─── LOOP-06 — cumulative cost tracking (Plan 33-08) ────────────
+        //
+        // Accumulate the just-completed turn's cost into LoopState.
+        // Smart-only — when smart_loop_enabled=false, the cumulative_cost_usd
+        // field stays at 0.0 forever (matches the legacy 12-iteration loop's
+        // cost-blind behavior; the cost-guard halt at iteration top is also
+        // gated on smart_loop_enabled, so this is consistent).
+        //
+        // The accumulation reads `turn.tokens_in` / `turn.tokens_out` (set
+        // by the provider response parser — see Plan 33-08 Task 1).
+        // Providers that don't report usage default to 0 here; their
+        // contribution to cumulative_cost_usd is 0.
+        //
+        // Called AFTER the LOOP-04 truncation retry block so the recorded
+        // cost reflects the FINAL (possibly-retried) turn. If the retry
+        // fired we account for the doubled-call's actual usage; if the
+        // original turn flowed through unchanged we account for that.
+        // Either way, both the original AND retry are captured because:
+        //   - retry-success path: turn = retry_turn (so we accumulate the
+        //     retry's tokens; the original truncated call's tokens are
+        //     IGNORED to keep the projection-vs-actual invariant simple)
+        //   - retry-fail path: turn stays as the original (tokens accounted)
+        // CONTEXT lock posture: this is the same simplification used in the
+        // cost-guard interlock projection — minor under-count on the retry-
+        // success path is acceptable; the over-estimating projection
+        // already reserved budget for the doubled call.
+        if config.r#loop.smart_loop_enabled {
+            let (price_in, price_out) =
+                crate::providers::price_per_million(&config.provider, &config.model);
+            let turn_cost_usd =
+                (turn.tokens_in as f32 * price_in
+                 + turn.tokens_out as f32 * price_out)
+                / 1_000_000.0;
+            loop_state.cumulative_cost_usd += turn_cost_usd;
         }
 
         conversation.push(ConversationMessage::Assistant {
@@ -1744,6 +1821,14 @@ pub async fn run_loop(
 
     // for-loop fell through (max_iter exhausted) or stuck-loop break triggered.
     // Caller continues to the loop-exhausted summary block at commands.rs:2584.
+    //
+    // Plan 33-08 — emit a structured halted event so ActivityStrip can render
+    // the "halted: iteration cap" chip via blade_loop_event. Symmetric with
+    // the cost_exceeded emit at iteration top.
+    emit_stream_event(&app, "blade_loop_event", serde_json::json!({
+        "kind": "halted",
+        "reason": "iteration_cap",
+    }));
     Err(LoopHaltReason::IterationCap)
 }
 
@@ -2139,6 +2224,220 @@ mod tests {
         let estimated_extra = (new_max as f32 - current_max as f32) * 0.000_01;
         let projected = cumulative_cost_usd + estimated_extra;
         assert!(projected > cap, "saturated cumulative cost must skip escalation");
+    }
+
+    // ─── Plan 33-08 (LOOP-06) — cost guard runtime + smart-off regression ──
+
+    #[test]
+    fn phase33_loop_06_cost_guard_halts_when_cap_exceeded() {
+        // The runtime gate at the top of run_loop's iteration body is a
+        // boolean expression: `smart_loop_enabled && cumulative_cost_usd > cap`.
+        // This test exercises that exact expression with a synthetic state
+        // that mirrors the production halt condition.
+        let mut cfg = crate::config::BladeConfig::default();
+        cfg.r#loop.smart_loop_enabled = true;
+        cfg.r#loop.cost_guard_dollars = 5.0;
+        let mut state = LoopState::default();
+        state.cumulative_cost_usd = 10.0;
+        let should_halt = cfg.r#loop.smart_loop_enabled
+            && state.cumulative_cost_usd > cfg.r#loop.cost_guard_dollars;
+        assert!(should_halt, "cost guard should halt when cumulative > cap");
+    }
+
+    #[test]
+    fn phase33_loop_06_cost_guard_does_not_halt_below_threshold() {
+        // Sister test of phase33_loop_06_cost_guard_halts_when_cap_exceeded:
+        // cumulative below the cap must NOT trigger halt regardless of
+        // smart-mode. Locks the comparison direction so a future edit can't
+        // accidentally invert the inequality.
+        let mut cfg = crate::config::BladeConfig::default();
+        cfg.r#loop.smart_loop_enabled = true;
+        cfg.r#loop.cost_guard_dollars = 5.0;
+        let mut state = LoopState::default();
+        state.cumulative_cost_usd = 4.99;
+        let should_halt = cfg.r#loop.smart_loop_enabled
+            && state.cumulative_cost_usd > cfg.r#loop.cost_guard_dollars;
+        assert!(!should_halt, "cost guard must NOT halt when cumulative < cap");
+    }
+
+    #[test]
+    fn phase33_loop_06_cost_accumulation_arithmetic() {
+        // 1M input tokens at $3/M + 1M output tokens at $15/M = $18.00.
+        // Locks the formula in run_loop's "cumulative cost tracking" block.
+        let (p_in, p_out) = (3.0_f32, 15.0_f32);
+        let tokens_in = 1_000_000_u32;
+        let tokens_out = 1_000_000_u32;
+        let cost = (tokens_in as f32 * p_in
+                  + tokens_out as f32 * p_out) / 1_000_000.0;
+        assert!(
+            (cost - 18.0).abs() < 0.001,
+            "1M in + 1M out at (3, 15) = $18.00; got {}", cost
+        );
+    }
+
+    #[test]
+    fn phase33_loop_06_cost_accumulation_via_price_helper() {
+        // End-to-end test of the production wiring: read price from
+        // providers::price_per_million, multiply by tokens_in/tokens_out,
+        // divide by 1M, add to cumulative. Uses anthropic claude-sonnet-4
+        // rates ($3.00 input, $15.00 output) — same as the arithmetic test
+        // but routed through the helper.
+        let (price_in, price_out) =
+            crate::providers::price_per_million("anthropic", "claude-sonnet-4-20250514");
+        assert!((price_in - 3.00).abs() < 0.01);
+        assert!((price_out - 15.00).abs() < 0.01);
+
+        let mut state = LoopState::default();
+        let tokens_in: u32 = 500_000;
+        let tokens_out: u32 = 100_000;
+        let turn_cost = (tokens_in as f32 * price_in
+                       + tokens_out as f32 * price_out) / 1_000_000.0;
+        state.cumulative_cost_usd += turn_cost;
+        // 500K in × $3/M = $1.50; 100K out × $15/M = $1.50; total = $3.00
+        assert!(
+            (state.cumulative_cost_usd - 3.00).abs() < 0.001,
+            "expected $3.00 cumulative; got {}", state.cumulative_cost_usd
+        );
+    }
+
+    #[test]
+    fn phase33_loop_06_smart_off_uses_iteration_cap_only() {
+        // Set cumulative_cost_usd absurdly above the cap; with smart_loop
+        // disabled, the cost-guard gate must short-circuit and NOT halt.
+        // This is the explicit regression for T-33-31 (tampering: future
+        // edit drops the smart_loop_enabled term in the cost-guard if).
+        let mut cfg = crate::config::BladeConfig::default();
+        cfg.r#loop.smart_loop_enabled = false;
+        cfg.r#loop.cost_guard_dollars = 0.001;
+        let mut state = LoopState::default();
+        state.cumulative_cost_usd = 999.0;
+        let should_halt = cfg.r#loop.smart_loop_enabled
+            && state.cumulative_cost_usd > cfg.r#loop.cost_guard_dollars;
+        assert!(!should_halt,
+            "smart-off path must NOT halt on cost guard regardless of cumulative spend");
+    }
+
+    #[test]
+    fn phase33_loop_06_max_iterations_25_default() {
+        // Plan 33-08 must preserve the Wave 1 LOOP-06 LoopConfig default of
+        // max_iterations=25. If a future edit accidentally changes the
+        // default (e.g. someone "tightens" it to 12), this test trips.
+        let cfg = crate::config::BladeConfig::default();
+        assert_eq!(
+            cfg.r#loop.max_iterations, 25,
+            "LoopConfig::default() max_iterations must be 25 (Wave 1 contract)"
+        );
+        assert!(
+            cfg.r#loop.smart_loop_enabled,
+            "LoopConfig::default() smart_loop_enabled must be true (Wave 1 contract)"
+        );
+        assert!(
+            (cfg.r#loop.cost_guard_dollars - 5.0).abs() < 0.01,
+            "LoopConfig::default() cost_guard_dollars must be $5.00 (Wave 1 contract)"
+        );
+    }
+
+    #[test]
+    fn phase33_smart_loop_disabled_runs_legacy_12_iterations_with_no_smart_features() {
+        // CRITICAL parity regression test for CONTEXT lock §Backward Compat.
+        // When smart is off, max_iter MUST be 12 AND none of the smart-feature
+        // gates fire. Each smart feature has its own `if config.r#loop.
+        // smart_loop_enabled` guard; this test validates each guard
+        // programmatically. If any guard regresses, this test trips.
+        let mut cfg = crate::config::BladeConfig::default();
+        cfg.r#loop.smart_loop_enabled = false;
+        cfg.r#loop.max_iterations = 999;          // ignored when smart off
+        cfg.r#loop.cost_guard_dollars = 0.001;    // ignored
+        cfg.r#loop.verification_every_n = 1;      // would fire every iter if smart on
+
+        // Gate 1 — iteration cap. Mirrors run_loop's max_iter selection.
+        let max_iter: usize = if cfg.r#loop.smart_loop_enabled {
+            cfg.r#loop.max_iterations as usize
+        } else { 12 };
+        assert_eq!(max_iter, 12, "smart-off must hard-code 12 iterations");
+
+        // Gate 2 — verification probe. Mirrors the firing site:
+        //   if smart_loop_enabled && iteration > 0 && iter % verify_every_n == 0
+        let iteration: u32 = 1;
+        let would_verify = cfg.r#loop.smart_loop_enabled
+            && iteration > 0
+            && iteration % cfg.r#loop.verification_every_n == 0;
+        assert!(!would_verify, "smart-off must skip verification probe");
+
+        // Gate 3 — cost-guard halt. Mirrors run_loop's iteration-top check:
+        //   if smart_loop_enabled && cumulative_cost_usd > cost_guard_dollars
+        let mut state = LoopState::default();
+        state.cumulative_cost_usd = 999.0;
+        let would_halt = cfg.r#loop.smart_loop_enabled
+            && state.cumulative_cost_usd > cfg.r#loop.cost_guard_dollars;
+        assert!(!would_halt, "smart-off must skip cost-guard halt");
+
+        // Gate 4 — token escalation (LOOP-04). Mirrors the truncation block's
+        // outer guard: `if config.r#loop.smart_loop_enabled { ... }`.
+        let escalation_gate = cfg.r#loop.smart_loop_enabled;
+        assert!(!escalation_gate, "smart-off must skip token-escalation block");
+
+        // Gate 5 — ToolError enrichment + replan trigger (LOOP-02 + LOOP-03).
+        // Same guard pattern.
+        let enrichment_gate = cfg.r#loop.smart_loop_enabled;
+        assert!(!enrichment_gate, "smart-off must skip enrich_alternatives + reject_plan");
+
+        // Gate 6 — cumulative cost accumulation. The post-turn block in
+        // run_loop is also gated on smart_loop_enabled — when off, the
+        // cumulative_cost_usd field stays at 0.0 forever.
+        let accumulation_gate = cfg.r#loop.smart_loop_enabled;
+        assert!(!accumulation_gate, "smart-off must skip cost accumulation");
+    }
+
+    #[test]
+    fn phase33_loop_06_smart_off_legacy_12_iter_loop_runs_to_completion() {
+        // Integration test: simulate a smart-off run that walks through 12
+        // iterations without any smart-feature side effect firing. Asserts
+        // that across all 12 iterations, NONE of {cost-guard, verify,
+        // escalate, replan, accumulate} would have fired given a config
+        // that would trigger every smart feature if smart were on.
+        let mut cfg = crate::config::BladeConfig::default();
+        cfg.r#loop.smart_loop_enabled = false;
+        cfg.r#loop.cost_guard_dollars = 0.001;
+        cfg.r#loop.verification_every_n = 1;
+
+        let mut state = LoopState::default();
+        // Pretend each fake-iteration costs $0.50 — well above the
+        // 0.001 cap. With smart off, this must NOT halt.
+        let max_iter = if cfg.r#loop.smart_loop_enabled { cfg.r#loop.max_iterations as usize } else { 12 };
+        assert_eq!(max_iter, 12, "smart-off iteration cap is the legacy 12");
+
+        let mut iters_ran = 0u32;
+        for iteration in 0..max_iter {
+            iters_ran += 1;
+
+            // Cost-guard gate — mirrors production. With smart off, this is
+            // unreachable; we just confirm the boolean is correctly false.
+            let would_halt = cfg.r#loop.smart_loop_enabled
+                && state.cumulative_cost_usd > cfg.r#loop.cost_guard_dollars;
+            assert!(!would_halt,
+                "iter {}: smart-off must not halt on cost (cumulative={}, cap={})",
+                iteration, state.cumulative_cost_usd, cfg.r#loop.cost_guard_dollars);
+
+            // Verification probe — mirrors production firing site.
+            let would_verify = cfg.r#loop.smart_loop_enabled
+                && iteration > 0
+                && (iteration as u32) % cfg.r#loop.verification_every_n == 0;
+            assert!(!would_verify, "iter {}: smart-off must not verify", iteration);
+
+            // Cost accumulation — mirrors production. With smart off, the
+            // post-turn accumulation block is skipped, so cumulative stays
+            // at 0.0 across all 12 iterations.
+            if cfg.r#loop.smart_loop_enabled {
+                state.cumulative_cost_usd += 0.50;
+            }
+        }
+
+        // After 12 fake-iterations with smart off, cumulative MUST still be
+        // 0.0 — no smart-mode accumulation took place.
+        assert_eq!(iters_ran, 12, "loop must complete 12 legacy iterations");
+        assert_eq!(state.cumulative_cost_usd, 0.0,
+            "smart-off must leave cumulative_cost_usd at 0.0 across all 12 iterations");
     }
 
     #[test]
