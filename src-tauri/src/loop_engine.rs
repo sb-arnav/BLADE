@@ -28,6 +28,18 @@
 //   - L14: ToolError migration is OUT OF SCOPE; the shim is non-optional.
 
 use std::collections::{HashMap, VecDeque};
+use std::sync::atomic::Ordering;
+
+use tauri::Emitter;
+
+use crate::commands::{
+    backoff_secs, classify_api_error, compress_conversation_smart, emit_stream_event,
+    explain_tool_failure, format_tool_result, is_circuit_broken, model_context_window,
+    record_error, safe_fallback_model, try_free_model_fallback, ApprovalMap, ErrorRecovery,
+    SharedMcpManager, CHAT_CANCEL,
+};
+use crate::providers::{self, ConversationMessage};
+use crate::trace;
 
 // ─── Loop state ────────────────────────────────────────────────────────────
 

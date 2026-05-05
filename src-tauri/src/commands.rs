@@ -21,7 +21,12 @@ pub type SharedMcpManager = Arc<Mutex<McpManager>>;
 pub type ApprovalMap = Arc<Mutex<StdHashMap<String, oneshot::Sender<bool>>>>;
 
 /// Global cancel flag — set to true to abort the current chat inference.
-static CHAT_CANCEL: AtomicBool = AtomicBool::new(false);
+///
+/// Phase 33 / Plan 33-03 (LOOP-06): visibility promoted to `pub(crate)` so
+/// `loop_engine::run_loop` can read this atomic from inside the lifted
+/// iteration body. The cancellation race window is unchanged: the flip
+/// takes effect at the next iteration boundary.
+pub(crate) static CHAT_CANCEL: AtomicBool = AtomicBool::new(false);
 static CHAT_INFLIGHT: AtomicBool = AtomicBool::new(false);
 
 // ---------------------------------------------------------------------------
@@ -97,7 +102,7 @@ fn error_history() -> &'static std::sync::Mutex<Vec<(String, std::time::Instant)
 }
 
 /// Record an error occurrence.
-fn record_error(kind: &str) {
+pub(crate) fn record_error(kind: &str) {
     if let Ok(mut h) = error_history().lock() {
         h.push((kind.to_string(), std::time::Instant::now()));
         // Keep at most 50 entries
@@ -108,7 +113,7 @@ fn record_error(kind: &str) {
 }
 
 /// Returns true if the same error kind occurred ≥3 times in the last 5 minutes.
-fn is_circuit_broken(kind: &str) -> bool {
+pub(crate) fn is_circuit_broken(kind: &str) -> bool {
     let Ok(h) = error_history().lock() else { return false };
     let window = std::time::Duration::from_secs(300);
     let now = std::time::Instant::now();
@@ -118,7 +123,7 @@ fn is_circuit_broken(kind: &str) -> bool {
 
 /// Exponential backoff for retries: base * 2^min(attempt, 3), capped at 120s.
 /// `attempt` is the number of recent occurrences of this error kind in the last 5 min.
-fn backoff_secs(base: u64, kind: &str) -> u64 {
+pub(crate) fn backoff_secs(base: u64, kind: &str) -> u64 {
     let Ok(h) = error_history().lock() else { return base };
     let window = std::time::Duration::from_secs(300);
     let now = std::time::Instant::now();
@@ -263,7 +268,7 @@ pub(crate) fn build_compaction_summary_prompt(events: &[String]) -> String {
 /// Smart context compression — inspired by MemPalace's AAAK pattern + OpenHands v7610.
 /// Instead of dropping old turns, summarizes them into a compact block.
 /// Keeps: system prompt + compressed summary + last ~8 turns (token-bounded) verbatim.
-async fn compress_conversation_smart(
+pub(crate) async fn compress_conversation_smart(
     conversation: &mut Vec<ConversationMessage>,
     max_tokens: usize,
     provider: &str,
@@ -349,7 +354,7 @@ async fn compress_conversation_smart(
 }
 
 /// Classify API errors and return a recovery action.
-enum ErrorRecovery {
+pub(crate) enum ErrorRecovery {
     TruncateAndRetry,
     /// Switch to a safe fallback model for this provider and retry
     SwitchModelAndRetry,
@@ -360,7 +365,7 @@ enum ErrorRecovery {
     Fatal(String),
 }
 
-fn classify_api_error(err: &str) -> ErrorRecovery {
+pub(crate) fn classify_api_error(err: &str) -> ErrorRecovery {
     let lower = err.to_lowercase();
 
     // Context window exceeded
@@ -412,7 +417,7 @@ fn classify_api_error(err: &str) -> ErrorRecovery {
 }
 
 /// Safe fallback model for a given provider when the configured model is invalid.
-fn safe_fallback_model(provider: &str) -> &'static str {
+pub(crate) fn safe_fallback_model(provider: &str) -> &'static str {
     match provider {
         "anthropic"   => "claude-haiku-4-5-20251001",
         "openai"      => "gpt-4o-mini",
@@ -434,7 +439,7 @@ const MAX_TOOL_RESULT_CHARS: usize = 200_000;
 /// Try to complete a turn using a free/fallback model when the primary is rate-limited.
 /// Attempts OpenRouter free tier first, then Groq, then Ollama.
 /// Returns Some(turn) on success, None if no free model is available.
-async fn try_free_model_fallback(
+pub(crate) async fn try_free_model_fallback(
     config: &crate::config::BladeConfig,
     conversation: &[crate::providers::ConversationMessage],
     tools: &[crate::providers::ToolDefinition],
@@ -616,7 +621,7 @@ fn count_task_steps(query: &str) -> usize {
 
 /// Build a human-readable explanation for a tool failure, including suggestions
 /// for alternative approaches and similar files/tools.
-fn explain_tool_failure(
+pub(crate) fn explain_tool_failure(
     tool_name: &str,
     args: &serde_json::Value,
     error: &str,
@@ -3163,7 +3168,7 @@ pub fn cap_tool_output(content: &str, budget_tokens: usize) -> ToolOutputCap {
     }
 }
 
-fn format_tool_result(result: &McpToolResult) -> String {
+pub(crate) fn format_tool_result(result: &McpToolResult) -> String {
     let parts = result
         .content
         .iter()
