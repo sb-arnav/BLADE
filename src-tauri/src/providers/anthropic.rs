@@ -4,6 +4,7 @@ fn build_body(
     model: &str,
     messages: &[ConversationMessage],
     tools: &[ToolDefinition],
+    max_tokens_override: Option<u32>,
 ) -> serde_json::Value {
     let system = messages.iter().find_map(|message| match message {
         ConversationMessage::System(content) => Some(content.clone()),
@@ -21,9 +22,13 @@ fn build_body(
         })
         .collect();
 
+    // Phase 33 / LOOP-04 — caller may force a higher max_tokens (truncation
+    // retry path). Default of 4096 is unchanged for every existing call site.
+    let max_tokens = max_tokens_override.unwrap_or(4096);
+
     let mut body = serde_json::json!({
         "model": model,
-        "max_tokens": 4096,
+        "max_tokens": max_tokens,
         "messages": msgs,
         "stream": false
     });
@@ -101,8 +106,21 @@ pub async fn complete(
     messages: &[ConversationMessage],
     tools: &[ToolDefinition],
 ) -> Result<AssistantTurn, String> {
+    complete_ext(api_key, model, messages, tools, None).await
+}
+
+/// Phase 33 / LOOP-04 — extended `complete` accepting an explicit
+/// `max_tokens_override` from the smart-loop truncation retry path. When
+/// `None`, the legacy 4096 default applies.
+pub async fn complete_ext(
+    api_key: &str,
+    model: &str,
+    messages: &[ConversationMessage],
+    tools: &[ToolDefinition],
+    max_tokens_override: Option<u32>,
+) -> Result<AssistantTurn, String> {
     let client = super::http_client();
-    let body = build_body(model, messages, tools);
+    let body = build_body(model, messages, tools, max_tokens_override);
 
     let response = client
         .post("https://api.anthropic.com/v1/messages")
@@ -144,9 +162,14 @@ pub async fn complete(
         }
     }
 
+    // Phase 33 / LOOP-04 — surface stop_reason for truncation detection.
+    // Anthropic values: "end_turn" | "max_tokens" | "stop_sequence" | "tool_use".
+    let stop_reason = json["stop_reason"].as_str().map(|s| s.to_string());
+
     Ok(AssistantTurn {
         content,
         tool_calls,
+        stop_reason,
     })
 }
 

@@ -54,10 +54,16 @@ pub async fn complete(
         .as_str()
         .unwrap_or_default()
         .to_string();
+    // Phase 33 / LOOP-04 — Ollama's chat API may emit a `done_reason` field
+    // ("stop" | "length" | …) but coverage varies across local models.
+    // Best-effort: surface it when present; otherwise the truncation
+    // detection in loop_engine falls back to the punctuation heuristic.
+    let stop_reason = json["done_reason"].as_str().map(|s| s.to_string());
 
     Ok(AssistantTurn {
         content,
         tool_calls: Vec::new(),
+        stop_reason,
     })
 }
 
