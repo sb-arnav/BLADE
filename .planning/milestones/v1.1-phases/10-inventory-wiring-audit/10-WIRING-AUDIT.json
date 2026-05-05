@@ -7466,6 +7466,108 @@
       "reachable_paths": [
         "invokeTyped(\"gmail_outbound_send\") -> src-tauri/src/tentacles/gmail_outbound.rs:20"
       ]
+    },
+    {
+      "file": "src-tauri/src/active_inference.rs",
+      "classification": "ACTIVE",
+      "purpose": "v1.4 Phase 28 — active inference loop. Tentacle predictions, prediction-error feedback to hormone bus, hippocampal replay.",
+      "trigger": "Internal — invoked by organism scheduler"
+    },
+    {
+      "file": "src-tauri/src/safety_bundle.rs",
+      "classification": "ACTIVE",
+      "purpose": "v1.4 Phase 26 — danger-triple HITL, mortality-salience cap, calm-vector bias, attachment guardrails.",
+      "trigger": "Internal — gates risky actions before execution"
+    },
+    {
+      "file": "src-tauri/src/vitality_engine.rs",
+      "classification": "ACTIVE",
+      "purpose": "v1.4 Phase 29 — vitality scalar 0-1, 5 behavioral bands, SDT replenishment, dormancy/reincarnation.",
+      "trigger": "Internal — drives behavioral band selection"
+    },
+    {
+      "file": "src-tauri/src/reward.rs",
+      "classification": "ACTIVE",
+      "purpose": "v1.4 reward weighting helper for hormone-driven feedback loops.",
+      "trigger": "Internal — invoked by hormone bus"
+    },
+    {
+      "file": "src-tauri/src/voyager_log.rs",
+      "classification": "ACTIVE",
+      "purpose": "v1.4 voyager skill-write event log; persists self-extending agent telemetry for evolution.rs.",
+      "trigger": "Internal — append-only writer for voyager events"
+    },
+    {
+      "file": "src-tauri/src/bin/skill_validator.rs",
+      "classification": "WIRED-NOT-USED",
+      "purpose": "v1.3 standalone CLI binary for offline skill manifest validation; not part of main runtime.",
+      "trigger": "External — `cargo run --bin skill_validator` (build/CI usage)"
+    },
+    {
+      "file": "src-tauri/src/skills/mod.rs",
+      "classification": "ACTIVE",
+      "purpose": "v1.3 skills system root module; re-exports skill loader / parser / validator / activator.",
+      "trigger": "Internal — referenced by lib.rs `mod skills`"
+    },
+    {
+      "file": "src-tauri/src/skills/types.rs",
+      "classification": "ACTIVE",
+      "purpose": "v1.3 skills shared type definitions (SkillManifest, SkillState, ConsentDecision).",
+      "trigger": "Internal — type-only module imported across skills/*"
+    },
+    {
+      "file": "src-tauri/src/skills/parser.rs",
+      "classification": "ACTIVE",
+      "purpose": "v1.3 skill manifest TOML/YAML parser.",
+      "trigger": "Internal — invoked by skills::loader on activation"
+    },
+    {
+      "file": "src-tauri/src/skills/validator.rs",
+      "classification": "ACTIVE",
+      "purpose": "v1.3 skill manifest validation against schema; enforces required fields + semver compliance.",
+      "trigger": "Internal — invoked by parser + by skill_validator binary"
+    },
+    {
+      "file": "src-tauri/src/skills/loader.rs",
+      "classification": "ACTIVE",
+      "purpose": "v1.3 skill discovery + load from disk; registers active skills in process state.",
+      "trigger": "Internal — runs at startup + on skill_install"
+    },
+    {
+      "file": "src-tauri/src/skills/resolver.rs",
+      "classification": "ACTIVE",
+      "purpose": "v1.3 skill dependency + capability resolver; determines which skills satisfy a tool request.",
+      "trigger": "Internal — invoked by tool dispatcher"
+    },
+    {
+      "file": "src-tauri/src/skills/activate.rs",
+      "classification": "ACTIVE",
+      "purpose": "v1.3 skill activation logic — loads + initializes skill runtime state.",
+      "trigger": "Internal — invoked by lifecycle on user-approved skills"
+    },
+    {
+      "file": "src-tauri/src/skills/lifecycle.rs",
+      "classification": "ACTIVE",
+      "purpose": "v1.3 skill lifecycle management — install / activate / deactivate / uninstall transitions.",
+      "trigger": "Internal — orchestrated by skills::mod"
+    },
+    {
+      "file": "src-tauri/src/skills/consent.rs",
+      "classification": "ACTIVE",
+      "purpose": "v1.3 skill consent prompt + decision recording; integrates with ConsentDialog UI.",
+      "trigger": "Internal — invoked before activate.rs on first-use"
+    },
+    {
+      "file": "src-tauri/src/skills/pending.rs",
+      "classification": "ACTIVE",
+      "purpose": "v1.3 pending skill queue — skills awaiting consent or capability resolution.",
+      "trigger": "Internal — drained when user approves consent"
+    },
+    {
+      "file": "src-tauri/src/skills/export.rs",
+      "classification": "ACTIVE",
+      "purpose": "v1.3 skill export — packages an active skill for sharing/distribution.",
+      "trigger": "Internal — invoked by skill_export Tauri command"
     }
   ],
   "routes": [
@@ -11048,6 +11150,33 @@
       "classification": "ACTIVE",
       "ui_surface": null,
       "control_type": "boolean — guardrail M-03 (observe-only mode for v1.1)"
+    },
+    {
+      "field": "BladeConfig.voyager_skill_write_budget_tokens",
+      "file": "src-tauri/src/config.rs:644",
+      "struct": "BladeConfig",
+      "disk_persisted": true,
+      "classification": "ACTIVE",
+      "ui_surface": null,
+      "control_type": "number (v1.4 voyager skill write budget — token cap on skill-write tools per turn)"
+    },
+    {
+      "field": "BladeConfig.reward_weights",
+      "file": "src-tauri/src/config.rs:649",
+      "struct": "BladeConfig",
+      "disk_persisted": true,
+      "classification": "ACTIVE",
+      "ui_surface": null,
+      "control_type": "complex (RewardWeights — v1.4 hormone reward weighting)"
+    },
+    {
+      "field": "BladeConfig.context",
+      "file": "src-tauri/src/config.rs:654",
+      "struct": "BladeConfig",
+      "disk_persisted": true,
+      "classification": "ACTIVE",
+      "ui_surface": "src/features/admin/DoctorPane.tsx (read-only context budget breakdown — Phase 32 / CTX-06)",
+      "control_type": "complex (ContextConfig sub-struct — Phase 32 selective injection / compaction / tool caps / CTX-07 fallback toggle)"
     }
   ],
   "not_wired_backlog": [
