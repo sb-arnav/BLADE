@@ -9,9 +9,9 @@ last_activity: 2026-05-05
 progress:
   total_phases: 7
   completed_phases: 0
-  total_plans: 7
-  completed_plans: 7
-  percent: 14
+  total_plans: 16
+  completed_plans: 16
+  percent: 29
 ---
 
 # STATE -- BLADE (v1.5 -- Intelligence Layer)
@@ -19,21 +19,22 @@ progress:
 **Project:** BLADE -- Desktop JARVIS
 **Current milestone:** v1.5 -- Intelligence Layer
 **Prior shipped:** v1.4 (2026-05-03), v1.3 (2026-05-02), v1.2 (2026-04-30), v1.1 (2026-04-27), v1.0 (2026-04-19)
-**Current Focus:** Phase 32 — Context Management (code complete; runtime UAT operator-deferred)
-**Status:** All 7 plans landed + reviewed + verified. Pending Arnav's runtime UAT on the dev binary to formally close. Phase 33 unblocks at that point.
+**Current Focus:** Phase 33 — Agentic Loop (code complete; runtime UAT operator-deferred). Phase 32 also UAT-pending.
+**Status:** Phases 32 + 33 both at the `checkpoint:human-verify` boundary. Pending Arnav's runtime UAT on the dev binary for both phases. Phase 34 unblocks once Phase 33 UAT clears.
 
 ## Current Position
 
-Phase: 32 — Context Management (7/7 plans complete; checkpoint:human-verify open)
-Plans: 7 (32-01 → 32-07) across 4 waves — all SUMMARY.md committed
-Status: Static-gate evidence package green; code review (32-REVIEW.md HIGH-01 + MEDIUM-01 + MEDIUM-02 fixed in commit 82d9a2c); goal-backward verification (32-VERIFICATION.md). Awaiting Arnav's 7-step UAT on the dev binary per CLAUDE.md Verification Protocol; see `.planning/phases/32-context-management/32-07-SUMMARY.md` §UAT Findings for the script.
-Last activity: 2026-05-05 — Phase 32 closed out autonomously to the v1.1-protected boundary (`checkpoint:human-verify`). UAT operator-deferred per Arnav's directive ("can we continue I will check after everything is done"). Three v1.4-debt items fixed during close-out (chat.css ghost tokens, 10-WIRING-AUDIT.json gaps, code-review-flagged DoctorPane TLS bug). One v1.4 organism-eval flake (OEVAL-01c) logged as out-of-scope drift — verified deterministically present pre-Phase 32 changes.
+Phase 32 — Context Management (7/7 plans complete; checkpoint:human-verify open)
+Phase 33 — Agentic Loop (9/9 plans complete; checkpoint:human-verify open)
+Status: Both phases code-complete with static-gate evidence packages green. Phase 33 surfaced + fixed two pre-existing v1.4-style debts during close-out (verify-emit-policy allowlist, 10-WIRING-AUDIT.json loop_engine.rs gap) — same pattern as Phase 32 close-out (chat.css ghost tokens, 10-WIRING-AUDIT.json gaps).
 
-Progress: [█░░░░░░░░░] 14% (7/7 plans complete; 0/7 phases formally closed pending UAT)
+Last activity: 2026-05-05 — Phase 33 closed to the v1.1-protected boundary autonomously. 35 commits across Phase 33 (CONTEXT + RESEARCH + 9 PLANs + 9 SUMMARYs + feat commits + REVIEW). 70 phase33 unit tests + 3 integration tests green; cargo check + cargo check --release + tsc clean; 36/37 npm run verify:all gates green (the 1 failure is the same pre-existing v1.4 OEVAL-01c organism-eval drift documented at Phase 32 close — out of Phase 33 scope, deterministic across with/without Phase 33 changes, zero coupling between vitality_engine and run_loop surfaces).
+
+Progress: [██░░░░░░░░] 29% (16/16 plans complete across phases 32 + 33; 0/7 phases formally closed pending UAT)
 
 ```
-32 [ ] Context Management
-33 [ ] Agentic Loop
+32 [~] Context Management         (code complete, UAT pending)
+33 [~] Agentic Loop                (code complete, UAT pending)
 34 [ ] Resilience + Session Persistence
 35 [ ] Auto-Decomposition
 36 [ ] Context Intelligence

@@ -117,7 +117,16 @@
   4. A response that is truncated mid-sentence auto-retries with a higher max-output-token value; the retry resolves the truncation
   5. The fast-streaming path runs the ego intercept (LOOP-05), preventing the ego-blind gap from silently dropping accumulated identity context
   6. The iteration limit is configurable via settings (default 25) and a cost guard prevents runaway beyond the configured spend ceiling
-**Plans**: TBD
+**Plans:** 9 plans across 4 waves (Wave 1: 33-01, 33-02; Wave 2: 33-03; Wave 3: 33-04, 33-05, 33-06, 33-07; Wave 4: 33-08, 33-09) — **all 9 code-complete; runtime UAT operator-deferred per Arnav 2026-05-05**
+- [x] 33-01-PLAN.md — LoopConfig sub-struct + 6-place wire-up (LOOP-06 substrate) [Wave 1] ✓ commits c4b0af5 + 3a6bcf8
+- [x] 33-02-PLAN.md — loop_engine.rs scaffold + LoopState/LoopHaltReason/ToolError + wrap_legacy_error shim (LOOP-02 substrate) [Wave 1] ✓ commits d69aa81 + b4f8d9d
+- [x] 33-03-PLAN.md — Lift commands.rs:1626 for-loop body into loop_engine::run_loop (LOOP-06 refactor) [Wave 2] ✓ commits 0d68b91 + 9754ee7 + c5598a8
+- [x] 33-04-PLAN.md — Mid-loop verification probe via cheap_model_for_provider (LOOP-01) [Wave 3] ✓ commits 146a911 + 3bc2f08 + 049b2cb
+- [x] 33-05-PLAN.md — ToolError boundary wiring + 3-same-tool replan trigger (LOOP-02, LOOP-03) [Wave 3] ✓ commits ccb0ac2 + abdb9e0
+- [x] 33-06-PLAN.md — Truncation detection + max_tokens escalation with cost-guard interlock (LOOP-04) [Wave 3] ✓ commits ffbf73e + f9430de + 5150b17 + b85789d
+- [x] 33-07-PLAN.md — build_fast_path_supplement closes Phase 18 KNOWN GAP (LOOP-05) [Wave 3] ✓ commits 23bf13f + 1e589fc + e36aed0
+- [x] 33-08-PLAN.md — Cost guard runtime + ActivityStrip BLADE_LOOP_EVENT wiring + smart-off regression (LOOP-06 close-out) [Wave 4] ✓ commits b63e108 + b6707e5 + 3273aaa + e0874ab
+- [x] 33-09-PLAN.md — Panic-injection regression test + checkpoint:human-verify UAT (phase closure) [Wave 4] ✓ commits da493b2 + 0edbd7a (Task 1); Task 2 = checkpoint:human-verify, runtime UAT pending Arnav
 
 ### Phase 34: Resilience + Session Persistence
 
