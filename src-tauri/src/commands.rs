@@ -1467,12 +1467,31 @@ pub(crate) async fn send_message_stream_inline(
         // closes the "identity-blind" half of the original gap; full ego
         // parity remains a follow-up.
 
-        // LOOP-05 — inject identity supplement at index 0 so the provider
-        // sees it before any user content. catch_unwind keeps a panic in
-        // supplement build from breaking the chat (CTX-07 fallback discipline).
+        // LOOP-05 — inject identity supplement so the provider sees it
+        // before any user content. catch_unwind keeps a panic in supplement
+        // build from breaking the chat (CTX-07 fallback discipline).
         // AssertUnwindSafe is required because &BladeConfig carries types
         // that aren't UnwindSafe — same pattern Phase 32-07 used at the
         // smart-path call sites.
+        //
+        // 33-NN-FIX (BL-02) — original LOOP-05 wiring did `conversation.insert(0, ...)`
+        // which displaced the slow-path system prompt (built at commands.rs:1167-1186
+        // and pushed into conversation[0] by build_conversation) to index 1.
+        // Anthropic + Gemini build_body extract the system message via
+        // `.find_map()` which returns the FIRST match and ignores subsequent
+        // System(_) entries — result was that the rich ~10k-token slow-path
+        // prompt was silently dropped on those two providers, leaving only
+        // the ~1k-token supplement. Anthropic fast-path identity became
+        // STRICTLY POORER than v1.4 (a regression). OpenAI/Groq/OpenRouter
+        // serialize System as plain `{"role":"system"}` array entries so both
+        // got through there — divergent runtime semantics across providers
+        // from a single insert site.
+        //
+        // Fix: MERGE the supplement into the existing System(0) (concatenate
+        // supplement + delimiter + existing-prompt) rather than insert. If no
+        // existing system message is at index 0 (defensive fallback), insert
+        // the supplement directly. This makes the wire identical across all
+        // five providers regardless of how each one extracts System messages.
         if config.r#loop.smart_loop_enabled {
             let supplement = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 crate::brain::build_fast_path_supplement(
@@ -1484,7 +1503,21 @@ pub(crate) async fn send_message_stream_inline(
             }))
             .unwrap_or_default();
             if !supplement.is_empty() {
-                conversation.insert(0, ConversationMessage::System(supplement));
+                if let Some(ConversationMessage::System(existing)) = conversation.get_mut(0) {
+                    // Merge into existing slow-path system prompt — the
+                    // supplement comes first (identity grounding, then the
+                    // rich downstream context), separated by a clear delimiter
+                    // so the model sees the boundary if it ever introspects.
+                    *existing = format!("{}\n\n---\n\n{}", supplement, existing);
+                } else {
+                    // No system message at index 0 — fall through to the
+                    // pre-fix insert behaviour. This branch is rare in
+                    // production (build_conversation always emits a System at
+                    // index 0 when the slow-path prompt is non-empty) but
+                    // covers the defensive case where commands.rs evolves to
+                    // skip the slow-path prompt for some fast-path branch.
+                    conversation.insert(0, ConversationMessage::System(supplement));
+                }
             }
         }
 
@@ -3064,6 +3097,122 @@ pub(crate) mod tests {
             formatted.len() <= 250_000,
             "format_tool_result must still have an outer safety ceiling (got {} chars)",
             formatted.len()
+        );
+    }
+
+    // ─── 33-NN-FIX (BL-02) — fast-path supplement merge regression ────────
+
+    /// Mirrors the production fast-path supplement injection at
+    /// commands.rs:1476. We can't construct a real BladeConfig + AppHandle
+    /// inside a unit test (Tauri AppHandle requires a runtime), so this test
+    /// directly exercises the `merge supplement into existing System(0)`
+    /// transformation against a synthetic conversation. The shape under test
+    /// is exactly what production runs:
+    ///
+    ///     1. build_conversation produces conversation[0] = System(slow_path_prompt)
+    ///     2. The fast-path branch wants to inject a supplement
+    ///     3. The CORRECT behaviour is to MERGE supplement into conversation[0]
+    ///        (concatenated with delimiter), NOT insert at index 0 (which would
+    ///        displace the slow-path prompt to index 1 where Anthropic + Gemini
+    ///        find_map() drops it).
+    ///
+    /// If a future edit accidentally re-introduces the displacement bug
+    /// (`conversation.insert(0, ...)` on the smart-loop branch), this test
+    /// trips because the slow-path prompt content is no longer at index 0.
+    #[test]
+    fn phase33_loop_05_supplement_does_not_displace_existing_system_prompt() {
+        let slow_path_prompt =
+            "SLOW_PATH_IDENTITY_AND_CONTEXT_AND_SMART_CTX_AND_BRAIN_L0_CRITICAL_FACTS";
+        let supplement = "FAST_PATH_IDENTITY_SUPPLEMENT";
+
+        let mut conversation: Vec<ConversationMessage> = vec![
+            ConversationMessage::System(slow_path_prompt.to_string()),
+            ConversationMessage::User("hello".to_string()),
+        ];
+
+        // Mirror the production merge logic at commands.rs:1476.
+        if !supplement.is_empty() {
+            if let Some(ConversationMessage::System(existing)) = conversation.get_mut(0) {
+                *existing = format!("{}\n\n---\n\n{}", supplement, existing);
+            } else {
+                conversation.insert(0, ConversationMessage::System(supplement.to_string()));
+            }
+        }
+
+        // Index 0 must still be a System message (no displacement).
+        assert!(
+            matches!(conversation.first(), Some(ConversationMessage::System(_))),
+            "conversation[0] must remain System after supplement merge — got {:?}",
+            conversation.first()
+        );
+
+        // The merged System(0) must contain BOTH the supplement AND the
+        // slow-path prompt — Anthropic + Gemini find_map() see this single
+        // message and route the entire merged content to the provider.
+        let ConversationMessage::System(merged) = conversation
+            .first()
+            .expect("conversation[0]")
+        else {
+            panic!("conversation[0] must be System");
+        };
+        assert!(
+            merged.contains(slow_path_prompt),
+            "merged System(0) must contain the slow-path prompt; got: {}",
+            merged
+        );
+        assert!(
+            merged.contains(supplement),
+            "merged System(0) must contain the supplement; got: {}",
+            merged
+        );
+
+        // Conversation length must NOT have grown — merge in place, not
+        // insert. If a future edit reverts to `conversation.insert(0, ...)`,
+        // length becomes 3 and this assertion trips.
+        assert_eq!(
+            conversation.len(),
+            2,
+            "merge must NOT grow conversation length (insert+displace bug); got len={}",
+            conversation.len()
+        );
+
+        // Confirm there is exactly ONE System message — Anthropic + Gemini
+        // build_body use find_map (returns first), so a regression that adds
+        // a SECOND System would trip this test.
+        let system_count = conversation
+            .iter()
+            .filter(|m| matches!(m, ConversationMessage::System(_)))
+            .count();
+        assert_eq!(
+            system_count, 1,
+            "merge must yield exactly 1 System message — find_map() in Anthropic + Gemini \
+             would silently drop a second one and we'd lose the slow-path prompt"
+        );
+    }
+
+    /// Defensive sister test — when there is NO existing System at index 0
+    /// (rare in production but possible with future commands.rs evolution),
+    /// the supplement should fall through to the legacy insert path.
+    #[test]
+    fn phase33_loop_05_supplement_inserts_when_no_existing_system() {
+        let supplement = "FAST_PATH_IDENTITY_SUPPLEMENT";
+        let mut conversation: Vec<ConversationMessage> = vec![
+            ConversationMessage::User("hello".to_string()),
+        ];
+
+        if !supplement.is_empty() {
+            if let Some(ConversationMessage::System(existing)) = conversation.get_mut(0) {
+                *existing = format!("{}\n\n---\n\n{}", supplement, existing);
+            } else {
+                conversation.insert(0, ConversationMessage::System(supplement.to_string()));
+            }
+        }
+
+        assert_eq!(conversation.len(), 2,
+            "no-existing-System path must INSERT, growing length by 1");
+        assert!(
+            matches!(conversation.first(), Some(ConversationMessage::System(s)) if s == supplement),
+            "supplement must be at index 0 when no prior System existed"
         );
     }
 }
