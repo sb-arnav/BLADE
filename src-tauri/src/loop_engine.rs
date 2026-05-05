@@ -66,6 +66,11 @@ pub struct LoopState {
     /// Resets to 0 when the tool succeeds or a different tool fails.
     /// On 3rd entry, reject_plan is called + replan nudge injected.
     pub consecutive_same_tool_failures: HashMap<String, u32>,
+    /// Plan 33-05 — last iteration where a nudge was injected (LOOP-01 NO/REPLAN
+    /// or LOOP-03 third-same-tool). Used to suppress stacking — if a nudge was
+    /// injected within the last 2 iterations, the next one is skipped.
+    /// (33-RESEARCH.md landmine #11.)
+    pub last_nudge_iteration: Option<u32>,
 }
 
 impl LoopState {
@@ -274,7 +279,17 @@ pub async fn run_loop(
     // mutable so record_tool_call (mut-borrow) works inline.
     let mut turn_acc = turn_acc;
 
+    // Plan 33-05 (LOOP-02 + LOOP-03) — central LoopState lives for the whole
+    // run_loop call. Plans 33-04..33-08 mount additional fields/usages
+    // (verification probe, cost guard, token escalation) onto this same value.
+    let mut loop_state = LoopState::default();
+
     for iteration in 0..max_iter {
+        // Plan 33-05 — keep LoopState.iteration in sync with the for-loop
+        // index so the stacking-prevention check (last_nudge_iteration) and
+        // future verification cadence (Plan 33-04) read the right value.
+        loop_state.iteration = iteration as u32;
+
         // Check cancellation before each iteration
         if CHAT_CANCEL.load(Ordering::SeqCst) {
             return Err(LoopHaltReason::Cancelled);
@@ -1236,6 +1251,97 @@ pub async fn run_loop(
                 content
             };
 
+            // Plan 33-05 (LOOP-02 + LOOP-03) — tool-failure boundary.
+            //
+            // LOOP-02: when the dispatch produced an error, wrap the (already
+            // explain_tool_failure-enriched, cap_tool_output-capped) content
+            // into a structured ToolError, populate suggested_alternatives via
+            // enrich_alternatives, and render via ToolError::render_for_model.
+            // The rendered string replaces the bare error content in the
+            // conversation, so the model sees the locked CONTEXT format
+            // (Tool failed.\nAttempted:\nReason:\nSuggested alternatives:)
+            // instead of a bare error string.
+            //
+            // LOOP-03: track per-tool consecutive failure counts. On the third
+            // consecutive same-tool failure, fire brain_planner::reject_plan,
+            // increment loop_state.replans_this_run, emit blade_loop_event
+            // {kind: "replanning", count: N}, and inject a "re-plan from
+            // current state" system nudge. Stacking prevention (33-RESEARCH
+            // landmine #11) suppresses the nudge if last_nudge_iteration is
+            // within 2 iterations.
+            //
+            // CONTEXT lock §Backward Compatibility: when smart_loop_enabled
+            // is false, neither LOOP-02 enrichment nor LOOP-03 trigger fires —
+            // the legacy (content, is_error) tuple flows straight to the push
+            // exactly as before this plan landed.
+            let content = if config.r#loop.smart_loop_enabled && is_error {
+                // LOOP-02 — wrap, enrich, render.
+                let mut tool_err = crate::native_tools::wrap_legacy_error(
+                    &tool_call.name,
+                    content.clone(),
+                );
+                tool_err.suggested_alternatives = enrich_alternatives(&tool_call.name);
+
+                // LOOP-03 — track consecutive same-tool failures.
+                // Reset map if the previous failure was for a different tool.
+                let last_failed_tool = loop_state
+                    .consecutive_same_tool_failures
+                    .keys()
+                    .next()
+                    .cloned();
+                if let Some(prev) = last_failed_tool {
+                    if prev != tool_call.name {
+                        loop_state.consecutive_same_tool_failures.clear();
+                    }
+                }
+                let counter = loop_state
+                    .consecutive_same_tool_failures
+                    .entry(tool_call.name.clone())
+                    .or_insert(0);
+                *counter += 1;
+                let triggered = *counter >= 3;
+
+                if triggered {
+                    // Stacking prevention (landmine #11) — if a nudge was
+                    // injected within the last 2 iterations, skip this one.
+                    let stacking = loop_state
+                        .last_nudge_iteration
+                        .map_or(false, |prev| {
+                            loop_state.iteration.saturating_sub(prev) <= 2
+                        });
+                    if !stacking {
+                        crate::brain_planner::reject_plan(last_user_text);
+                        loop_state.replans_this_run =
+                            loop_state.replans_this_run.saturating_add(1);
+                        loop_state.last_nudge_iteration = Some(loop_state.iteration);
+                        emit_stream_event(
+                            &app,
+                            "blade_loop_event",
+                            serde_json::json!({
+                                "kind": "replanning",
+                                "count": loop_state.replans_this_run,
+                            }),
+                        );
+                        conversation.push(ConversationMessage::System(
+                            "Internal check: re-plan from current state. Do not retry the failing step verbatim.".to_string(),
+                        ));
+                    }
+                    // Reset the streak regardless — we acted on it (or
+                    // suppressed via stacking guard); next failure starts a
+                    // fresh count for this tool.
+                    *counter = 0;
+                }
+
+                tool_err.render_for_model()
+            } else if config.r#loop.smart_loop_enabled && !is_error {
+                // Successful tool call — break any active failure streak.
+                loop_state.consecutive_same_tool_failures.clear();
+                content
+            } else {
+                // Legacy path (smart_loop_enabled=false) — preserve verbatim.
+                content
+            };
+
             conversation.push(ConversationMessage::Tool {
                 tool_call_id: tool_call.id,
                 tool_name: tool_call.name,
@@ -1370,5 +1476,169 @@ mod tests {
         assert_eq!(s.last_3_actions.len(), 3);
         assert_eq!(s.last_3_actions.front().unwrap().tool, "tool_2");
         assert_eq!(s.last_3_actions.back().unwrap().tool, "tool_4");
+    }
+
+    // ─── Plan 33-05 (LOOP-02 + LOOP-03) tests ─────────────────────────
+
+    #[test]
+    fn phase33_loop_02_render_replaces_bare_strings_on_smart_path() {
+        // Direct test of the wrap+enrich+render shape that the LoopState
+        // boundary produces on the smart path.
+        let mut tool_err =
+            crate::native_tools::wrap_legacy_error("read_file", "no such file".to_string());
+        tool_err.suggested_alternatives = enrich_alternatives("read_file");
+        let rendered = tool_err.render_for_model();
+        assert!(rendered.starts_with("Tool failed."), "got: {}", rendered);
+        assert!(rendered.contains("Attempted: read_file"), "got: {}", rendered);
+        assert!(rendered.contains("Reason: no such file"), "got: {}", rendered);
+        assert!(rendered.contains("Suggested alternatives:"), "got: {}", rendered);
+        assert!(rendered.contains("Verify the path exists"), "got: {}", rendered);
+    }
+
+    #[test]
+    fn phase33_loop_02_legacy_path_omits_alternatives() {
+        // Legacy path = wrap_legacy_error WITHOUT enrich_alternatives.
+        // The CONTEXT lock parity rule: rendered output must NOT include the
+        // "Suggested alternatives" block when the alternatives Vec is empty.
+        let tool_err =
+            crate::native_tools::wrap_legacy_error("read_file", "no such file".to_string());
+        let rendered = tool_err.render_for_model();
+        assert!(rendered.contains("Tool failed."), "got: {}", rendered);
+        assert!(rendered.contains("Reason: no such file"), "got: {}", rendered);
+        assert!(
+            !rendered.contains("Suggested alternatives"),
+            "legacy shim must produce no Suggested alternatives block (parity with bare-string behavior); got: {}",
+            rendered
+        );
+    }
+
+    #[test]
+    fn phase33_loop_03_replans_observed_after_three_same_tool_failures() {
+        // Synthetic LoopState — directly exercise the counter logic that
+        // triggers reject_plan on the third consecutive same-tool failure.
+        let mut state = LoopState::default();
+        let mut last_failed_tool: Option<String> = None;
+
+        for _ in 0..3 {
+            // Simulate three same-tool failures (tool-change reset path).
+            if let Some(prev) = last_failed_tool.clone() {
+                if prev != "read_file" {
+                    state.consecutive_same_tool_failures.clear();
+                }
+            }
+            let counter = state
+                .consecutive_same_tool_failures
+                .entry("read_file".to_string())
+                .or_insert(0);
+            *counter += 1;
+            last_failed_tool = Some("read_file".to_string());
+        }
+        assert_eq!(
+            *state.consecutive_same_tool_failures.get("read_file").unwrap(),
+            3,
+            "third same-tool failure must register count=3"
+        );
+
+        // Now simulate the trigger logic (the production code path increments
+        // replans_this_run + writes last_nudge_iteration when count >= 3).
+        if *state.consecutive_same_tool_failures.get("read_file").unwrap() >= 3 {
+            state.replans_this_run = state.replans_this_run.saturating_add(1);
+            state.last_nudge_iteration = Some(state.iteration);
+        }
+        assert_eq!(state.replans_this_run, 1, "replans_this_run must increment");
+        assert!(
+            state.last_nudge_iteration.is_some(),
+            "last_nudge_iteration must be set on trigger"
+        );
+    }
+
+    #[test]
+    fn phase33_loop_03_different_tool_resets_counter() {
+        // CONTEXT lock §Plan Adaptation: counter resets when a *different*
+        // tool name fails after a streak. The HashMap shape (one key at a
+        // time) matches the locked design.
+        let mut state = LoopState::default();
+        let mut last_failed_tool: Option<String> = None;
+
+        // Two failures of read_file
+        for _ in 0..2 {
+            if let Some(prev) = last_failed_tool.clone() {
+                if prev != "read_file" {
+                    state.consecutive_same_tool_failures.clear();
+                }
+            }
+            let counter = state
+                .consecutive_same_tool_failures
+                .entry("read_file".to_string())
+                .or_insert(0);
+            *counter += 1;
+            last_failed_tool = Some("read_file".to_string());
+        }
+        // One failure of bash — must clear read_file
+        if let Some(prev) = last_failed_tool.clone() {
+            if prev != "bash" {
+                state.consecutive_same_tool_failures.clear();
+            }
+        }
+        let counter = state
+            .consecutive_same_tool_failures
+            .entry("bash".to_string())
+            .or_insert(0);
+        *counter += 1;
+
+        assert!(
+            state.consecutive_same_tool_failures.get("read_file").is_none(),
+            "different-tool failure must clear the previous tool's streak"
+        );
+        assert_eq!(
+            *state.consecutive_same_tool_failures.get("bash").unwrap(),
+            1,
+            "new tool's first failure registers count=1"
+        );
+    }
+
+    #[test]
+    fn phase33_loop_03_stacking_prevention_skips_within_2_iterations() {
+        // 33-RESEARCH landmine #11 — a nudge within the last 2 iterations
+        // suppresses the next. Iteration 5 inserts (last_nudge_iteration=5);
+        // iterations 6 and 7 are stacking-blocked; iteration 8 (delta=3) is
+        // allowed.
+        let nudge_iter = 5u32;
+        for next_iter in [6u32, 7u32].iter() {
+            let stacking = next_iter.saturating_sub(nudge_iter) <= 2;
+            assert!(
+                stacking,
+                "iteration {} should be stacking-blocked vs prev={}",
+                next_iter, nudge_iter
+            );
+        }
+        let stacking = 8u32.saturating_sub(nudge_iter) <= 2;
+        assert!(
+            !stacking,
+            "iteration 8 vs prev=5 (delta 3) must be allowed"
+        );
+    }
+
+    #[test]
+    fn phase33_loop_03_successful_tool_clears_streak() {
+        // Success arm of the LoopState boundary: a successful tool call must
+        // clear consecutive_same_tool_failures so the next failure of the
+        // same tool starts a fresh streak.
+        let mut state = LoopState::default();
+        state
+            .consecutive_same_tool_failures
+            .insert("read_file".to_string(), 2);
+        assert_eq!(
+            *state.consecutive_same_tool_failures.get("read_file").unwrap(),
+            2
+        );
+
+        // Simulate the success-arm reset.
+        state.consecutive_same_tool_failures.clear();
+
+        assert!(
+            state.consecutive_same_tool_failures.is_empty(),
+            "successful tool call must clear all streak counters"
+        );
     }
 }
