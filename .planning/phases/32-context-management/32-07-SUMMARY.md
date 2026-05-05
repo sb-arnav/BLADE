@@ -255,16 +255,55 @@ None — no new network, auth, file-access, or schema surface. The threat regist
 
 ## UAT Findings
 
-**Pending — Task 2 awaits operator runtime UAT per CLAUDE.md Verification Protocol.**
+**2026-05-05 — UAT operator-deferred per Arnav's directive.** Quote: "can we continue I will check after everything is done." All static-gate evidence and engineering close-out completed autonomously this session; runtime exercise on the dev binary is Arnav's to perform.
 
-The continuation agent fills this section after Arnav replies "approved" with a substantive observation. Expected entries:
+### Static-gate evidence package (2026-05-05)
 
-- 7-step UAT script results (one line per step).
-- Screenshot paths (`docs/testing ss/phase32-*.png` at 1280×800 + 1100×700).
-- At least one screenshot read back via the Read tool (CLAUDE.md step 4).
-- Confirmation that `npm run verify:all` 37 gates remain green.
+| Gate | Result |
+|------|--------|
+| `cargo check` (debug) | exit 0, 3 pre-existing warnings unchanged |
+| `cargo check --release` | exit 0 (release build excludes #[cfg(test)] seams) |
+| `npx tsc --noEmit` | exit 0 |
+| `cargo test --lib phase32` | 44 passed / 0 failed (39 prior + 5 new from Plan 32-07) |
+| `cargo test --test context_management_integration` | 2 passed / 0 failed |
+| `npm run verify:all` | 37/37 gates green (after fixes — see "v1.4 debt resolved" below) |
+| `cargo test --lib --test-threads=1` | 500/508 passing — 8 environmental flakes unrelated to Phase 32 (router task_routing, dream_mode atomics, deep_scan fs walks, etc — all touch BLADE_CONFIG_DIR-global state, none touch brain.rs / commands.rs / config.rs surface) |
 
-If issues are found, this section documents them with file/line specifics and the resume agent runs `/gsd-plan-phase --gaps` for closure.
+### Code-review findings addressed before close (2026-05-05)
+
+`gsd-code-reviewer` audited the Phase 32 commit range (`b7b6ece..HEAD`) and produced `.planning/phases/32-context-management/32-REVIEW.md`. Three findings landed in commit `82d9a2c` (`fix(32-07): address code-review findings for Phase 32 close-out`):
+
+- **HIGH-01 — `LAST_BREAKDOWN` cross-thread visibility (CTX-06).** `thread_local!` meant `build_system_prompt_inner` (chat-streaming Tokio task) wrote to one thread's TLS slot while `get_context_breakdown` (Tauri command worker) read from another's empty slot. DoctorPane Context Budget panel would have shipped dead-on-arrival. Switched to `once_cell::sync::Lazy<std::sync::Mutex<Vec<(String, usize)>>>`. Lock is held only for fast `clear`/`push`/`clone` — never across an await — so contention is bounded. Side-effect: parallel test runner now races on the global state, so a `BREAKDOWN_TEST_LOCK` Mutex was added inside `#[cfg(test)] mod tests`; the 9 tests that build a prompt + inspect the breakdown acquire it at the top.
+- **MEDIUM-01 — `smart_injection_enabled = false` skipped sections 9-16.** Sections 0-8 honored the kill switch via `!smart || ...`; sections 9-16 (integrations, code, git, security, health, world_model, financial) used bare relevance gates and ignored the toggle. Wrapped each gate with `!smart || (... > gate)` so the CTX-07 escape hatch is now load-bearing across the entire `build_system_prompt_inner` surface.
+- **MEDIUM-02 — `world_chars` double-counted under `world_model` AND `system`.** Single source population was recorded under two labels, inflating `total_tokens` and `percent_used` in the budget panel. Now records only under `world_model`; `system` gets a 0-row placeholder for label-set completeness.
+
+LOW-01 (`cap_tool_output` chars vs bytes drift) and LOW-02 (`storage_id` ms-granular collision) deferred — non-blocking, tracked as v1.6 follow-ups.
+
+### Verification report
+
+`gsd-verifier` produced `.planning/phases/32-context-management/32-VERIFICATION.md`. Goal-backward static analysis on all 5 ROADMAP success criteria — every criterion has load-bearing code anchors with file:line citations. Status: `human_needed` (runtime UAT operator-deferred, as expected).
+
+### v1.4 debt resolved during Phase 32 close-out
+
+Static gates surfaced three v1.4-close audit gaps that had to be fixed to land "All 37 verify gates remain green" — none introduced by Phase 32:
+
+1. `src/features/chat/chat.css:432-437` — 5 ghost CSS token references (`--text-xs`, `--space-1`, `--space-2`, `--radius-sm`) introduced by v1.4 commit `2ea01ee0` (Phase 26-02 ConsentDialog). Resolved → commit `401d180`. Mapped to canonical `--s-N` / `--r-N` tokens per project convention.
+2. `.planning/milestones/v1.1-phases/10-inventory-wiring-audit/10-WIRING-AUDIT.json` — 3 missing `BladeConfig` fields (`voyager_skill_write_budget_tokens` v1.4, `reward_weights` v1.4, `context` Phase 32) + 17 missing `.rs` module entries (skills/* subtree + vitality_engine + active_inference + safety_bundle + reward + voyager_log + bin/skill_validator). Resolved → commit `2c3345a`.
+3. `evals::organism_eval::evaluates_organism` OEVAL-01c "timeline recovery arc" — `scalar=0.4032 band=Declining >= 0.45: false`. Verified deterministically failing both pre and post Phase 32 brain.rs changes (stash-and-rerun yields identical scalar). Zero coupling between vitality_engine + brain.rs surfaces. **Logged as v1.4 organism-eval drift, NOT a Phase 32 regression.** Recommendation: investigate vitality recovery dynamics in v1.6 — STATE.md's "13/13 fixtures, MRR 1.000" claim entering v1.5 was stale at v1.4 close. The remaining 12/13 + the floor-to-band hysteresis math may need re-tuning after the Phase 27-29 hormone wiring landed; out of Phase 32 scope.
+
+### Pending — operator UAT (the 7-step script)
+
+The original Plan 32-07 Task 2 checkpoint remains: when Arnav has time, the 7-step runtime UAT on the dev binary surfaces the live behavior:
+
+1. `npm run tauri dev` — clean startup, no panic in 10s, chat surface mounts.
+2. Send "what time is it?" — reply renders; DoctorPane Context Budget shows identity small, vision/hearing = 0, total < 8k tokens. Screenshot to `"docs/testing ss/phase32-uat-simple-query-1280x800.png"`.
+3. Send "explain how `score_context_relevance` works in brain.rs" — code section populated; total > step-2 value.
+4. Run bash tool with `seq 1 50000` — confirm `[truncated from N tokens; M omitted in middle; storage_id tool_out_...` marker.
+5. Drive conversation past ~80% capacity — confirm `blade_status: "compacting"` indicator + `[Earlier conversation summary]` user message after compaction.
+6. Edit `~/.config/blade/config.json` → `context.smart_injection_enabled = false` → restart → "what time is it?" — DoctorPane shows MUCH MORE injected (naive path / inject-everything) — verifies CTX-07 kill switch now load-bearing across all sections post-MEDIUM-01 fix.
+7. Resize to 1100×700 (the v1.1 button-below-fold viewport) → DoctorPane still legible. Screenshot to `"docs/testing ss/phase32-uat-doctorpane-1100x700.png"`.
+
+If issues surface during runtime UAT, run `/gsd-plan-phase 32 --gaps` for closure. Otherwise reply "approved" + a one-line observation cited from a screenshot Read; the resume agent will fold UAT findings into this section and mark Phase 32 complete.
 
 ## Self-Check: PASSED (Task 1)
 

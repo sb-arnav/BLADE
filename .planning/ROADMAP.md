@@ -96,14 +96,14 @@
   3. A bash command that returns 50k characters produces a tool output capped at ~4k tokens before entering the conversation, with a summary appended
   4. DoctorPane (or a debug view) shows a per-section token breakdown: identity, memory, screen, file, recent, etc.
   5. If selective injection or compaction throws any error, chat continues on the existing naive path — no conversation-ending crashes
-**Plans:** 7 plans across 4 waves (Wave 1: 32-01, 32-02; Wave 2: 32-03, 32-04, 32-05; Wave 3: 32-06; Wave 4: 32-07)
-- [ ] 32-01-PLAN.md — ContextConfig (six-place rule) + ContextBreakdown wire type [Wave 1]
-- [ ] 32-02-PLAN.md — Test harness: CTX_SCORE_OVERRIDE seam + build_test_conversation fixture + integration target [Wave 1]
-- [ ] 32-03-PLAN.md — Selective injection: gate sections 0-8, extend score_context_relevance with identity/vision/hearing, LAST_BREAKDOWN accumulator (CTX-01, CTX-02) [Wave 2]
-- [ ] 32-04-PLAN.md — Proactive compaction: per-model trigger, OpenHands v7610 prompt, token-aware keep_recent, blade_status emit (CTX-03, CTX-04) [Wave 2]
-- [ ] 32-05-PLAN.md — cap_tool_output helper + wiring at tool-conversation insertion + raise MAX_TOOL_RESULT_CHARS (CTX-05) [Wave 2]
-- [ ] 32-06-PLAN.md — DoctorPane breakdown panel: get_context_breakdown Tauri command + ContextBudgetSection on chat_done event (CTX-06) [Wave 3]
-- [ ] 32-07-PLAN.md — Fallback guarantee: catch_unwind wrappers + panic-injection regression test + phase-wide UAT checkpoint (CTX-07) [Wave 4]
+**Plans:** 7 plans across 4 waves (Wave 1: 32-01, 32-02; Wave 2: 32-03, 32-04, 32-05; Wave 3: 32-06; Wave 4: 32-07) — **all 7 code-complete; runtime UAT operator-deferred per Arnav 2026-05-05**
+- [x] 32-01-PLAN.md — ContextConfig (six-place rule) + ContextBreakdown wire type [Wave 1] ✓ commit b7b6ece + 0b6e16f
+- [x] 32-02-PLAN.md — Test harness: CTX_SCORE_OVERRIDE seam + build_test_conversation fixture + integration target [Wave 1] ✓ commit 87355a5 + fdf3418
+- [x] 32-03-PLAN.md — Selective injection: gate sections 0-8, extend score_context_relevance with identity/vision/hearing, LAST_BREAKDOWN accumulator (CTX-01, CTX-02) [Wave 2] ✓ commit 806fc08 + 0bbc6d4
+- [x] 32-04-PLAN.md — Proactive compaction: per-model trigger, OpenHands v7610 prompt, token-aware keep_recent, blade_status emit (CTX-03, CTX-04) [Wave 2] ✓ commit e2f220e + 319128e
+- [x] 32-05-PLAN.md — cap_tool_output helper + wiring at tool-conversation insertion + raise MAX_TOOL_RESULT_CHARS (CTX-05) [Wave 2] ✓ commit 719b497 + 20f842f
+- [x] 32-06-PLAN.md — DoctorPane breakdown panel: get_context_breakdown Tauri command + ContextBudgetSection on chat_done event (CTX-06) [Wave 3] ✓ commit 5ffe812 + fe2fb9d (DoctorPane TLS bug from review fixed in 82d9a2c)
+- [x] 32-07-PLAN.md — Fallback guarantee: catch_unwind wrappers + panic-injection regression test + phase-wide UAT checkpoint (CTX-07) [Wave 4] ✓ commit bb5d6ce (Task 1) + 82d9a2c (review fixes); Task 2 = checkpoint:human-verify, runtime UAT pending Arnav
 
 ### Phase 33: Agentic Loop
 
@@ -202,7 +202,7 @@
 | 29. Vitality Engine | v1.4 | 6/6 | Complete | 2026-05-03 |
 | 30. Organism Eval | v1.4 | 2/2 | Complete | 2026-05-03 |
 | 31. Close | v1.4 | 4/4 | Complete | 2026-05-03 |
-| 32. Context Management | v1.5 | 0/7 | Planned | — |
+| 32. Context Management | v1.5 | 6/7 | In progress | — |
 | 33. Agentic Loop | v1.5 | 0/TBD | Not started | — |
 | 34. Resilience + Session Persistence | v1.5 | 0/TBD | Not started | — |
 | 35. Auto-Decomposition | v1.5 | 0/TBD | Not started | — |
