@@ -250,6 +250,30 @@ pub async fn complete_turn(
     result
 }
 
+/// Phase 33 / LOOP-01 — one-shot text completion. Used by the verification
+/// probe (`loop_engine::verify_progress`). Builds a single-user-message
+/// conversation, calls `complete_turn` with no tools, returns the assistant
+/// turn's text content.
+///
+/// On error: returns Err(reason). The verification probe wraps this call in
+/// catch_unwind and continues the main loop on failure — `complete_simple`
+/// itself does no error handling beyond surfacing the underlying error.
+///
+/// Note on the empty-tools idiom: per CLAUDE.md, `&[]` cannot always be
+/// coerced to `&[ToolDefinition]` in all contexts, so we materialize an
+/// explicit `Vec<ToolDefinition>` and pass `&no_tools`.
+pub async fn complete_simple(
+    provider: &str,
+    api_key: &str,
+    model: &str,
+    prompt: &str,
+) -> Result<String, String> {
+    let conversation = vec![ConversationMessage::User(prompt.to_string())];
+    let no_tools: Vec<ToolDefinition> = Vec::new();
+    let turn = complete_turn(provider, api_key, model, &conversation, &no_tools, None).await?;
+    Ok(turn.content)
+}
+
 /// Stream a text-only response (no tool calling). Used when no tools are
 /// configured or for the final turn after all tool calls are done.
 ///
