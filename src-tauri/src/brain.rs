@@ -1707,6 +1707,75 @@ fn build_system_prompt_inner(
     parts.join("\n\n---\n\n")
 }
 
+/// Phase 33 / LOOP-05 — fast-path identity supplement.
+///
+/// Returns ONLY the always-keep core (identity tone, persona name, current
+/// date/time, active capability summary — codified by Phase 32-03 as the
+/// "small core remains unconditional" decision in 32-CONTEXT.md). The full
+/// character_bible / safety / hormones / identity_extension gates remain
+/// slow-path only.
+///
+/// Called from `commands.rs` fast-path branch BEFORE the streaming call.
+/// Output is injected as `ConversationMessage::System(...)` so the provider
+/// sees identity context even when the tool loop is bypassed (closes the
+/// Phase 18 "KNOWN GAP" comment).
+///
+/// **CTX-07 fallback discipline**: callers wrap this in `catch_unwind`. On
+/// panic, the wrapped result is `None` and the fast path falls back to no
+/// supplement (legacy behavior — preserves the v1.1 lesson that smart-path
+/// failures must never break the chat).
+///
+/// **Smart-off behavior**: returns the empty string when
+/// `config.r#loop.smart_loop_enabled = false` (legacy fast-path verbatim —
+/// the fast path injected nothing pre-Phase-33).
+///
+/// **Token cost**: ~1k tokens worst case; runs once per fast-path turn. Hard
+/// upper bound 2k tokens enforced via test
+/// `phase33_loop_05_supplement_capped_under_2k_tokens`.
+pub fn build_fast_path_supplement(
+    config: &crate::config::BladeConfig,
+    provider: &str,
+    model: &str,
+    last_user_text: &str,
+) -> String {
+    if !config.r#loop.smart_loop_enabled {
+        return String::new();
+    }
+
+    // Reserved for future query-aware shaping.
+    let _ = last_user_text;
+
+    let mut parts: Vec<String> = Vec::new();
+
+    // Block 1 — BLADE.md identity tone (always-keep core, slow path priority 0).
+    if let Some(blade_md) = load_blade_md() {
+        if !blade_md.trim().is_empty() {
+            parts.push(blade_md);
+        }
+    }
+
+    // Block 2 — runtime supplement (date/time, user name, model, shell note).
+    parts.push(build_identity_supplement(config, provider, model));
+
+    // Block 3 — L0 critical facts. Always-on in slow path (capped at source).
+    let db_path = crate::config::blade_config_dir().join("blade.db");
+    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+        let l0 = crate::db::brain_l0_critical_facts(&conn);
+        if !l0.trim().is_empty() {
+            parts.push(l0);
+        }
+    }
+
+    // Block 4 — active specialist role injection (always-keep core, slow path
+    // priority 2). Small and identity-coherent.
+    let role_injection = crate::roles::role_system_injection(&config.active_role);
+    if !role_injection.trim().is_empty() {
+        parts.push(role_injection);
+    }
+
+    parts.join("\n\n---\n\n")
+}
+
 /// Lean runtime supplement to BLADE.md.
 /// BLADE.md has the identity, rules, character, tool patterns — all static.
 /// This adds ONLY what BLADE.md cannot know at write-time: current date/time,
@@ -2921,4 +2990,64 @@ mod tests {
     // takes. If `score_or_default` is ever removed from a gate, this test
     // panics. Together with the integration-test serde round-trip, the toggle
     // contract is covered without parallel-test fragility.
+
+    // ── Phase 33 Plan 33-07 — LOOP-05 fast-path supplement tests ─────────────
+    //
+    // Closes the Phase 18 KNOWN GAP at commands.rs fast-path branch — the
+    // fast-streaming branch was identity-blind (no system prompt at all).
+    // build_fast_path_supplement emits the always-keep core (BLADE.md +
+    // identity_supplement + L0 facts + role) when smart_loop_enabled=true;
+    // returns "" verbatim when false.
+
+    #[test]
+    fn phase33_loop_05_supplement_smart_on_returns_nonempty() {
+        let _g = BREAKDOWN_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let mut cfg = crate::config::BladeConfig::default();
+        cfg.r#loop.smart_loop_enabled = true;
+        let s = build_fast_path_supplement(&cfg, "anthropic", "claude-sonnet-4", "hello");
+        assert!(!s.is_empty(),
+            "smart-on must return non-empty supplement; identity-blind fast path is the v1.1 retraction symptom");
+        // Strongest invariant: BLADE/blade appears somewhere in the supplement
+        // (BLADE.md identity tone + identity_supplement model name).
+        assert!(s.contains("BLADE") || s.contains("blade"),
+            "supplement must contain identity marker; got: {}", s);
+    }
+
+    #[test]
+    fn phase33_loop_05_supplement_smart_off_returns_empty() {
+        let _g = BREAKDOWN_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let mut cfg = crate::config::BladeConfig::default();
+        cfg.r#loop.smart_loop_enabled = false;
+        let s = build_fast_path_supplement(&cfg, "anthropic", "claude-sonnet-4", "hello");
+        assert_eq!(s, "",
+            "smart-off MUST return empty string verbatim — legacy fast-path behavior preserved (CTX-07 escape hatch parity)");
+    }
+
+    #[test]
+    fn phase33_loop_05_supplement_capped_under_2k_tokens() {
+        let _g = BREAKDOWN_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let mut cfg = crate::config::BladeConfig::default();
+        cfg.r#loop.smart_loop_enabled = true;
+        let s = build_fast_path_supplement(&cfg, "anthropic", "claude-sonnet-4", "hello");
+        // Rough token estimate (chars / 4). CONTEXT lock §LOOP-05 says
+        // "~1k tokens worst case"; 2k is the regression upper bound.
+        let est_tokens = s.chars().count() / 4;
+        assert!(est_tokens < 2000,
+            "supplement must stay under 2000 tokens (CONTEXT lock §LOOP-05 — '~1k tokens worst case'); got {} tokens / {} chars",
+            est_tokens, s.chars().count());
+    }
+
+    #[test]
+    fn phase33_loop_05_supplement_includes_current_date() {
+        let _g = BREAKDOWN_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let mut cfg = crate::config::BladeConfig::default();
+        cfg.r#loop.smart_loop_enabled = true;
+        let s = build_fast_path_supplement(&cfg, "anthropic", "claude-sonnet-4", "hello");
+        // build_identity_supplement emits "Date: <strftime> | <shell note>"
+        // with the current year as a 4-digit substring.
+        let year = chrono::Local::now().format("%Y").to_string();
+        assert!(s.contains(&year),
+            "supplement must include current date (year {}); identity_supplement may have been dropped from the always-keep core. got: {}",
+            year, s);
+    }
 }

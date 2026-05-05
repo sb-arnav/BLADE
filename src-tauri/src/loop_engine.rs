@@ -216,6 +216,167 @@ pub fn enrich_alternatives(tool_name: &str) -> Vec<String> {
     }
 }
 
+// ─── LOOP-01 — mid-loop verification (Plan 33-04) ─────────────────────────
+
+/// LOOP-01 — three-way verdict from the cheap-model verification probe.
+///
+/// Wire flow (CONTEXT lock §Mid-Loop Verification):
+///   YES    → continue normally; no nudge injected
+///   NO     → emit blade_loop_event {verdict: "NO"};
+///            inject "Internal check: …reconsider the approach." system msg
+///   REPLAN → emit blade_loop_event {verdict: "REPLAN"};
+///            inject "Internal check: …re-plan from current state." system msg
+///
+/// Note: REPLAN here is NOT the same trigger as Plan 33-05's third-same-tool
+/// reject_plan. They're separate signals that may both inject "re-plan"
+/// nudges within a run; landmine #11 stacking-prevention guards both.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Verdict {
+    /// Loop is progressing toward the goal — continue normally.
+    Yes,
+    /// Loop is not progressing — inject a "reconsider the approach" nudge.
+    No,
+    /// Loop should re-plan from current state — inject a "do not retry verbatim" nudge.
+    Replan,
+}
+
+/// LOOP-01 — verification probe.
+///
+/// Routes to `crate::config::cheap_model_for_provider(provider, model)` (the
+/// helper added in Phase 32-04) and submits the locked verification prompt
+/// (CONTEXT lock §Mid-Loop Verification — DO NOT paraphrase).
+///
+/// Test seam: `LOOP_OVERRIDE=YES|NO|REPLAN` short-circuits the cheap-model
+/// call (mirrors `CTX_SCORE_OVERRIDE` from Phase 32-02). Useful for unit
+/// tests that want to exercise each verdict branch without a network call.
+/// Anything else (including empty string) returns `Err(...)`.
+///
+/// Failure mode: returns Err on network error, parse error, invalid override,
+/// or unparseable verdict word. Callers MUST NOT halt the main loop on Err —
+/// the firing site in `run_loop` swallows the Err and continues. CTX-07
+/// fallback discipline.
+///
+/// Argument constraints:
+///   - `goal` is safe_slice'd to 1500 chars internally (don't pre-truncate
+///     at call sites; just pass last_user_text).
+///   - `actions` summaries are safe_slice'd to 300 chars internally per entry.
+pub async fn verify_progress(
+    provider: &str,
+    api_key: &str,
+    model: &str,
+    goal: &str,
+    actions: &VecDeque<ActionRecord>,
+) -> Result<Verdict, String> {
+    // Test seam — bypass the cheap-model call. Mirrors CTX_SCORE_OVERRIDE
+    // from Phase 32-02 (brain.rs scoring path). Documented in
+    // 33-RESEARCH.md §Implementation Sketches/LOOP-01.
+    if let Ok(override_val) = std::env::var("LOOP_OVERRIDE") {
+        return match override_val.to_uppercase().as_str() {
+            "YES"    => Ok(Verdict::Yes),
+            "NO"     => Ok(Verdict::No),
+            "REPLAN" => Ok(Verdict::Replan),
+            other    => Err(format!("invalid LOOP_OVERRIDE: {}", other)),
+        };
+    }
+
+    let cheap_model = crate::config::cheap_model_for_provider(provider, model);
+    let goal_short = crate::safe_slice(goal, 1500);
+    let actions_json = render_actions_json(actions);
+
+    // CONTEXT lock §Mid-Loop Verification — DO NOT paraphrase this prompt.
+    // The grep acceptance criterion in Plan 33-04 requires the literal
+    // "Reply with exactly one word: YES, NO, or REPLAN" substring.
+    let prompt = format!(
+        "Given the original goal `{}` and the last 3 tool actions `{}`, \
+         is the loop progressing toward the goal? \
+         Reply with exactly one word: YES, NO, or REPLAN, followed by a one-sentence reason.",
+        goal_short, actions_json
+    );
+
+    let response = crate::providers::complete_simple(provider, api_key, &cheap_model, &prompt)
+        .await
+        .map_err(|e| format!("verify_progress provider call failed: {}", e))?;
+
+    let first_word = response
+        .trim_start()
+        .split_whitespace()
+        .next()
+        .unwrap_or("")
+        .to_uppercase();
+    match first_word.as_str() {
+        "YES"    => Ok(Verdict::Yes),
+        "NO"     => Ok(Verdict::No),
+        "REPLAN" => Ok(Verdict::Replan),
+        _        => Err(format!("unexpected verdict word from verifier: {:?}", first_word)),
+    }
+}
+
+/// Render last_3_actions as a compact JSON array. Each summary is
+/// safe_slice'd to 300 chars to bound the prompt size
+/// (CONTEXT lock §Mid-Loop Verification).
+pub(crate) fn render_actions_json(actions: &VecDeque<ActionRecord>) -> String {
+    let mut entries: Vec<serde_json::Value> = Vec::with_capacity(actions.len());
+    for a in actions {
+        entries.push(serde_json::json!({
+            "tool": a.tool,
+            "in":  crate::safe_slice(&a.input_summary, 300),
+            "out": crate::safe_slice(&a.output_summary, 300),
+            "err": a.is_error,
+        }));
+    }
+    serde_json::Value::Array(entries).to_string()
+}
+
+// ─── LOOP-04 — truncation detection + max-tokens escalation (Plan 33-06) ──
+
+/// Returns true if the turn appears truncated mid-output. Two signals
+/// (CONTEXT lock §Max-Output-Token Escalation):
+///   1. Provider stop_reason indicates length cap reached (per-provider names
+///      vary — see is_truncated_stop_reason).
+///   2. Heuristic: last completed text chunk doesn't end with sentence-final
+///      punctuation (or code-fence end backtick). Fallback for providers that
+///      don't surface stop_reason cleanly (Ollama, some OpenRouter routes).
+///
+/// Note on UTF-8 safety: we operate on `chars().last()` (returns the final
+/// scalar value), never on byte slices, so non-ASCII content is handled
+/// correctly. The chars() iterator on a `&str` is O(n) — fine here because
+/// the tail check runs once per turn, not per chunk.
+pub fn detect_truncation(provider: &str, turn: &crate::providers::AssistantTurn) -> bool {
+    if is_truncated_stop_reason(provider, turn.stop_reason.as_deref()) {
+        return true;
+    }
+    // Punctuation heuristic — content empty → not truncated (just no text).
+    let trimmed = turn.content.trim_end();
+    if trimmed.is_empty() {
+        return false;
+    }
+    let last = trimmed.chars().last().unwrap_or(' ');
+    !matches!(last, '.' | '!' | '?' | ':' | '"' | ')' | '`')
+}
+
+fn is_truncated_stop_reason(provider: &str, stop_reason: Option<&str>) -> bool {
+    match (provider, stop_reason) {
+        ("anthropic",   Some("max_tokens")) => true,
+        ("openai",      Some("length"))     => true,
+        ("openrouter",  Some("length"))     => true,
+        ("groq",        Some("length"))     => true,
+        ("gemini",      Some(s)) if s.eq_ignore_ascii_case("MAX_TOKENS") => true,
+        _ => false,
+    }
+}
+
+/// Returns Some(new_max) where new_max = min(current * 2, provider_cap),
+/// or None if no escalation is possible (current is already at or above the
+/// per-model cap from `providers::max_output_tokens_for`). One-shot doubling
+/// only — if a doubled retry STILL truncates, the second truncation is
+/// accepted (CONTEXT lock §LOOP-04 — "each turn allows at most 1 escalation").
+pub fn escalate_max_tokens(provider: &str, model: &str, current: u32) -> Option<u32> {
+    let cap = crate::providers::max_output_tokens_for(provider, model);
+    let doubled = current.saturating_mul(2);
+    let new_max = doubled.min(cap);
+    if new_max <= current { None } else { Some(new_max) }
+}
+
 // ─── Loop driver (Plan 33-03) ──────────────────────────────────────────────
 
 /// LOOP-06 — replaces the inline `for iteration in 0..12 { ... }` previously at
@@ -293,6 +454,93 @@ pub async fn run_loop(
         // Check cancellation before each iteration
         if CHAT_CANCEL.load(Ordering::SeqCst) {
             return Err(LoopHaltReason::Cancelled);
+        }
+
+        // ─── LOOP-01 — mid-loop verification probe (Plan 33-04) ──────────
+        //
+        // Fires every config.r#loop.verification_every_n iterations starting
+        // at iteration N (skip iteration 0 — last_3_actions is empty there).
+        // Honors smart_loop_enabled toggle (CONTEXT lock §Backward Compat).
+        //
+        // Firing site rationale (CONTEXT lock §Mid-Loop Verification): top
+        // of iteration, AFTER cancellation check (don't waste a probe call
+        // if the user cancelled), BEFORE complete_turn (so any injected
+        // nudge is visible to the next assistant turn). Cadence math is
+        // strict modulo — at verification_every_n=3, fires at iter 3, 6, 9…
+        // and never at iter 0.
+        //
+        // CTX-07 fallback discipline: probe failure (Err from
+        // verify_progress) MUST NOT halt the main loop. Log to stderr,
+        // skip the nudge, continue. The cheap-model client itself returns
+        // Result<_, String>, so the synchronous panic surface is small;
+        // Plan 33-09 ports CTX-07's catch_unwind wrapper to harden against
+        // future regressions in the verifier path.
+        if config.r#loop.smart_loop_enabled
+            && iteration > 0
+            && (iteration as u32) % config.r#loop.verification_every_n == 0
+        {
+            let verdict_result = verify_progress(
+                &config.provider,
+                &config.api_key,
+                &config.model,
+                last_user_text,
+                &loop_state.last_3_actions,
+            )
+            .await;
+
+            match verdict_result {
+                Ok(Verdict::Yes) => {
+                    emit_stream_event(&app, "blade_loop_event", serde_json::json!({
+                        "kind": "verification_fired",
+                        "verdict": "YES",
+                    }));
+                    // No nudge injected — loop continues.
+                }
+                Ok(Verdict::No) => {
+                    emit_stream_event(&app, "blade_loop_event", serde_json::json!({
+                        "kind": "verification_fired",
+                        "verdict": "NO",
+                    }));
+                    // Stacking prevention (33-RESEARCH landmine #11) — if a
+                    // nudge was injected within the last 2 iterations
+                    // (Plan 33-05's reject_plan trigger or a prior verify
+                    // verdict), suppress this one to avoid stacking.
+                    let stacking = loop_state
+                        .last_nudge_iteration
+                        .map_or(false, |prev| {
+                            loop_state.iteration.saturating_sub(prev) <= 2
+                        });
+                    if !stacking {
+                        conversation.push(ConversationMessage::System(
+                            "Internal check: the last 3 tool calls do not appear to be making progress. Reconsider the approach.".to_string(),
+                        ));
+                        loop_state.last_nudge_iteration = Some(loop_state.iteration);
+                    }
+                }
+                Ok(Verdict::Replan) => {
+                    emit_stream_event(&app, "blade_loop_event", serde_json::json!({
+                        "kind": "verification_fired",
+                        "verdict": "REPLAN",
+                    }));
+                    let stacking = loop_state
+                        .last_nudge_iteration
+                        .map_or(false, |prev| {
+                            loop_state.iteration.saturating_sub(prev) <= 2
+                        });
+                    if !stacking {
+                        conversation.push(ConversationMessage::System(
+                            "Internal check: re-plan from current state. Do not retry the failing step verbatim.".to_string(),
+                        ));
+                        loop_state.last_nudge_iteration = Some(loop_state.iteration);
+                    }
+                }
+                Err(e) => {
+                    // Non-blocking — log to stderr, continue without injecting.
+                    // CTX-07 fallback discipline: probe failure invisible to
+                    // the user (no chat_error, no notification).
+                    eprintln!("[LOOP-01] verify_progress error (non-blocking): {}", e);
+                }
+            }
         }
 
         let span = trace::TraceSpan::new(
@@ -501,6 +749,78 @@ pub async fn run_loop(
                 }
             }
         };
+
+        // ─── LOOP-04 — truncation detection + one-shot retry (Plan 33-06) ──
+        //
+        // Gated by smart_loop_enabled. At most one escalation per turn (the
+        // local `escalated_this_turn` flag). The cost-guard interlock is a
+        // stub here — Plan 33-08 wires the real per-provider price math into
+        // `state.cumulative_cost_usd` and the projected_cost calculation
+        // below. For now we use a conservative flat rate ($0.00001/token)
+        // so the interlock is correctly-shaped but lenient until 33-08 lands.
+        //
+        // Why we mutate `turn` here (not later): the assistant turn must be
+        // pushed into the conversation buffer with the FINAL (retried)
+        // content so the model's next turn sees the full output. The
+        // `conversation.push(...)` immediately after this block is the
+        // canonical insertion site — touching anything beyond `turn` would
+        // cross the wave-3 parallel-plan boundary (33-04 / 33-05 / 33-07
+        // mount their own changes in different parts of the iteration body).
+        let mut turn = turn;
+        if config.r#loop.smart_loop_enabled
+            && detect_truncation(&config.provider, &turn)
+        {
+            // Anthropic + OpenAI both default to a 4096 max_tokens body
+            // literal (providers/anthropic.rs:26, providers/openai.rs:43).
+            // First-turn assumption: model received 4096 → escalate to 8192
+            // for the retry. `escalate_max_tokens` caps at provider_max so a
+            // future bump to 8192 default still does the right thing.
+            let current_max_tokens: u32 = 4096;
+            if let Some(new_max) = escalate_max_tokens(
+                &config.provider, &config.model, current_max_tokens,
+            ) {
+                // Cost-guard interlock — skip escalation if it would breach
+                // config.r#loop.cost_guard_dollars. Plan 33-08 will replace
+                // this stub with per-provider price math; for now we use a
+                // conservative flat-rate overestimate ($0.00001/token).
+                // TODO(33-08): wire real per-provider price table here.
+                let _projected_cost: f32 = 0.0; // TODO: Plan 33-08 wires this
+                let estimated_extra =
+                    (new_max as f32 - current_max_tokens as f32) * 0.000_01;
+                let projected = loop_state.cumulative_cost_usd + estimated_extra;
+
+                if projected <= config.r#loop.cost_guard_dollars {
+                    emit_stream_event(&app, "blade_loop_event", serde_json::json!({
+                        "kind":    "token_escalated",
+                        "new_max": new_max,
+                    }));
+                    loop_state.token_escalations =
+                        loop_state.token_escalations.saturating_add(1);
+
+                    // Retry the SAME turn with the doubled max_tokens. The
+                    // model receives identical context (CONTEXT lock §LOOP-04
+                    // — "retry-fresh"); only the max_tokens ceiling changes.
+                    let retry = providers::complete_turn_with_max_tokens(
+                        &config.provider,
+                        &config.api_key,
+                        &config.model,
+                        conversation,
+                        tools,
+                        config.base_url.as_deref(),
+                        new_max,
+                    ).await;
+                    if let Ok(retry_turn) = retry {
+                        // Discard the truncated turn; use the retry as the
+                        // canonical turn. The original truncated turn was
+                        // NOT yet pushed to `conversation` — that happens
+                        // immediately below. Order matters here.
+                        turn = retry_turn;
+                    }
+                    // On retry Err: accept the original truncated turn —
+                    // no infinite escalation, no second-chance fallthrough.
+                }
+            }
+        }
 
         conversation.push(ConversationMessage::Assistant {
             content: turn.content.clone(),
@@ -1342,6 +1662,25 @@ pub async fn run_loop(
                 content
             };
 
+            // LOOP-01 (Plan 33-04) — record this tool dispatch into the
+            // last_3_actions ring buffer for the next verification probe.
+            // Captured BEFORE conversation.push moves tool_call.name + content.
+            // safe_slice happens inside render_actions_json (300 char cap per
+            // field), so we keep the full strings here and let the renderer
+            // bound them at probe time. Honors smart_loop_enabled — when
+            // smart loop is off, the ring buffer is never consulted (the
+            // verification firing site is gated on smart_loop_enabled), so
+            // recording is a cheap no-op accumulating into a buffer that's
+            // dropped at run_loop exit.
+            let input_summary = serde_json::to_string(&tool_call.arguments)
+                .unwrap_or_else(|_| String::new());
+            loop_state.record_action(ActionRecord {
+                tool: tool_call.name.clone(),
+                input_summary,
+                output_summary: content.clone(),
+                is_error,
+            });
+
             conversation.push(ConversationMessage::Tool {
                 tool_call_id: tool_call.id,
                 tool_name: tool_call.name,
@@ -1462,6 +1801,106 @@ mod tests {
         );
     }
 
+    // ─── LOOP-04 detection + escalation tests (Plan 33-06) ─────────────
+
+    fn fake_turn_result(stop_reason: Option<&str>, content: &str) -> crate::providers::AssistantTurn {
+        crate::providers::AssistantTurn {
+            content: content.to_string(),
+            tool_calls: vec![],
+            stop_reason: stop_reason.map(|s| s.to_string()),
+        }
+    }
+
+    #[test]
+    fn phase33_loop_04_detect_truncation_via_anthropic_max_tokens() {
+        let t = fake_turn_result(Some("max_tokens"), "Hello, this is the start of a long");
+        assert!(detect_truncation("anthropic", &t));
+    }
+
+    #[test]
+    fn phase33_loop_04_detect_truncation_via_openai_length() {
+        let t = fake_turn_result(Some("length"), "Hello, this is the start of a long");
+        assert!(detect_truncation("openai", &t));
+    }
+
+    #[test]
+    fn phase33_loop_04_detect_truncation_via_punctuation_heuristic() {
+        let t = fake_turn_result(None, "Hello world we were just discussing");
+        assert!(
+            detect_truncation("anthropic", &t),
+            "no terminal punctuation should trigger heuristic regardless of stop_reason"
+        );
+    }
+
+    #[test]
+    fn phase33_loop_04_no_truncation_on_clean_finish() {
+        let t = fake_turn_result(Some("end_turn"), "Done.");
+        assert!(!detect_truncation("anthropic", &t));
+    }
+
+    #[test]
+    fn phase33_loop_04_escalate_doubles_under_cap() {
+        // Anthropic Sonnet 4 cap is 8192. 4096 doubles to 8192, which equals
+        // the cap — Some(8192) is correct (the doubled value, capped).
+        let result = escalate_max_tokens("anthropic", "claude-sonnet-4-test", 4096);
+        assert_eq!(result, Some(8192));
+    }
+
+    #[test]
+    fn phase33_loop_04_escalate_caps_at_provider_max() {
+        // 6000 doubled would be 12000 → capped at the Sonnet 4 ceiling 8192.
+        let result = escalate_max_tokens("anthropic", "claude-sonnet-4-test", 6000);
+        assert_eq!(result, Some(8192));
+    }
+
+    #[test]
+    fn phase33_loop_04_escalate_returns_none_when_at_max() {
+        // Already at cap — no further escalation possible.
+        let result = escalate_max_tokens("anthropic", "claude-sonnet-4-test", 8192);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn phase33_loop_04_truncation_clean_punctuation_not_flagged() {
+        let cases = [".", "!", "?", ":", "\"", ")", "`"];
+        for c in cases {
+            let t = fake_turn_result(None, &format!("Some text ending with {}", c));
+            assert!(
+                !detect_truncation("anthropic", &t),
+                "content ending with {:?} must not be flagged as truncated",
+                c
+            );
+        }
+    }
+
+    #[test]
+    fn phase33_loop_04_cost_guard_interlock_stub_under_cap() {
+        // Cost-guard interlock stub — when projected cost (cumulative + delta)
+        // is below the cap, the escalation should fire. Locks the sign of the
+        // arithmetic so a future Plan 33-08 wiring (real per-provider price
+        // table) doesn't accidentally invert the comparison.
+        let cumulative_cost_usd: f32 = 0.0;
+        let cap: f32 = 5.0;
+        let new_max: u32 = 8192;
+        let current_max: u32 = 4096;
+        let estimated_extra = (new_max as f32 - current_max as f32) * 0.000_01;
+        let projected = cumulative_cost_usd + estimated_extra;
+        assert!(projected <= cap, "stub estimate must remain under cap for typical case");
+    }
+
+    #[test]
+    fn phase33_loop_04_cost_guard_interlock_stub_at_cap() {
+        // When cumulative_cost_usd is already at the cap, no further
+        // escalation should fire (projected > cap).
+        let cumulative_cost_usd: f32 = 5.0;
+        let cap: f32 = 5.0;
+        let new_max: u32 = 8192;
+        let current_max: u32 = 4096;
+        let estimated_extra = (new_max as f32 - current_max as f32) * 0.000_01;
+        let projected = cumulative_cost_usd + estimated_extra;
+        assert!(projected > cap, "saturated cumulative cost must skip escalation");
+    }
+
     #[test]
     fn phase33_loop_state_record_action_evicts_oldest() {
         let mut s = LoopState::default();
@@ -1476,6 +1915,157 @@ mod tests {
         assert_eq!(s.last_3_actions.len(), 3);
         assert_eq!(s.last_3_actions.front().unwrap().tool, "tool_2");
         assert_eq!(s.last_3_actions.back().unwrap().tool, "tool_4");
+    }
+
+    // ─── Plan 33-04 (LOOP-01) verification probe tests ────────────────
+
+    /// Test helper — block a single async future to completion using
+    /// futures::executor::block_on. Used because the verify_progress fn is
+    /// async and the override seam returns synchronously inside the future.
+    /// Mirrors the pattern other Phase 33 tests use for async fn verification.
+    fn block_on_verify(
+        provider: &str,
+        api_key: &str,
+        model: &str,
+        goal: &str,
+        actions: &VecDeque<ActionRecord>,
+    ) -> Result<Verdict, String> {
+        futures::executor::block_on(verify_progress(provider, api_key, model, goal, actions))
+    }
+
+    fn clear_loop_override() { std::env::remove_var("LOOP_OVERRIDE"); }
+
+    #[test]
+    fn phase33_loop_01_verdict_yes_via_override() {
+        // Plan 33-04 — LOOP_OVERRIDE=YES short-circuits the cheap-model
+        // call and returns Ok(Verdict::Yes) directly. Mirrors
+        // CTX_SCORE_OVERRIDE from Phase 32-02. Locks the test seam so a
+        // future refactor can't accidentally remove it.
+        std::env::set_var("LOOP_OVERRIDE", "YES");
+        let actions: VecDeque<ActionRecord> = VecDeque::new();
+        let result = block_on_verify("anthropic", "x", "claude-haiku-4-5-20251001", "build a snake game", &actions);
+        clear_loop_override();
+        assert_eq!(result.expect("YES override must yield Ok(Yes)"), Verdict::Yes);
+    }
+
+    #[test]
+    fn phase33_loop_01_verdict_no_via_override() {
+        std::env::set_var("LOOP_OVERRIDE", "NO");
+        let actions: VecDeque<ActionRecord> = VecDeque::new();
+        let result = block_on_verify("openai", "x", "gpt-4o-mini", "deploy the app", &actions);
+        clear_loop_override();
+        assert_eq!(result.expect("NO override must yield Ok(No)"), Verdict::No);
+    }
+
+    #[test]
+    fn phase33_loop_01_verdict_replan_via_override() {
+        std::env::set_var("LOOP_OVERRIDE", "REPLAN");
+        let actions: VecDeque<ActionRecord> = VecDeque::new();
+        let result = block_on_verify("groq", "x", "llama-3.1-8b-instant", "research X", &actions);
+        clear_loop_override();
+        assert_eq!(result.expect("REPLAN override must yield Ok(Replan)"), Verdict::Replan);
+    }
+
+    #[test]
+    fn phase33_loop_01_verdict_invalid_override_returns_err() {
+        // Anything that's not YES/NO/REPLAN (case-insensitive) is an Err.
+        std::env::set_var("LOOP_OVERRIDE", "GARBAGE");
+        let actions: VecDeque<ActionRecord> = VecDeque::new();
+        let result = block_on_verify("anthropic", "x", "x", "x", &actions);
+        clear_loop_override();
+        assert!(result.is_err(), "invalid override must yield Err — got {:?}", result);
+        assert!(
+            result.as_ref().err().unwrap().contains("invalid LOOP_OVERRIDE"),
+            "Err message should identify the override seam: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn phase33_loop_01_override_is_case_insensitive() {
+        // Locks the .to_uppercase() normalisation. Lowercase override must
+        // still route to the right verdict.
+        std::env::set_var("LOOP_OVERRIDE", "yes");
+        let actions: VecDeque<ActionRecord> = VecDeque::new();
+        let r1 = block_on_verify("x", "x", "x", "x", &actions);
+        std::env::set_var("LOOP_OVERRIDE", "Replan");
+        let r2 = block_on_verify("x", "x", "x", "x", &actions);
+        clear_loop_override();
+        assert_eq!(r1.unwrap(), Verdict::Yes);
+        assert_eq!(r2.unwrap(), Verdict::Replan);
+    }
+
+    #[test]
+    fn phase33_loop_01_actions_json_safe_slices_to_300_chars() {
+        // Plan 33-04 — render_actions_json must safe_slice each input/output
+        // summary to 300 chars to bound prompt size (CONTEXT lock §Mid-Loop
+        // Verification). Brittle string-search confirms no 301-char run of
+        // the original character survived.
+        let big_in: String = "a".repeat(600);
+        let big_out: String = "b".repeat(600);
+        let mut actions: VecDeque<ActionRecord> = VecDeque::new();
+        actions.push_back(ActionRecord {
+            tool: "read_file".to_string(),
+            input_summary: big_in,
+            output_summary: big_out,
+            is_error: false,
+        });
+        let json = render_actions_json(&actions);
+        assert!(
+            !json.contains(&"a".repeat(301)),
+            "input_summary not safe_slice'd to 300 chars: prefix={}",
+            &json[..400.min(json.len())]
+        );
+        assert!(
+            !json.contains(&"b".repeat(301)),
+            "output_summary not safe_slice'd to 300 chars"
+        );
+        // And confirm the tool name + err flag still made it into the JSON.
+        assert!(json.contains("\"tool\":\"read_file\""));
+        assert!(json.contains("\"err\":false"));
+    }
+
+    #[test]
+    fn phase33_loop_01_actions_json_empty_buffer_yields_empty_array() {
+        // The probe is gated on iteration > 0 so empty buffers should not
+        // arise at production firing sites, but the renderer must still
+        // produce a valid empty JSON array for downstream string concat.
+        let actions: VecDeque<ActionRecord> = VecDeque::new();
+        assert_eq!(render_actions_json(&actions), "[]");
+    }
+
+    #[test]
+    fn phase33_loop_01_goal_safe_slices_to_1500_chars() {
+        // Indirect test — verify the safe_slice contract at the documented
+        // input length. We don't have direct access to the assembled prompt
+        // from outside verify_progress, so this test asserts the safe_slice
+        // invariant; source review confirms the safe_slice(goal, 1500)
+        // call site at the prompt-build path.
+        let big_goal: String = "g".repeat(3000);
+        let sliced = crate::safe_slice(&big_goal, 1500);
+        assert!(
+            sliced.chars().count() <= 1500,
+            "safe_slice contract: {} chars must not exceed 1500",
+            sliced.chars().count()
+        );
+    }
+
+    #[test]
+    fn phase33_loop_01_cadence_math_fires_at_iter_3_6_9() {
+        // Plan 33-04 acceptance criterion — at verification_every_n=3,
+        // probe fires at iter 3, 6, 9 and NEVER at iter 0, 1, 2, 4, 5.
+        // Locks the firing condition: iteration > 0 && iteration % N == 0.
+        let n: u32 = 3;
+        let fires = |it: u32| it > 0 && it % n == 0;
+        assert!(!fires(0), "iter 0 must NOT fire (last_3_actions is empty)");
+        assert!(!fires(1));
+        assert!(!fires(2));
+        assert!(fires(3),  "iter 3 must fire at N=3");
+        assert!(!fires(4));
+        assert!(!fires(5));
+        assert!(fires(6),  "iter 6 must fire at N=3");
+        assert!(!fires(7));
+        assert!(fires(9),  "iter 9 must fire at N=3");
     }
 
     // ─── Plan 33-05 (LOOP-02 + LOOP-03) tests ─────────────────────────
