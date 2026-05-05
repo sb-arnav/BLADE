@@ -60,10 +60,19 @@ pub async fn complete(
     // detection in loop_engine falls back to the punctuation heuristic.
     let stop_reason = json["done_reason"].as_str().map(|s| s.to_string());
 
+    // Phase 33 / LOOP-06 — Ollama may surface eval_count (output tokens) +
+    // prompt_eval_count (input tokens) at the top level. Coverage varies;
+    // when missing, default to 0 (cost is 0.0/$M for ollama anyway, so this
+    // contributes nothing to cumulative_cost_usd regardless).
+    let tokens_in = json["prompt_eval_count"].as_u64().unwrap_or(0).min(u32::MAX as u64) as u32;
+    let tokens_out = json["eval_count"].as_u64().unwrap_or(0).min(u32::MAX as u64) as u32;
+
     Ok(AssistantTurn {
         content,
         tool_calls: Vec::new(),
         stop_reason,
+        tokens_in,
+        tokens_out,
     })
 }
 

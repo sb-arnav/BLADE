@@ -1860,6 +1860,8 @@ mod tests {
             content: content.to_string(),
             tool_calls: vec![],
             stop_reason: stop_reason.map(|s| s.to_string()),
+            tokens_in: 0,
+            tokens_out: 0,
         }
     }
 
