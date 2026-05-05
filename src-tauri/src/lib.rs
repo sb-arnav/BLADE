@@ -37,6 +37,7 @@ mod watcher;
 mod godmode;
 mod goal_engine;
 mod learning_engine;
+mod loop_engine;          // Phase 33 v1.5 — Agentic Loop scaffolding (LoopState, LoopHaltReason, ToolError, enrich_alternatives)
 mod self_critique;
 mod tool_forge;
 mod sidecar;
