@@ -3475,3 +3475,50 @@ fn find_project_root(start: &std::path::Path) -> Option<std::path::PathBuf> {
     }
     None
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Phase 33 / LOOP-02 — back-compat shim
+// ─────────────────────────────────────────────────────────────────────────
+//
+// Wraps a legacy `Result<_, String>` error into the new `ToolError` struct
+// so the loop engine can format failures uniformly. NO existing tool
+// signatures change in Phase 33 — the shim makes legacy and migrated tools
+// indistinguishable to the loop. Per-tool migration is v1.6+ work
+// (CONTEXT lock §Structured Tool Errors).
+//
+// `suggested_alternatives` is empty here on purpose. The loop engine's
+// `enrich_alternatives` helper is consulted at the boundary where the error
+// enters LoopState, not at the shim site — that keeps tool code dumb and
+// pushes intelligence into one place.
+//
+// Naming: `wrap_legacy_error` is a free function (no impl block on a trait).
+// CONTEXT lock §Module Boundaries: `native_tools.rs` adds the shim only;
+// no other changes in this phase.
+
+/// LOOP-02 — wrap a legacy `Err(String)` from a native tool into a structured
+/// `ToolError`. Empty `suggested_alternatives`; the loop engine's
+/// `enrich_alternatives` helper populates them at the boundary where the
+/// failure is recorded into `LoopState`.
+pub fn wrap_legacy_error(tool_name: &str, err: String) -> crate::loop_engine::ToolError {
+    crate::loop_engine::ToolError {
+        attempted: tool_name.to_string(),
+        failure_reason: err,
+        suggested_alternatives: Vec::new(),
+    }
+}
+
+#[cfg(test)]
+mod phase33_loop02_tests {
+    use super::*;
+
+    #[test]
+    fn phase33_wrap_legacy_error_produces_empty_alternatives() {
+        let e = wrap_legacy_error("read_file", "no such file or directory".to_string());
+        assert_eq!(e.attempted, "read_file");
+        assert_eq!(e.failure_reason, "no such file or directory");
+        assert!(
+            e.suggested_alternatives.is_empty(),
+            "shim must produce empty alternatives — enrichment happens at the LoopState boundary"
+        );
+    }
+}

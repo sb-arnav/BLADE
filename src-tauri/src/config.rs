@@ -298,6 +298,73 @@ impl Default for ContextConfig {
     }
 }
 
+// ---------------------------------------------------------------------
+// Phase 33 Plan 33-01 (LOOP-06) — Agentic Loop runtime knobs.
+//
+// Locked decisions (33-CONTEXT.md):
+//   - smart_loop_enabled (default true) is the CTX-07-style escape hatch.
+//     Flag off = legacy 12-iteration blind loop with no smart features
+//     (mirrors context.smart_injection_enabled discipline).
+//   - max_iterations (default 25) — hard cap on tool-loop iterations
+//     (was hardcoded `for iteration in 0..12` at commands.rs:1621).
+//     When smart_loop_enabled=false, the loop reverts to literal 12.
+//   - cost_guard_dollars (default 5.0) — per-conversation cumulative
+//     spend cap in USD. When exceeded, the loop halts with
+//     LoopHaltReason::CostExceeded.
+//   - verification_every_n (default 3) — LOOP-01 mid-loop verification
+//     probe cadence. Probe fires at iterations N, 2N, 3N, ...
+//
+// Six-place rule (CLAUDE.md): every BladeConfig field MUST land in
+// DiskConfig struct, DiskConfig::default, BladeConfig struct,
+// BladeConfig::default, load_config, and save_config.
+//
+// Rust keyword: `loop` is a keyword. Use raw identifier `r#loop` for
+// the FIELD name in struct definitions and access sites. The TYPE name
+// `LoopConfig` is fine (Capitalized identifiers don't collide).
+//
+// Backward compatibility: `#[serde(default)]` on the field allows old
+// user config.json files (without a `loop` key) to load with
+// `LoopConfig::default()`. Per-field `#[serde(default = "fn")]` guards
+// against partial JSON (missing sub-fields).
+// ---------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct LoopConfig {
+    /// CTX-07-style escape hatch. true = smart loop enabled (verification,
+    /// plan adaptation, token escalation, cost guard, fast-path supplement).
+    /// false = legacy 12-iteration blind loop with no smart features.
+    #[serde(default = "default_smart_loop_enabled")]
+    pub smart_loop_enabled: bool,
+    /// Hard cap on tool-loop iterations. Default 25 (was hardcoded 12).
+    /// When smart_loop_enabled=false, the loop reverts to literal 12.
+    #[serde(default = "default_max_iterations")]
+    pub max_iterations: u32,
+    /// Per-conversation cumulative spend cap in USD. When exceeded, the loop
+    /// halts with LoopHaltReason::CostExceeded. Default 5.0.
+    #[serde(default = "default_cost_guard_dollars")]
+    pub cost_guard_dollars: f32,
+    /// LOOP-01 verification probe cadence — fires every N iterations. Default 3.
+    #[serde(default = "default_verification_every_n")]
+    pub verification_every_n: u32,
+}
+
+fn default_smart_loop_enabled() -> bool { true }
+fn default_max_iterations() -> u32 { 25 }
+fn default_cost_guard_dollars() -> f32 { 5.0 }
+fn default_verification_every_n() -> u32 { 3 }
+
+impl Default for LoopConfig {
+    fn default() -> Self {
+        Self {
+            smart_loop_enabled: default_smart_loop_enabled(),
+            max_iterations: default_max_iterations(),
+            cost_guard_dollars: default_cost_guard_dollars(),
+            verification_every_n: default_verification_every_n(),
+        }
+    }
+}
+
 /// Config as stored on disk — api_key is NOT stored here anymore
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct DiskConfig {
@@ -424,6 +491,11 @@ struct DiskConfig {
     // CTX-01/04/05 tunables). #[serde(default)] keeps legacy configs loadable.
     #[serde(default)]
     context: ContextConfig,
+    // Phase 33 Plan 33-01 (LOOP-06) — Agentic Loop runtime knobs (smart_loop_enabled
+    // escape hatch + max_iterations/cost_guard/verification_every_n). #[serde(default)]
+    // keeps legacy configs loadable. Field name uses raw identifier (`loop` is a Rust keyword).
+    #[serde(default)]
+    r#loop: LoopConfig,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -505,6 +577,7 @@ impl Default for DiskConfig {
             voyager_skill_write_budget_tokens: default_voyager_skill_write_budget_tokens(),
             reward_weights: default_reward_weights(),
             context: ContextConfig::default(),
+            r#loop: LoopConfig::default(),
             api_key: None,
         }
     }
@@ -652,6 +725,12 @@ pub struct BladeConfig {
     /// compaction_trigger_pct=0.80, tool_output_cap_tokens=4000. See `ContextConfig`.
     #[serde(default)]
     pub context: ContextConfig,
+    /// Phase 33 Plan 33-01 (LOOP-06) — Agentic Loop runtime knobs. Defaults:
+    /// smart_loop_enabled=true, max_iterations=25, cost_guard_dollars=5.0,
+    /// verification_every_n=3. Field name uses raw identifier (`loop` is a Rust keyword).
+    /// See `LoopConfig`.
+    #[serde(default)]
+    pub r#loop: LoopConfig,
 }
 
 impl BladeConfig {
@@ -719,6 +798,7 @@ impl Default for BladeConfig {
             voyager_skill_write_budget_tokens: default_voyager_skill_write_budget_tokens(),
             reward_weights: default_reward_weights(),
             context: ContextConfig::default(),
+            r#loop: LoopConfig::default(),
         }
     }
 }
@@ -880,6 +960,7 @@ pub fn load_config() -> BladeConfig {
         voyager_skill_write_budget_tokens: disk.voyager_skill_write_budget_tokens,
         reward_weights: disk.reward_weights.clone(),
         context: disk.context,
+        r#loop: disk.r#loop,
     }
 }
 
@@ -948,6 +1029,7 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         voyager_skill_write_budget_tokens: config.voyager_skill_write_budget_tokens,
         reward_weights: config.reward_weights.clone(),
         context: config.context.clone(),
+        r#loop: config.r#loop.clone(),
         api_key: None,
     };
 
@@ -1515,6 +1597,7 @@ mod tests {
             voyager_skill_write_budget_tokens: cfg.voyager_skill_write_budget_tokens,
             reward_weights: cfg.reward_weights.clone(),
             context: cfg.context.clone(),
+            r#loop: cfg.r#loop.clone(),
             api_key: None,
         };
 
@@ -1625,5 +1708,82 @@ mod tests {
             .expect("legacy config without context key must parse with defaults");
         assert_eq!(parsed.context, ContextConfig::default(),
             "missing context key must fall back to ContextConfig::default()");
+    }
+
+    // ---------------------------------------------------------------------
+    // Phase 33 Plan 33-01 — LoopConfig tests (LOOP-06 substrate).
+    //
+    // These three tests lock the six-place config wire-up for the new
+    // r#loop: LoopConfig field (raw identifier — `loop` is a Rust keyword):
+    //   - default_values: LoopConfig::default() returns the locked
+    //     LOOP-01/06 defaults (true / 25 / 5.0 / 3).
+    //   - round_trip: a non-default LoopConfig survives serialization
+    //     through DiskConfig (mirrors save_config -> load_config wire format).
+    //   - missing_in_disk_uses_defaults: legacy config.json without a
+    //     `loop` key MUST load with LoopConfig::default()
+    //     (#[serde(default)] on the field — non-negotiable per CLAUDE.md).
+    // ---------------------------------------------------------------------
+
+    #[test]
+    fn phase33_loop_config_default_values() {
+        let c = LoopConfig::default();
+        assert_eq!(c.smart_loop_enabled, true,
+            "LoopConfig default smart_loop_enabled must be true (CTX-07-style escape hatch)");
+        assert_eq!(c.max_iterations, 25,
+            "LoopConfig default max_iterations must be 25 (was hardcoded 12)");
+        assert!((c.cost_guard_dollars - 5.0).abs() < 1e-6,
+            "LoopConfig default cost_guard_dollars must be 5.0 USD, got {}",
+            c.cost_guard_dollars);
+        assert_eq!(c.verification_every_n, 3,
+            "LoopConfig default verification_every_n must be 3");
+    }
+
+    #[test]
+    fn phase33_loop_config_round_trip() {
+        // Build BladeConfig with non-default loop values to verify all four
+        // fields survive byte-for-byte through the DiskConfig wire format.
+        let mut cfg = BladeConfig::default();
+        cfg.r#loop = LoopConfig {
+            smart_loop_enabled: false,
+            max_iterations: 10,
+            cost_guard_dollars: 1.5,
+            verification_every_n: 5,
+        };
+
+        // Mirror the save_config DiskConfig snapshot — reuse DiskConfig::default()
+        // for unrelated fields and overlay the loop config we care about.
+        let mut disk = DiskConfig::default();
+        disk.r#loop = cfg.r#loop.clone();
+
+        let json = serde_json::to_string(&disk).expect("serialize DiskConfig");
+        // Field MUST appear on the wire — guards against accidental
+        // #[serde(skip_serializing)] regression on the new field.
+        assert!(
+            json.contains("\"loop\""),
+            "serialized DiskConfig missing loop field: {}",
+            json
+        );
+
+        let parsed: DiskConfig = serde_json::from_str(&json).expect("parse DiskConfig");
+        assert_eq!(parsed.r#loop, cfg.r#loop,
+            "LoopConfig round-trip lost data");
+    }
+
+    #[test]
+    fn phase33_loop_config_missing_in_disk_uses_defaults() {
+        // An old user's config.json that predates Phase 33 has no `loop`
+        // key. The #[serde(default)] on DiskConfig.r#loop MUST fall back to
+        // LoopConfig::default() rather than failing the load. This is the
+        // CLAUDE.md backward-compat invariant — every existing user must
+        // upgrade without a manual config edit.
+        let legacy_json = r#"{
+            "provider": "anthropic",
+            "model": "claude-sonnet-4",
+            "onboarded": true
+        }"#;
+        let parsed: DiskConfig = serde_json::from_str(legacy_json)
+            .expect("legacy config without loop key must parse with defaults");
+        assert_eq!(parsed.r#loop, LoopConfig::default(),
+            "missing loop key must fall back to LoopConfig::default()");
     }
 }
