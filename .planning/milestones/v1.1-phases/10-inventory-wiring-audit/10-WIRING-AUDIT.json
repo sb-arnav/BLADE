@@ -3245,6 +3245,20 @@
       ]
     },
     {
+      "file": "src-tauri/src/loop_engine.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 33 v1.5 — Agentic Loop engine: LoopState, LoopHaltReason, ToolError, verify_progress (LOOP-01), enrich_alternatives (LOOP-02), detect_truncation + escalate_max_tokens (LOOP-04), run_loop (LOOP-06 driver). Hosts the per-iteration smart-loop body lifted from commands.rs in Plan 33-03; gated on config.r#loop.smart_loop_enabled with CTX-07-style fallback to legacy 12-iteration loop.",
+      "trigger": "internal — invoked by src-tauri/src/commands.rs:send_message_stream tool loop",
+      "ui_surface": null,
+      "internal_callers": [
+        "src-tauri/src/commands.rs"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": [
+        "send_message_stream tool loop -> commands.rs -> loop_engine::run_loop"
+      ]
+    },
+    {
       "file": "src-tauri/src/main.rs",
       "classification": "ACTIVE",
       "purpose": "Prevents additional console window on Windows in release, DO NOT REMOVE!! ",

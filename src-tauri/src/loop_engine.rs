@@ -311,10 +311,37 @@ pub async fn verify_progress(
     }
 }
 
+/// Plan 33-09 — test-only override seam. When set to `true`, `render_actions_json`
+/// panics on entry. Used to assert that a panic in the verification probe code
+/// path is caught by `run_loop`'s `catch_unwind` wrapper and does NOT halt the
+/// main loop. Mirrors `brain.rs::CTX_SCORE_OVERRIDE` from Phase 32-02 (commit
+/// bb5d6ce).
+///
+/// Gated `#[cfg(test)]` so production builds carry zero overhead and have no
+/// panic surface here. Cargo's default test profile enables `cfg(test)`.
+#[cfg(test)]
+thread_local! {
+    pub(crate) static FORCE_VERIFY_PANIC: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+}
+
 /// Render last_3_actions as a compact JSON array. Each summary is
 /// safe_slice'd to 300 chars to bound the prompt size
 /// (CONTEXT lock §Mid-Loop Verification).
 pub(crate) fn render_actions_json(actions: &VecDeque<ActionRecord>) -> String {
+    // Plan 33-09 — panic-injection seam. When `FORCE_VERIFY_PANIC` is set,
+    // panic before doing any work. The `run_loop` verification firing site
+    // wraps `verify_progress(...)` in `AssertUnwindSafe(...).catch_unwind()`
+    // (futures::FutureExt) so this panic is caught and the iteration
+    // continues. The test
+    // `phase33_loop_01_panic_in_verify_progress_caught_by_outer_wrapper`
+    // exercises that boundary end-to-end.
+    #[cfg(test)]
+    FORCE_VERIFY_PANIC.with(|p| {
+        if p.get() {
+            panic!("test-only induced panic in render_actions_json (Plan 33-09 regression)");
+        }
+    });
     let mut entries: Vec<serde_json::Value> = Vec::with_capacity(actions.len());
     for a in actions {
         entries.push(serde_json::json!({
@@ -511,24 +538,41 @@ pub async fn run_loop(
             && iteration > 0
             && (iteration as u32) % config.r#loop.verification_every_n == 0
         {
-            let verdict_result = verify_progress(
+            // Plan 33-09 — wrap the verify_progress future in
+            // `AssertUnwindSafe(...).catch_unwind().await` (futures::FutureExt)
+            // so a panic in render_actions_json or any other synchronous code
+            // path inside the verifier swallows cleanly. CTX-07 fallback
+            // discipline ported from Phase 32-07: smart path → naive path
+            // (no nudge, loop continues). The
+            // `phase33_loop_01_panic_in_verify_progress_caught_by_outer_wrapper`
+            // regression test forces a panic via FORCE_VERIFY_PANIC and
+            // asserts the wrapper catches it.
+            //
+            // AssertUnwindSafe is required because `&config.provider`,
+            // `&config.api_key`, and `&config.model` are not auto-UnwindSafe
+            // (BladeConfig carries types that aren't unconditionally
+            // UnwindSafe — keyring handles, Mutex inner). The captured refs
+            // are read-only inside the closure so the assertion is safe.
+            use futures::FutureExt;
+            let probe = std::panic::AssertUnwindSafe(verify_progress(
                 &config.provider,
                 &config.api_key,
                 &config.model,
                 last_user_text,
                 &loop_state.last_3_actions,
-            )
+            ))
+            .catch_unwind()
             .await;
 
-            match verdict_result {
-                Ok(Verdict::Yes) => {
+            match probe {
+                Ok(Ok(Verdict::Yes)) => {
                     emit_stream_event(&app, "blade_loop_event", serde_json::json!({
                         "kind": "verification_fired",
                         "verdict": "YES",
                     }));
                     // No nudge injected — loop continues.
                 }
-                Ok(Verdict::No) => {
+                Ok(Ok(Verdict::No)) => {
                     emit_stream_event(&app, "blade_loop_event", serde_json::json!({
                         "kind": "verification_fired",
                         "verdict": "NO",
@@ -549,7 +593,7 @@ pub async fn run_loop(
                         loop_state.last_nudge_iteration = Some(loop_state.iteration);
                     }
                 }
-                Ok(Verdict::Replan) => {
+                Ok(Ok(Verdict::Replan)) => {
                     emit_stream_event(&app, "blade_loop_event", serde_json::json!({
                         "kind": "verification_fired",
                         "verdict": "REPLAN",
@@ -566,11 +610,22 @@ pub async fn run_loop(
                         loop_state.last_nudge_iteration = Some(loop_state.iteration);
                     }
                 }
-                Err(e) => {
+                Ok(Err(e)) => {
                     // Non-blocking — log to stderr, continue without injecting.
                     // CTX-07 fallback discipline: probe failure invisible to
                     // the user (no chat_error, no notification).
                     eprintln!("[LOOP-01] verify_progress error (non-blocking): {}", e);
+                }
+                Err(_panic) => {
+                    // Plan 33-09 — CTX-07 fallback discipline: a panic in the
+                    // verifier code path (render_actions_json, prompt build,
+                    // anything inside the future before/around the .await) is
+                    // SWALLOWED here. No nudge fires; loop_state.last_nudge_iteration
+                    // is NOT updated; loop continues to the next iteration.
+                    log::warn!(
+                        "[LOOP-01] verify_progress panicked at iter {}; loop continues (Plan 33-09 regression discipline, smart path → dumb path)",
+                        iteration
+                    );
                 }
             }
         }
@@ -2887,6 +2942,130 @@ mod tests {
         assert!(
             state.consecutive_same_tool_failures.is_empty(),
             "successful tool call must clear all streak counters"
+        );
+    }
+
+    // ─── Plan 33-09 (CTX-07 panic-injection regression suite) ─────────────
+    //
+    // Mirrors the brain.rs `phase32_build_system_prompt_survives_panic_in_scoring`
+    // pattern (commit bb5d6ce). The seam is `FORCE_VERIFY_PANIC` (cfg(test)
+    // thread_local Cell<bool>); the production check sits at the top of
+    // `render_actions_json`. The catch_unwind wrapper sits at the verifier
+    // firing site in `run_loop` (futures::FutureExt::catch_unwind on the
+    // AssertUnwindSafe-wrapped future).
+    //
+    // Three tests:
+    //   1. FORCE_VERIFY_PANIC=true makes render_actions_json panic when called
+    //      bare — proves the seam works.
+    //   2. FORCE_VERIFY_PANIC=false leaves render_actions_json producing valid
+    //      JSON — proves the seam is off-by-default and renders normally.
+    //   3. The futures-catch_unwind boundary (the same wrapper run_loop uses)
+    //      catches a forced panic when verify_progress is awaited — proves the
+    //      production wrapper would catch the same panic at the firing site.
+    //
+    // Cleanup: each test resets FORCE_VERIFY_PANIC to false BEFORE asserting
+    // so a failed assertion does not poison sibling tests on the same thread.
+
+    #[test]
+    fn phase33_loop_01_panic_in_render_actions_json_is_caught() {
+        // FORCE_VERIFY_PANIC=true → render_actions_json must panic on entry.
+        // catch_unwind around the synchronous call captures the panic and
+        // returns Err. This is the unit-level proof that the seam fires.
+        FORCE_VERIFY_PANIC.with(|p| p.set(true));
+        let actions: VecDeque<ActionRecord> = VecDeque::new();
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            render_actions_json(&actions)
+        }));
+        // Reset BEFORE the assertion so a failure doesn't poison other tests.
+        FORCE_VERIFY_PANIC.with(|p| p.set(false));
+        assert!(
+            result.is_err(),
+            "FORCE_VERIFY_PANIC=true must induce a panic in render_actions_json; got Ok({:?})",
+            result.as_ref().ok()
+        );
+    }
+
+    #[test]
+    fn phase33_loop_01_render_actions_json_normal_when_panic_off() {
+        // FORCE_VERIFY_PANIC=false (default) → render_actions_json produces
+        // a valid JSON array with the expected shape. Locks the seam to off-
+        // by-default so production builds don't accidentally panic.
+        FORCE_VERIFY_PANIC.with(|p| p.set(false));
+        let mut actions: VecDeque<ActionRecord> = VecDeque::new();
+        actions.push_back(ActionRecord {
+            tool: "read_file".to_string(),
+            input_summary: "x".to_string(),
+            output_summary: "y".to_string(),
+            is_error: false,
+        });
+        let json = render_actions_json(&actions);
+        assert!(
+            json.contains("\"tool\":\"read_file\""),
+            "expected tool name in JSON, got: {}",
+            json
+        );
+        assert!(
+            json.contains("\"in\":\"x\""),
+            "expected input summary in JSON, got: {}",
+            json
+        );
+        assert!(
+            json.contains("\"out\":\"y\""),
+            "expected output summary in JSON, got: {}",
+            json
+        );
+        assert!(
+            json.contains("\"err\":false"),
+            "expected err flag in JSON, got: {}",
+            json
+        );
+    }
+
+    #[test]
+    fn phase33_loop_01_panic_in_verify_progress_caught_by_outer_wrapper() {
+        // End-to-end test of the catch_unwind boundary used in run_loop.
+        // Mirrors the production wrapper exactly: AssertUnwindSafe around the
+        // verify_progress future, .catch_unwind() (futures::FutureExt), .await.
+        //
+        // Cleanup of LOOP_OVERRIDE: defensive — the seam should already be
+        // unset since we never set it in this test, but other tests run in
+        // parallel and the env var is process-global. Acquire the override
+        // mutex used by Plan 33-04 tests so we don't race with them.
+        let _g = loop_override_mutex().lock().unwrap_or_else(|p| p.into_inner());
+        std::env::remove_var("LOOP_OVERRIDE");
+
+        FORCE_VERIFY_PANIC.with(|p| p.set(true));
+        let actions: VecDeque<ActionRecord> = VecDeque::new();
+
+        // Block the future on a tokio runtime so the .await inside
+        // catch_unwind resolves. futures::FutureExt is the same trait
+        // run_loop uses (production code: `use futures::FutureExt;` at the
+        // verification firing site).
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("tokio runtime build");
+        let probe_result = rt.block_on(async {
+            use futures::FutureExt;
+            std::panic::AssertUnwindSafe(verify_progress(
+                "anthropic",
+                "x",
+                "claude-haiku-4-5-20251001",
+                "build a snake game",
+                &actions,
+            ))
+            .catch_unwind()
+            .await
+        });
+
+        // Reset BEFORE asserting so a failure doesn't poison other tests.
+        FORCE_VERIFY_PANIC.with(|p| p.set(false));
+
+        assert!(
+            probe_result.is_err(),
+            "panic in render_actions_json must propagate to the catch_unwind boundary; \
+             got Ok(_) — the production wrapper would NOT catch it. \
+             smart-path → dumb-path discipline broken."
         );
     }
 }
