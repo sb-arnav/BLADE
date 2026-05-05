@@ -32,6 +32,13 @@ const CROSS_WINDOW_ALLOWLIST = new Set([
   // ───── commands.rs — blade_status broadcasts (main + HUD) ─────────────
   'commands.rs:blade_status',
 
+  // ───── loop_engine.rs — blade_status broadcasts (lifted from commands.rs
+  // in Plan 33-03; same main+HUD audience as commands.rs:blade_status). The
+  // emit sites at the cancellation check, error-recovery branches, post-loop
+  // assembly, and tool-loop status transitions all carry the same broadcast
+  // semantics they had pre-Phase-33 when they lived in commands.rs.
+  'loop_engine.rs:blade_status',
+
   // ───── homeostasis / hormone bus (main + hud + body) ──────────────────
   'homeostasis.rs:homeostasis_update',
   'homeostasis.rs:hormone_update',  // Plan 03-01 WIRE-02 parallel emit (D-64)
