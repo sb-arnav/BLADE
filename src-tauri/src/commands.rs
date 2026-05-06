@@ -1850,14 +1850,43 @@ pub(crate) async fn send_message_stream_inline(
             return Ok(());
         }
         Err(crate::loop_engine::LoopHaltReason::CircuitOpen { error_kind, attempts_summary }) => {
-            // Plan 34-02 — type substrate only; Plan 34-05 (RES-02) will
-            // replace this placeholder with the structured "what was tried"
-            // chat surface + ActivityStrip chip emit. For now, surface a
-            // generic halt message that names the error_kind + attempt count.
+            // Plan 34-05 (RES-02) — structured "what was tried" chat surface.
+            // Renders the most-recent attempts (capped at 3) so the user sees
+            // which provider/model failed with which error message before the
+            // breaker tripped. Falls back to a generic message when entries
+            // were recorded via the legacy `record_error(kind)` wrapper (no
+            // provider/model/msg captured).
+            let recent: Vec<String> = attempts_summary
+                .iter()
+                .rev()
+                .take(3)
+                .map(|a| {
+                    let p = if a.provider.is_empty() { "(unknown provider)" } else { a.provider.as_str() };
+                    let m = if a.model.is_empty() { "(unknown model)" } else { a.model.as_str() };
+                    let em = if a.error_message.is_empty() {
+                        "(no error message captured)".to_string()
+                    } else {
+                        crate::safe_slice(&a.error_message, 200).to_string()
+                    };
+                    format!("{}/{} → {}", p, m, em)
+                })
+                .collect();
             let msg = format!(
-                "Loop halted: circuit breaker open ({} after {} attempts). Try again in a moment.",
-                error_kind, attempts_summary.len()
+                "Loop halted: circuit breaker tripped on '{}' after {} attempts. Most recent failures:\n  - {}",
+                error_kind,
+                attempts_summary.len(),
+                recent.join("\n  - "),
             );
+            // Plan 34-08 (SESS-01) will additionally record a SessionWriter
+            // LoopEvent { kind: "circuit_open", payload: {error_kind, attempts: N} }
+            // for forensics — at this layer we surface the user-facing chat_error
+            // and emit the ActivityStrip-ready blade_loop_event.
+            emit_stream_event(&app, "blade_loop_event", serde_json::json!({
+                "kind": "halted",
+                "reason": "circuit_breaker",
+                "error_kind": error_kind,
+                "attempts": attempts_summary.len(),
+            }));
             emit_stream_event(&app, "chat_error", msg.clone());
             emit_stream_event(&app, "chat_done", ());
             let _ = app.emit("blade_status", "error");
