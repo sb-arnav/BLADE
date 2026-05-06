@@ -59,6 +59,23 @@ function saveToStorage(entries: ActivityLogEntry[]): void {
   }
 }
 
+/**
+ * Phase 34 / Plan 34-11 — format a Rust StuckPattern discriminant
+ * (PascalCase from `src-tauri/src/resilience/stuck.rs::StuckPattern::discriminant`)
+ * into a chip-friendly lowercase + space-separated label.
+ *
+ *   RepeatedActionObservation → "repeated action observation"
+ *   MonologueSpiral           → "monologue spiral"
+ *   ContextWindowThrashing    → "context window thrashing"
+ *   NoProgress                → "no progress"
+ *   CostRunaway               → "cost runaway"
+ */
+function formatPatternLabel(pattern: string): string {
+  return pattern
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .toLowerCase();
+}
+
 // ---------------------------------------------------------------------------
 // Context
 // ---------------------------------------------------------------------------
@@ -92,7 +109,8 @@ export function ActivityLogProvider({ children }: { children: ReactNode }) {
 
   useTauriEvent<ActivityLogEntry>(BLADE_EVENTS.ACTIVITY_LOG, handleEvent);
 
-  // ─── Phase 33 / Plan 33-08 — agentic-loop lifecycle subscription ─────────
+  // ─── Phase 33 / Plan 33-08 + Phase 34 / Plan 34-11 — agentic-loop +
+  //     resilience lifecycle subscription ───────────────────────────────────
   //
   // Maps blade_loop_event into an ActivityLogEntry shape so it flows through
   // the same ring buffer + ActivityStrip surface as blade_activity_log.
@@ -106,6 +124,15 @@ export function ActivityLogProvider({ children }: { children: ReactNode }) {
   //   replanning         → "replanning (#N)"
   //   token_escalated    → "token bump → N"
   //   halted             → "halted: cost cap ($X of $Y)" / "halted: iteration cap"
+  //                        (Plan 34-06 may carry scope: PerConversation — chip
+  //                        text is the same; the JSONL-paired emit retains the
+  //                        scope discriminant for forensics)
+  // ─── Phase 34 additions ───────────────────────────────────────────────────
+  //   stuck_detected     → "stuck: <pattern lowercased + spaced>"
+  //   circuit_open       → "circuit open: <error_kind>"
+  //   cost_warning       → "cost 80% ($X.XX / $Y.YY)"
+  //   cost_update        → NO chip — consumed by cost-meter widget in
+  //                        InputBar (early return below; no log row appended)
   const handleLoopEvent = useCallback((e: Event<BladeLoopEventPayload>) => {
     const payload = e.payload;
     let summary: string;
@@ -135,6 +162,26 @@ export function ActivityLogProvider({ children }: { children: ReactNode }) {
             ? `halted: cost cap ($${(payload.spent_usd ?? 0).toFixed(2)} of $${(payload.cap_usd ?? 0).toFixed(2)})`
             : 'halted: iteration cap';
         break;
+      // ─── Phase 34 / Plan 34-11 ────────────────────────────────────────────
+      case 'stuck_detected':
+        action = 'stuck_detected';
+        summary = `stuck: ${formatPatternLabel(payload.pattern)}`;
+        break;
+      case 'circuit_open':
+        action = 'circuit_open';
+        summary = `circuit open: ${payload.error_kind}`;
+        break;
+      case 'cost_warning':
+        action = 'cost_warning';
+        summary = `cost 80% ($${payload.spent_usd.toFixed(2)} / $${payload.cap_usd.toFixed(2)})`;
+        break;
+      case 'cost_update':
+        // Phase 34 — cost_update is the live cost-meter tick, fired every
+        // iteration. It is NOT a chip event; the InputBar cost-meter chip
+        // subscribes directly via useTauriEvent and renders the running
+        // spend/cap. Bypass the activity-log ring buffer entirely so the
+        // strip doesn't churn one row per iteration.
+        return;
     }
     const entry: ActivityLogEntry = {
       module: 'loop',
