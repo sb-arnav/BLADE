@@ -507,56 +507,35 @@ pub(crate) fn safe_fallback_model(provider: &str) -> &'static str {
 // truly pathological multi-MB outputs only.
 const MAX_TOOL_RESULT_CHARS: usize = 200_000;
 
-/// Try to complete a turn using a free/fallback model when the primary is rate-limited.
-/// Attempts OpenRouter free tier first, then Groq, then Ollama.
-/// Returns Some(turn) on success, None if no free model is available.
+/// Phase 33 — try a free/fallback model when the primary is rate-limited.
+///
+/// Plan 34-07 deprecated this function in favor of
+/// [`crate::resilience::fallback::try_with_fallback`], which honours the
+/// configurable chain in `BladeConfig.resilience.provider_fallback_chain`
+/// (defaults: `["primary", "openrouter", "groq", "ollama"]`) and adds
+/// per-provider exponential-backoff retries.
+///
+/// The legacy fn body now delegates to the new helper for backward compat —
+/// existing call sites (today: `loop_engine.rs:955`) continue to work. The
+/// `#[deprecated]` warning is the migration prompt for Wave 4-5 plans that
+/// touch the rate-limit recovery path.
+///
+/// CONTEXT lock §RES-05 trade-off: the new helper performs SILENT fallover
+/// within the chain — the per-step `blade_notification` /
+/// `blade_routing_switched` emits that the legacy body fired are intentionally
+/// dropped. Only chain exhaustion surfaces (as `chat_error` at the call site
+/// when this fn returns `None`). Plan 34-08's `SessionWriter` will record a
+/// `LoopEvent { kind: "fallback_exhausted" }` for forensics.
+#[deprecated(note = "Plan 34-07 — use resilience::fallback::try_with_fallback (configurable chain)")]
 pub(crate) async fn try_free_model_fallback(
     config: &crate::config::BladeConfig,
     conversation: &[crate::providers::ConversationMessage],
     tools: &[crate::providers::ToolDefinition],
     app: &tauri::AppHandle,
 ) -> Option<crate::providers::AssistantTurn> {
-    // Candidates in order of preference (provider, model, needs_key)
-    let candidates: &[(&str, &str)] = &[
-        ("openrouter", "meta-llama/llama-3.3-70b-instruct:free"),
-        ("groq", "llama-3.3-70b-versatile"),
-        ("ollama", "llama3"),
-    ];
-
-    for (provider, model) in candidates {
-        // Skip if same as current (we already know it's rate-limited)
-        if *provider == config.provider.as_str() { continue; }
-
-        let key = if *provider == "ollama" {
-            String::new()
-        } else {
-            crate::config::get_provider_key(provider)
-        };
-
-        if key.is_empty() && *provider != "ollama" { continue; }
-
-        emit_stream_event(app, "blade_notification", serde_json::json!({
-            "type": "info",
-            "message": format!("Rate limited on {} — switching to {} ({}) for this request.",
-                config.provider, provider, model)
-        }));
-        let _ = app.emit("blade_status", "processing");
-
-        match providers::complete_turn(provider, &key, model, conversation, tools, None).await {
-            Ok(t) => {
-                emit_stream_event(app, "blade_routing_switched", serde_json::json!({
-                    "from_provider": &config.provider,
-                    "from_model": &config.model,
-                    "to_provider": provider,
-                    "to_model": model,
-                    "reason": "rate_limit",
-                }));
-                return Some(t);
-            }
-            Err(_) => continue,
-        }
-    }
-    None
+    crate::resilience::fallback::try_with_fallback(config, conversation, tools, app)
+        .await
+        .ok()
 }
 
 /// Count implied task steps in a user query.
