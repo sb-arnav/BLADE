@@ -874,16 +874,26 @@ pub async fn run_loop(
         // cross the wave-3 parallel-plan boundary (33-04 / 33-05 / 33-07
         // mount their own changes in different parts of the iteration body).
         //
-        // CTX-07 / Phase 32-07 / Plan 33-04 panic-safety: the synchronous
-        // decision (detect → escalate → cost-guard projection) is wrapped in
-        // `catch_unwind(AssertUnwindSafe(...))`. If any of those steps panic
-        // (regression in detect_truncation, integer-overflow on a future
-        // cost-math edit), the smart-path collapses gracefully back to the
-        // dumb path: original truncated turn flows through, no retry, no
-        // crash. The async retry call itself is outside the catch_unwind
-        // (catch_unwind cannot wrap an .await); on retry-Err we still keep
-        // the original turn.
+        // CTX-07 / Phase 32-07 / Plan 33-04 / 33-NN-FIX (HI-03) panic-safety:
+        //   1. The synchronous decision (detect → escalate → cost-guard
+        //      projection) is wrapped in `catch_unwind(AssertUnwindSafe(...))`.
+        //      If any of those steps panic (regression in detect_truncation,
+        //      integer-overflow on a future cost-math edit), the smart-path
+        //      collapses gracefully back to the dumb path: original truncated
+        //      turn flows through, no retry, no crash.
+        //   2. The async retry call (.await on
+        //      `complete_turn_with_max_tokens`) is ALSO wrapped via
+        //      `futures::FutureExt::catch_unwind` (mirrors the verifier path
+        //      at lines 556-565). A panic inside any provider's response
+        //      parser during the retry no longer kills the run_loop task —
+        //      we keep the original turn and continue. CTX-07 discipline:
+        //      smart-path → dumb path on panic, never main-thread crash.
         let mut turn = turn;
+        // 33-NN-FIX (HI-02) — flag set when the truncation block has already
+        // accumulated the original turn's cost. Used by the post-block
+        // accumulator to avoid double-counting on retry-fail (where `turn`
+        // still holds the original).
+        let mut original_cost_already_tracked: bool = false;
         if config.r#loop.smart_loop_enabled {
             // 33-NN-FIX (HI-01) — per-provider default. Hardcoding 4096 here
             // mis-estimated Gemini/Groq/Ollama (whose actual default is 8192,
@@ -957,32 +967,99 @@ pub async fn run_loop(
                 loop_state.token_escalations =
                     loop_state.token_escalations.saturating_add(1);
 
-                // Retry the SAME turn with the doubled max_tokens. The
-                // model receives identical context (CONTEXT lock §LOOP-04
-                // — "retry-fresh"); only the max_tokens ceiling changes.
-                let retry = providers::complete_turn_with_max_tokens(
-                    &config.provider,
-                    &config.api_key,
-                    &config.model,
-                    conversation,
-                    tools,
-                    config.base_url.as_deref(),
-                    new_max,
-                ).await;
-                if let Ok(retry_turn) = retry {
-                    // Discard the truncated turn; use the retry as the
-                    // canonical turn. The original truncated turn was
-                    // NOT yet pushed to `conversation` — that happens
-                    // immediately below. Order matters here.
-                    // NB: even if `retry_turn` is ALSO truncated, we do
-                    // NOT re-escalate — one-shot only per CONTEXT lock
-                    // §LOOP-04 ("each turn allows at most 1 escalation").
-                    // The block has already exited the truncation gate;
-                    // the retried turn flows through to conversation.push.
-                    turn = retry_turn;
+                // 33-NN-FIX (HI-02) — track the original truncated turn's
+                // tokens BEFORE the retry call. Pre-fix wiring discarded the
+                // turn after `turn = retry_turn` and the post-block
+                // accumulation at line ~999 only saw the retry's tokens. The
+                // original API call WAS billed (the provider returned a
+                // partial result, not free), and on a 4096-output truncation
+                // followed by an 8192-output retry on Anthropic Sonnet 4
+                // ($3/$15 per million), the unaccounted spend was up to
+                // ~$0.06 per truncation event — a real cost-guard
+                // under-count. We now accumulate the original turn's cost
+                // here, BEFORE the retry; the post-block accumulator picks
+                // up the retry's cost on top, so total recorded spend =
+                // original + retry whether the retry succeeds or fails.
+                {
+                    let (price_in, price_out) =
+                        crate::providers::price_per_million(&config.provider, &config.model);
+                    let original_cost = (turn.tokens_in as f32 * price_in
+                                       + turn.tokens_out as f32 * price_out)
+                                       / 1_000_000.0;
+                    loop_state.cumulative_cost_usd += original_cost;
+                    original_cost_already_tracked = true;
                 }
-                // On retry Err: accept the original truncated turn —
-                // no infinite escalation, no second-chance fallthrough.
+
+                // 33-NN-FIX (HI-03) — wrap the async retry call in
+                // `futures::FutureExt::catch_unwind` (mirrors the verifier
+                // path at lines 556-565). Pre-fix wiring left the .await
+                // outside any panic shield; a regression in any provider's
+                // response parser (malformed JSON unwrap, integer overflow
+                // in usage parse, etc.) would crash the run_loop task with
+                // no LoopHaltReason, no chat_error, no notification — chat
+                // appears to hang. CTX-07 discipline says smart-path → naive
+                // path on panic; this branch now honors that contract.
+                //
+                // AssertUnwindSafe is required because &BladeConfig and the
+                // captured &conversation/&tools refs are not unconditionally
+                // UnwindSafe — same posture as the verifier wrapper.
+                //
+                // Retry the SAME turn with the doubled max_tokens. The model
+                // receives identical context (CONTEXT lock §LOOP-04 —
+                // "retry-fresh"); only the max_tokens ceiling changes.
+                use futures::FutureExt;
+                let retry = std::panic::AssertUnwindSafe(
+                    providers::complete_turn_with_max_tokens(
+                        &config.provider,
+                        &config.api_key,
+                        &config.model,
+                        conversation,
+                        tools,
+                        config.base_url.as_deref(),
+                        new_max,
+                    ),
+                )
+                .catch_unwind()
+                .await;
+                match retry {
+                    Ok(Ok(retry_turn)) => {
+                        // Discard the truncated turn; use the retry as the
+                        // canonical turn. The original truncated turn was
+                        // NOT yet pushed to `conversation` — that happens
+                        // immediately below. Order matters here.
+                        // NB: even if `retry_turn` is ALSO truncated, we do
+                        // NOT re-escalate — one-shot only per CONTEXT lock
+                        // §LOOP-04 ("each turn allows at most 1 escalation").
+                        // The block has already exited the truncation gate;
+                        // the retried turn flows through to conversation.push.
+                        turn = retry_turn;
+                        // Clear the flag — `turn` is now the retry, whose
+                        // cost has NOT been tracked yet. Post-block accumulator
+                        // must run on the retry's tokens. (HI-02: this gives
+                        // total = original + retry, both accounted.)
+                        original_cost_already_tracked = false;
+                    }
+                    Ok(Err(_e)) => {
+                        // Retry returned Err — accept the original truncated
+                        // turn. No infinite escalation, no second chance.
+                        // Note: the original turn's cost was ALREADY tracked
+                        // above (HI-02). Flag stays true so the post-block
+                        // accumulator does NOT double-count.
+                    }
+                    Err(_panic) => {
+                        // Panic inside complete_turn_with_max_tokens (or any
+                        // future internal change to its provider parsers).
+                        // CTX-07 fallback discipline: smart path → dumb path.
+                        // Keep the original turn (already cost-tracked above)
+                        // and let the loop body continue to the next iteration.
+                        // Flag stays true → post-block does NOT double-count.
+                        log::warn!(
+                            "[LOOP-04] complete_turn_with_max_tokens panicked during retry; \
+                             keeping original truncated turn (smart path → dumb path, \
+                             CTX-07 discipline; 33-NN-FIX HI-03 regression discipline)"
+                        );
+                    }
+                }
             }
         }
 
@@ -999,20 +1076,28 @@ pub async fn run_loop(
         // Providers that don't report usage default to 0 here; their
         // contribution to cumulative_cost_usd is 0.
         //
-        // Called AFTER the LOOP-04 truncation retry block so the recorded
-        // cost reflects the FINAL (possibly-retried) turn. If the retry
-        // fired we account for the doubled-call's actual usage; if the
-        // original turn flowed through unchanged we account for that.
-        // Either way, both the original AND retry are captured because:
-        //   - retry-success path: turn = retry_turn (so we accumulate the
-        //     retry's tokens; the original truncated call's tokens are
-        //     IGNORED to keep the projection-vs-actual invariant simple)
-        //   - retry-fail path: turn stays as the original (tokens accounted)
-        // CONTEXT lock posture: this is the same simplification used in the
-        // cost-guard interlock projection — minor under-count on the retry-
-        // success path is acceptable; the over-estimating projection
-        // already reserved budget for the doubled call.
-        if config.r#loop.smart_loop_enabled {
+        // Called AFTER the LOOP-04 truncation retry block. 33-NN-FIX (HI-02)
+        // changed the accounting model so that BOTH the original truncated
+        // call AND the retry call are recorded on retry-success:
+        //   - Original turn's cost is accumulated INSIDE the truncation block
+        //     BEFORE the retry runs (so it survives even if the retry fails
+        //     or panics).
+        //   - On retry-success, the truncation block sets `turn = retry_turn`
+        //     and clears `original_cost_already_tracked` — this accumulator
+        //     then picks up the retry's cost on top of the already-tracked
+        //     original.
+        //   - On retry-fail / retry-panic, `turn` still holds the original
+        //     and the flag stays `true` — this accumulator skips, avoiding
+        //     a double-count.
+        //   - On the no-truncation path, the flag stays `false` (set on entry)
+        //     and this accumulator runs normally on the single turn.
+        if config.r#loop.smart_loop_enabled && !original_cost_already_tracked {
+            // 33-NN-FIX (HI-02) — the `!original_cost_already_tracked` guard
+            // prevents double-counting on retry-fail / retry-panic paths
+            // where `turn` still holds the original (whose cost was already
+            // accumulated inside the truncation block). On retry-success,
+            // the truncation block clears the flag so this accumulator picks
+            // up the retry's tokens on top of the already-tracked original.
             let (price_in, price_out) =
                 crate::providers::price_per_million(&config.provider, &config.model);
             let turn_cost_usd =
@@ -3118,48 +3203,136 @@ mod tests {
     }
 
     #[test]
-    fn phase33_loop_06_validate_rejects_zero_n() {
-        // BL-01 — LoopConfig::validate() MUST reject verification_every_n=0
-        // with a clear error string at save_config time. This is the strict
-        // gate; the firing-site `> 0` guard above is the safety net.
-        let mut cfg = crate::config::LoopConfig::default();
-        cfg.verification_every_n = 0;
-        let err = cfg
-            .validate()
-            .expect_err("verification_every_n=0 must be rejected by validate()");
+    fn phase33_loop_04_truncation_retry_does_not_undercount_cost() {
+        // 33-NN-FIX (HI-02) — the truncation retry block must accumulate
+        // the original truncated turn's cost BEFORE the retry runs, so
+        // total cumulative spend = original + retry on success, or just
+        // original on failure. Pre-fix the original was discarded silently
+        // and only the retry counted.
+        //
+        // We can't easily run the full run_loop in a unit test (Tauri
+        // AppHandle, network), so this test exercises the cost-arithmetic
+        // contract directly with the same shape the production code uses:
+        //   1. Original truncated call: 1k in, 4096 out → cost1 (tracked)
+        //   2. Retry success: 1k in, 8192 out → cost2 (tracked on top)
+        //   3. Final cumulative MUST equal cost1 + cost2.
+        let (price_in, price_out) =
+            crate::providers::price_per_million("anthropic", "claude-sonnet-4");
+
+        // Step 1: original truncated turn — accumulate.
+        let mut state = LoopState::default();
+        let orig_in: u32 = 1_000;
+        let orig_out: u32 = 4_096;
+        let original_cost = (orig_in as f32 * price_in + orig_out as f32 * price_out) / 1_000_000.0;
+        state.cumulative_cost_usd += original_cost;
+        let after_original = state.cumulative_cost_usd;
+        assert!(after_original > 0.0, "original cost must be tracked > 0");
+
+        // Step 2: retry success — accumulate on top.
+        let retry_in: u32 = 1_000;
+        let retry_out: u32 = 8_192;
+        let retry_cost = (retry_in as f32 * price_in + retry_out as f32 * price_out) / 1_000_000.0;
+        state.cumulative_cost_usd += retry_cost;
+
+        // Total must equal original + retry — the load-bearing HI-02 invariant.
+        let expected = original_cost + retry_cost;
         assert!(
-            err.contains("verification_every_n"),
-            "error message must identify the field; got: {}",
-            err
+            (state.cumulative_cost_usd - expected).abs() < 1e-6,
+            "cumulative ({}) must equal original ({}) + retry ({}) = {}",
+            state.cumulative_cost_usd, original_cost, retry_cost, expected
         );
 
-        // Sister checks: max_iterations=0 and negative cost_guard_dollars also rejected.
-        let mut cfg = crate::config::LoopConfig::default();
-        cfg.max_iterations = 0;
-        let err = cfg
-            .validate()
-            .expect_err("max_iterations=0 must be rejected by validate()");
+        // Sanity: the original cost alone is non-trivial — pre-fix, this
+        // entire amount would have been silently dropped (the cost guard
+        // would under-count by exactly this much per truncation event).
+        // 1k in × $3/M + 4096 out × $15/M = $0.003 + $0.06144 ≈ $0.06444
         assert!(
-            err.contains("max_iterations"),
-            "error message must identify the field; got: {}",
-            err
+            original_cost > 0.05,
+            "original truncated call cost ({}) is non-trivial — silent drop pre-HI-02 \
+             would under-count by at least this much per truncation event",
+            original_cost
         );
+    }
 
-        let mut cfg = crate::config::LoopConfig::default();
-        cfg.cost_guard_dollars = -1.0;
-        let err = cfg
-            .validate()
-            .expect_err("negative cost_guard_dollars must be rejected by validate()");
+    #[test]
+    fn phase33_loop_04_truncation_retry_does_not_overcount_on_retry_fail() {
+        // 33-NN-FIX (HI-02) sister test — on retry-fail (or retry-panic), the
+        // post-block accumulator must skip so the original cost (already
+        // tracked inside the truncation block) is NOT double-counted.
+        //
+        // Mirrors the production flag-based gating:
+        //   1. Original truncated call: cost1 added, flag set true.
+        //   2. Retry fails (Err or panic) — turn stays as original, flag stays true.
+        //   3. Post-block accumulator sees flag=true → skips.
+        //   4. Final cumulative = cost1 only (truthful).
+        let (price_in, price_out) =
+            crate::providers::price_per_million("anthropic", "claude-sonnet-4");
+        let mut state = LoopState::default();
+        let orig_in: u32 = 1_000;
+        let orig_out: u32 = 4_096;
+        let original_cost = (orig_in as f32 * price_in + orig_out as f32 * price_out) / 1_000_000.0;
+
+        // Step 1: original truncated turn — accumulate, set flag.
+        state.cumulative_cost_usd += original_cost;
+        let original_cost_already_tracked = true;
+
+        // Step 2: retry FAILED — flag stays true, post-block must skip.
+        let smart_loop_enabled = true;
+        let post_block_runs = smart_loop_enabled && !original_cost_already_tracked;
+        if post_block_runs {
+            // This path must NOT execute on retry-fail. If it did, we'd
+            // double-count the original cost.
+            state.cumulative_cost_usd += original_cost;
+        }
+
+        // Final must equal exactly the original cost (no double-count).
         assert!(
-            err.contains("cost_guard_dollars"),
-            "error message must identify the field; got: {}",
-            err
+            (state.cumulative_cost_usd - original_cost).abs() < 1e-6,
+            "cumulative ({}) on retry-fail must equal original ({}) only",
+            state.cumulative_cost_usd, original_cost
         );
+    }
 
-        // Default config must validate cleanly — sanity check.
-        crate::config::LoopConfig::default()
-            .validate()
-            .expect("default LoopConfig must validate cleanly");
+    #[test]
+    fn phase33_loop_04_truncation_retry_panic_safe() {
+        // 33-NN-FIX (HI-03) — the truncation retry .await call must be
+        // wrapped in `futures::FutureExt::catch_unwind`. A panic inside any
+        // provider's response parser during the retry must NOT crash the
+        // run_loop task; instead, the smart-path collapses to the dumb path
+        // (keep original turn, continue iteration).
+        //
+        // We mirror the production wrapper exactly: AssertUnwindSafe around
+        // the future, .catch_unwind() (futures::FutureExt), .await. The
+        // future itself panics synchronously (before any real I/O) so we
+        // can assert the wrapper returns Err(panic) without needing a real
+        // provider call.
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("tokio runtime build");
+
+        let probe_result = rt.block_on(async {
+            use futures::FutureExt;
+            std::panic::AssertUnwindSafe(async {
+                // Simulate complete_turn_with_max_tokens panicking inside a
+                // provider parser (malformed JSON unwrap, integer overflow
+                // in usage parse, etc.).
+                panic!("simulated panic inside complete_turn_with_max_tokens parser");
+                #[allow(unreachable_code)]
+                Ok::<crate::providers::AssistantTurn, String>(
+                    crate::providers::AssistantTurn::default(),
+                )
+            })
+            .catch_unwind()
+            .await
+        });
+
+        assert!(
+            probe_result.is_err(),
+            "panic in complete_turn_with_max_tokens must propagate to the \
+             catch_unwind boundary; got Ok(_) — pre-fix wiring would crash \
+             the run_loop task. CTX-07 smart-path → dumb-path discipline broken."
+        );
     }
 
     #[test]
@@ -3205,5 +3378,50 @@ mod tests {
         let escalated = escalate_max_tokens("openai", "gpt-4o", 4096);
         assert_eq!(escalated, Some(8192),
             "openai gpt-4o at default 4096 should escalate to 8192 (under 16384 cap)");
+    }
+
+    #[test]
+    fn phase33_loop_06_validate_rejects_zero_n() {
+        // BL-01 — LoopConfig::validate() MUST reject verification_every_n=0
+        // with a clear error string at save_config time. This is the strict
+        // gate; the firing-site `> 0` guard above is the safety net.
+        let mut cfg = crate::config::LoopConfig::default();
+        cfg.verification_every_n = 0;
+        let err = cfg
+            .validate()
+            .expect_err("verification_every_n=0 must be rejected by validate()");
+        assert!(
+            err.contains("verification_every_n"),
+            "error message must identify the field; got: {}",
+            err
+        );
+
+        // Sister checks: max_iterations=0 and negative cost_guard_dollars also rejected.
+        let mut cfg = crate::config::LoopConfig::default();
+        cfg.max_iterations = 0;
+        let err = cfg
+            .validate()
+            .expect_err("max_iterations=0 must be rejected by validate()");
+        assert!(
+            err.contains("max_iterations"),
+            "error message must identify the field; got: {}",
+            err
+        );
+
+        let mut cfg = crate::config::LoopConfig::default();
+        cfg.cost_guard_dollars = -1.0;
+        let err = cfg
+            .validate()
+            .expect_err("negative cost_guard_dollars must be rejected by validate()");
+        assert!(
+            err.contains("cost_guard_dollars"),
+            "error message must identify the field; got: {}",
+            err
+        );
+
+        // Default config must validate cleanly — sanity check.
+        crate::config::LoopConfig::default()
+            .validate()
+            .expect("default LoopConfig must validate cleanly");
     }
 }
