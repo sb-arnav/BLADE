@@ -852,4 +852,88 @@ mod tests {
             "FORCE_SUBAGENT_RESULT must be drained after the test"
         );
     }
+
+    // ─── Plan 35-11 — phase-closure panic-injection regression ──────────────
+
+    #[tokio::test]
+    async fn phase35_decomp_panic_in_distill_caught_by_summary_layer() {
+        // Plan 35-11 regression — verifies the catch_unwind boundary in
+        // distill_subagent_summary (Plan 35-06) converts a forced panic into
+        // a heuristic SubagentSummary{success=false} fallback. The parent
+        // execute_decomposed_task receives the fallback summary; siblings
+        // continue normally; the parent's chat does not crash.
+        //
+        // This test does NOT exercise the AppHandle path (which lives in
+        // the runtime UAT). It directly drives distill_subagent_summary
+        // and asserts the catch_unwind contract holds — same surface
+        // spawn_isolated_subagent calls at executor.rs §step (d).
+        //
+        // Mirrors the Phase 33-09 + Phase 34-04 panic-injection regression
+        // pattern (force seam → catch_unwind boundary → heuristic fallback).
+        crate::decomposition::summary::DECOMP_FORCE_DISTILL_PANIC.with(|c| c.set(true));
+        let mut cfg = crate::config::BladeConfig::default();
+        cfg.session.jsonl_log_dir =
+            std::path::PathBuf::from("/tmp/blade-test-decomp-11-panic");
+
+        let result = crate::decomposition::summary::distill_subagent_summary(
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV", // valid Crockford base32 (no real JSONL)
+            crate::agents::AgentRole::Researcher,
+            &cfg,
+        )
+        .await;
+        // Always teardown the seam — even if asserts below would panic.
+        crate::decomposition::summary::DECOMP_FORCE_DISTILL_PANIC.with(|c| c.set(false));
+
+        // catch_unwind in Plan 35-06 converts panic → Ok(heuristic_fallback).
+        let s = result.expect("catch_unwind must convert panic to Ok with heuristic fallback");
+        assert!(
+            !s.success,
+            "panic path must produce success=false summary; got success=true"
+        );
+        assert!(
+            !s.summary_text.is_empty(),
+            "heuristic fallback must produce non-empty summary text"
+        );
+        // The executor (spawn_isolated_subagent §step d) overrides
+        // step_index/subagent_session_id/tokens_used/cost_usd if the summary
+        // returned defaults — verify the heuristic returns a non-empty slot
+        // shape so the override math is well-defined.
+        assert_eq!(
+            s.role,
+            crate::agents::AgentRole::Researcher.as_str().to_string(),
+            "heuristic must preserve the role string passed in"
+        );
+    }
+
+    #[tokio::test]
+    async fn phase35_decomp_force_subagent_result_seam_provides_synthetic_summary() {
+        // Plan 35-11 regression — verifies the DECOMP_FORCE_SUBAGENT_RESULT
+        // seam round-trips a synthetic SubagentSummary correctly.
+        // Used by integration tests + Plan 35-04's run_loop trigger
+        // verification + the spawn_isolated_subagent short-circuit at
+        // executor.rs §step (a). Single-shot semantics — second take returns
+        // None, matching production consumer's `borrow_mut().take()`.
+        let synthetic = SubagentSummary {
+            step_index: 5,
+            subagent_session_id: "01TESTSEAMABCDEFGHJKLMNPQR".to_string(),
+            role: "coder".to_string(),
+            success: true,
+            summary_text: "test seam works".to_string(),
+            tokens_used: 42,
+            cost_usd: 0.001,
+        };
+        DECOMP_FORCE_SUBAGENT_RESULT.with(|c| *c.borrow_mut() = Some(synthetic.clone()));
+        let got = DECOMP_FORCE_SUBAGENT_RESULT.with(|c| c.borrow_mut().take());
+        assert!(got.is_some(), "seam must round-trip a SubagentSummary");
+        let s = got.unwrap();
+        assert_eq!(s.step_index, 5);
+        assert_eq!(s.role, "coder");
+        assert_eq!(s.tokens_used, 42);
+        assert_eq!(s.subagent_session_id, "01TESTSEAMABCDEFGHJKLMNPQR");
+        assert!((s.cost_usd - 0.001).abs() < 1e-6);
+
+        // Single-shot — second take returns None.
+        let again = DECOMP_FORCE_SUBAGENT_RESULT.with(|c| c.borrow_mut().take());
+        assert!(again.is_none(), "DECOMP_FORCE_SUBAGENT_RESULT is single-shot");
+    }
 }
