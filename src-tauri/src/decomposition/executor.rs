@@ -265,6 +265,20 @@ async fn spawn_isolated_subagent(
     // (b) Emit subagent_started AFTER fork succeeds, BEFORE run_loop begins.
     emit_subagent_started(app, group);
 
+    // (b.5) HI-01 fix — emit a single `subagent_progress { status: 'running' }`
+    //       between started and complete so the inline SubagentProgressBubble
+    //       lifecycle is exercised. The TS variant + ActivityStrip + bubble
+    //       consumer were shipped in 35-08/09 but ZERO Rust emit sites
+    //       existed — the bubble seeded with status='running' on
+    //       `subagent_started` and never updated until `subagent_complete`,
+    //       leaving the user with a frozen "running" pill. Per CONTEXT lock
+    //       §DECOMP-05 the long-term emit sites live inside the sub-agent's
+    //       run_loop (iteration boundaries / tool_call dispatch / compaction
+    //       boundary / verification probe); for v1's placeholder
+    //       run_subagent_to_halt one synthetic 'running' tick is sufficient
+    //       to keep the consumer code paths live.
+    emit_subagent_progress(app, group.step_index, "running", None);
+
     // (c) Run sub-agent to halt. v1 placeholder — Plan 35-07 wires the real
     //     run_loop dispatch with LoopState{is_subagent=true} pointing at the
     //     forked SessionWriter.
@@ -469,6 +483,55 @@ fn emit_subagent_started(app: &AppHandle, group: &StepGroup) {
     );
 }
 
+/// HI-01 fix — emit `subagent_progress` chips between started and complete.
+///
+/// Status variants (matching `payloads.ts:949-954`):
+///   - "running"    — generic mid-flight tick (v1 default after fork succeeds)
+///   - "tool_call"  — Plan 35-10 will fire this from inside the sub-agent's
+///                    run_loop on each tool dispatch
+///   - "compacting" — Plan 35-10 will fire this when LOOP-04 truncation
+///                    triggers inside the sub-agent
+///   - "verifying"  — Plan 35-10 will fire this when LOOP-05 verification
+///                    probe runs inside the sub-agent
+///
+/// For v1 only the "running" variant is emitted (one tick per spawn) so the
+/// SubagentProgressBubble consumer doesn't sit with a frozen 'running' pill
+/// for the placeholder duration. The richer status set lands when Plan 35-11
+/// UAT wires the real run_loop dispatch.
+fn emit_subagent_progress(
+    app: &AppHandle,
+    step_index: u32,
+    status: &str,
+    detail: Option<&str>,
+) {
+    crate::commands::emit_stream_event(
+        app,
+        "blade_loop_event",
+        build_subagent_progress_payload(step_index, status, detail),
+    );
+}
+
+/// Pure helper: builds the `subagent_progress` JSON payload. Factored out
+/// of `emit_subagent_progress` so unit tests can exercise the payload
+/// shape without an `AppHandle` (the codebase avoids `tauri::test::mock_app()`
+/// — see reward.rs:664 + this module's full-pipeline test for the same
+/// posture).
+fn build_subagent_progress_payload(
+    step_index: u32,
+    status: &str,
+    detail: Option<&str>,
+) -> serde_json::Value {
+    let mut payload = serde_json::json!({
+        "kind": "subagent_progress",
+        "step_index": step_index,
+        "status": status,
+    });
+    if let Some(d) = detail {
+        payload["detail"] = serde_json::Value::String(crate::safe_slice(d, 200).to_string());
+    }
+    payload
+}
+
 fn emit_subagent_complete(app: &AppHandle, group: &StepGroup, s: &SubagentSummary) {
     crate::commands::emit_stream_event(
         app,
@@ -524,6 +587,59 @@ mod tests {
         let e = DecompositionError::DagInvalid("cycle".to_string());
         let json = serde_json::to_string(&e).expect("serialize");
         let _parsed: DecompositionError = serde_json::from_str(&json).expect("parse");
+    }
+
+    #[test]
+    fn phase35_decomp_05_subagent_progress_emitted_between_started_and_complete() {
+        // HI-01 regression — Verify the `subagent_progress` payload contract
+        // matches the TS variant declared in `payloads.ts:949-954`. Before
+        // this fix, ZERO Rust emit sites existed for `subagent_progress` —
+        // the SubagentProgressBubble seeded with status='running' on
+        // `subagent_started` and never updated until `subagent_complete`,
+        // leaving the user with a frozen "running" pill for the placeholder
+        // duration.
+        //
+        // Per CONTEXT lock §DECOMP-05 the long-term emit sites live inside
+        // the sub-agent's run_loop (iteration boundaries / tool_call
+        // dispatch / compaction boundary / verification probe); for v1's
+        // placeholder run_subagent_to_halt one synthetic 'running' tick is
+        // sufficient to keep the bubble + ActivityStrip code paths live.
+        //
+        // This test pins the payload shape so a future TS rename (e.g.
+        // step_index → stepIndex) trips the test before shipping.
+
+        // (1) Default running tick — no detail.
+        let payload = build_subagent_progress_payload(2, "running", None);
+        assert_eq!(payload["kind"], "subagent_progress");
+        assert_eq!(payload["step_index"], 2);
+        assert_eq!(payload["status"], "running");
+        assert!(
+            payload.get("detail").is_none(),
+            "detail field must be absent when None — matches TS optional `detail?: string`"
+        );
+
+        // (2) tool_call status with detail (Plan 35-10 future emit site).
+        let payload2 = build_subagent_progress_payload(0, "tool_call", Some("read_file"));
+        assert_eq!(payload2["status"], "tool_call");
+        assert_eq!(payload2["detail"], "read_file");
+
+        // (3) compacting + verifying status variants — match TS union exactly.
+        let comp = build_subagent_progress_payload(1, "compacting", None);
+        assert_eq!(comp["status"], "compacting");
+        let verif = build_subagent_progress_payload(3, "verifying", Some("loop_05_probe"));
+        assert_eq!(verif["status"], "verifying");
+        assert_eq!(verif["detail"], "loop_05_probe");
+
+        // (4) detail is safe-sliced to 200 chars — defensive against runaway
+        //     tool-call descriptions or truncation-on-encoding mishaps.
+        let long_detail = "x".repeat(500);
+        let truncated = build_subagent_progress_payload(0, "tool_call", Some(&long_detail));
+        let detail_str = truncated["detail"].as_str().unwrap();
+        assert!(
+            detail_str.len() <= 200,
+            "detail must be capped at 200 chars by safe_slice; got {}",
+            detail_str.len()
+        );
     }
 
     #[test]
