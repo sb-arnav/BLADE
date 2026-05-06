@@ -139,3 +139,47 @@ export function getConversationCost(sessionId: string): Promise<ConversationCost
     { session_id: sessionId },
   );
 }
+
+/**
+ * Mirrors `src-tauri/src/session/list.rs::MergeResult` (Plan 35-08, DECOMP-04).
+ *
+ * The Rust struct is:
+ *   pub struct MergeResult {
+ *       pub fork_id: String,
+ *       pub parent_id: String,
+ *       pub summary_text: String,
+ *   }
+ *
+ * `summary_text` is the full distilled fork summary — the LoopEvent
+ * `fork_merged` payload carries a safe_slice'd excerpt for the activity strip,
+ * but the IPC return shape carries the full summary so the UI can show it
+ * in a confirmation toast / SessionsView merge-result panel without a
+ * second fetch.
+ */
+export interface MergeResult {
+  fork_id: string;
+  parent_id: string;
+  summary_text: string;
+}
+
+/**
+ * DECOMP-04 (Plan 35-08) — fold a fork's summary back into its parent
+ * session. Validates `fork_id` (Crockford-base32 26-char ULID; rejects
+ * path traversal etc.), confirms the JSONL records `parent` (i.e. the
+ * session is actually a fork), distills the fork's transcript via the
+ * cheap-model summary path, appends a synthetic
+ * `[Branch merged from fork {id[..8]}…] {summary}` UserMessage to the
+ * parent JSONL, and writes a `LoopEvent { kind: "fork_merged", … }` row
+ * for forensic continuity.
+ *
+ * EXPLICIT user action only — no auto-merge. The SessionsView "Merge
+ * back" button (Plan 35-10) is the sole call site.
+ *
+ * @see src-tauri/src/session/list.rs `pub async fn merge_fork_back(fork_id: String) -> Result<MergeResult, String>`
+ */
+export function mergeForkBack(forkId: string): Promise<MergeResult> {
+  return invokeTyped<MergeResult, { fork_id: string }>(
+    'merge_fork_back',
+    { fork_id: forkId },
+  );
+}
