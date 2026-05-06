@@ -168,6 +168,30 @@ impl SessionWriter {
         Self { path: PathBuf::new(), enabled: false }
     }
 
+    /// Plan 35-07 — open a writer over an EXISTING `{dir}/{id}.jsonl`. Used by
+    /// the DECOMP-02 sub-agent dispatch path to attach a `SessionWriter`
+    /// instance to a forked session_id (which `Phase 34 SESS-04 fork_session`
+    /// already wrote on disk). Unlike `new` / `new_with_id`, this:
+    ///   - does NOT generate a fresh ULID
+    ///   - does NOT run rotation (the file already exists)
+    ///   - does NOT create the parent dir (caller's responsibility — fork
+    ///     created it)
+    ///
+    /// When `enabled = false`, returns a no-op writer immediately. When the
+    /// dir is non-empty but the file is missing on disk, the path is still
+    /// constructed; `append` handles the missing-file create-on-write case
+    /// via `OpenOptions::create+append`.
+    ///
+    /// Synchronous — no I/O performed at construction. Safe to call from
+    /// async sub-agent dispatch hot-path.
+    pub fn open_existing(jsonl_log_dir: &Path, id: &str, enabled: bool) -> Self {
+        if !enabled {
+            return Self { path: PathBuf::new(), enabled: false };
+        }
+        let path = jsonl_log_dir.join(format!("{}.jsonl", id));
+        Self { path, enabled: true }
+    }
+
     /// Plan 34-08 — atomic append. Wrapped in `catch_unwind` so a panic in
     /// serialization or I/O does NOT crash the chat. Mirrors Phase 33-09 /
     /// Plan 34-04 CTX-07 fallback discipline.
