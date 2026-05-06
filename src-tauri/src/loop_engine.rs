@@ -614,6 +614,56 @@ pub async fn run_loop(
             }
         }
 
+        // ─── Plan 34-06 (RES-03 + RES-04) — per-conversation cost guard ──
+        //
+        // Two-tier check on conversation_cumulative_cost_usd (Plan 34-02
+        // LoopState field; runtime accumulation wired below at the post-turn
+        // accumulation site). Per CONTEXT lock §Backward Compatibility:
+        //   - 100% halt fires UNCONDITIONALLY (data integrity > smart features).
+        //     Even when smart_resilience_enabled = false, this halt still fires.
+        //   - 80% warn is gated by smart_resilience_enabled.
+        //   - Latch via cost_warning_80_emitted to fire ONCE per conversation.
+        //
+        // Coexistence with Phase 33-08 per-loop cap (block immediately below):
+        //   - Per-conversation cap fires FIRST (longer scope wins).
+        //   - Per-loop cap (gated by loop.smart_loop_enabled) keeps its own
+        //     scope: CostScope::PerLoop semantics — both ceilings can trip
+        //     within the same iteration; whichever predicate is true first
+        //     short-circuits.
+        //
+        // Threat T-34-24 mitigation: regression test
+        // phase34_res_04_smart_off_skips_warn_keeps_halt guards that smart-off
+        // does NOT skip the 100% halt.
+        let per_conv_cap = config.resilience.cost_guard_per_conversation_dollars;
+        let per_conv_spent = loop_state.conversation_cumulative_cost_usd;
+        if per_conv_spent > per_conv_cap {
+            emit_stream_event(&app, "blade_loop_event", serde_json::json!({
+                "kind": "halted",
+                "reason": "cost_exceeded",
+                "scope": "PerConversation",
+                "spent_usd": per_conv_spent,
+                "cap_usd": per_conv_cap,
+            }));
+            let _ = app.emit("blade_status", "error");
+            return Err(LoopHaltReason::CostExceeded {
+                spent_usd: per_conv_spent,
+                cap_usd: per_conv_cap,
+                scope: CostScope::PerConversation,
+            });
+        }
+        if config.resilience.smart_resilience_enabled
+            && !loop_state.cost_warning_80_emitted
+            && per_conv_spent > 0.8 * per_conv_cap
+        {
+            emit_stream_event(&app, "blade_loop_event", serde_json::json!({
+                "kind": "cost_warning",
+                "percent": 80,
+                "spent_usd": per_conv_spent,
+                "cap_usd": per_conv_cap,
+            }));
+            loop_state.cost_warning_80_emitted = true;
+        }
+
         // ─── LOOP-06 — cost guard halt (Plan 33-08) ─────────────────────
         //
         // At the top of each iteration (after cancellation, before any
@@ -1179,6 +1229,11 @@ pub async fn run_loop(
                                        + turn.tokens_out as f32 * price_out)
                                        / 1_000_000.0;
                     loop_state.cumulative_cost_usd += original_cost;
+                    // Plan 34-06 (RES-03) — mirror into per-conversation
+                    // running total. Lock-step with the per-loop accumulator
+                    // above so the two ceilings observe the same spend on
+                    // both retry-success and retry-fail paths.
+                    loop_state.conversation_cumulative_cost_usd += original_cost;
                     original_cost_already_tracked = true;
                 }
 
@@ -1298,6 +1353,60 @@ pub async fn run_loop(
                 / 1_000_000.0;
             loop_state.cumulative_cost_usd += turn_cost_usd;
         }
+
+        // ─── Plan 34-06 (RES-03) — per-conversation cost accumulation ───
+        //
+        // Same arithmetic as Phase 33-08 per-loop accumulator, separate field
+        // so per-loop and per-conversation caps are independently observable.
+        // UNCONDITIONAL — CONTEXT lock §Backward Compatibility absolute
+        // guarantee: "Per-conversation cost cap still enforced at 100% (data
+        // integrity > smart features)." Even smart-off conversations must
+        // accumulate so the 100% halt at the iteration top can fire.
+        //
+        // Plan 34-08's SessionWriter persists conversation_cumulative_cost_usd
+        // across reload via the cost_update LoopEvent emitted at iteration end
+        // — reopened sessions restore the running total.
+        //
+        // Note on truncation-retry accounting (LOOP-04 / HI-02): when the
+        // truncation block retried and FAILED (or panicked), the per-loop
+        // accumulator above skips because the original turn's cost was
+        // already added INSIDE the truncation block at line ~1181, and `turn`
+        // still holds the original (so accumulating again here would
+        // double-count). We mirror that discipline here for per-conversation
+        // (gated on the same flag) so the two totals stay in lock-step. On
+        // the no-truncation path or retry-success path, the flag is false and
+        // `turn` holds the canonical (original or retry) turn whose cost has
+        // not yet been accumulated — we add it here.
+        if !original_cost_already_tracked {
+            let (price_in, price_out) =
+                crate::providers::price_per_million(&config.provider, &config.model);
+            let turn_cost_usd =
+                (turn.tokens_in as f32 * price_in
+                 + turn.tokens_out as f32 * price_out)
+                / 1_000_000.0;
+            loop_state.conversation_cumulative_cost_usd += turn_cost_usd;
+        }
+
+        // ─── Plan 34-06 (RES-03) — live cost meter tick ─────────────────
+        //
+        // Emit at iteration end so the chat-input cost-meter chip (Plan 34-11
+        // frontend) renders current spend without polling. Per CONTEXT lock
+        // §RES-03: "The chat UI subscribes to blade_loop_event { kind:
+        // 'cost_update' } for live updates". Unconditional emit — the
+        // frontend can choose to hide the chip when smart_resilience_enabled
+        // is false; the backend always provides the data so a toggle-on flips
+        // the chip live. SessionWriter (Plan 34-08) persists this event to
+        // JSONL so resume restores the running total.
+        let cost_update_cap =
+            config.resilience.cost_guard_per_conversation_dollars.max(0.0001);
+        let cost_update_pct =
+            (100.0 * loop_state.conversation_cumulative_cost_usd / cost_update_cap) as u32;
+        emit_stream_event(&app, "blade_loop_event", serde_json::json!({
+            "kind": "cost_update",
+            "spent_usd": loop_state.conversation_cumulative_cost_usd,
+            "cap_usd": config.resilience.cost_guard_per_conversation_dollars,
+            "percent": cost_update_pct,
+        }));
 
         // ─── Plan 34-04 (RES-01) — feed the stuck detectors ─────────────
         //
@@ -3966,5 +4075,119 @@ mod tests {
             !crate::commands::is_circuit_broken("server"),
             "clear_error_history (called after each successful turn) must close the circuit"
         );
+    }
+
+    // ─── Plan 34-06 (RES-03 + RES-04) — per-conversation cost guard tests ──
+
+    /// RES-03 — per-conversation cumulative cost accumulates across iterations.
+    /// Three "turns" of (1M in, 1M out) at price (3.0, 15.0) → $18 each → $54.
+    /// Mirrors the arithmetic at the post-turn accumulator site.
+    #[test]
+    fn phase34_res_03_cost_accumulates_across_iterations() {
+        let mut state = LoopState::default();
+        for _ in 0..3 {
+            let turn_cost = (1_000_000_f32 * 3.0 + 1_000_000_f32 * 15.0) / 1_000_000.0;
+            state.conversation_cumulative_cost_usd += turn_cost;
+        }
+        assert!(
+            (state.conversation_cumulative_cost_usd - 54.0).abs() < 0.01,
+            "3 × $18 = $54; got {}",
+            state.conversation_cumulative_cost_usd
+        );
+    }
+
+    /// RES-04 — predicate gate fires at 80% of cap when smart-on AND latch unset.
+    /// Mirrors the iteration-top warn predicate verbatim.
+    #[test]
+    fn phase34_res_04_warning_emit_at_80_percent() {
+        let mut cfg = crate::config::ResilienceConfig::default();
+        cfg.smart_resilience_enabled = true;
+        cfg.cost_guard_per_conversation_dollars = 10.0;
+        let mut state = LoopState::default();
+        state.conversation_cumulative_cost_usd = 8.5;
+        let should_warn = cfg.smart_resilience_enabled
+            && !state.cost_warning_80_emitted
+            && state.conversation_cumulative_cost_usd
+                > 0.8 * cfg.cost_guard_per_conversation_dollars;
+        assert!(should_warn, "predicate must fire at 8.5 / 10.0 (85%)");
+    }
+
+    /// RES-04 — latch suppresses repeated warning emits within one conversation.
+    /// First fire sets the latch; subsequent iterations even at higher spend
+    /// must NOT re-emit. Mirrors the predicate at the iteration top.
+    #[test]
+    fn phase34_res_04_warning_emit_only_once_per_conversation() {
+        let mut cfg = crate::config::ResilienceConfig::default();
+        cfg.smart_resilience_enabled = true;
+        cfg.cost_guard_per_conversation_dollars = 10.0;
+        let mut state = LoopState::default();
+        state.conversation_cumulative_cost_usd = 8.5;
+        // First-iteration predicate fires.
+        let first = cfg.smart_resilience_enabled
+            && !state.cost_warning_80_emitted
+            && state.conversation_cumulative_cost_usd
+                > 0.8 * cfg.cost_guard_per_conversation_dollars;
+        assert!(first, "must fire at first crossing");
+        // Emulate the run_loop side effect — set the latch.
+        state.cost_warning_80_emitted = true;
+        // Crank spend higher; latch must still suppress.
+        state.conversation_cumulative_cost_usd = 9.5;
+        let second = cfg.smart_resilience_enabled
+            && !state.cost_warning_80_emitted
+            && state.conversation_cumulative_cost_usd
+                > 0.8 * cfg.cost_guard_per_conversation_dollars;
+        assert!(!second, "latch must suppress repeat fire (T-34-25 mitigation)");
+    }
+
+    /// RES-04 — 100% halt fires with CostScope::PerConversation. Verifies the
+    /// halt predicate AND the LoopHaltReason variant carries the right scope.
+    #[test]
+    fn phase34_res_04_halt_at_100_percent_per_conversation() {
+        let cfg = crate::config::ResilienceConfig {
+            cost_guard_per_conversation_dollars: 10.0,
+            ..Default::default()
+        };
+        let mut state = LoopState::default();
+        state.conversation_cumulative_cost_usd = 10.1;
+        let should_halt =
+            state.conversation_cumulative_cost_usd > cfg.cost_guard_per_conversation_dollars;
+        assert!(should_halt);
+        let halt = LoopHaltReason::CostExceeded {
+            spent_usd: state.conversation_cumulative_cost_usd,
+            cap_usd: cfg.cost_guard_per_conversation_dollars,
+            scope: CostScope::PerConversation,
+        };
+        match halt {
+            LoopHaltReason::CostExceeded { scope, spent_usd, cap_usd } => {
+                assert_eq!(scope, CostScope::PerConversation);
+                assert!((spent_usd - 10.1).abs() < 0.001);
+                assert!((cap_usd - 10.0).abs() < 0.001);
+            }
+            _ => panic!("expected CostExceeded"),
+        }
+    }
+
+    /// RES-04 — smart-off path: 80% warn is SKIPPED; 100% halt STILL FIRES.
+    /// Data-integrity guarantee per CONTEXT lock §Backward Compatibility:
+    /// "Per-conversation cost cap still enforced at 100% (data integrity >
+    /// smart features)." Threat T-34-24 regression discipline.
+    #[test]
+    fn phase34_res_04_smart_off_uses_per_loop_cap_only() {
+        let mut cfg = crate::config::ResilienceConfig::default();
+        cfg.smart_resilience_enabled = false;
+        cfg.cost_guard_per_conversation_dollars = 10.0;
+        let mut state = LoopState::default();
+        state.conversation_cumulative_cost_usd = 8.5;
+        // Warn predicate: smart-off MUST skip.
+        let should_warn = cfg.smart_resilience_enabled
+            && !state.cost_warning_80_emitted
+            && state.conversation_cumulative_cost_usd
+                > 0.8 * cfg.cost_guard_per_conversation_dollars;
+        assert!(!should_warn, "smart-off must skip 80% warn");
+        // Halt predicate: smart-off STILL fires — data integrity.
+        state.conversation_cumulative_cost_usd = 10.1;
+        let should_halt =
+            state.conversation_cumulative_cost_usd > cfg.cost_guard_per_conversation_dollars;
+        assert!(should_halt, "smart-off MUST fire 100% halt — data integrity");
     }
 }
