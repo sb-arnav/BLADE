@@ -843,24 +843,39 @@ export interface BladeReincarnationPayload {
 // Phase 33 — Agentic Loop events (LOOP-01..06)
 // ---------------------------------------------------------------------------
 
-/** Phase 33 / LOOP-01..06 — agentic loop lifecycle events.
+/** Phase 33 / LOOP-01..06 + Phase 34 / RES-01..05 + SESS-01..04 — agentic
+ *  loop + resilience lifecycle events.
  *
  *  Discriminated union over `kind`. ActivityStrip subscribes via the
  *  existing useActivityLog hook and renders chips with short labels:
  *  "verifying" | "replanning" | "token bump" | "halted: cost cap" |
- *  "halted: iteration cap".
+ *  "halted: iteration cap" | "stuck: <pattern>" |
+ *  "circuit open: <error_kind>" | "cost 80% ($X / $Y)".
+ *  cost_update does NOT render a chip — consumed by cost-meter widget only
+ *  (ChatComposer / InputBar live tick subscription, Plan 34-11).
  *
  *  Most-recent-only display per CONTEXT lock §ActivityStrip; no new timer
  *  system — entries flow through the same activity-log ring buffer that
  *  blade_status / blade_notification use.
  *
- *  See `src-tauri/src/loop_engine.rs` for the emit sites:
- *    - verification_fired   — verify_progress() result (Plan 33-04)
- *    - replanning           — third-same-tool reject_plan trigger (Plan 33-05)
- *    - token_escalated      — max_tokens doubled retry fires (Plan 33-06)
- *    - halted               — loop exits on cost cap or iteration cap (Plan 33-08)
+ *  See `src-tauri/src/loop_engine.rs` + `src-tauri/src/resilience/*` +
+ *  `src-tauri/src/session/log.rs` for the emit sites:
+ *    Phase 33:
+ *      - verification_fired   — verify_progress() result (Plan 33-04)
+ *      - replanning           — third-same-tool reject_plan trigger (Plan 33-05)
+ *      - token_escalated      — max_tokens doubled retry fires (Plan 33-06)
+ *      - halted               — loop exits on cost cap or iteration cap (Plan 33-08)
+ *    Phase 34:
+ *      - stuck_detected       — RES-01 5-pattern detect_stuck (Plan 34-04)
+ *      - circuit_open         — RES-02 N-consecutive-same-kind failures (Plan 34-05)
+ *      - cost_warning         — RES-04 80% threshold latch (Plan 34-06)
+ *      - cost_update          — RES-03 live cost-meter tick (Plan 34-06; every iter)
+ *  Plan 34-06 also mutates `halted` to optionally carry
+ *  `scope: 'PerLoop' | 'PerConversation'` (per-conversation cap is a new
+ *  halt scope distinct from Phase 33-08's per-loop cap).
  *
  *  @see .planning/phases/33-agentic-loop/33-CONTEXT.md §ActivityStrip Integration
+ *  @see .planning/phases/34-resilience-session/34-CONTEXT.md §ActivityStrip Integration
  */
 export type BladeLoopEventPayload =
   | { kind: 'verification_fired'; verdict: 'YES' | 'NO' | 'REPLAN' }
@@ -871,5 +886,20 @@ export type BladeLoopEventPayload =
       reason: 'cost_exceeded' | 'iteration_cap';
       spent_usd?: number;
       cap_usd?: number;
-    };
+      // Plan 34-06 (RES-04) — distinguishes per-loop vs per-conversation halt
+      scope?: 'PerLoop' | 'PerConversation';
+    }
+  // ───── Phase 34 additions ─────
+  | {
+      kind: 'stuck_detected';
+      pattern:
+        | 'RepeatedActionObservation'
+        | 'MonologueSpiral'
+        | 'ContextWindowThrashing'
+        | 'NoProgress'
+        | 'CostRunaway';
+    }
+  | { kind: 'circuit_open'; error_kind: string; attempts: number }
+  | { kind: 'cost_warning'; percent: 80; spent_usd: number; cap_usd: number }
+  | { kind: 'cost_update'; spent_usd: number; cap_usd: number; percent: number };
 
