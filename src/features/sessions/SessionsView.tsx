@@ -19,12 +19,14 @@
 // @see src-tauri/src/session/list.rs (4 #[tauri::command] handlers)
 // @see .planning/phases/34-resilience-session/34-CONTEXT.md §SESS-03 / §SESS-04
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouterCtx } from '@/windows/main/useRouter';
 import { useChatCtx, type ChatStreamMessage } from '@/features/chat';
+import { useToast } from '@/lib/context';
 import {
   forkSession,
   listSessions,
+  mergeForkBack,
   resumeSession,
   type SessionMeta,
 } from '@/lib/tauri/sessions';
@@ -32,12 +34,31 @@ import {
 export function SessionsView() {
   const { openRoute } = useRouterCtx();
   const { setHistory, setActiveSessionId } = useChatCtx();
+  const toast = useToast();
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [branchTarget, setBranchTarget] = useState<SessionMeta | null>(null);
   const [branchIdx, setBranchIdx] = useState<number>(1);
   const [busy, setBusy] = useState<string | null>(null);
+  // Phase 35 / Plan 35-10 (DECOMP-04) — Merge-back confirm modal state.
+  // mergeTarget is the fork session being merged; mergeError captures the
+  // last failure (rendered inline within the modal); mergeInFlight gates
+  // double-clicks during the IPC round-trip.
+  const [mergeTarget, setMergeTarget] = useState<SessionMeta | null>(null);
+  const [mergeError, setMergeError] = useState<string | null>(null);
+  const [mergeInFlight, setMergeInFlight] = useState(false);
+
+  // Phase 35 / Plan 35-10 (DECOMP-04) — quick lookup of a parent's
+  // first_message_excerpt by id. The parent row is in the same `sessions`
+  // list (parents and forks coexist), so a Map<id, SessionMeta> avoids an
+  // O(N) scan inside the modal render. Returns undefined if the parent has
+  // been pruned (auto-rotation) — modal shows a fallback excerpt then.
+  const sessionsById = useMemo(() => {
+    const m = new Map<string, SessionMeta>();
+    for (const s of sessions) m.set(s.id, s);
+    return m;
+  }, [sessions]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -150,6 +171,107 @@ export function SessionsView() {
     }
   }, [branchTarget, branchIdx, refresh]);
 
+  // Phase 35 / Plan 35-10 (DECOMP-04) — Merge-back handler. Calls the
+  // mergeForkBack Tauri wrapper (Plan 35-08 / 35-09 substrate); on success,
+  // shows a success toast and AUTO-ROUTES to the parent's chat per Claude's
+  // discretion lock §DECOMP-04 (chat-first pivot favors zero-click pickup of
+  // the merge result). The fork stays in the sessions list — the Rust side
+  // does NOT delete the fork JSONL (CONTEXT lock §DECOMP-04: "Fork's row
+  // remains visible in the list after merge"). On error, surface an error
+  // toast and keep the modal open so the user can retry without re-locating
+  // the row.
+  //
+  // Auto-route flow mirrors handleResume: resumeSession(parent_id) hydrates
+  // chat history, setActiveSessionId threads the session id into subsequent
+  // send_message_stream calls, then openRoute('chat') navigates. Without
+  // the resume hand-off the user lands on chat showing stale state.
+  const handleMergeBack = useCallback(
+    async (fork: SessionMeta) => {
+      setMergeInFlight(true);
+      setMergeError(null);
+      try {
+        const result = await mergeForkBack(fork.id);
+        // Refresh the list so any state changes (e.g. merged-into-parent
+        // marker once the backend persists one) propagate. Fork row stays.
+        await refresh();
+        toast.show({
+          type: 'success',
+          title: 'Merged into parent',
+          message: 'Opening parent conversation now.',
+        });
+        // Auto-route to parent — full resume hand-off.
+        try {
+          const r = await resumeSession(result.parent_id);
+          const hydrated: ChatStreamMessage[] = r.messages.map((raw, i) => {
+            const m = (raw ?? {}) as Record<string, unknown>;
+            const role = (m.role as string) ?? 'system';
+            const content = (m.content as string) ?? '';
+            if (role === 'tool') {
+              const toolName = (m.tool_name as string) ?? 'tool';
+              const isErr = m.is_error === true;
+              return {
+                id: crypto.randomUUID(),
+                role: 'system',
+                content: `[${toolName}${isErr ? ' error' : ''}] ${content}`,
+                createdAt: Date.now() + i,
+                isError: isErr,
+              };
+            }
+            if (role === 'user' || role === 'assistant' || role === 'system') {
+              return {
+                id: crypto.randomUUID(),
+                role,
+                content,
+                createdAt: Date.now() + i,
+              };
+            }
+            return {
+              id: crypto.randomUUID(),
+              role: 'system',
+              content: `[${role}] ${content}`,
+              createdAt: Date.now() + i,
+            };
+          });
+          setHistory(hydrated);
+          setActiveSessionId(r.session_id);
+          openRoute('chat');
+        } catch (resumeErr) {
+          // Resume failed — merge succeeded but auto-route didn't. Surface
+          // a non-blocking warn so the user knows merge persisted; they can
+          // resume manually from the row that just got the merged summary.
+          const msg =
+            typeof resumeErr === 'string'
+              ? resumeErr
+              : resumeErr instanceof Error
+                ? resumeErr.message
+                : String(resumeErr);
+          toast.show({
+            type: 'warn',
+            title: 'Merge ok — auto-open failed',
+            message: `Open the parent manually. (${msg})`,
+          });
+        }
+        setMergeTarget(null);
+      } catch (e) {
+        const msg =
+          typeof e === 'string'
+            ? e
+            : e instanceof Error
+              ? e.message
+              : String(e);
+        setMergeError(msg);
+        toast.show({
+          type: 'error',
+          title: 'Merge failed',
+          message: msg,
+        });
+      } finally {
+        setMergeInFlight(false);
+      }
+    },
+    [refresh, toast, openRoute, setHistory, setActiveSessionId],
+  );
+
   return (
     <div className="sessions-view" style={{ padding: 24, maxWidth: 960, margin: '0 auto' }}>
       <header style={{
@@ -236,6 +358,24 @@ export function SessionsView() {
                 >
                   Branch
                 </button>
+                {/* Phase 35 / Plan 35-10 (DECOMP-04) — Merge back action.
+                    Visible ONLY when this row is itself a fork (parent !== null).
+                    Click opens a confirm modal showing the parent's first
+                    message excerpt; confirm dispatches mergeForkBack and
+                    auto-routes to the parent on success. */}
+                {s.parent !== null && (
+                  <button
+                    onClick={() => {
+                      setMergeError(null);
+                      setMergeTarget(s);
+                    }}
+                    disabled={busy === s.id || mergeInFlight}
+                    title="Fold this fork's summary back into the parent conversation"
+                    style={btnStyle('secondary')}
+                  >
+                    Merge back
+                  </button>
+                )}
                 <button
                   disabled
                   title="v1.6 — auto-rotation handles overflow today; manual archive coming soon"
@@ -324,6 +464,97 @@ export function SessionsView() {
           </div>
         </div>
       )}
+
+      {/* Phase 35 / Plan 35-10 (DECOMP-04) — Merge-back confirm modal.
+          Mirrors the Branch picker modal's structure (backdrop click → close,
+          aria-modal, Cancel/Confirm actions). Body shows the parent's
+          first_message_excerpt so the user knows where the synthetic merge
+          message will land. Disabled-while-in-flight discipline matches the
+          Branch flow. Fork's row stays in the list after merge per CONTEXT
+          lock §DECOMP-04. */}
+      {mergeTarget && (() => {
+        const parent = mergeTarget.parent
+          ? sessionsById.get(mergeTarget.parent)
+          : undefined;
+        const parentExcerpt =
+          parent?.first_message_excerpt ||
+          (mergeTarget.parent
+            ? `parent ${mergeTarget.parent.slice(0, 8)}…`
+            : 'parent conversation');
+        return (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirm fork merge-back"
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.6)',
+              display: 'grid',
+              placeItems: 'center',
+              zIndex: 100,
+            }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !mergeInFlight) {
+                setMergeTarget(null);
+              }
+            }}
+          >
+            <div
+              className="merge-back-modal"
+              style={{
+                background: 'var(--surface-2, #1a1a1a)',
+                padding: 24,
+                border: '1px solid var(--surface-border, #2a2a2a)',
+                borderRadius: 8,
+                minWidth: 360,
+                maxWidth: 520,
+              }}
+            >
+              <h2 style={{ margin: 0, fontSize: 18 }}>Merge fork back?</h2>
+              <p style={{ fontSize: 13, marginTop: 12, color: 'var(--t-2, #ccc)' }}>
+                Merge this fork's summary back into{' '}
+                <strong style={{ color: 'var(--t-1, #eee)' }}>
+                  "{parentExcerpt}"
+                </strong>
+                ? This appends a synthetic message to the parent. The fork
+                stays in the list.
+              </p>
+              {mergeError && (
+                <p
+                  role="alert"
+                  style={{
+                    color: 'tomato',
+                    fontSize: 12,
+                    marginTop: 8,
+                  }}
+                >
+                  {mergeError}
+                </p>
+              )}
+              <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setMergeTarget(null)}
+                  disabled={mergeInFlight}
+                  style={btnStyle('ghost')}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => void handleMergeBack(mergeTarget)}
+                  disabled={mergeInFlight}
+                  style={btnStyle('primary')}
+                >
+                  {mergeInFlight ? 'Merging…' : 'Confirm merge'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
