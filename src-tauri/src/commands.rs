@@ -1809,17 +1809,33 @@ pub(crate) async fn send_message_stream_inline(
             // not double-emit here. Surface the error to the outer caller.
             return Err(error);
         }
-        Err(crate::loop_engine::LoopHaltReason::CostExceeded { spent_usd, cap_usd, scope: _ }) => {
+        Err(crate::loop_engine::LoopHaltReason::CostExceeded { spent_usd, cap_usd, scope }) => {
             // Plan 33-08 — runtime cost-guard halt. The blade_loop_event with
             // kind:halted, reason:cost_exceeded was already emitted at the
             // halt site inside run_loop; here we surface the error to the
             // user via the existing chat_error channel so the chat UI can
-            // render a friendly message ("Loop halted: cost cap reached
-            // ($X of $Y)") rather than a silent stop.
-            let msg = format!(
-                "Loop halted: cost cap reached (${:.2} of ${:.2}). Increase the cost guard in Settings or simplify the request.",
-                spent_usd, cap_usd
-            );
+            // render a friendly message rather than a silent stop.
+            //
+            // Plan 34-06 (RES-04) — differentiate per-loop vs per-conversation
+            // scope so the user knows whether to bump `loop.cost_guard_dollars`
+            // (single-turn cap, default $5) or `resilience.cost_guard_per_
+            // conversation_dollars` (lifetime cap, default $25). Per-loop
+            // halt fires when a single user message's API spend balloons;
+            // per-conversation halt fires when the cumulative spend across
+            // all turns in this session crosses the lifetime cap.
+            let msg = match scope {
+                crate::loop_engine::CostScope::PerLoop => format!(
+                    "Loop halted: per-turn cost cap reached (${:.2} of ${:.2}). \
+                     Raise `loop.cost_guard_dollars` in Settings or simplify the request.",
+                    spent_usd, cap_usd
+                ),
+                crate::loop_engine::CostScope::PerConversation => format!(
+                    "Conversation halted: lifetime cost cap reached (${:.2} of ${:.2}). \
+                     Raise `resilience.cost_guard_per_conversation_dollars` in Settings \
+                     or start a fresh conversation.",
+                    spent_usd, cap_usd
+                ),
+            };
             emit_stream_event(&app, "chat_error", msg.clone());
             emit_stream_event(&app, "chat_done", ());
             let _ = app.emit("blade_status", "error");
