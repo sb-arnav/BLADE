@@ -687,6 +687,49 @@ pub fn escalate_max_tokens(provider: &str, model: &str, current: u32) -> Option<
     if new_max <= current { None } else { Some(new_max) }
 }
 
+// ─── Phase 35 / DECOMP-01 — synthetic AssistantTurn from sub-agent summary ─
+
+/// Plan 35-04 — build a synthetic `ConversationMessage::Assistant` from a
+/// `SubagentSummary` using the Phase 32-04 marker pattern. The bracketed
+/// prefix is the user's visual cue that the content came from a sub-agent
+/// rather than the parent loop's own model output.
+///
+/// Format (CONTEXT lock §DECOMP-03 synthetic-turn shape):
+///
+/// ```text
+/// [Sub-agent summary — step {step_index}, {role}, session {ULID[..8]}…]
+/// {summary_text}
+///
+/// (success={success}, tokens={tokens_used}, cost=${cost_usd:.4f}; full conversation in session {ULID})
+/// ```
+///
+/// `tool_calls` is empty: the synthetic turn is plain assistant text; the
+/// parent loop never re-fires tools on a synthetic turn.
+fn synthetic_assistant_turn_from_summary(
+    s: &crate::decomposition::summary::SubagentSummary,
+) -> crate::providers::ConversationMessage {
+    let id_excerpt: &str = if s.subagent_session_id.len() >= 8 {
+        crate::safe_slice(&s.subagent_session_id, 8)
+    } else {
+        s.subagent_session_id.as_str()
+    };
+    let content = format!(
+        "[Sub-agent summary — step {}, {}, session {}…]\n{}\n\n(success={}, tokens={}, cost=${:.4}; full conversation in session {})",
+        s.step_index,
+        s.role,
+        id_excerpt,
+        s.summary_text,
+        s.success,
+        s.tokens_used,
+        s.cost_usd,
+        s.subagent_session_id,
+    );
+    crate::providers::ConversationMessage::Assistant {
+        content,
+        tool_calls: Vec::new(),
+    }
+}
+
 // ─── Loop driver (Plan 33-03) ──────────────────────────────────────────────
 
 /// LOOP-06 — replaces the inline `for iteration in 0..12 { ... }` previously at
@@ -781,6 +824,7 @@ pub async fn run_loop(
         current_message_id,
         session_writer,
         &mut loop_state,
+        conversation_id,
     )
     .await;
 
@@ -814,6 +858,12 @@ async fn run_loop_inner(
     current_message_id: &mut Option<String>,
     session_writer: &crate::session::log::SessionWriter,
     loop_state: &mut LoopState,
+    // Plan 35-04 (DECOMP-01) — parent conversation/session_id, passed through
+    // to `decomposition::executor::execute_decomposed_task` as the
+    // `_parent_session_id` argument so sub-agents can fork from the parent's
+    // SessionWriter at the decomposition point. Empty when session logging is
+    // disabled — the trigger still works (executor handles the empty-id path).
+    conversation_id: &str,
 ) -> Result<(), LoopHaltReason> {
     let max_iter: usize = if config.r#loop.smart_loop_enabled {
         config.r#loop.max_iterations as usize
@@ -827,6 +877,111 @@ async fn run_loop_inner(
     // branch consumes it via compute_and_persist_turn_reward. We rebind as
     // mutable so record_tool_call (mut-borrow) works inline.
     let mut turn_acc = turn_acc;
+
+    // ─── Plan 35-04 (DECOMP-01) — pre-iteration auto-decompose trigger ────
+    //
+    // Fires ONCE per user turn (NOT per iteration). Structurally distinct
+    // from Phase 34's detect_stuck (which fires at iteration top, EVERY
+    // iteration). This trigger lives BEFORE the iteration loop begins.
+    //
+    // Three gates (all must pass):
+    //   1. !loop_state.is_subagent — recursion gate (35-CONTEXT lock §DECOMP-02
+    //      "current scope: 1-level deep"). Sub-agents that detect 5+ steps
+    //      still run sequentially in their own run_loop; they do NOT spawn
+    //      grandchildren.
+    //   2. config.decomposition.auto_decompose_enabled — kill switch (CTX-07
+    //      escape hatch). Belt-and-suspenders: count_independent_steps_grouped
+    //      also returns None when disabled, but the gate avoids the call cost.
+    //   3. parent budget < 80% — cost-budget interlock per 35-CONTEXT lock
+    //      §Backward Compatibility ("Claude's discretion"). Don't fan out
+    //      expensive parallel sub-agents when already near the per-conversation
+    //      cap. The 80% boundary mirrors RES-04's warn-tier threshold.
+    //
+    // CTX-07 fallback discipline (Plan 34-04 catch_unwind pattern):
+    // count_independent_steps_grouped is wrapped in
+    // std::panic::catch_unwind(AssertUnwindSafe(...)); a panic logs
+    // [DECOMP-01] and falls through to the existing iteration loop unchanged.
+    // The DECOMP_FORCE_PLANNER_PANIC seam (planner.rs cfg(test)) regression-
+    // tests this wrapper.
+    if !loop_state.is_subagent && config.decomposition.auto_decompose_enabled {
+        let cap_dollars =
+            config.resilience.cost_guard_per_conversation_dollars.max(0.01);
+        let pct = loop_state.conversation_cumulative_cost_usd / cap_dollars;
+        if pct < 0.8 {
+            let groups_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                crate::decomposition::planner::count_independent_steps_grouped(
+                    last_user_text,
+                    config,
+                )
+            }));
+            let groups_opt = match groups_result {
+                Ok(opt) => opt,
+                Err(_) => {
+                    eprintln!(
+                        "[DECOMP-01] count_independent_steps_grouped panicked; fall through to sequential"
+                    );
+                    None
+                }
+            };
+            if let Some(groups) = groups_opt {
+                let threshold = config.decomposition.min_steps_to_decompose as usize;
+                if groups.len() >= threshold {
+                    log::info!(
+                        "[DECOMP-01] triggering fan-out: {} groups for query of {} chars",
+                        groups.len(),
+                        last_user_text.len()
+                    );
+                    match crate::decomposition::executor::execute_decomposed_task(
+                        conversation_id,
+                        loop_state,
+                        groups,
+                        &app,
+                        config,
+                    )
+                    .await
+                    {
+                        Ok(summaries) => {
+                            // Push each sub-agent summary as a synthetic
+                            // AssistantTurn into the parent's conversation.
+                            // Per CONTEXT lock §DECOMP-03, ONE synthetic
+                            // turn per StepGroup; the bracketed prefix is
+                            // the user's visual cue that the content came
+                            // from a sub-agent. The conversation Vec now
+                            // holds the fan-out result; commands.rs will
+                            // render those turns to the chat UI.
+                            for s in &summaries {
+                                conversation
+                                    .push(synthetic_assistant_turn_from_summary(s));
+                            }
+                            // Halt the parent loop. The
+                            // LoopHaltReason::DecompositionComplete variant
+                            // (unit; no payload) signals that the parent
+                            // should stop iterating — the synthetic turns
+                            // already hold the final answer. commands.rs
+                            // maps this halt to a normal end-of-turn render
+                            // (no chat_error / no notification).
+                            return Err(LoopHaltReason::DecompositionComplete);
+                        }
+                        Err(e) => {
+                            // Plan 35-02 stub returns
+                            // DecompositionError::Internal("not yet wired");
+                            // Plan 35-05 fills the body. Until then, log +
+                            // fall through to sequential.
+                            eprintln!(
+                                "[DECOMP-01] execute_decomposed_task returned Err({:?}); fall through to sequential",
+                                e
+                            );
+                        }
+                    }
+                }
+            }
+        } else {
+            log::info!(
+                "[DECOMP-01] declined: budget at {}% of per-conversation cap",
+                (pct * 100.0) as u32
+            );
+        }
+    }
 
     for iteration in 0..max_iter {
         // Plan 33-05 — keep LoopState.iteration in sync with the for-loop
