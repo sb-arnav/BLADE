@@ -912,9 +912,16 @@ pub fn run() {
             // reads conversation-lifetime spend on session load. Live ticks
             // come via the blade_loop_event { kind: "cost_update" } stream
             // emitted by run_loop each iteration. Frontend wiring lands in
-            // Plan 34-11. List + resume + fork commands stay registered in
-            // Plan 34-10 (still stubs as of this commit).
+            // Plan 34-11.
             session::list::get_conversation_cost,
+            // Phase 34 / Plan 34-10 (SESS-02 + SESS-03 + SESS-04) — session
+            // persistence Tauri commands. Plan 34-03 declared the stubs;
+            // Plan 34-10 filled the bodies + registers them here. Plan 34-11
+            // wires the SessionsView frontend (resume button + fork picker
+            // + cost meter polling get_conversation_cost on session load).
+            session::list::list_sessions,
+            session::list::resume_session,
+            session::list::fork_session,
             self_upgrade::self_upgrade_install,
             self_upgrade::self_upgrade_catalog,
             self_upgrade::self_upgrade_audit,
