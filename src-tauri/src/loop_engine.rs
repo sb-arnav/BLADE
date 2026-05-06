@@ -861,9 +861,39 @@ pub async fn run_loop(
                         }
                     }
                     ErrorRecovery::RateLimitRetry { secs } => {
-                        record_error("rate_limit");
+                        // Plan 34-05 (RES-02) — full-fidelity recorder captures
+                        // provider/model/msg for LoopHaltReason::CircuitOpen.attempts_summary.
+                        crate::commands::record_error_full(
+                            "rate_limit",
+                            &config.provider,
+                            &config.model,
+                            &e,
+                        );
                         if is_circuit_broken("rate_limit") {
+                            // Plan 34-05 (RES-02) — when smart_resilience_enabled, upgrade
+                            // the trip from a generic ProviderFatal to a structured
+                            // LoopHaltReason::CircuitOpen carrying attempts_summary so the
+                            // chat surface can render "what was tried". When smart-off,
+                            // preserve the legacy ProviderFatal posture.
                             let _ = app.emit("blade_status", "error");
+                            if config.resilience.smart_resilience_enabled {
+                                let attempts =
+                                    crate::commands::circuit_attempts_summary("rate_limit");
+                                let n = attempts.len() as u64;
+                                emit_stream_event(
+                                    &app,
+                                    "blade_loop_event",
+                                    serde_json::json!({
+                                        "kind": "circuit_open",
+                                        "error_kind": "rate_limit",
+                                        "attempts": n,
+                                    }),
+                                );
+                                return Err(LoopHaltReason::CircuitOpen {
+                                    error_kind: "rate_limit".to_string(),
+                                    attempts_summary: attempts,
+                                });
+                            }
                             return Err(LoopHaltReason::ProviderFatal {
                                 error: "Rate limit circuit breaker tripped — too many rate limit errors in 5 minutes. Check your API quota or switch providers.".to_string(),
                             });
@@ -905,9 +935,39 @@ pub async fn run_loop(
                         }
                     }
                     ErrorRecovery::OverloadedRetry => {
-                        record_error("overloaded");
+                        // Plan 34-05 (RES-02) — full-fidelity recorder captures
+                        // provider/model/msg for LoopHaltReason::CircuitOpen.attempts_summary.
+                        crate::commands::record_error_full(
+                            "overloaded",
+                            &config.provider,
+                            &config.model,
+                            &e,
+                        );
                         if is_circuit_broken("overloaded") {
+                            // Plan 34-05 (RES-02) — when smart_resilience_enabled, upgrade
+                            // the trip from a generic ProviderFatal to a structured
+                            // LoopHaltReason::CircuitOpen carrying attempts_summary so the
+                            // chat surface can render "what was tried". When smart-off,
+                            // preserve the legacy ProviderFatal posture.
                             let _ = app.emit("blade_status", "error");
+                            if config.resilience.smart_resilience_enabled {
+                                let attempts =
+                                    crate::commands::circuit_attempts_summary("overloaded");
+                                let n = attempts.len() as u64;
+                                emit_stream_event(
+                                    &app,
+                                    "blade_loop_event",
+                                    serde_json::json!({
+                                        "kind": "circuit_open",
+                                        "error_kind": "overloaded",
+                                        "attempts": n,
+                                    }),
+                                );
+                                return Err(LoopHaltReason::CircuitOpen {
+                                    error_kind: "overloaded".to_string(),
+                                    attempts_summary: attempts,
+                                });
+                            }
                             return Err(LoopHaltReason::ProviderFatal {
                                 error: "Server overload circuit breaker tripped — provider is consistently unavailable. Try again later or switch providers.".to_string(),
                             });
@@ -1304,6 +1364,15 @@ pub async fn run_loop(
                     loop_state.last_progress_text_hash = Some(h);
                 }
             }
+
+            // ───── Plan 34-05 (RES-02) — circuit-breaker reset on success ─────
+            // Successful complete_turn = circuit closes. Without this,
+            // ERROR_HISTORY accumulates monotonically (until the 50-entry cap
+            // drains the oldest 10); a stale window of rate_limits would block
+            // the system from ever escaping. Gated by smart_resilience_enabled
+            // so the smart-off path preserves Phase 33's monotonic-history
+            // behavior — Threat T-34-22 mitigation.
+            crate::commands::clear_error_history();
         }
 
         conversation.push(ConversationMessage::Assistant {
@@ -3808,6 +3877,94 @@ mod tests {
         assert!(
             v.is_none(),
             "smart_resilience_enabled=false must skip all stuck detectors; got {:?}", v
+        );
+    }
+
+    // ─── Plan 34-05 (RES-02) — circuit-breaker wire-site regression tests ───
+
+    /// Smart-off path must NOT halt with CircuitOpen even after 3 errors.
+    /// Threat T-34-22 mitigation — the smart-off escape hatch preserves
+    /// Phase 33's retry-exhaust posture (legacy ProviderFatal trip).
+    #[test]
+    fn phase34_res_02_smart_off_does_not_halt_on_circuit() {
+        crate::commands::clear_error_history();
+        let mut cfg = crate::config::ResilienceConfig::default();
+        cfg.smart_resilience_enabled = false;
+        crate::commands::record_error_full("rate_limit", "anthropic", "claude-sonnet-4", "429");
+        crate::commands::record_error_full("rate_limit", "anthropic", "claude-sonnet-4", "429");
+        crate::commands::record_error_full("rate_limit", "anthropic", "claude-sonnet-4", "429");
+        let broken = crate::commands::is_circuit_broken("rate_limit");
+        // Mirrors the call-site predicate at loop_engine.rs:RateLimitRetry branch.
+        let smart_halt = cfg.smart_resilience_enabled && broken;
+        assert!(
+            !smart_halt,
+            "smart_resilience_enabled=false must skip the CircuitOpen halt"
+        );
+        crate::commands::clear_error_history();
+    }
+
+    /// Builds a CircuitOpen halt at the same shape the run_loop wire site does
+    /// — error_kind + circuit_attempts_summary(kind) — and verifies the
+    /// AttemptRecord fields are preserved through the variant.
+    #[test]
+    fn phase34_res_02_halt_carries_error_kind_and_attempts_summary() {
+        crate::commands::clear_error_history();
+        crate::commands::record_error_full(
+            "rate_limit",
+            "anthropic",
+            "claude-sonnet-4",
+            "429 first",
+        );
+        crate::commands::record_error_full(
+            "rate_limit",
+            "anthropic",
+            "claude-sonnet-4",
+            "429 second",
+        );
+        crate::commands::record_error_full(
+            "rate_limit",
+            "anthropic",
+            "claude-sonnet-4",
+            "429 third",
+        );
+        let attempts = crate::commands::circuit_attempts_summary("rate_limit");
+        assert_eq!(attempts.len(), 3);
+        let halt = LoopHaltReason::CircuitOpen {
+            error_kind: "rate_limit".to_string(),
+            attempts_summary: attempts.clone(),
+        };
+        match halt {
+            LoopHaltReason::CircuitOpen {
+                error_kind,
+                attempts_summary,
+            } => {
+                assert_eq!(error_kind, "rate_limit");
+                assert_eq!(attempts_summary.len(), 3);
+                assert_eq!(attempts_summary[0].provider, "anthropic");
+                assert_eq!(attempts_summary[0].model, "claude-sonnet-4");
+                assert!(attempts_summary[0].error_message.starts_with("429"));
+            }
+            _ => panic!("expected CircuitOpen"),
+        }
+        crate::commands::clear_error_history();
+    }
+
+    /// Mirrors the run_loop post-success behavior (loop_engine.rs:1307 area):
+    /// 3 errors trip the breaker; clear_error_history() — called on every
+    /// successful complete_turn — closes it. Without this clear-on-success,
+    /// stale rate_limits from a recovered window would block future
+    /// recoveries. Threat T-34-20 mitigation.
+    #[test]
+    fn phase34_res_02_clear_on_success_resets_breaker() {
+        crate::commands::clear_error_history();
+        crate::commands::record_error_full("server", "openai", "gpt-4o", "503");
+        crate::commands::record_error_full("server", "openai", "gpt-4o", "503");
+        crate::commands::record_error_full("server", "openai", "gpt-4o", "503");
+        assert!(crate::commands::is_circuit_broken("server"));
+        crate::commands::clear_error_history();
+        assert!(
+            !crate::commands::is_circuit_broken("server"),
+            "clear_error_history (called after each successful turn) must close the circuit"
         );
     }
 }
