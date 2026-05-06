@@ -923,6 +923,7 @@ pub fn run() {
             session::list::list_sessions,
             session::list::resume_session,
             session::list::fork_session,
+            session::list::merge_fork_back,
             self_upgrade::self_upgrade_install,
             self_upgrade::self_upgrade_catalog,
             self_upgrade::self_upgrade_audit,
