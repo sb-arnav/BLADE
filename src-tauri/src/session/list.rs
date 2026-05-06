@@ -32,10 +32,158 @@ pub struct SessionMeta {
     pub parent: Option<String>,
 }
 
-/// SESS-03 — Tauri command. Plan 34-03 STUB returns empty vec. Plan 34-10 fills.
+/// SESS-03 — list past sessions sorted by start time descending. Walks
+/// `BladeConfig.session.jsonl_log_dir`, filters `*.jsonl` files (skipping the
+/// `archive/` subdir which is a directory not a file), validates each
+/// filename's stem via `validate_session_id` (defense-in-depth — rejects any
+/// stray non-ULID files a user may have dropped in), parses metadata via
+/// `read_meta`, returns SessionMeta entries sorted desc by `started_at_ms`.
+///
+/// Corrupted files (no SessionMeta event present) are skipped silently with
+/// a `log::warn` line — they neither block listing nor surface to the UI.
+///
+/// Wrapped in `catch_unwind` per Phase 31 / 34 panic-safety discipline:
+/// any panic in metadata parsing must NOT crash the command host.
 #[tauri::command]
 pub async fn list_sessions() -> Result<Vec<SessionMeta>, String> {
-    Ok(Vec::new())
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let dir = crate::config::load_config().session.jsonl_log_dir.clone();
+        if !dir.exists() {
+            return Ok::<Vec<SessionMeta>, String>(Vec::new());
+        }
+        let mut metas: Vec<SessionMeta> = Vec::new();
+        let entries = std::fs::read_dir(&dir).map_err(|e| e.to_string())?;
+        for entry in entries {
+            let entry = match entry {
+                Ok(e) => e,
+                Err(e) => {
+                    log::warn!("[SESS-03] read_dir entry error: {}", e);
+                    continue;
+                }
+            };
+            let path = entry.path();
+            // archive/ subdir is a directory, not a file — skipped here. We
+            // also skip any other dirs or non-*.jsonl files.
+            if !path.is_file() {
+                continue;
+            }
+            if path.extension().and_then(|s| s.to_str()) != Some("jsonl") {
+                continue;
+            }
+            let stem = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_string();
+            if validate_session_id(&stem).is_err() {
+                continue;
+            }
+            match read_meta(&path) {
+                Ok(Some(m)) => metas.push(m),
+                Ok(None) => {
+                    log::warn!(
+                        "[SESS-03] skip {}: no SessionMeta event (corrupted)",
+                        path.display()
+                    );
+                }
+                Err(e) => {
+                    log::warn!("[SESS-03] read_meta {}: {}", path.display(), e);
+                }
+            }
+        }
+        // Newest first.
+        metas.sort_by(|a, b| b.started_at_ms.cmp(&a.started_at_ms));
+        Ok(metas)
+    }));
+    match result {
+        Ok(r) => r,
+        Err(_panic) => {
+            eprintln!("[SESS-03] list_sessions panicked; returning empty list");
+            Ok(Vec::new())
+        }
+    }
+}
+
+/// Walk a JSONL file, extract SessionMeta. Returns None when no
+/// `SessionEvent::SessionMeta` is found (corrupted file). Returns Err on I/O
+/// error opening the file.
+///
+/// Per CONTEXT lock §SESS-03: forward-read full file; metadata-only; no
+/// full-text search. Per threat T-34-45 acceptance: rotation caps live
+/// sessions at `keep_n_sessions` (default 100), so worst-case file count is
+/// bounded. v1.6+ optimisation may stream only the first/last N events.
+fn read_meta(path: &std::path::Path) -> std::io::Result<Option<SessionMeta>> {
+    use std::io::BufRead;
+    let f = std::fs::File::open(path)?;
+    let reader = std::io::BufReader::new(f);
+    let mut id = String::new();
+    let mut parent: Option<String> = None;
+    let mut started_at_ms: u64 = 0;
+    let mut first_message_excerpt = String::new();
+    let mut message_count: u32 = 0;
+    let mut approximate_tokens: u32 = 0;
+    let mut halt_reason: Option<String> = None;
+    let mut found_meta = false;
+    for line in reader.lines() {
+        let line = match line {
+            Ok(l) => l,
+            Err(e) => {
+                log::warn!("[SESS-03] read_meta line error: {}", e);
+                continue;
+            }
+        };
+        if line.trim().is_empty() {
+            continue;
+        }
+        let ev = match serde_json::from_str::<crate::session::log::SessionEvent>(&line) {
+            Ok(e) => e,
+            Err(_) => continue, // skip corrupt lines
+        };
+        match ev {
+            crate::session::log::SessionEvent::SessionMeta {
+                id: i,
+                parent: p,
+                started_at_ms: t,
+                ..
+            } => {
+                id = i;
+                parent = p;
+                started_at_ms = t;
+                found_meta = true;
+            }
+            crate::session::log::SessionEvent::UserMessage { content, .. } => {
+                if first_message_excerpt.is_empty() {
+                    first_message_excerpt = crate::safe_slice(&content, 120).to_string();
+                }
+                message_count = message_count.saturating_add(1);
+            }
+            crate::session::log::SessionEvent::AssistantTurn {
+                tokens_in,
+                tokens_out,
+                ..
+            } => {
+                message_count = message_count.saturating_add(1);
+                approximate_tokens = approximate_tokens
+                    .saturating_add(tokens_in.saturating_add(tokens_out));
+            }
+            crate::session::log::SessionEvent::HaltReason { reason, .. } => {
+                halt_reason = Some(reason);
+            }
+            _ => {}
+        }
+    }
+    if !found_meta {
+        return Ok(None);
+    }
+    Ok(Some(SessionMeta {
+        id,
+        started_at_ms,
+        message_count,
+        first_message_excerpt,
+        approximate_tokens,
+        halt_reason,
+        parent,
+    }))
 }
 
 /// SESS-02 — Tauri command. Plan 34-03 STUB returns Err. Plan 34-10 fills.
@@ -181,9 +329,227 @@ mod tests {
         assert!(validate_session_id("hello").is_err());
     }
 
+    // ─── Plan 34-10 (SESS-03) — list_sessions metadata extraction tests ───
+
+    /// Helper — write a JSONL session file under `BLADE_CONFIG_DIR/sessions/`.
+    /// First line is SessionMeta; remaining events are written in order. Caller
+    /// must hold the TEST_ENV_LOCK and have `BLADE_CONFIG_DIR` already set.
+    fn write_session_file(
+        sessions_dir: &std::path::Path,
+        id: &str,
+        started_at_ms: u64,
+        events_after_meta: &[crate::session::log::SessionEvent],
+    ) {
+        use std::io::Write;
+        let path = sessions_dir.join(format!("{}.jsonl", id));
+        let mut f = std::fs::File::create(&path).expect("create session file");
+        let meta = crate::session::log::SessionEvent::SessionMeta {
+            id: id.to_string(),
+            parent: None,
+            fork_at_index: None,
+            started_at_ms,
+        };
+        let line = serde_json::to_string(&meta).expect("serialize meta");
+        f.write_all(line.as_bytes()).unwrap();
+        f.write_all(b"\n").unwrap();
+        for e in events_after_meta {
+            let line = serde_json::to_string(e).expect("serialize event");
+            f.write_all(line.as_bytes()).unwrap();
+            f.write_all(b"\n").unwrap();
+        }
+    }
+
+    /// Helper — provision an isolated BLADE_CONFIG_DIR with `sessions/` subdir.
+    /// Returns (root_tmp_dir, sessions_dir). Caller must hold TEST_ENV_LOCK.
+    fn provision_sessions_dir(label: &str) -> (std::path::PathBuf, std::path::PathBuf) {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let tmp = std::env::temp_dir().join(format!(
+            "blade-sess-list-{}-{}-{}",
+            label,
+            std::process::id(),
+            nanos
+        ));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).expect("create tmp root");
+        let sessions = tmp.join("sessions");
+        std::fs::create_dir_all(&sessions).expect("create sessions dir");
+        std::env::set_var("BLADE_CONFIG_DIR", &tmp);
+        (tmp, sessions)
+    }
+
+    /// SESS-03 — list_sessions returns sessions sorted desc by started_at_ms,
+    /// with first_message_excerpt populated from the first UserMessage event,
+    /// message_count summing UserMessage + AssistantTurn, approximate_tokens
+    /// summing AssistantTurn(tokens_in + tokens_out), and halt_reason from
+    /// the last HaltReason event.
     #[tokio::test]
-    async fn phase34_list_sessions_stub_returns_empty() {
-        let r = list_sessions().await.expect("stub returns Ok");
+    async fn phase34_sess_03_list_sessions_returns_sorted_by_started_at_desc() {
+        let _guard = TEST_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let (tmp, sessions) = provision_sessions_dir("sorted");
+
+        write_session_file(
+            &sessions,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAA",
+            1000,
+            &[
+                crate::session::log::SessionEvent::UserMessage {
+                    id: "u".into(),
+                    content: "hello first".into(),
+                    timestamp_ms: 1001,
+                },
+                crate::session::log::SessionEvent::AssistantTurn {
+                    content: "hi".into(),
+                    tool_calls: vec![],
+                    stop_reason: None,
+                    tokens_in: 100,
+                    tokens_out: 50,
+                    timestamp_ms: 1002,
+                },
+            ],
+        );
+        write_session_file(
+            &sessions,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAB",
+            2000,
+            &[crate::session::log::SessionEvent::UserMessage {
+                id: "u".into(),
+                content: "hello second".into(),
+                timestamp_ms: 2001,
+            }],
+        );
+        write_session_file(
+            &sessions,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAC",
+            3000,
+            &[crate::session::log::SessionEvent::HaltReason {
+                reason: "Cancelled".into(),
+                payload: serde_json::json!({}),
+                timestamp_ms: 3001,
+            }],
+        );
+
+        let r = list_sessions().await.expect("list");
+        std::env::remove_var("BLADE_CONFIG_DIR");
+        let _ = std::fs::remove_dir_all(&tmp);
+
+        assert_eq!(r.len(), 3, "all 3 sessions must be returned");
+        assert_eq!(r[0].started_at_ms, 3000, "newest first");
+        assert_eq!(r[1].started_at_ms, 2000);
+        assert_eq!(r[2].started_at_ms, 1000);
+        // SESS-03 metadata extraction
+        assert_eq!(r[2].first_message_excerpt, "hello first");
+        assert_eq!(r[2].message_count, 2);
+        assert_eq!(r[2].approximate_tokens, 150);
+        assert_eq!(r[0].halt_reason, Some("Cancelled".to_string()));
+    }
+
+    /// SESS-03 — list_sessions skips corrupted JSONL files (no SessionMeta
+    /// event present). Writes one valid + one corrupted file, asserts only
+    /// the valid one is returned.
+    #[tokio::test]
+    async fn phase34_sess_03_list_sessions_skips_corrupt_files() {
+        let _guard = TEST_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let (tmp, sessions) = provision_sessions_dir("corrupt");
+
+        write_session_file(&sessions, "01ARZ3NDEKTSV4RRFFQ69G5FA1", 1000, &[]);
+        // Corrupt: no SessionMeta event, just garbage lines
+        let corrupt = sessions.join("01ARZ3NDEKTSV4RRFFQ69G5FA2.jsonl");
+        std::fs::write(&corrupt, b"not json at all\n{}\n").unwrap();
+
+        let r = list_sessions().await.expect("list");
+        std::env::remove_var("BLADE_CONFIG_DIR");
+        let _ = std::fs::remove_dir_all(&tmp);
+
+        assert_eq!(r.len(), 1, "corrupted files must be skipped");
+        assert_eq!(r[0].id, "01ARZ3NDEKTSV4RRFFQ69G5FA1");
+    }
+
+    /// SESS-03 — first_message_excerpt is the first UserMessage's content
+    /// (truncated via safe_slice to 120 chars).
+    #[tokio::test]
+    async fn phase34_sess_03_list_sessions_populates_first_message_excerpt() {
+        let _guard = TEST_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let (tmp, sessions) = provision_sessions_dir("excerpt");
+
+        let long = "a".repeat(500);
+        write_session_file(
+            &sessions,
+            "01ARZ3NDEKTSV4RRFFQ69G5FA3",
+            1000,
+            &[
+                crate::session::log::SessionEvent::UserMessage {
+                    id: "u1".into(),
+                    content: long.clone(),
+                    timestamp_ms: 1,
+                },
+                crate::session::log::SessionEvent::UserMessage {
+                    id: "u2".into(),
+                    content: "second message".into(),
+                    timestamp_ms: 2,
+                },
+            ],
+        );
+
+        let r = list_sessions().await.expect("list");
+        std::env::remove_var("BLADE_CONFIG_DIR");
+        let _ = std::fs::remove_dir_all(&tmp);
+
+        assert_eq!(r.len(), 1);
+        assert_eq!(
+            r[0].first_message_excerpt.chars().count(),
+            120,
+            "long content must be truncated to 120 chars by safe_slice"
+        );
+        assert!(
+            r[0].first_message_excerpt.chars().all(|c| c == 'a'),
+            "excerpt is the FIRST UserMessage, not the second"
+        );
+        assert_eq!(r[0].message_count, 2);
+    }
+
+    /// SESS-03 — list_sessions does NOT walk the archive/ subdir; only LIVE
+    /// sessions are returned.
+    #[tokio::test]
+    async fn phase34_sess_03_list_sessions_skips_archive_subdir() {
+        let _guard = TEST_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let (tmp, sessions) = provision_sessions_dir("archive");
+
+        write_session_file(&sessions, "01ARZ3NDEKTSV4RRFFQ69G5FA4", 1000, &[]);
+        // Place a session in archive/ — it must NOT appear in list_sessions.
+        let archive = sessions.join("archive");
+        std::fs::create_dir_all(&archive).expect("mkdir archive");
+        let archived = archive.join("01ARZ3NDEKTSV4RRFFQ69G5FA0.jsonl");
+        let meta = crate::session::log::SessionEvent::SessionMeta {
+            id: "01ARZ3NDEKTSV4RRFFQ69G5FA0".into(),
+            parent: None,
+            fork_at_index: None,
+            started_at_ms: 500,
+        };
+        std::fs::write(
+            &archived,
+            format!("{}\n", serde_json::to_string(&meta).unwrap()),
+        )
+        .unwrap();
+
+        let r = list_sessions().await.expect("list");
+        std::env::remove_var("BLADE_CONFIG_DIR");
+        let _ = std::fs::remove_dir_all(&tmp);
+
+        assert_eq!(r.len(), 1, "archived sessions must NOT appear");
+        assert_eq!(r[0].id, "01ARZ3NDEKTSV4RRFFQ69G5FA4");
+    }
+
+    /// SESS-03 — empty jsonl_log_dir → Ok(vec![]).
+    #[tokio::test]
+    async fn phase34_sess_03_list_sessions_empty_dir() {
+        let _guard = TEST_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let (tmp, _sessions) = provision_sessions_dir("empty");
+        let r = list_sessions().await.expect("list");
+        std::env::remove_var("BLADE_CONFIG_DIR");
+        let _ = std::fs::remove_dir_all(&tmp);
         assert!(r.is_empty());
     }
 
