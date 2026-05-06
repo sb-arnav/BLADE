@@ -200,6 +200,20 @@ export function ActivityLogProvider({ children }: { children: ReactNode }) {
         // spend/cap. Bypass the activity-log ring buffer entirely so the
         // strip doesn't churn one row per iteration.
         return;
+      // ─── Phase 35 / Plan 35-09 ─────────────────────────────────────────
+      // Sub-agent + decomposition lifecycle variants land here so the
+      // switch stays exhaustive over the BladeLoopEventPayload union
+      // (otherwise TS reports `action`/`summary` as possibly unassigned at
+      // the entry construction below). Plan 35-10 wires the actual
+      // ActivityStrip chip switch + per-step throttling for these — for
+      // now, suppress them from the activity ring buffer so they don't
+      // surface as half-rendered rows. Deferred-consumer parity with
+      // `cost_update` above.
+      case 'subagent_started':
+      case 'subagent_progress':
+      case 'subagent_complete':
+      case 'decomposition_complete':
+        return;
     }
     const entry: ActivityLogEntry = {
       module: 'loop',

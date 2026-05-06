@@ -921,5 +921,65 @@ export type BladeLoopEventPayload =
     }
   | { kind: 'circuit_open'; error_kind: string; attempts: number }
   | { kind: 'cost_warning'; percent: 80; spent_usd: number; cap_usd: number }
-  | { kind: 'cost_update'; spent_usd: number; cap_usd: number; percent: number };
+  | { kind: 'cost_update'; spent_usd: number; cap_usd: number; percent: number }
+  // ───── Phase 35 additions (DECOMP-02 / DECOMP-05) ─────
+  /**
+   * Plan 35-04/05 — DECOMP-02 sub-agent dispatch boundary.
+   *
+   * Fires from `decomposition::executor::spawn_isolated_subagent` immediately
+   * after `fork_session(...)` succeeds and BEFORE the sub-agent's run_loop
+   * is invoked. ActivityStrip (Plan 35-10) renders a chip:
+   * "subagent {step_index} started: {role}".
+   *
+   * @see src-tauri/src/decomposition/executor.rs (Plan 35-04 emit site)
+   */
+  | { kind: 'subagent_started'; step_index: number; role: string; goal_excerpt: string }
+  /**
+   * Plan 35-04/05 — DECOMP-02 sub-agent in-flight progress.
+   *
+   * Fires from inside the sub-agent's run_loop at iteration boundaries
+   * (status='running'), tool dispatch (status='tool_call'), compaction
+   * (status='compacting'), and verification probe (status='verifying').
+   * Per CONTEXT lock §DECOMP-05, frontend ActivityStrip throttles
+   * 'running' + 'tool_call' to ≤1 chip per 3s per step_index; renders
+   * 'compacting' + 'verifying' chips immediately. (Plan 35-10 implements.)
+   *
+   * @see src-tauri/src/decomposition/executor.rs (Plan 35-04 emit site)
+   */
+  | {
+      kind: 'subagent_progress';
+      step_index: number;
+      status: 'running' | 'tool_call' | 'compacting' | 'verifying';
+      detail?: string;
+    }
+  /**
+   * Plan 35-04/05 — DECOMP-02 sub-agent halt.
+   *
+   * Fires from `decomposition::executor::execute_decomposed_task` after
+   * each sub-agent's summary is distilled, just BEFORE the summary is
+   * appended to the parent's conversation. `summary_excerpt` is
+   * `safe_slice(summary_text, 120)`.
+   *
+   * @see src-tauri/src/decomposition/executor.rs (Plan 35-04 emit site)
+   */
+  | {
+      kind: 'subagent_complete';
+      step_index: number;
+      success: boolean;
+      summary_excerpt: string;
+      subagent_session_id: string;
+    }
+  /**
+   * Plan 35-07 — DECOMP-02 decomposition pipeline completion chip.
+   *
+   * Fires from `commands.rs::send_message_stream` after the
+   * `DecompositionComplete` arm finalises and the synthesis turn lands.
+   * `subagent_count` is the total number of sub-agents that ran during
+   * this decomposed task (taken from `conversation.session.decomposition`
+   * when the decomposition pipeline materialised). ActivityStrip renders
+   * a single summary chip: "decomposition complete: {N} subagents".
+   *
+   * @see src-tauri/src/commands.rs:2118 (Plan 35-07 emit site)
+   */
+  | { kind: 'decomposition_complete'; subagent_count: number };
 
