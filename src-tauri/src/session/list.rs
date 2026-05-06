@@ -186,20 +186,194 @@ fn read_meta(path: &std::path::Path) -> std::io::Result<Option<SessionMeta>> {
     }))
 }
 
-/// SESS-02 — Tauri command. Plan 34-03 STUB returns Err. Plan 34-10 fills.
+/// SESS-02 — Tauri command wrapper. Validates session_id (defense against
+/// path traversal — see threat T-34-37), checks
+/// `BladeConfig.session.jsonl_log_enabled` (a disabled JSONL log has nothing
+/// to resume from), builds `{jsonl_log_dir}/{session_id}.jsonl`, and
+/// delegates to `crate::session::resume::load_session`.
+///
+/// Wrapped in `catch_unwind` per Phase 31 / 34 panic-safety discipline:
+/// a panic in JSONL replay must NOT crash the chat host.
 #[tauri::command]
-pub async fn resume_session(_session_id: String)
-    -> Result<crate::session::resume::ResumedConversation, String>
-{
-    Err("Plan 34-03 stub — Plan 34-10 fills body".to_string())
+pub async fn resume_session(
+    session_id: String,
+) -> Result<crate::session::resume::ResumedConversation, String> {
+    validate_session_id(&session_id)?;
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let cfg = crate::config::load_config();
+        if !cfg.session.jsonl_log_enabled {
+            return Err(
+                "session JSONL logging is disabled — nothing to resume".to_string(),
+            );
+        }
+        let dir = cfg.session.jsonl_log_dir.clone();
+        let path = dir.join(format!("{}.jsonl", &session_id));
+        crate::session::resume::load_session(&path, &session_id)
+    }));
+    match result {
+        Ok(r) => r,
+        Err(_panic) => {
+            eprintln!(
+                "[SESS-02] resume_session panicked for {}; surfacing Err",
+                session_id
+            );
+            Err("resume_session internal error (panic caught)".to_string())
+        }
+    }
 }
 
-/// SESS-04 — Tauri command. Plan 34-03 STUB returns Err. Plan 34-10 fills.
+/// SESS-04 — Tauri command. Two-pass copy of a parent JSONL up to the chosen
+/// message index, prepending a fresh `SessionMeta` carrying `parent` +
+/// `fork_at_index`, writing to a new ULID-named file in the same dir.
+///
+/// Per CONTEXT lock §SESS-04:
+///   - Shallow — child cannot itself be forked. Plan 34-10 ENFORCES this by
+///     reading parent's SessionMeta.parent: if Some, reject. v1.6+ may relax.
+///   - Ordinal counts UserMessage + AssistantTurn ONLY (CompactionBoundary,
+///     ToolCall, HaltReason, LoopEvent pass through unconditionally so
+///     forensic continuity is preserved up to the chosen cut point).
+///   - `fork_at_message_index` is CLAMPED to actual message count: the
+///     SessionMeta records the *clamped* value so the user sees the truth.
+///   - Forking does NOT auto-resume — frontend explicitly chooses Resume.
+///
+/// Wrapped in `catch_unwind` per Phase 31 / 34 panic-safety discipline.
 #[tauri::command]
-pub async fn fork_session(_parent_id: String, _fork_at_message_index: u32)
-    -> Result<String, String>
-{
-    Err("Plan 34-03 stub — Plan 34-10 fills body".to_string())
+pub async fn fork_session(
+    parent_id: String,
+    fork_at_message_index: u32,
+) -> Result<String, String> {
+    validate_session_id(&parent_id)?;
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let cfg = crate::config::load_config();
+        let dir = cfg.session.jsonl_log_dir.clone();
+        let parent_path = dir.join(format!("{}.jsonl", &parent_id));
+        if !parent_path.exists() {
+            return Err(format!("parent session not found: {}", parent_id));
+        }
+
+        // First pass: count UserMessage + AssistantTurn ordinals AND detect
+        // grandchild rejection (parent.parent.is_some()). Buffer all lines so
+        // the second pass doesn't reopen the file (the on-disk content can't
+        // change mid-fork without external interference, but reading once is
+        // simpler + matches Phase 34 single-pass-where-possible discipline).
+        use std::io::BufRead;
+        let f =
+            std::fs::File::open(&parent_path).map_err(|e| format!("open parent: {}", e))?;
+        let reader = std::io::BufReader::new(f);
+        let mut total_messages: u32 = 0;
+        let mut parent_is_fork = false;
+        let mut all_lines: Vec<String> = Vec::new();
+        for line in reader.lines() {
+            let line = line.map_err(|e| format!("read parent line: {}", e))?;
+            if line.trim().is_empty() {
+                continue;
+            }
+            all_lines.push(line.clone());
+            if let Ok(ev) =
+                serde_json::from_str::<crate::session::log::SessionEvent>(&line)
+            {
+                match ev {
+                    crate::session::log::SessionEvent::SessionMeta {
+                        parent, ..
+                    } => {
+                        if parent.is_some() {
+                            parent_is_fork = true;
+                        }
+                    }
+                    crate::session::log::SessionEvent::UserMessage { .. }
+                    | crate::session::log::SessionEvent::AssistantTurn { .. } => {
+                        total_messages = total_messages.saturating_add(1);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        if parent_is_fork {
+            return Err(
+                "cannot fork a session that is itself a fork — one-level deep only (v1.6+ may relax this)"
+                    .to_string(),
+            );
+        }
+
+        let fork_at_clamped = fork_at_message_index.min(total_messages);
+
+        // Generate new ULID + open new JSONL.
+        let new_id = ulid::Ulid::new().to_string();
+        let new_path = dir.join(format!("{}.jsonl", &new_id));
+
+        use std::io::Write;
+        let mut out =
+            std::fs::File::create(&new_path).map_err(|e| format!("create child: {}", e))?;
+
+        // Prepend fresh SessionMeta — parent + fork_at_index (clamped).
+        let meta = crate::session::log::SessionEvent::SessionMeta {
+            id: new_id.clone(),
+            parent: Some(parent_id.clone()),
+            fork_at_index: Some(fork_at_clamped),
+            started_at_ms: crate::session::log::now_ms(),
+        };
+        let meta_line =
+            serde_json::to_string(&meta).map_err(|e| format!("serialize meta: {}", e))?;
+        out.write_all(meta_line.as_bytes())
+            .map_err(|e| format!("write meta: {}", e))?;
+        out.write_all(b"\n").map_err(|e| format!("write nl: {}", e))?;
+
+        // Second pass: copy parent's lines, skipping its own SessionMeta,
+        // capping UserMessage + AssistantTurn at fork_at_clamped. Other event
+        // types (CompactionBoundary, ToolCall, HaltReason, LoopEvent) pass
+        // through unconditionally — forensic continuity per CONTEXT lock.
+        let mut copied_messages: u32 = 0;
+        for line in &all_lines {
+            if let Ok(ev) =
+                serde_json::from_str::<crate::session::log::SessionEvent>(line)
+            {
+                match ev {
+                    crate::session::log::SessionEvent::SessionMeta { .. } => continue,
+                    crate::session::log::SessionEvent::UserMessage { .. }
+                    | crate::session::log::SessionEvent::AssistantTurn { .. } => {
+                        if copied_messages >= fork_at_clamped {
+                            // Stop copying messages once we've hit the cap;
+                            // do NOT break since later lines may be ToolCall /
+                            // LoopEvent that we'd normally pass through, but
+                            // those events are scoped to specific turns — once
+                            // we stop the message stream we should stop the
+                            // whole copy to avoid orphan tool-results that
+                            // belong to messages NOT in the fork.
+                            break;
+                        }
+                        out.write_all(line.as_bytes())
+                            .map_err(|e| format!("write msg: {}", e))?;
+                        out.write_all(b"\n")
+                            .map_err(|e| format!("write nl: {}", e))?;
+                        copied_messages = copied_messages.saturating_add(1);
+                    }
+                    _ => {
+                        // CompactionBoundary, ToolCall, HaltReason, LoopEvent
+                        // all pass through unconditionally — they belong to
+                        // already-copied messages (we're walking in file order
+                        // so anything between message N and N+1 is causally
+                        // tied to message N which we've already copied).
+                        out.write_all(line.as_bytes())
+                            .map_err(|e| format!("write aux: {}", e))?;
+                        out.write_all(b"\n")
+                            .map_err(|e| format!("write nl: {}", e))?;
+                    }
+                }
+            }
+        }
+
+        Ok(new_id)
+    }));
+    match result {
+        Ok(r) => r,
+        Err(_panic) => {
+            eprintln!(
+                "[SESS-04] fork_session panicked for parent {}; surfacing Err",
+                parent_id
+            );
+            Err("fork_session internal error (panic caught)".to_string())
+        }
+    }
 }
 
 /// RES-03 — Tauri command. Returns `{spent_usd, cap_usd, percent}` for the
@@ -551,6 +725,230 @@ mod tests {
         std::env::remove_var("BLADE_CONFIG_DIR");
         let _ = std::fs::remove_dir_all(&tmp);
         assert!(r.is_empty());
+    }
+
+    // ─── Plan 34-10 (SESS-04) — fork_session two-pass copy tests ──────────
+
+    /// SESS-04 — fork at index 3 over a parent with 5 messages must copy
+    /// exactly 3 messages preceded by a fresh SessionMeta carrying parent.
+    #[tokio::test]
+    async fn phase34_sess_04_fork_session_creates_new_file_with_parent() {
+        let _guard = TEST_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let (tmp, sessions) = provision_sessions_dir("fork-creates");
+        let parent_id = "01ARZ3NDEKTSV4RRFFQ69G5FA1";
+        write_session_file(
+            &sessions,
+            parent_id,
+            1000,
+            &[
+                crate::session::log::SessionEvent::UserMessage {
+                    id: "u1".into(),
+                    content: "first".into(),
+                    timestamp_ms: 1,
+                },
+                crate::session::log::SessionEvent::AssistantTurn {
+                    content: "a1".into(),
+                    tool_calls: vec![],
+                    stop_reason: None,
+                    tokens_in: 0,
+                    tokens_out: 0,
+                    timestamp_ms: 2,
+                },
+                crate::session::log::SessionEvent::UserMessage {
+                    id: "u2".into(),
+                    content: "second".into(),
+                    timestamp_ms: 3,
+                },
+                crate::session::log::SessionEvent::AssistantTurn {
+                    content: "a2".into(),
+                    tool_calls: vec![],
+                    stop_reason: None,
+                    tokens_in: 0,
+                    tokens_out: 0,
+                    timestamp_ms: 4,
+                },
+                crate::session::log::SessionEvent::UserMessage {
+                    id: "u3".into(),
+                    content: "third".into(),
+                    timestamp_ms: 5,
+                },
+            ],
+        );
+
+        let new_id = fork_session(parent_id.to_string(), 3)
+            .await
+            .expect("fork");
+
+        let new_path = sessions.join(format!("{}.jsonl", new_id));
+        assert!(new_path.exists(), "child session file must exist");
+        let buf = std::fs::read_to_string(&new_path).expect("read child");
+        let lines: Vec<&str> = buf.lines().filter(|l| !l.trim().is_empty()).collect();
+        assert_eq!(
+            lines.len(),
+            4,
+            "expected 4 lines (SessionMeta + 3 messages); got {}: {:?}",
+            lines.len(),
+            lines
+        );
+        let meta: crate::session::log::SessionEvent =
+            serde_json::from_str(lines[0]).expect("parse meta");
+        match meta {
+            crate::session::log::SessionEvent::SessionMeta {
+                parent,
+                fork_at_index,
+                id,
+                ..
+            } => {
+                assert_eq!(parent, Some(parent_id.to_string()));
+                assert_eq!(fork_at_index, Some(3));
+                assert_eq!(id, new_id, "SessionMeta.id must match returned ULID");
+            }
+            _ => panic!("first line must be SessionMeta"),
+        }
+        std::env::remove_var("BLADE_CONFIG_DIR");
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    /// SESS-04 — forking past the end clamps to actual message count. Parent
+    /// with 2 messages, fork at 999 → SessionMeta.fork_at_index = 2.
+    #[tokio::test]
+    async fn phase34_sess_04_fork_session_clamps_index_to_message_count() {
+        let _guard = TEST_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let (tmp, sessions) = provision_sessions_dir("fork-clamp");
+        let parent_id = "01ARZ3NDEKTSV4RRFFQ69G5FA2";
+        write_session_file(
+            &sessions,
+            parent_id,
+            1000,
+            &[
+                crate::session::log::SessionEvent::UserMessage {
+                    id: "u1".into(),
+                    content: "u".into(),
+                    timestamp_ms: 1,
+                },
+                crate::session::log::SessionEvent::AssistantTurn {
+                    content: "a".into(),
+                    tool_calls: vec![],
+                    stop_reason: None,
+                    tokens_in: 0,
+                    tokens_out: 0,
+                    timestamp_ms: 2,
+                },
+            ],
+        );
+
+        let new_id = fork_session(parent_id.to_string(), 999)
+            .await
+            .expect("fork");
+        let new_path = sessions.join(format!("{}.jsonl", new_id));
+        let buf = std::fs::read_to_string(&new_path).expect("read child");
+        let first_line = buf.lines().next().unwrap_or("");
+        let meta: crate::session::log::SessionEvent =
+            serde_json::from_str(first_line).expect("parse meta");
+        match meta {
+            crate::session::log::SessionEvent::SessionMeta {
+                fork_at_index, ..
+            } => {
+                assert_eq!(
+                    fork_at_index,
+                    Some(2),
+                    "fork_at_index must be clamped to actual message count (2)"
+                );
+            }
+            _ => panic!("first line must be SessionMeta"),
+        }
+        std::env::remove_var("BLADE_CONFIG_DIR");
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    /// SESS-04 — forking a session that is itself a fork is rejected with
+    /// a clear error message (one-level deep per CONTEXT lock).
+    #[tokio::test]
+    async fn phase34_sess_04_fork_session_rejects_grandchild() {
+        let _guard = TEST_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let (tmp, sessions) = provision_sessions_dir("fork-grandchild");
+        let parent_id = "01ARZ3NDEKTSV4RRFFQ69G5FA3";
+        // Construct a parent that is ITSELF a fork.
+        let path = sessions.join(format!("{}.jsonl", parent_id));
+        let meta = crate::session::log::SessionEvent::SessionMeta {
+            id: parent_id.into(),
+            parent: Some("01ARZ3NDEKTSV4RRFFQ69G5FA0".into()),
+            fork_at_index: Some(2),
+            started_at_ms: 1000,
+        };
+        std::fs::write(
+            &path,
+            format!("{}\n", serde_json::to_string(&meta).unwrap()),
+        )
+        .unwrap();
+
+        let r = fork_session(parent_id.to_string(), 1).await;
+        std::env::remove_var("BLADE_CONFIG_DIR");
+        let _ = std::fs::remove_dir_all(&tmp);
+        assert!(r.is_err(), "must reject forking a fork");
+        let err = r.unwrap_err();
+        assert!(
+            err.contains("one-level deep") || err.contains("itself a fork"),
+            "error must explain the one-level-deep limit; got: {}",
+            err
+        );
+    }
+
+    /// SESS-04 — invalid parent_id is rejected before any filesystem access.
+    #[tokio::test]
+    async fn phase34_sess_04_fork_session_validates_parent_id() {
+        let r = fork_session("../../etc/passwd".to_string(), 0).await;
+        assert!(r.is_err(), "must reject path-traversal parent_id");
+    }
+
+    // ─── Plan 34-10 (SESS-02 wrapper) — resume_session validation tests ───
+
+    /// SESS-02 wrapper — resume_session must reject path-traversal IDs at
+    /// the entry, before any filesystem access fires.
+    #[tokio::test]
+    async fn phase34_resume_session_validates_session_id() {
+        let r = resume_session("../../etc/passwd".to_string()).await;
+        assert!(r.is_err(), "must reject path-traversal");
+    }
+
+    /// SESS-02 wrapper — when `session.jsonl_log_enabled = false`, resume
+    /// returns Err with a clear message (nothing to resume from).
+    #[tokio::test]
+    async fn phase34_resume_session_disabled_returns_err() {
+        let _guard = TEST_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let tmp = std::env::temp_dir().join(format!(
+            "blade-resume-disabled-{}-{}",
+            std::process::id(),
+            nanos
+        ));
+        std::fs::create_dir_all(&tmp).expect("mkdir");
+        // Write a config.json with jsonl_log_enabled=false. DiskConfig
+        // requires `provider`, `model`, `onboarded` to be present (no
+        // serde(default) on those three fields — see config.rs DiskConfig);
+        // every other field uses #[serde(default)] / SessionConfig#[serde(default)]
+        // so the partial JSON below is sufficient for our purposes.
+        let cfg_path = tmp.join("config.json");
+        std::fs::write(
+            &cfg_path,
+            r#"{"provider":"","model":"","onboarded":false,"session":{"jsonl_log_enabled":false}}"#,
+        )
+        .unwrap();
+        std::env::set_var("BLADE_CONFIG_DIR", &tmp);
+
+        let r = resume_session("01ARZ3NDEKTSV4RRFFQ69G5FAV".to_string()).await;
+        std::env::remove_var("BLADE_CONFIG_DIR");
+        let _ = std::fs::remove_dir_all(&tmp);
+        assert!(r.is_err(), "must Err when jsonl_log_enabled=false");
+        let err = r.unwrap_err();
+        assert!(
+            err.contains("disabled") || err.contains("nothing to resume"),
+            "error must indicate logging disabled; got: {}",
+            err
+        );
     }
 
     // ─── Plan 34-06 (RES-03) — get_conversation_cost JSONL read tests ─────
