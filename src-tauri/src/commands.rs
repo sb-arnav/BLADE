@@ -1736,7 +1736,7 @@ pub(crate) async fn send_message_stream_inline(
             // not double-emit here. Surface the error to the outer caller.
             return Err(error);
         }
-        Err(crate::loop_engine::LoopHaltReason::CostExceeded { spent_usd, cap_usd }) => {
+        Err(crate::loop_engine::LoopHaltReason::CostExceeded { spent_usd, cap_usd, scope: _ }) => {
             // Plan 33-08 — runtime cost-guard halt. The blade_loop_event with
             // kind:halted, reason:cost_exceeded was already emitted at the
             // halt site inside run_loop; here we surface the error to the
@@ -1755,6 +1755,36 @@ pub(crate) async fn send_message_stream_inline(
         Err(crate::loop_engine::LoopHaltReason::IterationCap) => {
             // Loop exhausted (max_iter reached) or stuck-loop break triggered.
             // Fall through to the loop-exhausted summary block below.
+        }
+        Err(crate::loop_engine::LoopHaltReason::Stuck { pattern }) => {
+            // Plan 34-02 — type substrate only; Plan 34-04 (RES-01) will
+            // replace this placeholder with the per-pattern user-facing
+            // summary + ActivityStrip chip emit. For now, surface a generic
+            // halt message via chat_error so the chat UI does not silently
+            // drop the response. blade_loop_event for the stuck pattern is
+            // emitted at the halt site inside run_loop (Plan 34-04).
+            let msg = format!(
+                "Loop halted: stuck pattern detected ({}). Try simplifying the request.",
+                pattern
+            );
+            emit_stream_event(&app, "chat_error", msg.clone());
+            emit_stream_event(&app, "chat_done", ());
+            let _ = app.emit("blade_status", "error");
+            return Ok(());
+        }
+        Err(crate::loop_engine::LoopHaltReason::CircuitOpen { error_kind, attempts_summary }) => {
+            // Plan 34-02 — type substrate only; Plan 34-05 (RES-02) will
+            // replace this placeholder with the structured "what was tried"
+            // chat surface + ActivityStrip chip emit. For now, surface a
+            // generic halt message that names the error_kind + attempt count.
+            let msg = format!(
+                "Loop halted: circuit breaker open ({} after {} attempts). Try again in a moment.",
+                error_kind, attempts_summary.len()
+            );
+            emit_stream_event(&app, "chat_error", msg.clone());
+            emit_stream_event(&app, "chat_done", ());
+            let _ = app.emit("blade_status", "error");
+            return Ok(());
         }
     }
 

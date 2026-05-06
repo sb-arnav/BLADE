@@ -411,6 +411,166 @@ impl LoopConfig {
     }
 }
 
+// ---------------------------------------------------------------------
+// Phase 34 Plan 34-01 — Resilience runtime knobs (RES-01..05).
+//
+// Locked decisions (34-CONTEXT.md §Module Boundaries):
+//   - smart_resilience_enabled (default true) — CTX-07-style escape hatch.
+//     false = stuck detection / circuit breaker / cost-warn / provider
+//     fallback all skipped (per-conversation 100% halt still enforced
+//     for data integrity; PerLoop cap untouched).
+//   - 5 RES-01 stuck thresholds (recent_actions_window, monologue,
+//     compaction_thrash, no_progress, plus the circuit-breaker
+//     threshold reused by RES-02).
+//   - cost_guard_per_conversation_dollars (default 25.0) — RES-04 cap.
+//     Phase 33's loop.cost_guard_dollars stays — Phase 34 adds a SECOND
+//     cap with PerConversation scope. Both ceilings coexist.
+//   - provider_fallback_chain (default vec!["primary","openrouter","groq",
+//     "ollama"]) — RES-05 chain. "primary" resolves to BladeConfig.provider.
+//   - max_retries_per_provider / backoff_base_ms / backoff_max_ms — RES-05
+//     exponential backoff with jitter (0..=200ms additive).
+//
+// Six-place rule (CLAUDE.md): every BladeConfig field MUST land in
+// DiskConfig struct, DiskConfig::default, BladeConfig struct,
+// BladeConfig::default, load_config, and save_config.
+// ---------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct ResilienceConfig {
+    /// CTX-07-style escape hatch. true = stuck/circuit/cost-warn/fallback all
+    /// active. false = legacy posture (PerConversation 100% halt still enforced).
+    #[serde(default = "default_smart_resilience_enabled")]
+    pub smart_resilience_enabled: bool,
+    /// RES-01 master toggle for the 5-pattern stuck detector.
+    #[serde(default = "default_stuck_detection_enabled")]
+    pub stuck_detection_enabled: bool,
+    /// RES-01 — capacity of LoopState.recent_actions ring buffer. Default 6.
+    #[serde(default = "default_recent_actions_window")]
+    pub recent_actions_window: u32,
+    /// RES-01 MonologueSpiral threshold (consecutive no-tool turns). Default 5.
+    #[serde(default = "default_monologue_threshold")]
+    pub monologue_threshold: u32,
+    /// RES-01 ContextWindowThrashing threshold (compactions per run). Default 3.
+    #[serde(default = "default_compaction_thrash_threshold")]
+    pub compaction_thrash_threshold: u32,
+    /// RES-01 NoProgress threshold (iterations without new tool/content). Default 5.
+    #[serde(default = "default_no_progress_threshold")]
+    pub no_progress_threshold: u32,
+    /// RES-02 — N consecutive same-type failures before circuit opens. Default 3.
+    #[serde(default = "default_circuit_breaker_threshold")]
+    pub circuit_breaker_threshold: u32,
+    /// RES-04 — per-conversation spend cap in USD. Warn at 80%, halt at 100%.
+    /// Default 25.0. Phase 33's loop.cost_guard_dollars stays as the per-loop cap.
+    #[serde(default = "default_cost_guard_per_conversation_dollars")]
+    pub cost_guard_per_conversation_dollars: f32,
+    /// RES-05 — provider fallback chain. "primary" resolves to BladeConfig.provider.
+    /// Default ["primary","openrouter","groq","ollama"].
+    #[serde(default = "default_provider_fallback_chain")]
+    pub provider_fallback_chain: Vec<String>,
+    /// RES-05 — retries per chain element before falling over. Default 2.
+    #[serde(default = "default_max_retries_per_provider")]
+    pub max_retries_per_provider: u32,
+    /// RES-05 — exponential backoff base in ms. Default 500.
+    #[serde(default = "default_backoff_base_ms")]
+    pub backoff_base_ms: u64,
+    /// RES-05 — exponential backoff cap in ms. Default 30000.
+    #[serde(default = "default_backoff_max_ms")]
+    pub backoff_max_ms: u64,
+}
+
+fn default_smart_resilience_enabled() -> bool { true }
+fn default_stuck_detection_enabled() -> bool { true }
+fn default_recent_actions_window() -> u32 { 6 }
+fn default_monologue_threshold() -> u32 { 5 }
+fn default_compaction_thrash_threshold() -> u32 { 3 }
+fn default_no_progress_threshold() -> u32 { 5 }
+fn default_circuit_breaker_threshold() -> u32 { 3 }
+fn default_cost_guard_per_conversation_dollars() -> f32 { 25.0 }
+fn default_provider_fallback_chain() -> Vec<String> {
+    vec![
+        "primary".to_string(),
+        "openrouter".to_string(),
+        "groq".to_string(),
+        "ollama".to_string(),
+    ]
+}
+fn default_max_retries_per_provider() -> u32 { 2 }
+fn default_backoff_base_ms() -> u64 { 500 }
+fn default_backoff_max_ms() -> u64 { 30_000 }
+
+impl Default for ResilienceConfig {
+    fn default() -> Self {
+        Self {
+            smart_resilience_enabled: default_smart_resilience_enabled(),
+            stuck_detection_enabled: default_stuck_detection_enabled(),
+            recent_actions_window: default_recent_actions_window(),
+            monologue_threshold: default_monologue_threshold(),
+            compaction_thrash_threshold: default_compaction_thrash_threshold(),
+            no_progress_threshold: default_no_progress_threshold(),
+            circuit_breaker_threshold: default_circuit_breaker_threshold(),
+            cost_guard_per_conversation_dollars: default_cost_guard_per_conversation_dollars(),
+            provider_fallback_chain: default_provider_fallback_chain(),
+            max_retries_per_provider: default_max_retries_per_provider(),
+            backoff_base_ms: default_backoff_base_ms(),
+            backoff_max_ms: default_backoff_max_ms(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------
+// Phase 34 Plan 34-01 — Session persistence knobs (SESS-01..04).
+//
+// Locked decisions (34-CONTEXT.md §Append-Only JSONL Session Log):
+//   - jsonl_log_enabled (default true) — independent escape hatch from
+//     resilience.smart_resilience_enabled. false = SessionWriter is no-op.
+//   - jsonl_log_dir = blade_config_dir().join("sessions") — auto-created
+//     on first SessionWriter::new.
+//   - auto_resume_last (default false) — explicit user action is the
+//     safer default per v1.1 lesson. SESS-02 toggle.
+//   - keep_n_sessions (default 100) — rotation moves older to
+//     {jsonl_log_dir}/archive/. Move, not delete.
+// ---------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct SessionConfig {
+    /// SESS-01 master toggle. false = SessionWriter::append is silent no-op;
+    /// no JSONL files written. Existing files still readable via list_sessions
+    /// for legacy session inspection.
+    #[serde(default = "default_jsonl_log_enabled")]
+    pub jsonl_log_enabled: bool,
+    /// SESS-01 directory containing one JSONL per session_id. Auto-created.
+    /// Default blade_config_dir().join("sessions"). Tests use BLADE_CONFIG_DIR
+    /// env override (config.rs::blade_config_dir line 852).
+    #[serde(default = "default_jsonl_log_dir")]
+    pub jsonl_log_dir: PathBuf,
+    /// SESS-02 auto-resume last session on app boot. Default false (explicit
+    /// user action is the safer default per v1.1 lesson).
+    #[serde(default = "default_auto_resume_last")]
+    pub auto_resume_last: bool,
+    /// SESS-01 rotation — keep N most-recent sessions in jsonl_log_dir.
+    /// Older sessions move to {jsonl_log_dir}/archive/. Default 100.
+    #[serde(default = "default_keep_n_sessions")]
+    pub keep_n_sessions: u32,
+}
+
+fn default_jsonl_log_enabled() -> bool { true }
+fn default_jsonl_log_dir() -> PathBuf { blade_config_dir().join("sessions") }
+fn default_auto_resume_last() -> bool { false }
+fn default_keep_n_sessions() -> u32 { 100 }
+
+impl Default for SessionConfig {
+    fn default() -> Self {
+        Self {
+            jsonl_log_enabled: default_jsonl_log_enabled(),
+            jsonl_log_dir: default_jsonl_log_dir(),
+            auto_resume_last: default_auto_resume_last(),
+            keep_n_sessions: default_keep_n_sessions(),
+        }
+    }
+}
+
 /// Config as stored on disk — api_key is NOT stored here anymore
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct DiskConfig {
@@ -542,6 +702,18 @@ struct DiskConfig {
     // keeps legacy configs loadable. Field name uses raw identifier (`loop` is a Rust keyword).
     #[serde(default)]
     r#loop: LoopConfig,
+    // Phase 34 Plan 34-01 — Resilience runtime knobs (RES-01..05).
+    // smart_resilience_enabled escape hatch + 5 stuck thresholds + circuit
+    // breaker threshold + per-conversation cost cap + provider fallback chain
+    // + retries/backoff. #[serde(default)] keeps legacy configs loadable.
+    #[serde(default)]
+    resilience: ResilienceConfig,
+    // Phase 34 Plan 34-01 — Session persistence knobs (SESS-01..04).
+    // jsonl_log_enabled escape hatch + jsonl_log_dir + auto_resume_last +
+    // keep_n_sessions rotation policy. #[serde(default)] keeps legacy
+    // configs loadable.
+    #[serde(default)]
+    session: SessionConfig,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -624,6 +796,8 @@ impl Default for DiskConfig {
             reward_weights: default_reward_weights(),
             context: ContextConfig::default(),
             r#loop: LoopConfig::default(),
+            resilience: ResilienceConfig::default(),
+            session: SessionConfig::default(),
             api_key: None,
         }
     }
@@ -777,6 +951,18 @@ pub struct BladeConfig {
     /// See `LoopConfig`.
     #[serde(default)]
     pub r#loop: LoopConfig,
+    /// Phase 34 Plan 34-01 — Resilience runtime knobs (RES-01..05). Defaults:
+    /// smart_resilience_enabled=true, 5 stuck thresholds, circuit_breaker_threshold=3,
+    /// cost_guard_per_conversation_dollars=25.0, provider_fallback_chain=
+    /// ["primary","openrouter","groq","ollama"], max_retries_per_provider=2,
+    /// backoff_base_ms=500, backoff_max_ms=30_000. See `ResilienceConfig`.
+    #[serde(default)]
+    pub resilience: ResilienceConfig,
+    /// Phase 34 Plan 34-01 — Session persistence knobs (SESS-01..04). Defaults:
+    /// jsonl_log_enabled=true, jsonl_log_dir=blade_config_dir().join("sessions"),
+    /// auto_resume_last=false, keep_n_sessions=100. See `SessionConfig`.
+    #[serde(default)]
+    pub session: SessionConfig,
 }
 
 impl BladeConfig {
@@ -845,6 +1031,8 @@ impl Default for BladeConfig {
             reward_weights: default_reward_weights(),
             context: ContextConfig::default(),
             r#loop: LoopConfig::default(),
+            resilience: ResilienceConfig::default(),
+            session: SessionConfig::default(),
         }
     }
 }
@@ -1007,6 +1195,8 @@ pub fn load_config() -> BladeConfig {
         reward_weights: disk.reward_weights.clone(),
         context: disk.context,
         r#loop: disk.r#loop,
+        resilience: disk.resilience,
+        session: disk.session,
     }
 }
 
@@ -1084,6 +1274,8 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         reward_weights: config.reward_weights.clone(),
         context: config.context.clone(),
         r#loop: config.r#loop.clone(),
+        resilience: config.resilience.clone(),
+        session: config.session.clone(),
         api_key: None,
     };
 
@@ -1652,6 +1844,8 @@ mod tests {
             reward_weights: cfg.reward_weights.clone(),
             context: cfg.context.clone(),
             r#loop: cfg.r#loop.clone(),
+            resilience: cfg.resilience.clone(),
+            session: cfg.session.clone(),
             api_key: None,
         };
 
@@ -1839,5 +2033,114 @@ mod tests {
             .expect("legacy config without loop key must parse with defaults");
         assert_eq!(parsed.r#loop, LoopConfig::default(),
             "missing loop key must fall back to LoopConfig::default()");
+    }
+
+    // ---------------------------------------------------------------------
+    // Phase 34 Plan 34-01 — ResilienceConfig + SessionConfig tests
+    // (RES-01..05 + SESS-01..04 substrate).
+    //
+    // Six tests lock the twelve-place config wire-up for the two new
+    // sub-structs (six places per struct):
+    //   - default_values: each ::default() returns the locked
+    //     RES-01..05 / SESS-01..04 defaults verbatim.
+    //   - round_trip: a non-default sub-struct survives serialization
+    //     through DiskConfig (mirrors save_config -> load_config wire format).
+    //   - missing_uses_defaults: legacy config.json without a `resilience`
+    //     or `session` key MUST load with the respective ::default()
+    //     (#[serde(default)] on the field — non-negotiable per CLAUDE.md).
+    // ---------------------------------------------------------------------
+
+    #[test]
+    fn phase34_resilience_config_default_values() {
+        let c = ResilienceConfig::default();
+        assert!(c.smart_resilience_enabled, "default smart_resilience_enabled must be true");
+        assert!(c.stuck_detection_enabled, "default stuck_detection_enabled must be true");
+        assert_eq!(c.recent_actions_window, 6);
+        assert_eq!(c.monologue_threshold, 5);
+        assert_eq!(c.compaction_thrash_threshold, 3);
+        assert_eq!(c.no_progress_threshold, 5);
+        assert_eq!(c.circuit_breaker_threshold, 3);
+        assert!((c.cost_guard_per_conversation_dollars - 25.0).abs() < 1e-6);
+        assert_eq!(c.provider_fallback_chain,
+            vec!["primary","openrouter","groq","ollama"]
+                .into_iter().map(String::from).collect::<Vec<_>>());
+        assert_eq!(c.max_retries_per_provider, 2);
+        assert_eq!(c.backoff_base_ms, 500);
+        assert_eq!(c.backoff_max_ms, 30_000);
+    }
+
+    #[test]
+    fn phase34_session_config_default_values() {
+        let c = SessionConfig::default();
+        assert!(c.jsonl_log_enabled, "default jsonl_log_enabled must be true");
+        assert_eq!(c.jsonl_log_dir, blade_config_dir().join("sessions"));
+        assert!(!c.auto_resume_last, "default auto_resume_last must be false (v1.1 lesson)");
+        assert_eq!(c.keep_n_sessions, 100);
+    }
+
+    #[test]
+    fn phase34_resilience_config_round_trip() {
+        let mut cfg = BladeConfig::default();
+        cfg.resilience = ResilienceConfig {
+            smart_resilience_enabled: false,
+            stuck_detection_enabled: false,
+            recent_actions_window: 12,
+            monologue_threshold: 8,
+            compaction_thrash_threshold: 5,
+            no_progress_threshold: 7,
+            circuit_breaker_threshold: 4,
+            cost_guard_per_conversation_dollars: 99.99,
+            provider_fallback_chain: vec!["x".to_string(), "y".to_string()],
+            max_retries_per_provider: 5,
+            backoff_base_ms: 1000,
+            backoff_max_ms: 60_000,
+        };
+        let mut disk = DiskConfig::default();
+        disk.resilience = cfg.resilience.clone();
+        let json = serde_json::to_string(&disk).expect("serialize");
+        let parsed: DiskConfig = serde_json::from_str(&json).expect("parse");
+        assert_eq!(parsed.resilience, cfg.resilience, "ResilienceConfig roundtrip lost data");
+    }
+
+    #[test]
+    fn phase34_session_config_round_trip() {
+        let mut cfg = BladeConfig::default();
+        cfg.session = SessionConfig {
+            jsonl_log_enabled: false,
+            jsonl_log_dir: std::path::PathBuf::from("/tmp/blade-test-sessions"),
+            auto_resume_last: true,
+            keep_n_sessions: 42,
+        };
+        let mut disk = DiskConfig::default();
+        disk.session = cfg.session.clone();
+        let json = serde_json::to_string(&disk).expect("serialize");
+        let parsed: DiskConfig = serde_json::from_str(&json).expect("parse");
+        assert_eq!(parsed.session, cfg.session, "SessionConfig roundtrip lost data");
+    }
+
+    #[test]
+    fn phase34_resilience_missing_uses_defaults() {
+        let legacy_json = r#"{
+            "provider": "anthropic",
+            "model": "claude-sonnet-4",
+            "onboarded": true
+        }"#;
+        let parsed: DiskConfig = serde_json::from_str(legacy_json)
+            .expect("legacy config should parse with defaults");
+        assert_eq!(parsed.resilience, ResilienceConfig::default(),
+            "missing 'resilience' key must fall back to ResilienceConfig::default()");
+    }
+
+    #[test]
+    fn phase34_session_missing_uses_defaults() {
+        let legacy_json = r#"{
+            "provider": "anthropic",
+            "model": "claude-sonnet-4",
+            "onboarded": true
+        }"#;
+        let parsed: DiskConfig = serde_json::from_str(legacy_json)
+            .expect("legacy config should parse with defaults");
+        assert_eq!(parsed.session, SessionConfig::default(),
+            "missing 'session' key must fall back to SessionConfig::default()");
     }
 }
