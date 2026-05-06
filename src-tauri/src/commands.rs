@@ -89,20 +89,35 @@ where
 
 // ---------------------------------------------------------------------------
 // Phase 4: Self-healing circuit breaker + exponential backoff
+// (Phase 34-05 widened the tuple to (kind, provider, model, msg, ts) for
+// LoopHaltReason::CircuitOpen.attempts_summary population.)
 // ---------------------------------------------------------------------------
 
-/// Ring-buffer of (error_kind, instant) for circuit-breaker tracking.
-static ERROR_HISTORY: std::sync::OnceLock<std::sync::Mutex<Vec<(String, std::time::Instant)>>> =
-    std::sync::OnceLock::new();
+/// Ring-buffer of (kind, provider, model, msg, instant) for circuit-breaker tracking.
+/// Plan 34-05 widened from (kind, instant) — provider/model/msg default to empty
+/// strings when the legacy `record_error(kind)` wrapper is used.
+static ERROR_HISTORY: std::sync::OnceLock<
+    std::sync::Mutex<Vec<(String, String, String, String, std::time::Instant)>>,
+> = std::sync::OnceLock::new();
 
-fn error_history() -> &'static std::sync::Mutex<Vec<(String, std::time::Instant)>> {
+fn error_history(
+) -> &'static std::sync::Mutex<Vec<(String, String, String, String, std::time::Instant)>> {
     ERROR_HISTORY.get_or_init(|| std::sync::Mutex::new(Vec::new()))
 }
 
-/// Record an error occurrence.
-pub(crate) fn record_error(kind: &str) {
+/// Plan 34-05 (RES-02) — full-fidelity recorder. Captures provider/model/msg
+/// for the new LoopHaltReason::CircuitOpen.attempts_summary surface. Existing
+/// call sites that only know `kind` continue to use the thin `record_error`
+/// wrapper below.
+pub(crate) fn record_error_full(kind: &str, provider: &str, model: &str, msg: &str) {
     if let Ok(mut h) = error_history().lock() {
-        h.push((kind.to_string(), std::time::Instant::now()));
+        h.push((
+            kind.to_string(),
+            provider.to_string(),
+            model.to_string(),
+            msg.to_string(),
+            std::time::Instant::now(),
+        ));
         // Keep at most 50 entries
         if h.len() > 50 {
             h.drain(0..10);
@@ -110,22 +125,80 @@ pub(crate) fn record_error(kind: &str) {
     }
 }
 
+/// Backward-compatible thin wrapper. Existing call sites at loop_engine.rs:864,
+/// loop_engine.rs:908, etc. continue to work; provider/model/msg default to
+/// empty strings (which means circuit_attempts_summary returns AttemptRecords
+/// with empty provider/model/msg for legacy entries — that's OK, the chat UI
+/// can display "(unknown provider/model)" when those are empty).
+pub(crate) fn record_error(kind: &str) {
+    record_error_full(kind, "", "", "");
+}
+
 /// Returns true if the same error kind occurred ≥3 times in the last 5 minutes.
+/// Plan 34-05 — unchanged behavior; reads new tuple shape (index 0 = kind).
 pub(crate) fn is_circuit_broken(kind: &str) -> bool {
     let Ok(h) = error_history().lock() else { return false };
     let window = std::time::Duration::from_secs(300);
     let now = std::time::Instant::now();
-    let count = h.iter().filter(|(k, t)| k == kind && now.duration_since(*t) < window).count();
+    let count = h
+        .iter()
+        .filter(|(k, _p, _m, _msg, t)| k == kind && now.duration_since(*t) < window)
+        .count();
     count >= 3
+}
+
+/// Plan 34-05 (RES-02) — return the matching failures for `attempts_summary`.
+/// Used by run_loop to populate LoopHaltReason::CircuitOpen with the human-
+/// readable list of attempts the user can see.
+pub(crate) fn circuit_attempts_summary(kind: &str) -> Vec<crate::loop_engine::AttemptRecord> {
+    let Ok(h) = error_history().lock() else { return Vec::new() };
+    let window = std::time::Duration::from_secs(300);
+    let now = std::time::Instant::now();
+    h.iter()
+        .filter(|(k, _p, _m, _msg, t)| k == kind && now.duration_since(*t) < window)
+        .map(|(_k, p, m, msg, t)| {
+            // Convert Instant to wall-clock ms via SystemTime::now() - elapsed.
+            // Approximate (Instant has no direct epoch mapping); good enough for
+            // forensic display.
+            let elapsed_ms = now.duration_since(*t).as_millis() as u64;
+            let now_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0);
+            crate::loop_engine::AttemptRecord {
+                provider: p.clone(),
+                model: m.clone(),
+                error_message: msg.clone(),
+                timestamp_ms: now_ms.saturating_sub(elapsed_ms),
+            }
+        })
+        .collect()
+}
+
+/// Plan 34-05 (RES-02) — reset on success. Called by every successful provider
+/// response (in run_loop, after `complete_turn` returns Ok and the cumulative
+/// cost is accumulated). Without this, today's behavior accumulates errors
+/// monotonically until the 50-entry cap drains the oldest 10 — a long history
+/// of stale `rate_limit` followed by one fresh `timeout` would NOT trip the
+/// timeout circuit, but the lingering `rate_limit` count would prevent
+/// recovery if rate-limits returned later.
+pub(crate) fn clear_error_history() {
+    if let Ok(mut h) = error_history().lock() {
+        h.clear();
+    }
 }
 
 /// Exponential backoff for retries: base * 2^min(attempt, 3), capped at 120s.
 /// `attempt` is the number of recent occurrences of this error kind in the last 5 min.
+/// Plan 34-05 — unchanged behavior; reads new tuple shape.
 pub(crate) fn backoff_secs(base: u64, kind: &str) -> u64 {
     let Ok(h) = error_history().lock() else { return base };
     let window = std::time::Duration::from_secs(300);
     let now = std::time::Instant::now();
-    let attempt = h.iter().filter(|(k, t)| k == kind && now.duration_since(*t) < window).count();
+    let attempt = h
+        .iter()
+        .filter(|(k, _p, _m, _msg, t)| k == kind && now.duration_since(*t) < window)
+        .count();
     let exp = attempt.min(3) as u32;
     (base * 2u64.pow(exp)).min(120)
 }
@@ -3247,6 +3320,70 @@ pub(crate) mod tests {
         assert!(
             matches!(conversation.first(), Some(ConversationMessage::System(s)) if s == supplement),
             "supplement must be at index 0 when no prior System existed"
+        );
+    }
+
+    // ─── Plan 34-05 (RES-02) — circuit-breaker widening tests ───────────────
+
+    #[test]
+    fn phase34_res_02_record_error_full_widens_tuple() {
+        clear_error_history();
+        record_error_full(
+            "server",
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            "503 Service Unavailable",
+        );
+        let summary = circuit_attempts_summary("server");
+        assert_eq!(summary.len(), 1);
+        assert_eq!(summary[0].provider, "anthropic");
+        assert_eq!(summary[0].model, "claude-sonnet-4-20250514");
+        assert_eq!(summary[0].error_message, "503 Service Unavailable");
+        clear_error_history();
+    }
+
+    #[test]
+    fn phase34_res_02_record_error_legacy_wrapper_works() {
+        clear_error_history();
+        record_error("timeout");
+        record_error("timeout");
+        record_error("timeout");
+        assert!(
+            is_circuit_broken("timeout"),
+            "3 calls to record_error(timeout) must trip is_circuit_broken"
+        );
+        clear_error_history();
+    }
+
+    #[test]
+    fn phase34_res_02_circuit_attempts_summary_filters_by_kind() {
+        clear_error_history();
+        record_error_full("rate_limit", "anthropic", "claude-sonnet-4", "429");
+        record_error_full("server", "openai", "gpt-4o", "503");
+        record_error_full("rate_limit", "groq", "llama-3", "429 again");
+        let rate_limits = circuit_attempts_summary("rate_limit");
+        assert_eq!(rate_limits.len(), 2);
+        let servers = circuit_attempts_summary("server");
+        assert_eq!(servers.len(), 1);
+        clear_error_history();
+    }
+
+    #[test]
+    fn phase34_res_02_clear_error_history_resets() {
+        clear_error_history();
+        record_error("timeout");
+        record_error("timeout");
+        record_error("timeout");
+        assert!(is_circuit_broken("timeout"));
+        clear_error_history();
+        assert!(
+            !is_circuit_broken("timeout"),
+            "clear_error_history must reset the breaker count to 0"
+        );
+        let after = circuit_attempts_summary("timeout");
+        assert!(
+            after.is_empty(),
+            "circuit_attempts_summary must be empty after clear"
         );
     }
 }
