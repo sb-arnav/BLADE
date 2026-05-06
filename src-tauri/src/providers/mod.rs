@@ -348,6 +348,29 @@ async fn complete_turn_inner(
 ///
 /// Sourced from each provider's published default-output-tokens behavior as
 /// of 2026-05.
+/// Phase 34 / RES-05 — preferred default model per provider. Used by
+/// `resilience::fallback::try_with_fallback` when a chain element is just a
+/// provider id (no per-element model in the configured chain).
+///
+/// Values mirror the hardcoded defaults in Phase 33's
+/// `commands::try_free_model_fallback` (commands.rs:520-523) plus the project's
+/// canonical anthropic / openai / gemini choices used elsewhere.
+///
+/// Unknown providers fall back to `"claude-sonnet-4-20250514"` — Anthropic is
+/// the canonical primary in BladeConfig::default(); a safe fallback matches
+/// the rest of the cost / token table behavior.
+pub fn default_model_for(provider: &str) -> &'static str {
+    match provider {
+        "anthropic"  => "claude-sonnet-4-20250514",
+        "openai"     => "gpt-4o",
+        "groq"       => "llama-3.3-70b-versatile",
+        "openrouter" => "meta-llama/llama-3.3-70b-instruct:free",
+        "ollama"     => "llama3",
+        "gemini"     => "gemini-2.0-flash-exp",
+        _            => "claude-sonnet-4-20250514",
+    }
+}
+
 pub fn default_max_tokens_for(provider: &str, _model: &str) -> u32 {
     match provider {
         // Body-literal defaults — see anthropic.rs:27, openai.rs:42.
@@ -1227,5 +1250,36 @@ mod tests {
         };
         assert_eq!(t2.tokens_in, 1234);
         assert_eq!(t2.tokens_out, 567);
+    }
+
+    /// Phase 34 / RES-05 — `default_model_for` returns a non-empty model for
+    /// every known provider in the default `provider_fallback_chain`. Unknown
+    /// providers fall back to a safe default (claude-sonnet-4) so the chain
+    /// never resolves an empty model string into a `complete_turn` call.
+    #[test]
+    fn phase34_res_05_default_model_for_returns_known_models() {
+        for provider in &[
+            "anthropic", "openai", "groq", "openrouter", "ollama", "gemini",
+        ] {
+            let m = default_model_for(provider);
+            assert!(
+                !m.is_empty(),
+                "default_model_for({}) must return non-empty",
+                provider
+            );
+        }
+        // Unknown provider falls back to a safe default (no panic, no empty).
+        let m = default_model_for("unknown_xyz_provider");
+        assert!(
+            !m.is_empty(),
+            "unknown provider must fall back to a safe default model"
+        );
+        // Sanity: known mappings are pinned.
+        assert_eq!(default_model_for("anthropic"),  "claude-sonnet-4-20250514");
+        assert_eq!(default_model_for("openai"),     "gpt-4o");
+        assert_eq!(default_model_for("groq"),       "llama-3.3-70b-versatile");
+        assert_eq!(default_model_for("openrouter"), "meta-llama/llama-3.3-70b-instruct:free");
+        assert_eq!(default_model_for("ollama"),     "llama3");
+        assert_eq!(default_model_for("gemini"),     "gemini-2.0-flash-exp");
     }
 }
