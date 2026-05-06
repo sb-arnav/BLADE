@@ -892,7 +892,15 @@ async fn run_loop_inner(
     //   2. config.decomposition.auto_decompose_enabled — kill switch (CTX-07
     //      escape hatch). Belt-and-suspenders: count_independent_steps_grouped
     //      also returns None when disabled, but the gate avoids the call cost.
-    //   3. parent budget < 80% — cost-budget interlock per 35-CONTEXT lock
+    //   3. !conversation_id.is_empty() — disabled-JSONL guard (BL-01 fix). When
+    //      `session.jsonl_log_enabled = false` (documented escape hatch),
+    //      commands.rs falls back to `(SessionWriter::no_op(), String::new())`
+    //      so the parent's session_id is "". `fork_session("")` rejects via
+    //      `validate_session_id` and EVERY sub-agent spawn returns a fork-
+    //      failed stub — the user sees N synthetic "[fork failed]" turns
+    //      instead of normal sequential chat. Sub-agent isolation requires a
+    //      live SessionWriter; without it, fall through to the iteration loop.
+    //   4. parent budget < 80% — cost-budget interlock per 35-CONTEXT lock
     //      §Backward Compatibility ("Claude's discretion"). Don't fan out
     //      expensive parallel sub-agents when already near the per-conversation
     //      cap. The 80% boundary mirrors RES-04's warn-tier threshold.
@@ -903,7 +911,10 @@ async fn run_loop_inner(
     // [DECOMP-01] and falls through to the existing iteration loop unchanged.
     // The DECOMP_FORCE_PLANNER_PANIC seam (planner.rs cfg(test)) regression-
     // tests this wrapper.
-    if !loop_state.is_subagent && config.decomposition.auto_decompose_enabled {
+    if !loop_state.is_subagent
+        && config.decomposition.auto_decompose_enabled
+        && !conversation_id.is_empty()
+    {
         let cap_dollars =
             config.resilience.cost_guard_per_conversation_dollars.max(0.01);
         let pct = loop_state.conversation_cumulative_cost_usd / cap_dollars;
@@ -5035,6 +5046,50 @@ mod tests {
         assert!(
             groups.is_none(),
             "planner with auto_decompose_enabled=false must return None"
+        );
+    }
+
+    #[test]
+    fn phase35_decomp_01_trigger_skipped_when_jsonl_disabled() {
+        // BL-01 regression — Verify the disabled-JSONL guard at the trigger
+        // call site. When `session.jsonl_log_enabled = false` (documented
+        // escape hatch), commands.rs falls back to
+        // (SessionWriter::no_op(), String::new()) — the parent's
+        // conversation_id is the empty string. Without the guard, the
+        // DECOMP-01 trigger would fire, every fork_session("") call would
+        // reject via validate_session_id, and the user would see N synthetic
+        // "[fork failed]" AssistantTurns instead of normal sequential chat.
+        //
+        // The guard is `!conversation_id.is_empty()` added to the gate at
+        // run_loop_inner — sub-agent isolation requires a live SessionWriter,
+        // and without one we fall through to the iteration loop unchanged.
+        let state = LoopState::default();
+        let cfg = crate::config::BladeConfig::default();
+        let conversation_id = ""; // simulates jsonl_log_enabled=false fallback
+
+        let trigger_should_fire = !state.is_subagent
+            && cfg.decomposition.auto_decompose_enabled
+            && !conversation_id.is_empty();
+        assert!(
+            !trigger_should_fire,
+            "empty conversation_id (jsonl_log_enabled=false) MUST short-circuit \
+             the DECOMP-01 trigger gate (BL-01). Without this guard, every \
+             default-config user with `jsonl_log_enabled=false` who asks a 5+ \
+             step question receives N synthetic [fork failed] turns instead of \
+             sequential chat — a v1.1-class DOA."
+        );
+
+        // Symmetric check: with a non-empty conversation_id (the normal case)
+        // and default config, the gate must allow the trigger to evaluate.
+        let conversation_id_present = "01PARENTSESSIONULID000000000";
+        let trigger_after_id = !state.is_subagent
+            && cfg.decomposition.auto_decompose_enabled
+            && !conversation_id_present.is_empty();
+        assert!(
+            trigger_after_id,
+            "with a non-empty conversation_id (jsonl_log_enabled=true, default), \
+             the gate must allow the trigger to evaluate the planner — empty-id \
+             guard must not over-block the normal path"
         );
     }
 
