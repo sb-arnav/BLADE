@@ -5,14 +5,20 @@
 //! SessionWriter. Sub-agents run through the existing `swarm.rs` DAG +
 //! `resolve_ready_tasks` 5-concurrent cap.
 //!
-//! Plan 35-02 STUB — body returns Err. Real implementation in Plans 35-05/06/07.
+//! Phase 35 Plan 35-05: filled. The Plan 35-02 stub body has been replaced
+//! with the real swarm-DAG dispatch + cost rollup + emit-event chips. The
+//! `run_subagent_to_halt` helper is a v1 placeholder (returns success/no-cost);
+//! Plan 35-07 wires the real per-sub-agent run_loop dispatch through the
+//! forked SessionWriter. Tests exercise the rollup arithmetic + DAG validation
+//! directly via the DECOMP_FORCE_SUBAGENT_RESULT seam (full async path lives
+//! in Plan 35-11 UAT).
 
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
 use crate::config::BladeConfig;
 use crate::decomposition::planner::StepGroup;
-use crate::decomposition::summary::SubagentSummary;
+use crate::decomposition::summary::{distill_subagent_summary, SubagentSummary};
 use crate::loop_engine::LoopState;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,20 +44,354 @@ thread_local! {
         std::cell::RefCell::new(None);
 }
 
-/// Orchestrate per-StepGroup fork + spawn + collect.
+/// DECOMP-02 orchestrator. Walks N StepGroups, spawns each as an isolated
+/// sub-agent (own LoopState, own SessionWriter via fork_session, own
+/// compaction cycle), collects SubagentSummary per group, rolls per-sub-agent
+/// cost into `parent_state.conversation_cumulative_cost_usd`. The parent's
+/// RES-04 cap is checked after each completion; over cap halts remaining.
 ///
-/// Plan 35-02 STUB — returns Err(DecompositionError::Internal("not yet wired")).
-/// Plan 35-05 fills the body with the swarm dispatch + cost rollup logic.
+/// Per CONTEXT lock §DECOMP-02:
+///   - Each sub-agent gets fresh `LoopState::default` with `is_subagent=true`
+///   - Each sub-agent gets its own SessionWriter via `fork_session`
+///   - Cost rollup is additive (NOT replace)
+///   - max_concurrent = `min(config.decomposition.max_parallel_subagents, 5)`
+///
+/// The entire orchestrator is wrapped in async `catch_unwind` mirroring the
+/// Phase 33+34 panic-safety discipline (fork failure or sub-agent panic
+/// surfaces as `DecompositionError::Internal` rather than tearing the parent
+/// run_loop down).
 pub async fn execute_decomposed_task(
-    _parent_session_id: &str,
-    _parent_state: &mut LoopState,
-    _groups: Vec<StepGroup>,
+    parent_session_id: &str,
+    parent_state: &mut LoopState,
+    groups: Vec<StepGroup>,
+    app: &AppHandle,
+    config: &BladeConfig,
+) -> Result<Vec<SubagentSummary>, DecompositionError> {
+    use futures::FutureExt;
+    let inner = std::panic::AssertUnwindSafe(execute_decomposed_task_inner(
+        parent_session_id,
+        parent_state,
+        groups,
+        app,
+        config,
+    ));
+    match inner.catch_unwind().await {
+        Ok(r) => r,
+        Err(_panic) => {
+            eprintln!(
+                "[DECOMP-02] execute_decomposed_task panicked; surfacing Internal err"
+            );
+            Err(DecompositionError::Internal(
+                "execute_decomposed_task panicked (catch_unwind)".to_string(),
+            ))
+        }
+    }
+}
+
+async fn execute_decomposed_task_inner(
+    parent_session_id: &str,
+    parent_state: &mut LoopState,
+    groups: Vec<StepGroup>,
+    app: &AppHandle,
+    config: &BladeConfig,
+) -> Result<Vec<SubagentSummary>, DecompositionError> {
+    // (1) Build swarm + validate DAG.
+    let swarm = build_swarm_from_groups(&groups, parent_session_id);
+    crate::swarm::validate_dag(&swarm.tasks).map_err(DecompositionError::DagInvalid)?;
+
+    // (2) Compute parent's current message count (the fork point). If the
+    //     parent JSONL doesn't exist yet (no SessionWriter, e.g. first turn
+    //     of a fresh process), default to 0 — `fork_session` clamps anyway.
+    let parent_msg_count =
+        read_parent_msg_count(&config.session.jsonl_log_dir, parent_session_id).unwrap_or(0);
+
+    // (3) Concurrency cap — see CONTEXT lock §DECOMP-02. v1 dispatches serially
+    //     for deterministic cost rollup ordering; the cap is documented for
+    //     Plan 35-07's parallel JoinSet variant.
+    let _max_concurrent = (config.decomposition.max_parallel_subagents.min(5)) as usize;
+
+    // (4) Walk groups serially. Distillation is also serial per CONTEXT
+    //     lock §DECOMP-03; serial dispatch keeps cost rollup deterministic.
+    let mut summaries: Vec<SubagentSummary> = Vec::with_capacity(groups.len());
+    let cap_dollars = config.resilience.cost_guard_per_conversation_dollars.max(0.01);
+    for group in &groups {
+        // RES-04 parent-budget interlock — over cap means halt remaining.
+        if parent_state.conversation_cumulative_cost_usd >= cap_dollars {
+            log::warn!(
+                "[DECOMP-02] parent budget exceeded ({:.4} >= {:.4}); halting at step {} of {}",
+                parent_state.conversation_cumulative_cost_usd,
+                cap_dollars,
+                group.step_index,
+                groups.len(),
+            );
+            return Err(DecompositionError::ParentBudgetExceeded);
+        }
+
+        let summary =
+            spawn_isolated_subagent(group, parent_session_id, parent_msg_count, app, config)
+                .await;
+
+        // Cost rollup — additive into parent's per-conversation total.
+        // The mutable borrow enforces single-writer; serial dispatch makes
+        // the += naturally race-free.
+        parent_state.conversation_cumulative_cost_usd += summary.cost_usd;
+        summaries.push(summary);
+    }
+    Ok(summaries)
+}
+
+/// Build a `Swarm` from `StepGroup`s. Each `StepGroup` becomes one `SwarmTask`
+/// with `id = step_{step_index}`; `depends_on` is mapped from `Vec<u32>` to
+/// `Vec<String>` of `step_{n}` task IDs so `swarm::validate_dag` can walk the
+/// graph. The Swarm's `goal` field captures the parent session linkage so
+/// `/swarm` views can identify auto-decomposition fan-outs separately from
+/// explicit user-invoked swarms.
+fn build_swarm_from_groups(
+    groups: &[StepGroup],
+    parent_session_id: &str,
+) -> crate::swarm::Swarm {
+    let swarm_id = ulid::Ulid::new().to_string();
+    let now = chrono::Utc::now().timestamp();
+    let tasks: Vec<crate::swarm::SwarmTask> = groups
+        .iter()
+        .map(|g| crate::swarm::SwarmTask {
+            id: format!("step_{}", g.step_index),
+            swarm_id: swarm_id.clone(),
+            title: crate::safe_slice(&g.goal, 80).to_string(),
+            goal: g.goal.clone(),
+            task_type: crate::swarm::SwarmTaskType::default(),
+            depends_on: g
+                .depends_on
+                .iter()
+                .map(|i| format!("step_{}", i))
+                .collect(),
+            agent_id: None,
+            status: crate::swarm::SwarmTaskStatus::Pending,
+            result: None,
+            scratchpad_key: None,
+            created_at: now,
+            started_at: None,
+            completed_at: None,
+            error: None,
+            role: g.role.as_str().to_string(),
+            required_tools: Vec::new(),
+            estimated_duration: g.estimated_duration.clone(),
+        })
+        .collect();
+    crate::swarm::Swarm {
+        id: swarm_id,
+        goal: format!(
+            "auto-decomposition fan-out from session {}",
+            crate::safe_slice(parent_session_id, 32)
+        ),
+        status: crate::swarm::SwarmStatus::Planning,
+        scratchpad: std::collections::HashMap::new(),
+        scratchpad_entries: Vec::new(),
+        final_result: None,
+        tasks,
+        created_at: now,
+        updated_at: now,
+    }
+}
+
+/// Spawn ONE sub-agent in isolation: seam check → `fork_session` (Phase 34
+/// SESS-04) → emit `subagent_started` → run sub-agent to halt → distill
+/// summary (DECOMP-03) → emit `subagent_complete` → return `SubagentSummary`.
+///
+/// On `fork_session` error: emit `subagent_complete` with success=false and
+/// return a stub `SubagentSummary` so siblings continue.
+///
+/// On `run_subagent_to_halt` error: log + return a stub summary with
+/// success=false.
+///
+/// On distillation error: return a heuristic summary with the error excerpt.
+async fn spawn_isolated_subagent(
+    group: &StepGroup,
+    parent_session_id: &str,
+    parent_msg_count: u32,
+    app: &AppHandle,
+    config: &BladeConfig,
+) -> SubagentSummary {
+    // Plan 35-05 test seam — short-circuit spawn entirely.
+    #[cfg(test)]
+    {
+        let forced = DECOMP_FORCE_SUBAGENT_RESULT.with(|c| c.borrow_mut().take());
+        if let Some(forced) = forced {
+            // Still emit started/complete chips so event-shape tests pass.
+            emit_subagent_started(app, group);
+            emit_subagent_complete(app, group, &forced);
+            return forced;
+        }
+    }
+
+    // (a) Fork session — Phase 34 SESS-04 substrate.
+    let new_id = match crate::session::list::fork_session(
+        parent_session_id.to_string(),
+        parent_msg_count,
+    )
+    .await
+    {
+        Ok(id) => id,
+        Err(e) => {
+            eprintln!(
+                "[DECOMP-02] fork_session failed for parent {} at idx {}: {}",
+                crate::safe_slice(parent_session_id, 32),
+                parent_msg_count,
+                e
+            );
+            let s = SubagentSummary {
+                step_index: group.step_index,
+                subagent_session_id: String::new(),
+                role: group.role.as_str().to_string(),
+                success: false,
+                summary_text: crate::safe_slice(&format!("[fork failed: {}]", e), 500)
+                    .to_string(),
+                tokens_used: 0,
+                cost_usd: 0.0,
+            };
+            // Emit complete chip so the UI doesn't see a hanging started
+            // event. Skip started since the spawn never began.
+            emit_subagent_complete(app, group, &s);
+            return s;
+        }
+    };
+
+    // (b) Emit subagent_started AFTER fork succeeds, BEFORE run_loop begins.
+    emit_subagent_started(app, group);
+
+    // (c) Run sub-agent to halt. v1 placeholder — Plan 35-07 wires the real
+    //     run_loop dispatch with LoopState{is_subagent=true} pointing at the
+    //     forked SessionWriter.
+    let (success, sub_cost, tokens_used) = match run_subagent_to_halt(
+        &new_id, group, app, config,
+    )
+    .await
+    {
+        Ok(triple) => triple,
+        Err(e) => {
+            eprintln!(
+                "[DECOMP-02] run_subagent_to_halt error for step {}: {}",
+                group.step_index, e
+            );
+            (false, 0.0, 0)
+        }
+    };
+
+    // (d) Distill summary (DECOMP-03 — Plan 35-06 fills the body).
+    //     During Plan 35-05's run, distill returns Err (Plan 35-02 stub);
+    //     the executor falls back to a heuristic SubagentSummary so siblings
+    //     continue + the rollup still sees the cost.
+    let mut summary = match distill_subagent_summary(&new_id, group.role.clone(), config).await
+    {
+        Ok(s) => s,
+        Err(e) => SubagentSummary {
+            step_index: group.step_index,
+            subagent_session_id: new_id.clone(),
+            role: group.role.as_str().to_string(),
+            success: false,
+            summary_text: crate::safe_slice(
+                &format!("[summary distillation failed: {}]", e),
+                500,
+            )
+            .to_string(),
+            tokens_used,
+            cost_usd: sub_cost,
+        },
+    };
+    // distill returns step_index=0 by default; overwrite with the real one.
+    summary.step_index = group.step_index;
+    if summary.subagent_session_id.is_empty() {
+        summary.subagent_session_id = new_id.clone();
+    }
+    if summary.tokens_used == 0 {
+        summary.tokens_used = tokens_used;
+    }
+    if summary.cost_usd == 0.0 {
+        summary.cost_usd = sub_cost;
+    }
+    summary.success = summary.success && success;
+
+    // (e) Emit subagent_complete AFTER distillation, BEFORE returning.
+    emit_subagent_complete(app, group, &summary);
+    summary
+}
+
+/// Plan 35-05 v1 sub-agent runner. Returns `(success, cost_usd, tokens_used)`.
+///
+/// **v1 placeholder** — Plan 35-07 wires the real dispatch through
+/// `run_loop` with `LoopState{is_subagent=true}` + the forked SessionWriter.
+/// Until then, this function returns `Ok((true, 0.0, 0))` so the executor
+/// body compiles + the cost-rollup tests work via the
+/// `DECOMP_FORCE_SUBAGENT_RESULT` seam (which short-circuits before this is
+/// called).
+///
+/// Real production-path callers will see this no-op behavior until Plan 35-07
+/// — that's intentional: a v1 sub-agent that does no work is preferable to
+/// a half-wired one that may corrupt the parent's conversation.
+async fn run_subagent_to_halt(
+    _new_id: &str,
+    _group: &StepGroup,
     _app: &AppHandle,
     _config: &BladeConfig,
-) -> Result<Vec<SubagentSummary>, DecompositionError> {
-    Err(DecompositionError::Internal(
-        "Plan 35-02 stub — execute_decomposed_task body wired in Plan 35-05".to_string(),
-    ))
+) -> Result<(bool, f32, u32), String> {
+    Ok((true, 0.0, 0))
+}
+
+fn emit_subagent_started(app: &AppHandle, group: &StepGroup) {
+    crate::commands::emit_stream_event(
+        app,
+        "blade_loop_event",
+        serde_json::json!({
+            "kind": "subagent_started",
+            "step_index": group.step_index,
+            "role": group.role.as_str(),
+            "goal_excerpt": crate::safe_slice(&group.goal, 120),
+        }),
+    );
+}
+
+fn emit_subagent_complete(app: &AppHandle, group: &StepGroup, s: &SubagentSummary) {
+    crate::commands::emit_stream_event(
+        app,
+        "blade_loop_event",
+        serde_json::json!({
+            "kind": "subagent_complete",
+            "step_index": group.step_index,
+            "success": s.success,
+            "summary_excerpt": crate::safe_slice(&s.summary_text, 120),
+            "subagent_session_id": s.subagent_session_id,
+        }),
+    );
+}
+
+/// Read the parent's `UserMessage` + `AssistantTurn` count from its JSONL.
+/// Used as the fork point — every sub-agent forks from the parent's CURRENT
+/// message count so it inherits the full pre-decomposition history.
+///
+/// Returns `Err` when the JSONL is missing (e.g. unit tests with no
+/// SessionWriter); callers should fall back to 0 — `fork_session` clamps
+/// `fork_at_message_index` to actual count anyway.
+fn read_parent_msg_count(dir: &std::path::Path, parent_id: &str) -> std::io::Result<u32> {
+    use std::io::BufRead;
+    let path = dir.join(format!("{}.jsonl", parent_id));
+    let file = std::fs::File::open(&path)?;
+    let reader = std::io::BufReader::new(file);
+    let mut count: u32 = 0;
+    for line in reader.lines().flatten() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        if let Ok(ev) = serde_json::from_str::<crate::session::log::SessionEvent>(&line) {
+            match ev {
+                crate::session::log::SessionEvent::UserMessage { .. }
+                | crate::session::log::SessionEvent::AssistantTurn { .. } => {
+                    count = count.saturating_add(1);
+                }
+                _ => {}
+            }
+        }
+    }
+    Ok(count)
 }
 
 #[cfg(test)]
