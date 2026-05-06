@@ -164,7 +164,18 @@
   3. When a sub-agent completes, only its summary (not its full conversation) is returned to the parent — the parent conversation does not inflate by the sub-agent's token count
   4. A user can branch a conversation ("let me explore this tangent") and later merge the branch summary back — both the fork and the merge are explicit user actions with visible checkpoints
   5. Sub-agent progress streams into the chat as it happens — the user sees intermediate status, not a silent wait followed by a wall of text
-**Plans**: TBD
+**Plans:** 11 plans across 5 waves (Wave 1: 35-01, 35-02; Wave 2: 35-03, 35-04; Wave 3: 35-05, 35-06, 35-07; Wave 4: 35-08, 35-09, 35-10; Wave 5: 35-11) — **all 11 code-complete; runtime UAT operator-deferred per Arnav 2026-05-06**
+- [x] 35-01-PLAN.md — DecompositionConfig sub-struct (6-place rule) + 5 fields [Wave 1] ✓ commits 8959f69 + 7cf566b
+- [x] 35-02-PLAN.md — LoopState.is_subagent + LoopHaltReason::DecompositionComplete + decomposition/ module scaffold + 3 FORCE seams [Wave 1] ✓ commits 55b93bd + d37267a + e517c60
+- [x] 35-03-PLAN.md — DECOMP-01 step counter (3-axis heuristic: verbs/files/tools) + role selection [Wave 2] ✓ commits 202e074 + ef7b118
+- [x] 35-04-PLAN.md — DECOMP-01 run_loop pre-iteration trigger + recursion gate + cost interlock + panic-injection [Wave 2] ✓ commits 3c6c2b3 + 6430432 + 194226d + b99ce83
+- [x] 35-05-PLAN.md — DECOMP-02 execute_decomposed_task body + spawn_isolated_subagent + cost rollup [Wave 3] ✓ commits f5366b7 + 0e11b58 + bde1b13
+- [x] 35-06-PLAN.md — DECOMP-03 distill_subagent_summary body + cheap-model dispatch + heuristic fallback [Wave 3] ✓ commits c66e8ea + 315ea5a
+- [x] 35-07-PLAN.md — DECOMP-02 sub-agent dispatch wiring + DecompositionComplete arm + full-pipeline integration test [Wave 3] ✓ commits 6e84fbb + 3b1ac6f + 9a4e825 + cda43f5
+- [x] 35-08-PLAN.md — DECOMP-04 merge_fork_back Tauri command + MergeResult + JSONL append helpers [Wave 4] ✓ commits 516bb56 + ebfa6c9 + 8d2e120
+- [x] 35-09-PLAN.md — DECOMP-05 BladeLoopEventPayload subagent variants + mergeForkBack typed wrapper [Wave 4] ✓ commits d19e4fc + c60fa0c
+- [x] 35-10-PLAN.md — DECOMP-04 SessionsView Merge back + DECOMP-05 ActivityStrip chips + SubagentProgressBubble [Wave 4] ✓ commits 1650a68 + a2a9499 + fc14989 + c1710a3
+- [x] 35-11-PLAN.md — Panic-injection regression + checkpoint:human-verify 15-step UAT [Wave 5] ✓ commits eb95b7a + b86d6e2; Task 3 = checkpoint:human-verify, runtime UAT pending Arnav
 
 ### Phase 36: Context Intelligence
 
