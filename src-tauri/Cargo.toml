@@ -59,6 +59,16 @@ zip = "2"
 whisper-rs = { version = "0.13", optional = true }
 walkdir = "2"
 once_cell = "1"
+# Plan 34-02 — RES-01 NoProgress + RepeatedActionObservation use sha256 of
+# safe_slice'd text/args for deterministic dedup hashing.
+sha2 = "0.10"
+# Plan 34-02 — SESS-01 session IDs. ULID is lex-sortable (48-bit ms timestamp +
+# 80-bit random), Crockford base32 (26 chars, no I/L/O/U), filesystem-friendly.
+ulid = "1"
+# Plan 34-02 — SESS-01 atomic JSONL append. fs2 provides cross-platform
+# advisory flock (LOCK_EX) for events that exceed the POSIX PIPE_BUF=4096
+# atomicity guarantee.
+fs2 = "0.4"
 
 [dev-dependencies]
 tempfile = "3"
