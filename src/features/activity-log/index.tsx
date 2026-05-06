@@ -157,10 +157,28 @@ export function ActivityLogProvider({ children }: { children: ReactNode }) {
         break;
       case 'halted':
         action = 'halted';
-        summary =
-          payload.reason === 'cost_exceeded'
-            ? `halted: cost cap ($${(payload.spent_usd ?? 0).toFixed(2)} of $${(payload.cap_usd ?? 0).toFixed(2)})`
-            : 'halted: iteration cap';
+        // Phase 34 / HI-01 (REVIEW finding) — Rust emits four halt reasons,
+        // not two. Previously every non-cost_exceeded reason was rendered as
+        // "halted: iteration cap" which silently mis-labeled circuit_breaker
+        // and stuck halts. Branch explicitly so the operator-visible chip
+        // matches what actually halted the loop.
+        if (payload.reason === 'cost_exceeded') {
+          summary = `halted: cost cap ($${(payload.spent_usd ?? 0).toFixed(2)} of $${(payload.cap_usd ?? 0).toFixed(2)})`;
+        } else if (payload.reason === 'circuit_breaker') {
+          summary = `halted: circuit open${payload.error_kind ? ` (${payload.error_kind})` : ''}`;
+        } else if (typeof payload.reason === 'string' && payload.reason.startsWith('stuck:')) {
+          // pattern is the suffix after `stuck:` — e.g. stuck:MonologueSpiral.
+          const pattern = payload.reason.slice('stuck:'.length);
+          summary = `halted: stuck (${formatPatternLabel(pattern)})`;
+        } else if (payload.reason === 'fallback_exhausted') {
+          summary = 'halted: fallback chain exhausted';
+        } else if (payload.reason === 'iteration_cap') {
+          summary = 'halted: iteration cap';
+        } else {
+          // Unknown reason string — surface it verbatim so the operator can
+          // see what the Rust side emitted instead of mis-labeling as iter cap.
+          summary = `halted: ${payload.reason}`;
+        }
         break;
       // ─── Phase 34 / Plan 34-11 ────────────────────────────────────────────
       case 'stuck_detected':

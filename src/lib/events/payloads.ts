@@ -883,7 +883,27 @@ export type BladeLoopEventPayload =
   | { kind: 'token_escalated'; new_max: number }
   | {
       kind: 'halted';
-      reason: 'cost_exceeded' | 'iteration_cap';
+      // Phase 34 / HI-01 (REVIEW finding) — Rust emits FOUR halt reasons, not two:
+      //   - "cost_exceeded"     (Phase 33-08 + 34-06 cap halts)
+      //   - "iteration_cap"     (Phase 33-08 max-iterations)
+      //   - "circuit_breaker"   (Phase 34-05 RES-02 N consecutive same-kind failures)
+      //   - "stuck:{pattern}"   (Phase 34-04 RES-01 — pattern is one of
+      //     RepeatedActionObservation | MonologueSpiral | ContextWindowThrashing |
+      //     NoProgress | CostRunaway). Encoded as the literal prefix `stuck:` so
+      //     a single switch can branch via `payload.reason.startsWith('stuck:')`.
+      // The trailing `string` keeps the union open for any Rust-side reason
+      // string we haven't enumerated yet — degrades gracefully instead of
+      // narrowing-by-omission like the previous 2-value union did.
+      reason:
+        | 'cost_exceeded'
+        | 'iteration_cap'
+        | 'circuit_breaker'
+        | `stuck:${string}`
+        | 'fallback_exhausted'
+        | string;
+      // Phase 34 RES-02 — circuit_breaker payload carries error_kind + attempts.
+      error_kind?: string;
+      attempts?: number;
       spent_usd?: number;
       cap_usd?: number;
       // Plan 34-06 (RES-04) — distinguishes per-loop vs per-conversation halt
