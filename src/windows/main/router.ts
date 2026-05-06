@@ -47,6 +47,10 @@ import { routes as onboardingRoutes } from '@/features/onboarding';
 import { routes as voiceOrbRoutes }   from '@/features/voice-orb';
 import { routes as ghostRoutes }      from '@/features/ghost';
 import { routes as quickaskRoutes }   from '@/features/quickask';
+// Phase 34 Plan 34-11 — Sessions list / resume / fork (SESS-02 / SESS-03 /
+// SESS-04). Single-route cluster for now; v1.6 may extend with a session
+// detail / archive admin surface.
+import { routes as sessionsRoutes }   from '@/features/sessions';
 import { routes as devRoutes }        from '@/features/dev';
 
 export const ALL_ROUTES: RouteDefinition[] = [
@@ -65,6 +69,7 @@ export const ALL_ROUTES: RouteDefinition[] = [
   ...voiceOrbRoutes,
   ...ghostRoutes,
   ...quickaskRoutes,
+  ...sessionsRoutes,
   ...(import.meta.env.DEV ? devRoutes : []),
 ];
 
