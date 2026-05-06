@@ -140,7 +140,18 @@
   4. When a provider errors, the loop retries with backoff, then silently falls over to the next provider in the fallback chain — the user only sees a message if the full chain is exhausted
   5. After closing and reopening the app, the user can select their last session and pick up from the last compaction boundary — conversation history is reconstructed correctly
   6. The session list UI shows past conversations with timestamp, first message, and approximate token count; any session can be resumed or branched
-**Plans**: TBD
+**Plans:** 11 plans across 5 waves (Wave 1: 34-01, 34-02, 34-03; Wave 2: 34-04, 34-05; Wave 3: 34-06, 34-07; Wave 4: 34-08, 34-09; Wave 5: 34-10, 34-11) — **all 11 code-complete; runtime UAT operator-deferred per Arnav 2026-05-06**
+- [x] 34-01-PLAN.md — ResilienceConfig + SessionConfig sub-structs (6-place rule × 2) [Wave 1] ✓ commit 45c0dfe + SUMMARY 04fa671
+- [x] 34-02-PLAN.md — LoopState extensions (8 RES-01..04 fields) + LoopHaltReason::{Stuck, CircuitOpen} + sha2/ulid/fs2 deps [Wave 1] ✓ commits 917b8ca + 45c0dfe + bb41e63 + 65406aa
+- [x] 34-03-PLAN.md — resilience/ + session/ module scaffold + SessionEvent enum + 4 Tauri command stubs [Wave 1] ✓ commits c7428b7 + 9541a7d + 5d120f0
+- [x] 34-04-PLAN.md — RES-01 5-pattern stuck detection + run_loop iteration-top wire [Wave 2] ✓ commits 47e5c1d + 643e299 + 6bccd54
+- [x] 34-05-PLAN.md — RES-02 circuit breaker (widen ERROR_HISTORY + CircuitOpen halt + reset-on-success) [Wave 2] ✓ commits 886652a + 89054c8 + 7dafd98
+- [x] 34-06-PLAN.md — RES-03 + RES-04 per-conversation cost tracking + two-tier guard [Wave 3] ✓ commits 5a3d893 + 063171f + 6a0c2e9
+- [x] 34-07-PLAN.md — RES-05 provider fallback chain + exponential backoff with jitter [Wave 3] ✓ commits 98037a5 + e514d59 + 866773f + 00ef194
+- [x] 34-08-PLAN.md — SESS-01 SessionWriter (flock + catch_unwind + rotation) wired into 5 message-flow boundaries [Wave 4] ✓ commits 81aec33 + 76a4b3b + 9a25610
+- [x] 34-09-PLAN.md — SESS-02 load_session replay from most-recent compaction boundary [Wave 4] ✓ commits f516297 + 24cdc88
+- [x] 34-10-PLAN.md — SESS-03 list_sessions + SESS-04 fork_session + Tauri command registration [Wave 5] ✓ commits e06c690 + eab4d83 + 7f885f7 + 8ee46f0
+- [x] 34-11-PLAN.md — Frontend integration (payloads, sessions.ts, ActivityStrip, SessionsView, cost-meter, route) + checkpoint:human-verify UAT [Wave 5] ✓ commits 126cdb9 + 0fd1544 + d228151 + f0e4dfd + 6fc8123 + d98f4db + 82f38a1 + d5588af; Task 6 = checkpoint:human-verify, runtime UAT pending Arnav
 
 ### Phase 35: Auto-Decomposition
 
