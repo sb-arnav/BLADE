@@ -447,6 +447,217 @@ pub async fn get_conversation_cost(
     }))
 }
 
+/// DECOMP-04 (Plan 35-08) — IPC return shape for the `merge_fork_back`
+/// Tauri command. The frontend `mergeForkBack(forkId)` typed wrapper
+/// (Plan 35-09) deserializes this. Exposed to JS via Tauri's serde bridge.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MergeResult {
+    pub fork_id: String,
+    pub parent_id: String,
+    pub summary_text: String,
+}
+
+/// DECOMP-04 (Plan 35-08) — fold a fork's summary back into its parent
+/// conversation. Explicit user action only (no auto-merge on fork halt);
+/// the SessionsView "Merge back" button (Plan 35-10) calls this.
+///
+/// Flow per CONTEXT lock §DECOMP-04:
+///   1. Validate `fork_id` via Phase 34 SESS-04's `validate_session_id`
+///      (Crockford-base32 regex; rejects `../` traversal, null bytes, etc).
+///   2. Open `{jsonl_log_dir}/{fork_id}.jsonl`. Read first SessionMeta event,
+///      extract parent attribution. If `parent.is_none()` →
+///      `Err("session is not a fork — cannot merge back")`.
+///   3. Distill the fork's conversation via Plan 35-06's
+///      `distill_subagent_summary` with `AgentRole::Analyst`
+///      (branch-merge distillation is structurally analytical).
+///   4. Append two events to parent's JSONL atomically (fs2 advisory lock):
+///        - `LoopEvent { kind: "fork_merged", payload: {fork_id, summary_text}, ts }`
+///        - `UserMessage { content: "[Branch merged from fork {id8}…] {summary}", ts }`
+///   5. Return `MergeResult { fork_id, parent_id, summary_text }`.
+///
+/// The fork's own JSONL is NOT deleted; users can fork-then-merge multiple
+/// times. Each merge stacks a new event with a fresh ULID (T-35-29 accept).
+///
+/// Wrapped in `catch_unwind` per Phase 31 / 34 panic-safety discipline:
+///   - the distillation path uses async catch_unwind (futures::FutureExt)
+///   - the synchronous append path uses std::panic::catch_unwind
+/// Either failure surfaces as `Err`; the host process never crashes.
+#[tauri::command]
+pub async fn merge_fork_back(fork_id: String) -> Result<MergeResult, String> {
+    validate_session_id(&fork_id)?;
+
+    let cfg = crate::config::load_config();
+    let dir = cfg.session.jsonl_log_dir.clone();
+    let fork_path = dir.join(format!("{}.jsonl", &fork_id));
+    if !fork_path.exists() {
+        return Err(format!("fork session not found: {}", fork_id));
+    }
+
+    // (1) Read parent attribution from the fork's first SessionMeta event.
+    //     Wrap the synchronous read in catch_unwind so a corrupt JSONL line
+    //     never crashes the IPC host.
+    let parent_meta_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        read_parent_from_meta(&fork_path)
+    }));
+    let parent_id = match parent_meta_result {
+        Ok(Ok(Some(p))) => p,
+        Ok(Ok(None)) => {
+            return Err("session is not a fork — cannot merge back".to_string());
+        }
+        Ok(Err(e)) => return Err(format!("read fork meta: {}", e)),
+        Err(_) => {
+            eprintln!(
+                "[DECOMP-04] read_parent_from_meta panicked for fork {}",
+                fork_id
+            );
+            return Err("read fork meta panicked (catch_unwind)".to_string());
+        }
+    };
+
+    // Validate the parent_id we just read off disk (defense in depth — if a
+    // hostile user edited the JSONL by hand, validate_session_id catches it
+    // BEFORE the dir.join() builds a path with traversal segments).
+    validate_session_id(&parent_id)
+        .map_err(|e| format!("invalid parent id in fork meta: {}", e))?;
+
+    let parent_path = dir.join(format!("{}.jsonl", &parent_id));
+    if !parent_path.exists() {
+        return Err(format!(
+            "parent session not found for fork {} (expected {}.jsonl)",
+            fork_id, parent_id
+        ));
+    }
+
+    // (2) Distill summary via Plan 35-06 (cheap-model + heuristic fallback).
+    //     `distill_subagent_summary` already wraps its inner future in
+    //     catch_unwind, but we mirror the discipline here for an extra layer
+    //     since this is an IPC boundary.
+    use futures::FutureExt;
+    let distill_future = std::panic::AssertUnwindSafe(async {
+        crate::decomposition::summary::distill_subagent_summary(
+            &fork_id,
+            crate::agents::AgentRole::Analyst,
+            &cfg,
+        )
+        .await
+    });
+    let summary = match distill_future.catch_unwind().await {
+        Ok(Ok(s)) => s,
+        Ok(Err(e)) => {
+            eprintln!("[DECOMP-04] distillation error: {}", e);
+            return Err(format!("distillation failed: {}", e));
+        }
+        Err(_) => {
+            eprintln!("[DECOMP-04] distillation panicked");
+            return Err("distillation panicked (catch_unwind)".to_string());
+        }
+    };
+
+    // (3) Build + append the 2 events to parent JSONL.
+    let now = crate::session::log::now_ms();
+    let merge_event = crate::session::log::SessionEvent::LoopEvent {
+        kind: "fork_merged".to_string(),
+        payload: serde_json::json!({
+            "fork_id": fork_id,
+            "summary_text": summary.summary_text,
+        }),
+        timestamp_ms: now,
+    };
+
+    // 8-char fork_id excerpt for the synthetic message header. fork_id is a
+    // 26-char ULID after validate_session_id, but use safe_slice anyway —
+    // ASCII Crockford base32 is single-byte so &[..8] is safe, but the helper
+    // gives uniform discipline across the codebase.
+    let id_excerpt = crate::safe_slice(&fork_id, 8);
+    let max_chars = (cfg.decomposition.subagent_summary_max_tokens as usize) * 4;
+    let synthetic_user = crate::session::log::SessionEvent::UserMessage {
+        id: ulid::Ulid::new().to_string(),
+        content: format!(
+            "[Branch merged from fork {}…] {}",
+            id_excerpt,
+            crate::safe_slice(&summary.summary_text, max_chars),
+        ),
+        timestamp_ms: now,
+    };
+
+    let append_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        append_events_to_jsonl(&parent_path, &[merge_event, synthetic_user])
+    }));
+    match append_result {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => {
+            eprintln!("[DECOMP-04] append error: {}", e);
+            return Err(format!("append events: {}", e));
+        }
+        Err(_) => {
+            eprintln!("[DECOMP-04] append panicked");
+            return Err("append panicked (catch_unwind)".to_string());
+        }
+    }
+
+    Ok(MergeResult {
+        fork_id: fork_id.clone(),
+        parent_id,
+        summary_text: summary.summary_text,
+    })
+}
+
+/// Plan 35-08 (DECOMP-04) helper — read first `SessionMeta` event from a
+/// JSONL file and return its `parent` attribution.
+///   - `Ok(Some(parent))` → file is a fork; parent is the source session.
+///   - `Ok(None)` → file is a top-level session OR no SessionMeta found.
+///   - `Err(_)` → I/O error opening the file.
+///
+/// Mirrors `read_meta`'s discipline: corrupt lines are skipped silently;
+/// the FIRST SessionMeta wins (later ones, if any, are ignored).
+fn read_parent_from_meta(path: &std::path::Path) -> Result<Option<String>, String> {
+    use std::io::BufRead;
+    let f = std::fs::File::open(path).map_err(|e| e.to_string())?;
+    let reader = std::io::BufReader::new(f);
+    for line in reader.lines() {
+        let line = line.map_err(|e| e.to_string())?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        if let Ok(ev) = serde_json::from_str::<crate::session::log::SessionEvent>(&line) {
+            if let crate::session::log::SessionEvent::SessionMeta { parent, .. } = ev {
+                return Ok(parent);
+            }
+        }
+    }
+    Ok(None)
+}
+
+/// Plan 35-08 (DECOMP-04) helper — atomically append one or more
+/// `SessionEvent`s to an existing JSONL file. Uses `fs2` advisory exclusive
+/// lock per Phase 34 SESS-01 discipline (T-35-31 mitigation: serializes
+/// merge-back appends against any concurrent SessionWriter::append on the
+/// same parent JSONL).
+///
+/// File is opened with `create(true).append(true)` — append-only semantics
+/// match SessionWriter; never truncates.
+fn append_events_to_jsonl(
+    path: &std::path::Path,
+    events: &[crate::session::log::SessionEvent],
+) -> Result<(), String> {
+    use fs2::FileExt;
+    use std::io::Write;
+    let mut f = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .map_err(|e| format!("open {}: {}", path.display(), e))?;
+    f.lock_exclusive().map_err(|e| format!("flock: {}", e))?;
+    for ev in events {
+        let line = serde_json::to_string(ev).map_err(|e| format!("serialize: {}", e))?;
+        f.write_all(line.as_bytes())
+            .map_err(|e| format!("write: {}", e))?;
+        f.write_all(b"\n").map_err(|e| format!("write nl: {}", e))?;
+    }
+    f.unlock().map_err(|e| format!("unlock: {}", e))?;
+    Ok(())
+}
+
 /// SESS-03 — validate that a session_id is a 26-char Crockford base32 ULID.
 /// Rejects path-traversal, null bytes, slashes, etc. Plan 34-03 ships the
 /// regex; Plan 34-10 wires it into every command body.
@@ -1127,6 +1338,246 @@ mod tests {
         // Cleanup.
         std::env::remove_var("BLADE_CONFIG_DIR");
         let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    // ─── Plan 35-08 (DECOMP-04) — merge_fork_back tests ─────────────────────
+
+    /// DECOMP-04 — MergeResult serializes/deserializes losslessly. Frontend
+    /// IPC contract: Plan 35-09 mirrors this struct in TS.
+    #[test]
+    fn phase35_decomp_04_merge_result_serde_roundtrip() {
+        let m = MergeResult {
+            fork_id: "01ARZ3NDEKTSV4RRFFQ69G5FAV".to_string(),
+            parent_id: "01ARZ3NDEKTSV4RRFFQ69G5FAW".to_string(),
+            summary_text: "merged content from fork".to_string(),
+        };
+        let json = serde_json::to_string(&m).expect("serialize");
+        let parsed: MergeResult = serde_json::from_str(&json).expect("parse");
+        assert_eq!(parsed.fork_id, m.fork_id);
+        assert_eq!(parsed.parent_id, m.parent_id);
+        assert_eq!(parsed.summary_text, m.summary_text);
+    }
+
+    /// DECOMP-04 — `read_parent_from_meta` returns Some(parent) for a fork
+    /// (SessionMeta with `parent: Some(_)`) and None for a top-level session
+    /// (SessionMeta with `parent: None`). Both cases exercise the helper's
+    /// first-SessionMeta-wins discipline.
+    #[test]
+    fn phase35_decomp_04_read_parent_from_meta_helper() {
+        // Use a fresh tmp dir; this test does NOT mutate BLADE_CONFIG_DIR
+        // (read_parent_from_meta takes an absolute path), so no env lock.
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let dir = std::env::temp_dir().join(format!(
+            "blade-decomp-04-readmeta-{}-{}",
+            std::process::id(),
+            nanos
+        ));
+        std::fs::create_dir_all(&dir).expect("mkdir");
+
+        // Fork file: SessionMeta.parent = Some(parent_id).
+        let parent_id = "01ARZ3NDEKTSV4RRFFQ69G5FAV".to_string();
+        let fork_id = "01ARZ3NDEKTSV4RRFFQ69G5FAW".to_string();
+        let fork_path = dir.join(format!("{}.jsonl", fork_id));
+        let fork_meta = crate::session::log::SessionEvent::SessionMeta {
+            id: fork_id.clone(),
+            parent: Some(parent_id.clone()),
+            fork_at_index: Some(3),
+            started_at_ms: 0,
+        };
+        std::fs::write(
+            &fork_path,
+            format!("{}\n", serde_json::to_string(&fork_meta).unwrap()),
+        )
+        .unwrap();
+        assert_eq!(
+            read_parent_from_meta(&fork_path).unwrap(),
+            Some(parent_id),
+            "fork SessionMeta must yield Some(parent_id)"
+        );
+
+        // Top-level file: SessionMeta.parent = None.
+        let top_id = "01ARZ3NDEKTSV4RRFFQ69G5FAX".to_string();
+        let top_path = dir.join(format!("{}.jsonl", top_id));
+        let top_meta = crate::session::log::SessionEvent::SessionMeta {
+            id: top_id.clone(),
+            parent: None,
+            fork_at_index: None,
+            started_at_ms: 0,
+        };
+        std::fs::write(
+            &top_path,
+            format!("{}\n", serde_json::to_string(&top_meta).unwrap()),
+        )
+        .unwrap();
+        assert_eq!(
+            read_parent_from_meta(&top_path).unwrap(),
+            None,
+            "top-level SessionMeta must yield None"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// DECOMP-04 — `append_events_to_jsonl` extends an existing JSONL file
+    /// rather than truncating it; events are written in order, one per line.
+    #[test]
+    fn phase35_decomp_04_append_events_to_jsonl_helper() {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let dir = std::env::temp_dir().join(format!(
+            "blade-decomp-04-append-{}-{}",
+            std::process::id(),
+            nanos
+        ));
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        let path = dir.join("01ARZ3NDEKTSV4RRFFQ69G5FAV.jsonl");
+
+        // Seed the file with one event so we can verify append semantics.
+        let seed = crate::session::log::SessionEvent::UserMessage {
+            id: "u-seed".to_string(),
+            content: "seed turn".to_string(),
+            timestamp_ms: 1,
+        };
+        std::fs::write(
+            &path,
+            format!("{}\n", serde_json::to_string(&seed).unwrap()),
+        )
+        .unwrap();
+
+        let appended = vec![
+            crate::session::log::SessionEvent::LoopEvent {
+                kind: "fork_merged".to_string(),
+                payload: serde_json::json!({"fork_id": "X", "summary_text": "S"}),
+                timestamp_ms: 2,
+            },
+            crate::session::log::SessionEvent::UserMessage {
+                id: "u-merge".to_string(),
+                content: "[Branch merged from fork XXXXXXXX…] S".to_string(),
+                timestamp_ms: 3,
+            },
+        ];
+        append_events_to_jsonl(&path, &appended).expect("append ok");
+
+        let buf = std::fs::read_to_string(&path).expect("read");
+        let lines: Vec<&str> = buf.lines().filter(|l| !l.trim().is_empty()).collect();
+        assert_eq!(
+            lines.len(),
+            3,
+            "seed + 2 appended must yield 3 lines; got {}: {:?}",
+            lines.len(),
+            lines
+        );
+        assert!(
+            lines[0].contains("seed turn"),
+            "seed must survive append (no truncation); line0={}",
+            lines[0]
+        );
+        assert!(
+            lines[1].contains("fork_merged"),
+            "first appended must be the LoopEvent; line1={}",
+            lines[1]
+        );
+        assert!(
+            lines[2].contains("[Branch merged from fork"),
+            "second appended must be the synthetic UserMessage; line2={}",
+            lines[2]
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// DECOMP-04 — `merge_fork_back` rejects path-traversal fork ids before
+    /// any filesystem access fires (Phase 34 SESS-04 hardening reused).
+    #[tokio::test]
+    async fn phase35_decomp_04_merge_validates_session_id() {
+        let r = merge_fork_back("../../etc/passwd".to_string()).await;
+        assert!(r.is_err(), "path-traversal fork_id must be rejected");
+        let r2 = merge_fork_back("".to_string()).await;
+        assert!(r2.is_err(), "empty fork_id must be rejected");
+        let r3 = merge_fork_back("not-a-ulid".to_string()).await;
+        assert!(r3.is_err(), "non-ULID fork_id must be rejected");
+    }
+
+    /// DECOMP-04 — `merge_fork_back` returns Err when the fork JSONL exists
+    /// but its SessionMeta carries `parent: None` (top-level session that is
+    /// not a fork). The error message must explain the rejection.
+    #[tokio::test]
+    async fn phase35_decomp_04_merge_rejects_non_fork() {
+        let _guard = TEST_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let (tmp, sessions) = provision_sessions_dir("decomp-04-non-fork");
+        let id = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+        // SessionMeta with NO parent — file exists, but it's not a fork.
+        write_session_file(&sessions, id, 1000, &[]);
+
+        let r = merge_fork_back(id.to_string()).await;
+        std::env::remove_var("BLADE_CONFIG_DIR");
+        let _ = std::fs::remove_dir_all(&tmp);
+
+        assert!(r.is_err(), "non-fork session must be rejected");
+        let err = r.unwrap_err();
+        assert!(
+            err.contains("not a fork") || err.contains("cannot merge back"),
+            "error must explain non-fork rejection; got: {}",
+            err
+        );
+    }
+
+    /// DECOMP-04 — `merge_fork_back` returns Err when the fork JSONL itself
+    /// is missing on disk (e.g. user manually deleted it).
+    #[tokio::test]
+    async fn phase35_decomp_04_merge_rejects_missing_fork_file() {
+        let _guard = TEST_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let (tmp, _sessions) = provision_sessions_dir("decomp-04-missing-fork");
+        let r = merge_fork_back("01ARZ3NDEKTSV4RRFFQ69G5FZZ".to_string()).await;
+        std::env::remove_var("BLADE_CONFIG_DIR");
+        let _ = std::fs::remove_dir_all(&tmp);
+        assert!(r.is_err(), "missing fork JSONL must Err");
+        let err = r.unwrap_err();
+        assert!(
+            err.contains("not found") || err.contains("fork session"),
+            "error must indicate missing fork; got: {}",
+            err
+        );
+    }
+
+    /// DECOMP-04 — `merge_fork_back` returns Err when the fork attributes a
+    /// parent but the parent JSONL is missing (orphaned fork).
+    #[tokio::test]
+    async fn phase35_decomp_04_merge_rejects_missing_parent_jsonl() {
+        let _guard = TEST_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let (tmp, sessions) = provision_sessions_dir("decomp-04-orphan");
+        let parent_id = "01ARZ3NDEKTSV4RRFFQ69G5FAA";
+        let fork_id = "01ARZ3NDEKTSV4RRFFQ69G5FAB";
+        // Write ONLY the fork; deliberately do NOT create the parent file.
+        let fork_path = sessions.join(format!("{}.jsonl", fork_id));
+        let meta = crate::session::log::SessionEvent::SessionMeta {
+            id: fork_id.to_string(),
+            parent: Some(parent_id.to_string()),
+            fork_at_index: Some(0),
+            started_at_ms: 1000,
+        };
+        std::fs::write(
+            &fork_path,
+            format!("{}\n", serde_json::to_string(&meta).unwrap()),
+        )
+        .unwrap();
+
+        let r = merge_fork_back(fork_id.to_string()).await;
+        std::env::remove_var("BLADE_CONFIG_DIR");
+        let _ = std::fs::remove_dir_all(&tmp);
+
+        assert!(r.is_err(), "orphan fork (missing parent) must Err");
+        let err = r.unwrap_err();
+        assert!(
+            err.contains("parent session not found"),
+            "error must explain missing parent; got: {}",
+            err
+        );
     }
 
     /// Phase 34 / BL-02 — `SessionWriter::new_with_id` reusing an existing id
