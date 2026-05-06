@@ -87,6 +87,44 @@ where
     }
 }
 
+/// Plan 34-08 (SESS-01) — emit a `blade_loop_event` to the chat UI AND record
+/// the matching `LoopEvent` in the SessionWriter's JSONL for forensic replay.
+///
+/// Reduces the ≥6 duplicated emit-and-log patterns in loop_engine.rs to a
+/// single function call. The `payload` should be a JSON object; its fields
+/// are merged with `{ "kind": kind }` for the live event sent to the UI, and
+/// recorded verbatim alongside `kind` in the JSONL line.
+///
+/// Drop-in replacement for:
+///   emit_stream_event(app, "blade_loop_event", json!({"kind": K, ... }))
+/// becomes:
+///   emit_with_jsonl(app, writer, K, json!({...}))   // no kind in payload
+pub(crate) fn emit_with_jsonl(
+    app: &tauri::AppHandle,
+    writer: &crate::session::log::SessionWriter,
+    kind: &str,
+    payload: serde_json::Value,
+) {
+    // Build the live event by merging {kind} with the payload object.
+    let mut full = serde_json::json!({ "kind": kind });
+    if let Some(obj) = payload.as_object() {
+        if let Some(full_obj) = full.as_object_mut() {
+            for (k, v) in obj {
+                full_obj.insert(k.clone(), v.clone());
+            }
+        }
+    }
+    emit_stream_event(app, "blade_loop_event", full);
+    // Record the forensic JSONL line. SessionWriter::append is panic-safe
+    // (Plan 34-08 catch_unwind boundary), so a failure here cannot disturb
+    // the live UI emit above.
+    writer.append(&crate::session::log::SessionEvent::LoopEvent {
+        kind: kind.to_string(),
+        payload,
+        timestamp_ms: crate::session::log::now_ms(),
+    });
+}
+
 // ---------------------------------------------------------------------------
 // Phase 4: Self-healing circuit breaker + exponential backoff
 // (Phase 34-05 widened the tuple to (kind, provider, model, msg, ts) for
@@ -984,6 +1022,48 @@ pub(crate) async fn send_message_stream_inline(
         return Err("No API key configured. Go to settings.".to_string());
     }
 
+    // ─── Plan 34-08 (SESS-01) — SessionWriter construction ──────────────
+    //
+    // Constructs the JSONL forensic writer for this turn. Per CONTEXT lock
+    // §SESS-01: each chat turn opens a SessionWriter at the message-flow
+    // entry; rotation runs BEFORE the new file is created (so the new file
+    // is never at risk of being archived on creation).
+    //
+    // For Plan 34-08, every send_message_stream call creates a fresh
+    // session_id — Plan 34-11 widens the Tauri command surface so the
+    // frontend can pass an existing session_id (resumed conversations).
+    //
+    // CTX-07 escape hatch: when config.session.jsonl_log_enabled = false,
+    // SessionWriter::new returns a no-op writer (no file created).
+    //
+    // Error-recovery: when SessionWriter::new returns Err (FS permission,
+    // disk full, etc.), fall back to SessionWriter::no_op() so the live
+    // chat path is unaffected. The chat-continues posture is the v1.1
+    // lesson incarnate: forensic logging must never crash chat.
+    let (session_writer, session_id) = match crate::session::log::SessionWriter::new(
+        &config.session.jsonl_log_dir,
+        config.session.jsonl_log_enabled,
+    ) {
+        Ok(pair) => pair,
+        Err(e) => {
+            eprintln!(
+                "[SESS-01] writer init failed: {}; sessions disabled this turn",
+                e
+            );
+            (crate::session::log::SessionWriter::no_op(), String::new())
+        }
+    };
+    // First JSONL line: SessionMeta. Skipped silently when the writer is
+    // disabled or in no-op mode (SessionWriter::append checks `enabled`).
+    if !session_id.is_empty() {
+        session_writer.append(&crate::session::log::SessionEvent::SessionMeta {
+            id: session_id.clone(),
+            parent: None,
+            fork_at_index: None,
+            started_at_ms: crate::session::log::now_ms(),
+        });
+    }
+
     // Smart routing: resolve best provider + model for this task type.
     // If the user configured e.g. "code tasks → Anthropic", this picks that provider + its key.
     // Falls back to active provider if the routed provider has no stored key.
@@ -1118,6 +1198,21 @@ pub(crate) async fn send_message_stream_inline(
     // Strip prompt injection attempts, excessive whitespace, null bytes,
     // and cap input length to prevent context window abuse.
     let last_user_text = sanitize_input(&last_user_text);
+
+    // ─── Plan 34-08 (SESS-01) — UserMessage JSONL emit ──────────────────
+    //
+    // Records the sanitized user message into the SessionWriter's JSONL
+    // log. Fires AFTER sanitize_input so what we replay on resume is what
+    // the model actually saw, not the raw inbound payload (which could
+    // contain stripped prompt-injection attempts). The id is a synthetic
+    // user-{ms} marker — Plan 34-11 may wire frontend-provided user
+    // message IDs through if needed; for SESS-01 the synthetic id is
+    // sufficient for SESS-02 ordering.
+    session_writer.append(&crate::session::log::SessionEvent::UserMessage {
+        id: format!("user-{}", crate::session::log::now_ms()),
+        content: last_user_text.clone(),
+        timestamp_ms: crate::session::log::now_ms(),
+    });
 
     // ── Phase 24 (v1.3) — chat-injected proposal reply apply path ────────────
     // intent_router classifies "yes <id>" / "no <id>" / "dismiss <id>" as
@@ -1728,6 +1823,7 @@ pub(crate) async fn send_message_stream_inline(
                 )
             }));
         }
+        let pre_compact_len = conversation.len();
         compress_conversation_smart(
             &mut conversation,
             trigger,
@@ -1738,6 +1834,35 @@ pub(crate) async fn send_message_stream_inline(
         ).await;
         // Restore status so subsequent stream events show the right indicator.
         let _ = app.emit("blade_status", "processing");
+
+        // ─── Plan 34-08 (SESS-01) — CompactionBoundary JSONL emit ────────
+        //
+        // Records the boundary IF compaction actually fired (kept_message_count
+        // changed). compress_conversation_smart is a no-op below the trigger;
+        // we detect that by comparing pre/post lengths and only record when
+        // they differ. Per CONTEXT lock §SESS-01: SESS-02 resume replays
+        // everything FROM the boundary forward (the synthetic
+        // `[Earlier conversation summary]` user message substitutes for the
+        // collapsed prefix). The summary excerpt's first 200 chars are
+        // captured for forensic display in list_sessions (SESS-03).
+        if conversation.len() != pre_compact_len {
+            let summary_excerpt = conversation
+                .iter()
+                .find_map(|m| match m {
+                    crate::providers::ConversationMessage::User(s)
+                        if s.starts_with("[Earlier conversation summary]") =>
+                    {
+                        Some(crate::safe_slice(s, 200).to_string())
+                    }
+                    _ => None,
+                })
+                .unwrap_or_default();
+            session_writer.append(&crate::session::log::SessionEvent::CompactionBoundary {
+                kept_message_count: conversation.len() as u32,
+                summary_first_chars: summary_excerpt,
+                timestamp_ms: crate::session::log::now_ms(),
+            });
+        }
     }
 
     // ─── Phase 33 / Plan 33-03 — iteration body lifted into loop_engine::run_loop ───
@@ -1768,7 +1893,34 @@ pub(crate) async fn send_message_stream_inline(
         input_message_count,
         turn_acc,
         &mut _current_message_id,
+        // Plan 34-08 (SESS-01) — SessionWriter forensic log handle.
+        &session_writer,
     ).await;
+
+    // ─── Plan 34-08 (SESS-01) — HaltReason JSONL emit ───────────────────
+    //
+    // Records the run_loop outcome (Ok or any Err variant) into the
+    // SessionWriter's JSONL log. LoopHaltReason now derives Serialize so
+    // its full payload (cost figures, stuck pattern, attempts_summary, etc.)
+    // round-trips to JSON. This event is the LAST line on every halt path —
+    // SESS-02 resume reads it to determine whether the conversation halted
+    // mid-loop and surface that to the user as a "resumed from halt: X"
+    // banner. Fires for both Ok(()) and Err(...) so a clean turn also has
+    // a terminal HaltReason marker (reason="ok") for SESS-02 to detect a
+    // gracefully-completed conversation vs. a mid-flight crash.
+    let (reason_str, payload) = match &halt {
+        Ok(()) => ("ok".to_string(), serde_json::json!({})),
+        Err(e) => {
+            let s = format!("{:?}", e);
+            let p = serde_json::to_value(e).unwrap_or(serde_json::Value::Null);
+            (s, p)
+        }
+    };
+    session_writer.append(&crate::session::log::SessionEvent::HaltReason {
+        reason: reason_str,
+        payload,
+        timestamp_ms: crate::session::log::now_ms(),
+    });
 
     match halt {
         Ok(()) => {

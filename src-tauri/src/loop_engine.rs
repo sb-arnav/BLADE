@@ -164,7 +164,11 @@ pub struct AttemptRecord {
 /// LOOP-06 + RES-02 — structured halt reasons. Returned from `run_loop` to the
 /// outer orchestration in commands.rs, which maps each variant to the
 /// appropriate chat_error / chat_cancelled emit.
-#[derive(Debug, Clone)]
+///
+/// Plan 34-08 — `serde::Serialize` added so the SESS-01 SessionWriter can
+/// record a `HaltReason { payload }` JSONL line that round-trips through
+/// `serde_json::to_value` at the halt site in `commands::send_message_stream_inline`.
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum LoopHaltReason {
     /// LOOP-06 — cumulative cost exceeded the cap. Plan 34-02 added the
     /// `scope: CostScope` field to distinguish per-loop (Phase 33) from
@@ -531,6 +535,12 @@ pub async fn run_loop(
     input_message_count: usize,
     turn_acc: crate::reward::TurnAccumulator,
     current_message_id: &mut Option<String>,
+    // Plan 34-08 (SESS-01) — JSONL forensic writer. Threaded from
+    // `commands::send_message_stream_inline` so AssistantTurn / ToolCall /
+    // LoopEvent emit sites inside the loop can record forensics for SESS-02
+    // resume + SESS-03/04 list/fork. Pass a `SessionWriter::no_op()` handle
+    // for callers that do not need recording (test paths).
+    session_writer: &crate::session::log::SessionWriter,
 ) -> Result<(), LoopHaltReason> {
     let max_iter: usize = if config.r#loop.smart_loop_enabled {
         config.r#loop.max_iterations as usize
@@ -589,14 +599,21 @@ pub async fn run_loop(
         match stuck_result {
             Ok(Some(pattern)) => {
                 let pattern_str = pattern.discriminant().to_string();
-                emit_stream_event(&app, "blade_loop_event", serde_json::json!({
-                    "kind": "stuck_detected",
-                    "pattern": &pattern_str,
-                }));
-                emit_stream_event(&app, "blade_loop_event", serde_json::json!({
-                    "kind": "halted",
-                    "reason": format!("stuck:{}", &pattern_str),
-                }));
+                // Plan 34-08 (SESS-01) — emit_with_jsonl pairs every
+                // blade_loop_event with a JSONL LoopEvent so SESS-02 resume
+                // can replay stuck-pattern forensics.
+                crate::commands::emit_with_jsonl(
+                    &app,
+                    session_writer,
+                    "stuck_detected",
+                    serde_json::json!({ "pattern": &pattern_str }),
+                );
+                crate::commands::emit_with_jsonl(
+                    &app,
+                    session_writer,
+                    "halted",
+                    serde_json::json!({ "reason": format!("stuck:{}", &pattern_str) }),
+                );
                 let _ = app.emit("blade_status", "error");
                 return Err(LoopHaltReason::Stuck { pattern: pattern_str });
             }
@@ -637,13 +654,19 @@ pub async fn run_loop(
         let per_conv_cap = config.resilience.cost_guard_per_conversation_dollars;
         let per_conv_spent = loop_state.conversation_cumulative_cost_usd;
         if per_conv_spent > per_conv_cap {
-            emit_stream_event(&app, "blade_loop_event", serde_json::json!({
-                "kind": "halted",
-                "reason": "cost_exceeded",
-                "scope": "PerConversation",
-                "spent_usd": per_conv_spent,
-                "cap_usd": per_conv_cap,
-            }));
+            // Plan 34-08 (SESS-01) — emit_with_jsonl mirrors per-conversation
+            // cost_exceeded halt to JSONL for SESS-02 resume forensics.
+            crate::commands::emit_with_jsonl(
+                &app,
+                session_writer,
+                "halted",
+                serde_json::json!({
+                    "reason": "cost_exceeded",
+                    "scope": "PerConversation",
+                    "spent_usd": per_conv_spent,
+                    "cap_usd": per_conv_cap,
+                }),
+            );
             let _ = app.emit("blade_status", "error");
             return Err(LoopHaltReason::CostExceeded {
                 spent_usd: per_conv_spent,
@@ -655,12 +678,17 @@ pub async fn run_loop(
             && !loop_state.cost_warning_80_emitted
             && per_conv_spent > 0.8 * per_conv_cap
         {
-            emit_stream_event(&app, "blade_loop_event", serde_json::json!({
-                "kind": "cost_warning",
-                "percent": 80,
-                "spent_usd": per_conv_spent,
-                "cap_usd": per_conv_cap,
-            }));
+            // Plan 34-08 — JSONL-paired cost_warning emit.
+            crate::commands::emit_with_jsonl(
+                &app,
+                session_writer,
+                "cost_warning",
+                serde_json::json!({
+                    "percent": 80,
+                    "spent_usd": per_conv_spent,
+                    "cap_usd": per_conv_cap,
+                }),
+            );
             loop_state.cost_warning_80_emitted = true;
         }
 
@@ -683,12 +711,18 @@ pub async fn run_loop(
         if config.r#loop.smart_loop_enabled
             && loop_state.cumulative_cost_usd > config.r#loop.cost_guard_dollars
         {
-            emit_stream_event(&app, "blade_loop_event", serde_json::json!({
-                "kind": "halted",
-                "reason": "cost_exceeded",
-                "spent_usd": loop_state.cumulative_cost_usd,
-                "cap_usd": config.r#loop.cost_guard_dollars,
-            }));
+            // Plan 34-08 (SESS-01) — JSONL-paired per-loop cost_exceeded halt.
+            crate::commands::emit_with_jsonl(
+                &app,
+                session_writer,
+                "halted",
+                serde_json::json!({
+                    "reason": "cost_exceeded",
+                    "scope": "PerLoop",
+                    "spent_usd": loop_state.cumulative_cost_usd,
+                    "cap_usd": config.r#loop.cost_guard_dollars,
+                }),
+            );
             let _ = app.emit("blade_status", "error");
             return Err(LoopHaltReason::CostExceeded {
                 spent_usd: loop_state.cumulative_cost_usd,
@@ -757,17 +791,22 @@ pub async fn run_loop(
 
             match probe {
                 Ok(Ok(Verdict::Yes)) => {
-                    emit_stream_event(&app, "blade_loop_event", serde_json::json!({
-                        "kind": "verification_fired",
-                        "verdict": "YES",
-                    }));
+                    // Plan 34-08 (SESS-01) — JSONL-paired verification_fired emit.
+                    crate::commands::emit_with_jsonl(
+                        &app,
+                        session_writer,
+                        "verification_fired",
+                        serde_json::json!({ "verdict": "YES" }),
+                    );
                     // No nudge injected — loop continues.
                 }
                 Ok(Ok(Verdict::No)) => {
-                    emit_stream_event(&app, "blade_loop_event", serde_json::json!({
-                        "kind": "verification_fired",
-                        "verdict": "NO",
-                    }));
+                    crate::commands::emit_with_jsonl(
+                        &app,
+                        session_writer,
+                        "verification_fired",
+                        serde_json::json!({ "verdict": "NO" }),
+                    );
                     // Stacking prevention (33-RESEARCH landmine #11) — if a
                     // nudge was injected within the last 2 iterations
                     // (Plan 33-05's reject_plan trigger or a prior verify
@@ -785,10 +824,12 @@ pub async fn run_loop(
                     }
                 }
                 Ok(Ok(Verdict::Replan)) => {
-                    emit_stream_event(&app, "blade_loop_event", serde_json::json!({
-                        "kind": "verification_fired",
-                        "verdict": "REPLAN",
-                    }));
+                    crate::commands::emit_with_jsonl(
+                        &app,
+                        session_writer,
+                        "verification_fired",
+                        serde_json::json!({ "verdict": "REPLAN" }),
+                    );
                     let stacking = loop_state
                         .last_nudge_iteration
                         .map_or(false, |prev| {
@@ -1202,10 +1243,13 @@ pub async fn run_loop(
             };
 
             if let Some(new_max) = new_max_opt {
-                emit_stream_event(&app, "blade_loop_event", serde_json::json!({
-                    "kind":    "token_escalated",
-                    "new_max": new_max,
-                }));
+                // Plan 34-08 (SESS-01) — JSONL-paired token_escalated emit.
+                crate::commands::emit_with_jsonl(
+                    &app,
+                    session_writer,
+                    "token_escalated",
+                    serde_json::json!({ "new_max": new_max }),
+                );
                 loop_state.token_escalations =
                     loop_state.token_escalations.saturating_add(1);
 
@@ -1401,12 +1445,19 @@ pub async fn run_loop(
             config.resilience.cost_guard_per_conversation_dollars.max(0.0001);
         let cost_update_pct =
             (100.0 * loop_state.conversation_cumulative_cost_usd / cost_update_cap) as u32;
-        emit_stream_event(&app, "blade_loop_event", serde_json::json!({
-            "kind": "cost_update",
-            "spent_usd": loop_state.conversation_cumulative_cost_usd,
-            "cap_usd": config.resilience.cost_guard_per_conversation_dollars,
-            "percent": cost_update_pct,
-        }));
+        // Plan 34-08 (SESS-01) — JSONL-paired cost_update tick. Per CONTEXT
+        // lock §RES-03, SessionWriter persists this event so SESS-02 resume
+        // can restore the running per-conversation total without re-summing.
+        crate::commands::emit_with_jsonl(
+            &app,
+            session_writer,
+            "cost_update",
+            serde_json::json!({
+                "spent_usd": loop_state.conversation_cumulative_cost_usd,
+                "cap_usd": config.resilience.cost_guard_per_conversation_dollars,
+                "percent": cost_update_pct,
+            }),
+        );
 
         // ─── Plan 34-04 (RES-01) — feed the stuck detectors ─────────────
         //
@@ -1482,6 +1533,42 @@ pub async fn run_loop(
             // so the smart-off path preserves Phase 33's monotonic-history
             // behavior — Threat T-34-22 mitigation.
             crate::commands::clear_error_history();
+        }
+
+        // ─── Plan 34-08 (SESS-01) — AssistantTurn JSONL emit ─────────────
+        //
+        // Record the just-completed assistant turn into the SessionWriter's
+        // JSONL log for SESS-02 resume + SESS-03/04 list/fork forensics.
+        // Fires for every turn (tool-call AND empty-tool-call branches),
+        // BEFORE the conversation.push below so the JSONL line ordering
+        // mirrors the conversation's append order.
+        //
+        // safe_slice the content to 4000 chars (huge assistant blobs would
+        // bloat the JSONL; full content is reproducible from the conversation
+        // mid-replay anyway). Tool-call args are excerpted to 200 chars per
+        // call via ToolCallSnippet — full args are recorded as separate
+        // ToolCall events further down at the dispatch site.
+        {
+            let tool_call_snippets: Vec<crate::session::log::ToolCallSnippet> = turn
+                .tool_calls
+                .iter()
+                .map(|tc| crate::session::log::ToolCallSnippet {
+                    name: tc.name.clone(),
+                    args_excerpt: crate::safe_slice(
+                        &serde_json::to_string(&tc.arguments).unwrap_or_default(),
+                        200,
+                    )
+                    .to_string(),
+                })
+                .collect();
+            session_writer.append(&crate::session::log::SessionEvent::AssistantTurn {
+                content: crate::safe_slice(&turn.content, 4000).to_string(),
+                tool_calls: tool_call_snippets,
+                stop_reason: turn.stop_reason.clone(),
+                tokens_in: turn.tokens_in,
+                tokens_out: turn.tokens_out,
+                timestamp_ms: crate::session::log::now_ms(),
+            });
         }
 
         conversation.push(ConversationMessage::Assistant {
@@ -2296,11 +2383,12 @@ pub async fn run_loop(
                         loop_state.replans_this_run =
                             loop_state.replans_this_run.saturating_add(1);
                         loop_state.last_nudge_iteration = Some(loop_state.iteration);
-                        emit_stream_event(
+                        // Plan 34-08 (SESS-01) — JSONL-paired replanning emit.
+                        crate::commands::emit_with_jsonl(
                             &app,
-                            "blade_loop_event",
+                            session_writer,
+                            "replanning",
                             serde_json::json!({
-                                "kind": "replanning",
                                 "count": loop_state.replans_this_run,
                             }),
                         );
@@ -2343,6 +2431,36 @@ pub async fn run_loop(
                 is_error,
             });
 
+            // ─── Plan 34-08 (SESS-01) — ToolCall JSONL emit ──────────────
+            //
+            // Recorded BEFORE the conversation.push below so we can still
+            // read `tool_call.name` and `content` (the push consumes
+            // tool_call.id + tool_call.name + content by-value). The result/
+            // error split mirrors how SESS-02 will reconstruct the tool
+            // outcome on resume — non-error → result populated, error → error
+            // populated; never both. safe_slice the result to 4000 chars to
+            // bound JSONL line size; full content is preserved in the
+            // conversation array which SESS-02 also replays.
+            {
+                let result_field = if is_error {
+                    None
+                } else {
+                    Some(crate::safe_slice(&content, 4000).to_string())
+                };
+                let error_field = if is_error {
+                    Some(crate::safe_slice(&content, 4000).to_string())
+                } else {
+                    None
+                };
+                session_writer.append(&crate::session::log::SessionEvent::ToolCall {
+                    name: tool_call.name.clone(),
+                    args: tool_call.arguments.clone(),
+                    result: result_field,
+                    error: error_field,
+                    timestamp_ms: crate::session::log::now_ms(),
+                });
+            }
+
             conversation.push(ConversationMessage::Tool {
                 tool_call_id: tool_call.id,
                 tool_name: tool_call.name,
@@ -2358,10 +2476,14 @@ pub async fn run_loop(
     // Plan 33-08 — emit a structured halted event so ActivityStrip can render
     // the "halted: iteration cap" chip via blade_loop_event. Symmetric with
     // the cost_exceeded emit at iteration top.
-    emit_stream_event(&app, "blade_loop_event", serde_json::json!({
-        "kind": "halted",
-        "reason": "iteration_cap",
-    }));
+    //
+    // Plan 34-08 (SESS-01) — JSONL-paired iteration_cap halted emit.
+    crate::commands::emit_with_jsonl(
+        &app,
+        session_writer,
+        "halted",
+        serde_json::json!({ "reason": "iteration_cap" }),
+    );
     Err(LoopHaltReason::IterationCap)
 }
 
