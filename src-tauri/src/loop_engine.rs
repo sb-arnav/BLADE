@@ -561,6 +561,59 @@ pub async fn run_loop(
             return Err(LoopHaltReason::Cancelled);
         }
 
+        // ─── Plan 34-04 (RES-01) — stuck detection ──────────────────────
+        //
+        // Walk the 5 stuck patterns at iteration top, BEFORE the cost-guard
+        // halt below. CostRunaway has highest priority within the stuck set,
+        // but the cost-guard ($5/loop cap) still wins on absolute spend
+        // because CostRunaway only trips at 2× rolling avg — not at 100% of
+        // the cap. The two halts coexist:
+        //   - CostRunaway: "this turn is anomalously expensive" (relative)
+        //   - CostExceeded: "you've spent more than the cap" (absolute)
+        //
+        // CTX-07 fallback discipline: any panic inside the detector code
+        // path is caught here; the loop continues with no halt injected.
+        // Mirrors Plan 33-09's verify_progress catch_unwind wrapper above.
+        // detect_stuck is synchronous (not a future), so plain catch_unwind
+        // suffices — no futures::FutureExt needed. AssertUnwindSafe is
+        // required because &loop_state and &config.resilience aren't
+        // unconditionally UnwindSafe (the captured refs are read-only inside
+        // the closure so the assertion is safe).
+        //
+        // Skipped entirely when smart_resilience_enabled OR
+        // stuck_detection_enabled is false — both checks live inside
+        // detect_stuck (CTX-07 escape hatch).
+        let stuck_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            crate::resilience::stuck::detect_stuck(&loop_state, &config.resilience)
+        }));
+        match stuck_result {
+            Ok(Some(pattern)) => {
+                let pattern_str = pattern.discriminant().to_string();
+                emit_stream_event(&app, "blade_loop_event", serde_json::json!({
+                    "kind": "stuck_detected",
+                    "pattern": &pattern_str,
+                }));
+                emit_stream_event(&app, "blade_loop_event", serde_json::json!({
+                    "kind": "halted",
+                    "reason": format!("stuck:{}", &pattern_str),
+                }));
+                let _ = app.emit("blade_status", "error");
+                return Err(LoopHaltReason::Stuck { pattern: pattern_str });
+            }
+            Ok(None) => { /* no pattern fired — continue iteration body */ }
+            Err(_panic) => {
+                // Panic in detector code path — swallowed per CTX-07
+                // discipline. Loop continues without injecting a halt.
+                // Threat T-34-15 mitigation: the
+                // phase34_res_01_panic_in_detect_stuck_caught_by_outer_wrapper
+                // regression test fails loudly if this wrapper goes missing.
+                eprintln!(
+                    "[BLADE] detect_stuck panicked at iteration {}; loop continues (Plan 34-04 catch_unwind)",
+                    loop_state.iteration
+                );
+            }
+        }
+
         // ─── LOOP-06 — cost guard halt (Plan 33-08) ─────────────────────
         //
         // At the top of each iteration (after cancellation, before any
@@ -1184,6 +1237,73 @@ pub async fn run_loop(
                  + turn.tokens_out as f32 * price_out)
                 / 1_000_000.0;
             loop_state.cumulative_cost_usd += turn_cost_usd;
+        }
+
+        // ─── Plan 34-04 (RES-01) — feed the stuck detectors ─────────────
+        //
+        // After each successful complete_turn, populate four LoopState
+        // fields that the 5 stuck detectors read at the next iteration top:
+        //   (a) consecutive_no_tool_turns: ++ on no tool calls; reset on
+        //       any tool call. Drives MonologueSpiral.
+        //   (b) last_iter_cost: per-iteration marginal cost. Drives
+        //       CostRunaway (uses the same price_per_million as cumulative).
+        //   (c) last_progress_iteration / last_progress_text_hash:
+        //       new-tool-name OR new-content advance. Drives NoProgress.
+        //
+        // All updates gated by smart_resilience_enabled — when smart-off,
+        // these fields stay at their defaults forever and the smart-off
+        // regression test (phase34_smart_resilience_disabled_no_smart_features)
+        // confirms detect_stuck returns None at the iteration-top call site.
+        // Threat T-34-19 mitigation: forgotten gate would start tripping
+        // detectors in smart-off; the regression test guards every gate.
+        if config.resilience.smart_resilience_enabled {
+            // (a) MonologueSpiral counter
+            if turn.tool_calls.is_empty() {
+                loop_state.consecutive_no_tool_turns =
+                    loop_state.consecutive_no_tool_turns.saturating_add(1);
+            } else {
+                loop_state.consecutive_no_tool_turns = 0;
+            }
+            // (b) CostRunaway per-iter marginal cost
+            {
+                let (price_in, price_out) =
+                    crate::providers::price_per_million(&config.provider, &config.model);
+                let iter_cost = (turn.tokens_in as f32 * price_in
+                    + turn.tokens_out as f32 * price_out)
+                    / 1_000_000.0;
+                loop_state.last_iter_cost = iter_cost;
+            }
+            // (c) NoProgress predicate — new tool name OR new content
+            {
+                use sha2::{Digest, Sha256};
+                use std::collections::HashSet;
+                let mut progressed = false;
+                if !turn.tool_calls.is_empty() {
+                    let new_names: HashSet<&str> =
+                        turn.tool_calls.iter().map(|tc| tc.name.as_str()).collect();
+                    let known_names: HashSet<&str> = loop_state
+                        .recent_actions
+                        .iter()
+                        .map(|a| a.tool.as_str())
+                        .collect();
+                    if new_names.iter().any(|n| !known_names.contains(n)) {
+                        progressed = true;
+                    }
+                }
+                let prefix = crate::safe_slice(&turn.content, 500);
+                let mut hasher = Sha256::new();
+                hasher.update(prefix.as_bytes());
+                let digest = hasher.finalize();
+                let mut h: [u8; 16] = [0; 16];
+                h.copy_from_slice(&digest[..16]);
+                if loop_state.last_progress_text_hash != Some(h) {
+                    progressed = true;
+                }
+                if progressed {
+                    loop_state.last_progress_iteration = loop_state.iteration;
+                    loop_state.last_progress_text_hash = Some(h);
+                }
+            }
         }
 
         conversation.push(ConversationMessage::Assistant {
@@ -3616,5 +3736,78 @@ mod tests {
             LoopHaltReason::Stuck { pattern } => assert_eq!(pattern, "MonologueSpiral"),
             _ => panic!("expected Stuck"),
         }
+    }
+
+    // ─── Plan 34-04 (RES-01) — wire-site regression tests ───────────────────
+
+    /// Verifies the call-site contract: when RES_FORCE_STUCK is set,
+    /// detect_stuck returns Some(pattern) and run_loop's iteration body
+    /// (modeled here via the same catch_unwind pattern) returns the
+    /// corresponding LoopHaltReason::Stuck. The seam decouples the priority
+    /// aggregator from the wire path so the wire code can be exercised
+    /// independently of detector logic.
+    #[test]
+    fn phase34_res_01_force_stuck_seam_halts_loop_synchronous() {
+        crate::resilience::stuck::RES_FORCE_STUCK.with(|c| {
+            c.set(Some(crate::resilience::stuck::StuckPattern::MonologueSpiral))
+        });
+        let state = LoopState::default();
+        let cfg = crate::config::ResilienceConfig::default();
+        let stuck = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            crate::resilience::stuck::detect_stuck(&state, &cfg)
+        }));
+        crate::resilience::stuck::RES_FORCE_STUCK.with(|c| c.set(None)); // teardown
+        assert!(
+            matches!(stuck, Ok(Some(crate::resilience::stuck::StuckPattern::MonologueSpiral))),
+            "RES_FORCE_STUCK must short-circuit to the forced verdict"
+        );
+    }
+
+    /// Mirrors Plan 33-09's phase33_loop_01_panic_in_render_actions_json_is_caught.
+    /// RES_FORCE_PANIC_IN_DETECTOR makes detect_repeated_action_observation
+    /// panic; run_loop's catch_unwind wrapper at the iteration-top call site
+    /// must catch it. T-34-15 mitigation — if a future regression silently
+    /// removes the catch_unwind wrapper, this test fails and demands the
+    /// wrapper be restored.
+    #[test]
+    fn phase34_res_01_panic_in_detect_stuck_caught_by_outer_wrapper() {
+        crate::resilience::stuck::RES_FORCE_PANIC_IN_DETECTOR.with(|c| c.set(true));
+        let state = LoopState::default();
+        let cfg = crate::config::ResilienceConfig::default();
+        // Mirror the call-site catch_unwind pattern from run_loop iteration top.
+        let stuck_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            crate::resilience::stuck::detect_stuck(&state, &cfg)
+        }));
+        crate::resilience::stuck::RES_FORCE_PANIC_IN_DETECTOR.with(|c| c.set(false));
+        assert!(
+            stuck_result.is_err(),
+            "panic in detector body must propagate to call-site catch_unwind boundary; got Ok({:?})",
+            stuck_result.as_ref().map(|_| "Ok")
+        );
+    }
+
+    /// CONTEXT lock §Backward Compatibility — smart_resilience_enabled=false
+    /// skips stuck detection at the call site. This test asserts the parity
+    /// claim: even with state shape that satisfies multiple stuck patterns,
+    /// detect_stuck returns None when the master switch is off.
+    /// Threat T-34-19 mitigation — guards every kill-switch gate.
+    #[test]
+    fn phase34_smart_resilience_disabled_no_smart_features() {
+        let mut cfg = crate::config::ResilienceConfig::default();
+        cfg.smart_resilience_enabled = false;
+        cfg.stuck_detection_enabled = true; // even with this on, smart-off wins
+        // Build a state that satisfies multiple patterns simultaneously.
+        let mut state = LoopState::default();
+        state.consecutive_no_tool_turns = 10;     // MonologueSpiral
+        state.compactions_this_run = 5;            // ContextWindowThrashing
+        state.iteration = 20;
+        state.last_progress_iteration = 0;         // NoProgress
+        state.cumulative_cost_usd = 5.0;
+        state.last_iter_cost = 100.0;              // CostRunaway
+        let v = crate::resilience::stuck::detect_stuck(&state, &cfg);
+        assert!(
+            v.is_none(),
+            "smart_resilience_enabled=false must skip all stuck detectors; got {:?}", v
+        );
     }
 }

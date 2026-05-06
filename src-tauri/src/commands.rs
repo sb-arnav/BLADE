@@ -1757,14 +1757,18 @@ pub(crate) async fn send_message_stream_inline(
             // Fall through to the loop-exhausted summary block below.
         }
         Err(crate::loop_engine::LoopHaltReason::Stuck { pattern }) => {
-            // Plan 34-02 — type substrate only; Plan 34-04 (RES-01) will
-            // replace this placeholder with the per-pattern user-facing
-            // summary + ActivityStrip chip emit. For now, surface a generic
-            // halt message via chat_error so the chat UI does not silently
-            // drop the response. blade_loop_event for the stuck pattern is
-            // emitted at the halt site inside run_loop (Plan 34-04).
+            // Plan 34-04 (RES-01) — surface the stuck halt to the chat UI.
+            // blade_loop_event { kind: "stuck_detected", pattern } AND
+            // blade_loop_event { kind: "halted", reason: "stuck:{pattern}" }
+            // are already emitted at the halt site inside run_loop (loop_engine.rs
+            // iteration-top call site). Here we surface the user-facing chat_error
+            // so the chat UI does not silently drop the response.
+            //
+            // Plan 34-08 (SESS-01) will additionally record a SessionWriter
+            // LoopEvent { kind: "stuck_detected", payload: {...} } so the
+            // JSONL captures forensics for post-hoc debugging.
             let msg = format!(
-                "Loop halted: stuck pattern detected ({}). Try simplifying the request.",
+                "Loop halted: stuck pattern detected ({}). Try rephrasing the request.",
                 pattern
             );
             emit_stream_event(&app, "chat_error", msg.clone());
