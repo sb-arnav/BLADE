@@ -170,6 +170,7 @@ mod auto_fix;
 mod tentacles;
 mod agent_factory;
 mod ecosystem;
+mod resilience;       // Phase 34 v1.5 — RES-01 stuck + RES-05 provider fallback (Plan 34-03 scaffold)
 
 use chrono::Timelike;
 use std::sync::Arc;
