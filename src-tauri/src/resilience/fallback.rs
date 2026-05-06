@@ -38,6 +38,15 @@ impl std::error::Error for FallbackExhausted {}
 thread_local! {
     pub(crate) static RES_FORCE_PROVIDER_ERROR: std::cell::RefCell<Option<String>> =
         const { std::cell::RefCell::new(None) };
+
+    /// Phase 34 / HI-02 (REVIEW finding) — test-only capture of the
+    /// (provider, model) tuple passed to each `complete_turn` attempt inside
+    /// `try_with_fallback_inner`. Used by
+    /// `phase34_res_05_primary_uses_user_configured_model` to verify the
+    /// PRIMARY chain element forwards `config.model` (not
+    /// `default_model_for(config.provider)`).
+    pub(crate) static RES_CAPTURED_ATTEMPTS: std::cell::RefCell<Vec<(String, String)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
 }
 
 /// RES-05 — generalises `commands::try_free_model_fallback`. Walks the chain
@@ -80,7 +89,13 @@ pub(crate) async fn try_with_fallback_inner(
     // ---- Smart-off path (CTX-07): single attempt on config.provider ------
     if !config.resilience.smart_resilience_enabled {
         let provider = config.provider.as_str();
-        let model = providers::default_model_for(provider);
+        // Phase 34 / HI-02 (REVIEW finding) — smart-off MUST honor the user's
+        // explicitly-configured model on the primary attempt. Previously this
+        // hardcoded `default_model_for(provider)`, which silently upgraded a
+        // user on `claude-haiku-4-5` to `claude-sonnet-4` (5-10× more
+        // expensive). Smart-off has only one attempt and that attempt is
+        // always on `config.provider`, so use `config.model` directly.
+        let model = config.model.as_str();
         let key = if provider == "ollama" {
             String::new()
         } else {
@@ -90,6 +105,11 @@ pub(crate) async fn try_with_fallback_inner(
         // Test seam: deterministic Err without network.
         #[cfg(test)]
         {
+            // HI-02 capture: record (provider, model) so the regression test
+            // can assert config.model survived the smart-off path.
+            RES_CAPTURED_ATTEMPTS.with(|c| {
+                c.borrow_mut().push((provider.to_string(), model.to_string()))
+            });
             let forced = RES_FORCE_PROVIDER_ERROR.with(|c| c.borrow().clone());
             if let Some(e) = forced {
                 return Err(FallbackExhausted {
@@ -117,12 +137,19 @@ pub(crate) async fn try_with_fallback_inner(
 
     for chain_elem in chain {
         // "primary" resolves to BladeConfig.provider; otherwise use literal.
-        let provider: &str = if chain_elem == "primary" {
-            config.provider.as_str()
+        // Phase 34 / HI-02 (REVIEW finding) — for the PRIMARY chain element
+        // we must use the user's explicitly-configured `config.model`. Falling
+        // back to `default_model_for(provider)` silently upgrades (e.g.) a
+        // user on `claude-haiku-4-5` to the canonical Sonnet default — 5-10×
+        // more expensive AND violates the explicit choice. Only non-primary
+        // chain elements (the literal "openrouter"/"groq"/"ollama" entries)
+        // fall through to `default_model_for(provider)` because the user
+        // hasn't picked a specific model for those.
+        let (provider, model): (&str, &str) = if chain_elem == "primary" {
+            (config.provider.as_str(), config.model.as_str())
         } else {
-            chain_elem.as_str()
+            (chain_elem.as_str(), providers::default_model_for(chain_elem.as_str()))
         };
-        let model = providers::default_model_for(provider);
         let key = if provider == "ollama" {
             String::new()
         } else {
@@ -138,6 +165,12 @@ pub(crate) async fn try_with_fallback_inner(
             // Test seam — bypasses real provider call.
             #[cfg(test)]
             {
+                // HI-02 capture: record (provider, model) PER ATTEMPT so the
+                // regression test can assert the PRIMARY chain element forwards
+                // config.model (not default_model_for(provider)).
+                RES_CAPTURED_ATTEMPTS.with(|c| {
+                    c.borrow_mut().push((provider.to_string(), model.to_string()))
+                });
                 let forced = RES_FORCE_PROVIDER_ERROR.with(|c| c.borrow().clone());
                 if let Some(e) = forced {
                     last_error = e;
@@ -338,6 +371,67 @@ mod tests {
                 );
             }
             Ok(_) => panic!("expected FallbackExhausted when openrouter has no key"),
+        }
+    }
+
+    /// Phase 34 / HI-02 (REVIEW finding) — the PRIMARY chain element must use
+    /// the user's explicitly-configured `config.model` rather than
+    /// `default_model_for(config.provider)`. A user on
+    /// `claude-haiku-4-5-20251001` who hits a transient error must NOT be
+    /// silently upgraded to `claude-sonnet-4-20250514` (the Anthropic default).
+    /// The test config picks `anthropic` + `claude-haiku-4-5-20251001` and
+    /// forces a chain walk via RES_FORCE_PROVIDER_ERROR; we then assert the
+    /// captured-attempt list shows haiku for the primary attempt(s) and the
+    /// non-primary defaults for any subsequent chain elements.
+    #[tokio::test]
+    async fn phase34_res_05_primary_uses_user_configured_model() {
+        seed_test_keys();
+        RES_FORCE_PROVIDER_ERROR
+            .with(|c| *c.borrow_mut() = Some("forced".to_string()));
+        RES_CAPTURED_ATTEMPTS.with(|c| c.borrow_mut().clear());
+
+        let mut cfg = test_config();
+        cfg.provider = "anthropic".to_string();
+        cfg.model = "claude-haiku-4-5-20251001".to_string();
+        // Chain: ["primary", "groq"] — primary resolves to anthropic + the
+        // configured haiku model; groq resolves to its default.
+        cfg.resilience.max_retries_per_provider = 1; // 2 attempts per element
+
+        let conv: Vec<ConversationMessage> = vec![ConversationMessage::User("hi".into())];
+        let tools: Vec<ToolDefinition> = Vec::new();
+        let _ = try_with_fallback_inner(&cfg, &conv, &tools).await;
+        let captured: Vec<(String, String)> =
+            RES_CAPTURED_ATTEMPTS.with(|c| c.borrow().clone());
+        RES_FORCE_PROVIDER_ERROR.with(|c| *c.borrow_mut() = None);
+        RES_CAPTURED_ATTEMPTS.with(|c| c.borrow_mut().clear());
+        crate::config::test_clear_keyring_overrides();
+
+        // First attempt MUST be (anthropic, claude-haiku-4-5-20251001) — the
+        // user's configured model, NOT the canonical Sonnet default.
+        let first = captured.first().expect("at least one attempt captured");
+        assert_eq!(
+            first.0, "anthropic",
+            "primary chain element resolves provider to config.provider"
+        );
+        assert_eq!(
+            first.1, "claude-haiku-4-5-20251001",
+            "primary chain element MUST forward config.model verbatim — \
+             previously this hardcoded default_model_for(anthropic) which \
+             silently upgraded haiku to sonnet (HI-02 regression). \
+             Captured attempts: {:?}",
+            captured
+        );
+
+        // Subsequent groq attempts (after primary fails the retry budget)
+        // SHOULD use default_model_for("groq") because the user hasn't picked
+        // a specific groq model.
+        let groq_attempts: Vec<&(String, String)> =
+            captured.iter().filter(|(p, _)| p == "groq").collect();
+        if let Some(first_groq) = groq_attempts.first() {
+            assert_eq!(
+                first_groq.1, "llama-3.3-70b-versatile",
+                "non-primary chain element falls back to default_model_for"
+            );
         }
     }
 
