@@ -43,25 +43,43 @@ use crate::trace;
 
 // ─── Loop state ────────────────────────────────────────────────────────────
 
-/// LOOP-01..06 — central state struct passed by mutable reference through
-/// every iteration of the loop. Plans 33-04..33-08 populate the fields.
+/// Plan 34-02 — capacity of the recent_actions ring buffer. Default 6 lets
+/// the 5 RES-01 detectors see "3 repeated triples in last 6 actions" with
+/// room for interspersed different actions. Configurable runtime via
+/// ResilienceConfig.recent_actions_window (Plan 34-04 reads the config and
+/// resizes if needed; the const here is the compile-time floor).
+pub const RECENT_ACTIONS_CAPACITY: usize = 6;
+
+/// LOOP-01..06 + RES-01..04 — central state struct passed by mutable reference
+/// through every iteration of the loop. Plans 33-04..33-08 populated the Phase 33
+/// fields; Plan 34-02 adds the Phase 34 fields (8 new) + renames the legacy
+/// 3-slot ring buffer to recent_actions + bumps capacity 3 → 6.
 #[derive(Debug, Clone, Default)]
 pub struct LoopState {
     /// Current iteration count (0-indexed).
     pub iteration: u32,
-    /// Per-conversation cumulative spend in USD. Compared against
-    /// `config.r#loop.cost_guard_dollars` at the top of each iteration
-    /// (LOOP-06 — Plan 33-08 wires the runtime check).
+    /// Per-loop (single user turn) cumulative spend in USD. Phase 33-08 wired
+    /// the runtime check at the top of each iteration. Phase 34 keeps this
+    /// field untouched and adds `conversation_cumulative_cost_usd` as the
+    /// per-conversation cap (RES-03 + RES-04).
     pub cumulative_cost_usd: f32,
+    /// Plan 34-02 (RES-03) — per-conversation cumulative spend, persisted across
+    /// turns via SessionWriter. Plan 34-06 wires the runtime accumulation.
+    pub conversation_cumulative_cost_usd: f32,
+    /// Plan 34-02 (RES-01 CostRunaway delta) — per-iteration marginal cost.
+    /// Used by detect_cost_runaway: trips when last_iter_cost > 2.0 × avg.
+    pub last_iter_cost: f32,
     /// LOOP-03 — observable counter for the "two consecutive plan adaptations"
     /// success criterion. Incremented when the third-same-tool-failure trigger
     /// fires reject_plan + injects the replan nudge.
     pub replans_this_run: u32,
     /// LOOP-04 — number of times max_tokens was doubled this run.
     pub token_escalations: u32,
-    /// LOOP-01 — ring buffer of the most recent 3 tool actions, used as
-    /// `actions` context for the verification probe prompt.
-    pub last_3_actions: VecDeque<ActionRecord>,
+    /// LOOP-01 — ring buffer of the most recent N tool actions, used as
+    /// `actions` context for the verification probe prompt AND for RES-01's
+    /// RepeatedActionObservation detector. Capacity is RECENT_ACTIONS_CAPACITY (6).
+    /// Renamed from the legacy 3-slot field in Plan 34-02; the previous name is gone.
+    pub recent_actions: VecDeque<ActionRecord>,
     /// LOOP-03 trigger — count of consecutive failures per tool name.
     /// Resets to 0 when the tool succeeds or a different tool fails.
     /// On 3rd entry, reject_plan is called + replan nudge injected.
@@ -71,15 +89,42 @@ pub struct LoopState {
     /// injected within the last 2 iterations, the next one is skipped.
     /// (33-RESEARCH.md landmine #11.)
     pub last_nudge_iteration: Option<u32>,
+    /// Plan 34-02 (RES-01 MonologueSpiral) — count of consecutive assistant
+    /// turns with no tool_calls. Reset to 0 whenever a tool fires.
+    pub consecutive_no_tool_turns: u32,
+    /// Plan 34-02 (RES-01 ContextWindowThrashing) — number of compactions
+    /// this run_loop invocation. Incremented via record_compaction() called
+    /// from commands::compress_conversation_smart on success.
+    pub compactions_this_run: u32,
+    /// Plan 34-02 (RES-01 NoProgress) — last iteration where the loop made
+    /// progress (new tool name OR new content). detect_no_progress fires
+    /// when iteration - last_progress_iteration >= no_progress_threshold.
+    pub last_progress_iteration: u32,
+    /// Plan 34-02 (RES-01 NoProgress dedup) — sha256-truncated-to-16 of the
+    /// last assistant turn's safe_slice(text, 500). Used to detect "same
+    /// content again" without comparing full text bodies.
+    pub last_progress_text_hash: Option<[u8; 16]>,
+    /// Plan 34-02 (RES-04 latch) — true once the 80% cost-warning event has
+    /// fired this conversation. Prevents repeat firing every iteration.
+    pub cost_warning_80_emitted: bool,
 }
 
 impl LoopState {
-    /// Push an action into the ring buffer, evicting the oldest if length > 3.
+    /// Push an action into the ring buffer, evicting the oldest if length
+    /// exceeds RECENT_ACTIONS_CAPACITY (6). Plan 34-02 bumped capacity from 3.
     pub fn record_action(&mut self, record: ActionRecord) {
-        self.last_3_actions.push_back(record);
-        while self.last_3_actions.len() > 3 {
-            self.last_3_actions.pop_front();
+        self.recent_actions.push_back(record);
+        while self.recent_actions.len() > RECENT_ACTIONS_CAPACITY {
+            self.recent_actions.pop_front();
         }
+    }
+
+    /// Plan 34-02 (RES-01 ContextWindowThrashing) — call from
+    /// commands::compress_conversation_smart on success. Increments the
+    /// per-run compaction counter; detect_context_window_thrashing fires
+    /// when compactions_this_run >= compaction_thrash_threshold (default 3).
+    pub fn record_compaction(&mut self) {
+        self.compactions_this_run = self.compactions_this_run.saturating_add(1);
     }
 }
 
@@ -325,7 +370,7 @@ thread_local! {
         const { std::cell::Cell::new(false) };
 }
 
-/// Render last_3_actions as a compact JSON array. Each summary is
+/// Render recent_actions as a compact JSON array. Each summary is
 /// safe_slice'd to 300 chars to bound the prompt size
 /// (CONTEXT lock §Mid-Loop Verification).
 pub(crate) fn render_actions_json(actions: &VecDeque<ActionRecord>) -> String {
@@ -518,7 +563,7 @@ pub async fn run_loop(
         // ─── LOOP-01 — mid-loop verification probe (Plan 33-04) ──────────
         //
         // Fires every config.r#loop.verification_every_n iterations starting
-        // at iteration N (skip iteration 0 — last_3_actions is empty there).
+        // at iteration N (skip iteration 0 — recent_actions is empty there).
         // Honors smart_loop_enabled toggle (CONTEXT lock §Backward Compat).
         //
         // Firing site rationale (CONTEXT lock §Mid-Loop Verification): top
@@ -568,7 +613,7 @@ pub async fn run_loop(
                 &config.api_key,
                 &config.model,
                 last_user_text,
-                &loop_state.last_3_actions,
+                &loop_state.recent_actions,
             ))
             .catch_unwind()
             .await;
@@ -1948,7 +1993,7 @@ pub async fn run_loop(
             };
 
             // LOOP-01 (Plan 33-04) — record this tool dispatch into the
-            // last_3_actions ring buffer for the next verification probe.
+            // recent_actions ring buffer for the next verification probe.
             // Captured BEFORE conversation.push moves tool_call.name + content.
             // safe_slice happens inside render_actions_json (300 char cap per
             // field), so we keep the full strings here and let the renderer
@@ -2043,10 +2088,18 @@ mod tests {
         let s = LoopState::default();
         assert_eq!(s.iteration, 0);
         assert_eq!(s.cumulative_cost_usd, 0.0);
+        assert_eq!(s.conversation_cumulative_cost_usd, 0.0);
+        assert_eq!(s.last_iter_cost, 0.0);
         assert_eq!(s.replans_this_run, 0);
         assert_eq!(s.token_escalations, 0);
-        assert!(s.last_3_actions.is_empty());
+        assert!(s.recent_actions.is_empty());
         assert!(s.consecutive_same_tool_failures.is_empty());
+        assert_eq!(s.last_nudge_iteration, None);
+        assert_eq!(s.consecutive_no_tool_turns, 0);
+        assert_eq!(s.compactions_this_run, 0);
+        assert_eq!(s.last_progress_iteration, 0);
+        assert_eq!(s.last_progress_text_hash, None);
+        assert!(!s.cost_warning_80_emitted);
     }
 
     #[test]
@@ -2599,7 +2652,7 @@ mod tests {
     #[test]
     fn phase33_loop_state_record_action_evicts_oldest() {
         let mut s = LoopState::default();
-        for i in 0..5 {
+        for i in 0..8 {
             s.record_action(ActionRecord {
                 tool: format!("tool_{}", i),
                 input_summary: "in".to_string(),
@@ -2607,9 +2660,11 @@ mod tests {
                 is_error: false,
             });
         }
-        assert_eq!(s.last_3_actions.len(), 3);
-        assert_eq!(s.last_3_actions.front().unwrap().tool, "tool_2");
-        assert_eq!(s.last_3_actions.back().unwrap().tool, "tool_4");
+        // Plan 34-02: capacity bumped from 3 to 6 (RECENT_ACTIONS_CAPACITY).
+        assert_eq!(s.recent_actions.len(), RECENT_ACTIONS_CAPACITY);
+        assert_eq!(s.recent_actions.len(), 6);
+        assert_eq!(s.recent_actions.front().unwrap().tool, "tool_2");
+        assert_eq!(s.recent_actions.back().unwrap().tool, "tool_7");
     }
 
     // ─── Plan 33-04 (LOOP-01) verification probe tests ────────────────
@@ -2768,7 +2823,7 @@ mod tests {
         // Locks the firing condition: iteration > 0 && iteration % N == 0.
         let n: u32 = 3;
         let fires = |it: u32| it > 0 && it % n == 0;
-        assert!(!fires(0), "iter 0 must NOT fire (last_3_actions is empty)");
+        assert!(!fires(0), "iter 0 must NOT fire (recent_actions is empty)");
         assert!(!fires(1));
         assert!(!fires(2));
         assert!(fires(3),  "iter 3 must fire at N=3");
@@ -3423,5 +3478,35 @@ mod tests {
         crate::config::LoopConfig::default()
             .validate()
             .expect("default LoopConfig must validate cleanly");
+    }
+
+    // ─── Plan 34-02 — Phase 34 LoopState extension tests ───────────────────
+
+    #[test]
+    fn phase34_loop_state_recent_actions_capacity_is_six() {
+        assert_eq!(RECENT_ACTIONS_CAPACITY, 6,
+            "Plan 34-02 bumped capacity from 3 to 6 — see CONTEXT lock §RES-01");
+    }
+
+    #[test]
+    fn phase34_loop_state_record_compaction_increments_counter() {
+        let mut s = LoopState::default();
+        assert_eq!(s.compactions_this_run, 0);
+        s.record_compaction();
+        s.record_compaction();
+        s.record_compaction();
+        assert_eq!(s.compactions_this_run, 3);
+    }
+
+    #[test]
+    fn phase34_loop_state_progress_hash_default_none() {
+        let s = LoopState::default();
+        assert_eq!(s.last_progress_text_hash, None);
+    }
+
+    #[test]
+    fn phase34_loop_state_cost_warning_latch_default_false() {
+        let s = LoopState::default();
+        assert!(!s.cost_warning_80_emitted);
     }
 }
