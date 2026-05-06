@@ -19,15 +19,28 @@ import type { ConversationSummary, StoredConversation } from '@/types/history';
 
 /**
  * @see src-tauri/src/commands.rs:558
- *   `pub async fn send_message_stream(app, state, approvals, vector_store, messages: Vec<ChatMessage>) -> Result<(), String>`
+ *   `pub async fn send_message_stream(app, state, approvals, vector_store, messages: Vec<ChatMessage>, conversation_id: Option<String>) -> Result<(), String>`
  *
  * Note: Rust accepts additional state params via #[tauri::command] injection —
- * TypeScript side only passes `messages`. Streaming tokens arrive via
- * `chat_token` / `chat_done` / `chat_thinking` / `blade_status` events
- * (wired in Plan 06).
+ * TypeScript side only passes `messages` (and optional `conversationId`).
+ * Streaming tokens arrive via `chat_token` / `chat_done` / `chat_thinking` /
+ * `blade_status` events (wired in Plan 06).
+ *
+ * Phase 34 / BL-01 + BL-02 (REVIEW finding) — when `conversationId` is
+ * supplied (after `resumeSession` or after the first turn issued an id), it
+ * threads through to the Rust SessionWriter (so the JSONL is the SAME file)
+ * AND the loop_engine carry-over registry (so per-conversation cost cap +
+ * stuck buckets persist across turns). When `undefined`, the Rust side
+ * generates a fresh ULID — legacy posture preserved.
  */
-export function sendMessageStream(messages: ChatMessage[]): Promise<void> {
-  return invokeTyped<void, { messages: ChatMessage[] }>('send_message_stream', { messages });
+export function sendMessageStream(
+  messages: ChatMessage[],
+  conversationId?: string,
+): Promise<void> {
+  return invokeTyped<void, { messages: ChatMessage[]; conversation_id: string | null }>(
+    'send_message_stream',
+    { messages, conversation_id: conversationId ?? null },
+  );
 }
 
 /** @see src-tauri/src/commands.rs:71 `pub fn cancel_chat(app: tauri::AppHandle)` */

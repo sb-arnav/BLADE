@@ -1050,4 +1050,141 @@ mod tests {
         let r = get_conversation_cost("../../etc/passwd".to_string()).await;
         assert!(r.is_err(), "must reject path-traversal id");
     }
+
+    /// Phase 34 / BL-02 (REVIEW finding) — full resume round-trip integration
+    /// test. Provisions a JSONL file in a tmp BLADE_CONFIG_DIR with a real
+    /// SessionWriter (so we exercise the actual append path), calls
+    /// `resume_session`, and verifies the returned messages match what was
+    /// appended in order. This is the regression guard for the v1.5
+    /// "Resume returns empty conversation" bug — if a future edit drops the
+    /// replay step or returns Err for live JSONL, this test fails loudly.
+    #[tokio::test]
+    async fn phase34_sess_02_resume_round_trip_e2e() {
+        let _g = TEST_ENV_LOCK.lock().unwrap();
+        let (tmp, sessions) = provision_sessions_dir("resume-roundtrip");
+
+        // Use the real SessionWriter::new_with_id with a known id so we can
+        // resume by that exact id afterwards. ULID format required by
+        // validate_session_id, so generate one fresh.
+        let id = ulid::Ulid::new().to_string();
+        let (writer, returned_id) =
+            crate::session::log::SessionWriter::new_with_id(&sessions, true, Some(id.clone()))
+                .expect("writer init");
+        assert_eq!(
+            returned_id, id,
+            "new_with_id must reuse the existing id verbatim (BL-02 contract)"
+        );
+
+        // Append: SessionMeta + UserMessage + AssistantTurn + ToolCall.
+        writer.append(&crate::session::log::SessionEvent::SessionMeta {
+            id: id.clone(),
+            parent: None,
+            fork_at_index: None,
+            started_at_ms: crate::session::log::now_ms(),
+        });
+        writer.append(&crate::session::log::SessionEvent::UserMessage {
+            id: "u1".to_string(),
+            content: "first user message".to_string(),
+            timestamp_ms: 1,
+        });
+        writer.append(&crate::session::log::SessionEvent::AssistantTurn {
+            content: "first assistant reply".to_string(),
+            tool_calls: vec![],
+            stop_reason: Some("end_turn".to_string()),
+            tokens_in: 10,
+            tokens_out: 5,
+            timestamp_ms: 2,
+        });
+        writer.append(&crate::session::log::SessionEvent::ToolCall {
+            name: "read_file".to_string(),
+            args: serde_json::json!({"path": "/tmp/x"}),
+            result: Some("ok content".to_string()),
+            error: None,
+            timestamp_ms: 3,
+        });
+
+        // Now resume — same id.
+        let r = resume_session(id.clone()).await.expect("resume_session");
+
+        // Round-trip assertions:
+        assert_eq!(r.session_id, id, "resume must echo the requested id");
+        assert_eq!(
+            r.messages.len(),
+            3,
+            "expected 3 messages: User + Assistant + Tool. Got {}: {:?}",
+            r.messages.len(),
+            r.messages
+        );
+        assert_eq!(r.messages[0]["role"], "user");
+        assert_eq!(r.messages[0]["content"], "first user message");
+        assert_eq!(r.messages[1]["role"], "assistant");
+        assert_eq!(r.messages[1]["content"], "first assistant reply");
+        assert_eq!(r.messages[2]["role"], "tool");
+        assert_eq!(r.messages[2]["tool_name"], "read_file");
+        assert_eq!(r.messages[2]["content"], "ok content");
+        assert_eq!(r.messages[2]["is_error"], false);
+
+        // Cleanup.
+        std::env::remove_var("BLADE_CONFIG_DIR");
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    /// Phase 34 / BL-02 — `SessionWriter::new_with_id` reusing an existing id
+    /// MUST append to the existing JSONL file rather than truncating it.
+    /// Critical for the resume → continue flow: when the user resumes a
+    /// session and types a new message, that turn's UserMessage event must
+    /// extend the same JSONL.
+    #[tokio::test]
+    async fn phase34_sess_01_new_with_id_appends_to_existing_jsonl() {
+        let _g = TEST_ENV_LOCK.lock().unwrap();
+        let (tmp, sessions) = provision_sessions_dir("new-with-id-append");
+
+        let id = ulid::Ulid::new().to_string();
+
+        // First writer — write event A.
+        let (w1, _) =
+            crate::session::log::SessionWriter::new_with_id(&sessions, true, Some(id.clone()))
+                .expect("first writer");
+        w1.append(&crate::session::log::SessionEvent::UserMessage {
+            id: "u1".to_string(),
+            content: "first turn".to_string(),
+            timestamp_ms: 1,
+        });
+        drop(w1);
+
+        // Second writer — same id, write event B. Must NOT truncate event A.
+        let (w2, _) =
+            crate::session::log::SessionWriter::new_with_id(&sessions, true, Some(id.clone()))
+                .expect("second writer");
+        w2.append(&crate::session::log::SessionEvent::UserMessage {
+            id: "u2".to_string(),
+            content: "second turn".to_string(),
+            timestamp_ms: 2,
+        });
+        drop(w2);
+
+        // Read the file back; both events must be present in order.
+        let path = sessions.join(format!("{}.jsonl", &id));
+        let content = std::fs::read_to_string(&path).expect("read jsonl");
+        let lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).collect();
+        assert_eq!(
+            lines.len(),
+            2,
+            "JSONL must contain both events (no truncation on second writer); got {} lines",
+            lines.len()
+        );
+        assert!(
+            lines[0].contains("first turn"),
+            "first event must survive a second SessionWriter::new_with_id; line0={}",
+            lines[0]
+        );
+        assert!(
+            lines[1].contains("second turn"),
+            "second event must be appended; line1={}",
+            lines[1]
+        );
+
+        std::env::remove_var("BLADE_CONFIG_DIR");
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
 }

@@ -29,7 +29,9 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::Ordering;
+use std::sync::Mutex;
 
+use once_cell::sync::Lazy;
 use tauri::Emitter;
 
 use crate::commands::{
@@ -159,6 +161,169 @@ pub struct ActionRecord {
     pub input_summary: String,
     pub output_summary: String,
     pub is_error: bool,
+}
+
+// ─── Per-conversation persistent state (BL-01 — REVIEW finding) ────────────
+//
+// Phase 34 / BL-01 (REVIEW finding) — `LoopState::default()` runs FRESH on
+// every `send_message_stream` call, so `conversation_cumulative_cost_usd`,
+// `cost_warning_80_emitted`, `consecutive_no_tool_turns`, `compactions_this_run`,
+// `last_progress_iteration`, and `recent_actions` all reset every user turn.
+// The CONTEXT lock §Backward Compatibility guarantee ("per-conversation cost
+// cap enforced at 100%") collapses to per-turn semantics without a way to
+// thread state across turns.
+//
+// The fix: a process-global registry keyed by `conversation_id` (the
+// SessionWriter's session_id). On each `run_loop` entry, we look up (or
+// initialize) the persisted carry-over fields. On each `run_loop` exit, we
+// save the carry-over fields back. This is the in-memory complement to the
+// JSONL persistence — JSONL is forensic-only per CONTEXT lock §SESS-02, and
+// `run_loop` is hot-path-sensitive enough that re-walking the JSONL on every
+// turn would inflate latency. The map is bounded (capped at 256 entries; LRU
+// eviction on overflow) so a long-running BLADE process can't leak memory
+// into N-many resumed conversations.
+//
+// What carries over (the lifetime-of-conversation fields):
+//   - conversation_cumulative_cost_usd (RES-03)
+//   - cost_warning_80_emitted          (RES-04 latch)
+//   - compactions_this_run             (RES-01 ContextWindowThrashing)
+//   - consecutive_no_tool_turns        (RES-01 MonologueSpiral)
+//   - last_progress_iteration          (RES-01 NoProgress)
+//   - last_progress_text_hash          (RES-01 NoProgress dedup)
+//   - last_iter_cost                   (RES-01 CostRunaway baseline)
+//
+// What does NOT carry over (per-turn semantics deliberately):
+//   - iteration                        (resets per send_message_stream)
+//   - cumulative_cost_usd              (PerLoop cap is per-turn by design)
+//   - replans_this_run / token_escalations  (per-turn; reset OK)
+//   - recent_actions                   (per-turn ring buffer for verification probe)
+//   - consecutive_same_tool_failures   (per-turn streak; reset OK)
+//   - last_nudge_iteration             (per-turn anti-stacking)
+
+/// Carry-over slice of LoopState that persists across `send_message_stream`
+/// calls within the same conversation_id. See module-level comment for the
+/// field-by-field justification.
+#[derive(Debug, Clone, Default)]
+pub struct ConversationCarryOver {
+    pub conversation_cumulative_cost_usd: f32,
+    pub cost_warning_80_emitted: bool,
+    pub compactions_this_run: u32,
+    pub consecutive_no_tool_turns: u32,
+    pub last_progress_iteration: u32,
+    pub last_progress_text_hash: Option<[u8; 16]>,
+    pub last_iter_cost: f32,
+}
+
+/// Maximum number of conversations whose carry-over state we keep in memory.
+/// Older entries are evicted FIFO-style on overflow. 256 is generous: a user
+/// would have to leave 256 distinct chats open before any state was lost,
+/// and even then the JSONL persistence still has the cost figures (so the
+/// next turn re-seeds from disk via SessionWriter on a cold-cache miss).
+const CONVERSATION_STATES_CAP: usize = 256;
+
+/// Process-global registry of per-conversation carry-over state. Keyed by
+/// `session_id` (the SessionWriter ULID). `Lazy + Mutex` mirrors the
+/// concurrency posture of `crate::commands::error_history` and the existing
+/// thread_local seams in this module.
+pub(crate) static CONVERSATION_STATES: Lazy<Mutex<HashMap<String, ConversationCarryOver>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+/// FIFO insertion order so we can evict oldest on overflow without dragging
+/// in a full LRU crate. Maintained alongside the map; both updated under the
+/// same mutex so they stay in sync.
+pub(crate) static CONVERSATION_STATES_ORDER: Lazy<Mutex<VecDeque<String>>> =
+    Lazy::new(|| Mutex::new(VecDeque::new()));
+
+/// BL-01 — load (or initialize) the per-conversation carry-over for a given
+/// session_id. Returns `Default::default()` when the conversation is new OR
+/// when the mutex is poisoned (defensive — chat continues with a fresh slate
+/// rather than panicking on an unrelated thread's panic).
+pub fn load_conversation_state(conversation_id: &str) -> ConversationCarryOver {
+    if conversation_id.is_empty() {
+        return ConversationCarryOver::default();
+    }
+    match CONVERSATION_STATES.lock() {
+        Ok(map) => map
+            .get(conversation_id)
+            .cloned()
+            .unwrap_or_default(),
+        Err(e) => {
+            eprintln!(
+                "[BL-01] CONVERSATION_STATES poisoned on load: {}; using fresh state",
+                e
+            );
+            ConversationCarryOver::default()
+        }
+    }
+}
+
+/// BL-01 — persist the carry-over fields back to the registry. Maintains
+/// FIFO eviction at `CONVERSATION_STATES_CAP`. Empty `conversation_id` is a
+/// no-op (no SessionWriter / JSONL session; nothing to associate state with).
+pub fn save_conversation_state(conversation_id: &str, carry: ConversationCarryOver) {
+    if conversation_id.is_empty() {
+        return;
+    }
+    let mut map = match CONVERSATION_STATES.lock() {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!(
+                "[BL-01] CONVERSATION_STATES poisoned on save: {}; dropping carry-over for {}",
+                e, conversation_id
+            );
+            return;
+        }
+    };
+    let mut order = match CONVERSATION_STATES_ORDER.lock() {
+        Ok(o) => o,
+        Err(e) => {
+            eprintln!(
+                "[BL-01] CONVERSATION_STATES_ORDER poisoned on save: {}; carry-over written but eviction skipped",
+                e
+            );
+            map.insert(conversation_id.to_string(), carry);
+            return;
+        }
+    };
+    let is_new = !map.contains_key(conversation_id);
+    map.insert(conversation_id.to_string(), carry);
+    if is_new {
+        order.push_back(conversation_id.to_string());
+        while map.len() > CONVERSATION_STATES_CAP {
+            if let Some(oldest) = order.pop_front() {
+                map.remove(&oldest);
+            } else {
+                break;
+            }
+        }
+    }
+}
+
+/// BL-01 — clear the carry-over for a conversation. Used by tests + future
+/// "Clear conversation history" UI paths.
+#[allow(dead_code)]
+pub fn forget_conversation_state(conversation_id: &str) {
+    if let Ok(mut map) = CONVERSATION_STATES.lock() {
+        map.remove(conversation_id);
+    }
+    if let Ok(mut order) = CONVERSATION_STATES_ORDER.lock() {
+        order.retain(|id| id != conversation_id);
+    }
+}
+
+/// BL-01 — extract the carry-over slice from a `LoopState`. Used by `run_loop`
+/// before every halt return path so the per-conversation cost figures and
+/// stuck-detector buckets are preserved across `send_message_stream` calls.
+pub fn extract_carry_over(s: &LoopState) -> ConversationCarryOver {
+    ConversationCarryOver {
+        conversation_cumulative_cost_usd: s.conversation_cumulative_cost_usd,
+        cost_warning_80_emitted: s.cost_warning_80_emitted,
+        compactions_this_run: s.compactions_this_run,
+        consecutive_no_tool_turns: s.consecutive_no_tool_turns,
+        last_progress_iteration: s.last_progress_iteration,
+        last_progress_text_hash: s.last_progress_text_hash,
+        last_iter_cost: s.last_iter_cost,
+    }
 }
 
 // ─── Loop halt reasons ────────────────────────────────────────────────────
@@ -564,6 +729,78 @@ pub async fn run_loop(
     // resume + SESS-03/04 list/fork. Pass a `SessionWriter::no_op()` handle
     // for callers that do not need recording (test paths).
     session_writer: &crate::session::log::SessionWriter,
+    // Phase 34 / BL-01 (REVIEW finding) — per-conversation identifier used to
+    // load + save the per-conversation carry-over state across
+    // `send_message_stream` calls. When empty (test paths or session
+    // logging disabled), the carry-over is in-memory-only for this turn —
+    // matches the legacy per-turn semantics.
+    conversation_id: &str,
+) -> Result<(), LoopHaltReason> {
+    // Phase 34 / BL-01 (REVIEW finding) — central LoopState now lives in the
+    // outer wrapper so we can persist the carry-over slice back to the
+    // process-global registry on EVERY return path (Ok, all Err variants).
+    // The for-loop body lives in `run_loop_inner` below and operates on
+    // `&mut loop_state`.
+    let mut loop_state = LoopState::default();
+    let prior = load_conversation_state(conversation_id);
+    loop_state.conversation_cumulative_cost_usd = prior.conversation_cumulative_cost_usd;
+    loop_state.cost_warning_80_emitted = prior.cost_warning_80_emitted;
+    loop_state.compactions_this_run = prior.compactions_this_run;
+    loop_state.consecutive_no_tool_turns = prior.consecutive_no_tool_turns;
+    loop_state.last_progress_iteration = prior.last_progress_iteration;
+    loop_state.last_progress_text_hash = prior.last_progress_text_hash;
+    loop_state.last_iter_cost = prior.last_iter_cost;
+
+    let result = run_loop_inner(
+        app,
+        state,
+        approvals,
+        vector_store,
+        config,
+        conversation,
+        tools,
+        last_user_text,
+        brain_plan_used,
+        meta_low_confidence,
+        meta_pre_check,
+        input_message_count,
+        turn_acc,
+        current_message_id,
+        session_writer,
+        &mut loop_state,
+    )
+    .await;
+
+    // BL-01 — persist the carry-over fields back to the registry, regardless
+    // of how the loop exited. Cost figures are especially load-bearing: a
+    // `CostExceeded` halt MUST keep the cumulative spend so the next turn's
+    // top-of-iteration check observes it.
+    save_conversation_state(conversation_id, extract_carry_over(&loop_state));
+
+    result
+}
+
+/// BL-01 — inner driver. Owns the iteration body. Operates on a `&mut
+/// LoopState` provided by the outer wrapper so we can persist carry-over
+/// state on every return path uniformly.
+#[allow(clippy::too_many_arguments)]
+async fn run_loop_inner(
+    app: tauri::AppHandle,
+    state: SharedMcpManager,
+    approvals: ApprovalMap,
+    vector_store: crate::embeddings::SharedVectorStore,
+    config: &mut crate::config::BladeConfig,
+    conversation: &mut Vec<ConversationMessage>,
+    tools: &[crate::providers::ToolDefinition],
+    last_user_text: &str,
+    brain_plan_used: bool,
+    meta_low_confidence: bool,
+    meta_pre_check: &crate::metacognition::CognitiveState,
+    input_message_count: usize,
+    turn_acc: crate::reward::TurnAccumulator,
+    current_message_id: &mut Option<String>,
+    session_writer: &crate::session::log::SessionWriter,
+    loop_state: &mut LoopState,
 ) -> Result<(), LoopHaltReason> {
     let max_iter: usize = if config.r#loop.smart_loop_enabled {
         config.r#loop.max_iterations as usize
@@ -577,11 +814,6 @@ pub async fn run_loop(
     // branch consumes it via compute_and_persist_turn_reward. We rebind as
     // mutable so record_tool_call (mut-borrow) works inline.
     let mut turn_acc = turn_acc;
-
-    // Plan 33-05 (LOOP-02 + LOOP-03) — central LoopState lives for the whole
-    // run_loop call. Plans 33-04..33-08 mount additional fields/usages
-    // (verification probe, cost guard, token escalation) onto this same value.
-    let mut loop_state = LoopState::default();
 
     for iteration in 0..max_iter {
         // Plan 33-05 — keep LoopState.iteration in sync with the for-loop
@@ -4397,5 +4629,123 @@ mod tests {
         let should_halt =
             state.conversation_cumulative_cost_usd > cfg.cost_guard_per_conversation_dollars;
         assert!(should_halt, "smart-off MUST fire 100% halt — data integrity");
+    }
+
+    /// Phase 34 / BL-01 (REVIEW finding) — per-conversation cost MUST persist
+    /// across `send_message_stream` calls within the same conversation_id.
+    /// We can't easily exercise the full `run_loop` without provider mocking,
+    /// so this test exercises the contract directly: the carry-over registry
+    /// load/save round-trip preserves cumulative cost, and a fresh
+    /// `LoopState` seeded from `load_conversation_state` reflects the prior
+    /// turn's spend (which is what `run_loop` does at its top).
+    #[test]
+    fn phase34_res_03_cost_persists_across_send_message_stream_calls() {
+        // Use a unique conversation_id per test run so parallel tests don't
+        // collide on the process-global registry.
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.subsec_nanos())
+            .unwrap_or(0);
+        let cid = format!("test-cid-bl01-{}-{}", std::process::id(), nanos);
+        // Clean any prior state for this id.
+        forget_conversation_state(&cid);
+
+        // Turn 1 — accumulate $5.00 cumulative.
+        let mut s1 = LoopState::default();
+        let prior1 = load_conversation_state(&cid);
+        // Fresh conversation: prior is zero.
+        assert_eq!(
+            prior1.conversation_cumulative_cost_usd, 0.0,
+            "fresh conversation must start at $0.00"
+        );
+        s1.conversation_cumulative_cost_usd = prior1.conversation_cumulative_cost_usd + 5.00;
+        s1.cost_warning_80_emitted = false;
+        save_conversation_state(&cid, extract_carry_over(&s1));
+
+        // Turn 2 — load prior, accumulate another $5.00.
+        let mut s2 = LoopState::default();
+        let prior2 = load_conversation_state(&cid);
+        assert!(
+            (prior2.conversation_cumulative_cost_usd - 5.00).abs() < 1e-6,
+            "turn 2 must observe $5.00 from turn 1; got ${}",
+            prior2.conversation_cumulative_cost_usd
+        );
+        s2.conversation_cumulative_cost_usd =
+            prior2.conversation_cumulative_cost_usd + 5.00;
+        save_conversation_state(&cid, extract_carry_over(&s2));
+
+        // Turn 3 — total must be $10.00.
+        let prior3 = load_conversation_state(&cid);
+        assert!(
+            (prior3.conversation_cumulative_cost_usd - 10.00).abs() < 1e-6,
+            "cumulative MUST be $10.00 after two $5.00 turns (BL-01 regression); got ${}",
+            prior3.conversation_cumulative_cost_usd
+        );
+
+        // Cleanup.
+        forget_conversation_state(&cid);
+        let cleared = load_conversation_state(&cid);
+        assert_eq!(
+            cleared.conversation_cumulative_cost_usd, 0.0,
+            "forget_conversation_state must clear the entry"
+        );
+    }
+
+    /// Phase 34 / BL-01 — empty `conversation_id` is a no-op for the registry
+    /// (test paths and quickask one-offs). load returns Default; save is
+    /// a no-op so we don't pollute the map with empty-string keys.
+    #[test]
+    fn phase34_bl_01_empty_conversation_id_is_noop() {
+        let prior = load_conversation_state("");
+        assert_eq!(prior.conversation_cumulative_cost_usd, 0.0);
+        // Save with non-zero — must NOT land in the map.
+        let carry = ConversationCarryOver {
+            conversation_cumulative_cost_usd: 99.99,
+            ..Default::default()
+        };
+        save_conversation_state("", carry);
+        // Re-load — still zero. No "" key in the map.
+        let after = load_conversation_state("");
+        assert_eq!(
+            after.conversation_cumulative_cost_usd, 0.0,
+            "empty conversation_id MUST NOT persist into registry"
+        );
+    }
+
+    /// Phase 34 / BL-01 — the FIFO eviction at CONVERSATION_STATES_CAP keeps
+    /// the registry bounded so a long-running BLADE process can't leak
+    /// arbitrary memory into N-many resumed conversations.
+    #[test]
+    fn phase34_bl_01_registry_bounded_eviction() {
+        // Drop the cap to a small number for the test by inserting CAP+10 entries
+        // and asserting the map size is ≤ CAP afterwards. We use a unique prefix
+        // so this test doesn't perturb sibling tests' entries.
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.subsec_nanos())
+            .unwrap_or(0);
+        let prefix = format!("test-bl01-evict-{}-{}-", std::process::id(), nanos);
+        let n_to_insert = CONVERSATION_STATES_CAP + 10;
+        for i in 0..n_to_insert {
+            let cid = format!("{}{}", prefix, i);
+            save_conversation_state(
+                &cid,
+                ConversationCarryOver {
+                    conversation_cumulative_cost_usd: i as f32 * 0.01,
+                    ..Default::default()
+                },
+            );
+        }
+        let map_len = CONVERSATION_STATES.lock().unwrap().len();
+        assert!(
+            map_len <= CONVERSATION_STATES_CAP,
+            "registry must not exceed CONVERSATION_STATES_CAP={}; got {}",
+            CONVERSATION_STATES_CAP,
+            map_len
+        );
+        // Cleanup our test entries.
+        for i in 0..n_to_insert {
+            forget_conversation_state(&format!("{}{}", prefix, i));
+        }
     }
 }

@@ -81,6 +81,16 @@ export interface ChatStateValue {
   toolApprovalRequest: ToolApprovalNeededPayload | null;
   tokenRatio: { ratio: number; used: number; window: number } | null;
   routing: ChatRoutingPayload | null;
+  /**
+   * Phase 34 / BL-01 + BL-02 (REVIEW finding) — currently-active conversation
+   * session_id. `null` for a brand-new chat that hasn't sent its first message
+   * yet; populated by `setActiveSessionId` after `resumeSession` returns. When
+   * non-null, every `send` call threads this id through `sendMessageStream` so
+   * the Rust side appends to the SAME JSONL and the per-conversation
+   * carry-over registry hits the same bucket. Cleared on `cancel`-then-new
+   * is the user's call (we do not auto-clear to avoid surprising fork).
+   */
+  activeSessionId: string | null;
   send: (text: string) => Promise<void>;
   cancel: () => Promise<void>;
   approveTool: (approvalId: string) => Promise<void>;
@@ -98,6 +108,21 @@ export interface ChatStateValue {
    * Called by QuickAskBridge (Plan 04-06) on BLADE_QUICKASK_BRIDGED.
    */
   injectUserMessage: (m: { id: string; content: string }) => void;
+  /**
+   * Phase 34 / BL-02 (REVIEW finding) — replace the chat history wholesale.
+   * Called by `SessionsView.handleResume` after `resumeSession` returns the
+   * `ResumedConversation.messages` so the chat surface re-renders with the
+   * resumed turns. Without this hook, the `Resume` button is a visual no-op:
+   * the user clicks Resume, the chat opens empty, and the next message starts
+   * a fresh session.
+   */
+  setHistory: (messages: ChatStreamMessage[]) => void;
+  /**
+   * Phase 34 / BL-01 + BL-02 — set the active conversation session_id. The
+   * next `send` call will thread this id through to Rust so the cumulative
+   * cost cap + JSONL append target the resumed conversation.
+   */
+  setActiveSessionId: (id: string | null) => void;
 }
 
 const Ctx = createContext<ChatStateValue | null>(null);
@@ -116,6 +141,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     useState<ToolApprovalNeededPayload | null>(null);
   const [tokenRatio, setTokenRatio] = useState<ChatStateValue['tokenRatio']>(null);
   const [routing, setRouting] = useState<ChatRoutingPayload | null>(null);
+  // Phase 34 / BL-01 + BL-02 (REVIEW finding) — active conversation session_id.
+  // Populated by setActiveSessionId after resumeSession returns; threaded into
+  // every send() so the Rust side hits the same SessionWriter target + the
+  // same per-conversation carry-over bucket.
+  const [activeSessionId, setActiveSessionIdState] = useState<string | null>(null);
 
   // ── rAF-flushed buffers (D-68) ────────────────────────────────────────────
   // Buffers accumulate synchronously inside the event handlers; a single
@@ -300,6 +330,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
 
+  // Phase 34 / BL-01 + BL-02 — keep activeSessionId in a ref so `send` can
+  // read the latest value without re-subscribing every consumer when the id
+  // changes (e.g. immediately after resumeSession).
+  const activeSessionIdRef = useRef<string | null>(activeSessionId);
+  activeSessionIdRef.current = activeSessionId;
+
   const send = useCallback(async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -313,6 +349,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setMessages((prev) => [...prev, userMsg]);
     setStatus('streaming');
 
+    // wireMsgs: only user/assistant turns map cleanly to ChatMessage.role.
+    // Tool / system rows synthesized on resume have role values that the
+    // ChatMessage type already accepts, so this filter narrows by content
+    // existence, not role.
     const wireMsgs: ChatMessage[] = [...messagesRef.current, userMsg].map((m) => ({
       role: m.role,
       content: m.content,
@@ -320,7 +360,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }));
 
     try {
-      await sendMessageStream(wireMsgs);
+      // Phase 34 / BL-01 + BL-02 — thread the active session_id through. When
+      // null (fresh chat that hasn't sent its first message yet), Rust generates
+      // a fresh ULID. When set (resumed conversation OR set on the first turn
+      // of a fresh chat by the future "claim id" path), the Rust SessionWriter
+      // appends to the SAME JSONL and the carry-over registry persists.
+      await sendMessageStream(wireMsgs, activeSessionIdRef.current ?? undefined);
     } catch (err) {
       // Fallback surface — Rust emits chat_error with a friendly message on
       // most error paths (fast path + provider failures), but any path that
@@ -395,6 +440,30 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  // Phase 34 / BL-02 (REVIEW finding) — replace the chat history wholesale
+  // for the resume hand-off. Wipes any in-flight streaming buffers so the
+  // resumed turns render cleanly even if the user clicked Resume mid-stream.
+  const setHistory = useCallback((nextMessages: ChatStreamMessage[]) => {
+    tokenBufRef.current = '';
+    thinkBufRef.current = '';
+    streamingContentRef.current = '';
+    thinkingContentRef.current = '';
+    currentMessageIdRef.current = null;
+    setStreamingContent('');
+    setThinkingContent('');
+    setCurrentMessageId(null);
+    setMessages(nextMessages);
+    setStatus('idle');
+  }, []);
+
+  // Phase 34 / BL-01 + BL-02 — set the active session_id (typically right
+  // after `resumeSession` returns). Subsequent `send` calls will thread this
+  // id to the Rust side so the JSONL append target + carry-over registry
+  // bucket match the resumed conversation.
+  const setActiveSessionId = useCallback((id: string | null) => {
+    setActiveSessionIdState(id);
+  }, []);
+
   const value: ChatStateValue = {
     messages,
     status,
@@ -404,11 +473,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     toolApprovalRequest,
     tokenRatio,
     routing,
+    activeSessionId,
     send,
     cancel,
     approveTool,
     denyTool,
     injectUserMessage,
+    setHistory,
+    setActiveSessionId,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
