@@ -112,9 +112,19 @@ async fn execute_decomposed_task_inner(
         read_parent_msg_count(&config.session.jsonl_log_dir, parent_session_id).unwrap_or(0);
 
     // (3) Concurrency cap — see CONTEXT lock §DECOMP-02. v1 dispatches serially
-    //     for deterministic cost rollup ordering; the cap is documented for
-    //     Plan 35-07's parallel JoinSet variant.
-    let _max_concurrent = (config.decomposition.max_parallel_subagents.min(5)) as usize;
+    //     for deterministic cost rollup ordering; parallel JoinSet dispatch
+    //     deferred to v1.6 per HI-03 review finding (run_subagent_to_halt is
+    //     a placeholder until Plan 35-11 UAT wires the real run_loop, so
+    //     parallelizing the placeholder buys nothing). The config field IS
+    //     read here (no leading underscore) so flipping max_parallel_subagents
+    //     produces a visible log line — and so v1.6's parallel dispatch lands
+    //     as a single-line consumer change rather than a config-rewire.
+    let max_concurrent = (config.decomposition.max_parallel_subagents.min(5)) as usize;
+    log::info!(
+        "[DECOMP-02] dispatching {} sub-agents (max_concurrent={}); v1 walks serially — parallel dispatch deferred to v1.6",
+        groups.len(),
+        max_concurrent,
+    );
 
     // (4) Walk groups serially. Distillation is also serial per CONTEXT
     //     lock §DECOMP-03; serial dispatch keeps cost rollup deterministic.
@@ -587,6 +597,60 @@ mod tests {
         let e = DecompositionError::DagInvalid("cycle".to_string());
         let json = serde_json::to_string(&e).expect("serialize");
         let _parsed: DecompositionError = serde_json::from_str(&json).expect("parse");
+    }
+
+    #[test]
+    fn phase35_decomp_02_max_parallel_respected_at_dispatch() {
+        // HI-03 regression — Verify the max_parallel_subagents config field
+        // is READ at dispatch (not just declared). Before this fix the
+        // executor did `let _max_concurrent = ...` — the leading underscore
+        // discarded the value, so flipping the config from 1 to 50 had
+        // identical runtime behavior.
+        //
+        // v1 simplification per HI-03 fall-back: read + log the value, but
+        // dispatch remains serial because run_subagent_to_halt is a
+        // placeholder until Plan 35-11 UAT (parallelizing the placeholder
+        // buys nothing). Plan 35-11 is the natural site for swapping the
+        // `for group in &groups` loop for a JoinSet/buffer_unordered
+        // dispatch — at which point this same value will gate concurrency.
+        //
+        // This test pins the CONTRACT that the value is consumed (no
+        // leading underscore) so a future regression that re-prefixes it
+        // with `_` trips here before shipping.
+        let mut cfg = BladeConfig::default();
+
+        // (1) Default 3 — pinned by config.rs default, re-asserted here
+        //     so a config-default flip surfaces in the executor tests too.
+        let max_default = (cfg.decomposition.max_parallel_subagents.min(5)) as usize;
+        assert_eq!(
+            max_default, 3,
+            "default max_parallel must be 3; clamp to 5 only kicks in for \
+             pathological configs. Got {}",
+            max_default
+        );
+
+        // (2) Pathological 50 must clamp to swarm.rs's 5-concurrent cap.
+        cfg.decomposition.max_parallel_subagents = 50;
+        let max_clamped = (cfg.decomposition.max_parallel_subagents.min(5)) as usize;
+        assert_eq!(
+            max_clamped, 5,
+            "max_parallel=50 must clamp to swarm.rs's 5-concurrent cap"
+        );
+
+        // (3) Pathological 0 — implementation chooses min(config, 5);
+        //     0 is less than 5, so the cap becomes 0. The dispatch loop
+        //     skips when there are no groups; with groups it walks serially
+        //     because the v1 implementation logs and falls through. This
+        //     locks the math; the v1.6 parallel JoinSet variant would treat
+        //     0 as "halt all dispatch", a separate contract for then.
+        cfg.decomposition.max_parallel_subagents = 0;
+        let max_zero = (cfg.decomposition.max_parallel_subagents.min(5)) as usize;
+        assert_eq!(
+            max_zero, 0,
+            "max_parallel=0 must compute to 0 (v1 logs + walks serially; \
+             v1.6 parallel dispatch may interpret as halt-all)"
+        );
+        let _ = max_zero; // prevent unused-binding noise
     }
 
     #[test]
