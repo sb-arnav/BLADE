@@ -2143,4 +2143,60 @@ mod tests {
         assert_eq!(parsed.session, SessionConfig::default(),
             "missing 'session' key must fall back to SessionConfig::default()");
     }
+
+    // ---------------------------------------------------------------------
+    // Phase 35 Plan 35-01 — DecompositionConfig tests (DECOMP-01..05 substrate).
+    //
+    // Three tests lock the six-place config wire-up for the new sub-struct:
+    //   - default_values: DecompositionConfig::default() returns the locked
+    //     DECOMP-01..05 defaults verbatim (auto_decompose_enabled=true,
+    //     min_steps_to_decompose=5, max_parallel_subagents=3,
+    //     subagent_isolation=true, subagent_summary_max_tokens=800).
+    //   - round_trip: a non-default DecompositionConfig survives serialization
+    //     through DiskConfig (mirrors save_config -> load_config wire format).
+    //   - missing_uses_defaults: legacy config.json without a `decomposition`
+    //     key MUST load with DecompositionConfig::default()
+    //     (#[serde(default)] on the field — non-negotiable per CLAUDE.md).
+    // ---------------------------------------------------------------------
+
+    #[test]
+    fn phase35_decomposition_default_values() {
+        let c = DecompositionConfig::default();
+        assert!(c.auto_decompose_enabled, "default auto_decompose_enabled must be true");
+        assert_eq!(c.min_steps_to_decompose, 5);
+        assert_eq!(c.max_parallel_subagents, 3);
+        assert!(c.subagent_isolation, "default subagent_isolation must be true");
+        assert_eq!(c.subagent_summary_max_tokens, 800);
+    }
+
+    #[test]
+    fn phase35_decomposition_config_round_trip() {
+        let mut cfg = BladeConfig::default();
+        cfg.decomposition = DecompositionConfig {
+            auto_decompose_enabled: false,
+            min_steps_to_decompose: 7,
+            max_parallel_subagents: 2,
+            subagent_isolation: false,
+            subagent_summary_max_tokens: 1200,
+        };
+        let mut disk = DiskConfig::default();
+        disk.decomposition = cfg.decomposition.clone();
+        let json = serde_json::to_string(&disk).expect("serialize");
+        let parsed: DiskConfig = serde_json::from_str(&json).expect("parse");
+        assert_eq!(parsed.decomposition, cfg.decomposition,
+            "DecompositionConfig roundtrip lost data");
+    }
+
+    #[test]
+    fn phase35_decomposition_missing_uses_defaults() {
+        let legacy_json = r#"{
+            "provider": "anthropic",
+            "model": "claude-sonnet-4",
+            "onboarded": true
+        }"#;
+        let parsed: DiskConfig = serde_json::from_str(legacy_json)
+            .expect("legacy config should parse with defaults");
+        assert_eq!(parsed.decomposition, DecompositionConfig::default(),
+            "missing 'decomposition' key must fall back to DecompositionConfig::default()");
+    }
 }
