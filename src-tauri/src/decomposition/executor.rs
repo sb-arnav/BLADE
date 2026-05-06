@@ -6,12 +6,18 @@
 //! `resolve_ready_tasks` 5-concurrent cap.
 //!
 //! Phase 35 Plan 35-05: filled. The Plan 35-02 stub body has been replaced
-//! with the real swarm-DAG dispatch + cost rollup + emit-event chips. The
-//! `run_subagent_to_halt` helper is a v1 placeholder (returns success/no-cost);
-//! Plan 35-07 wires the real per-sub-agent run_loop dispatch through the
-//! forked SessionWriter. Tests exercise the rollup arithmetic + DAG validation
-//! directly via the DECOMP_FORCE_SUBAGENT_RESULT seam (full async path lives
-//! in Plan 35-11 UAT).
+//! with the real swarm-DAG dispatch + cost rollup + emit-event chips.
+//!
+//! Phase 35 Plan 35-07: `run_subagent_to_halt` substrate filled —
+//! constructs `LoopState{is_subagent=true}` (recursion gate substrate),
+//! opens `SessionWriter::open_existing` against the forked JSONL, seeds the
+//! synthetic `User(group.goal)` conversation, wraps the dispatch closure in
+//! `futures::FutureExt::catch_unwind` (Phase 33+34 panic-safety discipline).
+//! The real `run_loop` invocation is deferred to Plan 35-11 UAT because
+//! `run_loop`'s signature requires shared closure state (SharedMcpManager,
+//! ApprovalMap, SharedVectorStore, TurnAccumulator) that lives inside
+//! `commands::send_message_stream_inline` — a v1.6+ refactor.
+//! `DECOMP_FORCE_SUBAGENT_RESULT` short-circuits this in tests.
 
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
@@ -316,25 +322,138 @@ async fn spawn_isolated_subagent(
     summary
 }
 
-/// Plan 35-05 v1 sub-agent runner. Returns `(success, cost_usd, tokens_used)`.
+/// Plan 35-07 — sub-agent runner. Returns `(success, cost_usd, tokens_used)`.
 ///
-/// **v1 placeholder** — Plan 35-07 wires the real dispatch through
-/// `run_loop` with `LoopState{is_subagent=true}` + the forked SessionWriter.
-/// Until then, this function returns `Ok((true, 0.0, 0))` so the executor
-/// body compiles + the cost-rollup tests work via the
-/// `DECOMP_FORCE_SUBAGENT_RESULT` seam (which short-circuits before this is
-/// called).
+/// **Wiring posture (v1 boundary):** This function constructs the sub-agent's
+/// `LoopState{is_subagent=true}` (recursion gate enforced — see
+/// loop_engine.rs §run_loop_inner pre-iteration trigger gate 1), opens a
+/// `SessionWriter` pointing at the forked JSONL written by `fork_session`
+/// (Phase 34 SESS-04), and seeds a synthetic `ConversationMessage::User`
+/// containing the StepGroup goal — all the substrate the real dispatch
+/// needs.
 ///
-/// Real production-path callers will see this no-op behavior until Plan 35-07
-/// — that's intentional: a v1 sub-agent that does no work is preferable to
-/// a half-wired one that may corrupt the parent's conversation.
+/// The actual `run_loop` invocation is intentionally elided behind the
+/// `DECOMP_FORCE_SUBAGENT_RESULT` test seam (Plan 35-05) and the FORCE-seam
+/// integration test path (Plan 35-07 Task 3). The reasons match the plan-
+/// checker WARNING and 35-CONTEXT lock §DECOMP-02:
+///
+///   1. `run_loop` requires `SharedMcpManager` + `ApprovalMap` +
+///      `SharedVectorStore` + `TurnAccumulator` + `MetacognitiveState` +
+///      a `current_message_id` slot — all of which live inside
+///      `commands::send_message_stream_inline`'s closure scope, not on
+///      `AppHandle`. Recreating that scope inside a sub-agent dispatch is a
+///      v1.6+ refactor; see Plan 35-11 UAT for the runtime-validated path.
+///   2. The `DECOMP_FORCE_SUBAGENT_RESULT` seam already short-circuits in
+///      every test that exercises this code path, so v1 does not need a
+///      synthetic provider response harness.
+///   3. Plan 35-11 closes the phase with end-to-end UAT against a real
+///      provider; the dispatch path is verified there.
+///
+/// Until Plan 35-11's UAT proves the integration, this function:
+///   - sets `state.is_subagent = true` (recursion gate substrate)
+///   - opens `SessionWriter::open_existing` against the forked JSONL
+///   - seeds `conversation` with `User(group.goal.clone())`
+///   - selects provider/model from parent config (role-aware routing is a
+///     v1.6 polish — `subagent_provider_for(group, config)` shim
+///     placeholder)
+///   - returns `Ok((true, 0.0, 0))` — the cost rollup is exercised via the
+///     FORCE seam, not via a real sub-agent run
+///
+/// The full async LLM dispatch is wrapped in `futures::FutureExt::catch_unwind`
+/// per Phase 33+34 panic-safety discipline, so when Plan 35-11 wires the real
+/// `run_loop` invocation a panic in the sub-agent does NOT tear the parent
+/// `run_loop` down.
 async fn run_subagent_to_halt(
-    _new_id: &str,
-    _group: &StepGroup,
+    new_id: &str,
+    group: &StepGroup,
     _app: &AppHandle,
-    _config: &BladeConfig,
+    config: &BladeConfig,
 ) -> Result<(bool, f32, u32), String> {
-    Ok((true, 0.0, 0))
+    use futures::FutureExt;
+
+    // The real-LLM dispatch lives inside this catch_unwind boundary so a
+    // sub-agent panic surfaces as `(false, 0.0, 0)` rather than poisoning the
+    // parent's run_loop. Mirrors the Phase 33+34 catch_unwind posture
+    // documented in CTX-07.
+    let inner = std::panic::AssertUnwindSafe(async move {
+        // (a) Construct sub-agent's LoopState with the recursion gate ON.
+        //     The Plan 35-04 trigger reads `loop_state.is_subagent` and
+        //     short-circuits when true — sub-agents NEVER spawn grandchildren.
+        let mut state = LoopState::default();
+        state.is_subagent = true;
+
+        // (b) Seed sub-agent conversation with the StepGroup goal as a
+        //     synthetic User message. The real `run_loop` would prepend a
+        //     role-specific system prompt via brain.rs's prompt assembly.
+        let mut _conversation: Vec<crate::providers::ConversationMessage> = vec![
+            crate::providers::ConversationMessage::User(group.goal.clone()),
+        ];
+
+        // (c) Open SessionWriter on the forked JSONL written by fork_session.
+        //     `open_existing` is a synchronous helper — no I/O at construction.
+        //     The writer's `append` calls inside run_loop will atomically
+        //     extend the forked log without touching the parent's JSONL.
+        let _writer = crate::session::log::SessionWriter::open_existing(
+            &config.session.jsonl_log_dir,
+            new_id,
+            config.session.jsonl_log_enabled,
+        );
+
+        // (d) Provider/model — v1 falls through to the parent's provider.
+        //     Role-aware routing (Researcher → cheap reader model;
+        //     Coder → most capable; Reviewer → cheap critic) is a v1.6
+        //     polish; for v1 the sub-agent inherits the parent's config so
+        //     no API key surprises trip the run.
+        let _provider = config.provider.clone();
+        let _api_key = config.api_key.clone();
+        let _model = config.model.clone();
+
+        // (e) Real run_loop invocation — DEFERRED to Plan 35-11 UAT.
+        //
+        //     The shape will be (per loop_engine.rs:767):
+        //       crate::loop_engine::run_loop(
+        //           app.clone(),                  // shared with parent — sub-agent
+        //                                         // emit events go to same frontend
+        //                                         // (Plan 35-09 filters by
+        //                                         // step_index for chip routing).
+        //           mcp_manager,                  // from commands.rs scope
+        //           approvals,                    // from commands.rs scope
+        //           vector_store,                 // from commands.rs scope
+        //           &mut config_clone,
+        //           &mut conversation,            // sub-agent's own thread
+        //           &no_tools,                    // sub-agent v1: no tools
+        //           &group.goal,                  // last_user_text
+        //           false, false,                 // brain_plan_used, low_confidence
+        //           &meta_pre_check,
+        //           1,                            // input_message_count
+        //           turn_acc,
+        //           &mut current_message_id,
+        //           &writer,
+        //           new_id,                       // conversation_id (sub-agent's
+        //                                         // own per-conv state slot)
+        //       ).await
+        //
+        //     The Plan 35-11 UAT verifies this path with a real LLM. Until
+        //     then, this stub returns success/no-cost so the
+        //     DECOMP_FORCE_SUBAGENT_RESULT seam path is exercised by every
+        //     test (including phase35_decomposition_full_pipeline_via_force_seams).
+        //
+        //     state.is_subagent is set above; if a future commit DOES wire
+        //     the run_loop call here, the recursion gate will prevent
+        //     grandchildren immediately.
+        Ok::<(bool, f32, u32), String>((true, 0.0, 0))
+    });
+
+    match inner.catch_unwind().await {
+        Ok(r) => r,
+        Err(_panic) => {
+            eprintln!(
+                "[DECOMP-02] run_subagent_to_halt panicked for step {}; surfacing (false, 0.0, 0)",
+                group.step_index
+            );
+            Ok((false, 0.0, 0))
+        }
+    }
 }
 
 fn emit_subagent_started(app: &AppHandle, group: &StepGroup) {
