@@ -140,15 +140,37 @@ pub struct ActionRecord {
 
 // ─── Loop halt reasons ────────────────────────────────────────────────────
 
-/// LOOP-06 — structured halt reasons. Returned from `run_loop` to the outer
-/// orchestration in commands.rs, which maps each variant to the appropriate
-/// chat_error / chat_cancelled emit.
+/// Plan 34-02 — scope discriminator for CostExceeded.
+/// PerLoop = single user turn (Phase 33's `loop.cost_guard_dollars` cap).
+/// PerConversation = lifetime of the SessionWriter's session_id (Phase 34's
+/// `resilience.cost_guard_per_conversation_dollars` cap).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum CostScope {
+    PerLoop,
+    PerConversation,
+}
+
+/// Plan 34-02 (RES-02) — failed provider attempt captured by the circuit
+/// breaker. Surfaced to the user as the `attempts_summary` field of
+/// `LoopHaltReason::CircuitOpen` so the chat UI can render "what was tried".
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct AttemptRecord {
+    pub provider: String,
+    pub model: String,
+    pub error_message: String,
+    pub timestamp_ms: u64,
+}
+
+/// LOOP-06 + RES-02 — structured halt reasons. Returned from `run_loop` to the
+/// outer orchestration in commands.rs, which maps each variant to the
+/// appropriate chat_error / chat_cancelled emit.
 #[derive(Debug, Clone)]
 pub enum LoopHaltReason {
-    /// LOOP-06 — cumulative cost exceeded `config.r#loop.cost_guard_dollars`.
-    /// Emit blade_loop_event {kind: "halted", reason: "cost_exceeded"} +
-    /// chat_error with the dollar figures.
-    CostExceeded { spent_usd: f32, cap_usd: f32 },
+    /// LOOP-06 — cumulative cost exceeded the cap. Plan 34-02 added the
+    /// `scope: CostScope` field to distinguish per-loop (Phase 33) from
+    /// per-conversation (Phase 34 RES-04). Emit blade_loop_event
+    /// {kind: "halted", reason: "cost_exceeded"} + chat_error with the figures.
+    CostExceeded { spent_usd: f32, cap_usd: f32, scope: CostScope },
     /// LOOP-06 — `config.r#loop.max_iterations` exhausted without resolution.
     /// Existing iteration-exhausted handling continues (preserve current
     /// commands.rs behavior; just emit blade_loop_event).
@@ -157,6 +179,17 @@ pub enum LoopHaltReason {
     Cancelled,
     /// Provider error that wasn't recoverable via classify_api_error fallback.
     ProviderFatal { error: String },
+    /// Plan 34-04 (RES-01) — stuck pattern detected. `pattern` is one of
+    /// "RepeatedActionObservation" | "MonologueSpiral" | "ContextWindowThrashing"
+    /// | "NoProgress" | "CostRunaway".
+    Stuck { pattern: String },
+    /// Plan 34-05 (RES-02) — circuit breaker opened after N consecutive
+    /// same-`error_kind` failures. `attempts_summary` lists the captured
+    /// failures within the breaker window.
+    CircuitOpen {
+        error_kind: String,
+        attempts_summary: Vec<AttemptRecord>,
+    },
 }
 
 // ─── Structured tool errors (LOOP-02) ──────────────────────────────────────
@@ -557,6 +590,7 @@ pub async fn run_loop(
             return Err(LoopHaltReason::CostExceeded {
                 spent_usd: loop_state.cumulative_cost_usd,
                 cap_usd: config.r#loop.cost_guard_dollars,
+                scope: CostScope::PerLoop,
             });
         }
 
@@ -3508,5 +3542,79 @@ mod tests {
     fn phase34_loop_state_cost_warning_latch_default_false() {
         let s = LoopState::default();
         assert!(!s.cost_warning_80_emitted);
+    }
+
+    // ─── Plan 34-02 — Phase 34 LoopHaltReason extension tests ──────────────
+
+    #[test]
+    fn phase34_halt_reason_cost_scope_serde_roundtrip() {
+        let s = CostScope::PerConversation;
+        let json = serde_json::to_string(&s).expect("serialize");
+        let parsed: CostScope = serde_json::from_str(&json).expect("parse");
+        assert_eq!(s, parsed);
+        let s2 = CostScope::PerLoop;
+        let json2 = serde_json::to_string(&s2).expect("serialize");
+        let parsed2: CostScope = serde_json::from_str(&json2).expect("parse");
+        assert_eq!(s2, parsed2);
+    }
+
+    #[test]
+    fn phase34_halt_reason_cost_exceeded_carries_scope() {
+        let halt = LoopHaltReason::CostExceeded {
+            spent_usd: 26.5,
+            cap_usd: 25.0,
+            scope: CostScope::PerConversation,
+        };
+        match halt {
+            LoopHaltReason::CostExceeded { scope, .. } => {
+                assert_eq!(scope, CostScope::PerConversation);
+            }
+            _ => panic!("expected CostExceeded"),
+        }
+    }
+
+    #[test]
+    fn phase34_halt_reason_circuit_open_carries_attempts() {
+        let attempts = vec![
+            AttemptRecord {
+                provider: "anthropic".to_string(),
+                model: "claude-sonnet-4".to_string(),
+                error_message: "timeout".to_string(),
+                timestamp_ms: 1000,
+            },
+            AttemptRecord {
+                provider: "anthropic".to_string(),
+                model: "claude-sonnet-4".to_string(),
+                error_message: "timeout".to_string(),
+                timestamp_ms: 2000,
+            },
+            AttemptRecord {
+                provider: "anthropic".to_string(),
+                model: "claude-sonnet-4".to_string(),
+                error_message: "timeout".to_string(),
+                timestamp_ms: 3000,
+            },
+        ];
+        let halt = LoopHaltReason::CircuitOpen {
+            error_kind: "timeout".to_string(),
+            attempts_summary: attempts.clone(),
+        };
+        match halt {
+            LoopHaltReason::CircuitOpen { error_kind, attempts_summary } => {
+                assert_eq!(error_kind, "timeout");
+                assert_eq!(attempts_summary.len(), 3);
+                assert_eq!(attempts_summary[0].timestamp_ms, 1000);
+            }
+            _ => panic!("expected CircuitOpen"),
+        }
+    }
+
+    #[test]
+    fn phase34_halt_reason_stuck_carries_pattern() {
+        let halt = LoopHaltReason::Stuck { pattern: "MonologueSpiral".to_string() };
+        match halt {
+            LoopHaltReason::Stuck { pattern } => assert_eq!(pattern, "MonologueSpiral"),
+            _ => panic!("expected Stuck"),
+        }
     }
 }
