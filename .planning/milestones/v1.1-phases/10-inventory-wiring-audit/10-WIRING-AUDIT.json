@@ -1869,6 +1869,65 @@
       ]
     },
     {
+      "file": "src-tauri/src/decomposition/executor.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 35 v1.5 DECOMP-02 — sub-agent spawn orchestrator. execute_decomposed_task walks N StepGroups, spawns each via fork_session (Phase 34 SESS-04) into an isolated LoopState{is_subagent=true} + own SessionWriter, drives each through swarm-DAG dispatch, distills 1-paragraph summaries (DECOMP-03), and rolls per-sub-agent cost into parent_state.conversation_cumulative_cost_usd. RES-04 parent-budget interlock halts remaining sub-agents on cap-trip; outer catch_unwind surfaces panics as DecompositionError::Internal.",
+      "trigger": "internal — invoked by src-tauri/src/loop_engine.rs run_loop's DECOMP-01 trigger gate (Plan 35-04) when count_independent_steps_grouped returns Some(groups)",
+      "ui_surface": "src/features/activity-log/index.tsx (subagent_started + subagent_complete chips via blade_loop_event)",
+      "internal_callers": [
+        "src-tauri/src/loop_engine.rs",
+        "src-tauri/src/commands.rs"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": [
+        "send_message_stream tool loop -> loop_engine::run_loop -> decomposition::executor::execute_decomposed_task -> spawn_isolated_subagent (per StepGroup)"
+      ]
+    },
+    {
+      "file": "src-tauri/src/decomposition/mod.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 35 v1.5 — Auto-decomposition module boundary. Re-exports count_independent_steps_grouped + StepGroup (DECOMP-01), execute_decomposed_task + DecompositionError (DECOMP-02), distill_subagent_summary + SubagentSummary (DECOMP-03). Pairs with DecompositionConfig at config.rs.",
+      "trigger": "internal — module aggregator; consumers import via `crate::decomposition::*`",
+      "ui_surface": null,
+      "internal_callers": [
+        "src-tauri/src/loop_engine.rs",
+        "src-tauri/src/commands.rs"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": [
+        "lib.rs -> mod decomposition -> decomposition::{planner,executor,summary}"
+      ]
+    },
+    {
+      "file": "src-tauri/src/decomposition/planner.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 35 v1.5 DECOMP-01 — step-counter trigger. count_independent_steps_grouped scores a query along 3 axes (verb_groups via connectors+action verbs, file_groups via path-shaped tokens, tool_families via cross-tool families) and returns Some(StepGroups) when max(axes) >= min_steps_to_decompose (default 5). auto_decompose_enabled=false short-circuits to None. Plan 35-04 wraps the call site in catch_unwind so a panic falls through to the naive sequential path.",
+      "trigger": "internal — invoked by src-tauri/src/loop_engine.rs run_loop's pre-iteration DECOMP-01 trigger gate (catch_unwind-wrapped per Plan 35-04)",
+      "ui_surface": "src/features/activity-log/index.tsx (decomposition_started chip via blade_loop_event when groups.len >= threshold)",
+      "internal_callers": [
+        "src-tauri/src/loop_engine.rs"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": [
+        "send_message_stream tool loop -> loop_engine::run_loop -> decomposition::planner::count_independent_steps_grouped"
+      ]
+    },
+    {
+      "file": "src-tauri/src/decomposition/summary.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 35 v1.5 DECOMP-03 — sub-agent summary distillation. distill_subagent_summary loads the sub-agent's JSONL via session/resume::load_session, builds a role-aware cheap-model prompt, calls providers::complete_simple, caps output at subagent_summary_max_tokens × 4 chars. catch_unwind boundary converts panic OR cheap-model error OR empty-response to a heuristic 200-char fallback from the last AssistantTurn (success=false).",
+      "trigger": "internal — invoked by src-tauri/src/decomposition/executor.rs spawn_isolated_subagent after run_subagent_to_halt completes (per-StepGroup)",
+      "ui_surface": "Synthetic AssistantTurn injected into parent's chat history (rendered via standard chat surface) with prefix '[Sub-agent summary — step N, ROLE, session ULID[..8]…]'",
+      "internal_callers": [
+        "src-tauri/src/decomposition/executor.rs",
+        "src-tauri/src/loop_engine.rs"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": [
+        "send_message_stream tool loop -> loop_engine::run_loop -> decomposition::executor::execute_decomposed_task -> decomposition::summary::distill_subagent_summary"
+      ]
+    },
+    {
       "file": "src-tauri/src/deep_scan/enrichment.rs",
       "classification": "ACTIVE",
       "purpose": "Phase 12 deep_scan enrichment \u2014 enriches scan profile with additional metadata.",
@@ -9977,6 +10036,15 @@
       "classification": "ACTIVE",
       "ui_surface": "src/features/admin/DoctorPane.tsx (read-only context budget breakdown \u2014 Phase 32 / CTX-06)",
       "control_type": "complex (ContextConfig sub-struct \u2014 Phase 32 selective injection / compaction / tool caps / CTX-07 fallback toggle)"
+    },
+    {
+      "field": "BladeConfig.decomposition",
+      "file": "src-tauri/src/config.rs:1047",
+      "struct": "BladeConfig",
+      "disk_persisted": true,
+      "classification": "ACTIVE",
+      "ui_surface": null,
+      "control_type": "complex (DecompositionConfig sub-struct \u2014 Phase 35 v1.5 auto-decomposition: auto_decompose_enabled kill switch, min_steps_to_decompose threshold, max_parallel_subagents cap, subagent_summary_max_tokens cap)"
     },
     {
       "field": "BladeConfig.ecosystem_observe_only",
