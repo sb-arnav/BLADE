@@ -34,6 +34,12 @@ thread_local! {
     /// overhead.
     pub(crate) static DECOMP_FORCE_STEP_COUNT: std::cell::Cell<Option<u32>> =
         std::cell::Cell::new(None);
+    /// Plan 35-04 — separate panic-injection seam. When set, the body of
+    /// count_independent_steps_grouped panics. Tests use this to verify the
+    /// catch_unwind boundary at the run_loop call site catches the panic
+    /// (mirrors Plan 34-04's detect_stuck panic-regression pattern).
+    pub(crate) static DECOMP_FORCE_PLANNER_PANIC: std::cell::Cell<bool> =
+        std::cell::Cell::new(false);
 }
 
 /// Plan 35-03 — DECOMP-01 trigger detector. Returns Some(groups) when
@@ -47,6 +53,9 @@ pub fn count_independent_steps_grouped(
     {
         if let Some(forced) = DECOMP_FORCE_STEP_COUNT.with(|c| c.get()) {
             return Some(synthetic_groups(query, forced));
+        }
+        if DECOMP_FORCE_PLANNER_PANIC.with(|c| c.get()) {
+            panic!("test-only induced panic in count_independent_steps_grouped (Plan 35-04 regression seam)");
         }
     }
     if !config.decomposition.auto_decompose_enabled {
