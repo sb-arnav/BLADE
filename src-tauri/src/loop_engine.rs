@@ -43,11 +43,17 @@ use crate::trace;
 
 // ─── Loop state ────────────────────────────────────────────────────────────
 
-/// Plan 34-02 — capacity of the recent_actions ring buffer. Default 6 lets
+/// Plan 34-02 — DEFAULT capacity of the recent_actions ring buffer. 6 lets
 /// the 5 RES-01 detectors see "3 repeated triples in last 6 actions" with
-/// room for interspersed different actions. Configurable runtime via
-/// ResilienceConfig.recent_actions_window (Plan 34-04 reads the config and
-/// resizes if needed; the const here is the compile-time floor).
+/// room for interspersed different actions.
+///
+/// Phase 34 / HI-03 (REVIEW finding) — runtime capacity is honored from
+/// `ResilienceConfig.recent_actions_window` via `record_action(record, cap)`.
+/// `LoopState::record_action(record)` (no-cap overload) preserves backwards
+/// compatibility with `LoopState::default()` test paths and uses this const
+/// as the fallback. The runtime call site at iteration end inside `run_loop`
+/// always passes the configured value so user edits to the config field take
+/// effect on the next chat turn.
 pub const RECENT_ACTIONS_CAPACITY: usize = 6;
 
 /// LOOP-01..06 + RES-01..04 — central state struct passed by mutable reference
@@ -111,10 +117,27 @@ pub struct LoopState {
 
 impl LoopState {
     /// Push an action into the ring buffer, evicting the oldest if length
-    /// exceeds RECENT_ACTIONS_CAPACITY (6). Plan 34-02 bumped capacity from 3.
+    /// exceeds the DEFAULT capacity `RECENT_ACTIONS_CAPACITY` (6).
+    ///
+    /// Phase 34 / HI-03 (REVIEW finding) — preserved as a thin wrapper over
+    /// `record_action_with_cap` for tests that construct `LoopState::default()`
+    /// without access to a `ResilienceConfig`. The runtime path inside
+    /// `run_loop` calls `record_action_with_cap` directly with
+    /// `config.resilience.recent_actions_window` so user edits to that field
+    /// take effect immediately.
     pub fn record_action(&mut self, record: ActionRecord) {
+        self.record_action_with_cap(record, RECENT_ACTIONS_CAPACITY);
+    }
+
+    /// HI-03 — runtime-configurable variant of `record_action`. Capacity comes
+    /// from the caller (typically `config.resilience.recent_actions_window as
+    /// usize`). A capacity of 0 is treated as the compile-time floor
+    /// (`RECENT_ACTIONS_CAPACITY`) to avoid pathological "ring buffer is empty
+    /// after every push" behavior.
+    pub fn record_action_with_cap(&mut self, record: ActionRecord, capacity: usize) {
+        let cap = if capacity == 0 { RECENT_ACTIONS_CAPACITY } else { capacity };
         self.recent_actions.push_back(record);
-        while self.recent_actions.len() > RECENT_ACTIONS_CAPACITY {
+        while self.recent_actions.len() > cap {
             self.recent_actions.pop_front();
         }
     }
@@ -2424,12 +2447,21 @@ pub async fn run_loop(
             // dropped at run_loop exit.
             let input_summary = serde_json::to_string(&tool_call.arguments)
                 .unwrap_or_else(|_| String::new());
-            loop_state.record_action(ActionRecord {
-                tool: tool_call.name.clone(),
-                input_summary,
-                output_summary: content.clone(),
-                is_error,
-            });
+            // Phase 34 / HI-03 (REVIEW finding) — honor the runtime-configured
+            // ring buffer capacity instead of the compile-time const. Users
+            // who set `resilience.recent_actions_window = 12` for a long-form
+            // research session now see the wider window take effect; previously
+            // the field was dead code and `record_action` always truncated to
+            // the hardcoded 6.
+            loop_state.record_action_with_cap(
+                ActionRecord {
+                    tool: tool_call.name.clone(),
+                    input_summary,
+                    output_summary: content.clone(),
+                    is_error,
+                },
+                config.resilience.recent_actions_window as usize,
+            );
 
             // ─── Plan 34-08 (SESS-01) — ToolCall JSONL emit ──────────────
             //
@@ -3119,6 +3151,60 @@ mod tests {
         assert_eq!(s.recent_actions.len(), 6);
         assert_eq!(s.recent_actions.front().unwrap().tool, "tool_2");
         assert_eq!(s.recent_actions.back().unwrap().tool, "tool_7");
+    }
+
+    /// Phase 34 / HI-03 (REVIEW finding) — `recent_actions_window` is honored
+    /// as the runtime cap for the ring buffer. Setting cap=10 and pushing 12
+    /// actions must produce a 10-element buffer with the 2 oldest evicted.
+    /// Previously the cap was hardcoded as `RECENT_ACTIONS_CAPACITY = 6` and
+    /// the config field was dead code.
+    #[test]
+    fn phase34_res_01_recent_actions_window_honored_from_config() {
+        let mut s = LoopState::default();
+        let cap: usize = 10;
+        for i in 0..12 {
+            s.record_action_with_cap(
+                ActionRecord {
+                    tool: format!("tool_{}", i),
+                    input_summary: "in".to_string(),
+                    output_summary: "out".to_string(),
+                    is_error: false,
+                },
+                cap,
+            );
+        }
+        assert_eq!(
+            s.recent_actions.len(),
+            cap,
+            "ring buffer length must match runtime cap (HI-03 regression)"
+        );
+        // 12 pushed, cap 10 → oldest 2 (tool_0, tool_1) evicted; tool_2..tool_11 remain.
+        assert_eq!(s.recent_actions.front().unwrap().tool, "tool_2");
+        assert_eq!(s.recent_actions.back().unwrap().tool, "tool_11");
+    }
+
+    /// Phase 34 / HI-03 — capacity = 0 falls back to the compile-time floor
+    /// (`RECENT_ACTIONS_CAPACITY`) instead of degenerating into "always empty".
+    /// Defense against a config typo or a future deserialize regression.
+    #[test]
+    fn phase34_res_01_recent_actions_window_zero_falls_back_to_floor() {
+        let mut s = LoopState::default();
+        for i in 0..8 {
+            s.record_action_with_cap(
+                ActionRecord {
+                    tool: format!("tool_{}", i),
+                    input_summary: "in".to_string(),
+                    output_summary: "out".to_string(),
+                    is_error: false,
+                },
+                0,
+            );
+        }
+        assert_eq!(
+            s.recent_actions.len(),
+            RECENT_ACTIONS_CAPACITY,
+            "capacity = 0 must fall back to RECENT_ACTIONS_CAPACITY (HI-03 defense)"
+        );
     }
 
     // ─── Plan 33-04 (LOOP-01) verification probe tests ────────────────
