@@ -99,6 +99,16 @@ export function ActivityLogProvider({ children }: { children: ReactNode }) {
   const logRef = useRef(log);
   logRef.current = log;
 
+  // Phase 35 / Plan 35-10 (DECOMP-05) — throttle Map for subagent_progress
+  // 'running' / 'tool_call' chips. Keyed by step_index. Value = last emit
+  // timestamp (ms). Per CONTEXT lock §DECOMP-05: 'running' + 'tool_call'
+  // throttled to ≤1 chip per 3s per step_index; 'compacting' + 'verifying'
+  // render immediately (bounded by ≤5 concurrent sub-agents). Cleaned on
+  // subagent_complete to avoid stale entries leaking across decomposition
+  // runs (T-35-37 mitigation — preserves throttle correctness if a new
+  // sub-agent reuses the same step_index).
+  const subagentProgressThrottleRef = useRef<Map<number, number>>(new Map());
+
   const handleEvent = useCallback((e: Event<ActivityLogEntry>) => {
     const entry = e.payload;
     const next = [entry, ...logRef.current].slice(0, MAX_ENTRIES);
@@ -200,20 +210,61 @@ export function ActivityLogProvider({ children }: { children: ReactNode }) {
         // spend/cap. Bypass the activity-log ring buffer entirely so the
         // strip doesn't churn one row per iteration.
         return;
-      // ─── Phase 35 / Plan 35-09 ─────────────────────────────────────────
-      // Sub-agent + decomposition lifecycle variants land here so the
-      // switch stays exhaustive over the BladeLoopEventPayload union
-      // (otherwise TS reports `action`/`summary` as possibly unassigned at
-      // the entry construction below). Plan 35-10 wires the actual
-      // ActivityStrip chip switch + per-step throttling for these — for
-      // now, suppress them from the activity ring buffer so they don't
-      // surface as half-rendered rows. Deferred-consumer parity with
-      // `cost_update` above.
+      // ─── Phase 35 / Plan 35-10 (DECOMP-05) — sub-agent + decomposition
+      //     lifecycle chip rendering. ────────────────────────────────────
+      // Maps the 4 sub-agent / decomposition variants emitted by the Rust
+      // decomposition::executor + commands.rs::send_message_stream to
+      // ActivityStrip chip rows. Per CONTEXT lock §DECOMP-05:
+      //   - subagent_started     → "sub-agent {step_index}: {role} — started"
+      //   - subagent_progress    → throttled chip (compacting/verifying
+      //                             render always; running/tool_call ≤1 per
+      //                             3s per step_index via
+      //                             subagentProgressThrottleRef Map).
+      //                             Throttle drops are silent — chip flood
+      //                             prevention (T-35-36 mitigation).
+      //   - subagent_complete    → "sub-agent {step_index}: ✓ {summary}" on
+      //                             success or "sub-agent {step_index}: ✗
+      //                             failed". Cleans the throttle Map entry
+      //                             so stale timestamps don't leak.
+      //   - decomposition_complete → "decomposition complete: {N} sub-agents".
       case 'subagent_started':
-      case 'subagent_progress':
+        action = 'subagent_started';
+        summary = `sub-agent ${payload.step_index}: ${payload.role} — started`;
+        break;
+      case 'subagent_progress': {
+        const stepIdx = payload.step_index;
+        const status = payload.status;
+        if (status !== 'compacting' && status !== 'verifying') {
+          // 'running' or 'tool_call' — throttle ≤1 chip per 3s per step_index.
+          const last = subagentProgressThrottleRef.current.get(stepIdx) ?? 0;
+          const now = Date.now();
+          if (now - last < 3000) {
+            // Drop silently — chip flood prevention (T-35-36).
+            return;
+          }
+          subagentProgressThrottleRef.current.set(stepIdx, now);
+        }
+        action = 'subagent_progress';
+        summary = `sub-agent ${stepIdx}: ${status}${
+          payload.detail ? ` · ${payload.detail}` : ''
+        }`;
+        break;
+      }
       case 'subagent_complete':
+        action = 'subagent_complete';
+        summary = payload.success
+          ? `sub-agent ${payload.step_index}: ✓ ${payload.summary_excerpt}`
+          : `sub-agent ${payload.step_index}: ✗ failed`;
+        // Clean throttle entry — prevents stale timestamps leaking across
+        // decomposition runs that re-use the same step_index.
+        subagentProgressThrottleRef.current.delete(payload.step_index);
+        break;
       case 'decomposition_complete':
-        return;
+        action = 'decomposition_complete';
+        summary = `decomposition complete: ${payload.subagent_count} sub-agent${
+          payload.subagent_count === 1 ? '' : 's'
+        }`;
+        break;
     }
     const entry: ActivityLogEntry = {
       module: 'loop',
