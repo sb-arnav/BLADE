@@ -47,6 +47,7 @@ import { CompactingIndicator } from './CompactingIndicator';
 import { ConsentDialog, type ConsentChoice } from './ConsentDialog';
 import { InputBar } from './InputBar';
 import { MessageList } from './MessageList';
+import { SubagentProgressBubble } from './SubagentProgressBubble';
 import { ToolApprovalDialog } from './ToolApprovalDialog';
 import { useChatCtx } from './useChat';
 import { VitalityIndicator } from './VitalityIndicator';
@@ -98,6 +99,11 @@ export function ChatPanel() {
         <VitalityIndicator />
       </header>
       <CompactingIndicator />
+      {/* Phase 35 / Plan 35-10 (DECOMP-05) — inline sub-agent progress
+          bubbles. Renders above MessageList so the in-flight indicator
+          flows with the streaming chat history rather than overlaying the
+          InputBar. Self-renders nothing when no sub-agents are active. */}
+      <SubagentProgressBubble />
       <MessageList />
       <ToolApprovalDialog />
       <ConsentDialog
