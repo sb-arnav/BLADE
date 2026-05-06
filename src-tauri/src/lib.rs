@@ -908,6 +908,13 @@ pub fn run() {
             session_handoff::session_handoff_clear,
             session_handoff::session_handoff_write,
             session_handoff::session_handoff_get,
+            // Phase 34 / Plan 34-06 (RES-03) — chat-input cost-meter chip
+            // reads conversation-lifetime spend on session load. Live ticks
+            // come via the blade_loop_event { kind: "cost_update" } stream
+            // emitted by run_loop each iteration. Frontend wiring lands in
+            // Plan 34-11. List + resume + fork commands stay registered in
+            // Plan 34-10 (still stubs as of this commit).
+            session::list::get_conversation_cost,
             self_upgrade::self_upgrade_install,
             self_upgrade::self_upgrade_catalog,
             self_upgrade::self_upgrade_audit,

@@ -54,15 +54,74 @@ pub async fn fork_session(_parent_id: String, _fork_at_message_index: u32)
     Err("Plan 34-03 stub — Plan 34-10 fills body".to_string())
 }
 
-/// RES-03 — Tauri command. Plan 34-03 STUB returns zeros. Plan 34-10 fills.
+/// RES-03 — Tauri command. Returns `{spent_usd, cap_usd, percent}` for the
+/// conversation identified by `session_id`. Reads `{jsonl_log_dir}/<id>.jsonl`,
+/// finds the LAST `LoopEvent` with `kind == "cost_update"`, returns its payload
+/// joined with the current cost cap. When no cost_update events exist
+/// (brand-new session OR every turn ran with smart-off and never emitted —
+/// see Plan 34-06 loop_engine cost_update emit which fires UNCONDITIONALLY),
+/// returns `spent_usd = 0`.
+///
+/// Used by:
+///   - the chat-input cost-meter chip on session load (one-shot poll —
+///     Plan 34-11 frontend);
+///   - live ticks come via the `blade_loop_event { kind: "cost_update" }`
+///     stream; this command answers "what was the spend before I subscribed?".
+///
+/// Threat T-34-26 disposition (accept): jsonl_log_dir lives inside the user's
+/// own config dir (chmod 0700 on macOS/Linux); cross-user access requires sudo.
+/// Threat T-34-27 disposition (accept): forward read with last-wins. For
+/// sessions ≥ 10 MB a v1.6 follow-up reads the file's tail first.
 #[tauri::command]
-pub async fn get_conversation_cost(_session_id: String)
-    -> Result<serde_json::Value, String>
-{
+pub async fn get_conversation_cost(
+    session_id: String,
+) -> Result<serde_json::Value, String> {
+    validate_session_id(&session_id)?;
+    let cfg = crate::config::load_config();
+    let cap = cfg.resilience.cost_guard_per_conversation_dollars;
+    let dir = cfg.session.jsonl_log_dir.clone();
+    let path = dir.join(format!("{}.jsonl", &session_id));
+    if !path.exists() {
+        return Ok(serde_json::json!({
+            "spent_usd": 0.0_f32,
+            "cap_usd": cap,
+            "percent": 0_u32,
+        }));
+    }
+    let f = std::fs::File::open(&path).map_err(|e| e.to_string())?;
+    use std::io::BufRead;
+    let reader = std::io::BufReader::new(f);
+    let mut last_spent: f32 = 0.0;
+    for line in reader.lines() {
+        let line = line.map_err(|e| e.to_string())?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        match serde_json::from_str::<crate::session::log::SessionEvent>(&line) {
+            Ok(crate::session::log::SessionEvent::LoopEvent { kind, payload, .. })
+                if kind == "cost_update" =>
+            {
+                if let Some(s) = payload.get("spent_usd").and_then(|v| v.as_f64()) {
+                    last_spent = s as f32;
+                }
+            }
+            Ok(_) => continue,
+            Err(e) => {
+                // Threat T-34-X (defense): a single corrupt line cannot block
+                // the whole read. Log to stderr and continue scanning.
+                eprintln!(
+                    "[SESS-03] get_conversation_cost: skip corrupt JSONL line in {}: {}",
+                    session_id, e
+                );
+                continue;
+            }
+        }
+    }
+    let percent = (100.0 * last_spent / cap.max(0.0001)) as u32;
     Ok(serde_json::json!({
-        "spent_usd": 0.0,
-        "cap_usd": 25.0,
-        "percent": 0.0
+        "spent_usd": last_spent,
+        "cap_usd": cap,
+        "percent": percent,
     }))
 }
 
@@ -82,6 +141,13 @@ pub(crate) fn validate_session_id(id: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Plan 34-06 — tests that mutate the process-global BLADE_CONFIG_DIR
+    /// env var must run serially. Cargo's default parallel-by-default test
+    /// harness will interleave set_var/remove_var across threads otherwise,
+    /// causing a sibling test to read another test's tmp dir. We acquire
+    /// this mutex at the top of every BLADE_CONFIG_DIR-touching test.
+    static TEST_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     #[test]
     fn phase34_session_meta_serde_roundtrip() {
@@ -119,5 +185,105 @@ mod tests {
     async fn phase34_list_sessions_stub_returns_empty() {
         let r = list_sessions().await.expect("stub returns Ok");
         assert!(r.is_empty());
+    }
+
+    // ─── Plan 34-06 (RES-03) — get_conversation_cost JSONL read tests ─────
+
+    /// RES-03 — get_conversation_cost reads the LAST cost_update LoopEvent
+    /// from the JSONL (not sum, not first — last-wins because each iteration's
+    /// emit overwrites the running total). Writes 3 events with spent values
+    /// 1.0, 2.0, 3.5 and asserts the read returns 3.5.
+    #[tokio::test]
+    async fn phase34_get_conversation_cost_reads_last_cost_update() {
+        let _guard = TEST_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "blade-test-cost-last-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let _ = std::fs::create_dir_all(&tmp);
+        std::env::set_var("BLADE_CONFIG_DIR", &tmp);
+
+        let sessions_dir = tmp.join("sessions");
+        std::fs::create_dir_all(&sessions_dir).expect("create sessions dir");
+        let session_id = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+        let path = sessions_dir.join(format!("{}.jsonl", session_id));
+
+        let events = vec![
+            crate::session::log::SessionEvent::LoopEvent {
+                kind: "cost_update".to_string(),
+                payload: serde_json::json!({"spent_usd": 1.0, "cap_usd": 25.0, "percent": 4}),
+                timestamp_ms: 1000,
+            },
+            crate::session::log::SessionEvent::LoopEvent {
+                kind: "cost_update".to_string(),
+                payload: serde_json::json!({"spent_usd": 2.0, "cap_usd": 25.0, "percent": 8}),
+                timestamp_ms: 2000,
+            },
+            crate::session::log::SessionEvent::LoopEvent {
+                kind: "cost_update".to_string(),
+                payload: serde_json::json!({"spent_usd": 3.5, "cap_usd": 25.0, "percent": 14}),
+                timestamp_ms: 3000,
+            },
+        ];
+        use std::io::Write;
+        let mut f = std::fs::File::create(&path).expect("create jsonl");
+        for e in &events {
+            let line = serde_json::to_string(e).expect("serialize");
+            f.write_all(line.as_bytes()).expect("write");
+            f.write_all(b"\n").expect("newline");
+        }
+        drop(f);
+
+        let r = get_conversation_cost(session_id.to_string())
+            .await
+            .expect("read");
+        let spent = r["spent_usd"].as_f64().expect("spent_usd");
+        assert!(
+            (spent - 3.5).abs() < 0.001,
+            "expected last cost_update.spent_usd=3.5; got {}",
+            spent
+        );
+        std::env::remove_var("BLADE_CONFIG_DIR");
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    /// RES-03 — missing JSONL (brand-new session that hasn't run yet) returns
+    /// spent_usd=0 with the configured cap. NOT an error.
+    #[tokio::test]
+    async fn phase34_get_conversation_cost_missing_session_returns_zero() {
+        let _guard = TEST_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "blade-test-cost-missing-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        // Create the dir but NOT the sessions/ subdir or any JSONL — the
+        // command must handle the missing-file path cleanly.
+        let _ = std::fs::create_dir_all(&tmp);
+        std::env::set_var("BLADE_CONFIG_DIR", &tmp);
+        let r = get_conversation_cost("01ARZ3NDEKTSV4RRFFQ69G5FAV".to_string())
+            .await
+            .expect("read");
+        let spent = r["spent_usd"].as_f64().expect("spent_usd");
+        assert_eq!(spent, 0.0);
+        std::env::remove_var("BLADE_CONFIG_DIR");
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    /// RES-03 / SESS-03 — validate_session_id rejects path-traversal IDs
+    /// before any filesystem access fires. Defense in depth even though the
+    /// canonical path build (jsonl_log_dir.join(format!("{}.jsonl"))) would
+    /// not honor a ".." segment cleanly anyway.
+    #[tokio::test]
+    async fn phase34_get_conversation_cost_rejects_invalid_id() {
+        let r = get_conversation_cost("../../etc/passwd".to_string()).await;
+        assert!(r.is_err(), "must reject path-traversal id");
     }
 }
