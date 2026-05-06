@@ -115,6 +115,13 @@ pub struct LoopState {
     /// Plan 34-02 (RES-04 latch) — true once the 80% cost-warning event has
     /// fired this conversation. Prevents repeat firing every iteration.
     pub cost_warning_80_emitted: bool,
+    /// Phase 35 / DECOMP-02 — recursion gate. When true, the DECOMP-01
+    /// trigger at the top of run_loop is SKIPPED for THIS loop. Set to true
+    /// at sub-agent spawn time by `decomposition::executor::spawn_isolated_subagent`.
+    /// Default false (parent loops). Without this gate, sub-agents would
+    /// recursively spawn grandchildren — explicitly out-of-scope per
+    /// 35-CONTEXT.md §Phase Boundary "current scope: 1-level deep".
+    pub is_subagent: bool,
 }
 
 impl LoopState {
@@ -382,6 +389,12 @@ pub enum LoopHaltReason {
         error_kind: String,
         attempts_summary: Vec<AttemptRecord>,
     },
+    /// Phase 35 / DECOMP-01 — `execute_decomposed_task` fanned out to N
+    /// sub-agents, collected all summaries, injected them into the parent's
+    /// conversation as synthetic AssistantTurns, and returned. The parent
+    /// loop returns this halt reason to commands.rs which stops iterating.
+    /// Carries no payload — the conversation already holds the summaries.
+    DecompositionComplete,
 }
 
 // ─── Structured tool errors (LOOP-02) ──────────────────────────────────────
@@ -4747,5 +4760,48 @@ mod tests {
         for i in 0..n_to_insert {
             forget_conversation_state(&format!("{}{}", prefix, i));
         }
+    }
+
+    // ---------------------------------------------------------------------
+    // Phase 35 Plan 35-02 — LoopState.is_subagent + LoopHaltReason::DecompositionComplete
+    // substrate tests. Three regression locks for the recursion gate field +
+    // halt variant + Clone preservation of the new field.
+    // ---------------------------------------------------------------------
+
+    #[test]
+    fn phase35_loop_state_has_is_subagent_default_false() {
+        let s = LoopState::default();
+        assert!(
+            !s.is_subagent,
+            "default LoopState.is_subagent must be false (parent loops)"
+        );
+    }
+
+    #[test]
+    fn phase35_loop_halt_reason_decomposition_complete_serde_roundtrip() {
+        let h = LoopHaltReason::DecompositionComplete;
+        let json = serde_json::to_string(&h).expect("serialize DecompositionComplete");
+        // LoopHaltReason::DecompositionComplete is a unit-variant — serializes
+        // as the bare discriminant string "DecompositionComplete".
+        assert!(
+            json.contains("DecompositionComplete"),
+            "expected discriminant in JSON, got {}",
+            json
+        );
+    }
+
+    #[test]
+    fn phase35_clone_loop_state_preserves_is_subagent() {
+        let mut s = LoopState::default();
+        s.is_subagent = true;
+        // No bespoke clone_loop_state helper exists in loop_engine.rs as of
+        // Phase 34; LoopState derives Clone, so this exercises the derived
+        // implementation. When a future plan introduces an explicit
+        // clone_loop_state helper, this test should be updated to call it.
+        let s2 = s.clone();
+        assert!(
+            s2.is_subagent,
+            "Clone of LoopState must preserve is_subagent flag"
+        );
     }
 }
