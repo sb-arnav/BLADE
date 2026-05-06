@@ -2104,6 +2104,27 @@ pub(crate) async fn send_message_stream_inline(
             let _ = app.emit("blade_status", "error");
             return Ok(());
         }
+        Err(crate::loop_engine::LoopHaltReason::DecompositionComplete) => {
+            // Phase 35 / DECOMP-01 — substrate handler (Plan 35-02 scaffold).
+            //
+            // When the brain planner detects 5+ independent steps,
+            // `decomposition::executor::execute_decomposed_task` fans out
+            // sub-agents, distills their summaries, and injects the
+            // synthetic AssistantTurns into `conversation` BEFORE returning
+            // this halt reason. By the time we reach this arm, the parent
+            // conversation already carries the summaries — there is nothing
+            // for the outer fall-through summary block to add.
+            //
+            // Plan 35-02 ships the type substrate only; the executor body is
+            // a stub that always returns Err, so this arm is currently
+            // unreachable in production. Plans 35-04 + 35-07 wire the real
+            // emit cadence (chat_done + idle status). For now, mirror the
+            // happy-path Ok(()) behaviour: surface chat_done, set idle, and
+            // return.
+            emit_stream_event(&app, "chat_done", ());
+            let _ = app.emit("blade_status", "idle");
+            return Ok(());
+        }
     }
 
     // Loop exhausted or stuck — do a final tool-free call so the model can
