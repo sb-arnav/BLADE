@@ -171,6 +171,7 @@ mod tentacles;
 mod agent_factory;
 mod ecosystem;
 mod resilience;       // Phase 34 v1.5 — RES-01 stuck + RES-05 provider fallback (Plan 34-03 scaffold)
+mod session;          // Phase 34 v1.5 — SESS-01 JSONL log + SESS-02 resume + SESS-03/04 list/fork (Plan 34-03 scaffold)
 
 use chrono::Timelike;
 use std::sync::Arc;
