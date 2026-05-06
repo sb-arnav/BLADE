@@ -21,6 +21,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouterCtx } from '@/windows/main/useRouter';
+import { useChatCtx, type ChatStreamMessage } from '@/features/chat';
 import {
   forkSession,
   listSessions,
@@ -30,6 +31,7 @@ import {
 
 export function SessionsView() {
   const { openRoute } = useRouterCtx();
+  const { setHistory, setActiveSessionId } = useChatCtx();
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,16 +61,62 @@ export function SessionsView() {
       setBusy(id);
       setError(null);
       try {
-        // Plan 34-09 / SESS-02 — load_session replays JSONL events into a
-        // ResumedConversation halting at the most-recent CompactionBoundary.
-        // The chat surface reads existing history via its own provider; the
-        // resume hand-off here is best-effort + navigation. A v1.6 follow-up
-        // wires the rebuilt messages directly into ChatProvider state via
-        // an exposed `setHistory` action; for v1.5 the resume call confirms
-        // the JSONL is intact + the user is routed to /chat where the next
-        // turn re-attaches to that session_id (currently delegated to the
-        // Rust send_message_stream session resolution).
-        await resumeSession(id);
+        // Phase 34 / BL-02 (REVIEW finding) — full resume hand-off:
+        //   1. resumeSession(id) → ResumedConversation { session_id, messages }
+        //   2. setHistory(narrowed messages) — chat surface re-renders with
+        //      the resumed turns instead of empty state.
+        //   3. setActiveSessionId(session_id) — next send_message_stream call
+        //      threads this id through to the Rust SessionWriter so the new
+        //      turn appends to the SAME JSONL and the per-conversation
+        //      cumulative cost cap continues from the prior total.
+        //   4. openRoute('chat') — navigate.
+        // Without (2) + (3) the Resume button is a visual no-op (the v1.5
+        // bug this REVIEW finding caught).
+        const r = await resumeSession(id);
+        // Narrow ResumedConversation.messages (Vec<serde_json::Value> on Rust
+        // side) into ChatStreamMessage. Rust emits {role, content} +
+        // optionally {tool_name, is_error} for tool rows. We surface tool
+        // results as system-style rows so the chat history reflects them —
+        // they are NOT replayed back to the LLM provider on the next turn
+        // because the Rust send_message_stream rebuilds conversation from
+        // the JSONL on its own (commands.rs build_conversation path).
+        const hydrated: ChatStreamMessage[] = r.messages.map((raw, i) => {
+          const m = (raw ?? {}) as Record<string, unknown>;
+          const role = (m.role as string) ?? 'system';
+          const content = (m.content as string) ?? '';
+          // tool rows surface to the user as 'system'-styled rows so the
+          // history shows what happened — the chat ChatStreamMessage type
+          // doesn't have a 'tool' role so fold them into 'system' with a
+          // labelled prefix.
+          if (role === 'tool') {
+            const toolName = (m.tool_name as string) ?? 'tool';
+            const isErr = m.is_error === true;
+            return {
+              id: crypto.randomUUID(),
+              role: 'system',
+              content: `[${toolName}${isErr ? ' error' : ''}] ${content}`,
+              createdAt: Date.now() + i,
+              isError: isErr,
+            };
+          }
+          if (role === 'user' || role === 'assistant' || role === 'system') {
+            return {
+              id: crypto.randomUUID(),
+              role,
+              content,
+              createdAt: Date.now() + i,
+            };
+          }
+          // Unknown role — fold into system with verbatim role prefix.
+          return {
+            id: crypto.randomUUID(),
+            role: 'system',
+            content: `[${role}] ${content}`,
+            createdAt: Date.now() + i,
+          };
+        });
+        setHistory(hydrated);
+        setActiveSessionId(r.session_id);
         openRoute('chat');
       } catch (e) {
         setError(typeof e === 'string' ? e : (e instanceof Error ? e.message : String(e)));
@@ -76,7 +124,7 @@ export function SessionsView() {
         setBusy(null);
       }
     },
-    [openRoute],
+    [openRoute, setHistory, setActiveSessionId],
   );
 
   const openBranchPicker = useCallback((session: SessionMeta) => {

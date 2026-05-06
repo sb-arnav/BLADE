@@ -116,7 +116,28 @@ impl SessionWriter {
     ///   - the ID is still generated for forensic continuity (so a later
     ///     toggle-on can reuse the ID surface)
     pub fn new(jsonl_log_dir: &Path, enabled: bool) -> std::io::Result<(Self, String)> {
-        let id = Ulid::new().to_string();
+        Self::new_with_id(jsonl_log_dir, enabled, None)
+    }
+
+    /// Phase 34 / BL-01 + BL-02 (REVIEW finding) — construct a writer for a
+    /// SPECIFIC session_id (resumed / forked conversations) instead of always
+    /// generating a fresh ULID. When `existing_id` is `Some`, we reuse it
+    /// verbatim — the JSONL file at `{dir}/{id}.jsonl` is opened in append
+    /// mode (so subsequent `append` calls extend the existing log instead of
+    /// stomping it) and rotation runs as usual. When `existing_id` is `None`,
+    /// behavior matches the original `new`: fresh ULID, fresh file.
+    ///
+    /// Critical for the per-conversation cost cap (RES-03 + RES-04) and for
+    /// SESS-02 resume — without this, every `send_message_stream` call would
+    /// generate a brand-new session_id, so the per-conversation state stored
+    /// in the global registry (loop_engine) would be unreachable on the next
+    /// turn.
+    pub fn new_with_id(
+        jsonl_log_dir: &Path,
+        enabled: bool,
+        existing_id: Option<String>,
+    ) -> std::io::Result<(Self, String)> {
+        let id = existing_id.unwrap_or_else(|| Ulid::new().to_string());
         if !enabled {
             return Ok((Self { path: PathBuf::new(), enabled: false }, id));
         }

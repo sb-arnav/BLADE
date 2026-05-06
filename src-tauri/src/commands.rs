@@ -925,6 +925,12 @@ pub async fn apply_proposal_reply(verb: &str, id: &str) -> Result<String, String
 /// Thin wrapper around `send_message_stream_inline` that preserves the Phase 3
 /// main-only emit contract (back-compat: `emit_windows = &["main"]`). Every
 /// user-visible stream event routes to the main window as before.
+///
+/// Phase 34 / BL-01 + BL-02 (REVIEW finding) — accepts an optional
+/// `conversation_id` so the frontend can thread the ACTIVE session_id (set
+/// after `resumeSession` or auto-issued on first turn) through to the Rust
+/// SessionWriter + LoopState carry-over registry. When None / empty, behavior
+/// matches the legacy "fresh ULID per turn" posture.
 #[tauri::command]
 pub async fn send_message_stream(
     app: tauri::AppHandle,
@@ -932,6 +938,7 @@ pub async fn send_message_stream(
     approvals: tauri::State<'_, ApprovalMap>,
     vector_store: tauri::State<'_, crate::embeddings::SharedVectorStore>,
     messages: Vec<ChatMessage>,
+    conversation_id: Option<String>,
 ) -> Result<(), String> {
     send_message_stream_inline(
         app,
@@ -940,6 +947,7 @@ pub async fn send_message_stream(
         vector_store.inner().clone(),
         messages,
         &["main"],
+        conversation_id,
     )
     .await
 }
@@ -965,6 +973,10 @@ pub(crate) async fn send_message_stream_inline(
     vector_store: crate::embeddings::SharedVectorStore,
     messages: Vec<ChatMessage>,
     emit_windows: &[&str],
+    // Phase 34 / BL-01 + BL-02 (REVIEW finding) — when Some, threads the
+    // existing session_id through to SessionWriter + run_loop so per-conv
+    // cost cap, 80% latch, and stuck-detector buckets persist across calls.
+    conversation_id: Option<String>,
 ) -> Result<(), String> {
     // Concurrency guard — prevent interleaved responses from rapid-fire messages
     if CHAT_INFLIGHT.swap(true, Ordering::SeqCst) {
@@ -1040,9 +1052,20 @@ pub(crate) async fn send_message_stream_inline(
     // disk full, etc.), fall back to SessionWriter::no_op() so the live
     // chat path is unaffected. The chat-continues posture is the v1.1
     // lesson incarnate: forensic logging must never crash chat.
-    let (session_writer, session_id) = match crate::session::log::SessionWriter::new(
+    // Phase 34 / BL-01 + BL-02 (REVIEW finding) — when the frontend supplies
+    // an existing `conversation_id` (resumed sessions), reuse it verbatim so
+    // SessionWriter appends to the SAME JSONL and the loop_engine carry-over
+    // registry hits the SAME bucket. When None/empty, fall back to ULID
+    // generation (fresh conversation).
+    let resumed_id = conversation_id
+        .as_ref()
+        .filter(|id| !id.is_empty())
+        .cloned();
+    let is_resumed = resumed_id.is_some();
+    let (session_writer, session_id) = match crate::session::log::SessionWriter::new_with_id(
         &config.session.jsonl_log_dir,
         config.session.jsonl_log_enabled,
+        resumed_id,
     ) {
         Ok(pair) => pair,
         Err(e) => {
@@ -1055,13 +1078,51 @@ pub(crate) async fn send_message_stream_inline(
     };
     // First JSONL line: SessionMeta. Skipped silently when the writer is
     // disabled or in no-op mode (SessionWriter::append checks `enabled`).
-    if !session_id.is_empty() {
+    //
+    // BL-02 — when this turn is resumed (conversation_id supplied by the
+    // frontend), the SessionMeta line was already written on the first turn
+    // of this conversation; skip the append so we don't double-stamp the
+    // session header. The append is otherwise unconditional for new sessions.
+    if !session_id.is_empty() && !is_resumed {
         session_writer.append(&crate::session::log::SessionEvent::SessionMeta {
             id: session_id.clone(),
             parent: None,
             fork_at_index: None,
             started_at_ms: crate::session::log::now_ms(),
         });
+    }
+
+    // Phase 34 / BL-01 (REVIEW finding) — cold-cache JSONL re-seed for the
+    // per-conversation cost cap. The in-memory carry-over registry doesn't
+    // survive process restarts; on resume we need to re-seed
+    // `conversation_cumulative_cost_usd` from the JSONL's last `cost_update`
+    // LoopEvent so the 100% halt at the iteration top observes the lifetime
+    // total instead of restarting from 0.
+    //
+    // Skip when:
+    //   - session_id empty (logging disabled or writer init failed)
+    //   - registry already has a non-zero cumulative (warm cache wins)
+    //   - this is a fresh conversation (NOT is_resumed) — there's no JSONL
+    //     history to seed from yet
+    if is_resumed && !session_id.is_empty() {
+        let registry = crate::loop_engine::load_conversation_state(&session_id);
+        if registry.conversation_cumulative_cost_usd == 0.0 {
+            // Read the JSONL via get_conversation_cost helper and write back
+            // into the registry so run_loop's seed read sees the lifetime spend.
+            if let Ok(v) = crate::session::list::get_conversation_cost(session_id.clone()).await {
+                if let Some(spent) = v.get("spent_usd").and_then(|s| s.as_f64()) {
+                    let mut carry = registry.clone();
+                    carry.conversation_cumulative_cost_usd = spent as f32;
+                    // Pre-seed the 80% latch on resume so a turn that crossed
+                    // 80% in a prior session doesn't fire the warning again.
+                    let cap = config.resilience.cost_guard_per_conversation_dollars;
+                    if (spent as f32) > 0.8 * cap {
+                        carry.cost_warning_80_emitted = true;
+                    }
+                    crate::loop_engine::save_conversation_state(&session_id, carry);
+                }
+            }
+        }
     }
 
     // Smart routing: resolve best provider + model for this task type.
@@ -1895,6 +1956,10 @@ pub(crate) async fn send_message_stream_inline(
         &mut _current_message_id,
         // Plan 34-08 (SESS-01) — SessionWriter forensic log handle.
         &session_writer,
+        // Phase 34 / BL-01 (REVIEW finding) — conversation_id keys the
+        // per-conversation carry-over (cumulative cost, 80% latch, stuck
+        // buckets) so it persists across turns within the same chat.
+        &session_id,
     ).await;
 
     // ─── Plan 34-08 (SESS-01) — HaltReason JSONL emit ───────────────────
@@ -2933,6 +2998,11 @@ pub async fn quickask_submit(
             vector_store_clone,
             messages,
             &["main", "quickask"],
+            // Phase 34 / BL-01 — quickask is stateless per submit, so no
+            // conversation_id is threaded; SessionWriter generates a fresh
+            // ULID and the per-conversation carry-over registry uses an empty
+            // key (effectively no carry-over for one-off quickasks).
+            None,
         )
         .await
         {
