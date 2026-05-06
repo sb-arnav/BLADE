@@ -885,11 +885,18 @@ pub async fn run_loop(
         // the original turn.
         let mut turn = turn;
         if config.r#loop.smart_loop_enabled {
-            // First-turn assumption: Anthropic + OpenAI both default to a
-            // 4096 max_tokens body literal (providers/anthropic.rs:26,
-            // providers/openai.rs:43). On detected truncation, escalate
-            // to 8192 (or capped per max_output_tokens_for).
-            let current_max_tokens: u32 = 4096;
+            // 33-NN-FIX (HI-01) — per-provider default. Hardcoding 4096 here
+            // mis-estimated Gemini/Groq/Ollama (whose actual default is 8192,
+            // body-literal omitted in build_body). Result: a non-truncated
+            // Groq/Gemini response that happened to lack terminal punctuation
+            // would trigger escalate_max_tokens(.., 4096) → Some(8192) → retry
+            // at the SAME ceiling the provider was already using → identical
+            // truncation outcome at full retry cost (cost-burning false
+            // positive). The fix uses `providers::default_max_tokens_for` so
+            // escalate_max_tokens correctly returns None when current is
+            // already at provider default ≥ provider cap.
+            let current_max_tokens: u32 =
+                crate::providers::default_max_tokens_for(&config.provider, &config.model);
 
             // Phase 32-07 / CTX-07 panic discipline — wrap the synchronous
             // decision so a regression in detect_truncation / escalate_max_tokens
@@ -3153,5 +3160,50 @@ mod tests {
         crate::config::LoopConfig::default()
             .validate()
             .expect("default LoopConfig must validate cleanly");
+    }
+
+    #[test]
+    fn phase33_loop_04_default_max_tokens_per_provider() {
+        // 33-NN-FIX (HI-01) — provider-aware defaults. Anthropic + OpenAI
+        // pass 4096 as a body literal (build_body sets it on every request);
+        // Groq + Gemini + Ollama omit the field, the server applies its own
+        // default (8192). OpenRouter is OpenAI-compatible (no body literal in
+        // our wiring); we treat it as 8192 too.
+        //
+        // Locking these values prevents a regression where the smart-loop
+        // truncation block re-hardcodes 4096 across all providers, re-introducing
+        // the false-positive escalation cost burn on Groq/Gemini.
+        use crate::providers::default_max_tokens_for;
+        assert_eq!(default_max_tokens_for("anthropic", "claude-sonnet-4"), 4096);
+        assert_eq!(default_max_tokens_for("openai", "gpt-4o"), 4096);
+        assert_eq!(default_max_tokens_for("groq", "llama-3.1-8b-instant"), 8192);
+        assert_eq!(default_max_tokens_for("gemini", "gemini-2.0-flash"), 8192);
+        assert_eq!(default_max_tokens_for("ollama", "llama3"), 8192);
+        assert_eq!(default_max_tokens_for("openrouter", "any/model"), 8192);
+        assert_eq!(default_max_tokens_for("unknown_provider", "weird"), 4096);
+
+        // The cost-burn false positive depends on the relationship between
+        // default and cap. For Groq/Gemini, default 8192 == max_output_tokens
+        // 8192, so escalate_max_tokens(provider, model, default) MUST return
+        // None — i.e. no wasted retry. This is the load-bearing property
+        // HI-01 fixed.
+        for provider in ["groq", "gemini"] {
+            let dflt = default_max_tokens_for(provider, "any-model");
+            let escalated = escalate_max_tokens(provider, "any-model", dflt);
+            assert_eq!(
+                escalated, None,
+                "{}: default ({}) is at cap; escalate must return None to avoid wasted retry",
+                provider, dflt
+            );
+        }
+
+        // Anthropic/OpenAI default 4096 < cap 8192/16384, so escalation IS
+        // possible — the doubling produces real new headroom.
+        let escalated = escalate_max_tokens("anthropic", "claude-sonnet-4", 4096);
+        assert_eq!(escalated, Some(8192),
+            "anthropic at default 4096 should escalate to 8192 (real headroom)");
+        let escalated = escalate_max_tokens("openai", "gpt-4o", 4096);
+        assert_eq!(escalated, Some(8192),
+            "openai gpt-4o at default 4096 should escalate to 8192 (under 16384 cap)");
     }
 }

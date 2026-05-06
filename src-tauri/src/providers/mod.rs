@@ -320,6 +320,51 @@ async fn complete_turn_inner(
 /// Phase 33 sticks to 8192 to avoid header juggling — when the eventual
 /// Phase 34/35 work needs the higher cap, the table moves to 64000 and the
 /// header is set conditionally.
+/// Phase 33 / 33-NN-FIX (HI-01) — per-provider DEFAULT max-output-tokens.
+///
+/// This is the value the provider would actually USE on a request that didn't
+/// pass `max_tokens` (or whatever each provider calls its output cap). It is
+/// distinct from `max_output_tokens_for` (the absolute ceiling for escalation):
+///
+///   - Anthropic + OpenAI: `build_body` hardcodes a default of 4096 in the
+///     request body (anthropic.rs:27, openai.rs:42), so 4096 is the actual
+///     baseline. Escalation via doubling to 8192 is real new headroom.
+///   - Groq + Gemini + Ollama: `build_body` does NOT pass a default at all —
+///     the field is omitted unless `max_tokens_override` is set. Each provider
+///     applies its own server-side default (Groq ~8192, Gemini ~8192, Ollama
+///     ~4096 typical). The smart-loop truncation block previously hardcoded
+///     `current_max_tokens = 4096`, which mis-estimated those three providers.
+///     A non-truncated Groq response on an 8192 ceiling that happened to lack
+///     terminal punctuation would trigger `escalate_max_tokens(.., 4096)` →
+///     `Some(8192)` → retry at the SAME ceiling Groq was already using →
+///     identical truncation outcome at full retry cost (false-positive
+///     escalation, money leak).
+///   - OpenRouter: depends on the upstream model; conservative 8192 (matches
+///     the OpenAI-compatible body builder when no override is passed).
+///
+/// Used by `loop_engine::run_loop` to seed `current_max_tokens` BEFORE calling
+/// `escalate_max_tokens(.., current)`. When `current >= cap`, escalate returns
+/// `None` and we skip the wasted retry.
+///
+/// Sourced from each provider's published default-output-tokens behavior as
+/// of 2026-05.
+pub fn default_max_tokens_for(provider: &str, _model: &str) -> u32 {
+    match provider {
+        // Body-literal defaults — see anthropic.rs:27, openai.rs:42.
+        "anthropic"  => 4_096,
+        "openai"     => 4_096,
+        // Server-side defaults — build_body omits the field entirely.
+        "groq"       => 8_192,
+        "gemini"     => 8_192,
+        "ollama"     => 8_192,
+        // OpenRouter is OpenAI-compatible; no body literal in our wiring,
+        // upstream typically honors 8192 as the modern default.
+        "openrouter" => 8_192,
+        // Unknown providers: conservative 4096 (lowest plausible default).
+        _            => 4_096,
+    }
+}
+
 pub fn max_output_tokens_for(provider: &str, model: &str) -> u32 {
     match (provider, model) {
         ("anthropic", m) if m.starts_with("claude-sonnet-4") => 8_192,
