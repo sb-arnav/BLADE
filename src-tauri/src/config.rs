@@ -571,6 +571,74 @@ impl Default for SessionConfig {
     }
 }
 
+// ---------------------------------------------------------------------
+// Phase 35 Plan 35-01 — Auto-Decomposition runtime knobs (DECOMP-01..05).
+//
+// Locked decisions (35-CONTEXT.md §Module Boundaries):
+//   - auto_decompose_enabled (default true) — CTX-07-style escape hatch.
+//     false = legacy sequential loop only (no count_independent_steps,
+//     no execute_decomposed_task, no fork per sub-agent, no swarm
+//     dispatch, no summary distillation, no subagent_* events).
+//   - min_steps_to_decompose (default 5) — DECOMP-01 trigger threshold
+//     against max(verb_groups, file_groups, tool_families).
+//   - max_parallel_subagents (default 3) — concurrency rate limiter.
+//     Runtime check uses min(this, 5) to respect swarm.rs's 5-concurrent
+//     cap at the dispatch site.
+//   - subagent_isolation (default true) — DECOMP-02 isolation toggle.
+//     DEBUG ONLY when false; cost rollup breaks when sub-agents share
+//     parent's LoopState + SessionWriter.
+//   - subagent_summary_max_tokens (default 800) — DECOMP-03 cap on the
+//     1-paragraph summary distilled per sub-agent and returned to parent.
+//
+// Six-place rule (CLAUDE.md): every BladeConfig field MUST land in
+// DiskConfig struct, DiskConfig::default, BladeConfig struct,
+// BladeConfig::default, load_config, and save_config.
+// ---------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct DecompositionConfig {
+    /// CTX-07-style escape hatch. true = auto-decompose triggers when a query
+    /// implies 5+ independent steps. false = legacy sequential loop only.
+    /// Phase 32 / 33 / 34 / 35 all carry the same v1.1-lesson kill switch.
+    #[serde(default = "default_auto_decompose_enabled")]
+    pub auto_decompose_enabled: bool,
+    /// DECOMP-01 trigger threshold (max of 3 independence axes — verb groups,
+    /// file/project nouns, tool families). Default 5.
+    #[serde(default = "default_min_steps_to_decompose")]
+    pub min_steps_to_decompose: u32,
+    /// DECOMP-02 — concurrent sub-agent rate limiter. Runtime uses
+    /// min(this, 5) to respect swarm.rs's 5-concurrent cap. Default 3.
+    #[serde(default = "default_max_parallel_subagents")]
+    pub max_parallel_subagents: u32,
+    /// DECOMP-02 — when false, sub-agents share parent's LoopState +
+    /// SessionWriter. DEBUG ONLY (cost rollup breaks). Default true.
+    #[serde(default = "default_subagent_isolation")]
+    pub subagent_isolation: bool,
+    /// DECOMP-03 — cap on per-sub-agent summary text returned to parent
+    /// (1-paragraph distillation). Default 800 tokens.
+    #[serde(default = "default_subagent_summary_max_tokens")]
+    pub subagent_summary_max_tokens: u32,
+}
+
+fn default_auto_decompose_enabled() -> bool { true }
+fn default_min_steps_to_decompose() -> u32 { 5 }
+fn default_max_parallel_subagents() -> u32 { 3 }
+fn default_subagent_isolation() -> bool { true }
+fn default_subagent_summary_max_tokens() -> u32 { 800 }
+
+impl Default for DecompositionConfig {
+    fn default() -> Self {
+        Self {
+            auto_decompose_enabled: default_auto_decompose_enabled(),
+            min_steps_to_decompose: default_min_steps_to_decompose(),
+            max_parallel_subagents: default_max_parallel_subagents(),
+            subagent_isolation: default_subagent_isolation(),
+            subagent_summary_max_tokens: default_subagent_summary_max_tokens(),
+        }
+    }
+}
+
 /// Config as stored on disk — api_key is NOT stored here anymore
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct DiskConfig {
@@ -714,6 +782,13 @@ struct DiskConfig {
     // configs loadable.
     #[serde(default)]
     session: SessionConfig,
+    // Phase 35 Plan 35-01 — Auto-Decomposition runtime knobs (DECOMP-01..05).
+    // auto_decompose_enabled escape hatch + min_steps_to_decompose threshold +
+    // max_parallel_subagents rate limiter + subagent_isolation toggle +
+    // subagent_summary_max_tokens cap. #[serde(default)] keeps legacy
+    // configs loadable.
+    #[serde(default)]
+    decomposition: DecompositionConfig,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -798,6 +873,7 @@ impl Default for DiskConfig {
             r#loop: LoopConfig::default(),
             resilience: ResilienceConfig::default(),
             session: SessionConfig::default(),
+            decomposition: DecompositionConfig::default(),
             api_key: None,
         }
     }
@@ -963,6 +1039,12 @@ pub struct BladeConfig {
     /// auto_resume_last=false, keep_n_sessions=100. See `SessionConfig`.
     #[serde(default)]
     pub session: SessionConfig,
+    /// Phase 35 Plan 35-01 — Auto-Decomposition runtime knobs (DECOMP-01..05).
+    /// Defaults: auto_decompose_enabled=true, min_steps_to_decompose=5,
+    /// max_parallel_subagents=3, subagent_isolation=true,
+    /// subagent_summary_max_tokens=800. See `DecompositionConfig`.
+    #[serde(default)]
+    pub decomposition: DecompositionConfig,
 }
 
 impl BladeConfig {
@@ -1033,6 +1115,7 @@ impl Default for BladeConfig {
             r#loop: LoopConfig::default(),
             resilience: ResilienceConfig::default(),
             session: SessionConfig::default(),
+            decomposition: DecompositionConfig::default(),
         }
     }
 }
@@ -1197,6 +1280,7 @@ pub fn load_config() -> BladeConfig {
         r#loop: disk.r#loop,
         resilience: disk.resilience,
         session: disk.session,
+        decomposition: disk.decomposition,
     }
 }
 
@@ -1276,6 +1360,7 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         r#loop: config.r#loop.clone(),
         resilience: config.resilience.clone(),
         session: config.session.clone(),
+        decomposition: config.decomposition.clone(),
         api_key: None,
     };
 
@@ -1846,6 +1931,7 @@ mod tests {
             r#loop: cfg.r#loop.clone(),
             resilience: cfg.resilience.clone(),
             session: cfg.session.clone(),
+            decomposition: cfg.decomposition.clone(),
             api_key: None,
         };
 
