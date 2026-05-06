@@ -2105,7 +2105,7 @@ pub(crate) async fn send_message_stream_inline(
             return Ok(());
         }
         Err(crate::loop_engine::LoopHaltReason::DecompositionComplete) => {
-            // Phase 35 / DECOMP-01 — substrate handler (Plan 35-02 scaffold).
+            // Phase 35 / DECOMP-01 — Plan 35-07 fills the cadence.
             //
             // When the brain planner detects 5+ independent steps,
             // `decomposition::executor::execute_decomposed_task` fans out
@@ -2115,12 +2115,27 @@ pub(crate) async fn send_message_stream_inline(
             // conversation already carries the summaries — there is nothing
             // for the outer fall-through summary block to add.
             //
-            // Plan 35-02 ships the type substrate only; the executor body is
-            // a stub that always returns Err, so this arm is currently
-            // unreachable in production. Plans 35-04 + 35-07 wire the real
-            // emit cadence (chat_done + idle status). For now, mirror the
-            // happy-path Ok(()) behaviour: surface chat_done, set idle, and
-            // return.
+            // Plan 35-07 surfaces a `decomposition_complete` blade_loop_event
+            // chip carrying `subagent_count` so the frontend ActivityStrip
+            // (Plan 35-09 / 35-10) can render the fan-out summary card. The
+            // count is computed by walking `conversation` and tallying
+            // synthetic AssistantTurns — the prefix `[Sub-agent summary` is
+            // produced verbatim by `synthetic_assistant_turn_from_summary`
+            // (loop_engine.rs §synthetic_assistant_turn_from_summary). This
+            // is a clean exit — chat_done fires, NO chat_error.
+            let subagent_count = conversation
+                .iter()
+                .filter(|m| matches!(m, ConversationMessage::Assistant { content, .. }
+                    if content.starts_with("[Sub-agent summary")))
+                .count();
+            log::info!(
+                "[DECOMP-01] decomposition complete; {} synthetic turns added to conversation",
+                subagent_count
+            );
+            emit_stream_event(&app, "blade_loop_event", serde_json::json!({
+                "kind": "decomposition_complete",
+                "subagent_count": subagent_count,
+            }));
             emit_stream_event(&app, "chat_done", ());
             let _ = app.emit("blade_status", "idle");
             return Ok(());
