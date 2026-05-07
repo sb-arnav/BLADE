@@ -243,9 +243,9 @@ pub fn render_map(rows: &[(SymbolNode, f32)], token_budget: u32) -> String {
 /// a real `super::pagerank::rank_symbols(query, mentions, damping, conn)`
 /// invocation. The signature is locked so the swap is a one-line change.
 fn rank_symbols_or_fallback(
-    _query: &str,
+    query: &str,
     mentioned_symbols: &[String],
-    _damping: f32,
+    damping: f32,
     conn: &Connection,
 ) -> Vec<(SymbolNode, f32)> {
     #[cfg(test)]
@@ -258,10 +258,15 @@ fn rank_symbols_or_fallback(
         }
     }
 
-    // Once Plan 36-03 ships, replace the body of this branch with:
-    //     return super::pagerank::rank_symbols(query, mentioned_symbols, damping, conn);
-    // For now, fall through to the SQL-based degree-centrality fallback so
-    // that Plan 36-04 ships independently.
+    // LO-04 (promoted to HIGH) fix — Plan 36-03's pagerank::rank_symbols is
+    // now the production code path. Fall back to degree-centrality only when
+    // PageRank returns an empty result (cold-start: no symbols indexed yet,
+    // SQL error in pagerank loader, etc.). This is the swap the original
+    // doc-comment promised.
+    let pr = super::pagerank::rank_symbols(query, mentioned_symbols, damping, conn);
+    if !pr.is_empty() {
+        return pr;
+    }
     rank_by_degree_centrality(mentioned_symbols, conn)
 }
 
