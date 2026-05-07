@@ -1486,6 +1486,8 @@ pub fn run() {
             vitality_engine::vitality_get_state,
             vitality_engine::vitality_get_history,
             vitality_engine::vitality_force_dormancy,
+            // Phase 36 / Plan 36-02 — INTEL-01 tree-sitter symbol graph re-index
+            intelligence::reindex_symbol_graph,
         ])
         .setup(move |app| {
             // Window state (position/size) handled by tauri-plugin-window-state
