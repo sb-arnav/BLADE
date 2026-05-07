@@ -1291,16 +1291,30 @@ mod tests {
     /// registry has an entry for every default it returns.
     #[test]
     fn phase36_intel_04_default_model_pairs_with_registry_entry() {
-        use crate::intelligence::capability_registry;
-        let cfg = crate::config::load_config();
+        use crate::intelligence::capability_registry::CapabilityRegistry;
+        // Bypass the on-disk registry (which may be stale on a developer
+        // machine that booted with an older canonical_models.json) and assert
+        // against the BUNDLED payload — the source of truth in the binary.
+        // The HI-04 fix specifically lands gemini-2.0-flash-exp in the
+        // bundled JSON; this test pins that contract.
+        const BUNDLED_REGISTRY: &str =
+            include_str!("../../canonical_models.json");
+        let reg: CapabilityRegistry = serde_json::from_str(BUNDLED_REGISTRY)
+            .expect("bundled canonical_models.json must parse");
+
+        // ollama is intentionally absent (local-only, capability_probe is the
+        // source of truth there) and OK to fall through.
         for provider in &[
-            "anthropic", "openai", "groq", "openrouter", "ollama", "gemini",
+            "anthropic", "openai", "groq", "openrouter", "gemini",
         ] {
             let model = default_model_for(provider);
-            let caps = capability_registry::get_capabilities(provider, model, &cfg);
+            let caps = reg
+                .providers
+                .get(*provider)
+                .and_then(|p| p.models.get(model));
             assert!(
                 caps.is_some(),
-                "registry MUST have an entry for default_model_for({}) = {} \
+                "BUNDLED registry MUST have an entry for default_model_for({}) = {} \
                  (HI-04 — registry-first lookup must not fall through to probe \
                  for the canonical default)",
                 provider,
