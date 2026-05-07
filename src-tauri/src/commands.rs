@@ -1260,6 +1260,47 @@ pub(crate) async fn send_message_stream_inline(
     // and cap input length to prevent context window abuse.
     let last_user_text = sanitize_input(&last_user_text);
 
+    // ─── Phase 36-07 (INTEL-06) — anchor extraction prelude ─────────────
+    //
+    // Parses `@screen` / `@file:PATH` / `@memory:TOPIC` tokens from the
+    // user query, strips them out, and resolves each into a (label, content)
+    // pair that bypasses Phase 32 selective gating (anchor = explicit user
+    // ask, not heuristic-driven).
+    //
+    // Discipline:
+    //   - Behind config.intelligence.context_anchor_enabled (CTX-07-style
+    //     escape hatch); when false, the @-syntax reaches the provider
+    //     verbatim.
+    //   - catch_unwind wrapped (CTX-07 v1.1 — anchor parser failures must
+    //     never crash chat). INTEL_FORCE_ANCHOR_PANIC test seam exercises
+    //     the fall-through.
+    //   - Resolution is best-effort: each anchor's [ANCHOR:... not found /
+    //     read error / rejected: binary] placeholder is harmless if the
+    //     underlying source is unavailable.
+    //
+    // The resolved anchor_injections are appended to system_prompt below
+    // (post brain.rs::build_system_prompt_for_model) so anchored content
+    // sits OUTSIDE the gated sections — Plan 36-08 lands the brain.rs
+    // receiver that records `anchor_screen` / `anchor_file` / `anchor_memory`
+    // labels via record_section without routing through score_or_default.
+    let (clean_query, anchors) = if config.intelligence.context_anchor_enabled {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            crate::intelligence::anchor_parser::extract_anchors(&last_user_text)
+        }))
+        .unwrap_or_else(|_| {
+            log::warn!("[INTEL-06] anchor parser panicked; treating query as plain text");
+            (last_user_text.clone(), Vec::new())
+        })
+    } else {
+        (last_user_text.clone(), Vec::new())
+    };
+    let last_user_text = clean_query; // shadow with stripped query
+    let anchor_injections: Vec<(String, String)> = if !anchors.is_empty() {
+        crate::intelligence::anchor_parser::resolve_anchors(&anchors, &app, &config).await
+    } else {
+        Vec::new()
+    };
+
     // ─── Plan 34-08 (SESS-01) — UserMessage JSONL emit ──────────────────
     //
     // Records the sanitized user message into the SessionWriter's JSONL
@@ -1380,6 +1421,24 @@ pub(crate) async fn send_message_stream_inline(
         &config.model,
         messages.len(),
     );
+
+    // ─── Phase 36-07 (INTEL-06) — append resolved anchor content ─────────
+    //
+    // anchor_injections was populated in the prelude above (post-sanitize).
+    // Each (label, content) pair is appended to the system prompt OUTSIDE
+    // the gated sections so anchored material — explicit user asks via
+    // @screen / @file: / @memory: — always reaches the provider regardless
+    // of Phase 32 score_or_default gating. Plan 36-08 lands the brain.rs
+    // receiver that registers `anchor_screen` / `anchor_file` /
+    // `anchor_memory` via record_section for telemetry; this 36-07 wiring
+    // is the commands.rs side of the contract.
+    if !anchor_injections.is_empty() {
+        system_prompt.push_str("\n\n");
+        for (_label, content) in &anchor_injections {
+            system_prompt.push_str(content);
+            system_prompt.push('\n');
+        }
+    }
 
     // Vision is always in the prompt via brain.rs priority 7 (always-on vision).
     // No reflex needed — BLADE always sees the screen.
