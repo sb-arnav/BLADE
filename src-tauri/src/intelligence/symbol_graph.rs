@@ -103,7 +103,12 @@ pub fn reindex_project(
     let like_pat = format!("%\"file_path\":\"{}%", escape_like(&root_str));
     let prior_ids: Vec<String> = conn
         .prepare(
-            "SELECT id FROM kg_nodes WHERE node_type = 'symbol' AND description LIKE ?1",
+            // HI-03 fix: declare ESCAPE '\' so the backslashes produced by
+            // escape_like() actually behave as escapes for `_` / `%` in
+            // SQLite. Without this, project paths containing `_`
+            // (`my_project`, `node_modules`, `src_tauri`) silently match
+            // ZERO rows and orphan kg_nodes survive a reindex.
+            "SELECT id FROM kg_nodes WHERE node_type = 'symbol' AND description LIKE ?1 ESCAPE '\\'",
         )
         .map_err(|e| format!("prepare prior-id select: {e}"))?
         .query_map(params![like_pat], |r| r.get::<_, String>(0))
@@ -407,6 +412,50 @@ mod tests {
             )
             .unwrap();
         assert_eq!(count, s2.symbols_inserted as i64);
+    }
+
+    #[test]
+    fn phase36_intel_01_reindex_path_with_underscore_no_orphan_rows() {
+        // HI-03 regression: project path containing `_` MUST round-trip
+        // through escape_like + LIKE ESCAPE '\' so a subsequent reindex with
+        // a removed file leaves zero stale kg_nodes rows for that file.
+        let conn = fixture_conn();
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("my_project_dir");
+        std::fs::create_dir_all(&project).unwrap();
+        let f1 = project.join("a.rs");
+        let f2 = project.join("b.rs");
+        std::fs::write(&f1, "fn alpha() {}\nfn beta() { alpha(); }\n").unwrap();
+        std::fs::write(&f2, "fn gamma() {}\n").unwrap();
+        let s1 = reindex_project(&project, &conn).unwrap();
+        assert!(s1.symbols_inserted >= 3, "first reindex should insert symbols");
+
+        // Remove f2 and reindex — its row should be cleaned up by the LIKE ESCAPE clause.
+        std::fs::remove_file(&f2).unwrap();
+        let s2 = reindex_project(&project, &conn).unwrap();
+
+        // Total rows must equal what reindex inserted (no orphans from f2).
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM kg_nodes WHERE node_type = 'symbol'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            count, s2.symbols_inserted as i64,
+            "reindex of project with `_` in path must leave no orphan rows; \
+             got count={count}, inserted={}",
+            s2.symbols_inserted
+        );
+    }
+
+    #[test]
+    fn phase36_intel_01_escape_like_escapes_underscore_and_percent() {
+        // Sanity: escape_like injects `\` before `_`, `%`, `\`.
+        assert_eq!(escape_like("my_project"), "my\\_project");
+        assert_eq!(escape_like("100%done"), "100\\%done");
+        assert_eq!(escape_like("a\\b"), "a\\\\b");
     }
 
     #[test]
