@@ -1413,6 +1413,15 @@ pub(crate) async fn send_message_stream_inline(
         manager.get_tools_ranked().into_iter().cloned().collect()
     };
 
+    // ─── Phase 36-08 (INTEL-06) — anchor injections threaded into builder ─
+    //
+    // Plan 36-07 populated `anchor_injections` in the prelude (post-sanitize).
+    // Plan 36-08 lands the brain.rs receiver: each (label, content) pair is
+    // injected at priority -1 (above BLADE.md) inside build_system_prompt_inner
+    // and recorded via record_section using the labels `anchor_screen` /
+    // `anchor_file` / `anchor_memory`. The contract: anchored content sits
+    // OUTSIDE the Phase 32 selective-injection gates — the user typed the
+    // anchor, so `score_or_default` is bypassed.
     let mut system_prompt = brain::build_system_prompt_for_model(
         &tool_snapshot,
         &last_user_text,
@@ -1420,25 +1429,8 @@ pub(crate) async fn send_message_stream_inline(
         &config.provider,
         &config.model,
         messages.len(),
+        &anchor_injections,
     );
-
-    // ─── Phase 36-07 (INTEL-06) — append resolved anchor content ─────────
-    //
-    // anchor_injections was populated in the prelude above (post-sanitize).
-    // Each (label, content) pair is appended to the system prompt OUTSIDE
-    // the gated sections so anchored material — explicit user asks via
-    // @screen / @file: / @memory: — always reaches the provider regardless
-    // of Phase 32 score_or_default gating. Plan 36-08 lands the brain.rs
-    // receiver that registers `anchor_screen` / `anchor_file` /
-    // `anchor_memory` via record_section for telemetry; this 36-07 wiring
-    // is the commands.rs side of the contract.
-    if !anchor_injections.is_empty() {
-        system_prompt.push_str("\n\n");
-        for (_label, content) in &anchor_injections {
-            system_prompt.push_str(content);
-            system_prompt.push('\n');
-        }
-    }
 
     // Vision is always in the prompt via brain.rs priority 7 (always-on vision).
     // No reflex needed — BLADE always sees the screen.

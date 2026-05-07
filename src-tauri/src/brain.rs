@@ -141,9 +141,15 @@ fn trim_for_small_model(parts: &mut Vec<String>, budget: usize) {
 /// Optionally accepts the current user message to inject semantically relevant memories.
 #[allow(dead_code)]
 pub fn build_system_prompt(tools: &[McpTool]) -> String {
-    build_system_prompt_inner(tools, "", None, &ModelTier::Frontier, "", "", usize::MAX)
+    build_system_prompt_inner(tools, "", None, &ModelTier::Frontier, "", "", usize::MAX, &[])
 }
 
+/// Phase 36-08 INTEL-06 — call site receives resolved anchor (label, content)
+/// pairs from commands.rs's prelude (`anchor_parser::resolve_anchors`). The
+/// inner builder prepends each pair to the prompt accumulator OUTSIDE the
+/// Phase 32 selective-injection gates and records them via record_section
+/// using the labels `anchor_screen` / `anchor_file` / `anchor_memory`. Pass
+/// `&[]` from any non-chat call site that has nothing to anchor.
 pub fn build_system_prompt_for_model(
     tools: &[McpTool],
     user_query: &str,
@@ -151,9 +157,19 @@ pub fn build_system_prompt_for_model(
     provider: &str,
     model: &str,
     message_count: usize,
+    anchor_injections: &[(String, String)],
 ) -> String {
     let tier = model_tier(provider, model);
-    build_system_prompt_inner(tools, user_query, vector_store, &tier, provider, model, message_count)
+    build_system_prompt_inner(
+        tools,
+        user_query,
+        vector_store,
+        &tier,
+        provider,
+        model,
+        message_count,
+        anchor_injections,
+    )
 }
 
 #[allow(dead_code)]
@@ -162,7 +178,7 @@ pub fn build_system_prompt_with_recall(
     user_query: &str,
     vector_store: Option<&crate::embeddings::SharedVectorStore>,
 ) -> String {
-    build_system_prompt_inner(tools, user_query, vector_store, &ModelTier::Frontier, "", "", usize::MAX)
+    build_system_prompt_inner(tools, user_query, vector_store, &ModelTier::Frontier, "", "", usize::MAX, &[])
 }
 
 /// Build a lean system prompt for the voice conversation loop.
@@ -719,6 +735,7 @@ fn build_system_prompt_inner(
     provider: &str,
     model: &str,
     message_count: usize,
+    anchor_injections: &[(String, String)],
 ) -> String {
     // ── Token budget ──────────────────────────────────────────────────────────
     // 1500 tokens ≈ 6000 chars. Anything above this on a cold "hi" is waste.
@@ -757,6 +774,27 @@ fn build_system_prompt_inner(
     clear_section_accumulator();
     let smart = config.context.smart_injection_enabled;
     let gate = config.context.relevance_gate;
+
+    // ── PHASE 36-08 / INTEL-06 — anchor injections (priority -1) ─────────────
+    // Resolved @screen / @file: / @memory: payloads from commands.rs's
+    // anchor_parser prelude. These bypass the Phase 32 selective-injection
+    // gates entirely (`score_or_default` is NOT consulted): the user typed
+    // the anchor, that IS consent + relevance. Recording happens via the
+    // stable labels `anchor_screen` / `anchor_file` / `anchor_memory` so
+    // DoctorPane (Plan 32-06) surfaces them in the per-turn budget panel.
+    //
+    // Pushed at the very top so the always-keep core (BLADE.md +
+    // identity_supplement) is still rendered, but the anchored content
+    // arrives before any heavy section that might be trimmed by
+    // SYSTEM_PROMPT_CHAR_BUDGET enforcement (enforce_budget never pops the
+    // first `keep` entries, and anchors land in that protected prefix).
+    for (label, content) in anchor_injections {
+        if content.is_empty() {
+            continue;
+        }
+        parts.push(content.clone());
+        record_section(label, content.len());
+    }
 
     // ── STATIC CORE (priority 0) ──────────────────────────────────────────────
     // BLADE.md is the authoritative identity. Always inject first.
@@ -2685,11 +2723,13 @@ mod tests {
             &[], "what time is it?", None,
             &ModelTier::Frontier,
             "anthropic", "claude-sonnet-4", 1,
+            &[],
         );
         let code = build_system_prompt_inner(
             &[], "explain this rust trait error in detail", None,
             &ModelTier::Frontier,
             "anthropic", "claude-sonnet-4", 1,
+            &[],
         );
         // Simple query should be SHORTER than code query because the heavy
         // sections (character bible, identity_extension, code index, hot files)
@@ -2711,6 +2751,7 @@ mod tests {
             &[], "abcxyz123", None,  // gibberish — no keyword hits
             &ModelTier::Frontier,
             "anthropic", "claude-sonnet-4", 1,
+            &[],
         );
         // BLADE.md or identity_supplement is always present (small core).
         // Some test environments lack ~/.blade/BLADE.md, so the supplement
@@ -2730,6 +2771,7 @@ mod tests {
             &[], "explain this rust function", None,
             &ModelTier::Frontier,
             "anthropic", "claude-sonnet-4", 1,
+            &[],
         );
         let breakdown = read_section_breakdown();
         assert!(
@@ -2754,12 +2796,14 @@ mod tests {
             &[], "first query about code", None,
             &ModelTier::Frontier,
             "anthropic", "claude-sonnet-4", 1,
+            &[],
         );
         let first_count = read_section_breakdown().len();
         let _ = build_system_prompt_inner(
             &[], "second query about meetings", None,
             &ModelTier::Frontier,
             "anthropic", "claude-sonnet-4", 1,
+            &[],
         );
         let second_count = read_section_breakdown().len();
         // If clear_section_accumulator works, the second call's breakdown does
@@ -2785,6 +2829,7 @@ mod tests {
             &[], "what time is it?", None,
             &ModelTier::Frontier,
             "anthropic", "claude-sonnet-4", 1,
+            &[],
         );
         let breakdown = read_section_breakdown();
         let vision_chars = breakdown.iter()
@@ -2837,6 +2882,7 @@ mod tests {
             &[], "explain this rust function", None,
             &ModelTier::Frontier,
             "anthropic", "claude-sonnet-4", 1,
+            &[],
         );
         let snap = build_breakdown_snapshot("anthropic", "claude-sonnet-4");
         assert!(!snap.sections.is_empty(),
@@ -2987,6 +3033,7 @@ mod tests {
                 &[], "what time is it?", None,
                 &ModelTier::Frontier,
                 "anthropic", "claude-sonnet-4", 1,
+                &[],
             )
         }));
         // Reset BEFORE assertion so failure doesn't poison sibling tests.
@@ -3145,6 +3192,7 @@ mod tests {
             &[], "explain this rust function bug error", None,
             &ModelTier::Frontier,
             "anthropic", "claude-sonnet-4", 1,
+            &[],
         );
 
         INTEL_FORCE_PAGERANK_RESULT.with(|c| c.set(None));
@@ -3202,6 +3250,7 @@ mod tests {
             &[], "what time is it?", None,
             &ModelTier::Frontier,
             "anthropic", "claude-sonnet-4", 1,
+            &[],
         );
 
         INTEL_FORCE_PAGERANK_RESULT.with(|c| c.set(None));
@@ -3237,12 +3286,155 @@ mod tests {
             &[], "anything goes here", None,
             &ModelTier::Frontier,
             "anthropic", "claude-sonnet-4", 1,
+            &[],
         );
         let breakdown = read_section_breakdown();
         let labels: Vec<&str> = breakdown.iter().map(|(l, _)| l.as_str()).collect();
         assert!(
             labels.iter().any(|l| *l == "repo_map"),
             "repo_map label missing from LAST_BREAKDOWN: {:?}",
+            labels
+        );
+    }
+
+    // ── Phase 36 Plan 36-08 INTEL-06 — anchor_injections receiver ─────────────
+    //
+    // Locks the contract that anchor-injected content is rendered into the
+    // system prompt regardless of whether the Phase 32 selective-injection
+    // gates are open. The user typed `@screen` / `@file:` / `@memory:` —
+    // that IS consent, so `score_or_default` is bypassed. record_section
+    // must register the labels `anchor_screen` / `anchor_file` /
+    // `anchor_memory` so DoctorPane (Plan 32-06) shows them in the per-turn
+    // budget panel.
+    //
+    // Strategy: use a non-code, non-identity, non-meeting query so most
+    // gates close. If the anchor receiver were routed through the gates,
+    // anchor content would be missing. Anchor labels appearing in
+    // LAST_BREAKDOWN proves the bypass + record_section wiring landed.
+
+    #[test]
+    fn phase36_intel_06_anchor_injections_bypass_gating() {
+        let _g = BREAKDOWN_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+
+        let injections: Vec<(String, String)> = vec![
+            (
+                "anchor_screen".to_string(),
+                "[ANCHOR:@screen]\nfaux ocr from active window".to_string(),
+            ),
+            (
+                "anchor_file".to_string(),
+                "[ANCHOR:@file:foo.rs]\nfn marker_for_anchor_file_test() {}".to_string(),
+            ),
+            (
+                "anchor_memory".to_string(),
+                "[ANCHOR:@memory:project] marker_for_anchor_memory_test".to_string(),
+            ),
+        ];
+
+        // Non-code, non-identity, non-meeting query. The default gate at 0.5
+        // closes most heavy sections; anchor content must inject regardless.
+        let prompt = build_system_prompt_inner(
+            &[],
+            "weather in tokyo", // benign query, no keyword matches
+            None,
+            &ModelTier::Frontier,
+            "anthropic",
+            "claude-sonnet-4",
+            1,
+            &injections,
+        );
+
+        // All three anchor payloads must appear in the prompt — proving
+        // anchor injection bypasses score_or_default gating.
+        assert!(
+            prompt.contains("[ANCHOR:@screen]"),
+            "anchor_screen content missing from prompt; receiver did not inject"
+        );
+        assert!(
+            prompt.contains("marker_for_anchor_file_test"),
+            "anchor_file content missing from prompt; receiver did not inject"
+        );
+        assert!(
+            prompt.contains("marker_for_anchor_memory_test"),
+            "anchor_memory content missing from prompt; receiver did not inject"
+        );
+
+        // LAST_BREAKDOWN must record all three labels with non-zero chars.
+        let breakdown = read_section_breakdown();
+        for label in &["anchor_screen", "anchor_file", "anchor_memory"] {
+            let chars = breakdown
+                .iter()
+                .find(|(l, _)| l == label)
+                .map(|(_, c)| *c)
+                .unwrap_or(0);
+            assert!(
+                chars > 0,
+                "LAST_BREAKDOWN missing or zero-char {label} row; entries={:?}",
+                breakdown
+            );
+        }
+    }
+
+    #[test]
+    fn phase36_intel_06_anchor_injections_empty_is_noop() {
+        // Empty anchor list must NOT add any anchor_* rows to LAST_BREAKDOWN
+        // and must not change the prompt's identity-only baseline.
+        let _g = BREAKDOWN_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+
+        let _ = build_system_prompt_inner(
+            &[], "hi", None,
+            &ModelTier::Frontier,
+            "anthropic", "claude-sonnet-4", 1,
+            &[],
+        );
+        let breakdown = read_section_breakdown();
+        let labels: Vec<&str> = breakdown.iter().map(|(l, _)| l.as_str()).collect();
+        for label in &["anchor_screen", "anchor_file", "anchor_memory"] {
+            assert!(
+                !labels.iter().any(|l| l == label),
+                "empty anchor list must not record {label}; labels={:?}",
+                labels
+            );
+        }
+    }
+
+    #[test]
+    fn phase36_intel_06_anchor_injections_skip_empty_content() {
+        // A (label, "") pair must be skipped — never recorded with 0 chars
+        // (avoid noise in DoctorPane). Non-empty pairs in the same call must
+        // still inject.
+        let _g = BREAKDOWN_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+
+        let injections: Vec<(String, String)> = vec![
+            ("anchor_screen".to_string(), "".to_string()), // empty — skip
+            (
+                "anchor_file".to_string(),
+                "[ANCHOR:@file:bar.rs]\npayload_marker_skip_test".to_string(),
+            ),
+        ];
+        let prompt = build_system_prompt_inner(
+            &[], "anything", None,
+            &ModelTier::Frontier,
+            "anthropic", "claude-sonnet-4", 1,
+            &injections,
+        );
+        assert!(
+            prompt.contains("payload_marker_skip_test"),
+            "non-empty anchor payload was dropped"
+        );
+        let breakdown = read_section_breakdown();
+        let labels: Vec<&str> = breakdown.iter().map(|(l, _)| l.as_str()).collect();
+        assert!(
+            !labels.iter().any(|l| *l == "anchor_screen"),
+            "empty anchor_screen pair must be skipped, not recorded; labels={:?}",
+            labels
+        );
+        assert!(
+            labels.iter().any(|l| *l == "anchor_file"),
+            "anchor_file row missing despite non-empty content; labels={:?}",
             labels
         );
     }
