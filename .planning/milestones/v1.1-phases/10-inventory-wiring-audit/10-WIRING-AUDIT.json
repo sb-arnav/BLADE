@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "generated_at": "2026-04-20T13:25:52.871Z",
+  "generated_at": "2026-05-07T03:52:12.773172+00:00",
   "modules": [
     {
       "file": "src-tauri/src/accountability.rs",
@@ -1871,8 +1871,8 @@
     {
       "file": "src-tauri/src/decomposition/executor.rs",
       "classification": "ACTIVE",
-      "purpose": "Phase 35 v1.5 DECOMP-02 — sub-agent spawn orchestrator. execute_decomposed_task walks N StepGroups, spawns each via fork_session (Phase 34 SESS-04) into an isolated LoopState{is_subagent=true} + own SessionWriter, drives each through swarm-DAG dispatch, distills 1-paragraph summaries (DECOMP-03), and rolls per-sub-agent cost into parent_state.conversation_cumulative_cost_usd. RES-04 parent-budget interlock halts remaining sub-agents on cap-trip; outer catch_unwind surfaces panics as DecompositionError::Internal.",
-      "trigger": "internal — invoked by src-tauri/src/loop_engine.rs run_loop's DECOMP-01 trigger gate (Plan 35-04) when count_independent_steps_grouped returns Some(groups)",
+      "purpose": "Phase 35 v1.5 DECOMP-02 \u2014 sub-agent spawn orchestrator. execute_decomposed_task walks N StepGroups, spawns each via fork_session (Phase 34 SESS-04) into an isolated LoopState{is_subagent=true} + own SessionWriter, drives each through swarm-DAG dispatch, distills 1-paragraph summaries (DECOMP-03), and rolls per-sub-agent cost into parent_state.conversation_cumulative_cost_usd. RES-04 parent-budget interlock halts remaining sub-agents on cap-trip; outer catch_unwind surfaces panics as DecompositionError::Internal.",
+      "trigger": "internal \u2014 invoked by src-tauri/src/loop_engine.rs run_loop's DECOMP-01 trigger gate (Plan 35-04) when count_independent_steps_grouped returns Some(groups)",
       "ui_surface": "src/features/activity-log/index.tsx (subagent_started + subagent_complete chips via blade_loop_event)",
       "internal_callers": [
         "src-tauri/src/loop_engine.rs",
@@ -1886,8 +1886,8 @@
     {
       "file": "src-tauri/src/decomposition/mod.rs",
       "classification": "ACTIVE",
-      "purpose": "Phase 35 v1.5 — Auto-decomposition module boundary. Re-exports count_independent_steps_grouped + StepGroup (DECOMP-01), execute_decomposed_task + DecompositionError (DECOMP-02), distill_subagent_summary + SubagentSummary (DECOMP-03). Pairs with DecompositionConfig at config.rs.",
-      "trigger": "internal — module aggregator; consumers import via `crate::decomposition::*`",
+      "purpose": "Phase 35 v1.5 \u2014 Auto-decomposition module boundary. Re-exports count_independent_steps_grouped + StepGroup (DECOMP-01), execute_decomposed_task + DecompositionError (DECOMP-02), distill_subagent_summary + SubagentSummary (DECOMP-03). Pairs with DecompositionConfig at config.rs.",
+      "trigger": "internal \u2014 module aggregator; consumers import via `crate::decomposition::*`",
       "ui_surface": null,
       "internal_callers": [
         "src-tauri/src/loop_engine.rs",
@@ -1901,8 +1901,8 @@
     {
       "file": "src-tauri/src/decomposition/planner.rs",
       "classification": "ACTIVE",
-      "purpose": "Phase 35 v1.5 DECOMP-01 — step-counter trigger. count_independent_steps_grouped scores a query along 3 axes (verb_groups via connectors+action verbs, file_groups via path-shaped tokens, tool_families via cross-tool families) and returns Some(StepGroups) when max(axes) >= min_steps_to_decompose (default 5). auto_decompose_enabled=false short-circuits to None. Plan 35-04 wraps the call site in catch_unwind so a panic falls through to the naive sequential path.",
-      "trigger": "internal — invoked by src-tauri/src/loop_engine.rs run_loop's pre-iteration DECOMP-01 trigger gate (catch_unwind-wrapped per Plan 35-04)",
+      "purpose": "Phase 35 v1.5 DECOMP-01 \u2014 step-counter trigger. count_independent_steps_grouped scores a query along 3 axes (verb_groups via connectors+action verbs, file_groups via path-shaped tokens, tool_families via cross-tool families) and returns Some(StepGroups) when max(axes) >= min_steps_to_decompose (default 5). auto_decompose_enabled=false short-circuits to None. Plan 35-04 wraps the call site in catch_unwind so a panic falls through to the naive sequential path.",
+      "trigger": "internal \u2014 invoked by src-tauri/src/loop_engine.rs run_loop's pre-iteration DECOMP-01 trigger gate (catch_unwind-wrapped per Plan 35-04)",
       "ui_surface": "src/features/activity-log/index.tsx (decomposition_started chip via blade_loop_event when groups.len >= threshold)",
       "internal_callers": [
         "src-tauri/src/loop_engine.rs"
@@ -1915,9 +1915,9 @@
     {
       "file": "src-tauri/src/decomposition/summary.rs",
       "classification": "ACTIVE",
-      "purpose": "Phase 35 v1.5 DECOMP-03 — sub-agent summary distillation. distill_subagent_summary loads the sub-agent's JSONL via session/resume::load_session, builds a role-aware cheap-model prompt, calls providers::complete_simple, caps output at subagent_summary_max_tokens × 4 chars. catch_unwind boundary converts panic OR cheap-model error OR empty-response to a heuristic 200-char fallback from the last AssistantTurn (success=false).",
-      "trigger": "internal — invoked by src-tauri/src/decomposition/executor.rs spawn_isolated_subagent after run_subagent_to_halt completes (per-StepGroup)",
-      "ui_surface": "Synthetic AssistantTurn injected into parent's chat history (rendered via standard chat surface) with prefix '[Sub-agent summary — step N, ROLE, session ULID[..8]…]'",
+      "purpose": "Phase 35 v1.5 DECOMP-03 \u2014 sub-agent summary distillation. distill_subagent_summary loads the sub-agent's JSONL via session/resume::load_session, builds a role-aware cheap-model prompt, calls providers::complete_simple, caps output at subagent_summary_max_tokens \u00d7 4 chars. catch_unwind boundary converts panic OR cheap-model error OR empty-response to a heuristic 200-char fallback from the last AssistantTurn (success=false).",
+      "trigger": "internal \u2014 invoked by src-tauri/src/decomposition/executor.rs spawn_isolated_subagent after run_subagent_to_halt completes (per-StepGroup)",
+      "ui_surface": "Synthetic AssistantTurn injected into parent's chat history (rendered via standard chat surface) with prefix '[Sub-agent summary \u2014 step N, ROLE, session ULID[..8]\u2026]'",
       "internal_callers": [
         "src-tauri/src/decomposition/executor.rs",
         "src-tauri/src/loop_engine.rs"
@@ -3335,6 +3335,122 @@
       "body_registry_entry": "integration_bridge",
       "reachable_paths": [
         "invokeTyped('integration_get_state') -> src-tauri/src/integration_bridge.rs:440"
+      ]
+    },
+    {
+      "file": "src-tauri/src/intelligence/anchor_parser.rs",
+      "classification": "ACTIVE",
+      "purpose": "INTEL-06 @screen / @file: / @memory: regex-based anchor extraction (Phase 36 Plan 36-07). extract_anchors(query) -> (cleaned, Vec<Anchor>) with three regex patterns evaluated under \\B word-boundary discipline so emails (arnav@pollpe.in) do NOT match @screen. resolve_anchors(anchors, app, config) routes per anchor type: @screen -> screen_timeline newest description, @file:PATH -> std::fs::read with 200KB cap + binary heuristic + truncation suffix, @memory:TOPIC -> embeddings::smart_context_recall(topic). Wired into commands.rs::send_message_stream_inline behind config.intelligence.context_anchor_enabled with a catch_unwind boundary at commands.rs:1287 (CTX-07 v1.1 fallback discipline). INTEL_FORCE_ANCHOR_PANIC thread-local seam exercises the catch_unwind regression.",
+      "trigger": "commands.rs::send_message_stream_inline pre-dispatch (anchor prelude), gated on config.intelligence.context_anchor_enabled. brain.rs receiver injects resolved (label, content) pairs as always-injected anchor sections.",
+      "ui_surface": "src/components/AnchorChip.tsx (frontend chip render via @-syntax detection in ChatComposer)",
+      "internal_callers": [
+        "src-tauri/src/commands.rs:1288"
+      ],
+      "reachable_paths": [
+        "ChatComposer.tsx @screen / @file:PATH / @memory:TOPIC -> AnchorChip render -> commands.rs::send_message_stream_inline -> intelligence::anchor_parser::extract_anchors -> resolve_anchors -> brain.rs anchor receiver -> system prompt anchor section"
+      ]
+    },
+    {
+      "file": "src-tauri/src/intelligence/capability_registry.rs",
+      "classification": "ACTIVE",
+      "purpose": "INTEL-04 + INTEL-05 canonical_models.json on-disk registry (Phase 36 Plan 36-05). Loads bundled canonical_models.json (21 models x 5 providers: anthropic, openai, openrouter, gemini, groq) at first boot, exposes mtime-watched get(provider, model) -> Option<ModelCapabilities> with fields {context_length, vision, tools, cost_input_per_million, cost_output_per_million}. router.rs is the registry-first consumer (Plan 36-06): reads registry -> probe-fallback if INTEL_FORCE_REGISTRY_MISS or unknown model. reload_capability_registry Tauri command exposes hand-edit round-trip. INTEL_FORCE_REGISTRY_MISS thread-local seam exercises the probe-fallback path.",
+      "trigger": "Lazy on first router.rs::resolve_capabilities call; mtime watch refreshes on next call when canonical_models.json changes; reload_capability_registry Tauri command forces a refresh.",
+      "ui_surface": "src/lib/tauri/intelligence.ts::reloadCapabilityRegistry / getActiveModelCapabilities (typed wrappers from Plan 36-08)",
+      "commands": [
+        {
+          "name": "intelligence::reload_capability_registry",
+          "registered": "src-tauri/src/lib.rs:1",
+          "invoked_from": "src/lib/tauri/intelligence.ts:1"
+        },
+        {
+          "name": "intelligence::get_active_model_capabilities",
+          "registered": "src-tauri/src/lib.rs:1",
+          "invoked_from": "src/lib/tauri/intelligence.ts:1"
+        }
+      ],
+      "internal_callers": [
+        "src-tauri/src/router.rs:328"
+      ],
+      "reachable_paths": [
+        "router.rs::resolve_capabilities -> intelligence::capability_registry::get -> Option<ModelCapabilities> -> vision/tools/cost routing decision",
+        "Settings UI / dev console -> reload_capability_registry Tauri command -> registry refresh -> next router call uses new values"
+      ]
+    },
+    {
+      "file": "src-tauri/src/intelligence/mod.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 36 intelligence module boundary (Plan 36-01 substrate). pub mod tree_sitter_parser; pub mod symbol_graph; pub mod pagerank; pub mod repo_map; pub mod capability_registry; pub mod anchor_parser. Houses the IntelligenceConfig sub-struct's runtime consumers as a single module tree. CONTEXT.md \u00a7IntelligenceConfig lock \u2014 every Phase 36 INTEL-01..06 surface lives under this module path.",
+      "trigger": "lib.rs::mod intelligence; (registered Plan 36-01)",
+      "ui_surface": null,
+      "internal_callers": [
+        "src-tauri/src/lib.rs:1",
+        "src-tauri/src/brain.rs:1438",
+        "src-tauri/src/commands.rs:1288",
+        "src-tauri/src/router.rs:328"
+      ],
+      "reachable_paths": [
+        "lib.rs -> mod intelligence -> {tree_sitter_parser, symbol_graph, pagerank, repo_map, capability_registry, anchor_parser}"
+      ]
+    },
+    {
+      "file": "src-tauri/src/intelligence/pagerank.rs",
+      "classification": "ACTIVE",
+      "purpose": "INTEL-02 personalized PageRank over kg_nodes/kg_edges (Phase 36 Plan 36-03). rank_symbols(query, mentions, damping, conn) -> Vec<(SymbolNode, f32)> using petgraph + Aider's locked damping=0.85 default. Personalization vector seeded from mentioned_symbols (query 2x weight, recent messages 1x \u2014 see repo_map::harvest_mentioned_symbols). 5-min RANK_CACHE keyed on cache_key(mentions); cache_invalidates_after_5_min recomputes. INTEL_FORCE_PAGERANK_RESULT thread-local seam returns synthetic ranked list verbatim for tests; INTEL_FORCE_PARSE_ERROR-style panic-safety: rank_symbols catches downstream panics (phase36_intel_02_panic_safe_returns_empty).",
+      "trigger": "intelligence::repo_map::rank_symbols_or_fallback dispatcher when tree_sitter_enabled = true and Plan 36-04 swap completes (currently routes through degree-centrality fallback until pagerank::rank_symbols swap-in lands in a v1.6 cleanup commit).",
+      "ui_surface": null,
+      "internal_callers": [
+        "src-tauri/src/intelligence/repo_map.rs:265"
+      ],
+      "reachable_paths": [
+        "brain.rs::build_system_prompt_inner -> intelligence::repo_map::build_repo_map -> rank_symbols_or_fallback -> intelligence::pagerank::rank_symbols (or degree-centrality fallback) -> render_map -> repo_map prompt section"
+      ]
+    },
+    {
+      "file": "src-tauri/src/intelligence/repo_map.rs",
+      "classification": "ACTIVE",
+      "purpose": "INTEL-03 budget-bounded repo map + brain.rs code-section injection helpers (Phase 36 Plan 36-04). build_repo_map(query, mentions, token_budget, config, conn) -> Option<String> returns None when tree_sitter_enabled = false, when the symbol graph is empty, or when the renderer produces nothing. harvest_mentioned_symbols(query, recent) extracts Rust path + PascalCase identifiers (query 2x weight, recent 1x). render_map(rows, token_budget) formats the ranked symbol list as flat-list 'file::name (kind, score=X.XXX)' lines, capped at token_budget*4 chars (Phase 32 chars/4 token approx). brain.rs caller wraps in catch_unwind so any panic falls through to the existing FTS code section. INTEL_FORCE_PAGERANK_RESULT seam (tests-only) drives the pipe from rank dispatcher onwards. Plan 36-09 phase-closure regression locks the catch_unwind boundary contract.",
+      "trigger": "brain.rs::build_system_prompt_inner code-section gate (Plan 36-04: when score_or_default(query, 'code') > gate AND config.intelligence.tree_sitter_enabled = true, attempt build_repo_map at brain.rs:1438; on Some(map) inject + record_section('repo_map', N) + suppress FTS code section; on None or panic, fall through to FTS).",
+      "ui_surface": "src/components/DoctorPane.tsx (LAST_BREAKDOWN repo_map row at 1280x800 + 1100x700 \u2014 Phase 36 UAT step 15)",
+      "internal_callers": [
+        "src-tauri/src/brain.rs:1439"
+      ],
+      "reachable_paths": [
+        "brain.rs::build_system_prompt_inner -> intelligence::repo_map::build_repo_map -> render_map -> system prompt code section",
+        "DoctorPane breakdown -> read_section_breakdown -> repo_map row with non-zero char count for code-shaped queries"
+      ]
+    },
+    {
+      "file": "src-tauri/src/intelligence/symbol_graph.rs",
+      "classification": "ACTIVE",
+      "purpose": "INTEL-01 symbol graph persistence to kg_nodes / kg_edges (Phase 36 Plan 36-02). reindex_symbol_graph(project_root, conn) -> ReindexStats walks Rust/Python/TypeScript files via tree_sitter_parser, materializes SymbolNode {id, name, kind, file_path, line_start, line_end, language, indexed_at} as kg_nodes rows with node_type='symbol', and SymbolEdge {from_id, to_id, relation in ('calls', 'imports', 'uses_type', 'defines')} as kg_edges rows. Idempotent \u2014 symbol_id is deterministic (file_path::name::line_start hash). reindex_symbol_graph Tauri command exposes manual reindex per Phase 36 UAT step 2.",
+      "trigger": "#[tauri::command] reindex_symbol_graph (called by DoctorPane debug button or typed wrapper from Plan 36-08); also tree_sitter_parser cold-start path on first build_repo_map call when graph is empty.",
+      "ui_surface": "src/lib/tauri/intelligence.ts::reindexSymbolGraph (typed wrapper from Plan 36-08); DoctorPane debug invocation",
+      "commands": [
+        {
+          "name": "intelligence::reindex_symbol_graph",
+          "registered": "src-tauri/src/lib.rs:1",
+          "invoked_from": "src/lib/tauri/intelligence.ts:1"
+        }
+      ],
+      "internal_callers": [
+        "src-tauri/src/intelligence/repo_map.rs:283"
+      ],
+      "reachable_paths": [
+        "DoctorPane reindex button -> reindex_symbol_graph Tauri command -> intelligence::symbol_graph::reindex_symbol_graph -> kg_nodes (node_type='symbol') + kg_edges (relation IN ('calls','imports','uses_type','defines'))",
+        "intelligence::repo_map::rank_by_degree_centrality -> SELECT FROM kg_nodes/kg_edges WHERE node_type='symbol'"
+      ]
+    },
+    {
+      "file": "src-tauri/src/intelligence/tree_sitter_parser.rs",
+      "classification": "ACTIVE",
+      "purpose": "INTEL-01 tree-sitter Rust/Python/TypeScript parser (Phase 36 Plan 36-02). parse_rust(src) / parse_python(src) / parse_typescript(src) each return Result<(Vec<ParsedSymbol>, Vec<ParsedEdge>), ParseError>. Symbol kinds: Function, Type, Module, Constant. Edge relations: calls, imports, uses_type, defines. catch_unwind discipline lives at the symbol_graph::reindex caller; INTEL_FORCE_PARSE_ERROR thread-local seam returns Err(ParseError::Forced) verbatim for the panic-injection regression at the caller.",
+      "trigger": "intelligence::symbol_graph::reindex_symbol_graph per-file dispatch based on language extension (.rs / .py / .ts/.tsx).",
+      "ui_surface": null,
+      "internal_callers": [
+        "src-tauri/src/intelligence/symbol_graph.rs:1"
+      ],
+      "reachable_paths": [
+        "symbol_graph::reindex_symbol_graph -> tree_sitter_parser::parse_rust|parse_python|parse_typescript -> (Vec<ParsedSymbol>, Vec<ParsedEdge>) -> kg_nodes/kg_edges insert"
       ]
     },
     {
@@ -10153,6 +10269,15 @@
       "disk_persisted": true,
       "ui_surface": null,
       "control_type": "bool"
+    },
+    {
+      "field": "BladeConfig.intelligence",
+      "file": "src-tauri/src/config.rs:1125",
+      "struct": "IntelligenceConfig",
+      "disk_persisted": true,
+      "classification": "ACTIVE",
+      "ui_surface": null,
+      "control_type": "nested"
     },
     {
       "field": "BladeConfig.last_deep_scan",
