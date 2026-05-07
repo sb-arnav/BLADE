@@ -113,3 +113,86 @@ export type CalendarEvent = {
 export function calendarGetToday(): Promise<CalendarEvent[]> {
   return invokeTyped<CalendarEvent[]>('calendar_get_today');
 }
+
+// ---------------------------------------------------------------------------
+// Phase 36 — Intelligence Substrate (INTEL-01..06).
+//
+// Three Tauri commands surface to the frontend:
+//   - reindex_symbol_graph (Plan 36-02 INTEL-01) — tree-sitter walk + persist
+//   - reload_capability_registry (Plan 36-05 INTEL-04) — re-read JSON registry
+//   - get_active_model_capabilities (Plan 36-05 INTEL-04) — current row
+//
+// Type shapes mirror the backend serde derives in src-tauri/src/intelligence/.
+// All field names are snake_case at the IPC boundary (D-38, P-04 prevention).
+//
+// @see src-tauri/src/intelligence/symbol_graph.rs `pub struct ReindexStats`
+// @see src-tauri/src/intelligence/capability_registry.rs `pub struct ModelCapabilities`
+// @see .planning/phases/36-context-intelligence/36-CONTEXT.md
+// ---------------------------------------------------------------------------
+
+/**
+ * Stats returned by reindex_symbol_graph after a tree-sitter pass over the
+ * project root. Mirrors symbol_graph.rs::ReindexStats serde shape.
+ */
+export interface ReindexStats {
+  files_walked: number;
+  files_parsed: number;
+  files_skipped: number;
+  symbols_inserted: number;
+  edges_inserted: number;
+  elapsed_ms: number;
+}
+
+/**
+ * Capability row returned by get_active_model_capabilities. Mirrors
+ * capability_registry.rs::ModelCapabilities serde shape — sourced from the
+ * canonical_models.json registry (Plan 36-05).
+ */
+export interface ModelCapabilities {
+  context_length: number;
+  tool_use: boolean;
+  vision: boolean;
+  audio: boolean;
+  cost_per_million_in: number;
+  cost_per_million_out: number;
+  notes: string;
+}
+
+/**
+ * Trigger a tree-sitter symbol-graph reindex pass over the given project root.
+ * Runs synchronously on the chat command worker; large repos can block several
+ * seconds — callers should provide a spinner.
+ *
+ * @see src-tauri/src/intelligence/symbol_graph.rs
+ *      `pub async fn reindex_symbol_graph(project_root: String) -> Result<ReindexStats, String>`
+ */
+export function reindexSymbolGraph(projectRoot: string): Promise<ReindexStats> {
+  return invokeTyped<ReindexStats, { project_root: string }>(
+    'reindex_symbol_graph',
+    { project_root: projectRoot },
+  );
+}
+
+/**
+ * Reload the capability registry from disk (canonical_models.json). Returns
+ * the number of provider/model entries successfully loaded. Used by Settings
+ * panes after the user edits the registry file or restores defaults.
+ *
+ * @see src-tauri/src/intelligence/capability_registry.rs
+ *      `pub fn reload_capability_registry() -> Result<usize, String>`
+ */
+export function reloadCapabilityRegistry(): Promise<number> {
+  return invokeTyped<number>('reload_capability_registry');
+}
+
+/**
+ * Return the capability row for the currently-active provider/model pair, or
+ * null when the active config doesn't match any registry entry. Surfaces
+ * pricing + ctx-length + tool/vision/audio flags for the active route.
+ *
+ * @see src-tauri/src/intelligence/capability_registry.rs
+ *      `pub fn get_active_model_capabilities() -> Option<ModelCapabilities>`
+ */
+export function getActiveModelCapabilities(): Promise<ModelCapabilities | null> {
+  return invokeTyped<ModelCapabilities | null>('get_active_model_capabilities');
+}
