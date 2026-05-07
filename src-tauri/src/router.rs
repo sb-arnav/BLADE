@@ -661,3 +661,318 @@ mod tests {
         test_clear_keyring_overrides();
     }
 }
+
+// ── Phase 36 Plan 36-06 INTEL-05 — registry-first capability check ───────────
+//
+// Locks the contract that router.rs consults the canonical_models.json registry
+// BEFORE the capability_probe-populated `provider_capabilities` HashMap. Three
+// regressions:
+//
+//   1. registry_first: a "lying" probe record (vision=true on a non-vision
+//      groq llama) is OVERRIDDEN by the registry (vision=false). Router must
+//      NOT surface groq as a vision-capable candidate.
+//
+//   2. fallback_to_probe_on_registry_miss: with INTEL_FORCE_REGISTRY_MISS=true
+//      the registry returns None for everything. Router falls through to the
+//      legacy probe path → the same lying record DOES surface (proves the
+//      legacy path is byte-identical when the seam fires).
+//
+//   3. long_context: registry says groq/llama-3.1-8b-instant has 131_072 ctx
+//      (≥100_000 → long_context=true). The probe-populated record (from a
+//      stale Phase 11 probe) says long_context=false. Router prefers the
+//      registry verdict → groq surfaces as long-context-capable.
+//
+// These tests exercise `find_capable_providers` and `build_capability_filtered_chain`
+// directly because they're the bookkeeping primitives `select_provider` calls
+// inside its tier-1 capability branch. select_provider's outer return tuple is
+// covered by the existing tier1/2/3 tests above (no signature change, so those
+// still pass).
+#[cfg(test)]
+mod phase36_intel_05_tests {
+    use super::*;
+    use crate::config::{
+        test_clear_keyring_overrides, test_set_keyring_override, BladeConfig,
+        ProbeStatus, ProviderCapabilityRecord,
+    };
+    use crate::intelligence::capability_registry::INTEL_FORCE_REGISTRY_MISS;
+    use std::collections::HashMap;
+
+    // Helper — build a ProviderCapabilityRecord with the given flags.
+    fn cap_rec(
+        provider: &str,
+        model: &str,
+        vision: bool,
+        tool_calling: bool,
+        long_context: bool,
+        audio: bool,
+        ctx: u32,
+    ) -> ProviderCapabilityRecord {
+        ProviderCapabilityRecord {
+            provider: provider.to_string(),
+            model: model.to_string(),
+            context_window: ctx,
+            vision,
+            audio,
+            tool_calling,
+            long_context,
+            last_probed: chrono::Utc::now(),
+            probe_status: ProbeStatus::Active,
+        }
+    }
+
+    // Build a fixture registry that disagrees with the probe-populated
+    // ProviderCapabilityRecord values used in these tests:
+    //   - groq/llama-3.3-70b-versatile: vision=false (probe will claim true)
+    //   - anthropic/claude-haiku-4-5:   vision=false (probe will claim true)
+    //   - anthropic/claude-sonnet-4-20250514: vision=true
+    //   - groq/llama-3.1-8b-instant:    long_context derives from ctx≥100k=true
+    fn fixture_registry(dir: &std::path::Path) -> std::path::PathBuf {
+        let path = dir.join("canonical_models.json");
+        let test_reg = serde_json::json!({
+            "version": 1,
+            "providers": {
+                "anthropic": {
+                    "models": {
+                        "claude-haiku-4-5": {
+                            "context_length": 200000,
+                            "tool_use": true,
+                            "vision": false,
+                            "audio": false,
+                            "cost_per_million_in": 1.0,
+                            "cost_per_million_out": 5.0,
+                            "notes": "test fixture: vision deliberately false"
+                        },
+                        "claude-sonnet-4-20250514": {
+                            "context_length": 200000,
+                            "tool_use": true,
+                            "vision": true,
+                            "audio": false,
+                            "cost_per_million_in": 3.0,
+                            "cost_per_million_out": 15.0,
+                            "notes": "test fixture"
+                        }
+                    }
+                },
+                "groq": {
+                    "models": {
+                        "llama-3.3-70b-versatile": {
+                            "context_length": 131072,
+                            "tool_use": true,
+                            "vision": false,
+                            "audio": false,
+                            "cost_per_million_in": 0.59,
+                            "cost_per_million_out": 0.79,
+                            "notes": "test fixture: vision strictly false"
+                        },
+                        "llama-3.1-8b-instant": {
+                            "context_length": 131072,
+                            "tool_use": true,
+                            "vision": false,
+                            "audio": false,
+                            "cost_per_million_in": 0.05,
+                            "cost_per_million_out": 0.08,
+                            "notes": "test fixture: long context"
+                        }
+                    }
+                }
+            }
+        });
+        std::fs::write(&path, serde_json::to_string(&test_reg).unwrap()).unwrap();
+        path
+    }
+
+    // Build the tipping-point cfg: provider_capabilities LIES about groq vision
+    // (vision=true) — the registry must override it (registry says vision=false).
+    fn cfg_with_lying_probe(registry_path: std::path::PathBuf) -> BladeConfig {
+        let mut cfg = BladeConfig::default();
+        cfg.intelligence.capability_registry_path = registry_path;
+        cfg.provider = "anthropic".to_string();
+        cfg.api_key = "sk-ant-primary".to_string();
+        cfg.model = "claude-sonnet-4-20250514".to_string();
+
+        let mut caps: HashMap<String, ProviderCapabilityRecord> = HashMap::new();
+        // Probe LIES: groq is NOT vision-capable, but the cached record says it is.
+        caps.insert(
+            "groq".into(),
+            cap_rec("groq", "llama-3.3-70b-versatile", true, true, true, false, 131_072),
+        );
+        // Truthful records — these match the registry.
+        caps.insert(
+            "anthropic".into(),
+            cap_rec("anthropic", "claude-sonnet-4-20250514", true, true, true, false, 200_000),
+        );
+        cfg.provider_capabilities = caps;
+        cfg.fallback_providers = vec!["groq".into(), "anthropic".into()];
+        cfg
+    }
+
+    #[test]
+    fn phase36_intel_05_router_uses_registry_first() {
+        // Lock: registry verdict (groq vision=false) BEATS the lying probe
+        // record (groq vision=true). find_capable_providers("vision") MUST
+        // exclude groq even though provider_capabilities says it's capable.
+        test_clear_keyring_overrides();
+        test_set_keyring_override("groq", "gsk-test");
+        test_set_keyring_override("anthropic", "sk-ant-test");
+        INTEL_FORCE_REGISTRY_MISS.with(|c| c.set(false));
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = fixture_registry(dir.path());
+        let cfg = cfg_with_lying_probe(path);
+
+        // Sanity: the lying record is in place.
+        assert!(
+            cfg.provider_capabilities.get("groq").unwrap().vision,
+            "test setup: probe record claims groq vision=true (lying)"
+        );
+
+        // Sanity: the registry tells the truth.
+        let groq_caps = crate::intelligence::capability_registry::get_capabilities(
+            "groq",
+            "llama-3.3-70b-versatile",
+            &cfg,
+        );
+        assert_eq!(
+            groq_caps.expect("registry hit").vision,
+            false,
+            "test setup: registry says groq vision=false"
+        );
+
+        // Registry-first: groq must NOT surface as vision-capable.
+        let capable = find_capable_providers("vision", &cfg);
+        let groq_in_chain = capable.iter().any(|(p, _)| p == "groq");
+        assert!(
+            !groq_in_chain,
+            "registry-first: groq excluded (vision=false in registry) despite lying probe record. got: {:?}",
+            capable
+        );
+        // Anthropic still surfaces because both registry + probe agree it's capable.
+        let ant_in_chain = capable.iter().any(|(p, _)| p == "anthropic");
+        assert!(
+            ant_in_chain,
+            "anthropic must still surface (registry vision=true). got: {:?}",
+            capable
+        );
+
+        // Same expectation through build_capability_filtered_chain.
+        let chain = build_capability_filtered_chain("vision", "anthropic", &cfg);
+        let groq_in_filtered = chain.iter().any(|(p, _)| p == "groq");
+        assert!(
+            !groq_in_filtered,
+            "registry-first chain: groq excluded. got: {:?}",
+            chain
+        );
+
+        test_clear_keyring_overrides();
+    }
+
+    #[test]
+    fn phase36_intel_05_router_falls_back_to_probe_on_registry_miss() {
+        // With INTEL_FORCE_REGISTRY_MISS=true, the registry returns None for
+        // every (provider, model). The legacy probe path fires: groq's lying
+        // record (vision=true) is now used → groq SURFACES as vision-capable.
+        // This proves the legacy path is byte-equivalent when the seam fires.
+        test_clear_keyring_overrides();
+        test_set_keyring_override("groq", "gsk-test");
+        test_set_keyring_override("anthropic", "sk-ant-test");
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = fixture_registry(dir.path());
+        let cfg = cfg_with_lying_probe(path);
+
+        INTEL_FORCE_REGISTRY_MISS.with(|c| c.set(true));
+
+        // Confirm the seam: registry returns None.
+        let groq_caps = crate::intelligence::capability_registry::get_capabilities(
+            "groq",
+            "llama-3.3-70b-versatile",
+            &cfg,
+        );
+        assert!(
+            groq_caps.is_none(),
+            "FORCE_REGISTRY_MISS must short-circuit registry lookup"
+        );
+
+        // Legacy probe path: groq's lying record drives the answer → vision=true.
+        let capable = find_capable_providers("vision", &cfg);
+        let groq_in_chain = capable.iter().any(|(p, _)| p == "groq");
+        assert!(
+            groq_in_chain,
+            "fallback to probe: groq surfaces (probe record vision=true). got: {:?}",
+            capable
+        );
+
+        let chain = build_capability_filtered_chain("vision", "anthropic", &cfg);
+        let groq_in_filtered = chain.iter().any(|(p, _)| p == "groq");
+        assert!(
+            groq_in_filtered,
+            "fallback chain: groq surfaces via probe record. got: {:?}",
+            chain
+        );
+
+        // Cleanup the seam so other tests don't observe leakage.
+        INTEL_FORCE_REGISTRY_MISS.with(|c| c.set(false));
+        test_clear_keyring_overrides();
+    }
+
+    #[test]
+    fn phase36_intel_05_router_picks_correct_model_for_long_context_task() {
+        // Lock: registry's context_length≥100_000 derivation BEATS the probe
+        // record's stale long_context=false. groq/llama-3.1-8b-instant has
+        // ctx=131_072 in the registry → long_context=true. The probe record
+        // says false (e.g. legacy/stale probe). Registry-first wins.
+        test_clear_keyring_overrides();
+        test_set_keyring_override("groq", "gsk-test");
+        test_set_keyring_override("anthropic", "sk-ant-test");
+        INTEL_FORCE_REGISTRY_MISS.with(|c| c.set(false));
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = fixture_registry(dir.path());
+        let mut cfg = BladeConfig::default();
+        cfg.intelligence.capability_registry_path = path;
+        cfg.provider = "anthropic".to_string();
+        cfg.api_key = "sk-ant-primary".to_string();
+        cfg.model = "claude-sonnet-4-20250514".to_string();
+
+        let mut caps: HashMap<String, ProviderCapabilityRecord> = HashMap::new();
+        // Probe is STALE: claims groq long_context=false even though the model
+        // is llama-3.1-8b-instant (131k ctx).
+        caps.insert(
+            "groq".into(),
+            cap_rec("groq", "llama-3.1-8b-instant", false, true, false, false, 131_072),
+        );
+        cfg.provider_capabilities = caps;
+        cfg.fallback_providers = vec!["groq".into()];
+
+        // Sanity: registry tells the truth (ctx ≥ 100k → long_context=true).
+        let registry_groq = crate::intelligence::capability_registry::get_capabilities(
+            "groq",
+            "llama-3.1-8b-instant",
+            &cfg,
+        );
+        let registry_caps = registry_groq.expect("registry hit");
+        assert!(
+            registry_caps.context_length >= 100_000,
+            "test setup: registry ctx_length must be ≥100k for long_context derivation"
+        );
+
+        // Registry-first: groq surfaces as long-context-capable.
+        let capable = find_capable_providers("long_context", &cfg);
+        let groq_in_long = capable.iter().any(|(p, _)| p == "groq");
+        assert!(
+            groq_in_long,
+            "registry-first: groq surfaces for long_context (ctx_length=131k≥100k). got: {:?}",
+            capable
+        );
+
+        let chain = build_capability_filtered_chain("long_context", "anthropic", &cfg);
+        let groq_in_chain = chain.iter().any(|(p, _)| p == "groq");
+        assert!(
+            groq_in_chain,
+            "registry-first chain: groq surfaces. got: {:?}",
+            chain
+        );
+
+        test_clear_keyring_overrides();
+    }
+}
