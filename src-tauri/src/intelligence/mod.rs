@@ -20,6 +20,8 @@ pub mod repo_map;
 pub mod symbol_graph;
 pub mod tree_sitter_parser;
 
+pub use anchor_parser::{extract_anchors, resolve_anchors, Anchor};
+
 pub use symbol_graph::{ReindexStats, SymbolKind, SymbolNode};
 
 pub use capability_registry::{
