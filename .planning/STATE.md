@@ -4,14 +4,14 @@ milestone: v1.5
 milestone_name: Intelligence Layer
 status: active
 stopped_at: null
-last_updated: "2026-05-06"
-last_activity: 2026-05-06
+last_updated: "2026-05-07"
+last_activity: 2026-05-07
 progress:
   total_phases: 7
   completed_phases: 0
-  total_plans: 38
-  completed_plans: 38
-  percent: 57
+  total_plans: 47
+  completed_plans: 47
+  percent: 71
 ---
 
 # STATE -- BLADE (v1.5 -- Intelligence Layer)
@@ -19,8 +19,8 @@ progress:
 **Project:** BLADE -- Desktop JARVIS
 **Current milestone:** v1.5 -- Intelligence Layer
 **Prior shipped:** v1.4 (2026-05-03), v1.3 (2026-05-02), v1.2 (2026-04-30), v1.1 (2026-04-27), v1.0 (2026-04-19)
-**Current Focus:** Phase 35 — Auto-Decomposition (code complete; runtime UAT operator-deferred). Phases 32 + 33 + 34 also UAT-pending.
-**Status:** Phases 32 + 33 + 34 + 35 all at the `checkpoint:human-verify` boundary. Pending Arnav's runtime UAT on the dev binary for all four phases. Phase 36 (Context Intelligence) is the next unblocked phase but per ROADMAP can run in parallel with Phase 33 (already done).
+**Current Focus:** Phase 36 — Context Intelligence (code complete; runtime UAT operator-deferred). Phases 32 + 33 + 34 + 35 also UAT-pending.
+**Status:** Phases 32 + 33 + 34 + 35 + 36 all at the `checkpoint:human-verify` boundary. Pending Arnav's runtime UAT on the dev binary for all five phases. Phase 37 (Intelligence Eval) is next; depends on Phases 32-36.
 
 ## Current Position
 
@@ -28,18 +28,19 @@ Phase 32 — Context Management (7/7 plans complete; checkpoint:human-verify ope
 Phase 33 — Agentic Loop (9/9 plans complete; checkpoint:human-verify open)
 Phase 34 — Resilience + Session Persistence (11/11 plans complete; checkpoint:human-verify open)
 Phase 35 — Auto-Decomposition (11/11 plans complete; checkpoint:human-verify open)
-Status: Four phases code-complete with static-gate evidence packages green. Each phase resolved its own pre-existing v1.4-style debts during close-out (chat.css ghost tokens; WIRING-AUDIT modules + config fields + routes; DoctorPane TLS bug; verify-emit-policy allowlist; 5 critical review fixes per phase).
+Phase 36 — Context Intelligence (9/9 plans complete; checkpoint:human-verify open)
+Status: Five phases code-complete with static-gate evidence packages green. Each phase resolved its own pre-existing v1.4-style debts during close-out (chat.css ghost tokens; WIRING-AUDIT modules + config fields + routes; DoctorPane TLS bug; verify-emit-policy allowlist; 4-5 critical review fixes per phase).
 
-Last activity: 2026-05-06 — Phase 35 closed to the v1.1-protected boundary autonomously. 30+ commits across Phase 35 (CONTEXT + RESEARCH + 11 PLANs + 11 SUMMARYs + feat commits). 43 phase35 unit tests + 8 integration tests green; cargo check + cargo check --release + tsc clean; 30/31 npm run verify:all gates green (the 1 failure is the same pre-existing v1.4 OEVAL-01c organism-eval drift documented at Phase 32 + 33 + 34 close — out of Phase 35 scope, deterministic across with/without Phase 35 changes, zero coupling between vitality_engine and decomposition surfaces).
+Last activity: 2026-05-07 — Phase 36 closed to the v1.1-protected boundary autonomously. 30+ commits across Phase 36 (CONTEXT + 9 PLANs + 9 SUMMARYs + feat commits + REVIEW pending). 67 phase36 unit tests + 58 intelligence module tests green; cargo check + cargo check --release + tsc clean; 35/37 npm run verify:all gates green (the 2 failures are pre-existing v1.4 OEVAL-01c organism-eval drift documented at Phase 32+33+34+35 close — out of Phase 36 scope, zero coupling between vitality_engine and intelligence surfaces).
 
-Progress: [██████░░░░] 57% (38/38 plans complete across phases 32 + 33 + 34 + 35; 0/7 phases formally closed pending UAT)
+Progress: [███████░░░] 71% (47/47 plans complete across phases 32 + 33 + 34 + 35 + 36; 0/7 phases formally closed pending UAT)
 
 ```
 32 [~] Context Management              (code complete, UAT pending)
 33 [~] Agentic Loop                    (code complete, UAT pending)
 34 [~] Resilience + Session Persistence (code complete, UAT pending)
 35 [~] Auto-Decomposition              (code complete, UAT pending)
-36 [ ] Context Intelligence
+36 [~] Context Intelligence            (code complete, UAT pending)
 37 [ ] Intelligence Eval
 38 [ ] Close
 ```

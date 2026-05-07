@@ -188,8 +188,16 @@
   3. `canonical_models.json` exists and is testable: a given provider+model combination has a documented context length, vision support flag, tool_use support flag, and cost-per-token; router.rs reads from it
   4. When a query requires vision and the active model has `vision: false` in the registry, router.rs transparently selects a vision-capable model without user intervention
   5. Typing `@screen` in the chat injects the current screen OCR context; `@file:path` injects the file content within budget; `@memory:topic` injects matching memory entries — each anchor is visually indicated in the message
-**Plans**: TBD
-**UI hint**: yes
+**Plans:** 9 plans across 5 waves (Wave 1: 36-01; Wave 2: 36-02; Wave 3: 36-03, 36-04; Wave 4: 36-05, 36-06; Wave 5: 36-07, 36-08, 36-09) — **all 9 code-complete; runtime UAT operator-deferred per Arnav 2026-05-07**
+- [x] 36-01-PLAN.md — IntelligenceConfig sub-struct (5 fields, 6-place rule) + intelligence/ module scaffold + tree-sitter+petgraph Cargo deps [Wave 1] ✓ commits 081bd77 + 9049061 + fb80601 + 63c7ed7
+- [x] 36-02-PLAN.md — INTEL-01 tree-sitter parser (TS/Rust/Python) + symbol_graph SQL persistence + reindex_symbol_graph Tauri cmd [Wave 2] ✓ commits 5127e0f + 3afab45 + 37941d1 + 01fc9f3
+- [x] 36-03-PLAN.md — INTEL-02 personalized PageRank + 5-min cache + INTEL_FORCE_PAGERANK_RESULT seam [Wave 3] ✓ commit efe0b19 (SUMMARY bundled in 94c7fa6)
+- [x] 36-04-PLAN.md — INTEL-03 repo_map builder + brain.rs code-gate injection + LAST_BREAKDOWN repo_map row [Wave 3] ✓ commits 0d3cc86 + fa416a2 + 94c7fa6
+- [x] 36-05-PLAN.md — INTEL-04 canonical_models.json (5 providers × 21 models) + capability_registry loader + 2 Tauri cmds [Wave 4] ✓ commits bb336f7 + f55464d + 2263402 + 8e50761
+- [x] 36-06-PLAN.md — INTEL-05 router.rs registry-first cap_for helper + tier-1 rewire [Wave 4] ✓ commits ae9da76 + 4166de4 + 5479dc2
+- [x] 36-07-PLAN.md — INTEL-06 anchor_parser regex extraction + resolve + commands.rs prelude wiring [Wave 5] ✓ commits 480f562 + f2161af + 878aef2
+- [x] 36-08-PLAN.md — INTEL-06 frontend AnchorChip + brain.rs anchor_injections receiver + intelligence.ts wrappers [Wave 5] ✓ commits 14197cf + 5a02b87 + 96335a8 + 61afa1d
+- [x] 36-09-PLAN.md — Panic-injection regressions + wiring-audit debt + checkpoint:human-verify 17-step UAT [Wave 5] ✓ commits 3f69e2e + ee99f4d + 2081326; Task 3 = checkpoint:human-verify, runtime UAT pending Arnav
 
 ### Phase 37: Intelligence Eval
 
