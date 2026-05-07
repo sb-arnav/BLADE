@@ -1493,6 +1493,11 @@ pub fn run() {
             intelligence::get_active_model_capabilities,
         ])
         .setup(move |app| {
+            // Phase 36 / HI-02 fix — seed canonical_models.json on first boot
+            // and run validate_against_probe so registry/probe drifts surface
+            // as [INTEL-04] warnings at startup (non-halting).
+            crate::intelligence::init();
+
             // Window state (position/size) handled by tauri-plugin-window-state
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();

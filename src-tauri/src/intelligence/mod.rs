@@ -29,6 +29,11 @@ pub use capability_registry::{
     CapabilityRegistry, ModelCapabilities, ProviderEntry,
 };
 
+/// HI-02 instrumentation: increments every time `init()` runs so a test can
+/// assert lib.rs's setup hook actually wires the call in. Atomic counter so
+/// concurrent first-boot races don't corrupt observation.
+pub static INIT_RUN_COUNT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
 /// Phase 36 init hook — called from lib.rs setup. Subsequent plans fill the body
 /// (Plan 36-05 hydrates capability_registry on first access, Plan 36-02 verifies
 /// tree-sitter language bindings load).
@@ -36,8 +41,8 @@ pub use capability_registry::{
 /// 36-05: seed `canonical_models.json` to user's blade_config_dir if missing,
 /// load it once, and run `validate_against_probe` so registry/capability_probe
 /// drifts surface as `[INTEL-04]` warnings at startup (non-halting).
-#[allow(dead_code)]
 pub fn init() {
+    INIT_RUN_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     let cfg = crate::config::load_config();
     let path = &cfg.intelligence.capability_registry_path;
     if let Err(e) = capability_registry::ensure_registry_file(path) {
@@ -47,6 +52,23 @@ pub fn init() {
     match capability_registry::load_registry(path) {
         Ok(reg) => capability_registry::validate_against_probe(&reg),
         Err(e) => log::warn!("[INTEL-04] init: load_registry failed: {e}"),
+    }
+}
+
+#[cfg(test)]
+mod init_tests {
+    use super::*;
+
+    #[test]
+    fn phase36_intel_04_init_runs_validate_against_probe() {
+        let before = INIT_RUN_COUNT.load(std::sync::atomic::Ordering::SeqCst);
+        init();
+        let after = INIT_RUN_COUNT.load(std::sync::atomic::Ordering::SeqCst);
+        assert!(
+            after > before,
+            "init() must increment INIT_RUN_COUNT (before={before}, after={after}) — \
+             this is the lib.rs setup-hook wiring assertion for HI-02"
+        );
     }
 }
 
