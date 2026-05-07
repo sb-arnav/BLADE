@@ -70,6 +70,17 @@ ulid = "1"
 # atomicity guarantee.
 fs2 = "0.4"
 
+# Phase 36 Plan 36-01 — Context Intelligence (INTEL-01 + INTEL-02).
+# tree-sitter family powers per-language symbol extraction (TS/JS, Rust, Python)
+# for the symbol graph (INTEL-01); petgraph backs the personalized PageRank
+# computation over that graph (INTEL-02). All deps are pre-staged in 36-01;
+# Plans 36-02 and 36-03 wire concrete usage.
+tree-sitter = "0.22"
+tree-sitter-typescript = "0.21"
+tree-sitter-rust = "0.21"
+tree-sitter-python = "0.21"
+petgraph = "0.6"
+
 [dev-dependencies]
 tempfile = "3"
 filetime = "0.2"
