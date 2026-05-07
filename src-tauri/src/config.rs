@@ -639,6 +639,71 @@ impl Default for DecompositionConfig {
     }
 }
 
+// ---------------------------------------------------------------------
+// Phase 36 Plan 36-01 — Context Intelligence runtime knobs (INTEL-01..06).
+//
+// Locked decisions (36-CONTEXT.md §IntelligenceConfig Sub-Struct):
+//   - tree_sitter_enabled (default true) — CTX-07-style escape hatch.
+//     false = no tree-sitter parse pass, no PageRank, no repo map.
+//     Code-section gate falls through to indexer.rs FTS (Phase 32 baseline).
+//   - repo_map_token_budget (default 1000) — INTEL-03 budget cap.
+//     Bounded at consumer site to <= 0.10 * model_context_length.
+//   - pagerank_damping (default 0.85) — Aider's locked default.
+//   - capability_registry_path (default blade_config_dir/canonical_models.json) —
+//     INTEL-04 source-of-truth for provider/model capabilities.
+//   - context_anchor_enabled (default true) — CTX-07-style escape hatch.
+//     false = @screen / @file: / @memory: text reaches provider verbatim;
+//     no injection side-effect.
+//
+// Six-place rule (CLAUDE.md): every BladeConfig field MUST land in
+// DiskConfig struct, DiskConfig::default, BladeConfig struct,
+// BladeConfig::default, load_config, and save_config.
+// ---------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct IntelligenceConfig {
+    /// CTX-07-style escape hatch. true = enable tree-sitter symbol graph + PageRank
+    /// + repo map injection. false = legacy FTS-only code context.
+    #[serde(default = "default_tree_sitter_enabled")]
+    pub tree_sitter_enabled: bool,
+    /// INTEL-03 — token budget cap for the repo map injected into the system
+    /// prompt's code section. Default 1000. Consumer enforces <= 0.10 * ctx.
+    #[serde(default = "default_repo_map_token_budget")]
+    pub repo_map_token_budget: u32,
+    /// INTEL-02 — Aider's locked default damping factor for personalized PageRank.
+    #[serde(default = "default_pagerank_damping")]
+    pub pagerank_damping: f32,
+    /// INTEL-04 — on-disk path to canonical_models.json registry override.
+    /// Bundled default seeds this path on first boot if missing.
+    #[serde(default = "default_capability_registry_path")]
+    pub capability_registry_path: std::path::PathBuf,
+    /// CTX-07-style escape hatch. true = parse @screen/@file:/@memory: anchors
+    /// from user queries; false = anchors reach provider verbatim as text.
+    #[serde(default = "default_context_anchor_enabled")]
+    pub context_anchor_enabled: bool,
+}
+
+fn default_tree_sitter_enabled() -> bool { true }
+fn default_repo_map_token_budget() -> u32 { 1000 }
+fn default_pagerank_damping() -> f32 { 0.85 }
+fn default_capability_registry_path() -> std::path::PathBuf {
+    blade_config_dir().join("canonical_models.json")
+}
+fn default_context_anchor_enabled() -> bool { true }
+
+impl Default for IntelligenceConfig {
+    fn default() -> Self {
+        Self {
+            tree_sitter_enabled: default_tree_sitter_enabled(),
+            repo_map_token_budget: default_repo_map_token_budget(),
+            pagerank_damping: default_pagerank_damping(),
+            capability_registry_path: default_capability_registry_path(),
+            context_anchor_enabled: default_context_anchor_enabled(),
+        }
+    }
+}
+
 /// Config as stored on disk — api_key is NOT stored here anymore
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct DiskConfig {
@@ -789,6 +854,12 @@ struct DiskConfig {
     // configs loadable.
     #[serde(default)]
     decomposition: DecompositionConfig,
+    // Phase 36 Plan 36-01 — Context Intelligence runtime knobs (INTEL-01..06).
+    // tree_sitter_enabled escape hatch + repo_map_token_budget cap +
+    // pagerank_damping factor + capability_registry_path + context_anchor_enabled
+    // escape hatch. #[serde(default)] keeps legacy configs loadable.
+    #[serde(default)]
+    intelligence: IntelligenceConfig,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -874,6 +945,7 @@ impl Default for DiskConfig {
             resilience: ResilienceConfig::default(),
             session: SessionConfig::default(),
             decomposition: DecompositionConfig::default(),
+            intelligence: IntelligenceConfig::default(),
             api_key: None,
         }
     }
@@ -1045,6 +1117,12 @@ pub struct BladeConfig {
     /// subagent_summary_max_tokens=800. See `DecompositionConfig`.
     #[serde(default)]
     pub decomposition: DecompositionConfig,
+    /// Phase 36 Plan 36-01 — Context Intelligence runtime knobs (INTEL-01..06).
+    /// Defaults: tree_sitter_enabled=true, repo_map_token_budget=1000,
+    /// pagerank_damping=0.85, capability_registry_path=blade_config_dir/canonical_models.json,
+    /// context_anchor_enabled=true. See `IntelligenceConfig`.
+    #[serde(default)]
+    pub intelligence: IntelligenceConfig,
 }
 
 impl BladeConfig {
@@ -1116,6 +1194,7 @@ impl Default for BladeConfig {
             resilience: ResilienceConfig::default(),
             session: SessionConfig::default(),
             decomposition: DecompositionConfig::default(),
+            intelligence: IntelligenceConfig::default(),
         }
     }
 }
@@ -1281,6 +1360,7 @@ pub fn load_config() -> BladeConfig {
         resilience: disk.resilience,
         session: disk.session,
         decomposition: disk.decomposition,
+        intelligence: disk.intelligence,
     }
 }
 
@@ -1361,6 +1441,7 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         resilience: config.resilience.clone(),
         session: config.session.clone(),
         decomposition: config.decomposition.clone(),
+        intelligence: config.intelligence.clone(),
         api_key: None,
     };
 
@@ -1932,6 +2013,7 @@ mod tests {
             resilience: cfg.resilience.clone(),
             session: cfg.session.clone(),
             decomposition: cfg.decomposition.clone(),
+            intelligence: cfg.intelligence.clone(),
             api_key: None,
         };
 
@@ -2284,5 +2366,64 @@ mod tests {
             .expect("legacy config should parse with defaults");
         assert_eq!(parsed.decomposition, DecompositionConfig::default(),
             "missing 'decomposition' key must fall back to DecompositionConfig::default()");
+    }
+
+    // ---------------------------------------------------------------------
+    // Phase 36 Plan 36-01 — IntelligenceConfig tests (INTEL-01..06 substrate).
+    //
+    // Three tests lock the six-place config wire-up for the new sub-struct:
+    //   - default_values: IntelligenceConfig::default() returns the locked
+    //     INTEL defaults verbatim (tree_sitter_enabled=true,
+    //     repo_map_token_budget=1000, pagerank_damping=0.85,
+    //     capability_registry_path ends in canonical_models.json,
+    //     context_anchor_enabled=true).
+    //   - round_trip: a non-default IntelligenceConfig survives serialization
+    //     through DiskConfig (mirrors save_config -> load_config wire format).
+    //   - missing_uses_defaults: legacy config.json without an `intelligence`
+    //     key MUST load with IntelligenceConfig::default()
+    //     (#[serde(default)] on the field — non-negotiable per CLAUDE.md).
+    // ---------------------------------------------------------------------
+
+    #[test]
+    fn phase36_intelligence_default_values() {
+        let c = IntelligenceConfig::default();
+        assert!(c.tree_sitter_enabled, "default tree_sitter_enabled must be true");
+        assert_eq!(c.repo_map_token_budget, 1000);
+        assert!((c.pagerank_damping - 0.85).abs() < 1e-6,
+            "default pagerank_damping must be 0.85, got {}", c.pagerank_damping);
+        assert!(c.capability_registry_path.ends_with("canonical_models.json"),
+            "default capability_registry_path must end in canonical_models.json");
+        assert!(c.context_anchor_enabled, "default context_anchor_enabled must be true");
+    }
+
+    #[test]
+    fn phase36_intelligence_config_round_trip() {
+        let mut cfg = BladeConfig::default();
+        cfg.intelligence = IntelligenceConfig {
+            tree_sitter_enabled: false,
+            repo_map_token_budget: 4000,
+            pagerank_damping: 0.7,
+            capability_registry_path: std::path::PathBuf::from("/tmp/test-models.json"),
+            context_anchor_enabled: false,
+        };
+        let mut disk = DiskConfig::default();
+        disk.intelligence = cfg.intelligence.clone();
+        let json = serde_json::to_string(&disk).expect("serialize");
+        let parsed: DiskConfig = serde_json::from_str(&json).expect("parse");
+        assert_eq!(parsed.intelligence, cfg.intelligence,
+            "IntelligenceConfig roundtrip lost data");
+    }
+
+    #[test]
+    fn phase36_intelligence_missing_uses_defaults() {
+        let legacy_json = r#"{
+            "provider": "anthropic",
+            "model": "claude-sonnet-4",
+            "onboarded": true
+        }"#;
+        let parsed: DiskConfig = serde_json::from_str(legacy_json)
+            .expect("legacy config should parse with defaults");
+        assert_eq!(parsed.intelligence, IntelligenceConfig::default(),
+            "missing 'intelligence' key must fall back to IntelligenceConfig::default()");
     }
 }
