@@ -150,6 +150,15 @@
           "cost_per_million_out": 2.50,
           "notes": "Gemini 2.0 Flash"
         },
+        "gemini-2.0-flash-exp": {
+          "context_length": 1048576,
+          "tool_use": true,
+          "vision": true,
+          "audio": false,
+          "cost_per_million_in": 0.30,
+          "cost_per_million_out": 2.50,
+          "notes": "Gemini 2.0 Flash (experimental SKU; default_model_for(\"gemini\") routes here)"
+        },
         "gemini-1.5-pro": {
           "context_length": 2097152,
           "tool_use": true,
