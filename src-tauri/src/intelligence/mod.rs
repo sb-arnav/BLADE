@@ -22,12 +22,53 @@ pub mod tree_sitter_parser;
 
 pub use symbol_graph::{ReindexStats, SymbolKind, SymbolNode};
 
+pub use capability_registry::{
+    ensure_registry_file, force_reload, get_capabilities, load_registry, validate_against_probe,
+    CapabilityRegistry, ModelCapabilities, ProviderEntry,
+};
+
 /// Phase 36 init hook — called from lib.rs setup. Subsequent plans fill the body
 /// (Plan 36-05 hydrates capability_registry on first access, Plan 36-02 verifies
-/// tree-sitter language bindings load). For 36-01 substrate ship: no-op.
+/// tree-sitter language bindings load).
+///
+/// 36-05: seed `canonical_models.json` to user's blade_config_dir if missing,
+/// load it once, and run `validate_against_probe` so registry/capability_probe
+/// drifts surface as `[INTEL-04]` warnings at startup (non-halting).
 #[allow(dead_code)]
 pub fn init() {
-    // Plan 36-01 stub. Plans 36-02..36-07 wire concrete init steps as needed.
+    let cfg = crate::config::load_config();
+    let path = &cfg.intelligence.capability_registry_path;
+    if let Err(e) = capability_registry::ensure_registry_file(path) {
+        log::warn!("[INTEL-04] init: {e}");
+        return;
+    }
+    match capability_registry::load_registry(path) {
+        Ok(reg) => capability_registry::validate_against_probe(&reg),
+        Err(e) => log::warn!("[INTEL-04] init: load_registry failed: {e}"),
+    }
+}
+
+/// INTEL-04 Tauri command — clear the capability registry cache and reload
+/// from `config.intelligence.capability_registry_path`. Returns the number
+/// of providers parsed.
+#[tauri::command]
+pub async fn reload_capability_registry() -> Result<u32, String> {
+    let cfg = crate::config::load_config();
+    capability_registry::force_reload(&cfg.intelligence.capability_registry_path)
+}
+
+/// INTEL-04 Tauri command — return capabilities for the currently-active
+/// provider/model pair. Returns None when the registry has no entry; the
+/// frontend (or Plan 36-06 router) is expected to fall back to
+/// capability_probe::infer_capabilities.
+#[tauri::command]
+pub async fn get_active_model_capabilities() -> Result<Option<ModelCapabilities>, String> {
+    let cfg = crate::config::load_config();
+    Ok(capability_registry::get_capabilities(
+        &cfg.provider,
+        &cfg.model,
+        &cfg,
+    ))
 }
 
 /// INTEL-01 Tauri command — re-index the symbol graph for `project_root`.
