@@ -296,9 +296,53 @@ pub fn select_provider(
     (prov, key, model, chain, None)
 }
 
-/// Return every provider in `provider_capabilities` whose flag for `capability`
-/// is true. Order is HashMap iteration order — callers filter further by
-/// stored-key availability before committing to a selection.
+/// Phase 36 Plan 36-06 INTEL-05 — registry-first capability resolution.
+///
+/// Returns `true` iff the (provider, model) pair has the requested `capability`.
+/// Consults `intelligence::capability_registry::get_capabilities` FIRST; falls
+/// back to the probe-populated `ProviderCapabilityRecord` ONLY when the
+/// registry returns None (unknown model, INTEL_FORCE_REGISTRY_MISS seam, etc.)
+///
+/// `long_context` is derived from `context_length >= 100_000` per the same
+/// rule capability_probe::infer_capabilities uses for symmetry.
+fn cap_for(
+    capability: &str,
+    provider: &str,
+    model: &str,
+    rec: Option<&crate::config::ProviderCapabilityRecord>,
+    config: &crate::config::BladeConfig,
+) -> bool {
+    // Registry-first.
+    if let Some(reg_caps) =
+        crate::intelligence::capability_registry::get_capabilities(provider, model, config)
+    {
+        return match capability {
+            "vision" => reg_caps.vision,
+            "audio" => reg_caps.audio,
+            "tools" => reg_caps.tool_use,
+            "long_context" => reg_caps.context_length >= 100_000,
+            _ => false,
+        };
+    }
+    // Probe fallback — byte-identical to pre-Plan-36-06 behavior under
+    // INTEL_FORCE_REGISTRY_MISS=true and for any (provider, model) not in
+    // the canonical_models.json registry (OpenRouter substring matches,
+    // custom base_url, Ollama, future providers).
+    rec.map(|r| match capability {
+        "vision" => r.vision,
+        "audio" => r.audio,
+        "tools" => r.tool_calling,
+        "long_context" => r.long_context,
+        _ => false,
+    })
+    .unwrap_or(false)
+}
+
+/// Return every provider whose `capability` is true. Iteration source is
+/// `config.provider_capabilities` (the probe-populated cache) — this is the
+/// candidate enumeration surface. The capability VERDICT goes through
+/// `cap_for`, which prefers the canonical_models.json registry over the
+/// probe record (Plan 36-06 INTEL-05).
 fn find_capable_providers(
     capability: &str,
     config: &crate::config::BladeConfig,
@@ -306,13 +350,7 @@ fn find_capable_providers(
     config
         .provider_capabilities
         .iter()
-        .filter(|(_, rec)| match capability {
-            "vision" => rec.vision,
-            "audio" => rec.audio,
-            "tools" => rec.tool_calling,
-            "long_context" => rec.long_context,
-            _ => false,
-        })
+        .filter(|(prov, rec)| cap_for(capability, prov, &rec.model, Some(rec), config))
         .map(|(prov, rec)| (prov.clone(), rec.model.clone()))
         .collect()
 }
@@ -336,19 +374,14 @@ fn build_capability_filtered_chain(
     let mut seen: HashSet<String> = HashSet::new();
     seen.insert(primary_provider.to_string());
 
-    // Step 1: providers with capability records showing the capability = true.
+    // Step 1: providers in `provider_capabilities` whose registry-or-probe
+    // verdict for `capability` is true (Plan 36-06 INTEL-05 — `cap_for`
+    // prefers canonical_models.json over the probe record).
     for (prov, rec) in &config.provider_capabilities {
         if seen.contains(prov) {
             continue;
         }
-        let has_cap = match capability {
-            "vision" => rec.vision,
-            "audio" => rec.audio,
-            "tools" => rec.tool_calling,
-            "long_context" => rec.long_context,
-            _ => false,
-        };
-        if !has_cap {
+        if !cap_for(capability, prov, &rec.model, Some(rec), config) {
             continue;
         }
         let key = crate::config::get_provider_key(prov);
@@ -359,22 +392,21 @@ fn build_capability_filtered_chain(
         chain.push((prov.clone(), rec.model.clone()));
     }
 
-    // Step 2: user-ordered fallback_providers (filtered by capability).
+    // Step 2: user-ordered fallback_providers (filtered by capability via
+    // the same registry-first rule).
     for prov in &config.fallback_providers {
         if seen.contains(prov) {
             continue;
         }
         let rec = config.provider_capabilities.get(prov);
-        let has_cap = rec
-            .map(|r| match capability {
-                "vision" => r.vision,
-                "audio" => r.audio,
-                "tools" => r.tool_calling,
-                "long_context" => r.long_context,
-                _ => false,
-            })
-            .unwrap_or(false);
-        if !has_cap {
+        // Resolve the model for the registry lookup. Prefer the probe
+        // record's model (set by Phase 11 probes); fall back to the
+        // canonical default for the provider so registry-only entries
+        // (no probe record) still get a fair shot.
+        let model_for_lookup = rec
+            .map(|r| r.model.clone())
+            .unwrap_or_else(|| crate::providers::default_model_for(prov).to_string());
+        if !cap_for(capability, prov, &model_for_lookup, rec, config) {
             continue;
         }
         let key = crate::config::get_provider_key(prov);
@@ -382,10 +414,7 @@ fn build_capability_filtered_chain(
             continue;
         }
         seen.insert(prov.clone());
-        chain.push((
-            prov.clone(),
-            rec.map(|r| r.model.clone()).unwrap_or_default(),
-        ));
+        chain.push((prov.clone(), model_for_lookup));
     }
 
     chain
