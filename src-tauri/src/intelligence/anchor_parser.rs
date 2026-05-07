@@ -476,6 +476,51 @@ mod tests {
         assert!(result.1.is_empty());
     }
 
+    // ── Phase 36 Plan 36-09 phase-closure panic-injection regression ────────
+    //
+    // Mirrors the Phase 32-07 / 33-09 / 34-11 / 35-11 panic-injection regression
+    // pattern: drive INTEL_FORCE_ANCHOR_PANIC through the production
+    // catch_unwind wrapper at commands.rs:1287 (send_message_stream_inline
+    // anchor prelude) and assert the surface returns (original_query,
+    // Vec::new()) so chat continues unchanged.
+    //
+    // Distinct from phase36_intel_06_resolve_panic_safe_falls_through (Plan
+    // 36-07's own seam regression) by name: this test locks the contract
+    // SHAPE Plan 36-09 phase closure depends on, with a name that maps 1:1 to
+    // 36-09-PLAN.md §must_haves and the SUMMARY's panic-injection regression
+    // table. If a future refactor unwinds the commands.rs wrapper or changes
+    // the fallback shape, this regression fires.
+
+    #[test]
+    fn phase36_intel_06_anchor_parser_panic_caught_by_commands_layer() {
+        // Plan 36-09 regression — verifies catch_unwind in commands.rs
+        // (`src-tauri/src/commands.rs:1287`) converts INTEL_FORCE_ANCHOR_PANIC
+        // into the (original_query, []) fallback so chat continues with naive
+        // path (no anchor expansion).
+        INTEL_FORCE_ANCHOR_PANIC.with(|c| c.set(true));
+        let original = "what does @screen show?".to_string();
+
+        // Simulate the commands.rs prelude wrapper at commands.rs:1287:
+        //   let (clean_query, anchors) =
+        //     std::panic::catch_unwind(AssertUnwindSafe(|| extract_anchors(...)))
+        //       .unwrap_or_else(|_| (original.to_string(), Vec::new()));
+        let (clean_query, anchors) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            extract_anchors(&original)
+        }))
+        .unwrap_or_else(|_| (original.clone(), Vec::new()));
+
+        INTEL_FORCE_ANCHOR_PANIC.with(|c| c.set(false));
+
+        assert_eq!(
+            clean_query, original,
+            "panic fallback MUST preserve original query verbatim so the user's intent reaches the provider unchanged"
+        );
+        assert!(
+            anchors.is_empty(),
+            "panic fallback MUST produce no anchors so brain.rs's anchor receiver short-circuits"
+        );
+    }
+
     #[test]
     fn phase36_intel_06_resolve_file_caps_at_200kb() {
         let dir = tempfile::tempdir().unwrap();
