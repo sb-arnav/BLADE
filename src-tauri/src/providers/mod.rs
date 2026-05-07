@@ -1282,4 +1282,30 @@ mod tests {
         assert_eq!(default_model_for("ollama"),     "llama3");
         assert_eq!(default_model_for("gemini"),     "gemini-2.0-flash-exp");
     }
+
+    /// HI-04 regression: every provider's `default_model_for(...)` must
+    /// resolve through the canonical_models.json registry. Plan 36-06's
+    /// "registry-first" promise was silently failing for Gemini because
+    /// `gemini-2.0-flash-exp` was missing from canonical_models.json.
+    /// This test pins both halves: default_model_for stays stable, and the
+    /// registry has an entry for every default it returns.
+    #[test]
+    fn phase36_intel_04_default_model_pairs_with_registry_entry() {
+        use crate::intelligence::capability_registry;
+        let cfg = crate::config::load_config();
+        for provider in &[
+            "anthropic", "openai", "groq", "openrouter", "ollama", "gemini",
+        ] {
+            let model = default_model_for(provider);
+            let caps = capability_registry::get_capabilities(provider, model, &cfg);
+            assert!(
+                caps.is_some(),
+                "registry MUST have an entry for default_model_for({}) = {} \
+                 (HI-04 — registry-first lookup must not fall through to probe \
+                 for the canonical default)",
+                provider,
+                model
+            );
+        }
+    }
 }
