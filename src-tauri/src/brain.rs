@@ -1367,7 +1367,59 @@ fn build_system_prompt_inner(
     let gate = thalamus_threshold(current_chars);
 
     let mut code_chars: usize = 0;
-    if !smart || (!user_query.is_empty() && score_or_default(user_query, "code", 1.0) > gate) {
+    let mut repo_map_chars: usize = 0;
+    let code_gate_open = !smart || (!user_query.is_empty() && score_or_default(user_query, "code", 1.0) > gate);
+
+    // ── Phase 36-04 INTEL-03: repo map injection (preferred over FTS) ────────
+    // When the code-section gate fires AND tree_sitter_enabled = true, attempt
+    // to render a PageRank-scored repo map. On Some(map): inject + record
+    // "repo_map" + suppress the existing FTS code section (no double-injection).
+    // On None or panic: fall through to the FTS path unchanged (Phase 32 baseline).
+    let mut handled_by_repo_map = false;
+    if code_gate_open && config.intelligence.tree_sitter_enabled {
+        let recent_text: Vec<&str> = Vec::new(); // brain.rs lacks a recent-msg
+        // accessor in Plan 36-04; harvest from the current query alone. A
+        // future plan can lift the conversation history through if needed.
+        let mentions = crate::intelligence::repo_map::harvest_mentioned_symbols(
+            user_query, &recent_text);
+        // Token-budget bound at consumer site: cap at 10% of the model context
+        // length per CONTEXT.md §IntelligenceConfig Sub-Struct lock. No
+        // `providers::context_length_for(provider, model)` helper exists at
+        // Plan 36-04 ship time, so fall back to a literal 200_000-token
+        // conservative ceiling (tightened by a future plan once the helper
+        // exists). 1000 tokens vs. 20_000 (10% of 200k) → bound = 1000.
+        let model_ctx: u32 = 200_000;
+        let bounded_budget = config.intelligence.repo_map_token_budget
+            .min(((model_ctx as f32) * 0.10) as u32);
+
+        // Open the kg_nodes/kg_edges connection (same pattern memory_l0 uses
+        // higher up in this function). Skip the repo-map branch on connect
+        // failure — we'll fall through to FTS naturally.
+        let kg_db = crate::config::blade_config_dir().join("blade.db");
+        let map_opt = match rusqlite::Connection::open(&kg_db) {
+            Ok(conn) => std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                crate::intelligence::repo_map::build_repo_map(
+                    user_query, &mentions, bounded_budget, &config, &conn)
+            })).unwrap_or_else(|_| {
+                log::warn!("[INTEL-03] repo map builder panicked; falling through to FTS");
+                None
+            }),
+            Err(e) => {
+                log::debug!("[INTEL-03] kg conn open failed ({e}); skipping repo map");
+                None
+            }
+        };
+
+        if let Some(map) = map_opt {
+            if !map.is_empty() {
+                repo_map_chars = repo_map_chars.saturating_add(map.len());
+                parts.push(map);
+                handled_by_repo_map = true;
+            }
+        }
+    }
+
+    if !handled_by_repo_map && code_gate_open {
         const MAX_PROJECT_CHARS: usize = 3_000;
         const MAX_INDEX_TOTAL_CHARS: usize = 12_000;
         let known_projects = crate::indexer::list_indexed_projects();
@@ -1400,6 +1452,7 @@ fn build_system_prompt_inner(
             }
         }
     }
+    record_section("repo_map", repo_map_chars);
 
     // ── GIT CONTEXT (priority 12, code-gated) ────────────────────────────────
     let mut git_chars: usize = 0;
@@ -3049,5 +3102,148 @@ mod tests {
         assert!(s.contains(&year),
             "supplement must include current date (year {}); identity_supplement may have been dropped from the always-keep core. got: {}",
             year, s);
+    }
+
+    // ── Phase 36 Plan 36-04 INTEL-03 — repo map injection at code-section gate ──
+    //
+    // brain.rs::build_system_prompt_inner gains a new branch at the existing
+    // Phase 32-03 code-section gate: when (a) score_or_default(query, "code")
+    // > gate AND (b) config.intelligence.tree_sitter_enabled = true, attempt
+    // build_repo_map; on Some(map) inject + record_section("repo_map", N) +
+    // suppress the FTS code section. On None or panic, fall through to FTS.
+    //
+    // These tests exercise the FORCE seam path (test-only) so we don't need
+    // a real symbol graph populated. The FORCE seam lives in repo_map.rs and
+    // makes rank_symbols_or_fallback return a synthetic ranked list verbatim.
+
+    #[test]
+    fn phase36_intel_03_brain_injects_repo_map_at_code_gate() {
+        let _g = BREAKDOWN_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+
+        // Force a non-empty rank result so build_repo_map returns Some(rendered).
+        use crate::intelligence::repo_map::INTEL_FORCE_PAGERANK_RESULT;
+        use crate::intelligence::symbol_graph::{SymbolKind, SymbolNode};
+
+        let synthetic = vec![(
+            SymbolNode {
+                id: "sym:phase36_test_function".to_string(),
+                name: "phase36_test_function".to_string(),
+                kind: SymbolKind::Function,
+                file_path: "/x/y.rs".to_string(),
+                line_start: 1,
+                line_end: 5,
+                language: "rust".to_string(),
+                indexed_at: 0,
+            },
+            0.5_f32,
+        )];
+        INTEL_FORCE_PAGERANK_RESULT.with(|c| c.set(Some(synthetic)));
+
+        // Code-shaped query opens the gate (matches `code` keyword bag).
+        let prompt = build_system_prompt_inner(
+            &[], "explain this rust function bug error", None,
+            &ModelTier::Frontier,
+            "anthropic", "claude-sonnet-4", 1,
+        );
+
+        INTEL_FORCE_PAGERANK_RESULT.with(|c| c.set(None));
+
+        // Repo map text should be present in the prompt.
+        assert!(
+            prompt.contains("REPO MAP"),
+            "REPO MAP header missing from prompt — repo map injection branch did not fire"
+        );
+        assert!(
+            prompt.contains("phase36_test_function"),
+            "synthetic symbol missing from prompt"
+        );
+        // LAST_BREAKDOWN must include a "repo_map" entry with non-zero chars.
+        let breakdown = read_section_breakdown();
+        let repo_map_chars = breakdown.iter()
+            .find(|(l, _)| l == "repo_map")
+            .map(|(_, c)| *c)
+            .unwrap_or(0);
+        assert!(
+            repo_map_chars > 0,
+            "LAST_BREAKDOWN missing 'repo_map' row or zero chars; entries={:?}",
+            breakdown
+        );
+    }
+
+    #[test]
+    fn phase36_intel_03_brain_skips_when_smart_off() {
+        // When the code-section gate does NOT fire (non-code query under smart
+        // mode), the repo map branch must not run. LAST_BREAKDOWN's repo_map
+        // row should be zero (or absent → 0 via unwrap_or).
+        let _g = BREAKDOWN_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+
+        use crate::intelligence::repo_map::INTEL_FORCE_PAGERANK_RESULT;
+        use crate::intelligence::symbol_graph::{SymbolKind, SymbolNode};
+        // Force a result; we expect the gate to suppress the branch entirely
+        // before this is consumed.
+        let synthetic = vec![(
+            SymbolNode {
+                id: "sym:should_not_appear".to_string(),
+                name: "should_not_appear".to_string(),
+                kind: SymbolKind::Function,
+                file_path: "/x/y.rs".to_string(),
+                line_start: 1, line_end: 5,
+                language: "rust".to_string(),
+                indexed_at: 0,
+            },
+            0.5_f32,
+        )];
+        INTEL_FORCE_PAGERANK_RESULT.with(|c| c.set(Some(synthetic)));
+
+        // Non-code query: "what time is it?" scores low on the code keyword bag.
+        let prompt = build_system_prompt_inner(
+            &[], "what time is it?", None,
+            &ModelTier::Frontier,
+            "anthropic", "claude-sonnet-4", 1,
+        );
+
+        INTEL_FORCE_PAGERANK_RESULT.with(|c| c.set(None));
+
+        // The synthetic symbol must NOT appear — gate didn't open.
+        assert!(
+            !prompt.contains("should_not_appear"),
+            "repo map injected for a non-code query — gate failed to suppress"
+        );
+        // breakdown should record repo_map = 0 (record_section runs after the
+        // FTS branch unconditionally).
+        let breakdown = read_section_breakdown();
+        let repo_map_chars = breakdown.iter()
+            .find(|(l, _)| l == "repo_map")
+            .map(|(_, c)| *c)
+            .unwrap_or(0);
+        assert_eq!(
+            repo_map_chars, 0,
+            "expected repo_map=0 chars for non-code query; got {} (entries={:?})",
+            repo_map_chars, breakdown
+        );
+    }
+
+    #[test]
+    fn phase36_intel_03_brain_records_repo_map_label() {
+        // The "repo_map" label must always appear in LAST_BREAKDOWN once
+        // build_system_prompt_inner has run, even if its char count is 0.
+        // DoctorPane's auto-render relies on the row being present.
+        let _g = BREAKDOWN_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+
+        let _ = build_system_prompt_inner(
+            &[], "anything goes here", None,
+            &ModelTier::Frontier,
+            "anthropic", "claude-sonnet-4", 1,
+        );
+        let breakdown = read_section_breakdown();
+        let labels: Vec<&str> = breakdown.iter().map(|(l, _)| l.as_str()).collect();
+        assert!(
+            labels.iter().any(|l| *l == "repo_map"),
+            "repo_map label missing from LAST_BREAKDOWN: {:?}",
+            labels
+        );
     }
 }
