@@ -704,6 +704,81 @@ impl Default for IntelligenceConfig {
     }
 }
 
+// ---------------------------------------------------------------------
+// Phase 37 Plan 37-01 — Intelligence Eval runtime knobs (EVAL-01..05).
+//
+// Locked decisions (37-CONTEXT.md §EvalConfig Sub-Struct):
+//   - intelligence_eval_enabled (default true) — CTX-07-style escape hatch
+//     (eighth structural application of the v1.1 lesson). false = the
+//     scripts/verify-intelligence.sh gate short-circuits to exit 0 with a
+//     skip message; cargo test --lib evals::intelligence_eval still runs.
+//   - baseline_path (default blade_config_dir/eval-runs/v1.5-baseline.json) —
+//     operator-populated baseline read by the deterministic CI lane for
+//     regression detection. Plan 37-08 writes this file.
+//   - multi_step_iterations_cap (default 25) — matches LoopConfig.iter_cap.
+//     Each EVAL-01 fixture must terminate in <= cap loop iterations.
+//   - stuck_detection_min_accuracy (default 0.80) — ROADMAP success criterion
+//     #3 floor. EVAL-03 aggregate accuracy must be >= this value.
+//   - context_efficiency_strict (default true) — production CI gate. Strict
+//     mode asserts LAST_BREAKDOWN total <= cap; soft-warn (false) flags rows
+//     as `relaxed: true` and excludes from MODULE_FLOOR math.
+//
+// Six-place rule (CLAUDE.md): every BladeConfig field MUST land in
+// DiskConfig struct, DiskConfig::default, BladeConfig struct,
+// BladeConfig::default, load_config, and save_config.
+// ---------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct EvalConfig {
+    /// CTX-07-style escape hatch (8th application). true = scripts/verify-intelligence.sh
+    /// runs the cargo test gate. false = verify script short-circuits to exit 0
+    /// with a skip message. Cargo test --lib evals::intelligence_eval is unaffected.
+    #[serde(default = "default_intelligence_eval_enabled")]
+    pub intelligence_eval_enabled: bool,
+    /// EVAL-01 — operator-populated baseline JSON path. Default
+    /// blade_config_dir/eval-runs/v1.5-baseline.json. Deterministic CI lane
+    /// reads this file when present and asserts current pass-counts match.
+    /// Plan 37-08's intelligence-benchmark bin writes this file.
+    #[serde(default = "default_baseline_path")]
+    pub baseline_path: std::path::PathBuf,
+    /// EVAL-01 — per-fixture loop iteration cap. Default 25 matches
+    /// LoopConfig.iter_cap. Over-cap means scripted-response coverage is
+    /// incomplete (a fixture bug, not a production bug).
+    #[serde(default = "default_multi_step_iterations_cap")]
+    pub multi_step_iterations_cap: u32,
+    /// EVAL-03 — ROADMAP success criterion #3 floor. Default 0.80.
+    /// Aggregate stuck-detection accuracy across the 10 stuck/healthy
+    /// fixtures must be >= this value at end-of-driver-test.
+    #[serde(default = "default_stuck_detection_min_accuracy")]
+    pub stuck_detection_min_accuracy: f32,
+    /// EVAL-02 — production CI gate. true = LAST_BREAKDOWN total must be
+    /// <= expected_max_total_tokens. false = soft-warn (relaxed=true rows
+    /// excluded from MODULE_FLOOR math) — used during prompt-shape iteration.
+    #[serde(default = "default_context_efficiency_strict")]
+    pub context_efficiency_strict: bool,
+}
+
+fn default_intelligence_eval_enabled() -> bool { true }
+fn default_baseline_path() -> std::path::PathBuf {
+    blade_config_dir().join("eval-runs").join("v1.5-baseline.json")
+}
+fn default_multi_step_iterations_cap() -> u32 { 25 }
+fn default_stuck_detection_min_accuracy() -> f32 { 0.80 }
+fn default_context_efficiency_strict() -> bool { true }
+
+impl Default for EvalConfig {
+    fn default() -> Self {
+        Self {
+            intelligence_eval_enabled: default_intelligence_eval_enabled(),
+            baseline_path: default_baseline_path(),
+            multi_step_iterations_cap: default_multi_step_iterations_cap(),
+            stuck_detection_min_accuracy: default_stuck_detection_min_accuracy(),
+            context_efficiency_strict: default_context_efficiency_strict(),
+        }
+    }
+}
+
 /// Config as stored on disk — api_key is NOT stored here anymore
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct DiskConfig {
@@ -860,6 +935,12 @@ struct DiskConfig {
     // escape hatch. #[serde(default)] keeps legacy configs loadable.
     #[serde(default)]
     intelligence: IntelligenceConfig,
+    // Phase 37 Plan 37-01 — Intelligence Eval runtime knobs (EVAL-01..05).
+    // intelligence_eval_enabled escape hatch + baseline_path +
+    // multi_step_iterations_cap + stuck_detection_min_accuracy +
+    // context_efficiency_strict. #[serde(default)] keeps legacy configs loadable.
+    #[serde(default)]
+    eval: EvalConfig,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -946,6 +1027,7 @@ impl Default for DiskConfig {
             session: SessionConfig::default(),
             decomposition: DecompositionConfig::default(),
             intelligence: IntelligenceConfig::default(),
+            eval: EvalConfig::default(),
             api_key: None,
         }
     }
@@ -1123,6 +1205,13 @@ pub struct BladeConfig {
     /// context_anchor_enabled=true. See `IntelligenceConfig`.
     #[serde(default)]
     pub intelligence: IntelligenceConfig,
+    /// Phase 37 Plan 37-01 — Intelligence Eval runtime knobs (EVAL-01..05).
+    /// Defaults: intelligence_eval_enabled=true, baseline_path=
+    /// blade_config_dir/eval-runs/v1.5-baseline.json, multi_step_iterations_cap=25,
+    /// stuck_detection_min_accuracy=0.80, context_efficiency_strict=true.
+    /// See `EvalConfig`.
+    #[serde(default)]
+    pub eval: EvalConfig,
 }
 
 impl BladeConfig {
@@ -1195,6 +1284,7 @@ impl Default for BladeConfig {
             session: SessionConfig::default(),
             decomposition: DecompositionConfig::default(),
             intelligence: IntelligenceConfig::default(),
+            eval: EvalConfig::default(),
         }
     }
 }
@@ -1361,6 +1451,7 @@ pub fn load_config() -> BladeConfig {
         session: disk.session,
         decomposition: disk.decomposition,
         intelligence: disk.intelligence,
+        eval: disk.eval,
     }
 }
 
@@ -1442,6 +1533,7 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         session: config.session.clone(),
         decomposition: config.decomposition.clone(),
         intelligence: config.intelligence.clone(),
+        eval: config.eval.clone(),
         api_key: None,
     };
 
@@ -2014,6 +2106,7 @@ mod tests {
             session: cfg.session.clone(),
             decomposition: cfg.decomposition.clone(),
             intelligence: cfg.intelligence.clone(),
+            eval: cfg.eval.clone(),
             api_key: None,
         };
 
@@ -2425,5 +2518,60 @@ mod tests {
             .expect("legacy config should parse with defaults");
         assert_eq!(parsed.intelligence, IntelligenceConfig::default(),
             "missing 'intelligence' key must fall back to IntelligenceConfig::default()");
+    }
+
+    // ---------------------------------------------------------------------
+    // Phase 37 Plan 37-01 — EvalConfig substrate test (EVAL-01..05).
+    //
+    // Single consolidated test covering the three substrate guarantees:
+    //   - default values per 37-CONTEXT lock §EvalConfig Sub-Struct
+    //   - DiskConfig <-> BladeConfig serde round-trip preserves all 5 fields
+    //   - legacy DiskConfig JSON without `eval` key falls back to defaults
+    //     (#[serde(default)] on the field — non-negotiable per CLAUDE.md).
+    // ---------------------------------------------------------------------
+
+    #[test]
+    fn phase37_eval_config_default_matches_locked_contract() {
+        // (a) Default values per 37-CONTEXT lock §EvalConfig Sub-Struct.
+        let c = EvalConfig::default();
+        assert!(c.intelligence_eval_enabled,
+            "default intelligence_eval_enabled must be true (8th v1.1-lesson application)");
+        assert!(c.baseline_path.ends_with("v1.5-baseline.json"),
+            "default baseline_path must end in v1.5-baseline.json, got {:?}", c.baseline_path);
+        assert!(c.baseline_path.to_string_lossy().contains("eval-runs"),
+            "default baseline_path must contain eval-runs/, got {:?}", c.baseline_path);
+        assert_eq!(c.multi_step_iterations_cap, 25,
+            "default multi_step_iterations_cap must be 25 (matches LoopConfig.iter_cap)");
+        assert!((c.stuck_detection_min_accuracy - 0.80).abs() < 1e-6,
+            "default stuck_detection_min_accuracy must be 0.80 (ROADMAP #3 floor), got {}",
+            c.stuck_detection_min_accuracy);
+        assert!(c.context_efficiency_strict,
+            "default context_efficiency_strict must be true (production CI gate)");
+
+        // (b) Round-trip via DiskConfig serde — every field preserved.
+        let mut cfg = BladeConfig::default();
+        cfg.eval = EvalConfig {
+            intelligence_eval_enabled: false,
+            baseline_path: std::path::PathBuf::from("/tmp/test-baseline.json"),
+            multi_step_iterations_cap: 50,
+            stuck_detection_min_accuracy: 0.95,
+            context_efficiency_strict: false,
+        };
+        let mut disk = DiskConfig::default();
+        disk.eval = cfg.eval.clone();
+        let json = serde_json::to_string(&disk).expect("serialize");
+        let parsed: DiskConfig = serde_json::from_str(&json).expect("parse");
+        assert_eq!(parsed.eval, cfg.eval, "EvalConfig roundtrip lost data");
+
+        // (c) Legacy DiskConfig JSON without `eval` key falls back to defaults.
+        let legacy_json = r#"{
+            "provider": "anthropic",
+            "model": "claude-sonnet-4",
+            "onboarded": true
+        }"#;
+        let parsed: DiskConfig = serde_json::from_str(legacy_json)
+            .expect("legacy config should parse with defaults");
+        assert_eq!(parsed.eval, EvalConfig::default(),
+            "missing 'eval' key must fall back to EvalConfig::default()");
     }
 }
