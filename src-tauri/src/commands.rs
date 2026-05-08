@@ -347,7 +347,14 @@ pub(crate) fn compute_keep_recent(
 ///
 /// Pure / synchronous / unit-testable — extracted from compress_conversation_smart
 /// so the prompt construction can be asserted without invoking a real LLM.
-pub(crate) fn build_compaction_summary_prompt(events: &[String]) -> String {
+///
+/// Phase 37 / Plan 37-06 — visibility widened from `pub(crate)` to `pub` so
+/// `evals/intelligence_eval.rs` (EVAL-04 compaction-fidelity fixtures) can
+/// invoke the prompt builder directly with a synthetic events list. The
+/// widening is purely additive — no body / call-site changes — and lets future
+/// v1.6+ external eval crates exercise the same prompt template without a
+/// crate-private workaround.
+pub fn build_compaction_summary_prompt(events: &[String]) -> String {
     format!(
         "You are maintaining a context-aware state summary for an interactive agent. \
          You will be given a list of events corresponding to actions taken by the agent, \

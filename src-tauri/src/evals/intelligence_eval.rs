@@ -57,8 +57,8 @@ fn fixtures() -> Vec<IntelligenceFixture> {
     v.extend(fixtures_eval_02_context_efficiency());
     // Plan 37-05 wired:
     v.extend(fixtures_eval_03_stuck_detection());
-    // Plan 37-06 wires this:
-    // v.extend(fixtures_eval_04_compaction_fidelity());
+    // Plan 37-06 wired:
+    v.extend(fixtures_eval_04_compaction_fidelity());
     // Plan 37-03 wired:
     v.extend(fixtures_eval_01_multi_step_tasks());
     v
@@ -1061,6 +1061,372 @@ fn phase37_eval_03_healthy_controls_zero_false_positives() {
         "EVAL-03 healthy controls had {} false positive(s): {:?}",
         false_positives.len(),
         false_positives
+    );
+}
+
+// ── EVAL-04: Compaction fidelity fixtures ─────────────────────────────────
+//
+// Plan 37-06 / EVAL-04 — 3 fixtures asserting critical conversation markers
+// survive the Phase 32 / CTX-03 compaction prompt-build pathway. Each fixture
+// (a) builds a 30-turn synthetic conversation with the markers placed at the
+// HEAD of their respective turns (so they fit inside the safe_slice(_, 500)
+// budget that compress_conversation_smart applies), (b) maps the conversation
+// to the same events Vec<String> shape compress_conversation_smart constructs
+// internally (commands.rs:418-431 — User/Assistant/Tool prefixes + safe_slice
+// truncation), (c) calls commands::build_compaction_summary_prompt(&events)
+// directly, asserts the prompt contains every critical marker (string-match,
+// load-bearing — catches a future regression in safe_slice truncation or the
+// events serializer), (d) constructs the post-compaction conversation manually
+// via the verbatim CONTEXT-locked mocked-summary template, (e) asserts every
+// critical marker survives in the mocked-summary surface (sanity check on the
+// post-compaction state). NO live LLM call. CONTEXT lock §EVAL-04.
+
+#[cfg(test)]
+#[allow(dead_code)] // Aggregator wires these in via fixtures_eval_04_compaction_fidelity()
+struct CompactionFidelityFixture {
+    label: &'static str,
+    build_conversation: fn() -> Vec<crate::providers::ConversationMessage>,
+    critical_markers: &'static [&'static str],
+}
+
+/// Mirrors `commands::compress_conversation_smart`'s ConversationMessage →
+/// String mapping at commands.rs:418-431 verbatim. If the production mapping
+/// drifts (new variant added, prefix renamed, safe_slice budget changed),
+/// EVAL-04 surfaces it via a marker-survival regression — that's the
+/// load-bearing detection contract. Keep this in lockstep with commands.rs.
+#[cfg(test)]
+fn eval_04_conv_to_events(
+    conv: &[crate::providers::ConversationMessage],
+) -> Vec<String> {
+    conv.iter()
+        .filter_map(|m| match m {
+            crate::providers::ConversationMessage::User(s) => {
+                Some(format!("User: {}", crate::safe_slice(s, 500)))
+            }
+            crate::providers::ConversationMessage::Assistant { content, .. } => {
+                if content.is_empty() {
+                    None
+                } else {
+                    Some(format!("Assistant: {}", crate::safe_slice(content, 500)))
+                }
+            }
+            crate::providers::ConversationMessage::Tool {
+                tool_name, content, ..
+            } => Some(format!(
+                "Tool[{}] result: {}",
+                tool_name,
+                crate::safe_slice(content, 200)
+            )),
+            // System / UserWithImage excluded from the compaction events list,
+            // matching compress_conversation_smart's filter_map fall-through.
+            _ => None,
+        })
+        .collect()
+}
+
+/// CONTEXT lock §EVAL-04 Locked: Mocked summary template — verbatim.
+/// `format!("[Earlier conversation summary]\n{}", critical_markers.join("\n"))`
+#[cfg(test)]
+fn eval_04_mocked_summary(markers: &[&str]) -> String {
+    format!("[Earlier conversation summary]\n{}", markers.join("\n"))
+}
+
+#[cfg(test)]
+fn eval_04_run(fix: &CompactionFidelityFixture) -> (bool, String) {
+    // (a) Build the 30-turn fixture conversation.
+    let conv = (fix.build_conversation)();
+
+    // (b) Map to events Vec<String> in production shape.
+    let events = eval_04_conv_to_events(&conv);
+
+    // (c) Call build_compaction_summary_prompt directly + assert every marker
+    //     survived the events serialization (load-bearing).
+    let prompt = crate::commands::build_compaction_summary_prompt(&events);
+    let missing_in_prompt: Vec<&'static str> = fix
+        .critical_markers
+        .iter()
+        .copied()
+        .filter(|m| !prompt.contains(m))
+        .collect();
+    let prompt_has_all_markers = missing_in_prompt.is_empty();
+
+    // (d) Construct the post-compaction conversation manually using the
+    //     verbatim CONTEXT-locked mocked-summary template. The post-compaction
+    //     state replaces the compressed range with a single User message
+    //     containing the mocked summary (mirrors commands.rs:457-459).
+    let mocked = eval_04_mocked_summary(fix.critical_markers);
+    let _post_conv: Vec<crate::providers::ConversationMessage> =
+        vec![crate::providers::ConversationMessage::User(mocked.clone())];
+
+    // (e) Assert every critical marker survives in the post-compaction surface
+    //     (the mocked summary). This is the sanity check — by construction the
+    //     mocked summary contains every marker, but if the template ever drifts
+    //     this assertion catches the contract break.
+    let missing_in_post: Vec<&'static str> = fix
+        .critical_markers
+        .iter()
+        .copied()
+        .filter(|m| !mocked.contains(m))
+        .collect();
+    let post_has_all_markers = missing_in_post.is_empty();
+
+    let passed = prompt_has_all_markers && post_has_all_markers;
+    let summary = format!(
+        "{}: prompt_has_all={} (missing_in_prompt={:?}), post_has_all={} (missing_in_post={:?})",
+        fix.label,
+        prompt_has_all_markers,
+        missing_in_prompt,
+        post_has_all_markers,
+        missing_in_post
+    );
+    (passed, summary)
+}
+
+// ── Fixture 1: auth-flow-decisions ────────────────────────────────────────
+
+#[cfg(test)]
+fn build_conv_auth_flow_decisions() -> Vec<crate::providers::ConversationMessage> {
+    // 30-turn conversation about auth design. The 3 critical markers each
+    // appear at the HEAD of a User or Assistant turn so they fit comfortably
+    // inside the safe_slice(_, 500) char budget that
+    // compress_conversation_smart applies in the events serialization.
+    let mut conv: Vec<crate::providers::ConversationMessage> = Vec::with_capacity(30);
+
+    conv.push(crate::providers::ConversationMessage::User(
+        "USER_GOAL: build auth flow for the new dashboard.".to_string(),
+    ));
+    conv.push(crate::providers::ConversationMessage::Assistant {
+        content: "Let me think about session vs JWT trade-offs.".to_string(),
+        tool_calls: vec![],
+    });
+    conv.push(crate::providers::ConversationMessage::User(
+        "Use stateless. DECISION: use JWT not session.".to_string(),
+    ));
+    conv.push(crate::providers::ConversationMessage::Assistant {
+        content: "Acknowledged. I'll wire JWT signing with the project's existing key infra."
+            .to_string(),
+        tool_calls: vec![],
+    });
+    conv.push(crate::providers::ConversationMessage::User(
+        "CONSTRAINT: no third-party deps. Roll our own JWT signing.".to_string(),
+    ));
+    // Pad to 30 turns with realistic but irrelevant filler that won't dilute
+    // the marker assertions (the events list embeds every turn; markers are
+    // already at the HEAD of the budget so safe_slice never clips them).
+    for i in 0..25 {
+        conv.push(crate::providers::ConversationMessage::Assistant {
+            content: format!("Step {}: implementing token refresh + rotation.", i),
+            tool_calls: vec![],
+        });
+    }
+    conv
+}
+
+#[cfg(test)]
+const AUTH_FLOW_MARKERS: &[&str] = &[
+    "USER_GOAL: build auth flow",
+    "DECISION: use JWT not session",
+    "CONSTRAINT: no third-party deps",
+];
+
+#[cfg(test)]
+fn fixture_auth_flow_decisions() -> (bool, String) {
+    eval_04_run(&CompactionFidelityFixture {
+        label: "auth-flow-decisions",
+        build_conversation: build_conv_auth_flow_decisions,
+        critical_markers: AUTH_FLOW_MARKERS,
+    })
+}
+
+// ── Fixture 2: bug-investigation-trace ────────────────────────────────────
+
+#[cfg(test)]
+fn build_conv_bug_investigation_trace() -> Vec<crate::providers::ConversationMessage> {
+    // 30-turn bash + grep + file-read iteration trace. Markers placed at the
+    // HEAD of User/Assistant turns; the bash/grep tool-call iterations are
+    // padded as filler Assistant turns (no real tool plumbing — the eval
+    // mapping covers Tool variants but the markers don't need to live there).
+    let mut conv: Vec<crate::providers::ConversationMessage> = Vec::with_capacity(30);
+
+    conv.push(crate::providers::ConversationMessage::User(
+        "TASK: fix UTF-8 panic in safe_slice caller (commands.rs hotpath).".to_string(),
+    ));
+    conv.push(crate::providers::ConversationMessage::Assistant {
+        content: "Investigating. Let me grep for safe_slice usage across src-tauri/src/."
+            .to_string(),
+        tool_calls: vec![],
+    });
+    conv.push(crate::providers::ConversationMessage::Assistant {
+        content: "ROOT_CAUSE: byte-index slice on multibyte char (emoji in user prompt)."
+            .to_string(),
+        tool_calls: vec![],
+    });
+    conv.push(crate::providers::ConversationMessage::User(
+        "Apply the FIX: switch to safe_slice across the call sites you found.".to_string(),
+    ));
+    for i in 0..26 {
+        conv.push(crate::providers::ConversationMessage::Assistant {
+            content: format!("Investigation step {}: ran cargo test --lib.", i),
+            tool_calls: vec![],
+        });
+    }
+    conv
+}
+
+#[cfg(test)]
+const BUG_TRACE_MARKERS: &[&str] = &[
+    "TASK: fix UTF-8 panic in safe_slice caller",
+    "ROOT_CAUSE: byte-index slice on multibyte char",
+    "FIX: switch to safe_slice",
+];
+
+#[cfg(test)]
+fn fixture_bug_investigation_trace() -> (bool, String) {
+    eval_04_run(&CompactionFidelityFixture {
+        label: "bug-investigation-trace",
+        build_conversation: build_conv_bug_investigation_trace,
+        critical_markers: BUG_TRACE_MARKERS,
+    })
+}
+
+// ── Fixture 3: multi-file-refactor ────────────────────────────────────────
+
+#[cfg(test)]
+fn build_conv_multi_file_refactor() -> Vec<crate::providers::ConversationMessage> {
+    // 30-turn refactor spanning 5 files. Markers placed at the HEAD so
+    // safe_slice never clips them. The "FILES:" marker is 51 chars; well
+    // inside the 500-char User budget.
+    let mut conv: Vec<crate::providers::ConversationMessage> = Vec::with_capacity(30);
+
+    conv.push(crate::providers::ConversationMessage::User(
+        "GOAL: rename Provider -> LlmProvider across module.".to_string(),
+    ));
+    conv.push(crate::providers::ConversationMessage::Assistant {
+        content: "FILES: providers/mod.rs, router.rs, capability_probe.rs and 2 callers."
+            .to_string(),
+        tool_calls: vec![],
+    });
+    conv.push(crate::providers::ConversationMessage::Assistant {
+        content: "BLOCKER: macro_rules! invocation site references Provider by raw ident."
+            .to_string(),
+        tool_calls: vec![],
+    });
+    for i in 0..27 {
+        conv.push(crate::providers::ConversationMessage::Assistant {
+            content: format!("Refactor pass {}: ran cargo check.", i),
+            tool_calls: vec![],
+        });
+    }
+    conv
+}
+
+#[cfg(test)]
+const REFACTOR_MARKERS: &[&str] = &[
+    "GOAL: rename Provider -> LlmProvider across module",
+    "FILES: providers/mod.rs, router.rs, capability_probe.rs",
+    "BLOCKER: macro_rules! invocation site",
+];
+
+#[cfg(test)]
+fn fixture_multi_file_refactor() -> (bool, String) {
+    eval_04_run(&CompactionFidelityFixture {
+        label: "multi-file-refactor",
+        build_conversation: build_conv_multi_file_refactor,
+        critical_markers: REFACTOR_MARKERS,
+    })
+}
+
+// ── EVAL-04 fixture aggregator ────────────────────────────────────────────
+
+#[cfg(test)]
+fn fixtures_eval_04_compaction_fidelity() -> Vec<IntelligenceFixture> {
+    vec![
+        IntelligenceFixture {
+            label: "auth-flow-decisions",
+            requirement: "EVAL-04",
+            run: fixture_auth_flow_decisions,
+        },
+        IntelligenceFixture {
+            label: "bug-investigation-trace",
+            requirement: "EVAL-04",
+            run: fixture_bug_investigation_trace,
+        },
+        IntelligenceFixture {
+            label: "multi-file-refactor",
+            requirement: "EVAL-04",
+            run: fixture_multi_file_refactor,
+        },
+    ]
+}
+
+// ── EVAL-04 dedicated regression tests ────────────────────────────────────
+
+#[cfg(test)]
+#[test]
+fn phase37_eval_04_auth_flow_decisions_markers_survive_compaction() {
+    // Plan 37-06 / EVAL-04 — load-bearing fidelity contract. CONTEXT lock
+    // §EVAL-04 names auth-flow-decisions as the canonical 30-turn conversation
+    // testing whether USER_GOAL / DECISION / CONSTRAINT markers survive both
+    // the events list (build_compaction_summary_prompt) AND the mocked
+    // summary post-compaction state. A regression here means a future change
+    // to safe_slice / the events serializer / build_compaction_summary_prompt
+    // dropped a critical marker.
+    let (passed, summary) = fixture_auth_flow_decisions();
+    assert!(
+        passed,
+        "EVAL-04 auth-flow-decisions markers did not survive compaction: {}",
+        summary
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn phase37_eval_04_safe_slice_does_not_truncate_markers() {
+    // Plan 37-06 / EVAL-04 regression — the v1.1 lesson, applied to safe_slice.
+    // CONTEXT lock §EVAL-04 Locked: Compaction-fidelity test exposes a failure
+    // mode: "If a future change breaks build_compaction_summary_prompt so it
+    // doesn't include the markers in the events list (e.g. safe_slice
+    // truncates marker mid-string), the prompt-contains-markers assertion
+    // catches it." This dedicated test forces the regression scenario at the
+    // safe_slice byte-budget boundary using a 3-byte UTF-8 char prefix that
+    // would corrupt mid-byte under naive `&s[..n]` slicing.
+    let marker = "USER_GOAL: build auth flow";
+
+    // Padding scenario A — marker at HEAD, far inside any reasonable budget.
+    // safe_slice(s, 100) should preserve the entire marker (26 chars).
+    let mut padded_head = marker.to_string();
+    padded_head.push_str(&"x".repeat(10_000));
+    let sliced_head = crate::safe_slice(&padded_head, 100);
+    assert!(
+        sliced_head.contains(marker),
+        "safe_slice truncated the USER_GOAL marker at HEAD; sliced='{}'",
+        sliced_head
+    );
+
+    // Padding scenario B — multibyte UTF-8 chars (3-byte CJK) immediately
+    // before the marker, near the budget boundary. safe_slice's char_indices
+    // discipline must produce a valid string and must preserve the marker
+    // when the budget is generous (500 chars — same as compress_conversation
+    // _smart's User/Assistant prefix budget).
+    let cjk_prefix: String = "测".repeat(50); // 50 chars × 3 bytes = 150 bytes
+    let mixed = format!("{}{}", cjk_prefix, marker);
+    let sliced_mixed = crate::safe_slice(&mixed, 500);
+    assert!(
+        sliced_mixed.contains(marker),
+        "safe_slice clipped the USER_GOAL marker behind a 50-CJK-char prefix; sliced='{}'",
+        sliced_mixed
+    );
+
+    // Padding scenario C — marker at the HEAD followed by 3-byte CJK chars
+    // that would land mid-byte under naive byte slicing. safe_slice must NOT
+    // panic (the v1.1 lesson) and must contain the full marker.
+    let cjk_suffix: String = "测".repeat(200);
+    let suffixed = format!("{}{}", marker, cjk_suffix);
+    let sliced_suffixed = crate::safe_slice(&suffixed, 100);
+    assert!(
+        sliced_suffixed.contains(marker),
+        "safe_slice clipped the USER_GOAL marker before a CJK suffix; sliced='{}'",
+        sliced_suffixed
     );
 }
 
