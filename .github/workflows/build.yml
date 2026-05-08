@@ -23,6 +23,42 @@ jobs:
       - name: Install frontend deps
         run: npm ci
 
+      # Rust toolchain + system deps land BEFORE verify:all because the
+      # eval gates (verify:eval, verify:safety, verify:hormone, verify:inference,
+      # verify:vitality, verify:organism, verify:intelligence) call
+      # `cargo test --lib evals` which transitively pulls glib-sys / gtk-sys
+      # build-script crates. Without the apt deps, cargo-build fails with
+      # "system library glib-2.0 was not found". Phase 38 close (2026-05-08)
+      # caught this when verify:wiring-audit-shape stopped fast-failing first.
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust deps
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install system deps (Ubuntu)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libasound2-dev \
+            libdbus-1-dev \
+            libsecret-1-dev \
+            libglib2.0-dev \
+            libxdo-dev \
+            libpipewire-0.3-dev \
+            libspa-0.2-dev \
+            libclang-dev \
+            libdrm-dev \
+            libgbm-dev \
+            pkg-config
+
       # ───── Phase 1 invariants (D-27, D-31, D-33, D-34, D-45-regress) ─────
       # Run BEFORE typecheck / build — these are pure fs-scan scripts that
       # fail in ~3s, giving a clean early-abort signal without waiting for
@@ -60,35 +96,7 @@ jobs:
       # `npm run test:e2e` — wiring into CI deferred to Phase 9 Polish Pass
       # (requires xvfb-run + extra ~2min per job; not worth it while the full
       # Tauri harness isn't live).
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust deps
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Install system deps (Ubuntu)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            libssl-dev \
-            libasound2-dev \
-            libdbus-1-dev \
-            libsecret-1-dev \
-            libglib2.0-dev \
-            libxdo-dev \
-            libpipewire-0.3-dev \
-            libspa-0.2-dev \
-            libclang-dev \
-            libdrm-dev \
-            libgbm-dev \
-            pkg-config
+      # Rust + system deps installed earlier (above the verify:all step).
 
       - name: Rust check (catch compile errors early)
         run: cargo check --manifest-path src-tauri/Cargo.toml
