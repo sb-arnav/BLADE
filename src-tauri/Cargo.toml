@@ -102,3 +102,11 @@ winreg = "0.52"
 lto = true
 codegen-units = 1
 strip = true
+
+# Phase 37 / EVAL-01 — operator-runnable real-LLM benchmark bin (Plan 37-08).
+# Invoke via `BLADE_RUN_BENCHMARK=true cargo run --bin intelligence-benchmark --release`
+# OR `BLADE_RUN_BENCHMARK=true bash scripts/run-intel-benchmark.sh`.
+# Default behavior (env unset): print usage + exit 0. NOT in verify:all. NOT in CI.
+[[bin]]
+name = "intelligence-benchmark"
+path = "src/bin/intelligence_benchmark.rs"
