@@ -13,6 +13,69 @@ Nothing yet.
 
 ---
 
+## [1.5.0] -- 2026-05-08
+
+### Added (v1.5 -- Intelligence Layer)
+
+> Code-complete 2026-05-08 across phases 32-38 (6 feature phases + 1 close phase). Static gates: `cargo check` clean . `npx tsc --noEmit` clean . `npm run verify:all` 36/38 sub-gates green (verify:intelligence + 35 prior; OEVAL-01c v1.4 carry-forward in verify:eval + verify:hybrid_search documented out-of-scope per Phase 32-37 SCOPE BOUNDARY). Phases 32-37 ship at the `checkpoint:human-verify` boundary with operator-deferred runtime UAT.
+>
+> v1.5's eval is dual-mode: a deterministic CI lane runs 26 fixtures with no LLM calls (`verify:intelligence` is the 38th gate); an opt-in operator-runnable lane (`BLADE_RUN_BENCHMARK=true bash scripts/run-intel-benchmark.sh`) runs 10 multi-step fixtures against real LLMs to populate `eval-runs/v1.5-baseline.json` for regression-only checks.
+
+**Phase 32 -- Context Management** *(code-complete 2026-05-05; UAT pending)*
+- `brain.rs` selective injection gating sections 0-8 by query relevance; LAST_BREAKDOWN per-section accumulator surfaces in DoctorPane.
+- Proactive compaction at ~80% capacity using OpenHands v7610 structured summary prompt; token-aware keep_recent.
+- `cap_tool_output` helper caps individual tool results at ~4k tokens with summary suffix.
+- `ContextBreakdown` wire type + `get_context_breakdown` Tauri command + DoctorPane breakdown panel.
+- CTX-07 fallback guarantee: any selective-injection / compaction failure degrades to the naive path.
+- 7/7 CTX-XX requirements satisfied. checkpoint:human-verify open.
+
+**Phase 33 -- Agentic Loop** *(code-complete 2026-05-06; UAT pending)*
+- Mid-loop verifier runs every 3 tool calls; replans when the goal isn't being served.
+- Structured `ToolError` feedback: what was tried, why it failed, suggested alternative.
+- Plan adaptation on tool failure; iteration cap configurable (default 25).
+- Truncation auto-retry with escalated `max_tokens` value.
+- Ego intercept ported to the fast-streaming path (closes the Phase 18 known gap).
+- 6/6 LOOP-XX requirements satisfied. checkpoint:human-verify open.
+
+**Phase 34 -- Resilience + Session Persistence** *(code-complete 2026-05-06; UAT pending)*
+- 5-pattern stuck detection: RepeatedActionObservation, ContextWindowThrashing, NoProgress, MonologueSpiral, CostRunaway.
+- Circuit breaker after N consecutive same-type failures; per-conversation cost guard with 80%/100% tiers.
+- Provider fallback chain with exponential backoff.
+- Append-only JSONL session log; reopen-and-resume from last compaction boundary; branch-from-any-point; one-line preview list.
+- 5/5 RES-XX + 4/4 SESS-XX requirements satisfied. checkpoint:human-verify open.
+
+**Phase 35 -- Auto-Decomposition** *(code-complete 2026-05-07; UAT pending)*
+- Brain planner detects 5+ independent steps and auto-fans into parallel sub-agents.
+- Isolated sub-agent contexts (each sub-agent's 50k bash output doesn't bloat parent).
+- Summary-only return to parent; conversation forking into sub-agent branches.
+- Sub-agent progress streams into chat with explicit checkpoints.
+- 5/5 DECOMP-XX requirements satisfied. checkpoint:human-verify open.
+
+**Phase 36 -- Context Intelligence** *(code-complete 2026-05-07; UAT pending)*
+- `tree-sitter` parses TypeScript/JavaScript/Rust/Python source into a symbol-level dependency graph.
+- Personalized PageRank scores symbols by current chat mentions.
+- Budget-bounded repo map (~1k tokens default) injects at the code-section gate.
+- `canonical_models.json` capability registry replaces per-call probes; `router.rs` reads from it.
+- `@screen` / `@file:src/main.rs` / `@memory:topic` anchor syntax with chat chip rendering.
+- 6/6 INTEL-XX requirements satisfied. REVIEW + REVIEW-FIX commits address 5 critical findings. checkpoint:human-verify open.
+
+**Phase 37 -- Intelligence Eval** *(code-complete 2026-05-08; UAT pending)*
+- 26 deterministic fixtures across 4 surfaces: 10 multi-step task completion + 3 context efficiency + 5 stuck + 5 healthy controls + 3 compaction fidelity.
+- ScriptedProvider stub + EVAL_FORCE_PROVIDER thread-local seam in `loop_engine.rs` enables zero-LLM CI.
+- `verify:intelligence` gate joins `verify:all` as the 38th composed gate.
+- Operator-runnable benchmark via `BLADE_RUN_BENCHMARK=true bash scripts/run-intel-benchmark.sh` populates `eval-runs/v1.5-baseline.json`.
+- 13 intelligence_eval tests green; driver emits 26 rows, top-1=26/26, top-3=26/26, MRR=1.000.
+- 5/5 EVAL-XX requirements satisfied. UAT (b) baseline.json operator-deferred per memory `feedback_deferred_uat_pattern.md`.
+
+**Phase 38 -- Close** *(shipped 2026-05-08; tech_debt)*
+- README extends Cognitive Architecture section with Intelligence Layer narrative; Research Foundations cites Claude Code (arxiv 2604.14228), Aider, OpenHands, Goose, mini-SWE-agent.
+- This CHANGELOG entry.
+- `.planning/milestones/v1.5-MILESTONE-AUDIT.md` written; v1.5 status: `tech_debt`; 42/42 requirements routed; 36/38 verify gates green.
+- Phase 32-38 directories archived to `.planning/milestones/v1.5-phases/`.
+- 4/4 close success criteria satisfied.
+
+---
+
 ## [1.4.0] -- 2026-05-03
 
 ### Added (v1.4 -- Cognitive Architecture)
@@ -308,6 +371,7 @@ D-227). The sequence operators run after approval:
 | Phase 9 | 4 (aria-icon-buttons, motion-tokens, tokens-consistency, empty-state-coverage) | **18** |
 | Phases 21-24 (v1.3) | 2 (skill-format, voyager-loop) | 33 |
 | Phases 25-30 (v1.4) | 4 (safety, hormone, inference, organism) | **37** |
+| Phases 32-37 (v1.5) | 1 (intelligence) | **38** |
 
 Three additional scripts are NOT in `verify:all`: `verify:html-entries` / `verify:dev-html-entries` / `verify:prod-entries` — these require a build artifact (`dist/`) that only exists after `npm run build` and are wired into the GitHub Actions pipeline separately.
 
