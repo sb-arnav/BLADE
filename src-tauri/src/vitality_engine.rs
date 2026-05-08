@@ -166,6 +166,7 @@ pub fn get_vitality() -> VitalityState {
 }
 
 /// Enable the dormancy stub so tests never call process::exit.
+#[cfg(test)]
 pub fn enable_dormancy_stub() {
     DORMANCY_STUB.store(true, Ordering::SeqCst);
 }

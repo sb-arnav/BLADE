@@ -233,6 +233,9 @@ pub struct ToolCallTrace {
     pub args_str:       String,
     pub result_content: String,
     pub is_error:       bool,
+    /// Monotonic order marker; populated at record-time. Held for the v1.6
+    /// per-turn timeline trace (currently the order is implicit via Vec push).
+    #[allow(dead_code)]
     pub timestamp_ms:   i64,
 }
 

@@ -168,6 +168,7 @@ pub(crate) fn record_error_full(kind: &str, provider: &str, model: &str, msg: &s
 /// empty strings (which means circuit_attempts_summary returns AttemptRecords
 /// with empty provider/model/msg for legacy entries — that's OK, the chat UI
 /// can display "(unknown provider/model)" when those are empty).
+#[cfg(test)]
 pub(crate) fn record_error(kind: &str) {
     record_error_full(kind, "", "", "");
 }
@@ -552,36 +553,10 @@ pub(crate) fn safe_fallback_model(provider: &str) -> &'static str {
 // truly pathological multi-MB outputs only.
 const MAX_TOOL_RESULT_CHARS: usize = 200_000;
 
-/// Phase 33 — try a free/fallback model when the primary is rate-limited.
-///
-/// Plan 34-07 deprecated this function in favor of
-/// [`crate::resilience::fallback::try_with_fallback`], which honours the
-/// configurable chain in `BladeConfig.resilience.provider_fallback_chain`
-/// (defaults: `["primary", "openrouter", "groq", "ollama"]`) and adds
-/// per-provider exponential-backoff retries.
-///
-/// The legacy fn body now delegates to the new helper for backward compat —
-/// existing call sites (today: `loop_engine.rs:955`) continue to work. The
-/// `#[deprecated]` warning is the migration prompt for Wave 4-5 plans that
-/// touch the rate-limit recovery path.
-///
-/// CONTEXT lock §RES-05 trade-off: the new helper performs SILENT fallover
-/// within the chain — the per-step `blade_notification` /
-/// `blade_routing_switched` emits that the legacy body fired are intentionally
-/// dropped. Only chain exhaustion surfaces (as `chat_error` at the call site
-/// when this fn returns `None`). Plan 34-08's `SessionWriter` will record a
-/// `LoopEvent { kind: "fallback_exhausted" }` for forensics.
-#[deprecated(note = "Plan 34-07 — use resilience::fallback::try_with_fallback (configurable chain)")]
-pub(crate) async fn try_free_model_fallback(
-    config: &crate::config::BladeConfig,
-    conversation: &[crate::providers::ConversationMessage],
-    tools: &[crate::providers::ToolDefinition],
-    app: &tauri::AppHandle,
-) -> Option<crate::providers::AssistantTurn> {
-    crate::resilience::fallback::try_with_fallback(config, conversation, tools, app)
-        .await
-        .ok()
-}
+// Phase 33 free/fallback model path was retired in Plan 34-07 in favor of
+// `crate::resilience::fallback::try_with_fallback`. Phase 38 close removed
+// the `try_free_model_fallback` deprecated wrapper after the last caller
+// (`loop_engine.rs`) migrated to the new helper directly.
 
 /// Count implied task steps in a user query.
 /// Detect if a query needs deep multi-step REASONING (not action).

@@ -452,6 +452,7 @@ pub async fn compute_prediction_errors(
 /// Synchronous test wrapper — no app handle, no SQLite, no emit.
 /// Accepts synthetic TentacleReport AND CalendarEvent slices for full fixture control.
 /// Uses all-Active statuses for test isolation (no Hive global state dependency).
+#[cfg(test)]
 pub fn process_reports_for_test(
     reports: &[crate::hive::TentacleReport],
     calendar_events: &[crate::integration_bridge::CalendarEvent],

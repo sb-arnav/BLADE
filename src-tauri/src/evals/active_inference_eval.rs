@@ -104,7 +104,7 @@ fn fixture_ainf03() -> (bool, String) {
     }
     let initial = crate::homeostasis::get_physiology();
     let initial_cortisol = initial.cortisol;
-    let initial_ne = initial.norepinephrine;
+    let _initial_ne = initial.norepinephrine;
 
     // Apply sustained high error (aggregate=0.75, sustained_ticks=3) — triggers D-07 stress response.
     // Two calls because sustained_high_ticks >= 2 gate requires repeated ticks.
@@ -260,7 +260,7 @@ fn fixture_ainf06() -> (bool, String) {
     let mut pred = crate::active_inference::default_prediction("slack");
 
     // Slack alpha = 0.08 per update_prediction_ema
-    let alpha: f32 = 0.08;
+    let _alpha: f32 = 0.08;
     let observation = 15.0_f32;
 
     // Record the initial error (unread_count expected=5.0, observed=15.0)

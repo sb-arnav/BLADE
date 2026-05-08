@@ -348,6 +348,7 @@ fn resolve_file(path: &str) -> String {
 /// `commands.rs` (or this module's `tests` block) can exercise the truncation
 /// path without spinning up a Tauri app handle.
 #[doc(hidden)]
+#[cfg(test)]
 pub fn resolve_file_for_test(path: &str) -> String {
     resolve_file(path)
 }

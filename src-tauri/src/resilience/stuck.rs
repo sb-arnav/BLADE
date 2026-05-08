@@ -61,18 +61,19 @@ impl StuckPattern {
     }
 }
 
-/// Plan 34-04 — test-only override seam. Mirrors loop_engine::FORCE_VERIFY_PANIC
-/// (Plan 33-09). When set, `detect_stuck` returns the forced verdict without
-/// walking the real detectors. Tests set the seam to assert the loop halts
-/// with the right `LoopHaltReason::Stuck { pattern }` variant.
+// Plan 34-04 — test-only override seam. Mirrors loop_engine::FORCE_VERIFY_PANIC
+// (Plan 33-09). When set, `detect_stuck` returns the forced verdict without
+// walking the real detectors. Tests set the seam to assert the loop halts
+// with the right `LoopHaltReason::Stuck { pattern }` variant.
+//
+// RES_FORCE_PANIC_IN_DETECTOR — separate panic-injection seam. When set, the
+// FIRST real detector (detect_repeated_action_observation) panics. Tests use
+// this to verify the catch_unwind boundary in run_loop catches detector
+// panics. Mirrors Phase 33-09's FORCE_VERIFY_PANIC pattern.
 #[cfg(test)]
 thread_local! {
     pub(crate) static RES_FORCE_STUCK: std::cell::Cell<Option<StuckPattern>> =
         const { std::cell::Cell::new(None) };
-    /// Plan 34-04 — separate panic-injection seam. When set, the FIRST real
-    /// detector (detect_repeated_action_observation) panics. Tests use this
-    /// to verify the catch_unwind boundary in run_loop catches detector panics.
-    /// Mirrors Phase 33-09's FORCE_VERIFY_PANIC pattern.
     pub(crate) static RES_FORCE_PANIC_IN_DETECTOR: std::cell::Cell<bool> =
         const { std::cell::Cell::new(false) };
 }
