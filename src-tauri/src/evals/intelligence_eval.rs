@@ -55,8 +55,8 @@ fn fixtures() -> Vec<IntelligenceFixture> {
     // EVAL-02 → EVAL-03 → EVAL-04 → EVAL-01 (broadest fixture last).
     // Plan 37-04 wired:
     v.extend(fixtures_eval_02_context_efficiency());
-    // Plan 37-05 wires this:
-    // v.extend(fixtures_eval_03_stuck_detection());
+    // Plan 37-05 wired:
+    v.extend(fixtures_eval_03_stuck_detection());
     // Plan 37-06 wires this:
     // v.extend(fixtures_eval_04_compaction_fidelity());
     // Plan 37-03 wired:
@@ -94,8 +94,31 @@ fn run_intelligence_eval_driver() {
             sum.asserted_mrr, MODULE_FLOOR);
     }
 
-    // Plan 37-05 will append: EVAL-03 aggregate accuracy assertion at this point.
-    // Plan 37-02 ships only the table emit + floor guard.
+    // ── Plan 37-05: EVAL-03 aggregate accuracy assertion ─────────────────
+    // CONTEXT lock §EVAL-03 Locked: Aggregate floor assertion. Filter rows by
+    // the "EVAL-03:" label prefix (to_row formats labels as
+    // "{requirement}: {label}"), compute accuracy = passes / total, assert it
+    // meets cfg.eval.stuck_detection_min_accuracy (default 0.80, ROADMAP
+    // success criterion #3 floor). Per-row floor 1.0 is already enforced by
+    // the asserted_mrr assertion above; this assertion provides explicit
+    // reporting + survives a future 1-2 fixture relax without catastrophic
+    // suite breakage.
+    let stuck_rows: Vec<&EvalRow> =
+        rows.iter().filter(|r| r.label.starts_with("EVAL-03:")).collect();
+    if !stuck_rows.is_empty() {
+        let stuck_passes = stuck_rows.iter().filter(|r| r.top1).count();
+        let accuracy = stuck_passes as f32 / stuck_rows.len() as f32;
+        let cfg = crate::config::load_config();
+        assert!(
+            accuracy >= cfg.eval.stuck_detection_min_accuracy,
+            "EVAL-03 aggregate accuracy {:.2} below floor {:.2} (passes {}/{}); cfg.eval.stuck_detection_min_accuracy={:.2}",
+            accuracy,
+            cfg.eval.stuck_detection_min_accuracy,
+            stuck_passes,
+            stuck_rows.len(),
+            cfg.eval.stuck_detection_min_accuracy
+        );
+    }
 }
 
 // ── Phase 37 / EVAL-01 — ScriptedProvider (test-only) ─────────────────────────
@@ -579,6 +602,466 @@ fn phase37_eval_02_code_query_fixed_paths_under_token_cap() {
 fn phase37_eval_02_screen_anchor_query_under_token_cap() {
     let (passed, summary) = fixture_screen_anchor_query();
     assert!(passed, "EVAL-02 screen-anchor-query failed: {}", summary);
+}
+
+// ── EVAL-03: Stuck detection fixtures ──────────────────────────────────────
+//
+// Plan 37-05 / EVAL-03 — 5 stuck `LoopState` builders + 5 healthy controls
+// = 10 rows. Each fixture calls `resilience::stuck::detect_stuck(&state,
+// &config)` directly (existing public function at resilience/stuck.rs:92)
+// and asserts `result.is_some() == fixture.expected_detection`. Aggregate
+// accuracy assertion at end-of-driver (run_intelligence_eval_driver above)
+// computes accuracy across the 10 EVAL-03 rows and asserts it >=
+// cfg.eval.stuck_detection_min_accuracy (default 0.80, ROADMAP success
+// criterion #3 floor). Per-row floor is 1.0 (capstone discipline).
+//
+// CONTEXT lock §EVAL-03 + Phase 34-04 detector code.
+//
+// ── DEVIATION DOC: fixture-label → StuckPattern variant mapping ───────────
+// Phase 34-04 ships 5 detectors. The actual variant names are:
+//   CostRunaway, RepeatedActionObservation, ContextWindowThrashing,
+//   MonologueSpiral, NoProgress.
+//
+// CONTEXT placeholder names ("ErrorLoop", "OscillatingTools",
+// "NoProgressTokens") do NOT exist as separate enum variants. The mapping
+// from fixture label → expected variant is:
+//
+//   fixture-label                          → variant (per Phase 34-04 wiring)
+//   ──────────────────────────────────────────────────────────────────────
+//   repeated-action-observation-pair       → RepeatedActionObservation
+//   error-loop                             → RepeatedActionObservation
+//        (3 identical (tool, input, output) triples with is_error=true.
+//         The detector hashes tool|input|output regardless of is_error,
+//         so three identical errors trip RepeatedActionObservation. There
+//         is NO separate ErrorLoop detector or error_history field. Per
+//         threat T-37-43, the assertion is is_some() == expected_detection
+//         — the specific variant returned is captured for debugging.)
+//   oscillating-tools                      → RepeatedActionObservation
+//        (A,B,A,B,A,B → 3 identical "A" triples + 3 identical "B" triples.
+//         The first matching pattern wins; with 3 As + 3 Bs, the count
+//         hits 3 on either side and trips. Phase 34-04's detector does
+//         NOT have a separate oscillation arm.)
+//   no-progress-tokens                     → NoProgress
+//        (iteration >= no_progress_threshold AND
+//         iteration - last_progress_iteration >= no_progress_threshold.
+//         The closest "verifier-reject counter" semantics map to NoProgress
+//         since LoopState has no `verifier_rejected_count` field. Phase 34
+//         tracks reject_plan via replans_this_run, but detect_stuck does
+//         NOT consume replans_this_run — the actual stuck signal at the
+//         "no progress" semantic level is the iteration delta from the
+//         last progress mark. Builder uses iteration=10,
+//         last_progress_iteration=0 → diff=10 >= 5 (default threshold).)
+//   context-window-thrash                  → ContextWindowThrashing
+//        (compactions_this_run >= compaction_thrash_threshold (default 3).)
+//
+// Healthy controls must populate ALL fields that could trip ANY detector
+// to NEUTRAL values. Specifically:
+//   - recent_actions: < 3 entries OR no triple repeated 3x.
+//   - consecutive_no_tool_turns: < monologue_threshold (5).
+//   - compactions_this_run: < compaction_thrash_threshold (3).
+//   - For NoProgress: iteration < no_progress_threshold (5), OR
+//     last_progress_iteration close to iteration (diff < 5).
+//   - For CostRunaway: iteration < 3 OR cumulative_cost_usd 0.0 OR
+//     last_iter_cost <= 2× rolling avg.
+// ─────────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+#[allow(dead_code)] // requirement_tag inspected via summary line
+struct StuckDetectionFixture {
+    label: &'static str,
+    state_setup: fn() -> crate::loop_engine::LoopState,
+    expected_detection: bool,
+    requirement_tag: &'static str,
+}
+
+// ── 5 stuck-state builders ────────────────────────────────────────────────
+
+/// Stuck pattern #1: same (tool, input, output) triple appears 3+ times.
+/// Phase 34-04 detector: RepeatedActionObservation (resilience/stuck.rs:124).
+#[cfg(test)]
+fn build_state_repeated_action_observation_pair() -> crate::loop_engine::LoopState {
+    let mut state = crate::loop_engine::LoopState::default();
+    for _ in 0..3 {
+        state.record_action(crate::loop_engine::ActionRecord {
+            tool: "bash".to_string(),
+            input_summary: r#"{"command":"ls /tmp"}"#.to_string(),
+            output_summary: "permission denied".to_string(),
+            is_error: true,
+        });
+    }
+    state.iteration = 3;
+    state.last_progress_iteration = 3; // disarm NoProgress
+    state
+}
+
+/// Stuck pattern #2: same error triple appears 3+ times (modeled as repeated
+/// failed action). Phase 34-04 has no separate ErrorLoop detector or
+/// error_history field — three identical (tool, input, error_output) triples
+/// with is_error=true trip RepeatedActionObservation via the same hash path.
+/// Per threat T-37-43, the assertion is is_some() == expected_detection.
+#[cfg(test)]
+fn build_state_error_loop() -> crate::loop_engine::LoopState {
+    let mut state = crate::loop_engine::LoopState::default();
+    for _ in 0..3 {
+        state.record_action(crate::loop_engine::ActionRecord {
+            tool: "edit_file".to_string(),
+            input_summary: r#"{"path":"foo.rs","old":"x","new":"y"}"#.to_string(),
+            output_summary: "Error: pattern not found".to_string(),
+            is_error: true,
+        });
+    }
+    state.iteration = 3;
+    state.last_progress_iteration = 3; // disarm NoProgress
+    state
+}
+
+/// Stuck pattern #3: A → B → A → B → A → B between two distinct tools.
+/// Phase 34-04 detector: RepeatedActionObservation (3 identical "A" triples
+/// AND 3 identical "B" triples both fire the count-hits-3 condition; first
+/// match wins, returning Some(RepeatedActionObservation)).
+#[cfg(test)]
+fn build_state_oscillating_tools() -> crate::loop_engine::LoopState {
+    let mut state = crate::loop_engine::LoopState::default();
+    let pairs = [
+        ("bash",      r#"{"command":"ls"}"#,       "ok"),
+        ("read_file", r#"{"path":"a.rs"}"#,        "// a.rs"),
+        ("bash",      r#"{"command":"ls"}"#,       "ok"),
+        ("read_file", r#"{"path":"a.rs"}"#,        "// a.rs"),
+        ("bash",      r#"{"command":"ls"}"#,       "ok"),
+        ("read_file", r#"{"path":"a.rs"}"#,        "// a.rs"),
+    ];
+    for (tool, input, output) in pairs {
+        state.record_action(crate::loop_engine::ActionRecord {
+            tool: tool.to_string(),
+            input_summary: input.to_string(),
+            output_summary: output.to_string(),
+            is_error: false,
+        });
+    }
+    state.iteration = 6;
+    state.last_progress_iteration = 6; // disarm NoProgress
+    state
+}
+
+/// Stuck pattern #4: iteration delta from last_progress_iteration >=
+/// no_progress_threshold (default 5). LoopState has no separate
+/// verifier_rejected_count field; the "no progress on tokens" semantic is
+/// most directly modeled by setting iteration high while leaving
+/// last_progress_iteration far behind. Phase 34-04 detector: NoProgress
+/// (resilience/stuck.rs:170).
+#[cfg(test)]
+fn build_state_no_progress_tokens() -> crate::loop_engine::LoopState {
+    let mut state = crate::loop_engine::LoopState::default();
+    state.iteration = 10;
+    state.last_progress_iteration = 0; // diff = 10 >= 5 → trips NoProgress
+    state
+}
+
+/// Stuck pattern #5: compactions_this_run >= compaction_thrash_threshold
+/// (default 3). Phase 34-04 detector: ContextWindowThrashing
+/// (resilience/stuck.rs:162).
+#[cfg(test)]
+fn build_state_context_window_thrash() -> crate::loop_engine::LoopState {
+    let mut state = crate::loop_engine::LoopState::default();
+    state.compactions_this_run = 4; // >= 3 threshold
+    state.iteration = 4;
+    state.last_progress_iteration = 4; // disarm NoProgress
+    state
+}
+
+// ── 5 healthy-state builders ──────────────────────────────────────────────
+
+/// Healthy #6: 6 distinct tool calls with unique (tool, input, output)
+/// triples, no errors. Each triple hash is unique → no RepeatedAction.
+/// iteration matches last_progress_iteration → no NoProgress.
+/// detect_stuck = None.
+#[cfg(test)]
+fn build_healthy_state_varied_tools_progressing() -> crate::loop_engine::LoopState {
+    let mut state = crate::loop_engine::LoopState::default();
+    let actions = [
+        ("bash",       r#"{"command":"date"}"#,        "Wed May  8"),
+        ("read_file",  r#"{"path":"a.rs"}"#,           "// a.rs"),
+        ("edit_file",  r#"{"path":"b.rs"}"#,           "ok"),
+        ("grep_repo",  r#"{"pattern":"foo"}"#,         "match: a.rs:1"),
+        ("write_file", r#"{"path":"c.rs"}"#,           "ok"),
+        ("bash",       r#"{"command":"cargo check"}"#, "ok"),
+    ];
+    for (tool, input, output) in actions {
+        state.record_action(crate::loop_engine::ActionRecord {
+            tool: tool.to_string(),
+            input_summary: input.to_string(),
+            output_summary: output.to_string(),
+            is_error: false,
+        });
+    }
+    state.iteration = 6;
+    state.last_progress_iteration = 6;
+    state
+}
+
+/// Healthy #7: one bash call → final assistant text, halt. Only 1 action in
+/// recent_actions (< 3 — not enough data for RepeatedAction). iteration=1
+/// (< no_progress_threshold=5 — cold-start guard rejects NoProgress).
+/// detect_stuck = None.
+#[cfg(test)]
+fn build_healthy_state_single_tool_success() -> crate::loop_engine::LoopState {
+    let mut state = crate::loop_engine::LoopState::default();
+    state.record_action(crate::loop_engine::ActionRecord {
+        tool: "bash".to_string(),
+        input_summary: r#"{"command":"date"}"#.to_string(),
+        output_summary: "Wed May  8 12:00:00 UTC 2026".to_string(),
+        is_error: false,
+    });
+    state.iteration = 1;
+    state.last_progress_iteration = 1;
+    state
+}
+
+/// Healthy #8: one error, then a different tool succeeds. 2 distinct triples
+/// (< 3 — not enough). iteration=2 (< 5 — cold-start rejects NoProgress).
+/// detect_stuck = None.
+#[cfg(test)]
+fn build_healthy_state_error_then_recovery() -> crate::loop_engine::LoopState {
+    let mut state = crate::loop_engine::LoopState::default();
+    state.record_action(crate::loop_engine::ActionRecord {
+        tool: "bash".to_string(),
+        input_summary: r#"{"command":"missing_cmd"}"#.to_string(),
+        output_summary: "command not found".to_string(),
+        is_error: true,
+    });
+    state.record_action(crate::loop_engine::ActionRecord {
+        tool: "read_file".to_string(),
+        input_summary: r#"{"path":"/etc/hostname"}"#.to_string(),
+        output_summary: "blade-host".to_string(),
+        is_error: false,
+    });
+    state.iteration = 2;
+    state.last_progress_iteration = 2;
+    state
+}
+
+/// Healthy #9: one compaction (< 3), varied tools after. detect_stuck = None.
+#[cfg(test)]
+fn build_healthy_state_compaction_once_progressing() -> crate::loop_engine::LoopState {
+    let mut state = crate::loop_engine::LoopState::default();
+    state.compactions_this_run = 1; // < 3 threshold
+    state.record_action(crate::loop_engine::ActionRecord {
+        tool: "read_file".to_string(),
+        input_summary: r#"{"path":"a.rs"}"#.to_string(),
+        output_summary: "// a.rs content".to_string(),
+        is_error: false,
+    });
+    state.record_action(crate::loop_engine::ActionRecord {
+        tool: "edit_file".to_string(),
+        input_summary: r#"{"path":"a.rs","old":"x","new":"y"}"#.to_string(),
+        output_summary: "ok".to_string(),
+        is_error: false,
+    });
+    state.iteration = 5;
+    state.last_progress_iteration = 5;
+    state
+}
+
+/// Healthy #10: verifier accepts every probe. replans_this_run=0,
+/// iteration=10 with last_progress_iteration=10 (no NoProgress trip).
+/// One varied tool action (< 3 entries). detect_stuck = None.
+#[cfg(test)]
+fn build_healthy_state_verifier_pass_throughout() -> crate::loop_engine::LoopState {
+    let mut state = crate::loop_engine::LoopState::default();
+    state.replans_this_run = 0;
+    state.iteration = 10;
+    state.last_progress_iteration = 10; // disarm NoProgress (delta = 0)
+    state.record_action(crate::loop_engine::ActionRecord {
+        tool: "bash".to_string(),
+        input_summary: r#"{"command":"echo done"}"#.to_string(),
+        output_summary: "done".to_string(),
+        is_error: false,
+    });
+    state
+}
+
+// ── EVAL-03 fixture run helper ────────────────────────────────────────────
+
+/// Build a LoopState via the fixture's setup, run detect_stuck against a
+/// default ResilienceConfig (smart_resilience_enabled=true,
+/// stuck_detection_enabled=true, all thresholds at production defaults), and
+/// assert `result.is_some() == fix.expected_detection`. The summary line
+/// records the actual variant returned (debug-friendly for T-37-43).
+#[cfg(test)]
+fn eval_03_run(fix: &StuckDetectionFixture) -> (bool, String) {
+    let state = (fix.state_setup)();
+    let config = crate::config::ResilienceConfig::default();
+    let result = crate::resilience::stuck::detect_stuck(&state, &config);
+    let detected = result.is_some();
+    let passed = detected == fix.expected_detection;
+    let summary = format!(
+        "[{}] {}: detected={} (expected={}), pattern={:?}",
+        fix.requirement_tag, fix.label, detected, fix.expected_detection, result
+    );
+    (passed, summary)
+}
+
+// ── 10 fixture functions ──────────────────────────────────────────────────
+
+#[cfg(test)]
+fn fixture_repeated_action_observation_pair() -> (bool, String) {
+    eval_03_run(&StuckDetectionFixture {
+        label: "repeated-action-observation-pair",
+        state_setup: build_state_repeated_action_observation_pair,
+        expected_detection: true,
+        requirement_tag: "EVAL-03",
+    })
+}
+
+#[cfg(test)]
+fn fixture_error_loop() -> (bool, String) {
+    eval_03_run(&StuckDetectionFixture {
+        label: "error-loop",
+        state_setup: build_state_error_loop,
+        expected_detection: true,
+        requirement_tag: "EVAL-03",
+    })
+}
+
+#[cfg(test)]
+fn fixture_oscillating_tools() -> (bool, String) {
+    eval_03_run(&StuckDetectionFixture {
+        label: "oscillating-tools",
+        state_setup: build_state_oscillating_tools,
+        expected_detection: true,
+        requirement_tag: "EVAL-03",
+    })
+}
+
+#[cfg(test)]
+fn fixture_no_progress_tokens() -> (bool, String) {
+    eval_03_run(&StuckDetectionFixture {
+        label: "no-progress-tokens",
+        state_setup: build_state_no_progress_tokens,
+        expected_detection: true,
+        requirement_tag: "EVAL-03",
+    })
+}
+
+#[cfg(test)]
+fn fixture_context_window_thrash() -> (bool, String) {
+    eval_03_run(&StuckDetectionFixture {
+        label: "context-window-thrash",
+        state_setup: build_state_context_window_thrash,
+        expected_detection: true,
+        requirement_tag: "EVAL-03",
+    })
+}
+
+#[cfg(test)]
+fn fixture_varied_tools_progressing() -> (bool, String) {
+    eval_03_run(&StuckDetectionFixture {
+        label: "varied-tools-progressing",
+        state_setup: build_healthy_state_varied_tools_progressing,
+        expected_detection: false,
+        requirement_tag: "EVAL-03",
+    })
+}
+
+#[cfg(test)]
+fn fixture_single_tool_success() -> (bool, String) {
+    eval_03_run(&StuckDetectionFixture {
+        label: "single-tool-success",
+        state_setup: build_healthy_state_single_tool_success,
+        expected_detection: false,
+        requirement_tag: "EVAL-03",
+    })
+}
+
+#[cfg(test)]
+fn fixture_error_then_recovery() -> (bool, String) {
+    eval_03_run(&StuckDetectionFixture {
+        label: "error-then-recovery",
+        state_setup: build_healthy_state_error_then_recovery,
+        expected_detection: false,
+        requirement_tag: "EVAL-03",
+    })
+}
+
+#[cfg(test)]
+fn fixture_compaction_once_progressing() -> (bool, String) {
+    eval_03_run(&StuckDetectionFixture {
+        label: "compaction-once-progressing",
+        state_setup: build_healthy_state_compaction_once_progressing,
+        expected_detection: false,
+        requirement_tag: "EVAL-03",
+    })
+}
+
+#[cfg(test)]
+fn fixture_verifier_pass_throughout() -> (bool, String) {
+    eval_03_run(&StuckDetectionFixture {
+        label: "verifier-pass-throughout",
+        state_setup: build_healthy_state_verifier_pass_throughout,
+        expected_detection: false,
+        requirement_tag: "EVAL-03",
+    })
+}
+
+// ── EVAL-03 fixture aggregator ────────────────────────────────────────────
+
+#[cfg(test)]
+fn fixtures_eval_03_stuck_detection() -> Vec<IntelligenceFixture> {
+    vec![
+        // 5 stuck fixtures
+        IntelligenceFixture { label: "repeated-action-observation-pair", requirement: "EVAL-03", run: fixture_repeated_action_observation_pair },
+        IntelligenceFixture { label: "error-loop",                       requirement: "EVAL-03", run: fixture_error_loop },
+        IntelligenceFixture { label: "oscillating-tools",                requirement: "EVAL-03", run: fixture_oscillating_tools },
+        IntelligenceFixture { label: "no-progress-tokens",               requirement: "EVAL-03", run: fixture_no_progress_tokens },
+        IntelligenceFixture { label: "context-window-thrash",            requirement: "EVAL-03", run: fixture_context_window_thrash },
+        // 5 healthy controls
+        IntelligenceFixture { label: "varied-tools-progressing",         requirement: "EVAL-03", run: fixture_varied_tools_progressing },
+        IntelligenceFixture { label: "single-tool-success",              requirement: "EVAL-03", run: fixture_single_tool_success },
+        IntelligenceFixture { label: "error-then-recovery",              requirement: "EVAL-03", run: fixture_error_then_recovery },
+        IntelligenceFixture { label: "compaction-once-progressing",      requirement: "EVAL-03", run: fixture_compaction_once_progressing },
+        IntelligenceFixture { label: "verifier-pass-throughout",         requirement: "EVAL-03", run: fixture_verifier_pass_throughout },
+    ]
+}
+
+// ── EVAL-03 dedicated regression tests ────────────────────────────────────
+
+#[cfg(test)]
+#[test]
+fn phase37_eval_03_repeated_action_observation_pair_detected() {
+    // Plan 37-05 / EVAL-03 — load-bearing detector. CONTEXT lock §EVAL-03
+    // Locked: each fixture's run calls detect_stuck directly.
+    let (passed, summary) = fixture_repeated_action_observation_pair();
+    assert!(passed, "EVAL-03 repeated-action-observation-pair detector regressed: {}", summary);
+}
+
+#[cfg(test)]
+#[test]
+fn phase37_eval_03_healthy_controls_zero_false_positives() {
+    // Plan 37-05 / EVAL-03 — CONTEXT lock §EVAL-03 Locked: ZERO false
+    // positives on healthy controls. A single false positive halts the
+    // table at MODULE_FLOOR. This dedicated test surfaces the failure
+    // independently of the driver test (so the regression message
+    // explicitly mentions "false positive on healthy control").
+    let healthy_fixtures: [(&str, fn() -> (bool, String)); 5] = [
+        ("varied-tools-progressing",    fixture_varied_tools_progressing),
+        ("single-tool-success",         fixture_single_tool_success),
+        ("error-then-recovery",         fixture_error_then_recovery),
+        ("compaction-once-progressing", fixture_compaction_once_progressing),
+        ("verifier-pass-throughout",    fixture_verifier_pass_throughout),
+    ];
+    let mut false_positives: Vec<String> = Vec::new();
+    for (label, run_fn) in healthy_fixtures.iter() {
+        let (passed, summary) = run_fn();
+        if !passed {
+            false_positives.push(format!("{}: {}", label, summary));
+        }
+    }
+    assert!(
+        false_positives.is_empty(),
+        "EVAL-03 healthy controls had {} false positive(s): {:?}",
+        false_positives.len(),
+        false_positives
+    );
 }
 
 // ── EVAL-01: Multi-step task fixtures ──────────────────────────────────────
