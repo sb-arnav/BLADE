@@ -20,14 +20,9 @@ pub mod repo_map;
 pub mod symbol_graph;
 pub mod tree_sitter_parser;
 
-pub use anchor_parser::{extract_anchors, resolve_anchors, Anchor};
 
-pub use symbol_graph::{ReindexStats, SymbolKind, SymbolNode};
 
-pub use capability_registry::{
-    ensure_registry_file, force_reload, get_capabilities, load_registry, validate_against_probe,
-    CapabilityRegistry, ModelCapabilities, ProviderEntry,
-};
+pub use capability_registry::ModelCapabilities;
 
 /// HI-02 instrumentation: increments every time `init()` runs so a test can
 /// assert lib.rs's setup hook actually wires the call in. Atomic counter so

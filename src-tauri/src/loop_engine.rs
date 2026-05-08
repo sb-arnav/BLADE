@@ -36,10 +36,10 @@ use tauri::Emitter;
 
 use crate::commands::{
     backoff_secs, classify_api_error, compress_conversation_smart, emit_stream_event,
-    explain_tool_failure, format_tool_result, is_circuit_broken, model_context_window,
-    record_error, safe_fallback_model, try_free_model_fallback, ApprovalMap, ErrorRecovery,
+    explain_tool_failure, format_tool_result, is_circuit_broken, model_context_window, safe_fallback_model, ApprovalMap, ErrorRecovery,
     SharedMcpManager, CHAT_CANCEL,
 };
+use crate::resilience::fallback::try_with_fallback;
 use crate::providers::{self, ConversationMessage};
 use crate::trace;
 
@@ -134,6 +134,7 @@ impl LoopState {
     /// `run_loop` calls `record_action_with_cap` directly with
     /// `config.resilience.recent_actions_window` so user edits to that field
     /// take effect immediately.
+    #[cfg(test)]
     pub fn record_action(&mut self, record: ActionRecord) {
         self.record_action_with_cap(record, RECENT_ACTIONS_CAPACITY);
     }
@@ -155,6 +156,7 @@ impl LoopState {
     /// commands::compress_conversation_smart on success. Increments the
     /// per-run compaction counter; detect_context_window_thrashing fires
     /// when compactions_this_run >= compaction_thrash_threshold (default 3).
+    #[cfg(test)]
     pub fn record_compaction(&mut self) {
         self.compactions_this_run = self.compactions_this_run.saturating_add(1);
     }
@@ -594,14 +596,14 @@ pub async fn verify_progress(
     }
 }
 
-/// Plan 33-09 — test-only override seam. When set to `true`, `render_actions_json`
-/// panics on entry. Used to assert that a panic in the verification probe code
-/// path is caught by `run_loop`'s `catch_unwind` wrapper and does NOT halt the
-/// main loop. Mirrors `brain.rs::CTX_SCORE_OVERRIDE` from Phase 32-02 (commit
-/// bb5d6ce).
-///
-/// Gated `#[cfg(test)]` so production builds carry zero overhead and have no
-/// panic surface here. Cargo's default test profile enables `cfg(test)`.
+// Plan 33-09 — test-only override seam. When set to `true`, `render_actions_json`
+// panics on entry. Used to assert that a panic in the verification probe code
+// path is caught by `run_loop`'s `catch_unwind` wrapper and does NOT halt the
+// main loop. Mirrors `brain.rs::CTX_SCORE_OVERRIDE` from Phase 32-02 (commit
+// bb5d6ce).
+//
+// Gated `#[cfg(test)]` so production builds carry zero overhead and have no
+// panic surface here. Cargo's default test profile enables `cfg(test)`.
 #[cfg(test)]
 thread_local! {
     pub(crate) static FORCE_VERIFY_PANIC: std::cell::Cell<bool> =
@@ -916,7 +918,7 @@ async fn run_loop_inner(
     // turn_acc is moved by-value through the loop; the empty-tool-calls
     // branch consumes it via compute_and_persist_turn_reward. We rebind as
     // mutable so record_tool_call (mut-borrow) works inline.
-    let mut turn_acc = turn_acc;
+    let turn_acc = turn_acc;
 
     // ─── Plan 35-04 (DECOMP-01) — pre-iteration auto-decompose trigger ────
     //
@@ -1488,12 +1490,12 @@ async fn run_loop_inner(
                         // Strategy: instead of just waiting, try switching to a free/fallback
                         // model first. This keeps the conversation flowing without delay.
                         // Priority: OpenRouter free tier → Groq (generous free tier) → wait + retry.
-                        let free_model_result = try_free_model_fallback(
+                        let free_model_result = try_with_fallback(
                             config,
                             conversation,
                             tools,
                             &app,
-                        ).await;
+                        ).await.ok();
                         if let Some(t) = free_model_result {
                             t
                         } else {
@@ -3889,18 +3891,13 @@ mod tests {
         // Mirror the production match: Ok arms continue normally; Err arm
         // logs + continues. We assert the Err arm fires and that handling
         // it does not unwind.
-        let mut continued = false;
-        match result {
-            Ok(Verdict::Yes) | Ok(Verdict::No) | Ok(Verdict::Replan) => {
-                continued = true; // would proceed to next iteration
-            }
-            Err(_e) => {
-                // Production: eprintln!("[LOOP-01] verify_progress error
-                // (non-blocking): {}", e);. Here we just confirm we reach
-                // the arm and continue without panicking.
-                continued = true;
-            }
-        }
+        let continued = match result {
+            Ok(Verdict::Yes) | Ok(Verdict::No) | Ok(Verdict::Replan) => true, // would proceed to next iteration
+            // Production: eprintln!("[LOOP-01] verify_progress error
+            // (non-blocking): {}", e);. Here we just confirm we reach
+            // the arm and continue without panicking.
+            Err(_e) => true,
+        };
         assert!(continued, "Err arm must continue the loop, not halt it");
     }
 

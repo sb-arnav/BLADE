@@ -30,21 +30,23 @@ impl std::fmt::Display for FallbackExhausted {
 
 impl std::error::Error for FallbackExhausted {}
 
-/// Plan 34-07 — test-only override seam. When set, every provider call inside
-/// `try_with_fallback_inner` returns Err(forced_error) instead of hitting the
-/// network. Used to deterministically exhaust the chain in tests without
-/// making real API calls.
+// Plan 34-07 — test-only override seams.
+//
+// RES_FORCE_PROVIDER_ERROR — when set, every provider call inside
+// `try_with_fallback_inner` returns Err(forced_error) instead of hitting the
+// network. Used to deterministically exhaust the chain in tests without
+// making real API calls.
+//
+// RES_CAPTURED_ATTEMPTS — Phase 34 / HI-02 (REVIEW finding) — test-only
+// capture of the (provider, model) tuple passed to each `complete_turn`
+// attempt inside `try_with_fallback_inner`. Used by
+// `phase34_res_05_primary_uses_user_configured_model` to verify the PRIMARY
+// chain element forwards `config.model` (not `default_model_for(config.provider)`).
 #[cfg(test)]
 thread_local! {
     pub(crate) static RES_FORCE_PROVIDER_ERROR: std::cell::RefCell<Option<String>> =
         const { std::cell::RefCell::new(None) };
 
-    /// Phase 34 / HI-02 (REVIEW finding) — test-only capture of the
-    /// (provider, model) tuple passed to each `complete_turn` attempt inside
-    /// `try_with_fallback_inner`. Used by
-    /// `phase34_res_05_primary_uses_user_configured_model` to verify the
-    /// PRIMARY chain element forwards `config.model` (not
-    /// `default_model_for(config.provider)`).
     pub(crate) static RES_CAPTURED_ATTEMPTS: std::cell::RefCell<Vec<(String, String)>> =
         const { std::cell::RefCell::new(Vec::new()) };
 }

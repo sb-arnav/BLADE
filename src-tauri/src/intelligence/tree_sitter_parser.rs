@@ -21,6 +21,7 @@ pub struct ParsedSymbol {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)] // Module + Constant variants reserved for v1.6 expanded language coverage (Go, Ruby, Java)
 pub enum ParsedSymbolKind {
     Function,
     Type,
@@ -30,7 +31,8 @@ pub enum ParsedSymbolKind {
 
 #[derive(Debug, Clone)]
 pub struct ParsedEdge {
-    pub from_name: String, // resolved at the symbol_graph layer
+    #[allow(dead_code)] // resolved at the symbol_graph layer; held for the v1.6 cross-file refactor pass
+    pub from_name: String,
     pub to_name: String,
     pub kind: ParsedEdgeKind,
     /// Source line of the edge call/import site (used for from-name resolution

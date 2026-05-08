@@ -115,6 +115,7 @@ impl SessionWriter {
     ///   - no rotation run
     ///   - the ID is still generated for forensic continuity (so a later
     ///     toggle-on can reuse the ID surface)
+    #[cfg(test)]
     pub fn new(jsonl_log_dir: &Path, enabled: bool) -> std::io::Result<(Self, String)> {
         Self::new_with_id(jsonl_log_dir, enabled, None)
     }
@@ -308,9 +309,9 @@ pub(crate) fn rotate_old_sessions(dir: &Path, keep_n: usize) -> std::io::Result<
     Ok(())
 }
 
-/// Plan 34-08 test seam — when set to true, SessionWriter::append panics.
-/// Used to assert catch_unwind discipline (panic in append must NOT crash
-/// the chat). Mirrors loop_engine::FORCE_VERIFY_PANIC (Plan 33-09).
+// Plan 34-08 test seam — when set to true, SessionWriter::append panics.
+// Used to assert catch_unwind discipline (panic in append must NOT crash
+// the chat). Mirrors loop_engine::FORCE_VERIFY_PANIC (Plan 33-09).
 #[cfg(test)]
 thread_local! {
     pub(crate) static SESS_FORCE_APPEND_PANIC: std::cell::Cell<bool> =
