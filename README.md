@@ -86,6 +86,19 @@ BLADE's behavior genuinely changes based on internal state -- not prompt enginee
 
 ---
 
+## Intelligence Layer (v1.5)
+
+v1.5 transforms the agentic loop. BLADE no longer runs a naive 12-iteration for-loop with everything injected every turn — the loop verifies its own progress, recovers from structured errors, detects when it's stuck, fans out to parallel sub-agents on big tasks, and injects only the context each query actually needs.
+
+- **Selective Context Injection** -- `brain.rs` gates every section by query relevance. "What time is it?" doesn't see your screen OCR + repo map + hormone state. The condenser fires proactively at 80% capacity using OpenHands' v7610 structured summary prompt. Tool outputs cap at ~4k tokens with a one-line summary. Per-section breakdown surfaces in DoctorPane.
+- **Verified Agentic Loop** -- Mid-loop verifier runs every 3 tool calls; if the goal isn't being served, the loop replans. Tool failures return a structured `ToolError` with what was tried, why it failed, and a suggested alternative. Truncated responses auto-retry with a higher `max_tokens` value. The fast-streaming path runs the ego intercept (closes the Phase 18 known gap). Iteration cap configurable, default 25.
+- **Stuck Detection + Session Persistence** -- 5-pattern stuck detection (RepeatedActionObservation, ContextWindowThrashing, NoProgress, MonologueSpiral, CostRunaway). Circuit breaker fires after N consecutive same-type failures. Per-conversation cost guard with 80%/100% tiers. Provider fallback chain with exponential backoff. Every conversation persists to an append-only JSONL log; sessions reopen from the last compaction boundary, branch from any point, list with one-line preview.
+- **Auto-Decomposition** -- When the brain planner detects 5+ independent steps, BLADE fans out to parallel sub-agents automatically. Each sub-agent runs in an isolated context window — one sub-agent's 50k-token bash output doesn't bloat the parent. Only summaries return. Sub-agent progress streams into the chat with explicit checkpoints.
+- **Context Intelligence** -- `tree-sitter` parses TypeScript/JavaScript, Rust, and Python source into a symbol-level dependency graph (calls, imports, type usage). Personalized PageRank scores symbols by what the current chat actually mentions. A budget-bounded repo map (~1k tokens default) injects at the code-section gate. `canonical_models.json` formalizes per-model capabilities (context length, tool_use, vision, cost) — `router.rs` reads from it instead of per-call probes. Type `@screen` to inject the current OCR; `@file:src/main.rs` to inject a file's content; `@memory:project-deadline` to inject matching memory entries — each anchor renders as a chip in the chat.
+- **Intelligence Eval** -- 26 deterministic fixtures across 4 surfaces (10 multi-step task completion + 3 context efficiency + 5 stuck + 5 healthy controls + 3 compaction fidelity). `verify:intelligence` gate joins `verify:all` as the 38th. An opt-in operator-runnable mode (`BLADE_RUN_BENCHMARK=true bash scripts/run-intel-benchmark.sh`) runs the same 10 fixtures against real LLMs to populate `eval-runs/v1.5-baseline.json` for regression detection.
+
+---
+
 ## Core Features
 
 ### Ghost Mode — Invisible Meeting AI
@@ -359,6 +372,21 @@ Create `~/.blade/BLADE.md` to give BLADE workspace-level instructions (restrict 
 - [x] Personality Mirror, Conversational Voice, Temporal Intelligence
 - [x] Security Fortress, Onboarding v2, "Hey BLADE" wake word
 
+### Done in v1.5 (Intelligence Layer — shipped 2026-05-08; tech_debt — operator UAT pending)
+- [x] Selective context injection — brain.rs gates every section by query relevance; OpenHands v7610 condenser at 80% capacity; tool outputs cap at ~4k tokens
+- [x] Verified agentic loop — mid-loop verifier every 3 tool calls; structured ToolError feedback; plan adaptation on failure; truncation auto-retry; ego intercept on fast-streaming path
+- [x] Stuck detection + session persistence — 5-pattern detector; circuit breaker; cost guard; provider fallback; append-only JSONL session log; reopen-and-resume + branch-from-any-point
+- [x] Auto-decomposition — brain planner detects 5+ independent steps + auto-fans into parallel sub-agents; isolated sub-agent contexts; summary-only return to parent
+- [x] Context intelligence — tree-sitter symbol graph; personalized PageRank repo map; canonical_models.json capability registry; @screen / @file: / @memory: anchors
+- [x] Intelligence eval — 26 deterministic fixtures; verify:intelligence as the 38th gate; opt-in operator-runnable real-LLM benchmark
+
+### v1.6 — TBD
+- Operator-deferred UAT for Phases 32–37 carries forward
+- OEVAL-01c v1.4 organism-eval drift repair (verify:eval + verify:hybrid_search)
+- Live A/B routing eval, multi-session aggregate eval, live file-watcher symbol graph updates (deferred from Phase 36/37)
+- Voice resurrection (JARVIS-01/02), organism UI surfacing, distribution work — pre-v1.5 deferred items
+- Specific phase shape locked when operator runs `/gsd-new-milestone v1.6`
+
 ### What's next
 - [ ] LSP integration — run language servers, feed diagnostics back into tool results after edits
 - [ ] Interactive terminal — proper PTY for SSH sessions and interactive commands
@@ -380,6 +408,14 @@ BLADE's cognitive architecture is grounded in peer-reviewed research:
 - Ryan, R. M., & Deci, E. L. (2000). Self-determination theory and the facilitation of intrinsic motivation. *American Psychologist*, 55(1), 68-78.
 - Greenberg, J., Pyszczynski, T., & Solomon, S. (1986). The causes and consequences of a need for self-esteem: A terror management theory. *Public Self and Private Self*, 189-212.
 - Ngo, H., et al. (2026). Scale Buys Evaluation but Not Control in AI Metacognition. *arXiv:2604.16009* (MEDLEY-BENCH).
+
+### v1.5 — Intelligence Layer
+
+- Anthropic. (2025). *Claude Code: A Production Coding Agent*. arxiv:2604.14228 — selective context injection, agentic loop, tree-sitter context awareness.
+- Gauthier, P. (2023). *Aider's Repository Map*. https://aider.chat/2023/10/22/repomap.html — symbol graph + personalized PageRank pattern.
+- All-Hands AI. (2025). *OpenHands Condenser Pattern*. PR #7610 (csmith49) — keep-edges-summarize-middle compaction prompt.
+- Block, Inc. (2025). *Goose Capability Registry*. — per-model capability descriptors as the v1.5 canonical_models.json schema basis.
+- Yang, K., Liu, X., Chen, Y., et al. (2025). *Mini-SWE-Agent: Repurposing SWE-Bench for Agent Loop Verification*. — minimal scaffold pattern for the agentic-loop verification probe.
 
 ---
 
