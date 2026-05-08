@@ -2255,3 +2255,53 @@ fn phase37_eval_panic_in_scripted_closure_handled_gracefully() {
          seam (v1.1 fallback discipline regression)"
     );
 }
+
+// ── EVAL-05: Verify gate regression ────────────────────────────────────────
+//
+// Plan 37-07 / EVAL-05 — asserts scripts/verify-intelligence.sh respects the
+// BLADE_INTELLIGENCE_EVAL=false escape hatch (CTX-07 8th application).
+// CONTEXT lock §Testing & Verification §Locked: Eval-disabled regression test.
+// Mirrors Phase 36-09's kill-switch posture verbatim.
+
+#[cfg(test)]
+#[test]
+fn phase37_eval_05_verify_intelligence_short_circuits_when_disabled() {
+    use std::process::Command;
+
+    // The test runs from `src-tauri/`, but the script needs to run from the
+    // workspace root. Find the workspace root by walking up from CARGO_MANIFEST_DIR.
+    let manifest_dir = env!("CARGO_MANIFEST_DIR"); // = /path/to/blade/src-tauri
+    let workspace_root = std::path::Path::new(manifest_dir)
+        .parent()
+        .expect("workspace root must be parent of src-tauri/");
+
+    let script_path = workspace_root.join("scripts").join("verify-intelligence.sh");
+    assert!(
+        script_path.exists(),
+        "verify-intelligence.sh missing at {:?}",
+        script_path
+    );
+
+    let output = Command::new("bash")
+        .arg(&script_path)
+        .env("BLADE_INTELLIGENCE_EVAL", "false")
+        .current_dir(workspace_root)
+        .output()
+        .expect("failed to spawn bash for verify-intelligence.sh");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(
+        output.status.success(),
+        "verify-intelligence.sh did not exit 0 with skip env; status={:?}, stdout={}, stderr={}",
+        output.status,
+        stdout,
+        stderr
+    );
+    assert!(
+        stdout.contains("[verify-intelligence] SKIP"),
+        "expected SKIP message in stdout when BLADE_INTELLIGENCE_EVAL=false; got: {}",
+        stdout
+    );
+}
