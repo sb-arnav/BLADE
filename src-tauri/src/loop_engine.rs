@@ -608,6 +608,46 @@ thread_local! {
         const { std::cell::Cell::new(false) };
 }
 
+// ── Phase 37 / EVAL-01 — Test-only ScriptedProvider seam ────────────────────
+//
+// Mirrors Phase 33-04 LOOP_OVERRIDE / Phase 34-04 RES_FORCE_STUCK
+// (resilience/stuck.rs:70) / Phase 36-03 INTEL_FORCE_PAGERANK_RESULT
+// (intelligence/pagerank.rs:46) precedents. Test-only; production builds
+// carry zero overhead because the entire block is gated behind cfg(test).
+//
+// Plan 37-03's EVAL-01 fixtures install a closure here that delegates to
+// the ScriptedProvider declared in evals/intelligence_eval.rs. The closure
+// returns canned AssistantTurn values indexed by call-counter so loop_engine's
+// run_loop body can replay multi-step task sequences deterministically.
+//
+// Type note: providers::complete_turn returns Result<AssistantTurn, String>
+// (see providers/mod.rs:227). The plan's CONTEXT mentioned `TurnResult` as a
+// placeholder name — actual upstream type is `AssistantTurn`. The seam stores
+// a Box<dyn Fn(...)> which is not Copy, hence RefCell (Cell can't hold it).
+#[cfg(test)]
+thread_local! {
+    pub static EVAL_FORCE_PROVIDER: std::cell::RefCell<
+        Option<Box<dyn Fn(
+            &[crate::providers::ConversationMessage],
+            &[crate::providers::ToolDefinition],
+        ) -> Result<crate::providers::AssistantTurn, String>>>
+    > = std::cell::RefCell::new(None);
+}
+
+/// Plan 37-02 — short-circuit helper. Reads the EVAL_FORCE_PROVIDER thread-local
+/// and applies the closure if Some. Called immediately before the production
+/// `providers::complete_turn` dispatch in run_loop_inner. Returns None when no
+/// closure is installed (the production code path runs unchanged).
+#[cfg(test)]
+fn maybe_force_provider(
+    msgs: &[crate::providers::ConversationMessage],
+    tools: &[crate::providers::ToolDefinition],
+) -> Option<Result<crate::providers::AssistantTurn, String>> {
+    EVAL_FORCE_PROVIDER.with(|cell| {
+        cell.borrow().as_ref().map(|f| f(msgs, tools))
+    })
+}
+
 /// Render recent_actions as a compact JSON array. Each summary is
 /// safe_slice'd to 300 chars to bound the prompt size
 /// (CONTEXT lock §Mid-Loop Verification).
@@ -1301,15 +1341,36 @@ async fn run_loop_inner(
             &config.model,
             &format!("complete_turn_{}", iteration),
         );
-        let turn_result = providers::complete_turn(
-            &config.provider,
-            &config.api_key,
-            &config.model,
-            conversation,
-            tools,
-            config.base_url.as_deref(),
-        )
-        .await;
+        let turn_result = {
+            #[cfg(test)]
+            {
+                if let Some(forced) = maybe_force_provider(conversation, tools) {
+                    forced
+                } else {
+                    providers::complete_turn(
+                        &config.provider,
+                        &config.api_key,
+                        &config.model,
+                        conversation,
+                        tools,
+                        config.base_url.as_deref(),
+                    )
+                    .await
+                }
+            }
+            #[cfg(not(test))]
+            {
+                providers::complete_turn(
+                    &config.provider,
+                    &config.api_key,
+                    &config.model,
+                    conversation,
+                    tools,
+                    config.base_url.as_deref(),
+                )
+                .await
+            }
+        };
         let entry = span.finish(turn_result.is_ok(), turn_result.as_ref().err().cloned());
         trace::log_trace(&entry);
         let turn = match turn_result {
