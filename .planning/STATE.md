@@ -4,14 +4,14 @@ milestone: v1.5
 milestone_name: Intelligence Layer
 status: active
 stopped_at: null
-last_updated: "2026-05-07"
-last_activity: 2026-05-07
+last_updated: "2026-05-08"
+last_activity: 2026-05-08
 progress:
   total_phases: 7
   completed_phases: 0
-  total_plans: 47
-  completed_plans: 47
-  percent: 71
+  total_plans: 55
+  completed_plans: 55
+  percent: 81
 ---
 
 # STATE -- BLADE (v1.5 -- Intelligence Layer)
@@ -19,8 +19,8 @@ progress:
 **Project:** BLADE -- Desktop JARVIS
 **Current milestone:** v1.5 -- Intelligence Layer
 **Prior shipped:** v1.4 (2026-05-03), v1.3 (2026-05-02), v1.2 (2026-04-30), v1.1 (2026-04-27), v1.0 (2026-04-19)
-**Current Focus:** Phase 36 — Context Intelligence (code complete; runtime UAT operator-deferred). Phases 32 + 33 + 34 + 35 also UAT-pending.
-**Status:** Phases 32 + 33 + 34 + 35 + 36 all at the `checkpoint:human-verify` boundary. Pending Arnav's runtime UAT on the dev binary for all five phases. Phase 37 (Intelligence Eval) is next; depends on Phases 32-36.
+**Current Focus:** Phase 37 — Intelligence Eval (code complete; runtime UAT operator-deferred at the checkpoint:human-verify boundary). Phases 32 + 33 + 34 + 35 + 36 also UAT-pending.
+**Status:** Phases 32 + 33 + 34 + 35 + 36 + 37 all at the `checkpoint:human-verify` boundary. Pending Arnav's runtime UAT on the dev binary for all six phases. Phase 38 (Close) is next; depends on Phase 37.
 
 ## Current Position
 
@@ -29,11 +29,14 @@ Phase 33 — Agentic Loop (9/9 plans complete; checkpoint:human-verify open)
 Phase 34 — Resilience + Session Persistence (11/11 plans complete; checkpoint:human-verify open)
 Phase 35 — Auto-Decomposition (11/11 plans complete; checkpoint:human-verify open)
 Phase 36 — Context Intelligence (9/9 plans complete; checkpoint:human-verify open)
-Status: Five phases code-complete with static-gate evidence packages green. Each phase resolved its own pre-existing v1.4-style debts during close-out (chat.css ghost tokens; WIRING-AUDIT modules + config fields + routes; DoctorPane TLS bug; verify-emit-policy allowlist; 4-5 critical review fixes per phase).
+Phase 37 — Intelligence Eval (8/8 plans complete; checkpoint:human-verify open — operator-deferred UAT (b) baseline.json)
+Status: Six phases code-complete with static-gate evidence packages green. Each phase resolved its own pre-existing v1.4-style debts during close-out (chat.css ghost tokens; WIRING-AUDIT modules + config fields + routes; DoctorPane TLS bug; verify-emit-policy allowlist; 4-5 critical review fixes per phase).
+
+Last activity: 2026-05-08 — Phase 37 closed to the v1.1-protected boundary autonomously. 16 commits across Phase 37 (CONTEXT + 8 PLANs + 8 SUMMARYs + feat commits). 13 intelligence_eval tests green (10 EVAL-01 + 3 EVAL-02 + EVAL-03 driver + EVAL-04 marker survival + EVAL-05 escape hatch + 2 panic-injection regressions); driver emits 26 rows top-1=26/26 top-3=26/26 MRR=1.000; cargo check clean; verify:intelligence is the 38th gate in verify:all and exits 0 standalone + 0 with BLADE_INTELLIGENCE_EVAL=false skip; intelligence-benchmark bin compiles + wrapper script env-gates correctly. UAT (b) `BLADE_RUN_BENCHMARK=true bash scripts/run-intel-benchmark.sh` is operator-deferred per memory feedback_deferred_uat_pattern.md — operator runs it once + commits eval-runs/v1.5-baseline.json as a separate post-Phase-37-close task.
 
 Last activity: 2026-05-07 — Phase 36 closed to the v1.1-protected boundary autonomously. 30+ commits across Phase 36 (CONTEXT + 9 PLANs + 9 SUMMARYs + feat commits + REVIEW pending). 67 phase36 unit tests + 58 intelligence module tests green; cargo check + cargo check --release + tsc clean; 35/37 npm run verify:all gates green (the 2 failures are pre-existing v1.4 OEVAL-01c organism-eval drift documented at Phase 32+33+34+35 close — out of Phase 36 scope, zero coupling between vitality_engine and intelligence surfaces).
 
-Progress: [███████░░░] 71% (47/47 plans complete across phases 32 + 33 + 34 + 35 + 36; 0/7 phases formally closed pending UAT)
+Progress: [████████░░] 81% (55/55 plans complete across phases 32 + 33 + 34 + 35 + 36 + 37; 0/7 phases formally closed pending UAT)
 
 ```
 32 [~] Context Management              (code complete, UAT pending)
@@ -41,7 +44,7 @@ Progress: [███████░░░] 71% (47/47 plans complete across phas
 34 [~] Resilience + Session Persistence (code complete, UAT pending)
 35 [~] Auto-Decomposition              (code complete, UAT pending)
 36 [~] Context Intelligence            (code complete, UAT pending)
-37 [ ] Intelligence Eval
+37 [~] Intelligence Eval               (code complete, UAT pending)
 38 [ ] Close
 ```
 
@@ -91,6 +94,6 @@ For v1.5:
 
 ## Session Continuity
 
-Last session: v1.5 milestone initialization + roadmap creation
-Stopped at: Roadmap written, REQUIREMENTS.md traceability updated
-Resume with: `/gsd-plan-phase 32`
+Last session: 2026-05-08 — Phase 37 close-out. Plan 37-08 shipped operator-runnable benchmark bin (intelligence-benchmark) + wrapper script + panic-injection regression at the seam boundary + STATE/ROADMAP updates. UAT (a) verify-intelligence.sh standalone PASS; UAT (c) BLADE_INTELLIGENCE_EVAL=false skip path PASS; UAT (b) operator-deferred per memory feedback_deferred_uat_pattern.md.
+Stopped at: Phase 37 checkpoint:human-verify boundary. Plan 37-08 STOPPED at the final task per resume directive — Phase 38 is a separate phase.
+Resume with: `/gsd-plan-phase 38` (after operator UAT (b) completes + eval-runs/v1.5-baseline.json committed)

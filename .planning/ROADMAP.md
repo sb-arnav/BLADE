@@ -210,7 +210,15 @@
   3. Stuck-detection accuracy on 5 synthetic stuck scenarios is >= 80% (detects stuck, does not false-positive on healthy loops)
   4. After N compaction cycles on a known conversation, the critical context elements (task goal, user constraints, key decisions) are still present and accurate in the compacted form
   5. `verify:intelligence` gate is green and the verify chain grows from 37 to 38 gates; all 37 existing gates remain green
-**Plans**: TBD
+**Plans**:
+- [x] 37-01-PLAN.md — EVAL-05 EvalConfig sub-struct (6-place wire-up; intelligence_eval_enabled escape hatch + baseline_path + iterations_cap + stuck_min_accuracy + context_efficiency_strict) + eval-runs/.gitkeep [Wave 1] ✓ commits 571b233 + 6c6dc85
+- [x] 37-02-PLAN.md — EVAL-01 scaffold: evals/intelligence_eval.rs + ScriptedProvider stub + EVAL_FORCE_PROVIDER thread-local seam in loop_engine.rs [Wave 2] ✓ commits 06538e4 + 28daeac
+- [x] 37-03-PLAN.md — EVAL-01 ten multi-step task fixtures (code-edit-multi-file, repo-search-then-summarize, bash-grep-fix-test, web-search-extract, parallel-file-reads, tool-error-recovery, verification-rejected-replan, truncation-retry, compaction-mid-loop, cost-guard-warn) + per-fixture seam runner + first panic-injection regression [Wave 3] ✓ commits 67c03d9 + 63a82e7
+- [x] 37-04-PLAN.md — EVAL-02 three context efficiency fixtures (simple-time-query, code-query-fixed-paths, screen-anchor-query) — direct LAST_BREAKDOWN inspection under per-module token caps [Wave 3] ✓ commits 997cce6 + 0645426
+- [x] 37-05-PLAN.md — EVAL-03 stuck detection (5 stuck + 5 healthy controls); aggregate accuracy >= 0.80 floor enforced [Wave 3] ✓ commits 5324788 + c95ced1
+- [x] 37-06-PLAN.md — EVAL-04 compaction fidelity (3 marker-survival fixtures via build_compaction_summary_prompt) — visibility widened pub(crate) for the eval module [Wave 4] ✓ commits 12cc4c7 + 47ba3bf
+- [x] 37-07-PLAN.md — EVAL-05 verify-intelligence.sh (38th gate) + verify:all wire-up + BLADE_INTELLIGENCE_EVAL escape hatch (CTX-07 8th application) [Wave 4] ✓ commits bb97fb8 + 737e398
+- [x] 37-08-PLAN.md — Operator-runnable benchmark bin (intelligence-benchmark) + scripts/run-intel-benchmark.sh wrapper + 8th panic-injection regression at the seam + STATE/ROADMAP close-out + checkpoint:human-verify [Wave 4] ✓ Code complete (UAT pending — operator runs (b) baseline.json post-Phase-37-close per memory feedback_deferred_uat_pattern.md)
 
 ### Phase 38: Close
 
@@ -246,7 +254,7 @@
 | 34. Resilience + Session Persistence | v1.5 | 0/TBD | Not started | — |
 | 35. Auto-Decomposition | v1.5 | 0/TBD | Not started | — |
 | 36. Context Intelligence | v1.5 | 0/TBD | Not started | — |
-| 37. Intelligence Eval | v1.5 | 0/TBD | Not started | — |
+| 37. Intelligence Eval | v1.5 | 8/8 | Code complete (UAT pending) | — |
 | 38. Close | v1.5 | 0/TBD | Not started | — |
 
 ---
@@ -278,4 +286,4 @@
 
 ---
 
-*Last updated: 2026-05-03 — v1.5 roadmap created. 7 phases (32–38), 38 requirements mapped, 100% coverage. Ready for planning.*
+*Last updated: 2026-05-08 — Phase 37 (Intelligence Eval) closed at the checkpoint:human-verify boundary. 8/8 plans complete; deterministic CI lane (verify:intelligence — gate 38) green; operator-runnable benchmark bin shipped as a structural skeleton with run_loop wiring operator-deferred per CONTEXT §Operator-Runnable Benchmark. UAT (b) baseline.json commit + Phase 38 next.*
