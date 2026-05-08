@@ -200,10 +200,11 @@ Security testing with mandatory ownership verification. Uses Groq or Ollama — 
 
 | Platform | Download |
 |----------|----------|
-| **macOS** (Apple Silicon) | [`.dmg` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.7.4_aarch64.dmg) |
-| **macOS** (Intel) | [`.dmg` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.7.4_x64.dmg) |
-| **Windows** | [`.exe` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.7.4_x64-setup.exe) |
-| **Linux** | [`.AppImage` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_0.7.4_amd64.AppImage) |
+| **macOS** (Apple Silicon) | [`.dmg` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_1.5.0_aarch64.dmg) |
+| **Windows** | [`.exe` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_1.5.0_x64-setup.exe) · [`.msi` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_1.5.0_x64_en-US.msi) |
+| **Linux** | [`.AppImage` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_1.5.0_amd64.AppImage) · [`.deb` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_1.5.0_amd64.deb) · [`.rpm` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade-1.5.0-1.x86_64.rpm) |
+
+> **Intel Mac:** v1.5.0 ships Apple Silicon only. Intel users — open an issue if you need an x64 build.
 
 > **macOS note:** If you see "Blade is damaged and can't be opened", run:
 > ```bash
