@@ -61,6 +61,7 @@
 | voice-orb | N/A (new — Phase 11 Plan 11-05 capability-gap surface) | src/features/voice-orb/VoiceOrbView.tsx | core | 11 | Pending | – | PROV-08 audio capability; palette-hidden main-window route (useCapability gate). Existing voice orb overlay window unchanged. |
 | settings-ecosystem | N/A (new — Phase 13 self-configuring ecosystem) | src/features/settings/panes/EcosystemPane.tsx | core | 13 | Shipped | – | Phase 13 ecosystem tentacle management tab; referenced by dashboard empty-state CTAs in Phase 14 |
 | system-lock-screen | N/A (new) | src/features/settings/LockScreen.tsx | core | 14 | Pending | – |  |
+| sessions | N/A (new) | src/features/sessions/Sessions.tsx | core | 34 | Pending | – |  |
 | diagnostics-dev | src.bak/components/Diagnostics.tsx | src/features/dev/Diagnostics.tsx | dev | 1 | Shipped | – | DEV-only listener counter + perf marks; palette-hidden |
 | primitives | N/A (new — dev showcase) | src/features/dev/Primitives.tsx | dev | 1 | Shipped | – | DEV-only showcase; palette-hidden |
 | wrapper-smoke | N/A (new — P-04 harness) | src/features/dev/WrapperSmoke.tsx | dev | 1 | Shipped | – | DEV-only P-04 harness; palette-hidden |
@@ -126,11 +127,11 @@
 
 ## Totals
 
-- **Routes tracked:** 108
-- **Pending:** 93
+- **Routes tracked:** 109
+- **Pending:** 94
 - **Shipped:** 15
 - **Deferred:** 0
-- **Source:** 19 feature clusters under `src/features/` (`activity-log`, `admin`, `agents`, `body`, `chat`, `dashboard`, `dev`, `dev-tools`, `ghost`, `hive`, `hud`, `identity`, `knowledge`, `life-os`, `onboarding`, `providers`, `quickask`, `settings`, `voice-orb`)
+- **Source:** 20 feature clusters under `src/features/` (`activity-log`, `admin`, `agents`, `body`, `chat`, `dashboard`, `dev`, `dev-tools`, `ghost`, `hive`, `hud`, `identity`, `knowledge`, `life-os`, `onboarding`, `providers`, `quickask`, `sessions`, `settings`, `voice-orb`)
 
 ## Re-seed
 
