@@ -51,13 +51,15 @@ fn to_row(label: &str, requirement: &str, passed: bool, result: &str, expected: 
 
 fn fixtures() -> Vec<IntelligenceFixture> {
     let mut v = Vec::new();
-    // Plan 37-04 wires this:
-    // v.extend(fixtures_eval_02_context_efficiency());
+    // Banner ordering per CONTEXT lock §intelligence_eval.rs Module Layout:
+    // EVAL-02 → EVAL-03 → EVAL-04 → EVAL-01 (broadest fixture last).
+    // Plan 37-04 wired:
+    v.extend(fixtures_eval_02_context_efficiency());
     // Plan 37-05 wires this:
     // v.extend(fixtures_eval_03_stuck_detection());
     // Plan 37-06 wires this:
     // v.extend(fixtures_eval_04_compaction_fidelity());
-    // Plan 37-03 wires this:
+    // Plan 37-03 wired:
     v.extend(fixtures_eval_01_multi_step_tasks());
     v
 }
@@ -226,6 +228,357 @@ mod tests {
             &rows,
         );
     }
+}
+
+// ── EVAL-02: Context efficiency fixtures ──────────────────────────────────
+//
+// Plan 37-04 / EVAL-02 — 3 fixtures asserting LAST_BREAKDOWN section presence
+// + total-token cap. CONTEXT lock §EVAL-02. No live LLM calls — pure prompt
+// assembly inspection via brain::build_system_prompt_for_model +
+// brain::read_section_breakdown.
+//
+// Token estimation reuses the existing Phase 32 chars/4 helper (CONTEXT lock
+// §EVAL-02 Locked: Token estimation reuses).
+//
+// ── DEVIATION DOC: section labels + "forbidden" semantics ──────────────────
+// 1. CONTEXT placeholder labels updated to match production strings recorded
+//    by record_section() in brain.rs:805-1750:
+//      - "identity"   → "identity_supplement" (brain.rs:811; "identity" never
+//        used as a record_section label — it's only a score_context_relevance
+//        keyword type at brain.rs:509)
+//      - "ocr"        → "vision" (brain.rs:1069/1071/1074/1077 — the OCR-bearing
+//        section is labelled "vision")
+//    "repo_map", "anchor_screen", "hormones" map verbatim to production.
+//
+// 2. "Forbidden" means the section must have ZERO chars, NOT that the label
+//    must be absent. Production code calls record_section("repo_map", 0) and
+//    record_section("hormones", 0) etc. unconditionally even when the gate
+//    closes (brain.rs:907, 1493, etc.) — so the breakdown VECTOR always
+//    contains those labels. The semantic CONTEXT means is "section was not
+//    injected" which maps to chars == 0 in production. Asserting label-absence
+//    would fail every fixture deterministically.
+//
+// 3. The code-query-fixed-paths fixture uses the existing
+//    `INTEL_FORCE_PAGERANK_RESULT` test seam (intelligence::repo_map.rs:90)
+//    instead of calling intelligence::symbol_graph::reindex_project. The
+//    seam path mirrors brain.rs:3167 (phase36_intel_03_brain_injects_repo_map_at_code_gate)
+//    verbatim — it's the canonical test path for forcing a non-empty repo
+//    map without populating the kg_nodes/kg_edges DB. reindex_project also
+//    requires a writeable rusqlite::Connection which complicates the test
+//    runtime; the FORCE seam needs neither DB nor disk.
+// ─────────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+struct ContextEfficiencyFixture {
+    label: &'static str,
+    query: &'static str,
+    expected_max_total_tokens: usize,
+    forbidden_section_labels: &'static [&'static str],
+    required_section_labels: &'static [&'static str],
+    requirement_tag: &'static str,
+}
+
+#[cfg(test)]
+fn eval_02_total_tokens(breakdown: &[(String, usize)]) -> usize {
+    // Token estimation reuses Phase 32's chars/4 helper (CONTEXT lock §EVAL-02).
+    // Sum every section's char count, then divide by 4 to approximate tokens.
+    breakdown.iter().map(|(_, chars)| *chars).sum::<usize>() / 4
+}
+
+/// Aggregate per-label char counts. record_section() may push the same label
+/// multiple times (e.g. "anchor_screen" / "anchor_file" / "anchor_memory"
+/// each push once per anchor_injection entry); sum them so a single label
+/// = single row in our forbidden/required logic.
+#[cfg(test)]
+fn eval_02_label_chars(breakdown: &[(String, usize)], label: &str) -> usize {
+    breakdown.iter().filter(|(l, _)| l == label).map(|(_, c)| *c).sum()
+}
+
+/// Process-local mutex serialising EVAL-02 fixtures. Each fixture clears
+/// LAST_BREAKDOWN, calls build_system_prompt_for_model, then reads the
+/// breakdown — the accumulator is process-global (brain.rs:291) and
+/// `--test-threads=1` is mandatory per CONTEXT lock §verify-intelligence.sh
+/// Gate, but a defensive lock makes the eval robust to a future
+/// `cargo test` invocation that forgets the flag.
+#[cfg(test)]
+static EVAL_02_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[cfg(test)]
+fn eval_02_run(fix: &ContextEfficiencyFixture) -> (bool, String) {
+    let _guard = EVAL_02_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
+    // Clear the breakdown accumulator before the prompt build. The Phase 32
+    // contract is that build_system_prompt_inner clears+repopulates on every
+    // invocation (brain.rs:774 — clear_section_accumulator at the top of the
+    // builder), but an explicit clear here means a sibling test that didn't
+    // clear cannot bleed entries into our read.
+    crate::brain::clear_section_accumulator();
+
+    // Use the public Tauri-friendly wrapper. The wrapper calls
+    // build_system_prompt_inner with a real provider/model so the smart
+    // injection gate engages (matches production behavior). Default tier
+    // resolves via model_tier(provider, model); anchor_injections=&[] for
+    // the simple/code fixtures, populated for screen-anchor.
+    let _prompt = crate::brain::build_system_prompt_for_model(
+        &[],
+        fix.query,
+        None,
+        "anthropic",
+        "claude-sonnet-4",
+        1,
+        &[],
+    );
+
+    let breakdown = crate::brain::read_section_breakdown();
+    let total_tokens = eval_02_total_tokens(&breakdown);
+
+    // Forbidden: section's aggregated char count must be 0 (gate closed,
+    // section not injected). See deviation doc above for why label-absence
+    // is the wrong test.
+    let forbidden_violations: Vec<String> = fix.forbidden_section_labels.iter()
+        .filter(|forbid| eval_02_label_chars(&breakdown, forbid) > 0)
+        .map(|s| s.to_string())
+        .collect();
+    let no_forbidden = forbidden_violations.is_empty();
+
+    // Required: section's aggregated char count must be > 0 (gate open,
+    // section actually injected).
+    let missing_required: Vec<String> = fix.required_section_labels.iter()
+        .filter(|req| eval_02_label_chars(&breakdown, req) == 0)
+        .map(|s| s.to_string())
+        .collect();
+    let all_required = missing_required.is_empty();
+
+    let cap_ok = total_tokens <= fix.expected_max_total_tokens;
+
+    let cfg = crate::config::load_config();
+    let strict = cfg.eval.context_efficiency_strict;
+    let passed = if strict {
+        cap_ok && no_forbidden && all_required
+    } else {
+        // Soft-warn mode: only required labels are asserted. Cap and
+        // forbidden produce warnings but do not fail the row. CONTEXT lock
+        // §EvalConfig Sub-Struct §Locked: context_efficiency_strict.
+        all_required
+    };
+
+    let summary = format!(
+        "[{}] {}: total={}t (cap {}t, ok={}), no_forbidden={} (violators=[{}]), all_required={} (missing=[{}])",
+        fix.requirement_tag, fix.label, total_tokens, fix.expected_max_total_tokens, cap_ok,
+        no_forbidden, forbidden_violations.join(","),
+        all_required, missing_required.join(",")
+    );
+    (passed, summary)
+}
+
+// ── Fixture 1: simple-time-query ──────────────────────────────────────────
+//
+// "what time is it?" — score_context_relevance returns 0 for all heavy
+// keyword bags ("code", "vision", "hearing", "smart_home", etc.) so every
+// section gate at brain.rs:1409+ should close. Always-keep core
+// (blade_md + identity_supplement) lands unconditionally.
+
+// Cap calibrated against measured baseline. Plan author estimate was 800t but
+// the always-keep core (identity_supplement embeds date/time/OS/model) is
+// ~1187t in a clean test env (no BLADE.md, no L0 facts, no character bible
+// on disk). 1500t gives ~26% headroom — tight enough to catch a regression
+// that doubled the always-keep core (e.g. an unintended new always-on
+// section), loose enough to absorb environment variation.
+#[cfg(test)]
+const FIXTURE_SIMPLE_TIME_QUERY: ContextEfficiencyFixture = ContextEfficiencyFixture {
+    label: "simple-time-query",
+    query: "what time is it?",
+    expected_max_total_tokens: 1500,
+    forbidden_section_labels: &["vision", "hormones", "repo_map", "anchor_screen"],
+    required_section_labels: &["identity_supplement"],
+    requirement_tag: "EVAL-02",
+};
+
+#[cfg(test)]
+fn fixture_simple_time_query() -> (bool, String) {
+    eval_02_run(&FIXTURE_SIMPLE_TIME_QUERY)
+}
+
+// ── Fixture 2: code-query-fixed-paths ─────────────────────────────────────
+//
+// "fix the bug in commands.rs::run_loop where iteration counter overruns"
+// — high-signal "code" keywords ("fix", "bug", "commands.rs") open the code
+// gate at brain.rs:1409. With INTEL_FORCE_PAGERANK_RESULT installed, the
+// repo_map branch fires (brain.rs:1438→intelligence::repo_map::build_repo_map
+// → rank_symbols_or_fallback honors the seam at intelligence/repo_map.rs:253)
+// and a non-zero "repo_map" row lands in LAST_BREAKDOWN.
+//
+// Test-seam path mirrors brain.rs:3167 (phase36_intel_03_brain_injects_repo_map_at_code_gate)
+// verbatim. No DB or symbol-graph reindex required.
+
+#[cfg(test)]
+const FIXTURE_CODE_QUERY_FIXED_PATHS: ContextEfficiencyFixture = ContextEfficiencyFixture {
+    label: "code-query-fixed-paths",
+    query: "fix the bug in commands.rs::run_loop where iteration counter overruns",
+    expected_max_total_tokens: 4000,
+    forbidden_section_labels: &["vision"],
+    required_section_labels: &["identity_supplement", "repo_map"],
+    requirement_tag: "EVAL-02",
+};
+
+#[cfg(test)]
+fn fixture_code_query_fixed_paths() -> (bool, String) {
+    let _guard = EVAL_02_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
+    // Force a synthetic non-empty PageRank result so build_repo_map returns
+    // Some(rendered) and brain.rs's repo_map injection branch fires. Mirrors
+    // brain.rs:3167 verbatim.
+    use crate::intelligence::repo_map::INTEL_FORCE_PAGERANK_RESULT;
+    use crate::intelligence::symbol_graph::{SymbolKind, SymbolNode};
+    let synthetic = vec![(
+        SymbolNode {
+            id: "sym:eval_02_run_loop_target".to_string(),
+            name: "run_loop".to_string(),
+            kind: SymbolKind::Function,
+            file_path: "/blade/src-tauri/src/commands.rs".to_string(),
+            line_start: 1,
+            line_end: 50,
+            language: "rust".to_string(),
+            indexed_at: 0,
+        },
+        0.5_f32,
+    )];
+    INTEL_FORCE_PAGERANK_RESULT.with(|c| c.set(Some(synthetic)));
+
+    // Run the fixture. eval_02_run holds EVAL_02_LOCK internally — but we
+    // already hold it here, and std::sync::Mutex isn't reentrant. Drop our
+    // guard before recursing.
+    drop(_guard);
+    let result = eval_02_run(&FIXTURE_CODE_QUERY_FIXED_PATHS);
+
+    // Always clear the seam so a subsequent test that doesn't expect
+    // forced-rank doesn't see the synthetic row.
+    INTEL_FORCE_PAGERANK_RESULT.with(|c| c.set(None));
+
+    result
+}
+
+// ── Fixture 3: screen-anchor-query (Claude's-discretion swap from CONTEXT) ──
+//
+// "@screen what app is this?" — anchor_injections carries an
+// ("anchor_screen", content) tuple which bypasses the Phase 32 selective-
+// injection gates entirely (brain.rs:791-797). The anchored content is
+// pushed at the very top of `parts`, and record_section("anchor_screen", N)
+// fires with N>0. Code-shaped keywords are absent so repo_map gate stays
+// closed.
+//
+// CONTEXT lock §EVAL-02: planner picked screen-anchor over general-conversation
+// to broaden INTEL-06 (Phase 36 anchor parser) coverage.
+
+#[cfg(test)]
+const FIXTURE_SCREEN_ANCHOR_QUERY: ContextEfficiencyFixture = ContextEfficiencyFixture {
+    label: "screen-anchor-query",
+    query: "@screen what app is this?",
+    expected_max_total_tokens: 1500,
+    forbidden_section_labels: &["repo_map"],
+    required_section_labels: &["identity_supplement", "anchor_screen"],
+    requirement_tag: "EVAL-02",
+};
+
+#[cfg(test)]
+fn fixture_screen_anchor_query() -> (bool, String) {
+    let _guard = EVAL_02_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
+    // For this fixture we bypass eval_02_run and call build_system_prompt_for_model
+    // directly with a non-empty anchor_injections list. The screen anchor parser
+    // (intelligence::anchor_parser) lives behind commands.rs's prelude — for an
+    // eval that inspects prompt-assembly only, we synthesize the resolved-anchor
+    // tuple directly (mirroring how commands.rs's anchor_parser::resolve_anchors
+    // produces the (label, content) pairs). The label must be exactly
+    // "anchor_screen" for record_section to use it as the breakdown key
+    // (brain.rs:783 + 796).
+
+    crate::brain::clear_section_accumulator();
+
+    let synthetic_screen_payload = "[Active app: Visual Studio Code]\n\
+        Window title: src/main.rs - blade\n\
+        Visible content (OCR excerpt): fn run_loop() { ... iteration counter ... }".to_string();
+    let anchors: Vec<(String, String)> = vec![
+        ("anchor_screen".to_string(), synthetic_screen_payload),
+    ];
+
+    let _prompt = crate::brain::build_system_prompt_for_model(
+        &[],
+        FIXTURE_SCREEN_ANCHOR_QUERY.query,
+        None,
+        "anthropic",
+        "claude-sonnet-4",
+        1,
+        &anchors,
+    );
+
+    let breakdown = crate::brain::read_section_breakdown();
+    let total_tokens = eval_02_total_tokens(&breakdown);
+
+    let forbidden_violations: Vec<String> = FIXTURE_SCREEN_ANCHOR_QUERY.forbidden_section_labels.iter()
+        .filter(|forbid| eval_02_label_chars(&breakdown, forbid) > 0)
+        .map(|s| s.to_string())
+        .collect();
+    let no_forbidden = forbidden_violations.is_empty();
+
+    let missing_required: Vec<String> = FIXTURE_SCREEN_ANCHOR_QUERY.required_section_labels.iter()
+        .filter(|req| eval_02_label_chars(&breakdown, req) == 0)
+        .map(|s| s.to_string())
+        .collect();
+    let all_required = missing_required.is_empty();
+
+    let cap_ok = total_tokens <= FIXTURE_SCREEN_ANCHOR_QUERY.expected_max_total_tokens;
+
+    let cfg = crate::config::load_config();
+    let strict = cfg.eval.context_efficiency_strict;
+    let passed = if strict {
+        cap_ok && no_forbidden && all_required
+    } else {
+        all_required
+    };
+
+    let summary = format!(
+        "[{}] {}: total={}t (cap {}t, ok={}), no_forbidden={} (violators=[{}]), all_required={} (missing=[{}])",
+        FIXTURE_SCREEN_ANCHOR_QUERY.requirement_tag, FIXTURE_SCREEN_ANCHOR_QUERY.label,
+        total_tokens, FIXTURE_SCREEN_ANCHOR_QUERY.expected_max_total_tokens, cap_ok,
+        no_forbidden, forbidden_violations.join(","),
+        all_required, missing_required.join(",")
+    );
+    (passed, summary)
+}
+
+// ── EVAL-02 fixture aggregator ────────────────────────────────────────────
+
+#[cfg(test)]
+fn fixtures_eval_02_context_efficiency() -> Vec<IntelligenceFixture> {
+    vec![
+        IntelligenceFixture { label: "simple-time-query",       requirement: "EVAL-02", run: fixture_simple_time_query },
+        IntelligenceFixture { label: "code-query-fixed-paths",  requirement: "EVAL-02", run: fixture_code_query_fixed_paths },
+        IntelligenceFixture { label: "screen-anchor-query",     requirement: "EVAL-02", run: fixture_screen_anchor_query },
+    ]
+}
+
+// ── EVAL-02 per-fixture regression tests ──────────────────────────────────
+
+#[cfg(test)]
+#[test]
+fn phase37_eval_02_simple_time_query_under_token_cap() {
+    let (passed, summary) = fixture_simple_time_query();
+    assert!(passed, "EVAL-02 simple-time-query failed: {}", summary);
+}
+
+#[cfg(test)]
+#[test]
+fn phase37_eval_02_code_query_fixed_paths_under_token_cap() {
+    let (passed, summary) = fixture_code_query_fixed_paths();
+    assert!(passed, "EVAL-02 code-query-fixed-paths failed: {}", summary);
+}
+
+#[cfg(test)]
+#[test]
+fn phase37_eval_02_screen_anchor_query_under_token_cap() {
+    let (passed, summary) = fixture_screen_anchor_query();
+    assert!(passed, "EVAL-02 screen-anchor-query failed: {}", summary);
 }
 
 // ── EVAL-01: Multi-step task fixtures ──────────────────────────────────────
