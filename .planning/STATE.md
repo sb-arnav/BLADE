@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Intelligence Layer
-status: active
+status: complete
 stopped_at: null
 last_updated: "2026-05-08"
 last_activity: 2026-05-08
 progress:
   total_phases: 7
-  completed_phases: 0
-  total_plans: 55
-  completed_plans: 55
-  percent: 81
+  completed_phases: 1
+  total_plans: 59
+  completed_plans: 59
+  percent: 84
 ---
 
 # STATE -- BLADE (v1.5 -- Intelligence Layer)
@@ -19,8 +19,8 @@ progress:
 **Project:** BLADE -- Desktop JARVIS
 **Current milestone:** v1.5 -- Intelligence Layer
 **Prior shipped:** v1.4 (2026-05-03), v1.3 (2026-05-02), v1.2 (2026-04-30), v1.1 (2026-04-27), v1.0 (2026-04-19)
-**Current Focus:** Phase 37 — Intelligence Eval (code complete; runtime UAT operator-deferred at the checkpoint:human-verify boundary). Phases 32 + 33 + 34 + 35 + 36 also UAT-pending.
-**Status:** Phases 32 + 33 + 34 + 35 + 36 + 37 all at the `checkpoint:human-verify` boundary. Pending Arnav's runtime UAT on the dev binary for all six phases. Phase 38 (Close) is next; depends on Phase 37.
+**Current Focus:** v1.5 Intelligence Layer closed 2026-05-08 (status: tech_debt). README + CHANGELOG + v1.5-MILESTONE-AUDIT shipped; Phase 32-38 directories archived to `.planning/milestones/v1.5-phases/`. Operator next-steps tracked in audit gaps + tech_debt arrays. v1.6 — TBD (operator runs `/gsd-new-milestone v1.6` to scope).
+**Status:** v1.5 closed `tech_debt`. Phases 32-37 carry operator-deferred runtime UAT (gaps array). OEVAL-01c v1.4 organism-eval drift carries forward to v1.6+ (tech_debt array). Phase 38 docs-only close shipped with sanity-checked static gates.
 
 ## Current Position
 
@@ -36,7 +36,7 @@ Last activity: 2026-05-08 — Phase 37 closed to the v1.1-protected boundary aut
 
 Last activity: 2026-05-07 — Phase 36 closed to the v1.1-protected boundary autonomously. 30+ commits across Phase 36 (CONTEXT + 9 PLANs + 9 SUMMARYs + feat commits + REVIEW pending). 67 phase36 unit tests + 58 intelligence module tests green; cargo check + cargo check --release + tsc clean; 35/37 npm run verify:all gates green (the 2 failures are pre-existing v1.4 OEVAL-01c organism-eval drift documented at Phase 32+33+34+35 close — out of Phase 36 scope, zero coupling between vitality_engine and intelligence surfaces).
 
-Progress: [████████░░] 81% (55/55 plans complete across phases 32 + 33 + 34 + 35 + 36 + 37; 0/7 phases formally closed pending UAT)
+Progress: [████████░░] 84% (59/59 plans complete; 1/7 phases formally closed -- Phase 38 close shipped; Phases 32-37 code-complete + UAT-pending per audit gaps array)
 
 ```
 32 [~] Context Management              (code complete, UAT pending)
@@ -45,7 +45,7 @@ Progress: [████████░░] 81% (55/55 plans complete across phas
 35 [~] Auto-Decomposition              (code complete, UAT pending)
 36 [~] Context Intelligence            (code complete, UAT pending)
 37 [~] Intelligence Eval               (code complete, UAT pending)
-38 [ ] Close
+38 [x] Close                           (shipped 2026-05-08; tech_debt)
 ```
 
 ## Project Reference
@@ -94,6 +94,6 @@ For v1.5:
 
 ## Session Continuity
 
-Last session: 2026-05-08 — Phase 37 close-out. Plan 37-08 shipped operator-runnable benchmark bin (intelligence-benchmark) + wrapper script + panic-injection regression at the seam boundary + STATE/ROADMAP updates. UAT (a) verify-intelligence.sh standalone PASS; UAT (c) BLADE_INTELLIGENCE_EVAL=false skip path PASS; UAT (b) operator-deferred per memory feedback_deferred_uat_pattern.md.
-Stopped at: Phase 37 checkpoint:human-verify boundary. Plan 37-08 STOPPED at the final task per resume directive — Phase 38 is a separate phase.
-Resume with: `/gsd-plan-phase 38` (after operator UAT (b) completes + eval-runs/v1.5-baseline.json committed)
+Last session: 2026-05-08 — Phase 38 close shipped. Plan 38-01 README updates (Intelligence Layer section + Research Foundations + Roadmap markers); Plan 38-02 CHANGELOG ## [1.5.0] entry + Verify-Gate Evolution row; Plan 38-03 .planning/milestones/v1.5-MILESTONE-AUDIT.md (status: tech_debt, 42/42 routed); Plan 38-04 phase archive (7 git mv to milestones/v1.5-phases) + REQUIREMENTS/ROADMAP snapshots + STATE/PROJECT updates. Sanity-checked: cargo check + tsc --noEmit + verify-intelligence.sh all exit 0.
+Stopped at: v1.5 milestone closed (status: tech_debt). No checkpoint:human-verify task — Phase 38 is documentary.
+Resume with: `/gsd-new-milestone v1.6` when operator decides v1.6 scope. Operator next-steps (audit gaps): runtime UAT for Phases 32-37 + `BLADE_RUN_BENCHMARK=true bash scripts/run-intel-benchmark.sh` + optional OEVAL-01c v1.4 repair.

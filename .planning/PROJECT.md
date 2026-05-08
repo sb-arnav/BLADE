@@ -191,4 +191,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-*Last updated: 2026-05-03 — v1.5 milestone scoped via /gsd-new-milestone. v1.4 Cognitive Architecture closed clean (7 phases, 37 gates, zero debt). v1.5 Intelligence Layer: fix the agentic loop (selective context, compaction, verification, stuck detection, auto-decomposition) + port proven patterns (Aider repo map, OpenHands condenser, Goose capability registry). Competitive audit confirmed BLADE is alone in the full-stack desktop agent space — but loop quality lags dedicated tools.*
+*Last updated: 2026-05-08 — v1.5 Intelligence Layer closed (status: tech_debt; 7 phases, 59 plans, verify gates 38 with OEVAL-01c v1.4 carry-forward). README + CHANGELOG + v1.5-MILESTONE-AUDIT shipped; Phase 32-38 archived to milestones/v1.5-phases/. Operator next-steps tracked in audit gaps + tech_debt arrays. v1.6 — TBD (operator scopes via /gsd-new-milestone).*
