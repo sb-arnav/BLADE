@@ -4,6 +4,7 @@ version = "1.5.0"
 description = "Blade - Personal AI"
 authors = ["Arnav Maurya"]
 edition = "2021"
+default-run = "blade"
 
 [lib]
 name = "blade_lib"
