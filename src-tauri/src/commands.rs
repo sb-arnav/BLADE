@@ -1606,6 +1606,37 @@ pub(crate) async fn send_message_stream_inline(
     let mut tools = mcp_tools;
     tools.extend(native_tools);
 
+    // ── B3 / B5 backstop: sanitize tool names before they leave the process ──
+    //
+    // Anthropic enforces tool name regex `^[a-zA-Z0-9_-]{1,128}$` and uniqueness.
+    // Tool registries can drift (external MCP servers, evolution loop, future
+    // built-ins) and a single bad name 400s the entire turn. This is the wire-
+    // level guard so a stale/poisoned manager state never reaches the provider.
+    // First-wins on duplicates (native_tools were appended last so MCP entries
+    // take precedence — flip the order above if you want the opposite).
+    let sanitize_re = regex::Regex::new(r"^[a-zA-Z0-9_-]{1,128}$").expect("static regex");
+    let pre_sanitize_count = tools.len();
+    let mut seen_names: std::collections::HashSet<String> = std::collections::HashSet::new();
+    tools.retain(|t| {
+        if !sanitize_re.is_match(&t.name) {
+            log::warn!("[tools] dropping invalid tool name (regex): {}", t.name);
+            return false;
+        }
+        if !seen_names.insert(t.name.clone()) {
+            log::warn!("[tools] dropping duplicate tool name: {}", t.name);
+            return false;
+        }
+        true
+    });
+    if tools.len() != pre_sanitize_count {
+        log::info!(
+            "[tools] sanitized {} → {} ({} dropped)",
+            pre_sanitize_count,
+            tools.len(),
+            pre_sanitize_count - tools.len()
+        );
+    }
+
     // Capture message count before build_conversation moves the Vec.
     let input_message_count = messages.len();
     // Phase 33 / LOOP-05 — `mut` (was immutable) so the fast-path branch can
