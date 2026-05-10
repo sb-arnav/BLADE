@@ -513,11 +513,17 @@ impl McpManager {
 
     /// Register the built-in in-process servers (memory + filesystem).
     /// Call once at startup after McpManager is created.
+    ///
+    /// v1.5.1: emits no tools. The `blade.fs.*` / `blade.memory.*`
+    /// qualified names violate Anthropic's tool-name regex
+    /// `^[a-zA-Z0-9_-]{1,128}$` (dots not allowed) and also duplicate
+    /// equivalents already in `native_tools::tool_definitions()`
+    /// (`blade_read_file`, `blade_memory_search`, etc.) — which broke
+    /// every tool-using turn on Anthropic. Dispatch arms for these
+    /// server_names are kept harmlessly below in case anything still
+    /// calls a qualified name with the old shape.
     pub fn register_built_in_servers(&mut self) {
-        let memory_tools = crate::mcp_memory_server::register_built_in_tools();
-        self.tools.extend(memory_tools);
-        let fs_tools = crate::mcp_fs_server::register_built_in_tools();
-        self.tools.extend(fs_tools);
+        // intentionally empty — see comment above
     }
 
     /// Call a tool by its qualified name.
