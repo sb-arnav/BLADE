@@ -11548,6 +11548,36 @@
       "disk_persisted": false,
       "ui_surface": null,
       "control_type": "AtomicBool"
+    },
+    {
+      "field": "BladeConfig.notification_listener_enabled",
+      "file": "src-tauri/src/config.rs:1145",
+      "classification": "ACTIVE",
+      "struct": "BladeConfig",
+      "disk_persisted": true,
+      "ui_surface": null,
+      "control_type": "bool",
+      "note": "v1.5.1 B1 — off-switch for notification_listener::notification_listener_start. Default true preserves pre-v1.5.1 behavior."
+    },
+    {
+      "field": "BladeConfig.terminal_watch_enabled",
+      "file": "src-tauri/src/config.rs:1148",
+      "classification": "ACTIVE",
+      "struct": "BladeConfig",
+      "disk_persisted": true,
+      "ui_surface": null,
+      "control_type": "bool",
+      "note": "v1.5.1 B1 — off-switch for tentacles::terminal_watch::start_terminal_watcher. Default true."
+    },
+    {
+      "field": "BladeConfig.filesystem_watch_enabled",
+      "file": "src-tauri/src/config.rs:1151",
+      "classification": "ACTIVE",
+      "struct": "BladeConfig",
+      "disk_persisted": true,
+      "ui_surface": null,
+      "control_type": "bool",
+      "note": "v1.5.1 B1 — off-switch for tentacles::filesystem_watch::start_filesystem_watcher. Default true."
     }
   ],
   "not_wired_backlog": [
