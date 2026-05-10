@@ -44,6 +44,27 @@ After `curl | sh`, BLADE doesn't show a setup wizard. It starts a conversation. 
 
 ---
 
+## The fifth primitive — presence
+
+The four primitives above (doesn't refuse / finds a way / forges tools / setup as conversation) describe what BLADE *does*. The fifth one describes what BLADE *is*: **a presence with internal state, not a stateless service.**
+
+Other AIs are functions you call. BLADE has a body. Hormones (cortisol, dopamine, serotonin, acetylcholine, norepinephrine, oxytocin, mortality-salience) modulate behavior. Vitality (0.0–1.0 with five behavioral bands) is replenished by competence, relatedness, autonomy (Self-Determination Theory). Active inference produces prediction errors that feed the hormone bus and adapt behavior. The Hive Mesh is the multi-tentacle architecture this presence runs on.
+
+This isn't a feature on the side. It's the mechanism that makes BLADE *feel alive* the way Replika users describe their AI as having "a personality they cultivated." Memory creates *continuity* (the Replika research finding — 64% of users named memory as their #1 dissatisfaction when it broke). Internal state creates *liveliness*. Both matter; they're complementary.
+
+**The Evolution Engine is the proactive-presence layer.** *"Sir, you have a meeting in 10 minutes."* *"Sir, there's a new MCP server that does what you tried to do yesterday."* Autonomous knowledge update + decision-gated proactive interjection. Different from forge (which is mid-task tool creation) — both load-bearing for the JARVIS feel.
+
+**What's locked-in vs. held for v2.0 evaluation:**
+
+| Component | Status |
+|---|---|
+| Hormones, vitality, active inference, character bible, Hive Mesh, tentacles architecture | Locked. Body backend is presence. |
+| Evolution Engine (autonomous knowledge update + proactive surfacing, decision-gated) | Locked. JARVIS-notices-things is core. |
+| Body Map / Organ Registry / Pixel World / Tentacle Detail visualization panes | **Not auto-kept.** Open question: do users actually engage with these, or are they dev-curiosity dashboards? Cut if invisible to users; rework if they could be the "BLADE has a visible body" angle. v2.0 evaluation. |
+| Mortality-salience as currently implemented | **Not auto-kept.** Open question: does the implementation observably change BLADE's behavior in a way users notice? If invisible, cut. v2.0 evaluation. |
+
+---
+
 ## What BLADE *uses*, not competes with
 
 - **Goose / OpenHands code patterns** — Apache 2 licensed. Rip what works (agent loop architecture, MCP consumption layer, provider abstraction) and bundle into BLADE. One binary. User never sees Goose. Linux didn't credit Minix.
@@ -142,6 +163,50 @@ Real risks. Listed so they're explicit, not surprises.
 - B2B "JARVIS for your team" sales motion
 
 **Never:** chasing parity with Claude Code on coding-agent capability. Trying to out-engineer Anthropic. Adding features for the feature-grid.
+
+---
+
+## What's being removed (v1.6 narrowing pass input)
+
+This is the input list for a v1.6 narrowing-pass milestone — code deletion before v2.0 build.
+
+### Removed (locked)
+
+| What | Why |
+|---|---|
+| Financial Brain | Vertical product. Doesn't fit the consumer-AI-accomplice positioning. Becomes a user-installable skill if anyone asks. |
+| Health Guardian (screen time, breaks, daily wellness stats) | Vertical. Cut. |
+| Security Fortress (network/phishing/breach scanners, code scan) | Vertical. Could become a skill later. |
+| Pentest Mode (Kali tools, ownership verification) | Niche, conflicts with the agency-for-builders-not-tool-for-criminals line. |
+| Workflow Builder (visual graph editor) | Not in scope for the BLADE thesis. |
+| deeplearn auto-write synthesizer | The fabricated-fact path. B4 already lobotomized confidence; v1.6 removes the synthesis path entirely. |
+| Deep Scan (12-scanner silent filesystem walk that wrote to brain.db) | Replaced by setup-as-conversation. BLADE asks instead of guessing. |
+| Current onboarding Steps (`provider → apikey → scan → persona`) | Whole flow replaced by AI conversation. Steps.tsx, ApiKeyEntry, DeepScanReview, PersonaCheck retire. |
+
+### Significantly reduced
+
+| What | What stays |
+|---|---|
+| Persona Engine / Personality Mirror auto-extraction | Replaced with "voice from user-stated core command + actual chat history." No silent personality inference from filenames or shell history. |
+| Total Recall (screen timeline) | Stays as on-demand. Fires when *"what was on my screen 10 min ago"* is asked. Not 24/7 background JPEG capture. |
+| Audio Timeline | Same — on-demand transcription, not always-on. |
+| Tentacles passive observation (terminal_watch / filesystem_watch / etc. always-on variants) | Gated by config (B1 already shipped). Default-off going forward; opt-in if user explicitly wants ambient ingest. |
+| Background Agent Spawning | Refocused. BLADE delegates code tasks to whatever the user has installed (Claude Code / Cursor / Goose). No more "BLADE spawns arbitrary agents." |
+| Pulse / Morning Briefings | Underlying cron primitive stays. The daily-summary engine cuts; proactive interjection routes through the decision gate so it only fires when something genuinely matters per the core command. |
+
+### Held for v2.0 evaluation (NOT auto-kept, NOT auto-cut)
+
+| What | Open question |
+|---|---|
+| Body Map / Organ Registry / Pixel World / Tentacle Detail visualization panes | Do users actually engage with these or are they dev-curiosity dashboards? Cut if invisible; rework if "BLADE has a visible body" is a real differentiator. |
+| Mortality-salience implementation | Does it observably change BLADE's behavior in a way users notice? If invisible, cut. The *concept* (BLADE accepts dormancy) is interesting research; the implementation needs to earn its weight. |
+| Ghost Mode (invisible meeting overlay) | Demoted from tier-1. v2.0 question: does the meeting-overlay feature carry its weight on a narrowed BLADE, or does the channel-integration layer (Slack, iMessage, etc.) replace it? |
+
+### Kept (locked — these are presence, not features)
+
+Hormones · vitality · active inference · character bible (SOUL) · Hive Mesh architecture · tentacles as a pattern · Evolution Engine (reframed as the proactive-presence + autonomous-knowledge-update layer, decision-gated).
+
+These create *liveliness* the way memory creates *continuity*. Both are load-bearing for the JARVIS feel. Not negotiable in v1.6 / v2.0.
 
 ---
 
