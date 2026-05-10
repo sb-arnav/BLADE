@@ -1,5 +1,47 @@
 use super::{AssistantTurn, ConversationMessage, ToolCall, ToolDefinition};
 
+/// B8 — Anthropic prompt caching. Audit (Abhinav, 2026-05-09) showed every
+/// tool-using turn ships ~6k input tokens of system prompt + tool defs. On
+/// tier-1 (10k input tokens / minute) that's ~1 turn / minute and constant
+/// 429s on agentic flows.
+///
+/// Cache breakpoints we set:
+/// 1. End of system prompt — caches the (large, mostly stable) BLADE system
+///    prompt across requests in the same 5-minute window.
+/// 2. End of tools array — caches the tool definitions block, which is
+///    long and rarely changes within a session.
+///
+/// Anthropic charges cached reads at 10% of input rate, so cache hits give
+/// ~10x effective rate-limit headroom after the first request of every
+/// 5-minute window. Prompt caching is GA on Sonnet 4 — no beta header
+/// needed.
+const EPHEMERAL: &str = "ephemeral";
+
+/// Wrap a string system prompt as a single text block with `cache_control`.
+/// Returns a JSON array suitable for the `system` field.
+fn system_block_with_cache(text: String) -> serde_json::Value {
+    serde_json::json!([{
+        "type": "text",
+        "text": text,
+        "cache_control": { "type": EPHEMERAL },
+    }])
+}
+
+/// Mark the last tool in the array with `cache_control`. The cache breakpoint
+/// covers everything up to and including that tool, so all tool defs are
+/// cached as one block.
+fn mark_last_tool_cached(mut tool_defs: Vec<serde_json::Value>) -> Vec<serde_json::Value> {
+    if let Some(last) = tool_defs.last_mut() {
+        if let Some(obj) = last.as_object_mut() {
+            obj.insert(
+                "cache_control".to_string(),
+                serde_json::json!({ "type": EPHEMERAL }),
+            );
+        }
+    }
+    tool_defs
+}
+
 fn build_body(
     model: &str,
     messages: &[ConversationMessage],
@@ -21,6 +63,7 @@ fn build_body(
             })
         })
         .collect();
+    let tool_defs = mark_last_tool_cached(tool_defs);
 
     // Phase 33 / LOOP-04 — caller may force a higher max_tokens (truncation
     // retry path). Default of 4096 is unchanged for every existing call site.
@@ -34,7 +77,7 @@ fn build_body(
     });
 
     if let Some(system) = system {
-        body["system"] = serde_json::Value::String(system);
+        body["system"] = system_block_with_cache(system);
     }
 
     if !tool_defs.is_empty() {
@@ -226,7 +269,7 @@ pub async fn stream_text(
         "stream": true
     });
     if let Some(sys) = system {
-        body["system"] = serde_json::Value::String(sys);
+        body["system"] = system_block_with_cache(sys);
     }
 
     let response = client
@@ -313,7 +356,7 @@ pub async fn stream_text_with_thinking(
         "stream": true
     });
     if let Some(sys) = system {
-        body["system"] = serde_json::Value::String(sys);
+        body["system"] = system_block_with_cache(sys);
     }
 
     let response = client
