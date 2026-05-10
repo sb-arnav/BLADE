@@ -332,25 +332,15 @@ JSON:"#,
 fn write_synthesis_to_brain(conn: &rusqlite::Connection, s: &IdentitySynthesis) -> Result<(), String> {
     let now = chrono::Utc::now().timestamp_millis();
 
-    // Identity
-    if let Some(ref name) = s.identity_name {
-        if !name.is_empty() {
-            let _ = conn.execute(
-                "INSERT OR REPLACE INTO brain_identity(key,value) VALUES('name',?1)",
-                rusqlite::params![name],
-            );
-        }
-    }
-    if let Some(ref role) = s.identity_role {
-        if !role.is_empty() {
-            let _ = conn.execute(
-                "INSERT OR REPLACE INTO brain_identity(key,value) VALUES('role',?1)",
-                rusqlite::params![role],
-            );
-        }
-    }
+    // B4 — do NOT write to brain_identity from deeplearn. The audit
+    // (Abhinav, 2026-05-09) found `role: Web Developer` written into
+    // brain_identity for a Founder/CEO based on filename inference.
+    // Identity should only come from explicit user statements
+    // (persona.md / onboarding), not LLM inference over shell history.
+    // Name + role are intentionally dropped here.
+    let _ = (&s.identity_name, &s.identity_role); // silence unused-warn
 
-    // Style tags
+    // Style tags — kept (these are descriptors, not factual claims).
     for tag in &s.style_tags {
         let id = format!("dl:{}", tag.replace(' ', "-"));
         let _ = conn.execute(
@@ -359,20 +349,30 @@ fn write_synthesis_to_brain(conn: &rusqlite::Connection, s: &IdentitySynthesis) 
         );
     }
 
-    // Preferences
+    // B4 — Preferences written below the 0.75 injection threshold used by
+    // embeddings::smart_context_recall. The data still exists in brain_preferences
+    // for inspection / promotion, but inferred facts no longer pollute the
+    // system prompt as if they were user-confirmed truth.
+    // Audit findings: 'uses Visual Studio Dark theme' (0.8), 'uses MesloLSG
+    // Nerd Font' (0.8) — both auto-injected on every turn before this fix.
     for pref in &s.preferences {
         let id = format!("dl:pref:{}", uuid::Uuid::new_v4());
         let _ = conn.execute(
-            "INSERT OR IGNORE INTO brain_preferences(id,text,confidence,source,updated_at) VALUES(?1,?2,0.8,'deeplearn',?3)",
+            "INSERT OR IGNORE INTO brain_preferences(id,text,confidence,source,updated_at) VALUES(?1,?2,0.5,'deeplearn',?3)",
             rusqlite::params![id, pref, now],
         );
     }
 
-    // Memories
+    // B4 — Memories likewise lowered. Audit findings: 'Working on ranking
+    // functionality in a Node.js project', 'Has a main script file called
+    // jp.js' — both fabrications traced to deeplearn parsing
+    // /Applications/Claude.app/Contents/Resources/ja-JP.json as 'jp.js'.
+    // Lowered confidence ensures any future read path that gates on it
+    // (≥0.75 typical) won't surface these as authoritative.
     for mem in &s.memories {
         let id = format!("dl:mem:{}", uuid::Uuid::new_v4());
         let _ = conn.execute(
-            "INSERT OR IGNORE INTO brain_memories(id,text,source_conversation_id,entities_json,confidence,created_at) VALUES(?1,?2,'deeplearn','[]',0.9,?3)",
+            "INSERT OR IGNORE INTO brain_memories(id,text,source_conversation_id,entities_json,confidence,created_at) VALUES(?1,?2,'deeplearn','[]',0.5,?3)",
             rusqlite::params![id, mem, now],
         );
     }
