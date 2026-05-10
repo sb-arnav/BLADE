@@ -2262,6 +2262,28 @@ JSON:"#,
             let kind = node["kind"].as_str().unwrap_or("concept").trim().to_string();
             let summary = node["summary"].as_str().unwrap_or("").trim().to_string();
             if label.is_empty() || label.len() > 80 { continue; }
+
+            // B9 — drop transient session artifacts that the extractor sometimes
+            // pulls in as 'entities': built-in tool names (e.g. `blade_write_file`,
+            // `blade__memory__add`), absolute file paths (e.g. `/tmp/blade-fix-test.txt`),
+            // and bare tool-result strings (`it works`). Audit (Abhinav, 2026-05-09)
+            // showed these dominating `top entities` because brain_nodes was being
+            // mention-counted from chat-context noise.
+            let lower = label.to_lowercase();
+            let looks_like_blade_tool = lower.starts_with("blade_") || lower.starts_with("blade__");
+            let looks_like_path = label.starts_with('/') || label.starts_with("./") || label.starts_with("~/");
+            let looks_like_url_path = label.starts_with("http://") || label.starts_with("https://");
+            // Tool-call result strings tend to be lowercase fragments without spaces
+            // and < 4 words. Allow them only when explicitly tagged as concepts/persons
+            // by the LLM, not as a fallback.
+            if looks_like_blade_tool || looks_like_path {
+                log::debug!("[brain.kg] skipping transient artifact as entity: {}", label);
+                continue;
+            }
+            if looks_like_url_path && kind != "url" {
+                continue;
+            }
+
             let valid_kind = matches!(kind.as_str(), "person"|"project"|"tool"|"concept"|"company"|"url");
             let kind = if valid_kind { kind } else { "concept".to_string() };
             // Deterministic node ID: kind:normalized-label (same as TS side)
