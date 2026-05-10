@@ -16,6 +16,10 @@ use tokio::fs;
 
 pub const SERVER_NAME: &str = "blade.fs";
 
+// v1.5.1: not currently called — dot-named tools were removed from the in-process
+// registration to fix Anthropic's tool-name regex (B3). Kept around as the source
+// of truth if/when we expose this as an external MCP server.
+#[allow(dead_code)]
 pub fn register_built_in_tools() -> Vec<McpTool> {
     vec![
         McpTool {
