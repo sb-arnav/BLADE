@@ -14,6 +14,11 @@ import type { ProviderId } from '@/types/provider';
 // Phase 11 D-56: paste-any-config card rendered beneath the 6 cards.
 // The 6 cards themselves remain unchanged — this is an ADD, not a replace.
 import { ProviderPasteForm } from '@/features/providers';
+// v1.5.1 — when a paste already includes an api_key, skip the apikey step
+// and route directly to scan. (Bug Arnav reported: pasted curl was being
+// detected but onboarding still asked for a key.)
+import { storeProviderKey, switchProvider } from '@/lib/tauri';
+import { useToast } from '@/lib/context';
 
 type State = ReturnType<typeof useOnboardingState>;
 
@@ -37,6 +42,7 @@ const KNOWN_PROVIDER_IDS: ReadonlySet<ProviderId> = new Set<ProviderId>([
 
 export function ProviderPicker({ state, setProvider, setStep }: Props) {
   const selected = PROVIDERS.find((p) => p.id === state.providerId) ?? PROVIDERS[0];
+  const { show } = useToast();
 
   return (
     <section className="onb glass glass-1" aria-labelledby="onb-provider-title">
@@ -74,17 +80,36 @@ export function ProviderPicker({ state, setProvider, setStep }: Props) {
         <span className="t-small">or</span>
       </div>
       <ProviderPasteForm
-        onSuccess={(parsed) => {
-          // Only advance the onboarding machine if the paste resolved to
-          // one of the 6 known ProviderId values. Custom base_url pastes
-          // pre-populate the provider via the fallback path below.
-          if (
+        onSuccess={async (parsed) => {
+          const knownProvider =
             parsed.provider_guess !== 'custom' &&
-            KNOWN_PROVIDER_IDS.has(parsed.provider_guess as ProviderId) &&
-            parsed.model
-          ) {
+            KNOWN_PROVIDER_IDS.has(parsed.provider_guess as ProviderId);
+
+          if (knownProvider && parsed.model) {
             setProvider(parsed.provider_guess as ProviderId, parsed.model);
           }
+
+          // v1.5.1 — if the paste already extracted a real api_key (from a
+          // curl Authorization header or python OpenAI() call), persist it
+          // now and skip the apikey step. Hitting Continue should NOT ask
+          // the user for a key they already pasted.
+          if (knownProvider && parsed.model && parsed.api_key) {
+            try {
+              await storeProviderKey(parsed.provider_guess as ProviderId, parsed.api_key);
+              await switchProvider(parsed.provider_guess as ProviderId, parsed.model);
+              show({ type: 'success', title: 'Provider set', message: `${parsed.provider_guess} · ${parsed.model}` });
+              setStep('scan');
+              return;
+            } catch (e) {
+              show({
+                type: 'error',
+                title: 'Could not save provider',
+                message: e instanceof Error ? e.message : String(e),
+              });
+              // fall through to apikey step so the user can re-enter manually
+            }
+          }
+
           setStep('apikey');
         }}
       />

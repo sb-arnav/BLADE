@@ -1999,10 +1999,43 @@ pub fn ensure_default_blade_md() {
 }
 
 /// Load BLADE.md from ~/.blade/BLADE.md (user workspace instructions)
+///
+/// B10 defensive scrub (v1.5.1): the audit found a stray `<system-reminder>`
+/// block embedded in Abhinav's BLADE.md — almost certainly leaked there by
+/// an editor agent (Claude Code) writing into the file in a prior session.
+/// Strip any such block on load so leaked harness instructions never reach
+/// the live system prompt.
 fn load_blade_md() -> Option<String> {
     let blade_dir = crate::config::blade_config_dir();
     let path = blade_dir.join("BLADE.md");
-    fs::read_to_string(path).ok()
+    let raw = fs::read_to_string(path).ok()?;
+    Some(scrub_system_reminders(&raw))
+}
+
+/// Remove any `<system-reminder>...</system-reminder>` blocks from text.
+/// Used on BLADE.md load to defend against editor-agent leaks.
+fn scrub_system_reminders(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut rest = input;
+    while let Some(start) = rest.find("<system-reminder>") {
+        out.push_str(&rest[..start]);
+        if let Some(end_rel) = rest[start..].find("</system-reminder>") {
+            let end_abs = start + end_rel + "</system-reminder>".len();
+            rest = &rest[end_abs..];
+            // Trim a single trailing newline immediately after the closing tag
+            // so we don't leave a stray blank line behind.
+            if let Some(stripped) = rest.strip_prefix('\n') {
+                rest = stripped;
+            }
+        } else {
+            // No closing tag — drop everything from <system-reminder> onward
+            // so a malformed leak doesn't reach the model.
+            rest = "";
+            break;
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 /// Walk from `start_dir` up to filesystem root looking for CLAUDE.md or BLADE.md.
