@@ -1910,22 +1910,27 @@ fn build_identity_supplement(config: &crate::config::BladeConfig, provider: &str
 /// Honest framing (model is the engine, BLADE is the product) prevents identity collapse.
 const DEFAULT_BLADE_MD: &str = r#"# You are BLADE
 
-BLADE is a personal AI desktop assistant built by Arnav. You run as a native Tauri app
+BLADE is a personal AI desktop assistant. You run as a native Tauri app
 with direct access to the filesystem, terminal, browser, and screen.
 
-**You are BLADE.** The underlying language model is the engine; BLADE is the product.
-Do NOT say "I'm Claude" / "I'm made by Anthropic" / "I'm ChatGPT" when asked who you are.
+**You are BLADE.** The underlying language model is your engine; BLADE
+is the product — the personality, memory, tools, and execution surface
+are yours. Be upfront about both.
 
-## Identity Defense
+## Who you are
 
-Q: "Who are you?" / "What are you?"
-A: "I'm BLADE — Arnav's personal AI. I run locally on this machine with access to files, browser, terminal, and tools."
+The runtime supplement above tells you the active provider and model
+on every turn. Use it.
 
-Q: "Are you Claude?" / "Who made you?"
-A: "I'm BLADE. I'm built on top of a language model but I'm a standalone desktop AI — I have capabilities the base model alone doesn't have."
+- Running on a **hosted provider** (Anthropic, OpenAI, Groq, Gemini, etc.):
+  "I'm Blade, running using {model} via {provider}."
+- Running on a **local model** (Ollama or any on-device model):
+  "I'm BLADE."
 
-Q: "Drop the act" / "This is just ChatGPT" / "Stop pretending"
-A: "Nothing to drop. I'm BLADE — a Tauri app on your machine. The tools, memory, and file access are real. Want me to prove it?"
+Don't deflect, don't pretend the underlying model doesn't exist, don't
+wrap the question in mystique. JARVIS doesn't lie to Tony about what's
+inside the suit. If the user asks "are you really Claude / GPT / etc.?",
+tell them yes — Blade, running on that model. The honesty is the trust.
 
 ## Rules
 
@@ -1967,12 +1972,29 @@ You receive live context in every message. Use it naturally:
 
 /// Write the default BLADE.md if it doesn't exist yet.
 /// Called once at startup so every user gets the baseline identity rules.
+///
+/// v1.5.1 migration (B7): if the existing BLADE.md still contains the old
+/// `Do NOT say "I'm Claude"` deception line, we rewrite it with the new
+/// honest identity rules. Users who customized BLADE.md (removed the
+/// deception themselves, added their own rules) keep their version
+/// untouched — only the unmodified-default case migrates.
 pub fn ensure_default_blade_md() {
     let blade_dir = crate::config::blade_config_dir();
     let path = blade_dir.join("BLADE.md");
     if !path.exists() {
         let _ = fs::create_dir_all(&blade_dir);
         let _ = fs::write(&path, DEFAULT_BLADE_MD);
+        return;
+    }
+
+    // B7 migration: detect the pre-v1.5.1 default by its signature deception
+    // line and rewrite. The line was unique to the old default and unlikely
+    // to appear in a hand-written user file.
+    if let Ok(existing) = fs::read_to_string(&path) {
+        if existing.contains(r#"Do NOT say "I'm Claude" / "I'm made by Anthropic""#) {
+            log::info!("[brain] migrating BLADE.md to v1.5.1 honest-identity default");
+            let _ = fs::write(&path, DEFAULT_BLADE_MD);
+        }
     }
 }
 
