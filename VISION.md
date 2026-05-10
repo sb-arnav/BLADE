@@ -213,12 +213,72 @@ These create *liveliness* the way memory creates *continuity*. Both are load-bea
 ## How decisions trace back to this document
 
 When a feature, plan, or roadmap item is proposed, ask:
-- Does it advance one of the four primitives (doesn't-refuse / finds-a-way / forges-tools / setup-as-conversation)?
+- Does it advance one of the four primitives (doesn't-refuse / finds-a-way / forges-tools / setup-as-conversation) or the fifth (presence)?
 - Does it serve the user (builders, founders, power users, kids with side projects)?
 - Does it survive the SaaS-eaten era (i.e., not something a frontier-model upgrade eats)?
 
 If yes to all three: ship.
 If not: defer or kill.
+
+---
+
+## Handoff to the next session
+
+> Written 2026-05-10 by the session that produced this vision. The session is going to expire; this is what the next session should know walking in.
+
+**Read these first, in order:**
+1. This file (VISION.md) — top to bottom.
+2. `/home/arnav/.claude/projects/-home-arnav-blade/memory/MEMORY.md` and the feedback memories it indexes. Especially: research-prior-art-first, human-shaped-research-prompts, discuss-before-multi-bug-sweeps.
+3. `CHANGELOG.md` for what shipped in v1.5.0 → v1.5.1.
+4. `git log --oneline -30` for recent commits.
+
+**Where the project actually is:**
+- v1.5.1 was tagged and pushed at the close of the previous session. Release workflow `25637399809` was building installers — confirm via `gh release list` that v1.5.1 went green and is Latest.
+- The v1.5.0 release is marked prerelease (audit-broken).
+- 8 audit bugs were closed (B1, B3, B4, B5, B7, B8, B9, B10) plus the onboarding curl-paste bug. The audit is in `~/.planning/audits/` if archived, or the previous session's chat history has it pasted verbatim. Abhinav (Arnav's brother) was the auditor.
+- VISION.md is locked. Do not relitigate it. If something contradicts it, the proposal is wrong, not the vision.
+
+**The next milestone Arnav will run:**
+He'll run `/gsd-new-milestone`. The previous session recommended splitting into:
+- **v1.6 — Narrowing Pass.** Code-deletion milestone. Removes everything in the "Removed (locked)" and "Significantly reduced" sections above. Roughly 60% of the current surface area. ~1-2 weeks of focused work. Clean foundation before v2.0 build.
+- **v2.0 — Five Primitives.** Builds setup-as-conversation, activates the forge primitive (B6), ships persistence (mid-loop replanning + cross-session continuation + the "second time destroys it" promise), lands the opinionated character + honest-identity, refines the presence backend (hormones / vitality / active inference / Evolution Engine).
+
+If Arnav asks you to merge them, push back gently — narrowing first means v2.0 builds on a clean base.
+
+**Things to NOT do (failure modes from the previous session that you'll be tempted to repeat):**
+1. **Don't produce 8-tier plans.** Arnav explicitly hates this. Plans get one or two sentences of structure, not Roman numeral hierarchy. He said *"why does it feel more complex than it has to."*
+2. **Don't pattern-match BLADE into "another personal AI app."** That category is saturated. BLADE's lane is "consumer-facing AI accomplice that's actually yours" — see the competitive landscape table above.
+3. **Don't auto-run multi-bug sweeps in auto mode.** Strategic work needs alignment first. There's a memory file about this.
+4. **Don't grid-search when researching.** Use natural-language single-thread queries to the web-researcher subagent. There's a memory about this too. Arnav said *"your search prompts are very direct - search more like a human."*
+5. **Don't treat the v1.5 Intelligence Layer pitch (selective context, verifier, anchors, sessions) as a moat.** Research showed it's 2026 parity, not differentiation. Don't lead with it.
+6. **Don't suggest features without checking if they already exist.** Arnav said *"you give a suggestion now I find that there already exist something for which we have been hitting our heads for the past 5 days."* Search first.
+7. **Don't cave when Arnav pushes back.** If a position is well-grounded, hold it. He explicitly tested for sycophancy: *"did you say that only cause I said or fr?"* Sometimes the right answer is "yes, here's why I still believe it." See the body-backend / Evolution Engine reframe above — that was a real reframe, not a cave. The mortality-salience / Body Map UIs were where I (the previous session) caved without conviction; those are now correctly held for v2.0 evaluation.
+8. **Don't refuse to take positions.** Arnav repeatedly asked "tell me where you land." He wants commitment, not options. If three paths exist, pick one and defend it. He'll push back if you're wrong.
+
+**Things Arnav values:**
+- Direct, opinionated answers
+- Honest "I don't know" over confident-wrong
+- Research-grounded claims over abstract framings
+- Positions that survive challenge
+- The ability to pivot when shown a better argument
+- Brevity over completeness
+
+**Constraints to remember:**
+- Arnav has no API budget and no local-model machine. He can't be the test user of v2.0 if it requires expensive substrate. v2.0 must work on free tiers (Groq, Gemini) + the existing Anthropic key.
+- Abhinav (his brother) is the only other tester. No public users. Migration concerns are theoretical.
+- This is a single-developer project. Foundation custody / community-building / B2B sales are *future* moves, not current ones.
+
+**The locked-in pitch in one line:**
+> The AI that's actually yours. Doesn't refuse. Finds a way. Builds its own tools. Acts on your machine. Free, open, fork-able.
+
+**The locked-in differentiator vs Claude Code:**
+Claude Code is the surgeon you call in. BLADE is the GP that knows your whole history, calls in the surgeon when needed, follows up after, is the same person across years. BLADE *uses* Claude Code; doesn't compete with it.
+
+**The locked-in differentiator vs Goose / OpenHands / etc.:**
+Those are agent runtimes (developer-facing). BLADE is the consumer-facing presence layer that *consumes* those runtimes (likely by ripping their Apache 2 code into BLADE's binary) and adds the user-relationship, life-context, and presence mechanisms on top.
+
+**One thing the previous session didn't finish that you might be asked about:**
+The AI-driven setup conversation (replacing the current onboarding Steps flow) is described in this VISION.md but not designed in detail. When Arnav decides to start v2.0 work on it, the design conversation will need: how the setup AI introduces itself agent-to-agent to other installed agents (Claude Code, Cursor, MCP servers), what the privacy-question framing looks like in dialogue, and how the core command gets captured and made load-bearing. Don't try to build this without that design conversation.
 
 ---
 
