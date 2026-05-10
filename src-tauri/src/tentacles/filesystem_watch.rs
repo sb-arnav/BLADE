@@ -396,12 +396,25 @@ fn collect_stale(
 
 /// Start the filesystem watcher background loop. Idempotent.
 pub fn start_filesystem_watcher(app: AppHandle) {
+    // B1 — honor the off-switch. Audit (Abhinav, 2026-05-09) found this watcher
+    // running unconditionally; v1.5.1 added `filesystem_watch_enabled`.
+    if !crate::config::load_config().filesystem_watch_enabled {
+        log::info!("[FilesystemWatch] disabled in config — not starting.");
+        return;
+    }
     if FS_WATCHER_RUNNING.swap(true, Ordering::SeqCst) {
         return;
     }
 
     tauri::async_runtime::spawn(async move {
         loop {
+            // B1 — re-check between iterations so a live config flip stops
+            // the watcher without a process restart.
+            if !crate::config::load_config().filesystem_watch_enabled {
+                FS_WATCHER_RUNNING.store(false, Ordering::SeqCst);
+                log::info!("[FilesystemWatch] disabled in config — stopping.");
+                break;
+            }
             tick_filesystem_watcher(&app);
             // 5-minute interval
             tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;

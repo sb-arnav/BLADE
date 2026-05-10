@@ -81,11 +81,20 @@ static WAKE_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 /// Start the wake word listener. Safe to call multiple times — no-ops if already running.
 pub fn start_wake_word_listener(app: tauri::AppHandle) {
+    let config = crate::config::load_config();
+
+    // B1 — honor the off-switch. Audit (Abhinav, 2026-05-09) found this loop
+    // was starting regardless of `wake_word_enabled: false` in config.json,
+    // which means the microphone listened despite the user opting out.
+    if !config.wake_word_enabled {
+        log::info!("[wake_word] disabled in config — not starting");
+        return;
+    }
+
     if WAKE_ACTIVE.swap(true, Ordering::SeqCst) {
         return; // already running
     }
 
-    let config = crate::config::load_config();
     let phrases = build_phrase_list(&config.wake_word_phrase);
     // Sensitivity 1-5: higher = more sensitive (lower energy threshold)
     // sensitivity=3 → threshold=0.017 (normal speech), sensitivity=5 → 0.010 (whispers)

@@ -327,6 +327,17 @@ pub async fn capture_timeline_tick(app: &tauri::AppHandle) {
 // ---------------------------------------------------------------------------
 
 pub fn start_timeline_capture_loop(app: tauri::AppHandle) {
+    // B1 — honor the off-switch. Audit (Abhinav, 2026-05-09) found this loop
+    // was capturing JPEGs every ~25s regardless of `screen_timeline_enabled:
+    // false` in config.json, which broke the local-first / opt-in promise.
+    {
+        let cfg = crate::config::load_config();
+        if !cfg.screen_timeline_enabled {
+            log::info!("[screen_timeline] disabled in config — not starting");
+            return;
+        }
+    }
+
     // Omi approach: capture every 5s, but only run the EXPENSIVE vision model
     // call when the context changes (app/window switch). Identical/near-identical
     // frames are skipped via fingerprint dedup. This means:
@@ -344,6 +355,13 @@ pub fn start_timeline_capture_loop(app: tauri::AppHandle) {
 
         loop {
             crate::supervisor::heartbeat("screen_timeline");
+
+            // B1 — re-check between iterations so a live config flip stops capture
+            // without a process restart.
+            if !crate::config::load_config().screen_timeline_enabled {
+                log::info!("[screen_timeline] disabled in config — stopping");
+                break;
+            }
 
             // Phase 29: Critical band disables timeline capture (D-09)
             let vitality = crate::vitality_engine::get_vitality();

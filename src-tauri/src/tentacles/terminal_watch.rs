@@ -568,12 +568,25 @@ pub fn get_command_frequency() -> Vec<(String, u32)> {
 /// Start the terminal watcher background loop.
 /// Idempotent — second call is a no-op.
 pub fn start_terminal_watcher(app: AppHandle) {
+    // B1 — honor the off-switch. Audit (Abhinav, 2026-05-09) found this watcher
+    // running unconditionally; v1.5.1 added `terminal_watch_enabled`.
+    if !crate::config::load_config().terminal_watch_enabled {
+        log::info!("[TerminalWatch] disabled in config — not starting.");
+        return;
+    }
     if WATCHER_RUNNING.swap(true, Ordering::SeqCst) {
         return;
     }
 
     tauri::async_runtime::spawn(async move {
         loop {
+            // B1 — re-check between iterations so a live config flip stops
+            // the watcher without a process restart.
+            if !crate::config::load_config().terminal_watch_enabled {
+                WATCHER_RUNNING.store(false, Ordering::SeqCst);
+                log::info!("[TerminalWatch] disabled in config — stopping.");
+                break;
+            }
             tick_terminal_watcher(&app);
             tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
         }

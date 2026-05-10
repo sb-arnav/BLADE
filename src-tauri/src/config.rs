@@ -685,6 +685,12 @@ pub struct IntelligenceConfig {
 }
 
 fn default_tree_sitter_enabled() -> bool { true }
+
+// B1 — defaults for the always-on ambient watchers added in v1.5.1
+// (notification_listener, terminal_watch, filesystem_watch). Default true
+// preserves pre-v1.5.1 behavior; users can flip them off in config.json
+// or via the settings UI.
+fn default_true_ambient() -> bool { true }
 fn default_repo_map_token_budget() -> u32 { 1000 }
 fn default_pagerank_damping() -> f32 { 0.85 }
 fn default_capability_registry_path() -> std::path::PathBuf {
@@ -862,6 +868,16 @@ struct DiskConfig {
     ha_base_url: String,
     #[serde(default)]
     audio_capture_enabled: bool,
+    /// B1 — off-switch for the OS-notification poller (every 30s).
+    /// Defaults to true to preserve pre-v1.5.1 behavior.
+    #[serde(default = "default_true_ambient")]
+    notification_listener_enabled: bool,
+    /// B1 — off-switch for the terminal-history watcher tentacle.
+    #[serde(default = "default_true_ambient")]
+    terminal_watch_enabled: bool,
+    /// B1 — off-switch for the filesystem (Downloads dir) watcher tentacle.
+    #[serde(default = "default_true_ambient")]
+    filesystem_watch_enabled: bool,
     #[serde(default)]
     ghost_mode_enabled: bool,
     #[serde(default = "default_ghost_mode_position")]
@@ -1006,6 +1022,9 @@ impl Default for DiskConfig {
             tts_speed: 1.0,
             ha_base_url: String::new(),
             audio_capture_enabled: false,
+            notification_listener_enabled: true,
+            terminal_watch_enabled: true,
+            filesystem_watch_enabled: true,
             ghost_mode_enabled: false,
             ghost_mode_position: "bottom-right".to_string(),
             ghost_auto_reply: false,
@@ -1121,6 +1140,15 @@ pub struct BladeConfig {
     /// Always-on audio capture alongside screenshots (Omi-style)
     #[serde(default)]
     pub audio_capture_enabled: bool,
+    /// B1 — off-switch for the OS-notification poller (every 30s).
+    #[serde(default = "default_true_ambient")]
+    pub notification_listener_enabled: bool,
+    /// B1 — off-switch for the terminal-history watcher tentacle.
+    #[serde(default = "default_true_ambient")]
+    pub terminal_watch_enabled: bool,
+    /// B1 — off-switch for the filesystem (Downloads dir) watcher tentacle.
+    #[serde(default = "default_true_ambient")]
+    pub filesystem_watch_enabled: bool,
     /// Enable Ghost Mode — invisible overlay during meetings
     #[serde(default)]
     pub ghost_mode_enabled: bool,
@@ -1263,6 +1291,9 @@ impl Default for BladeConfig {
             tts_speed: 1.0,
             ha_base_url: String::new(),
             audio_capture_enabled: false,
+            notification_listener_enabled: true,
+            terminal_watch_enabled: true,
+            filesystem_watch_enabled: true,
             ghost_mode_enabled: false,
             ghost_mode_position: "bottom-right".to_string(),
             ghost_auto_reply: false,
@@ -1430,6 +1461,9 @@ pub fn load_config() -> BladeConfig {
         tts_speed: disk.tts_speed,
         ha_base_url: disk.ha_base_url,
         audio_capture_enabled: disk.audio_capture_enabled,
+        notification_listener_enabled: disk.notification_listener_enabled,
+        terminal_watch_enabled: disk.terminal_watch_enabled,
+        filesystem_watch_enabled: disk.filesystem_watch_enabled,
         ghost_mode_enabled: disk.ghost_mode_enabled,
         ghost_mode_position: disk.ghost_mode_position,
         ghost_auto_reply: disk.ghost_auto_reply,
@@ -1512,6 +1546,9 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         tts_speed: config.tts_speed,
         ha_base_url: config.ha_base_url.clone(),
         audio_capture_enabled: config.audio_capture_enabled,
+        notification_listener_enabled: config.notification_listener_enabled,
+        terminal_watch_enabled: config.terminal_watch_enabled,
+        filesystem_watch_enabled: config.filesystem_watch_enabled,
         ghost_mode_enabled: config.ghost_mode_enabled,
         ghost_mode_position: config.ghost_mode_position.clone(),
         ghost_auto_reply: config.ghost_auto_reply,

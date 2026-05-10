@@ -78,6 +78,12 @@ pub fn notification_get_recent() -> Vec<OsNotification> {
 /// Start the background notification polling loop.
 #[tauri::command]
 pub fn notification_listener_start(app: tauri::AppHandle) {
+    // B1 — honor the off-switch. Audit (Abhinav, 2026-05-09) found this poller
+    // running unconditionally; v1.5.1 added `notification_listener_enabled`.
+    if !crate::config::load_config().notification_listener_enabled {
+        log::info!("[notification_listener] disabled in config — not starting");
+        return;
+    }
     tauri::async_runtime::spawn(async move {
         start_notification_listener(app).await;
     });
@@ -90,6 +96,12 @@ pub async fn start_notification_listener(app: tauri::AppHandle) {
     let mut last_seen_ts: i64 = chrono::Utc::now().timestamp() - 120; // seed: last 2 min
 
     loop {
+        // B1 — re-check between iterations so a live config flip stops polling
+        // without a process restart.
+        if !crate::config::load_config().notification_listener_enabled {
+            log::info!("[notification_listener] disabled in config — stopping");
+            break;
+        }
         let fresh = poll_notifications(last_seen_ts).await;
         if !fresh.is_empty() {
             let mut max_ts = last_seen_ts;
