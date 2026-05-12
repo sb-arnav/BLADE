@@ -24,7 +24,6 @@
 // Phase 6 Plan 06-07 adds 4 more isolation routes for the life-os + identity
 // Playwright specs (same passthrough pattern; test shim mocks the invokes):
 //   - dev-health-view     → ./HealthViewDev     (SC-1 snapshot + streak + 5 stats)
-//   - dev-finance-view    → ./FinanceViewDev    (SC-2 KPIs + CSV import affordance)
 //   - dev-character-bible → ./CharacterBibleDev (SC-4 bible content + honest log deferral)
 //   - dev-persona-view    → ./PersonaViewDev    (SC-3 + SC-4 4-tab dossier)
 //
@@ -80,9 +79,6 @@ const KnowledgeBaseDev = lazy(() =>
 );
 const HealthViewDev = lazy(() =>
   import('./HealthViewDev').then((m) => ({ default: m.HealthViewDev })),
-);
-const FinanceViewDev = lazy(() =>
-  import('./FinanceViewDev').then((m) => ({ default: m.FinanceViewDev })),
 );
 const CharacterBibleDev = lazy(() =>
   import('./CharacterBibleDev').then((m) => ({ default: m.CharacterBibleDev })),
@@ -202,15 +198,6 @@ export const routes: RouteDefinition[] = [
     phase: 6,
     paletteHidden: true,
     description: 'DEV: HealthView isolation (SC-1 snapshot + streak + 5 stats)',
-  },
-  {
-    id: 'dev-finance-view',
-    label: 'DEV: FinanceView',
-    section: 'dev',
-    component: FinanceViewDev,
-    phase: 6,
-    paletteHidden: true,
-    description: 'DEV: FinanceView isolation (SC-2 KPIs + CSV import affordance)',
   },
   {
     id: 'dev-character-bible',

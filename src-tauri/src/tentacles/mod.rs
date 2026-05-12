@@ -12,7 +12,7 @@
 ///                         channel summaries, waiting-response detection, thread nudges,
 ///                         channel importance learning
 ///   - email_deep        : Full inbox triage, context-aware reply drafting,
-///                         auto-unsubscribe via CDP, invoice extraction → financial_brain
+///                         auto-unsubscribe via CDP, invoice extraction (v1.6: surface to user, not financial_brain)
 ///   - terminal_watch    : PowerShell history analysis, command suggestions, loop detection
 ///   - filesystem_watch  : Downloads categorisation, duplicate detection, stale files
 ///   - calendar_tentacle : Schedule, meeting prep, focus blocking, post-meeting summaries

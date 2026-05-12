@@ -757,8 +757,9 @@ async fn visit_unsubscribe_link(url: &str) -> Result<(), String> {
 
 // ── 4. detect_invoices ────────────────────────────────────────────────────────
 
-/// Extract structured invoice/receipt data from emails and route to the
-/// financial_brain for tracking.
+/// Extract structured invoice/receipt data from emails and store as typed memory
+/// so the user (or BLADE on the user's behalf) can recall them later.
+/// v1.6 narrowing — financial_brain was cut; invoices now surface as memories only.
 pub async fn detect_invoices(emails: &[EmailSummary]) -> Result<Vec<Invoice>, String> {
     let mut invoices = Vec::new();
 
@@ -772,8 +773,7 @@ pub async fn detect_invoices(emails: &[EmailSummary]) -> Result<Vec<Invoice>, St
         });
 
         if let Ok(invoice) = extract_invoice_data(email, &body).await {
-            // Route to financial_brain
-            route_to_financial_brain(&invoice);
+            record_invoice_memory(&invoice);
             invoices.push(invoice);
         }
     }
@@ -839,14 +839,13 @@ async fn extract_invoice_data(email: &EmailSummary, body: &str) -> Result<Invoic
     })
 }
 
-/// Push an invoice into financial_brain as a transaction for tracking.
-fn route_to_financial_brain(invoice: &Invoice) {
+/// Persist an invoice as a typed memory so the user can recall it later.
+fn record_invoice_memory(invoice: &Invoice) {
     let content = format!(
         "Invoice from {} for {} {} on {} — {}",
         invoice.vendor, invoice.currency, invoice.amount, invoice.date, invoice.description
     );
 
-    // Store as a typed memory so the financial brain can pick it up
     let _ = crate::typed_memory::store_typed_memory(
         crate::typed_memory::MemoryCategory::Fact,
         &content,
@@ -855,7 +854,7 @@ fn route_to_financial_brain(invoice: &Invoice) {
     );
 
     log::info!(
-        "[email_deep] routed invoice to financial_brain: {} {} from {}",
+        "[email_deep] recorded invoice memory: {} {} from {}",
         invoice.currency, invoice.amount, invoice.vendor
     );
 }

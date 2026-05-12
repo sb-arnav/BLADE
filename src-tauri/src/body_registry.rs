@@ -166,7 +166,6 @@ pub fn get_body_map() -> Vec<ModuleMapping> {
         m("health_guardian", "lifestyle", "health", "Screen time + break reminders"),
         m("health_tracker", "lifestyle", "health", "Health nudges"),
         m("streak_stats", "lifestyle", "health", "Daily streaks + gamification"),
-        m("financial_brain", "lifestyle", "finance", "Spending, CSV import, subscriptions"),
         m("cron", "lifestyle", "scheduler", "Task scheduler (morning briefing, weekly review)"),
         m("reminders", "lifestyle", "scheduler", "Reminder system"),
         m("watcher", "lifestyle", "scheduler", "URL/file watchers"),

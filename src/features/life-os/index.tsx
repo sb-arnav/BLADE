@@ -11,7 +11,6 @@ import { lazy } from 'react';
 import type { RouteDefinition } from '@/lib/router';
 
 const HealthView         = lazy(() => import('./HealthView').then((m) => ({ default: m.HealthView })));
-const FinanceView        = lazy(() => import('./FinanceView').then((m) => ({ default: m.FinanceView })));
 const GoalView           = lazy(() => import('./GoalView').then((m) => ({ default: m.GoalView })));
 const HabitView          = lazy(() => import('./HabitView').then((m) => ({ default: m.HabitView })));
 const MeetingsView       = lazy(() => import('./MeetingsView').then((m) => ({ default: m.MeetingsView })));
@@ -22,7 +21,6 @@ const AccountabilityView = lazy(() => import('./AccountabilityView').then((m) =>
 
 export const routes: RouteDefinition[] = [
   { id: 'health',          label: 'Health',                 section: 'life', component: HealthView,         phase: 6, description: "Today's snapshot + streak" },
-  { id: 'finance',         label: 'Finance',                section: 'life', component: FinanceView,        phase: 6 },
   { id: 'goals',           label: 'Goals',                  section: 'life', component: GoalView,           phase: 6 },
   { id: 'habits',          label: 'Habits',                 section: 'life', component: HabitView,          phase: 6 },
   { id: 'meetings',        label: 'Meetings',               section: 'life', component: MeetingsView,       phase: 6 },

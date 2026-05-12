@@ -65,12 +65,10 @@ export interface Prefs {
   /** ScreenTimeline auto-load latest toggle. */
   'screenTimeline.autoLoadLatest'?: boolean;
   // ───── Phase 6 (Plan 06-01, D-165) ─────
-  /** Life OS active tab (used by MeetingsView + FinanceView right-pane + any future tabbed life-os surface). */
+  /** Life OS active tab (used by MeetingsView + any future tabbed life-os surface). */
   'lifeOs.activeTab'?: string;
   /** Health unit system default for display conversion. */
   'lifeOs.health.unit'?: 'metric' | 'imperial';
-  /** Default ISO currency code for Intl.NumberFormat in FinanceView. */
-  'lifeOs.finance.currency'?: string;
   /** Identity active tab (PersonaView 4-tab surface, NegotiationView 4-tab surface). */
   'identity.activeTab'?: string;
   /** Last-expanded trait id in PersonaView (deep-link reset on nav). */
