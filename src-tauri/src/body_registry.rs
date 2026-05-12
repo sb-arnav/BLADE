@@ -199,7 +199,6 @@ pub fn get_body_map() -> Vec<ModuleMapping> {
         m("soul_commands", "skin", "epidermis", "Soul/persona Tauri commands"),
 
         // ── PROVIDERS (Lungs — gas exchange) ─────────────────────────────
-        m("deeplearn", "respiratory", "alveoli", "Deep learning model management"),
         m("negotiation_engine", "nervous", "cerebrum", "Debate coach + negotiation assistant"),
         m("authority_engine", "nervous", "cerebrum", "9 specialist agents with authority hierarchy"),
         m("self_upgrade", "immune", "adaptive", "Self-improvement + pentest capabilities"),

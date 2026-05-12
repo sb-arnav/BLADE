@@ -18,7 +18,6 @@ mod indexer;
 mod self_upgrade;
 pub mod session_handoff; // Phase 24 v1.3 — pub for skill_validator bin (list --diff reads SessionHandoff)
 mod computer_use;
-mod deeplearn;
 mod discord;
 mod obsidian;
 mod journal;
@@ -811,8 +810,6 @@ pub fn run() {
             pulse::pulse_get_digest,
             journal::journal_get_recent,
             journal::journal_write_now,
-            deeplearn::deeplearn_discover_sources,
-            deeplearn::deeplearn_run,
             thread::blade_thread_update,
             thread::blade_thread_get,
             thread::blade_thread_auto_update,
