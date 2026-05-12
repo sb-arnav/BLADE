@@ -986,25 +986,7 @@ fn build_system_prompt_inner(
         }
     }
 
-    // ── PENTEST MODE (priority 6) ─────────────────────────────────────────────
-    {
-        let active_auths = crate::pentest::pentest_list_auth();
-        if !active_auths.is_empty() {
-            let auth_lines: Vec<String> = active_auths.iter().map(|a| {
-                format!("- {} ({}) — {}", a.target, a.target_type, a.scope_notes)
-            }).collect();
-            let (prov, _, mdl) = crate::pentest::get_pentest_safe_provider();
-            let model_note = if prov == "none" {
-                "⚠ No safe pentest provider — configure Ollama or Groq".to_string()
-            } else {
-                format!("Use {}/{} for analysis (NOT your Anthropic key)", prov, mdl)
-            };
-            parts.push(format!(
-                "## Pentest Mode ACTIVE\n\nAuthorized:\n{}\n{}\n\nFull Kali tool access via blade_bash.",
-                auth_lines.join("\n"), model_note
-            ));
-        }
-    }
+    // v1.6 narrowing — Pentest Mode block cut (VISION lines 173-184).
 
     // ── ALWAYS-ON VISION (priority 7) ───────────────────────────────────────
     // BLADE always sees the screen. This is not optional. No "God Mode off."
@@ -1491,12 +1473,9 @@ fn build_system_prompt_inner(
     // v1.6 narrowing — security_monitor cut (VISION lines 173-184); only the
     // kali security-expertise prompt remains in this block (cut in v1.6 P4).
     let mut security_chars: usize = 0;
-    // Full security expertise: only when query is clearly security-focused
-    if !user_query.is_empty() && crate::kali::is_security_context(user_query) {
-        let s = format!("## Security Expertise\n\n{}", crate::kali::security_system_prompt());
-        security_chars = security_chars.saturating_add(s.len());
-        parts.push(s);
-    } else if !smart || (!user_query.is_empty() && score_or_default(user_query, "security", 1.0) > 0.5) {
+    // v1.6 narrowing — kali expertise prompt cut. Security context now relies
+    // on whatever the model already knows; no curated kali wisdom injected.
+    if !smart || (!user_query.is_empty() && score_or_default(user_query, "security", 1.0) > 0.5) {
         let s = "## Security\n\nBe precise about risks, mitigations, and tool options.".to_string();
         security_chars = security_chars.saturating_add(s.len());
         parts.push(s);

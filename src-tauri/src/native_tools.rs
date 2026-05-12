@@ -603,20 +603,6 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "blade_pentest_authorize".to_string(),
-            description: "PENTEST MODE: Record authorization to security-test a target. REQUIRED before using any offensive security tools (nmap, nikto, sqlmap, metasploit, etc.). The user must confirm they own or are authorized to test the target. Creates a 24-hour authorization window. Without this, BLADE will refuse offensive commands.".to_string(),
-            input_schema: json!({
-                "type": "object",
-                "properties": {
-                    "target": {"type": "string", "description": "Target to authorize: IP, domain, IP range (CIDR), or description like 'my home lab'"},
-                    "target_type": {"type": "string", "description": "Type: 'ip', 'domain', 'range', 'description'", "enum": ["ip", "domain", "range", "description"]},
-                    "ownership_claim": {"type": "string", "description": "Claim type: 'owner' (I own this), 'authorized' (I have written permission), 'bug_bounty' (in-scope for bounty), 'ctf' (CTF challenge), 'lab' (my own test lab), 'hired' (hired as penetration tester)"},
-                    "scope_notes": {"type": "string", "description": "What's in scope, what's out of scope, any constraints"}
-                },
-                "required": ["target", "target_type", "ownership_claim", "scope_notes"]
-            }),
-        },
-        ToolDefinition {
             name: "blade_self_upgrade".to_string(),
             description: "Install a missing tool or capability that BLADE needs. Use when a command fails because a tool isn't installed. Pass the tool name (e.g., 'docker', 'node', 'ffmpeg', 'claude', 'aider'). BLADE installs it automatically.".to_string(),
             input_schema: json!({
@@ -1701,22 +1687,6 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
                     format!("{}:{} [{}] {}{}", s.file_path, s.line_number, s.symbol_type, s.signature, doc)
                 }).collect::<Vec<_>>().join("\n");
                 (text, false)
-            }
-        }
-        "blade_pentest_authorize" => {
-            let target = match args["target"].as_str() {
-                Some(t) => t.to_string(),
-                None => return ("Missing required argument: target".to_string(), true),
-            };
-            let target_type = args["target_type"].as_str().unwrap_or("description").to_string();
-            let ownership_claim = match args["ownership_claim"].as_str() {
-                Some(c) => c.to_string(),
-                None => return ("Missing required argument: ownership_claim".to_string(), true),
-            };
-            let scope_notes = args["scope_notes"].as_str().unwrap_or("").to_string();
-            match crate::pentest::pentest_authorize(target, target_type, ownership_claim, scope_notes).await {
-                Ok(msg) => (msg, false),
-                Err(e) => (format!("Authorization failed: {}", e), true),
             }
         }
         "blade_self_upgrade" => {
