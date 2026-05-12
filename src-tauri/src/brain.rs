@@ -1574,16 +1574,7 @@ fn build_system_prompt_inner(
         parts.push(accountability_ctx);
     }
 
-    // Financial — only for money queries
-    let mut financial_chars: usize = 0;
-    if !smart || (!user_query.is_empty() && score_or_default(user_query, "financial", 1.0) > gate) {
-        let fin = crate::financial_brain::get_financial_context();
-        if !fin.is_empty() {
-            financial_chars = financial_chars.saturating_add(fin.len());
-            parts.push(fin);
-        }
-    }
-    record_section("financial", financial_chars);
+    // v1.6 narrowing — financial_brain removed (VISION.md lines 173-184).
     record_section("code", code_chars);
 
     // Habits — only if the engine has data

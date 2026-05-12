@@ -14,11 +14,6 @@ export type {
   // health_guardian
   HealthGuardianStats,
   HealthTakeBreakResult,
-  // financial_brain
-  FinanceTransaction,
-  FinancialSnapshot,
-  FinancialInsight,
-  FinancialGoal,
   // goal_engine
   Goal,
   GoalSubtask,
@@ -58,10 +53,10 @@ export type {
 // Cluster-only UI types (Plans 06-03..06 extend).
 // ═══════════════════════════════════════════════════════════════════════════
 
-/** Active tab key for tab-bearing Life OS surfaces (Finance right-pane, Meetings). */
+/** Active tab key for tab-bearing Life OS surfaces (Meetings, etc.). */
 export type LifeTabKey = string;
 
-/** Stat card data used by HealthView + FinanceView KPI rows. */
+/** Stat card data used by HealthView KPI rows. */
 export interface LifeStatCard {
   label: string;
   value: string | number;

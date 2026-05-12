@@ -764,13 +764,6 @@ pub async fn ops_head_think(reports: &[TentacleReport]) -> Vec<Decision> {
         });
     }
 
-    // ── 3e. Cost anomaly check (periodic — from financial_brain) ──────────────
-    if let Some(cost_warning) = check_cost_anomaly().await {
-        decisions.push(Decision::Inform {
-            summary: format!("[Ops/Cost] {}", cost_warning),
-        });
-    }
-
     // Low-priority routine updates
     for r in reports {
         if r.priority == Priority::Low && !r.requires_action {
@@ -799,63 +792,6 @@ async fn check_recent_ci_activity() -> String {
     );
 
     result.unwrap_or_default()
-}
-
-/// Check financial_brain for cost anomalies (fires at most once per hour).
-async fn check_cost_anomaly() -> Option<String> {
-    // Rate-limit to avoid spamming this on every tick
-    static LAST_COST_CHECK: std::sync::OnceLock<std::sync::Mutex<i64>> =
-        std::sync::OnceLock::new();
-    let last_check = LAST_COST_CHECK.get_or_init(|| std::sync::Mutex::new(0));
-    {
-        let mut guard = last_check.lock().unwrap();
-        let elapsed = now_secs() - *guard;
-        if elapsed < 3600 {
-            return None;
-        }
-        *guard = now_secs();
-    }
-
-    // Try to read spending summary from financial_brain's DB
-    let db_path = crate::config::blade_config_dir().join("blade.db");
-    let Ok(conn) = rusqlite::Connection::open(&db_path) else {
-        return None;
-    };
-
-    // Check if we have a spending_summary table
-    let has_table: bool = conn
-        .query_row(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='spending_summary'",
-            [],
-            |row| row.get::<_, i64>(0),
-        )
-        .map(|n| n > 0)
-        .unwrap_or(false);
-
-    if !has_table {
-        return None;
-    }
-
-    // Look for this-month vs last-month trend
-    let result: Result<(f64, f64), _> = conn.query_row(
-        "SELECT this_month, last_month FROM spending_summary ORDER BY created_at DESC LIMIT 1",
-        [],
-        |row| Ok((row.get::<_, f64>(0)?, row.get::<_, f64>(1)?)),
-    );
-
-    if let Ok((this_month, last_month)) = result {
-        if last_month > 0.0 {
-            let pct_change = ((this_month - last_month) / last_month) * 100.0;
-            if pct_change > 15.0 {
-                return Some(format!(
-                    "Monthly spend trending {:.0}% higher than last month (${:.2} vs ${:.2}). Review in financial dashboard.",
-                    pct_change, this_month, last_month
-                ));
-            }
-        }
-    }
-
-    None
 }
 
 // ── 4. INTELLIGENCE HEAD ─────────────────────────────────────────────────────

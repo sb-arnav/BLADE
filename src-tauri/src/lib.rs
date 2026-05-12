@@ -135,7 +135,6 @@ mod whisper_local;
 mod world_model;
 mod workflow_builder;
 mod context_engine;
-mod financial_brain;
 mod reasoning_engine;
 mod social_graph;
 mod health_tracker;
@@ -1116,18 +1115,6 @@ pub fn run() {
             context_engine::context_assemble,
             context_engine::context_score_chunk,
             context_engine::context_clear_cache,
-            // Financial Brain — personal finance intelligence
-            financial_brain::finance_add_transaction,
-            financial_brain::finance_get_transactions,
-            financial_brain::finance_delete_transaction,
-            financial_brain::finance_get_snapshot,
-            financial_brain::finance_generate_insights,
-            financial_brain::finance_get_goals,
-            financial_brain::finance_create_goal,
-            financial_brain::finance_update_goal,
-            financial_brain::finance_investment_suggestions,
-            financial_brain::finance_budget_recommendation,
-            financial_brain::finance_get_context,
             // Negotiation Engine — debate coach + negotiation assistant
             negotiation_engine::negotiation_build_argument,
             negotiation_engine::negotiation_steelman,
@@ -1289,11 +1276,6 @@ pub fn run() {
             security_monitor::security_run_audit,
             security_monitor::security_audit_deps,
             security_monitor::security_scan_code,
-            // Financial Brain — Phase 8A CSV import + analytics
-            financial_brain::finance_import_csv,
-            financial_brain::finance_auto_categorize,
-            financial_brain::finance_spending_summary,
-            financial_brain::finance_detect_subscriptions,
             // Health Guardian — Phase 8B screen time monitoring
             health_guardian::health_guardian_stats,
             health_guardian::health_take_break,

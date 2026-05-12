@@ -25,7 +25,6 @@ pub fn init_all_tables() {
     crate::prediction_engine::ensure_tables();
     crate::meeting_intelligence::ensure_tables();
     crate::social_graph::ensure_tables();
-    crate::financial_brain::ensure_tables();
     crate::negotiation_engine::ensure_tables();
     crate::habit_engine::ensure_tables();
     crate::health_guardian::ensure_tables();
