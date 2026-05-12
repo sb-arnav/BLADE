@@ -1,7 +1,7 @@
 // src/lib/tauri/life_os.ts
 //
 // Typed wrappers for the Life OS cluster — one per registered Rust #[tauri::command]
-// across health_tracker.rs, health.rs, health_guardian.rs,
+// across health_tracker.rs, health.rs,
 // goal_engine.rs, habit_engine.rs, meeting_intelligence.rs, social_graph.rs,
 // prediction_engine.rs, emotional_intelligence.rs, accountability.rs,
 // streak_stats.rs, people_graph.rs, learning_engine.rs, temporal_intel.rs
@@ -78,11 +78,6 @@ export interface ProjectHealth {
   summary: string;
   [k: string]: unknown;
 }
-
-// ─── health_guardian.rs types — returned as serde_json::Value ────────────────
-
-export type HealthGuardianStats = Record<string, unknown>;
-export type HealthTakeBreakResult = Record<string, unknown>;
 
 // ─── goal_engine.rs types ────────────────────────────────────────────────────
 
@@ -499,26 +494,6 @@ export function healthScanNow(args: { project: string; rootPath: string }): Prom
 /** @see src-tauri/src/health.rs:363 health_summary_all */
 export function healthSummaryAll(): Promise<string[]> {
   return invokeTyped<string[]>('health_summary_all', {});
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// health_guardian.rs — 2 commands
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * @see src-tauri/src/health_guardian.rs:307 health_guardian_stats
- * Returns serde_json::Value with screen-time / break data.
- */
-export function healthGuardianStats(): Promise<HealthGuardianStats> {
-  return invokeTyped<HealthGuardianStats>('health_guardian_stats', {});
-}
-
-/**
- * @see src-tauri/src/health_guardian.rs:312 health_take_break
- * Returns serde_json::Value acknowledgement.
- */
-export function healthTakeBreak(): Promise<HealthTakeBreakResult> {
-  return invokeTyped<HealthTakeBreakResult>('health_take_break', {});
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

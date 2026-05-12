@@ -11,9 +11,6 @@ export type {
   HealthStats,
   // health
   ProjectHealth,
-  // health_guardian
-  HealthGuardianStats,
-  HealthTakeBreakResult,
   // goal_engine
   Goal,
   GoalSubtask,

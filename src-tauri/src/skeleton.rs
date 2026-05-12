@@ -27,7 +27,6 @@ pub fn init_all_tables() {
     crate::social_graph::ensure_tables();
     crate::negotiation_engine::ensure_tables();
     crate::habit_engine::ensure_tables();
-    crate::health_guardian::ensure_tables();
     crate::health_tracker::ensure_tables();
     crate::streak_stats::ensure_tables();
     crate::workflow_builder::ensure_tables();
