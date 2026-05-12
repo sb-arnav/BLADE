@@ -16,7 +16,6 @@ mod execution_memory;
 mod health;
 mod indexer;
 mod self_upgrade;
-mod pentest;
 pub mod session_handoff; // Phase 24 v1.3 — pub for skill_validator bin (list --diff reads SessionHandoff)
 mod computer_use;
 mod deeplearn;
@@ -47,7 +46,6 @@ mod code_sandbox;
 mod causal_graph;
 mod memory_palace;
 mod authority_engine;
-mod kali;
 mod agents;
 mod automation;
 mod brain;
@@ -925,11 +923,6 @@ pub fn run() {
             self_upgrade::self_upgrade_install,
             self_upgrade::self_upgrade_catalog,
             self_upgrade::self_upgrade_audit,
-            pentest::pentest_authorize,
-            pentest::pentest_check_auth,
-            pentest::pentest_revoke,
-            pentest::pentest_list_auth,
-            pentest::pentest_check_model_safety,
             background_agent::agent_spawn,
             background_agent::agent_list_background,
             background_agent::agent_get_background,
@@ -1012,12 +1005,6 @@ pub fn run() {
             self_critique::self_critique_history,
             self_critique::self_critique_deep_roast,
             self_critique::self_critique_weekly_meta,
-            kali::kali_recon,
-            kali::kali_crack_hash,
-            kali::kali_analyze_ctf,
-            kali::kali_explain_exploit,
-            kali::kali_generate_payload,
-            kali::kali_check_tools,
             world_model::world_get_state,
             world_model::world_get_summary,
             world_model::world_refresh,

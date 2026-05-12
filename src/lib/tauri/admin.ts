@@ -153,17 +153,6 @@ export interface UpgradeInstallResult {
   [k: string]: unknown;
 }
 
-/** @see src-tauri/src/self_upgrade.rs:366 PentestAuthorization */
-export interface PentestAuthorization {
-  target: string;
-  target_type: string;
-  ownership_claim: string;
-  scope_notes: string;
-  confirmed_at: number;
-  session_id: string;
-  [k: string]: unknown;
-}
-
 // ─── evolution.rs types ──────────────────────────────────────────────────────
 
 /** @see src-tauri/src/evolution.rs:315 EvolutionLevel */
@@ -841,61 +830,6 @@ export function selfUpgradeCatalog(): Promise<UpgradeCatalogEntry[]> {
  */
 export function selfUpgradeAudit(): Promise<Array<[string, boolean]>> {
   return invokeTyped<Array<[string, boolean]>>('self_upgrade_audit');
-}
-
-/**
- * @see src-tauri/src/self_upgrade.rs:416 pentest_authorize
- * Rust signature: `pentest_authorize(target: String, target_type: String, ownership_claim: String, scope_notes: String, ...) -> Result<PentestAuthorization, String>`.
- */
-export function pentestAuthorize(args: {
-  target: string;
-  targetType: string;
-  ownershipClaim: string;
-  scopeNotes: string;
-}): Promise<PentestAuthorization> {
-  return invokeTyped<
-    PentestAuthorization,
-    { target: string; target_type: string; ownership_claim: string; scope_notes: string }
-  >('pentest_authorize', {
-    target: args.target,
-    target_type: args.targetType,
-    ownership_claim: args.ownershipClaim,
-    scope_notes: args.scopeNotes,
-  });
-}
-
-/**
- * @see src-tauri/src/self_upgrade.rs:460 pentest_check_auth
- * Rust signature: `pentest_check_auth(target: String) -> Option<PentestAuthorization>`.
- */
-export function pentestCheckAuth(target: string): Promise<PentestAuthorization | null> {
-  return invokeTyped<PentestAuthorization | null, { target: string }>('pentest_check_auth', {
-    target,
-  });
-}
-
-/**
- * @see src-tauri/src/self_upgrade.rs:466 pentest_revoke
- * Rust signature: `pentest_revoke(target: String) -> Result<(), String>`.
- */
-export function pentestRevoke(target: string): Promise<void> {
-  return invokeTyped<void, { target: string }>('pentest_revoke', { target });
-}
-
-/**
- * @see src-tauri/src/self_upgrade.rs:556 pentest_list_auth
- * Rust signature: `pentest_list_auth() -> Vec<PentestAuthorization>`.
- */
-export function pentestListAuth(): Promise<PentestAuthorization[]> {
-  return invokeTyped<PentestAuthorization[]>('pentest_list_auth');
-}
-
-/**
- * @see src-tauri/src/self_upgrade.rs:532 pentest_check_model_safety
- * Rust signature: `pentest_check_model_safety() -> serde_json::Value`.
- */
-export function pentestCheckModelSafety(): Promise<Record<string, unknown>> {
-  return invokeTyped<Record<string, unknown>>('pentest_check_model_safety');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -22,7 +22,6 @@ export type {
   Report,
   UpgradeCatalogEntry,
   UpgradeInstallResult,
-  PentestAuthorization,
   EvolutionLevel,
   EvolutionSuggestion,
   DecisionLogEntry,

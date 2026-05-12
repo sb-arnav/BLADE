@@ -282,24 +282,6 @@ export interface PersonalityProfile {
   [k: string]: unknown;
 }
 
-// ─── kali.rs ─────────────────────────────────────────────────────────────────
-
-/** @see src-tauri/src/kali.rs:358 Finding */
-export interface KaliFinding {
-  severity: string;
-  [k: string]: unknown;
-}
-
-/** @see src-tauri/src/kali.rs:349 ScanResult */
-export interface KaliScanResult {
-  target: string;
-  tool: string;
-  output: string;
-  findings: KaliFinding[];
-  timestamp: number;
-  [k: string]: unknown;
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
 // character.rs — 7 commands
 // ═══════════════════════════════════════════════════════════════════════════
@@ -923,76 +905,3 @@ export function personalityGetProfile(): Promise<PersonalityProfile | null> {
   return invokeTyped<PersonalityProfile | null>('personality_get_profile', {});
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// kali.rs — 6 commands (exposed via SidecarView per D-158)
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * @see src-tauri/src/kali.rs:1093 kali_recon
- * Rust signature: `kali_recon(target: String) -> Result<ScanResult, String>`.
- */
-export function kaliRecon(target: string): Promise<KaliScanResult> {
-  return invokeTyped<KaliScanResult, { target: string }>('kali_recon', { target });
-}
-
-/**
- * @see src-tauri/src/kali.rs:1098 kali_crack_hash
- * Rust signature: `kali_crack_hash(hash: String, hash_type: Option<String>) -> Result<String, String>`.
- */
-export function kaliCrackHash(args: { hash: string; hashType?: string }): Promise<string> {
-  return invokeTyped<string, { hash: string; hash_type?: string }>('kali_crack_hash', {
-    hash: args.hash,
-    hash_type: args.hashType,
-  });
-}
-
-/**
- * @see src-tauri/src/kali.rs:1103 kali_analyze_ctf
- * Rust signature: `kali_analyze_ctf(name, category, description, files: Vec<String>) -> Result<String, String>`.
- */
-export function kaliAnalyzeCtf(args: {
-  name: string;
-  category: string;
-  description: string;
-  files: string[];
-}): Promise<string> {
-  return invokeTyped<
-    string,
-    { name: string; category: string; description: string; files: string[] }
-  >('kali_analyze_ctf', {
-    name: args.name,
-    category: args.category,
-    description: args.description,
-    files: args.files,
-  });
-}
-
-/**
- * @see src-tauri/src/kali.rs:1124 kali_explain_exploit
- * Rust signature: `kali_explain_exploit(code: String) -> Result<String, String>`.
- */
-export function kaliExplainExploit(code: string): Promise<string> {
-  return invokeTyped<string, { code: string }>('kali_explain_exploit', { code });
-}
-
-/**
- * @see src-tauri/src/kali.rs:1129 kali_generate_payload
- * Rust signature: `kali_generate_payload(payload_type, target_info) -> Result<String, String>`.
- */
-export function kaliGeneratePayload(args: {
-  payloadType: string;
-  targetInfo: string;
-}): Promise<string> {
-  return invokeTyped<string, { payload_type: string; target_info: string }>(
-    'kali_generate_payload',
-    { payload_type: args.payloadType, target_info: args.targetInfo },
-  );
-}
-
-/**
- * @see src-tauri/src/kali.rs:1137 kali_check_tools
- * Returns serde_json::Value with per-tool availability map + _wordlists nested map.
- */
-export function kaliCheckTools(): Promise<Record<string, unknown>> {
-  return invokeTyped<Record<string, unknown>>('kali_check_tools', {});
-}

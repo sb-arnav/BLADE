@@ -36,9 +36,6 @@ export type {
   SidecarRunAllEntry,
   // personality_mirror
   PersonalityProfile,
-  // kali
-  KaliScanResult,
-  KaliFinding,
 } from '@/lib/tauri/identity';
 
 // ═══════════════════════════════════════════════════════════════════════════
