@@ -204,7 +204,6 @@ pub fn get_body_map() -> Vec<ModuleMapping> {
         m("authority_engine", "nervous", "cerebrum", "9 specialist agents with authority hierarchy"),
         m("self_upgrade", "immune", "adaptive", "Self-improvement + pentest capabilities"),
         m("autonomous_research", "immune", "adaptive", "Self-directed knowledge gap research"),
-        m("workflow_builder", "lifestyle", "scheduler", "User-defined workflow automation"),
         m("iot_bridge", "muscular", "hands", "Home Assistant + Spotify control"),
     ]
 }

@@ -14,7 +14,6 @@ const Terminal          = lazy(() => import('./Terminal').then((m) => ({ default
 const FileBrowser       = lazy(() => import('./FileBrowser').then((m) => ({ default: m.FileBrowser })));
 const GitPanel          = lazy(() => import('./GitPanel').then((m) => ({ default: m.GitPanel })));
 const Canvas            = lazy(() => import('./Canvas').then((m) => ({ default: m.Canvas })));
-const WorkflowBuilder   = lazy(() => import('./WorkflowBuilder').then((m) => ({ default: m.WorkflowBuilder })));
 const WebAutomation     = lazy(() => import('./WebAutomation').then((m) => ({ default: m.WebAutomation })));
 const EmailAssistant    = lazy(() => import('./EmailAssistant').then((m) => ({ default: m.EmailAssistant })));
 const DocumentGenerator = lazy(() => import('./DocumentGenerator').then((m) => ({ default: m.DocumentGenerator })));
@@ -26,7 +25,6 @@ export const routes: RouteDefinition[] = [
   { id: 'file-browser',       label: 'File Browser',    section: 'dev', component: FileBrowser,       phase: 7 },
   { id: 'git-panel',          label: 'Git',             section: 'dev', component: GitPanel,          phase: 7 },
   { id: 'canvas',             label: 'Canvas',          section: 'dev', component: Canvas,            phase: 7 },
-  { id: 'workflow-builder',   label: 'Workflows',       section: 'dev', component: WorkflowBuilder,   phase: 7 },
   { id: 'web-automation',     label: 'Web Automation',  section: 'dev', component: WebAutomation,     phase: 7 },
   { id: 'email-assistant',    label: 'Email Assistant', section: 'dev', component: EmailAssistant,    phase: 7 },
   { id: 'document-generator', label: 'Documents',       section: 'dev', component: DocumentGenerator, phase: 7 },

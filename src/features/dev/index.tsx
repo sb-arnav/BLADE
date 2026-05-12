@@ -30,7 +30,6 @@
 // Phase 7 Plan 07-07 adds 4 more isolation routes for the dev-tools + admin
 // Playwright specs (same passthrough pattern; test shim mocks the invokes):
 //   - dev-terminal            → ./TerminalDev            (SC-1 run_shell path)
-//   - dev-workflow-builder    → ./WorkflowBuilderDev     (DEV-05 list + detail + tabs)
 //   - dev-mcp-settings        → ./McpSettingsDev         (ADMIN-09 CRUD + tool trust)
 //
 // Phase 8 Plan 08-05 adds 3 more isolation routes for the body + hive
@@ -87,9 +86,6 @@ const PersonaViewDev = lazy(() =>
 );
 const TerminalDev = lazy(() =>
   import('./TerminalDev').then((m) => ({ default: m.TerminalDev })),
-);
-const WorkflowBuilderDev = lazy(() =>
-  import('./WorkflowBuilderDev').then((m) => ({ default: m.WorkflowBuilderDev })),
 );
 const McpSettingsDev = lazy(() =>
   import('./McpSettingsDev').then((m) => ({ default: m.McpSettingsDev })),
@@ -221,15 +217,6 @@ export const routes: RouteDefinition[] = [
     phase: 7,
     paletteHidden: true,
     description: 'DEV: Terminal isolation (SC-1 run_shell path)',
-  },
-  {
-    id: 'dev-workflow-builder',
-    label: 'DEV: WorkflowBuilder',
-    section: 'dev',
-    component: WorkflowBuilderDev,
-    phase: 7,
-    paletteHidden: true,
-    description: 'DEV: WorkflowBuilder isolation (DEV-05 list + detail + tabs)',
   },
   {
     id: 'dev-mcp-settings',

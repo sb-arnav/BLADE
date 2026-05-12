@@ -129,49 +129,6 @@ export interface SandboxResult {
   [k: string]: unknown;
 }
 
-// ─── workflow_builder.rs types ───────────────────────────────────────────────
-
-/** @see src-tauri/src/workflow_builder.rs:23 WorkflowNode */
-export interface WorkflowNode {
-  id: string;
-  /** "trigger/schedule" | "trigger/file_change" | "llm" | "bash" | "http"
-   *  | "file_write" | "notify" | "condition" */
-  node_type: string;
-  config: unknown;
-  next_nodes: string[];
-  on_error?: string | null;
-  [k: string]: unknown;
-}
-
-/** @see src-tauri/src/workflow_builder.rs:37 Workflow */
-export interface Workflow {
-  id: string;
-  name: string;
-  description: string;
-  nodes: WorkflowNode[];
-  enabled: boolean;
-  last_run?: number | null;
-  run_count: number;
-  created_at: number;
-  [k: string]: unknown;
-}
-
-/** Legacy alias — Phase 7 consumers should prefer `WorkflowNode` directly. */
-export type WorkflowStep = WorkflowNode;
-
-/** @see src-tauri/src/workflow_builder.rs:49 WorkflowRun */
-export interface WorkflowRun {
-  workflow_id: string;
-  run_id: string;
-  started_at: number;
-  ended_at?: number | null;
-  /** "running" | "success" | "failed" */
-  status: string;
-  node_outputs: Record<string, string>;
-  error?: string | null;
-  [k: string]: unknown;
-}
-
 // ─── browser_agent.rs + browser_native.rs types ──────────────────────────────
 //
 // `browser_action` takes a raw `serde_json::Value` (free-form action spec) and
@@ -684,80 +641,6 @@ export function sandboxFixAndRun(args: {
  */
 export function sandboxDetectLanguage(code: string): Promise<string> {
   return invokeTyped<string, { code: string }>('sandbox_detect_language', { code });
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// workflow_builder.rs — n8n-style automation (8 commands)
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * @see src-tauri/src/workflow_builder.rs:836 workflow_list
- * Rust signature: `workflow_list() -> Vec<Workflow>`.
- */
-export function workflowList(): Promise<Workflow[]> {
-  return invokeTyped<Workflow[]>('workflow_list');
-}
-
-/**
- * @see src-tauri/src/workflow_builder.rs:841 workflow_get
- * Rust signature: `workflow_get(id: String) -> Option<Workflow>`.
- */
-export function workflowGet(id: string): Promise<Workflow | null> {
-  return invokeTyped<Workflow | null, { id: string }>('workflow_get', { id });
-}
-
-/**
- * @see src-tauri/src/workflow_builder.rs:846 workflow_create
- * Rust signature: `workflow_create(workflow: Workflow) -> Result<Workflow, String>`.
- */
-export function workflowCreate(workflow: Workflow): Promise<Workflow> {
-  return invokeTyped<Workflow, { workflow: Workflow }>('workflow_create', { workflow });
-}
-
-/**
- * @see src-tauri/src/workflow_builder.rs:859 workflow_update
- * Rust signature: `workflow_update(workflow: Workflow) -> Result<Workflow, String>`.
- */
-export function workflowUpdate(workflow: Workflow): Promise<Workflow> {
-  return invokeTyped<Workflow, { workflow: Workflow }>('workflow_update', { workflow });
-}
-
-/**
- * @see src-tauri/src/workflow_builder.rs:865 workflow_delete
- * Rust signature: `workflow_delete(id: String) -> Result<(), String>`.
- */
-export function workflowDelete(id: string): Promise<void> {
-  return invokeTyped<void, { id: string }>('workflow_delete', { id });
-}
-
-/**
- * @see src-tauri/src/workflow_builder.rs:870 workflow_run_now
- * Rust signature: `workflow_run_now(workflow_id: String, app: AppHandle) -> Result<WorkflowRun, String>`.
- */
-export function workflowRunNow(workflowId: string): Promise<WorkflowRun> {
-  return invokeTyped<WorkflowRun, { workflow_id: string }>('workflow_run_now', {
-    workflow_id: workflowId,
-  });
-}
-
-/**
- * @see src-tauri/src/workflow_builder.rs:879 workflow_get_runs
- * Rust signature: `workflow_get_runs(workflow_id: String) -> Vec<WorkflowRun>`.
- */
-export function workflowGetRuns(workflowId: string): Promise<WorkflowRun[]> {
-  return invokeTyped<WorkflowRun[], { workflow_id: string }>('workflow_get_runs', {
-    workflow_id: workflowId,
-  });
-}
-
-/**
- * @see src-tauri/src/workflow_builder.rs:884 workflow_generate_from_description
- * Rust signature: `workflow_generate_from_description(description: String) -> Result<Workflow, String>`.
- */
-export function workflowGenerateFromDescription(description: string): Promise<Workflow> {
-  return invokeTyped<Workflow, { description: string }>('workflow_generate_from_description', {
-    description,
-  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

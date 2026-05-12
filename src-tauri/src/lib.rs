@@ -131,7 +131,6 @@ mod voice_intelligence;
 mod voice_local;
 mod whisper_local;
 mod world_model;
-mod workflow_builder;
 mod context_engine;
 mod reasoning_engine;
 mod social_graph;
@@ -1088,14 +1087,6 @@ pub fn run() {
             code_sandbox::sandbox_fix_and_run,
             code_sandbox::sandbox_detect_language,
             // Workflow Builder — visual n8n-style automation
-            workflow_builder::workflow_list,
-            workflow_builder::workflow_get,
-            workflow_builder::workflow_create,
-            workflow_builder::workflow_update,
-            workflow_builder::workflow_delete,
-            workflow_builder::workflow_run_now,
-            workflow_builder::workflow_get_runs,
-            workflow_builder::workflow_generate_from_description,
             // Context Engine — smart RAG context assembly
             context_engine::context_assemble,
             context_engine::context_score_chunk,
@@ -1706,7 +1697,6 @@ pub fn run() {
             // Prediction engine — runs inside learning_engine's 30-min tick (no separate loop)
 
             // Workflow Builder scheduler — checks every 60s for due scheduled workflows
-            workflow_builder::start_workflow_scheduler(app.handle().clone());
 
             // Integration Bridge — Phase 4 MCP always-on service polling
             if startup_god_config.integration_polling_enabled {
