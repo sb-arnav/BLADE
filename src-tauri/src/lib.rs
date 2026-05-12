@@ -153,7 +153,6 @@ mod deep_scan;
 mod integration_bridge;
 mod system_control;
 mod notification_listener;
-mod security_monitor;
 mod temporal_intel;
 mod iot_bridge;
 mod typed_memory;
@@ -1265,16 +1264,7 @@ pub fn run() {
             notification_listener::notification_get_recent,
             notification_listener::notification_listener_start,
             // Security Monitor — Phase 9 security fortress
-            security_monitor::security_scan_network,
-            security_monitor::security_check_breach,
-            security_monitor::security_check_password_hash,
-            security_monitor::security_scan_sensitive_files,
-            security_monitor::security_check_url,
-            security_monitor::security_overview,
             // Security Monitor — Phase 10 Decepticon-inspired chained pipeline
-            security_monitor::security_run_audit,
-            security_monitor::security_audit_deps,
-            security_monitor::security_scan_code,
             // Temporal Intelligence — Phase 8C time-aware context
             temporal_intel::temporal_what_was_i_doing,
             temporal_intel::temporal_daily_standup,
@@ -1741,15 +1731,6 @@ pub fn run() {
 
             // Notification Listener — Phase 5 partial: poll OS notifications every 30s
             notification_listener::notification_listener_start(app.handle().clone());
-
-            // Security Cache — refresh network suspicious-connection count every 5 min.
-            // Runs netstat once in background so brain.rs can read it without blocking.
-            tauri::async_runtime::spawn(async {
-                loop {
-                    security_monitor::update_security_cache();
-                    tokio::time::sleep(std::time::Duration::from_secs(300)).await;
-                }
-            });
 
             // Temporal Intelligence — ensure tables ready on startup
             temporal_intel::ensure_tables();

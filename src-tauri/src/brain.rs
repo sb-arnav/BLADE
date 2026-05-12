@@ -1488,12 +1488,9 @@ fn build_system_prompt_inner(
     record_section("git", git_chars);
 
     // ── SECURITY (priority 13) ────────────────────────────────────────────────
-    // Alert: only inject when there's an actual alert (gated at source)
+    // v1.6 narrowing — security_monitor cut (VISION lines 173-184); only the
+    // kali security-expertise prompt remains in this block (cut in v1.6 P4).
     let mut security_chars: usize = 0;
-    if let Some(alert) = crate::security_monitor::get_security_alert_for_prompt() {
-        security_chars = security_chars.saturating_add(alert.len());
-        parts.push(alert);
-    }
     // Full security expertise: only when query is clearly security-focused
     if !user_query.is_empty() && crate::kali::is_security_context(user_query) {
         let s = format!("## Security Expertise\n\n{}", crate::kali::security_system_prompt());

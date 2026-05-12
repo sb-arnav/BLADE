@@ -108,7 +108,6 @@ pub fn get_body_map() -> Vec<ModuleMapping> {
         m("evolution", "immune", "adaptive", "MCP catalog discovery + auto-install"),
         m("tool_forge", "immune", "adaptive", "Dynamic tool creation via Claude Code"),
         m("permissions", "immune", "skin_barrier", "Tool risk classification (Blocked/Ask/Allow)"),
-        m("security_monitor", "immune", "lymph_nodes", "Network, phishing, breach, code scan"),
         m("kali", "immune", "lymph_nodes", "Security expertise + pentest mode"),
 
         // ── SKELETON (Structure) ─────────────────────────────────────────
