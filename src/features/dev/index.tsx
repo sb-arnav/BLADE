@@ -31,7 +31,6 @@
 // Playwright specs (same passthrough pattern; test shim mocks the invokes):
 //   - dev-terminal            → ./TerminalDev            (SC-1 run_shell path)
 //   - dev-workflow-builder    → ./WorkflowBuilderDev     (DEV-05 list + detail + tabs)
-//   - dev-security-dashboard  → ./SecurityDashboardDev   (SC-4 hero + 4 tabs + pentest danger)
 //   - dev-mcp-settings        → ./McpSettingsDev         (ADMIN-09 CRUD + tool trust)
 //
 // Phase 8 Plan 08-05 adds 3 more isolation routes for the body + hive
@@ -91,9 +90,6 @@ const TerminalDev = lazy(() =>
 );
 const WorkflowBuilderDev = lazy(() =>
   import('./WorkflowBuilderDev').then((m) => ({ default: m.WorkflowBuilderDev })),
-);
-const SecurityDashboardDev = lazy(() =>
-  import('./SecurityDashboardDev').then((m) => ({ default: m.SecurityDashboardDev })),
 );
 const McpSettingsDev = lazy(() =>
   import('./McpSettingsDev').then((m) => ({ default: m.McpSettingsDev })),
@@ -234,15 +230,6 @@ export const routes: RouteDefinition[] = [
     phase: 7,
     paletteHidden: true,
     description: 'DEV: WorkflowBuilder isolation (DEV-05 list + detail + tabs)',
-  },
-  {
-    id: 'dev-security-dashboard',
-    label: 'DEV: SecurityDashboard',
-    section: 'dev',
-    component: SecurityDashboardDev,
-    phase: 7,
-    paletteHidden: true,
-    description: 'DEV: SecurityDashboard isolation (SC-4 hero + 4 tabs + pentest warning)',
   },
   {
     id: 'dev-mcp-settings',

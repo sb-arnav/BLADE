@@ -15,7 +15,6 @@ const Analytics         = lazy(() => import('./Analytics').then((m) => ({ defaul
 const CapabilityReports = lazy(() => import('./CapabilityReports').then((m) => ({ default: m.CapabilityReports })));
 const Reports           = lazy(() => import('./Reports').then((m) => ({ default: m.Reports })));
 const DecisionLog       = lazy(() => import('./DecisionLog').then((m) => ({ default: m.DecisionLog })));
-const SecurityDashboard = lazy(() => import('./SecurityDashboard').then((m) => ({ default: m.SecurityDashboard })));
 const Temporal          = lazy(() => import('./Temporal').then((m) => ({ default: m.Temporal })));
 const Diagnostics       = lazy(() => import('./Diagnostics').then((m) => ({ default: m.Diagnostics })));
 const IntegrationStatus = lazy(() => import('./IntegrationStatus').then((m) => ({ default: m.IntegrationStatus })));
@@ -28,7 +27,6 @@ export const routes: RouteDefinition[] = [
   { id: 'capability-reports', label: 'Capability Reports', section: 'admin', component: CapabilityReports, phase: 7 },
   { id: 'reports',            label: 'Reports',            section: 'admin', component: Reports,           phase: 7, description: 'Backend openRoute target for capability_gap_detected' },
   { id: 'decision-log',       label: 'Decision Log',       section: 'admin', component: DecisionLog,       phase: 7 },
-  { id: 'security-dashboard', label: 'Security',           section: 'admin', component: SecurityDashboard, phase: 7 },
   { id: 'temporal',           label: 'Temporal',           section: 'admin', component: Temporal,          phase: 7 },
   { id: 'diagnostics',        label: 'Diagnostics',        section: 'admin', component: Diagnostics,       phase: 7 },
   { id: 'integration-status', label: 'Integration Status', section: 'admin', component: IntegrationStatus, phase: 7 },
