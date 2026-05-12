@@ -29,7 +29,6 @@ pub fn init_all_tables() {
     crate::habit_engine::ensure_tables();
     crate::health_tracker::ensure_tables();
     crate::streak_stats::ensure_tables();
-    crate::workflow_builder::ensure_tables();
     crate::document_intelligence::ensure_tables();
     crate::temporal_intel::ensure_tables();
     crate::voice_intelligence::ensure_tables();
