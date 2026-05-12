@@ -643,11 +643,6 @@ pub fn maybe_add_humor(
     let hour = now.hour();
     let weekday = now.weekday();
 
-    // Gather state signals
-    let streak_mins = crate::health_guardian::get_health_stats()["current_streak_minutes"]
-        .as_i64()
-        .unwrap_or(0);
-
     // Git branch count — check quickly
     let branch_count: usize = {
         let win = crate::context::get_active_window().ok();
@@ -667,17 +662,7 @@ pub fn maybe_add_humor(
         }
     }
 
-    // Long coding streak
-    if streak_mins >= 240 {
-        let hours = streak_mins / 60;
-        return Some(format!(
-            "{}h straight. Your code is probably fine. Your posture definitely isn't.",
-            hours
-        ));
-    }
-    if streak_mins >= 120 {
-        return Some("You've been at this for 2 hours. At least your coffee can take a break.".to_string());
-    }
+    // v1.6 narrowing — health_guardian streak humor removed (VISION cut).
 
     // Too many git branches (light roast)
     if branch_count >= 14 {
@@ -1521,29 +1506,17 @@ fn build_system_prompt_inner(
     }
     record_section("security", security_chars);
 
-    // ── HEALTH NUDGE (priority 14, streak >= 90 min only) ────────────────────
+    // ── HEALTH CONTEXT (priority 14, health-relevant queries only) ───────────
+    // v1.6 narrowing — health_guardian streak gate removed; inject health_tracker
+    // context on health-relevant queries only.
     {
         let mut health_chars: usize = 0;
-        let streak_mins = crate::health_guardian::get_health_stats()["current_streak_minutes"]
-            .as_i64().unwrap_or(0);
-        if streak_mins >= 90 {
-            let h = streak_mins / 60;
-            let m = streak_mins % 60;
-            let dur = if h > 0 && m > 0 { format!("{}h {}min", h, m) }
-                      else if h > 0 { format!("{}h", h) }
-                      else { format!("{}min", m) };
-            let s = format!("Note: {} without a break.", dur);
-            health_chars = health_chars.saturating_add(s.len());
-            parts.push(s);
-
-            // Full health context only when health-relevant query
-            let health_score = score_or_default(user_query, "health", 1.0);
-            if !smart || health_score > 0.3 {
-                let health_ctx = crate::health_tracker::get_health_context();
-                if !health_ctx.is_empty() {
-                    health_chars = health_chars.saturating_add(health_ctx.len());
-                    parts.push(health_ctx);
-                }
+        let health_score = score_or_default(user_query, "health", 1.0);
+        if !smart || health_score > 0.3 {
+            let health_ctx = crate::health_tracker::get_health_context();
+            if !health_ctx.is_empty() {
+                health_chars = health_chars.saturating_add(health_ctx.len());
+                parts.push(health_ctx);
             }
         }
         record_section("health", health_chars);

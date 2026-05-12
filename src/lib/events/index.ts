@@ -138,7 +138,6 @@ export const BLADE_EVENTS = {
   // long-running commands (not simple request-response). Phase 6 consumers
   // benefit from subscribing vs polling. Values match Rust emit strings verbatim.
   BLADE_HEALTH_NUDGE:     'blade_health_nudge',     // health_tracker.rs:416,450,469 — scheduled nudge loop
-  HEALTH_BREAK_REMINDER:  'health_break_reminder',  // health_guardian.rs:150,160,180 — scheduled break loop
   BLADE_EMOTION_DETECTED: 'blade_emotion_detected', // emotional_intelligence.rs:753 — fires on valence shift during detection
   ACCOUNTABILITY_NUDGE:   'accountability_nudge',   // accountability.rs:755,777 — scheduled check-in + behind-KR alerts
   BLADE_PREDICTION:       'blade_prediction',       // prediction_engine.rs:589 — high-confidence predictions fired during background generation

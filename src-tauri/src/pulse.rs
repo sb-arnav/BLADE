@@ -901,18 +901,8 @@ pub async fn generate_daily_digest(app: &tauri::AppHandle) -> Result<DailyDigest
     // ── Pending commitments from reminders + people notes ──────────────────
     let commitments = gather_commitments(&db_path);
 
-    // ── Health note from guardian ────────────────────────────────────────────
-    let health_note = {
-        let stats = crate::health_guardian::get_health_stats();
-        let mins = stats["daily_total_minutes"].as_i64().unwrap_or(0);
-        if mins > 480 {
-            format!("You were at the screen for {} hours yesterday. Watch the streak.", mins / 60)
-        } else if mins > 0 {
-            format!("{} hours of screen time recorded yesterday.", mins / 60)
-        } else {
-            String::new()
-        }
-    };
+    // v1.6 narrowing — health_guardian screen-time note removed from pulse.
+    let health_note = String::new();
 
     // ── Temporal pattern ─────────────────────────────────────────────────────
     let pattern_insight = rusqlite::Connection::open(&db_path)

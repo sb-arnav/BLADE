@@ -902,12 +902,12 @@ pub fn build_user_model() -> UserModel {
     expertise_vec.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
     model.expertise = expertise_vec.into_iter().take(15).collect();
 
-    // ── Mood from health/streak stats ─────────────────────────────────────────
-    let stats = crate::health_guardian::get_health_stats();
-    let streak_mins = stats["current_streak_minutes"].as_i64().unwrap_or(0);
+    // ── Mood from time-of-day + traits ────────────────────────────────────────
+    // v1.6 narrowing — health_guardian streak input removed; mood estimate is
+    // time-of-day + traits only.
     let hour = chrono::Local::now().hour() as u8;
 
-    model.mood_today = estimate_mood_from_context(streak_mins as u32, hour, &traits);
+    model.mood_today = estimate_mood_from_context(0, hour, &traits);
 
     model
 }
@@ -1009,26 +1009,22 @@ pub async fn predict_next_need(
 ) -> Option<String> {
     let hour = chrono::Local::now().hour() as u8;
     let day = chrono::Local::now().weekday();
-    let streak = crate::health_guardian::get_health_stats();
-    let streak_mins = streak["current_streak_minutes"].as_i64().unwrap_or(0) as u32;
 
-    // Rule 1: Monday morning + fresh start → morning briefing
-    if hour >= 7 && hour <= 10
-       && day == chrono::Weekday::Mon
-       && streak_mins < 5
-    {
+    // v1.6 narrowing — health_guardian streak-conditioned rules removed.
+    // Rule 1: Monday morning → morning briefing
+    if hour >= 7 && hour <= 10 && day == chrono::Weekday::Mon {
         return Some("morning briefing — it's Monday morning and they just opened BLADE".to_string());
     }
 
-    // Rule 2: Fresh start any weekday morning
-    if hour >= 7 && hour <= 9 && streak_mins < 5 {
+    // Rule 2: Any weekday morning → quick context
+    if hour >= 7 && hour <= 9 {
         return Some("quick morning context — what's on the agenda today".to_string());
     }
 
-    // Rule 3: Error on screen for a while → debugging help
-    if !perception.visible_errors.is_empty() && streak_mins > 8 {
+    // Rule 3: Error on screen → debugging help
+    if !perception.visible_errors.is_empty() {
         let err_preview = crate::safe_slice(&perception.visible_errors[0], 80);
-        return Some(format!("debugging help — error on screen for {}min: {}", streak_mins, err_preview));
+        return Some(format!("debugging help — error visible: {}", err_preview));
     }
 
     // Rule 4: On Slack/messaging app → draft reply help
@@ -1045,11 +1041,6 @@ pub async fn predict_next_need(
        || app_lower.contains("github") || app_lower.contains("gitlab")
     {
         return Some("PR review or ticket update".to_string());
-    }
-
-    // Rule 6: Long streak → break suggestion
-    if streak_mins > 90 {
-        return Some(format!("break suggestion — {}min streak, encourage a short rest", streak_mins));
     }
 
     // Rule 7: Code editor + specific language context
@@ -1184,23 +1175,11 @@ pub fn get_user_model_summary() -> Option<String> {
     let role_str = if model.role.is_empty() { "developer".to_string() } else { model.role.clone() };
     lines.push(format!("{} ({}{}).", model.name, role_str, langs));
 
-    // Line 2: Current focus + streak
-    let stats = crate::health_guardian::get_health_stats();
-    let streak_mins = stats["current_streak_minutes"].as_i64().unwrap_or(0);
-    let streak_str = if streak_mins >= 60 {
-        format!("{}h{}min streak", streak_mins / 60, streak_mins % 60)
-    } else if streak_mins > 0 {
-        format!("{}min streak", streak_mins)
-    } else {
-        "fresh session".to_string()
-    };
-
-    let project_str = if let Some(proj) = model.active_projects.first() {
-        format!(", working on {}", proj)
-    } else {
-        String::new()
-    };
-    lines.push(format!("Currently {}{}.", streak_str, project_str));
+    // Line 2: Current focus
+    // v1.6 narrowing — health_guardian streak removed; focus is project-only.
+    if let Some(proj) = model.active_projects.first() {
+        lines.push(format!("Currently working on {}.", proj));
+    }
 
     // Line 3: Mood + predicted need
     lines.push(format!("Mood: {}.", model.mood_today));

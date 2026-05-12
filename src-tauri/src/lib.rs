@@ -154,7 +154,6 @@ mod integration_bridge;
 mod system_control;
 mod notification_listener;
 mod security_monitor;
-mod health_guardian;
 mod temporal_intel;
 mod iot_bridge;
 mod typed_memory;
@@ -1276,9 +1275,6 @@ pub fn run() {
             security_monitor::security_run_audit,
             security_monitor::security_audit_deps,
             security_monitor::security_scan_code,
-            // Health Guardian — Phase 8B screen time monitoring
-            health_guardian::health_guardian_stats,
-            health_guardian::health_take_break,
             // Temporal Intelligence — Phase 8C time-aware context
             temporal_intel::temporal_what_was_i_doing,
             temporal_intel::temporal_daily_standup,
@@ -1745,9 +1741,6 @@ pub fn run() {
 
             // Notification Listener — Phase 5 partial: poll OS notifications every 30s
             notification_listener::notification_listener_start(app.handle().clone());
-
-            // Health Guardian — Phase 8B: screen time + wellbeing monitor (every 5 min)
-            health_guardian::start_health_monitor(app.handle().clone());
 
             // Security Cache — refresh network suspicious-connection count every 5 min.
             // Runs netstat once in background so brain.rs can read it without blocking.

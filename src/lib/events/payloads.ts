@@ -384,7 +384,6 @@ export interface AgentOutputPayload {
 // drift risk. Field names mirror Rust `#[serde]` output verbatim (snake_case).
 //
 // @see src-tauri/src/health_tracker.rs:416,450,469
-// @see src-tauri/src/health_guardian.rs:150,160,180
 // @see src-tauri/src/emotional_intelligence.rs:753
 // @see src-tauri/src/accountability.rs:755,777
 // @see src-tauri/src/prediction_engine.rs:589
@@ -402,15 +401,6 @@ export interface BladeHealthNudgePayload {
   sleep_hours?: number;
   energy?: number;
   mood?: number;
-  [k: string]: unknown;
-}
-
-/** Mirrors Rust emit at `src-tauri/src/health_guardian.rs:150,160,180`
- *  (health_break_reminder). Scheduled break-reminder loop. */
-export interface HealthBreakReminderPayload {
-  urgency: 'warning' | 'critical' | 'wind_down' | string;
-  streak_minutes: number;
-  message: string;
   [k: string]: unknown;
 }
 
