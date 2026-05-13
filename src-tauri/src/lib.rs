@@ -1599,8 +1599,15 @@ pub fn run() {
                 startup_god_config.god_mode_tier.clone()
             };
             godmode::start_god_mode(app.handle().clone(), &god_tier);
-            // Screen timeline always runs — BLADE always sees your screen
-            screen_timeline::start_timeline_capture_loop(app.handle().clone());
+            // Phase 40 (v1.6 REDUCE-02) — Total Recall is on-demand only.
+            // The background screenshot loop no longer fires at app launch.
+            // On-demand path remains: `screen_timeline_commands::*` Tauri
+            // commands (timeline_search_cmd, timeline_browse_cmd, etc.) and
+            // `start_timeline_capture_loop` itself stay callable so the LLM
+            // can invoke screen capture when chat asks "what was on my
+            // screen 10 min ago?". The function is still gated by
+            // `screen_timeline_enabled` (default false) when invoked.
+            // See: .planning/phases/40-always-on-to-on-demand/40-CONTEXT.md
 
             // Proactive vision — listen for context switches from screen_timeline
             // and run lightweight assistants (task extraction, focus detection, insights)
