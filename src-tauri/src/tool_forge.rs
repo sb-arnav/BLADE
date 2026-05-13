@@ -932,6 +932,93 @@ if __name__ == "__main__":
     }
 }
 
+// ── Phase 51 (FORGE-GAP-*) — multi-gap robustness fixtures ───────────────────
+//
+// Each fixture mirrors what an LLM would emit for the stated capability gap.
+// They use only the Python standard library so the build-time smoke test in
+// `test_tool` does not depend on third-party packages. In production the
+// real LLM is allowed to reach for `requests` / `feedparser`; the fixtures
+// stick to `urllib.request` + `xml.etree.ElementTree` + `json` to keep CI
+// hermetic.
+
+/// Phase 51 (FORGE-GAP-ARXIV) — fetch an arXiv paper's abstract by ID or URL.
+/// Hits `https://export.arxiv.org/api/query?id_list=<id>` (returns Atom XML)
+/// and extracts the `<summary>` element.
+#[cfg(any(test, feature = "voyager-fixture"))]
+pub fn arxiv_abstract_fixture() -> ForgeGeneration {
+    ForgeGeneration {
+        script_code: r#"#!/usr/bin/env python3
+"""Fetch the abstract of an arXiv paper by ID or URL.
+
+Usage:
+    arxiv_abstract.py <id_or_url>
+
+Accepts either a bare arXiv ID ("2103.00020") or a full URL
+("https://arxiv.org/abs/2103.00020"). Returns JSON with id, title,
+and abstract.
+"""
+import json
+import re
+import sys
+import urllib.request
+import xml.etree.ElementTree as ET
+
+
+ARXIV_API = "https://export.arxiv.org/api/query?id_list={id}"
+ATOM_NS = {"a": "http://www.w3.org/2005/Atom"}
+
+
+def extract_id(arg: str) -> str:
+    # Strip arxiv.org/abs/ prefix if present; tolerate version suffix
+    m = re.search(r"(\d{4}\.\d{4,5})(v\d+)?$", arg)
+    if m:
+        return m.group(1)
+    return arg.strip()
+
+
+def main() -> int:
+    if len(sys.argv) < 2:
+        print("usage: arxiv_abstract.py <id_or_url>", file=sys.stderr)
+        return 1
+    paper_id = extract_id(sys.argv[1])
+    try:
+        with urllib.request.urlopen(ARXIV_API.format(id=paper_id), timeout=10) as r:
+            body = r.read().decode("utf-8")
+    except Exception as e:
+        print(f"network error: {e}", file=sys.stderr)
+        return 1
+    try:
+        root = ET.fromstring(body)
+        entry = root.find("a:entry", ATOM_NS)
+        if entry is None:
+            print("no entry found", file=sys.stderr)
+            return 1
+        title_el = entry.find("a:title", ATOM_NS)
+        summary_el = entry.find("a:summary", ATOM_NS)
+        title = (title_el.text or "").strip() if title_el is not None else ""
+        summary = (summary_el.text or "").strip() if summary_el is not None else ""
+        print(json.dumps({"id": paper_id, "title": title, "abstract": summary}, indent=2))
+        return 0
+    except ET.ParseError as e:
+        print(f"parse error: {e}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+"#
+        .to_string(),
+        description: "Fetch the abstract of an arXiv paper by ID or URL.".to_string(),
+        usage_template: "tool.py <id_or_url>".to_string(),
+        parameters: vec![ToolParameter {
+            name: "id_or_url".to_string(),
+            param_type: "string".to_string(),
+            description: "arXiv paper ID (e.g. 2103.00020) or full URL".to_string(),
+            required: true,
+        }],
+    }
+}
+
 /// Load all forged tools from the DB, sorted by use_count descending.
 pub fn get_forged_tools() -> Vec<ForgedTool> {
     let conn = match open_db() {
