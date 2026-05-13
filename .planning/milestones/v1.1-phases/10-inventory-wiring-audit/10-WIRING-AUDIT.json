@@ -7377,6 +7377,15 @@
       ]
     },
     {
+      "file": "src-tauri/src/onboarding/contradictions.rs",
+      "classification": "ACTIVE",
+      "purpose": "Phase 49 HUNT-06-ADV — second-pass LLM classification of hunt findings into thematic clusters (work / personal / hobby / past-self) with contradiction surfacing. Routed through cheap_model_for_provider with a 5s tokio::time::timeout budget.",
+      "trigger": "Called by onboarding::hunt::start_hunt after findings accumulate (>= 3 useful probes). Result feeds a hunt_question chat-line on contradiction.",
+      "internal_callers": [
+        "src-tauri/src/onboarding/hunt.rs"
+      ]
+    },
+    {
       "file": "src-tauri/src/oauth/mod.rs",
       "classification": "NOT-WIRED",
       "purpose": "Phase 46 HUNT-10 OAuth scaffolds. OAuthToken canonical shape + OAuthConfig (auth/token URL injection for tests). Submodules: gmail (primary impl), slack + github (stubs).",
@@ -10941,6 +10950,26 @@
       "ui_surface": null,
       "control_type": "bool",
       "note": "v1.5.1 B1 — off-switch for tentacles::filesystem_watch::start_filesystem_watcher. Default true."
+    },
+    {
+      "field": "BladeConfig.hunt",
+      "file": "src-tauri/src/config.rs:1252",
+      "classification": "ACTIVE",
+      "struct": "BladeConfig",
+      "disk_persisted": true,
+      "ui_surface": null,
+      "control_type": "struct",
+      "note": "Phase 49 (HUNT-COST-CHAT) — HuntConfig { budget_usd: f32 }. Default $3.00 per session. Drives the cost-block threshold in onboarding::hunt::start_hunt."
+    },
+    {
+      "field": "BladeConfig.forge",
+      "file": "src-tauri/src/config.rs:1257",
+      "classification": "ACTIVE",
+      "struct": "BladeConfig",
+      "disk_persisted": true,
+      "ui_surface": null,
+      "control_type": "struct",
+      "note": "Phase 49 (HUNT-COST-CHAT) — ForgeConfig { budget_usd: f32 }. Default $3.00 per session. Drives the cost-block threshold in tool_forge::forge_complete_turn_tracked."
     }
   ],
   "not_wired_backlog": [
