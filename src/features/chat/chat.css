@@ -119,6 +119,45 @@
   50%      { opacity: 0.92; }
 }
 
+/* ── Phase 47 (FORGE-02): forge chat-lines ─────────────────────────────────
+   System-role messages with a forgePhase get a distinct visual treatment so
+   the gap_detected → writing → testing → registered → retrying sequence
+   reads as its own band of the stream, not as a stack of errors.
+
+   Override .chat-bubble-system's red tint with a neutral forge accent;
+   per-phase modifiers narrow the band color (red on failed, green on
+   registered). Monospace + smaller font emphasizes the systems-event
+   character of these lines. */
+.chat-bubble-forge {
+  align-self: stretch;
+  max-width: 100%;
+  background: color-mix(in oklab, var(--g-fill), #4a6dff 8%);
+  border-color: color-mix(in oklab, var(--g-edge-hi), #4a6dff 22%);
+  color: var(--t-1);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12.5px;
+  line-height: 1.45;
+  opacity: 0.96;
+  padding: var(--s-2) var(--s-3);
+}
+
+.chat-bubble-forge-gap_detected,
+.chat-bubble-forge-writing,
+.chat-bubble-forge-testing,
+.chat-bubble-forge-retrying {
+  /* neutral forge accent — inherits .chat-bubble-forge */
+}
+
+.chat-bubble-forge-registered {
+  background: color-mix(in oklab, var(--g-fill), #2ea84a 12%);
+  border-color: color-mix(in oklab, var(--g-edge-hi), #2ea84a 32%);
+}
+
+.chat-bubble-forge-failed {
+  background: color-mix(in oklab, var(--g-fill), #b83c3c 14%);
+  border-color: color-mix(in oklab, var(--g-edge-hi), #b83c3c 30%);
+}
+
 /* ── Input bar ────────────────────────────────────────────────────────────── */
 
 .chat-input-bar {

@@ -246,6 +246,14 @@ export const BLADE_EVENTS = {
   BLADE_HUNT_LINE:  'blade_hunt_line',
   BLADE_HUNT_DONE:  'blade_hunt_done',
   BLADE_HUNT_ERROR: 'blade_hunt_error',
+
+  // ───── Phase 47 — Forge Wire (FORGE-02, v2.0) ────────────────────────────
+  // Emitted by src-tauri/src/tool_forge.rs::emit_forge_line at every
+  // transition in the forge loop. ChatProvider subscribes and appends a
+  // system-role ChatStreamMessage so the chat renders the gap_detected →
+  // writing → testing → registered → retrying sequence as distinct
+  // chat-lines. Payload: BladeForgeLinePayload (./payloads.ts).
+  BLADE_FORGE_LINE: 'blade_forge_line',
 } as const;
 
 /** Literal union of every string in BLADE_EVENTS. */
