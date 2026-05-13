@@ -1019,6 +1019,110 @@ if __name__ == "__main__":
     }
 }
 
+/// Phase 51 (FORGE-GAP-RSS) — extract titles + summaries from an RSS or Atom
+/// feed URL. Uses `urllib.request` + `xml.etree.ElementTree` to support both
+/// RSS 2.0 (`<item>` under `<channel>`) and Atom (`<entry>` with `<summary>`).
+/// In production the LLM is encouraged to use `feedparser`; the fixture
+/// keeps the dependency surface stdlib-only.
+#[cfg(any(test, feature = "voyager-fixture"))]
+pub fn rss_feed_fixture() -> ForgeGeneration {
+    ForgeGeneration {
+        script_code: r#"#!/usr/bin/env python3
+"""Extract titles and summaries from an RSS or Atom feed URL.
+
+Usage:
+    rss_feed.py <feed_url> [N]
+
+Returns JSON list of {title, summary, link} for up to N entries
+(default 10). Supports RSS 2.0 and Atom.
+"""
+import json
+import sys
+import urllib.request
+import xml.etree.ElementTree as ET
+
+
+ATOM_NS = {"a": "http://www.w3.org/2005/Atom"}
+
+
+def parse_atom(root, n):
+    out = []
+    for entry in root.findall("a:entry", ATOM_NS)[:n]:
+        title_el = entry.find("a:title", ATOM_NS)
+        summary_el = entry.find("a:summary", ATOM_NS) or entry.find("a:content", ATOM_NS)
+        link_el = entry.find("a:link", ATOM_NS)
+        out.append({
+            "title": (title_el.text or "").strip() if title_el is not None else "",
+            "summary": (summary_el.text or "").strip() if summary_el is not None else "",
+            "link": link_el.get("href", "") if link_el is not None else "",
+        })
+    return out
+
+
+def parse_rss(root, n):
+    out = []
+    channel = root.find("channel") or root
+    for item in channel.findall("item")[:n]:
+        title = item.findtext("title", default="").strip()
+        description = item.findtext("description", default="").strip()
+        link = item.findtext("link", default="").strip()
+        out.append({"title": title, "summary": description, "link": link})
+    return out
+
+
+def main() -> int:
+    if len(sys.argv) < 2:
+        print("usage: rss_feed.py <feed_url> [N]", file=sys.stderr)
+        return 1
+    url = sys.argv[1]
+    try:
+        n = int(sys.argv[2]) if len(sys.argv) > 2 else 10
+    except ValueError:
+        n = 10
+    n = max(1, min(n, 50))
+    try:
+        with urllib.request.urlopen(url, timeout=10) as r:
+            body = r.read()
+    except Exception as e:
+        print(f"network error: {e}", file=sys.stderr)
+        return 1
+    try:
+        root = ET.fromstring(body)
+    except ET.ParseError as e:
+        print(f"parse error: {e}", file=sys.stderr)
+        return 1
+    tag = root.tag.lower()
+    if "feed" in tag:
+        items = parse_atom(root, n)
+    else:
+        items = parse_rss(root, n)
+    print(json.dumps(items, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+"#
+        .to_string(),
+        description: "Extract titles and summaries from an RSS or Atom feed URL.".to_string(),
+        usage_template: "tool.py <feed_url> [N]".to_string(),
+        parameters: vec![
+            ToolParameter {
+                name: "feed_url".to_string(),
+                param_type: "string".to_string(),
+                description: "URL of the RSS or Atom feed".to_string(),
+                required: true,
+            },
+            ToolParameter {
+                name: "n".to_string(),
+                param_type: "integer".to_string(),
+                description: "Max entries to return (1-50, default 10)".to_string(),
+                required: false,
+            },
+        ],
+    }
+}
+
 /// Load all forged tools from the DB, sorted by use_count descending.
 pub fn get_forged_tools() -> Vec<ForgedTool> {
     let conn = match open_db() {

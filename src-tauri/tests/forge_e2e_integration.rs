@@ -30,7 +30,7 @@
 
 use blade_lib::tool_forge::{
     arxiv_abstract_fixture, forge_tool_from_fixture, get_forged_tools, pre_check_existing_tools,
-    ForgeGeneration, ToolParameter,
+    rss_feed_fixture, ForgeGeneration, ToolParameter,
 };
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -349,6 +349,68 @@ async fn forge_e2e_arxiv_abstract_lands_in_catalog() {
     assert!(
         !stderr.contains("SyntaxError"),
         "arxiv fixture should be syntactically valid Python; got: {}",
+        stderr
+    );
+
+    std::env::remove_var("BLADE_CONFIG_DIR");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Phase 51 (FORGE-GAP-RSS) — gap detected → tool written → smoke-test runs
+/// → registered. Equivalent to the HN/arXiv tests but for the RSS/Atom feed
+/// extractor.
+#[tokio::test]
+async fn forge_e2e_rss_feed_lands_in_catalog() {
+    let _g = ENV_LOCK.lock().unwrap();
+    let dir = fresh_config_dir("rss-feed");
+    std::env::set_var("BLADE_CONFIG_DIR", &dir);
+
+    let forged = forge_tool_from_fixture(
+        "extract titles and summaries from an RSS or Atom feed URL",
+        "python",
+        rss_feed_fixture(),
+    )
+    .await
+    .expect("forge_tool_from_fixture should land the RSS tool");
+
+    let script_path = PathBuf::from(&forged.script_path);
+    assert!(script_path.is_file(), "script should exist");
+    assert!(forged.script_path.ends_with(".py"));
+
+    let all = get_forged_tools();
+    assert!(
+        all.iter().any(|t| t.id == forged.id),
+        "forged tool should be retrievable via get_forged_tools()"
+    );
+
+    let desc_lower = forged.description.to_lowercase();
+    assert!(
+        desc_lower.contains("rss")
+            || desc_lower.contains("atom")
+            || desc_lower.contains("feed"),
+        "description should reference the capability; got: {}",
+        forged.description
+    );
+
+    let fname = format!("{}.py", forged.name);
+    assert!(
+        forged.usage.contains(&fname),
+        "usage '{}' should reference the actual script filename '{}'",
+        forged.usage,
+        fname
+    );
+
+    // Script should be syntactically valid Python (smoke-test ran during forge;
+    // re-invoke here to make the assertion explicit).
+    let py = std::process::Command::new("python3")
+        .arg(&forged.script_path)
+        .arg("--help")
+        .output()
+        .expect("python3 should be available on the test host");
+    let stderr = String::from_utf8_lossy(&py.stderr);
+    assert!(
+        !stderr.contains("SyntaxError"),
+        "rss fixture should be syntactically valid Python; got: {}",
         stderr
     );
 
