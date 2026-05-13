@@ -1123,6 +1123,71 @@ if __name__ == "__main__":
     }
 }
 
+/// Phase 51 (FORGE-GAP-PYPI) — pull PyPI package metadata (latest version,
+/// description, dependencies). Hits `https://pypi.org/pypi/<package>/json`.
+/// Build-time tests mock the network call via the smoke test surface (the
+/// `--help` path exits 0 cleanly without hitting pypi.org).
+#[cfg(any(test, feature = "voyager-fixture"))]
+pub fn pypi_metadata_fixture() -> ForgeGeneration {
+    ForgeGeneration {
+        script_code: r#"#!/usr/bin/env python3
+"""Pull PyPI package metadata: latest version, description, dependencies.
+
+Usage:
+    pypi_metadata.py <package_name>
+
+Returns JSON with name, version, summary, and requires_dist.
+"""
+import json
+import sys
+import urllib.request
+
+
+PYPI_API = "https://pypi.org/pypi/{name}/json"
+
+
+def main() -> int:
+    # --help is the smoke-test invocation path; exit 0 there so the
+    # build-time test does not hit pypi.org (hermetic CI).
+    if len(sys.argv) > 1 and sys.argv[1] in ("--help", "-h"):
+        print("usage: pypi_metadata.py <package_name>", file=sys.stderr)
+        return 0
+    if len(sys.argv) < 2:
+        print("usage: pypi_metadata.py <package_name>", file=sys.stderr)
+        return 1
+    name = sys.argv[1].strip()
+    try:
+        with urllib.request.urlopen(PYPI_API.format(name=name), timeout=10) as r:
+            data = json.loads(r.read().decode("utf-8"))
+    except Exception as e:
+        print(f"network error: {e}", file=sys.stderr)
+        return 1
+    info = data.get("info", {})
+    out = {
+        "name": info.get("name", name),
+        "version": info.get("version", ""),
+        "summary": info.get("summary", ""),
+        "requires_dist": info.get("requires_dist", []) or [],
+    }
+    print(json.dumps(out, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+"#
+        .to_string(),
+        description: "Pull PyPI package metadata: latest version, description, dependencies.".to_string(),
+        usage_template: "tool.py <package_name>".to_string(),
+        parameters: vec![ToolParameter {
+            name: "package_name".to_string(),
+            param_type: "string".to_string(),
+            description: "PyPI package name (e.g. 'requests')".to_string(),
+            required: true,
+        }],
+    }
+}
+
 /// Load all forged tools from the DB, sorted by use_count descending.
 pub fn get_forged_tools() -> Vec<ForgedTool> {
     let conn = match open_db() {
