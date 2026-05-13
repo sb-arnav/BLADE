@@ -183,6 +183,35 @@ Background research loop that monitors AI news, suggests new MCP tools to instal
 
 ## Install
 
+**macOS / Linux:**
+```bash
+curl -sSL slayerblade.site/install | sh
+```
+
+**Windows (PowerShell):**
+```powershell
+iwr -useb slayerblade.site/install.ps1 | iex
+```
+
+After install, BLADE launches automatically. User data in `~/.blade/` (macOS/Linux) or `%LOCALAPPDATA%\Blade\` (Windows) is preserved on upgrade — `who-you-are.md`, `blade.db`, keychain entries all stay put.
+
+*Curl-pipe-sh concern? Audit the script before running:*
+```bash
+curl -sSL slayerblade.site/install > install.sh && less install.sh && bash install.sh
+```
+
+### macOS Gatekeeper
+
+The installer auto-runs `xattr -cr /Applications/Blade.app` to clear the quarantine flag. If macOS still blocks BLADE with "Blade is damaged and can't be opened", run it yourself:
+
+```bash
+xattr -cr /Applications/Blade.app
+```
+
+BLADE isn't notarized yet — Apple charges $99/year for a developer certificate. Until then, `xattr -cr` is the workaround.
+
+### Manual download
+
 | Platform | Download |
 |----------|----------|
 | **macOS** (Apple Silicon) | [`.dmg` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_1.5.0_aarch64.dmg) |
@@ -191,13 +220,7 @@ Background research loop that monitors AI news, suggests new MCP tools to instal
 
 > **Intel Mac:** v1.5.0 ships Apple Silicon only. Intel users — open an issue if you need an x64 build.
 
-> **macOS note:** If you see "Blade is damaged and can't be opened", run:
-> ```bash
-> xattr -cr /Applications/Blade.app
-> ```
-> This clears the quarantine flag. BLADE isn't notarized yet.
-
-Installed builds auto-update from GitHub Releases.
+Installed builds auto-update from GitHub Releases. If GitHub is unreachable on your network, the installer falls back to a CDN mirror at `cdn.slayerblade.site`.
 
 ---
 
