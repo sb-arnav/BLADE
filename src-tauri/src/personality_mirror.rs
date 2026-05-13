@@ -6,6 +6,12 @@
 /// prompt so BLADE mirrors back the user's natural communication style.
 ///
 /// No fine-tuning involved — pure prompt engineering from observed patterns.
+///
+/// v1.6 narrowing (REDUCE-01): this module is the LEGITIMATE keep-path. Voice
+/// comes from user-stated core command (filled by v2.0 hunt) + actual chat
+/// history (this module). No filename/shell-history inference happens here.
+/// `personality_analyze` reads ~/.blade/history/*.json (BLADE's own chat log);
+/// `personality_import_chats` requires explicit user-initiated import.
 
 use crate::config::{blade_config_dir, load_config};
 use crate::providers::{complete_turn, ConversationMessage};
