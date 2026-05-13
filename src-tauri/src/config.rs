@@ -686,11 +686,14 @@ pub struct IntelligenceConfig {
 
 fn default_tree_sitter_enabled() -> bool { true }
 
-// B1 — defaults for the always-on ambient watchers added in v1.5.1
-// (notification_listener, terminal_watch, filesystem_watch). Default true
-// preserves pre-v1.5.1 behavior; users can flip them off in config.json
-// or via the settings UI.
-fn default_true_ambient() -> bool { true }
+// B1 (v1.5.1) added the off-switches; Phase 40 (v1.6 REDUCE-04) flips the
+// shipped state to default-off for all three observer-class watchers
+// (notification_listener, terminal_watch, filesystem_watch). They become
+// on-demand: the user explicitly enables them via Settings or via the
+// LLM toggling config keys through Tauri commands. Per-tentacle gates
+// in start_*_watcher and notification_listener_start short-circuit
+// when the flag is false (already wired in B1).
+fn default_false_ambient() -> bool { false }
 fn default_repo_map_token_budget() -> u32 { 1000 }
 fn default_pagerank_damping() -> f32 { 0.85 }
 fn default_capability_registry_path() -> std::path::PathBuf {
@@ -869,14 +872,16 @@ struct DiskConfig {
     #[serde(default)]
     audio_capture_enabled: bool,
     /// B1 — off-switch for the OS-notification poller (every 30s).
-    /// Defaults to true to preserve pre-v1.5.1 behavior.
-    #[serde(default = "default_true_ambient")]
+    /// Phase 40 (v1.6 REDUCE-04): default flipped to false.
+    #[serde(default = "default_false_ambient")]
     notification_listener_enabled: bool,
     /// B1 — off-switch for the terminal-history watcher tentacle.
-    #[serde(default = "default_true_ambient")]
+    /// Phase 40 (v1.6 REDUCE-04): default flipped to false.
+    #[serde(default = "default_false_ambient")]
     terminal_watch_enabled: bool,
     /// B1 — off-switch for the filesystem (Downloads dir) watcher tentacle.
-    #[serde(default = "default_true_ambient")]
+    /// Phase 40 (v1.6 REDUCE-04): default flipped to false.
+    #[serde(default = "default_false_ambient")]
     filesystem_watch_enabled: bool,
     #[serde(default)]
     ghost_mode_enabled: bool,
@@ -1022,9 +1027,10 @@ impl Default for DiskConfig {
             tts_speed: 1.0,
             ha_base_url: String::new(),
             audio_capture_enabled: false,
-            notification_listener_enabled: true,
-            terminal_watch_enabled: true,
-            filesystem_watch_enabled: true,
+            // Phase 40 (v1.6 REDUCE-04) — observer-class tentacles default off.
+            notification_listener_enabled: false,
+            terminal_watch_enabled: false,
+            filesystem_watch_enabled: false,
             ghost_mode_enabled: false,
             ghost_mode_position: "bottom-right".to_string(),
             ghost_auto_reply: false,
@@ -1141,13 +1147,16 @@ pub struct BladeConfig {
     #[serde(default)]
     pub audio_capture_enabled: bool,
     /// B1 — off-switch for the OS-notification poller (every 30s).
-    #[serde(default = "default_true_ambient")]
+    /// Phase 40 (v1.6 REDUCE-04): default flipped to false.
+    #[serde(default = "default_false_ambient")]
     pub notification_listener_enabled: bool,
     /// B1 — off-switch for the terminal-history watcher tentacle.
-    #[serde(default = "default_true_ambient")]
+    /// Phase 40 (v1.6 REDUCE-04): default flipped to false.
+    #[serde(default = "default_false_ambient")]
     pub terminal_watch_enabled: bool,
     /// B1 — off-switch for the filesystem (Downloads dir) watcher tentacle.
-    #[serde(default = "default_true_ambient")]
+    /// Phase 40 (v1.6 REDUCE-04): default flipped to false.
+    #[serde(default = "default_false_ambient")]
     pub filesystem_watch_enabled: bool,
     /// Enable Ghost Mode — invisible overlay during meetings
     #[serde(default)]
@@ -1291,9 +1300,10 @@ impl Default for BladeConfig {
             tts_speed: 1.0,
             ha_base_url: String::new(),
             audio_capture_enabled: false,
-            notification_listener_enabled: true,
-            terminal_watch_enabled: true,
-            filesystem_watch_enabled: true,
+            // Phase 40 (v1.6 REDUCE-04) — observer-class tentacles default off.
+            notification_listener_enabled: false,
+            terminal_watch_enabled: false,
+            filesystem_watch_enabled: false,
             ghost_mode_enabled: false,
             ghost_mode_position: "bottom-right".to_string(),
             ghost_auto_reply: false,
