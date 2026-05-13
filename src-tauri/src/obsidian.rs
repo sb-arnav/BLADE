@@ -105,26 +105,10 @@ pub fn log_pulse_thought(thought: &str) {
     append_to_daily("BLADE Pulse", short);
 }
 
-/// Append a morning briefing to today's note.
-pub fn log_briefing(briefing: &str) {
-    let Some(vault) = vault_path() else { return };
-    ensure_daily_note();
-    let path = today_note_path(&vault);
-
-    let existing = fs::read_to_string(&path).unwrap_or_default();
-    let header = "## Morning";
-    let entry = format!("\n> **BLADE Briefing — {}**\n> {}\n", now_str(), briefing.replace('\n', "\n> "));
-
-    let updated = if let Some(pos) = existing.find(header) {
-        let after = pos + header.len();
-        let line_end = existing[after..].find('\n').map(|i| after + i + 1).unwrap_or(after);
-        format!("{}{}{}", &existing[..line_end], entry, &existing[line_end..])
-    } else {
-        format!("{}\n{}\n{}", existing, header, entry)
-    };
-
-    let _ = fs::write(&path, updated);
-}
+// v1.6 narrowing (Phase 43 REDUCE-06): morning-briefing engine retired.
+// `log_briefing` removed — the caller (pulse.rs::run_morning_briefing) is gone.
+// Companion `log_pulse_thought` above stays — pulse-thoughts still flow,
+// just gated through decision_gate per Phase 43.
 
 /// Save a conversation summary to a new note in BLADE/Conversations/.
 pub fn save_conversation(title: &str, summary: &str, conversation_id: &str) {
