@@ -6,7 +6,7 @@
 // The emit site check is a string-literal search: the phase name must appear as
 // "phase_name" (double-quoted) somewhere in the deep_scan/ Rust source tree.
 // This catches renames on either side (TS or Rust) without executing any code.
-import { readFileSync, readdirSync } from 'fs';
+import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join, extname } from 'path';
 import { exit } from 'process';
 import { fileURLToPath } from 'url';
@@ -16,8 +16,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const repoRoot = join(__dirname, '..');
 
-// Read the TypeScript phase list
+// v1.6 narrowing (commit aa789f7 — VISION cut list #7): deep_scan + scan
+// onboarding + deepScanPhases.ts deleted. The invariant this script enforced
+// is moot — there's no scan onboarding flow to keep TS<->Rust in sync.
 const phasesFile = join(repoRoot, 'src', 'features', 'onboarding', 'deepScanPhases.ts');
+if (!existsSync(phasesFile)) {
+  console.log('[PASS] verify:scan-event-compat: deep_scan cut by v1.6 (commit aa789f7) — invariant retired.');
+  exit(0);
+}
 let phasesSource;
 try {
   phasesSource = readFileSync(phasesFile, 'utf8');

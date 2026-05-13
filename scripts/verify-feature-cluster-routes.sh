@@ -112,7 +112,7 @@ done
 # ─────────────────────────────────────────────────────────────────────
 LIFEOS_FILES=(
   "HealthView"
-  "FinanceView"
+  # FinanceView removed by v1.6 chore commit ae54a15 (financial_brain cut, VISION list #1).
   "GoalView"
   "HabitView"
   "MeetingsView"
@@ -140,7 +140,7 @@ IDENTITY_FILES=(
   "NegotiationView"
   "ReasoningView"
   "ContextEngineView"
-  "SidecarView"
+  # SidecarView removed by v1.6 chore commit aa789f7 (deep_scan + ecosystem auto-enable cut, VISION list #7).
 )
 for name in "${IDENTITY_FILES[@]}"; do
   path="src/features/identity/${name}.tsx"
@@ -166,7 +166,7 @@ DEVTOOLS_FILES=(
   "FileBrowser"
   "GitPanel"
   "Canvas"
-  "WorkflowBuilder"
+  # WorkflowBuilder removed by v1.6 chore commit 2686761 (workflow_builder cut, VISION list #5).
   "WebAutomation"
   "EmailAssistant"
   "DocumentGenerator"
@@ -190,7 +190,7 @@ ADMIN_FILES=(
   "CapabilityReports"
   "Reports"
   "DecisionLog"
-  "SecurityDashboard"
+  # SecurityDashboard removed by v1.6 chore commit 7083d14 (security_monitor cut, VISION list #3).
   "Temporal"
   "Diagnostics"
   "IntegrationStatus"

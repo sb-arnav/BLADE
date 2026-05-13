@@ -71,13 +71,10 @@ if (/^\s*mod\s+ecosystem\s*;/m.test(librs)) {
 }
 
 // ── Check 6: auto_enable_from_scan hook in deep_scan/mod.rs ──────────────────
-const deepScanModPath = resolve(ROOT, 'src-tauri/src/deep_scan/mod.rs');
-const deepScanMod = readFileSync(deepScanModPath, 'utf8');
-if (/ecosystem::auto_enable_from_scan/.test(deepScanMod)) {
-  ok('ecosystem::auto_enable_from_scan hook present in deep_scan/mod.rs');
-} else {
-  fail('ecosystem::auto_enable_from_scan hook missing from deep_scan/mod.rs');
-}
+// v1.6 narrowing (commit aa789f7 — VISION cut list #7): deep_scan + ecosystem
+// auto-enable cut. The scan-to-tentacle auto-wire is gone; tentacle observation
+// defaults to off (REDUCE-04). This check retires.
+ok('deep_scan + ecosystem auto-enable cut by v1.6 (commit aa789f7) — check retired.');
 
 // ── Check 7: ecosystem_tentacles in config.rs (6-place pattern) ──────────────
 const configPath = resolve(ROOT, 'src-tauri/src/config.rs');
