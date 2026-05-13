@@ -145,7 +145,6 @@ mod action_tags;
 mod browser_agent;
 mod perception_fusion;
 mod decision_gate;
-mod deep_scan;
 mod integration_bridge;
 mod system_control;
 mod notification_listener;
@@ -1200,14 +1199,7 @@ pub fn run() {
             godmode::dismiss_proactive_task,
             godmode::get_god_mode_context,
             // Deep Scan -- full machine identity discovery
-            deep_scan::deep_scan_start,
-            deep_scan::deep_scan_results,
-            deep_scan::deep_scan_summary,
             // Deep Scan profile overlay (Plan 12-03)
-            deep_scan::profile::profile_get_rendered,
-            deep_scan::profile::profile_overlay_upsert,
-            deep_scan::profile::profile_overlay_reset,
-            deep_scan::profile::scan_cancel,
             // Deep Scan privacy config (Plan 12-04, D-65)
             config::set_scan_classes_enabled,
             // Integration Bridge — Phase 4 MCP real-world integrations
@@ -1424,7 +1416,6 @@ pub fn run() {
             ecosystem::ecosystem_list_tentacles,
             ecosystem::ecosystem_toggle_tentacle,
             ecosystem::ecosystem_observe_only_check,
-            ecosystem::ecosystem_run_auto_enable,
             // Phase 29 — Vitality Engine
             vitality_engine::vitality_get_state,
             vitality_engine::vitality_get_history,

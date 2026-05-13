@@ -37,16 +37,6 @@ export interface ProviderKeyList {
   active_provider: string;
 }
 
-/**
- * Opaque DTO for deep scan results. The Rust struct has ~12 fields nested
- * deep; the frontend only consumes a summary string today, so we type it as
- * a loose record and narrow in Phase 3 (Dashboard) if any field is rendered
- * directly.
- *
- * @see src-tauri/src/deep_scan.rs `DeepScanResults`
- */
-export type DeepScanResults = Record<string, unknown>;
-
 // ---------------------------------------------------------------------------
 // Phase 11 Plan 11-01 — ParsedProviderConfig
 //

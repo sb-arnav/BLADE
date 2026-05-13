@@ -98,7 +98,7 @@ export function ProviderPicker({ state, setProvider, setStep }: Props) {
               await storeProviderKey(parsed.provider_guess as ProviderId, parsed.api_key);
               await switchProvider(parsed.provider_guess as ProviderId, parsed.model);
               show({ type: 'success', title: 'Provider set', message: `${parsed.provider_guess} · ${parsed.model}` });
-              setStep('scan');
+              setStep('persona');
               return;
             } catch (e) {
               show({

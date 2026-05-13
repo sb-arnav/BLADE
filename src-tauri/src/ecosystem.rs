@@ -1,8 +1,11 @@
 //! ecosystem.rs — Phase 13 Plan 13-01 (ECOSYS-01..09)
 //!
-//! Auto-enables observer-class tentacles based on DeepScanResults.
-//! Central OBSERVE_ONLY guardrail (AtomicBool) blocks all outbound actions.
-//! v1.2 acting-capability work removes one flag here, enabling write paths.
+//! Tentacle registry + OBSERVE_ONLY guardrail (AtomicBool) blocks outbound actions.
+//! v1.6 narrowing — auto_enable_from_scan + deep_scan-driven probes cut.
+//! Tentacles are default-off going forward (VISION lines 173-208); user opts
+//! in via Settings.
+
+#![allow(dead_code)]
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -10,7 +13,6 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter};
 use crate::config::{load_config, save_config, TentacleRecord};
-use crate::deep_scan::leads::DeepScanResults;
 
 // ── Guardrail ─────────────────────────────────────────────────────────────────
 
@@ -112,16 +114,7 @@ fn emit_activity_with_id(app: &AppHandle, module: &str, action: &str, summary: &
 }
 
 // ── Signal probes ─────────────────────────────────────────────────────────────
-
-/// Probe 1: repo watcher — triggered when scan found any repos
-fn probe_repos(results: &DeepScanResults) -> (bool, String) {
-    let count = results.repo_rows.len() + results.git_repos.len();
-    if count > 0 {
-        (true, format!("Auto-enabled because deep scan found {} repos", count))
-    } else {
-        (false, String::new())
-    }
-}
+// v1.6 narrowing — probe_repos + probe_ai_sessions cut (depended on deep_scan).
 
 /// Probe 2: Slack monitor — check for ~/.slack/, ~/.config/slack/, or SLACK_TOKEN
 fn probe_slack() -> (bool, String) {
@@ -187,27 +180,6 @@ fn probe_github_cli() -> (bool, String) {
     (false, String::new())
 }
 
-/// Probe 5: AI session bridge — check for active AI coding session history
-fn probe_ai_sessions(results: &DeepScanResults) -> (bool, String) {
-    let home = dirs::home_dir().unwrap_or_default();
-
-    // Check scan results for known AI tools
-    let tools_match = results.ai_tools.iter().any(|t| {
-        let name_lower = t.name.to_lowercase();
-        name_lower.contains("claude") || name_lower.contains("cursor")
-    });
-
-    // Check for ~/.claude/projects or ~/.cursor
-    let claude_projects = home.join(".claude").join("projects");
-    let cursor_dir = home.join(".cursor");
-
-    if tools_match || claude_projects.exists() || cursor_dir.exists() {
-        (true, "Auto-enabled because active AI coding session history detected".to_string())
-    } else {
-        (false, String::new())
-    }
-}
-
 /// Probe 6: Calendar monitor — check for Google credentials
 fn probe_calendar() -> (bool, String) {
     let home = dirs::home_dir().unwrap_or_default();
@@ -233,67 +205,7 @@ fn probe_calendar() -> (bool, String) {
     (false, String::new())
 }
 
-// ── Auto-enable orchestrator ──────────────────────────────────────────────────
-
-/// Run all 6 probes against the latest scan results and register new observer
-/// tentacles if triggered. Skips tentacles the user has explicitly disabled
-/// (enabled_at > 0 && enabled == false).  Called non-blocking from deep_scan::run().
-pub async fn auto_enable_from_scan(app: &AppHandle, results: &DeepScanResults) {
-    // Gate: only run after onboarding is complete (safety check)
-    let mut cfg = load_config();
-    if !cfg.onboarded { return; }
-
-    // Run all 6 probes
-    let repo_probe   = probe_repos(results);
-    let slack_probe  = probe_slack();
-    let vercel_probe = probe_vercel();
-    let gh_probe     = probe_github_cli();
-    let ai_probe     = probe_ai_sessions(results);
-    let cal_probe    = probe_calendar();
-
-    let probes: Vec<(&str, bool, String)> = vec![
-        ("repo_watcher",     repo_probe.0,   repo_probe.1),
-        ("slack_monitor",    slack_probe.0,  slack_probe.1),
-        ("deploy_monitor",   vercel_probe.0, vercel_probe.1),
-        ("pr_watcher",       gh_probe.0,     gh_probe.1),
-        ("session_bridge",   ai_probe.0,     ai_probe.1),
-        ("calendar_monitor", cal_probe.0,    cal_probe.1),
-    ];
-
-    let mut changed = false;
-    for (id, triggered, rationale) in probes {
-        if !triggered { continue; }
-        match cfg.ecosystem_tentacles.iter_mut().find(|t| t.id == id) {
-            Some(rec) if rec.enabled_at > 0 && !rec.enabled => {
-                // User explicitly disabled — never re-enable (ECOSYS-08)
-                log::info!("[ecosystem] {} is user-disabled; skipping re-enable", id);
-            }
-            Some(rec) => {
-                // Already registered — refresh rationale in case scan found more
-                rec.rationale = rationale;
-                changed = true;
-            }
-            None => {
-                // First registration — start observer loop
-                cfg.ecosystem_tentacles.push(TentacleRecord {
-                    id: id.to_string(),
-                    enabled: true,
-                    rationale: rationale.clone(),
-                    enabled_at: now_secs(),
-                    trigger_detail: rationale,
-                });
-                start_observer_loop(id, app);
-                changed = true;
-            }
-        }
-    }
-
-    if changed {
-        if let Err(e) = save_config(&cfg) {
-            log::error!("[ecosystem] failed to save tentacle state: {}", e);
-        }
-    }
-}
+// v1.6 narrowing — auto_enable_from_scan cut (no deep_scan results to drive it).
 
 // ── Observer loop stubs ───────────────────────────────────────────────────────
 
@@ -445,24 +357,13 @@ pub fn ecosystem_observe_only_check() -> bool {
     OBSERVE_ONLY.load(Ordering::SeqCst)
 }
 
-/// Trigger auto-enable from the last saved scan results (manual re-trigger from UI)
-#[tauri::command]
-pub async fn ecosystem_run_auto_enable(app: AppHandle) -> Result<(), String> {
-    match crate::deep_scan::load_results_pub() {
-        Some(results) => {
-            auto_enable_from_scan(&app, &results).await;
-            Ok(())
-        }
-        None => Err("No scan results available. Run deep scan first.".to_string()),
-    }
-}
+// v1.6 narrowing — ecosystem_run_auto_enable cut (depended on deep_scan).
 
 // ── Unit tests ────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::deep_scan::leads::{DeepScanResults, RepoRow, AiToolInfo};
 
     /// The guardrail must reject write-path calls with an Err containing "OBSERVE_ONLY".
     #[test]
@@ -542,28 +443,6 @@ mod tests {
         );
     }
 
-    /// repo probe triggers when DeepScanResults has at least one RepoRow.
-    #[test]
-    fn test_repo_probe_triggered() {
-        let mut results = DeepScanResults::default();
-        results.repo_rows.push(RepoRow {
-            row_id: "repo:/home/user/project".to_string(),
-            path: "/home/user/project".to_string(),
-            ..RepoRow::default()
-        });
-        let (triggered, rationale) = probe_repos(&results);
-        assert!(triggered, "probe_repos must return true when repo_rows is non-empty");
-        assert!(!rationale.is_empty(), "rationale must be non-empty when triggered");
-    }
-
-    /// repo probe does NOT trigger when DeepScanResults is empty.
-    #[test]
-    fn test_repo_probe_empty() {
-        let results = DeepScanResults::default();
-        let (triggered, _) = probe_repos(&results);
-        assert!(!triggered, "probe_repos must return false when no repos found");
-    }
-
     /// Slack probe triggers when SLACK_TOKEN is set in the environment.
     #[test]
     fn test_slack_probe_env() {
@@ -573,33 +452,6 @@ mod tests {
         std::env::remove_var("SLACK_TOKEN");
         assert!(triggered, "probe_slack must return true when SLACK_TOKEN is set");
         assert!(!rationale.is_empty(), "rationale must be non-empty when triggered");
-    }
-
-    /// AI session probe triggers when ai_tools contains "claude" OR ~/.claude/projects exists.
-    #[test]
-    fn test_ai_session_probe_claude_dir() {
-        // First try: construct results with "claude" in ai_tools
-        let mut results = DeepScanResults::default();
-        results.ai_tools.push(AiToolInfo {
-            name: "claude-code".to_string(),
-            detected: true,
-            details: String::new(),
-        });
-        let (triggered, _) = probe_ai_sessions(&results);
-        if triggered {
-            // Pass via ai_tools
-            return;
-        }
-        // Fallback: check if ~/.claude/projects exists on this machine
-        let home = dirs::home_dir().unwrap_or_default();
-        if home.join(".claude").join("projects").exists() {
-            let empty = DeepScanResults::default();
-            let (triggered2, _) = probe_ai_sessions(&empty);
-            assert!(triggered2, "probe_ai_sessions must trigger when ~/.claude/projects exists");
-        } else {
-            // Neither condition present — verify ai_tools path works
-            assert!(triggered, "probe_ai_sessions must trigger when ai_tools contains 'claude'");
-        }
     }
 
     /// Vercel probe returns false when neither CLI nor auth.json is present.

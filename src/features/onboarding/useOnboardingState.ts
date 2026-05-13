@@ -21,7 +21,7 @@ import { useCallback, useState } from 'react';
 import type { ProviderId } from '@/types/provider';
 import { DEFAULT_PROVIDER } from './providers';
 
-export type OnbStep = 'provider' | 'apikey' | 'scan' | 'persona';
+export type OnbStep = 'provider' | 'apikey' | 'persona';
 
 /**
  * Full onboarding state. All fields are mutated via the setters returned from
@@ -40,11 +40,6 @@ export interface OnbState {
   testResult: string | null;
   /** Rust `test_provider` error text on failure. null = no error. */
   testError: string | null;
-  scanRunning: boolean;
-  /** phase name → `found` count from DeepScanProgressPayload. Empty before scan starts. */
-  scanProgress: Record<string, number>;
-  scanComplete: boolean;
-  scanError: string | null;
   /** Fixed-length 5-tuple — `complete_onboarding` requires exactly 5 answers. */
   personaAnswers: [string, string, string, string, string];
 }
@@ -57,10 +52,6 @@ const INITIAL: OnbState = {
   testing: false,
   testResult: null,
   testError: null,
-  scanRunning: false,
-  scanProgress: {},
-  scanComplete: false,
-  scanError: null,
   personaAnswers: ['', '', '', '', ''],
 };
 
@@ -102,32 +93,6 @@ export function useOnboardingState() {
     setState((s) => ({ ...s, testing: false, testError: err, testResult: null }));
   }, []);
 
-  const beginScan = useCallback(() => {
-    setState((s) => ({
-      ...s,
-      scanRunning: true,
-      scanComplete: false,
-      scanProgress: {},
-      scanError: null,
-    }));
-  }, []);
-
-  const observePhase = useCallback((phase: string, found: number) => {
-    setState((s) => ({
-      ...s,
-      scanProgress: { ...s.scanProgress, [phase]: found },
-    }));
-  }, []);
-
-  const endScan = useCallback((err?: string) => {
-    setState((s) => ({
-      ...s,
-      scanRunning: false,
-      scanComplete: !err,
-      scanError: err ?? null,
-    }));
-  }, []);
-
   const setAnswer = useCallback(
     (index: 0 | 1 | 2 | 3 | 4, value: string) => {
       setState((s) => {
@@ -149,9 +114,6 @@ export function useOnboardingState() {
     beginTest,
     endTestOk,
     endTestErr,
-    beginScan,
-    observePhase,
-    endScan,
     setAnswer,
     reset,
   };

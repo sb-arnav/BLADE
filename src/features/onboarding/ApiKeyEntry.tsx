@@ -60,7 +60,7 @@ export function ApiKeyEntry({
       await switchProvider(provider.id, provider.defaultModel);
       endTestOk(msg);
       show({ type: 'success', title: 'Connection OK', message: msg });
-      setStep('scan');
+      setStep('persona');
     } catch (e) {
       const err = e instanceof TauriError ? e.rustMessage : String(e);
       endTestErr(err);

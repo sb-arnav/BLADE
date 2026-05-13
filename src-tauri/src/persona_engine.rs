@@ -782,39 +782,9 @@ pub fn build_user_model() -> UserModel {
         config.user_name.clone()
     };
 
-    // ── Role from deep_scan results ───────────────────────────────────────────
-    if let Some(scan) = crate::deep_scan::load_scan_summary() {
-        // Extract primary languages from scan summary text (simple heuristic)
-        let langs_candidates = ["TypeScript", "Rust", "Python", "JavaScript", "Go", "Java",
-                                 "C#", "C++", "Swift", "Kotlin", "Ruby", "PHP"];
-        let scan_lower = scan.to_lowercase();
-        for lang in &langs_candidates {
-            if scan_lower.contains(&lang.to_lowercase()) && !model.primary_languages.contains(&lang.to_string()) {
-                model.primary_languages.push(lang.to_string());
-            }
-        }
-    }
-
-    // ── Git repos as active projects ──────────────────────────────────────────
-    if let Some(scan_results) = crate::deep_scan::load_results_pub() {
-        for repo in &scan_results.git_repos {
-            let name = std::path::Path::new(&repo.path)
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_else(|| repo.path.clone());
-            if !model.active_projects.contains(&name) {
-                model.active_projects.push(name);
-            }
-            // Collect languages from repos
-            for (lang, _) in &repo.language_counts {
-                if !model.primary_languages.contains(lang) {
-                    model.primary_languages.push(lang.clone());
-                }
-            }
-        }
-        model.active_projects.truncate(10);
-        model.primary_languages.truncate(8);
-    }
+    // v1.6 narrowing — deep_scan cut; primary_languages + active_projects no
+    // longer auto-populated from filesystem scan. Future: setup-as-conversation
+    // (v2.0) asks the user instead.
 
     // ── Character bible for role/identity ─────────────────────────────────────
     let bible = crate::character::load_bible();
@@ -1068,13 +1038,12 @@ pub async fn predict_next_need(
     // Ambiguous — use LLM for complex cases
     if !perception.active_app.is_empty() {
         let context_summary = format!(
-            "User: {} ({}). Current app: {}. Window: {}. Tags: {}. Streak: {}min. Mood: {}. Hour: {}.",
+            "User: {} ({}). Current app: {}. Window: {}. Tags: {}. Mood: {}. Hour: {}.",
             model.name,
             model.role,
             perception.active_app,
             crate::safe_slice(&perception.active_title, 60),
             perception.context_tags.join(", "),
-            streak_mins,
             model.mood_today,
             hour,
         );

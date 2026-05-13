@@ -88,7 +88,7 @@ export function PersonaQuestions({ state, setStep, setAnswer, onComplete }: Prop
       </div>
 
       <div className="onb-footer">
-        <Button variant="ghost" onClick={() => setStep('scan')} disabled={submitting}>
+        <Button variant="ghost" onClick={() => setStep('apikey')} disabled={submitting}>
           ← Back
         </Button>
         <Button

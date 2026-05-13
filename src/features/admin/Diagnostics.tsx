@@ -13,7 +13,7 @@
 // @see src/lib/tauri/admin.ts (supervisor*, trace*, authority*, deep_scan*, config*)
 
 import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
-import { Button, Dialog, GlassPanel, GlassSpinner, Input, EmptyState, ListSkeleton } from '@/design-system/primitives';
+import { Button, Dialog, GlassPanel, Input, ListSkeleton } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import { usePrefs } from '@/hooks/usePrefs';
 import {
@@ -23,9 +23,6 @@ import {
   authorityRouteAndRun,
   authorityRunChain,
   debugConfig,
-  deepScanResults,
-  deepScanStart,
-  deepScanSummary,
   getRecentTraces,
   resetOnboarding,
   setConfig,
@@ -35,7 +32,6 @@ import {
 import type {
   AuthorityAgent,
   AuthorityDelegation,
-  DeepScanResult,
   SupervisorService,
   TraceEntry,
 } from './types';
@@ -48,7 +44,7 @@ const DoctorPane = lazy(() =>
   import('./DoctorPane').then((m) => ({ default: m.DoctorPane }))
 );
 
-type DiagTab = 'health' | 'traces' | 'authority' | 'deep' | 'sysadmin' | 'config' | 'doctor';
+type DiagTab = 'health' | 'traces' | 'authority' | 'sysadmin' | 'config' | 'doctor';
 const TAB_PREF_KEY = 'admin.activeTab';
 const TAB_PREF_PREFIX = 'diag:';
 const DEFAULT_TAB: DiagTab = 'health';
@@ -60,7 +56,6 @@ function readInitialTab(raw: string | number | boolean | undefined): DiagTab {
       t === 'health' ||
       t === 'traces' ||
       t === 'authority' ||
-      t === 'deep' ||
       t === 'sysadmin' ||
       t === 'config' ||
       t === 'doctor'
@@ -152,7 +147,6 @@ export function Diagnostics() {
               ['health', 'Health'],
               ['traces', 'Traces'],
               ['authority', 'Authority'],
-              ['deep', 'Deep scan'],
               ['sysadmin', 'Sysadmin'],
               ['config', 'Config'],
               ['doctor', 'Doctor'],
@@ -179,7 +173,6 @@ export function Diagnostics() {
         )}
         {tab === 'traces' && <TracesTab />}
         {tab === 'authority' && <AuthorityTab />}
-        {tab === 'deep' && <DeepScanTab />}
         {tab === 'sysadmin' && <DiagnosticsSysadminTab />}
         {tab === 'config' && <ConfigTab />}
         {tab === 'doctor' && (
@@ -580,97 +573,6 @@ function RunChainDialog(props: {
         </Button>
       </div>
     </Dialog>
-  );
-}
-
-// ─── Deep scan tab ──────────────────────────────────────────────────────────
-
-function DeepScanTab() {
-  const [result, setResult] = useState<DeepScanResult | null>(null);
-  const [summary, setSummary] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const toast = useToast();
-
-  const refresh = useCallback(async () => {
-    try {
-      const r = await deepScanResults();
-      setResult(r);
-      setError(null);
-    } catch (e) {
-      setError(typeof e === 'string' ? e : String(e));
-    }
-  }, []);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  const runNow = useCallback(async () => {
-    setBusy(true);
-    try {
-      const out = await deepScanStart();
-      setResult(out);
-      toast.show({ type: 'success', title: 'Deep scan complete' });
-    } catch (e) {
-      toast.show({
-        type: 'error',
-        title: 'Deep scan failed',
-        message: typeof e === 'string' ? e : String(e),
-      });
-    } finally {
-      setBusy(false);
-    }
-  }, [toast]);
-
-  const loadSummary = useCallback(async () => {
-    try {
-      const s = await deepScanSummary();
-      setSummary(s);
-    } catch (e) {
-      toast.show({
-        type: 'error',
-        title: 'Summary failed',
-        message: typeof e === 'string' ? e : String(e),
-      });
-    }
-  }, [toast]);
-
-  return (
-    <section className="diagnostics-section">
-      <div className="admin-inline-row" style={{ justifyContent: 'space-between' }}>
-        <h4 className="diagnostics-section-title">Deep scan</h4>
-        <div className="admin-inline-row">
-          <Button variant="secondary" size="sm" onClick={runNow} disabled={busy}>
-            {busy ? (
-              <>
-                <GlassSpinner /> Scanning…
-              </>
-            ) : (
-              'Run now'
-            )}
-          </Button>
-          <Button variant="secondary" size="sm" onClick={loadSummary}>
-            Summary
-          </Button>
-          <Button variant="ghost" size="sm" onClick={refresh}>
-            Refresh
-          </Button>
-        </div>
-      </div>
-      {error && <p className="admin-empty">Error: {error}</p>}
-      {summary && <div className="temporal-recall-card">{summary}</div>}
-      {result ? (
-        <pre className="diagnostics-config-pre">{JSON.stringify(result, null, 2)}</pre>
-      ) : (
-        <EmptyState
-          label="No diagnostics"
-          description="Run deep scan to populate."
-          actionLabel="Run deep scan"
-          onAction={() => void runNow()}
-        />
-      )}
-    </section>
   );
 }
 
