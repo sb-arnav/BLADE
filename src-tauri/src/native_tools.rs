@@ -621,7 +621,7 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
                 "type": "object",
                 "properties": {
                     "task": {"type": "string", "description": "Detailed description of what the agent should do"},
-                    "agent_type": {"type": "string", "description": "Agent to use: 'claude' (Claude Code CLI), 'aider', 'goose', 'bash' (raw script). Defaults to 'claude'.", "enum": ["claude", "aider", "goose", "bash"]},
+                    "agent_type": {"type": "string", "description": "Coding CLI to delegate to: 'claude' (Claude Code), 'aider', 'goose', 'codex' (OpenAI Codex CLI). Defaults to 'claude'. v1.6 narrowing: BLADE no longer spawns arbitrary scripts via this path — use the native blade_bash tool for raw shell exec.", "enum": ["claude", "aider", "goose", "codex"]},
                     "cwd": {"type": "string", "description": "Working directory for the agent (absolute path)"}
                 },
                 "required": ["task"]
