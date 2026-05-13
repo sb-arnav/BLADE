@@ -1630,8 +1630,15 @@ pub fn run() {
             // File indexer — indexes ALL files on the machine (not just code)
             file_indexer::start_file_indexer(app.handle().clone());
 
-            // Audio: always listening — "Hey BLADE" wake word + ambient capture
-            audio_timeline::start_audio_timeline_capture(app.handle().clone());
+            // Phase 40 (v1.6 REDUCE-03) — Audio Timeline always-on transcription
+            // is OFF by default. The Whisper capture loop no longer fires at
+            // app launch. On-demand path remains: `audio_timeline::*` commands
+            // and `start_audio_timeline_capture` itself stay callable (the
+            // function is gated by `audio_capture_enabled`, default false)
+            // so LLM tool-use can still invoke transcription when chat asks
+            // "what did I just say?" or starts a meeting capture explicitly.
+            // Wake word stays — it's the on-demand voice entry point, not a
+            // perception loop.
             wake_word::start_wake_word_listener(app.handle().clone());
 
             // EVOLUTION ENGINE — BLADE's self-improvement loop.
