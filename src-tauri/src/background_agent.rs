@@ -1,11 +1,14 @@
-/// BLADE BACKGROUND AGENT SPAWNER
+/// BLADE BACKGROUND AGENT — delegation to user-installed coding CLIs
 ///
-/// BLADE orchestrates other AI coding agents — Claude Code, Aider, Codex CLI —
-/// as subprocesses. You ask BLADE to refactor a 10k-line codebase. BLADE spawns
-/// a Claude Code agent, monitors it, emits progress events, and reports back.
+/// v1.6 narrowing (REDUCE-05): BLADE no longer spawns arbitrary agents.
+/// This module DELEGATES code work to whichever coding CLIs the user has
+/// already installed — Claude Code, Cursor, Aider, Goose, Codex CLI. If
+/// none are installed, BLADE asks the user to install one (or handles
+/// the task inline via its own chat + tools).
 ///
-/// This is multi-agent orchestration from a desktop app.
-/// BLADE becomes the meta-agent that delegates and supervises.
+/// Per V2-AUTONOMOUS-HANDOFF.md §0 + VISION.md "Significantly reduced":
+/// > Background Agent Spawning → delegate to user's Claude Code / Cursor
+/// > / Goose. BLADE detects what the user has and routes code work there.
 ///
 /// Event flow:
 ///   agent_spawn → [agent_stdout lines] → agent_complete | agent_error
@@ -13,9 +16,8 @@
 /// Agents run in background threads. BLADE can run multiple simultaneously.
 /// Each agent has a unique ID for tracking and cancellation.
 ///
-/// Smart spawning: auto_spawn_agent() inspects the task description and
-/// picks the right agent type automatically. The LLM never needs to know
-/// which binary to invoke — it just describes the goal.
+/// Routing: auto_spawn_agent() classifies the task and picks the best
+/// installed agent. The LLM names the goal; this module picks the CLI.
 ///
 /// Multi-agent coordination: get_active_agents() returns all running agents.
 /// When two agents share related tasks, context injection links them so each
@@ -136,13 +138,11 @@ fn build_agent_command(agent_type: &str, task: &str, _cwd: &str) -> Option<(Stri
                 vec!["-q".to_string(), task.to_string()],
             ))
         }
-        "bash" => {
-            // Raw bash script — for when BLADE writes a script and runs it
-            #[cfg(target_os = "windows")]
-            return Some(("cmd".to_string(), vec!["/C".to_string(), task.to_string()]));
-            #[cfg(not(target_os = "windows"))]
-            Some(("bash".to_string(), vec!["-c".to_string(), task.to_string()]))
-        }
+        // v1.6 narrowing (REDUCE-05): "bash" agent_type removed — that was the
+        // "spawn arbitrary script" path. BLADE has a first-class bash tool in
+        // native_tools.rs for direct shell exec; the background-agent system is
+        // for delegating to user-installed coding CLIs, not for BLADE-driven
+        // script runs.
         _ => None,
     }
 }
