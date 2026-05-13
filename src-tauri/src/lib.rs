@@ -1272,9 +1272,6 @@ pub fn run() {
             auto_reply::auto_reply_draft,
             auto_reply::auto_reply_learn_from_edit,
             auto_reply::auto_reply_draft_batch,
-            // Daily Digest -- rich morning briefing
-            pulse::pulse_daily_digest,
-            pulse::pulse_get_daily_digest,
             // Streak & Stats -- gamification layer
             streak_stats::streak_get_stats,
             streak_stats::streak_record_activity,
@@ -1540,16 +1537,10 @@ pub fn run() {
             // Start ambient intelligence monitor
             ambient::start_ambient_monitor(app.handle().clone());
 
-            // Start Blade's pulse — the heartbeat that makes it alive
+            // Start Blade's pulse — the heartbeat that makes it alive.
+            // Phase 43: pulse thought emission now routes through decision_gate.
+            // Daily-summary engine + morning-briefing retired per VISION narrowing.
             pulse::start_pulse(app.handle().clone());
-
-            // Morning briefing — fires once per day if it's morning
-            let briefing_app = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                // Brief delay so the window is visible before briefing fires
-                tokio::time::sleep(tokio::time::Duration::from_secs(8)).await;
-                pulse::maybe_morning_briefing(briefing_app).await;
-            });
 
             // Evening journal + weekly soul evolution + daily character consolidation
             tauri::async_runtime::spawn(async move {

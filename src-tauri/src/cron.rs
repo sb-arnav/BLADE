@@ -248,14 +248,11 @@ fn seed_preset_tasks(conn: &Connection) {
     let now = chrono::Utc::now().timestamp();
 
     // (id, name, description, schedule_json, action_json)
+    // Phase 43: preset:morning_briefing retired per VISION narrowing — daily-summary
+    // engine cut. Proactive interjection now routes through decision_gate via the
+    // pulse loop itself. Legacy seeded rows still in user DBs fall through to the
+    // generic pulse_now branch in execute_pulse_task (no crash, just a pulse thought).
     let presets: &[(&str, &str, &str, &str, &str)] = &[
-        (
-            "preset:morning_briefing",
-            "Morning Briefing",
-            "Daily 9am morning summary: calendar, email, git, weather, and temporal patterns.",
-            r#"{"kind":"daily","time_of_day":540,"day_of_week":null,"interval_secs":null}"#,
-            r#"{"kind":"pulse","content":"morning_briefing","agent_type":null,"cwd":null}"#,
-        ),
         (
             "preset:weekly_review",
             "Weekly Review",
@@ -536,15 +533,13 @@ async fn execute_pulse_task(task: &CronTask, app: &tauri::AppHandle) {
     }
 
     match task.action.content.as_str() {
-        "morning_briefing" => {
-            // Force a fresh morning briefing regardless of the once-per-day guard
-            crate::pulse::run_morning_briefing(app.clone()).await;
-        }
         "weekly_review" => {
             run_weekly_review(app, &config).await;
         }
         _ => {
-            // Generic: trigger pulse_now
+            // Generic: trigger pulse_now. Phase 43: legacy "morning_briefing" content
+            // falls through here — emits a single pulse thought instead of the cut
+            // daily-summary engine. Pulse emission itself is decision_gate-gated.
             match crate::pulse::pulse_now(app.clone()).await {
                 Ok(thought) => {
                     log::info!("[cron] Pulse task '{}' fired: {}", task.name, crate::safe_slice(&thought, 60));
