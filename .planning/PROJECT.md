@@ -65,28 +65,34 @@ BLADE is a desktop AI that lives on your machine — 204+ Rust modules (brain, o
 - ✓ EVAL — Organism eval suite: vitality dynamics, hormone-driven behavior, persona stability under stress, 13/13 organism eval fixtures, verify:organism gate — v1.4 Phase 30
 - ✓ CLOSE — README rewrite, CHANGELOG, v1.4 milestone audit, phase archive — v1.4 Phase 31 (37 verify gates, 435+ tests, zero debt)
 
-### Current Milestone: v1.5 — Intelligence Layer
+### Validated (v1.5 — Intelligence Layer, closed 2026-05-08 at Phase 38, status tech_debt)
 
-**Goal:** Transform BLADE's naive 12-iteration tool loop into a genuine agentic intelligence. Selective context injection, progressive compaction, mid-loop verification, self-correction, stuck detection, auto-decomposition into sub-agents, and battle-tested patterns ported from the best open-source agents (Claude Code, Aider, OpenHands, Goose). The organism layer exists — now the brain that drives it needs to actually think.
+- ✓ CTX — Selective context injection + condenser compaction; tool output caps; budget dashboard — v1.5 Phase 32 (CTX-01..07)
+- ✓ LOOP — Mid-loop verification, structured error feedback, plan adaptation, max-token escalation, ego intercept, configurable iteration limit — v1.5 Phase 33 (LOOP-01..06)
+- ✓ STUCK — Stuck detection (5 semantic patterns), circuit breaker, token cost tracking, cost guard, provider fallback chain, JSONL session log, session resume + forking — v1.5 Phase 34 (RES-01..05, SESS-01..04)
+- ✓ DECOMP — Brain planner → swarm auto-trigger; isolated sub-agent contexts; summary-only parent returns; conversation forking — v1.5 Phase 35 (DECOMP-01..05)
+- ✓ REPO — Tree-sitter + PageRank repo map; canonical_models.json capability registry; @context-anchor chat syntax — v1.5 Phase 36 (INTEL-01..06)
+- ✓ EVAL — Multi-step task benchmarks; context efficiency; stuck-detection accuracy; compaction fidelity; verify:intelligence gate (38th gate) — v1.5 Phase 37 (EVAL-01..05)
+- ✓ CLOSE — README cites Claude Code/Aider/OpenHands/Goose/mini-SWE-agent; CHANGELOG; v1.5 milestone audit; phase archive — v1.5 Phase 38
 
-**Target features (phases 32–38):**
+### Current Milestone: v1.6 — Narrowing Pass
 
-- [ ] **CTX** *(Phase 32)* — Selective context injection + progressive compaction. Gate ALL brain.rs context by query relevance (not just items 9-16). Implement condenser pattern: keep first ~8k tokens (system + task) + last ~8k (recent work), LLM-summarize the middle. Replace reactive 140k hard truncation. Thalamus becomes the real gatekeeper.
-- [ ] **LOOP** *(Phase 33)* — Agentic loop rewrite. Mid-loop verification ("are we progressing toward the goal?") every 3 tool calls. Structured error feedback (tool failures return reasons + suggested alternatives, not just error strings). Plan adaptation: if step N fails, re-plan from current state instead of retrying. Max-output-token escalation on truncation.
-- [ ] **STUCK** *(Phase 34)* — Stuck detection + cost awareness. 5 semantic patterns checked every iteration: repeated action/observation pairs, monologue spirals, context-window thrashing, no-progress loops, cost runaway. Circuit-breaker: after N consecutive same-type failures, escalate to user instead of looping. Token cost tracking per conversation.
-- [ ] **DECOMP** *(Phase 35)* — Auto-decomposition. Wire swarm into the main chat loop. When brain_planner detects 5+ independent steps, auto-spawn sub-agents with isolated context windows. Only summary returns to parent conversation. Conversation forking for sub-tasks. "This task would be faster in parallel" → automatic.
-- [ ] **REPO** *(Phase 36)* — Context intelligence. Aider-style tree-sitter + PageRank repo map for code tasks (extend knowledge_graph.rs with symbol dependency graph). Goose-style canonical_models.json capability registry for multi-provider routing (formalize router.rs). @context-anchor explicit injection (@screen, @file, @memory:topic) alongside ambient context.
-- [ ] **EVAL** *(Phase 37)* — Intelligence eval suite. Agentic loop benchmarks: multi-step task completion rate, context efficiency (tokens used vs task complexity), stuck-detection accuracy, decomposition quality, plan adaptation success rate. Compare before/after on same task set. verify:intelligence gate.
-- [ ] **CLOSE** *(Phase 38)* — Close. README update with architecture citations (Claude Code arxiv 2604.14228, Aider repo map, OpenHands condenser, Goose capability registry, mini-SWE-agent simplicity proof). CHANGELOG. v1.5 milestone audit. Phase archive.
+**Goal:** Cut every "Removed (locked)" vertical and converge every "Significantly reduced" perception/agent module per VISION.md (locked 2026-05-10), so v2.0 builds setup-as-conversation and the forge demo on a clean substrate. Pure deletion + reduction. No new features. Agent-native audit recs (slash commands, crud_tools! macro, build-time codegen) roll into **v2.0**, not v1.6.
 
-**Explicitly deferred to v1.6+:**
-- Organism surfacing (hormones/vitality/metacognition visible in chat UI) — backend works, needs UI surface; v1.6
-- JARVIS-01/02 voice resurrection — UX feature, not intelligence; v1.6
-- Persona shaping via curated SFT data (Layer 7) — v1.6
-- Immune / behavioral-drift cross-cutting layer — v1.6
-- Federation Pattern A + selection mechanisms — v1.6
-- Profile isolation work/personal split — v1.6
-- Phase 19 UAT close (23 carry-overs) — v1.6
+**Target features (phases 39–44):**
+
+- [x] **DEL** *(Phase 39)* — Vertical Deletions. 7 `chore(v1.6)` commits already shipped (financial_brain, health_guardian, security_monitor, pentest, workflow_builder, deeplearn, deep_scan). Retroactive scaffold landed 2026-05-13.
+- [ ] **REDUCE-ON-DEMAND** *(Phase 40)* — Always-On → On-Demand. Total Recall background screenshot loop OFF; Audio Timeline always-on transcription OFF; tentacle passive observation defaults OFF. On-demand paths preserved (LLM tool-use can still invoke them).
+- [ ] **REDUCE-PERSONA** *(Phase 41)* — Persona Auto-Extraction Removal. Rip silent personality inference from filenames + shell history in `persona_engine.rs` + `personality_mirror.rs`. Voice from user-stated core command (v2.0 hunt) + actual chat history only.
+- [ ] **REDUCE-AGENT** *(Phase 42)* — Background Agent Delegation. Rip BLADE's spawn-arbitrary-agents code. Detect installed agent stacks (Claude Code / Cursor / Goose / Aider) and route code work to them instead.
+- [ ] **REDUCE-PULSE** *(Phase 43)* — Pulse Reduction. Cron primitive stays. Daily-summary engine + morning briefings cut. Proactive interjection routes through `decision_gate`.
+- [ ] **CLOSE** *(Phase 44)* — Close. CHANGELOG v1.6; milestones/v1.6-MILESTONE-AUDIT.md; phase archive to milestones/v1.6-phases/; README narrowed-scope update; MILESTONES.md entry; git tag v1.6.
+
+**Explicitly deferred to v2.0+ (post v1.6 narrowing):**
+- v2.0 = Install Pipeline (INSTALL-01..07) + Agentic Hunt Onboarding (HUNT-01..10 per v2.0-onboarding-spec.md) + One Forge Wire (FORGE-01..03 — the Twitter-video moment per VISION:40)
+- Onboarding Steps cut (Steps.tsx → ApiKeyEntry → DeepScanReview → PersonaCheck) folds INTO v2.0 Phase 1, not v1.6 — the hunt replaces the flow wholesale
+- Agent-native audit recs #2-10 (slash commands, crud_tools! macro, build-time codegen, prompts/dir migration) roll into v2.0 phase shape
+- Held for v2.0 evaluation (per VISION.md): Body Map / Organ Registry / Pixel World / Tentacle Detail panes, mortality-salience implementation, Ghost Mode invisible meeting overlay — NOT cut, NOT kept; v2.0 decides
 - Browser-harness Q1 decision — pull as dependency arises
 - D-04 Step 2 LLM intent fallback, fast-streaming ego accumulator refactor — pull if loop rewrite surfaces them
 - Go/NoGo decision gating (basal ganglia) — v2+ research bet
@@ -94,6 +100,9 @@ BLADE is a desktop AI that lives on your machine — 204+ Rust modules (brain, o
 - NREM/REM dual-phase dream-mode redesign — v2+ research bet
 - V-JEPA 2 world model integration — v3+
 - TTT continual learning — v2+
+
+**Kept (locked — VISION.md "presence, not features", not negotiable):**
+Hormones · vitality · active inference · character bible (SOUL) · Hive Mesh architecture · tentacles as a pattern · Evolution Engine (reframed as proactive-presence + autonomous-knowledge-update, decision-gated).
 
 **Research inputs:**
 - arxiv 2604.14228 (Claude Code architecture) — 5-layer compaction, sub-agent isolation, TAOR loop, failure-returns-reasons
@@ -191,4 +200,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-*Last updated: 2026-05-08 — v1.5 Intelligence Layer closed (status: tech_debt; 7 phases, 59 plans, verify gates 38 with OEVAL-01c v1.4 carry-forward). README + CHANGELOG + v1.5-MILESTONE-AUDIT shipped; Phase 32-38 archived to milestones/v1.5-phases/. Operator next-steps tracked in audit gaps + tech_debt arrays. v1.6 — TBD (operator scopes via /gsd-new-milestone).*
+*Last updated: 2026-05-13 — v1.6 Narrowing Pass retroactive scaffold landed per V2-AUTONOMOUS-HANDOFF.md §4 Step 0. Phase 39 (Vertical Deletions) wraps 7 chore commits 2026-05-12/13. Phases 40-44 = 4 reduction phases + close. Onboarding Steps cut folded to v2.0 per handoff §0 item 7. Executing via /gsd-autonomous chain.*

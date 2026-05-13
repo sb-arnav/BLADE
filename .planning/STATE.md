@@ -1,99 +1,101 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.5
-milestone_name: Intelligence Layer
-status: complete
+milestone: v1.6
+milestone_name: Narrowing Pass
+status: in_progress
 stopped_at: null
-last_updated: "2026-05-08"
-last_activity: 2026-05-08
+last_updated: "2026-05-13"
+last_activity: 2026-05-13
 progress:
-  total_phases: 7
+  total_phases: 6
   completed_phases: 1
-  total_plans: 59
-  completed_plans: 59
-  percent: 84
+  total_plans: 13
+  completed_plans: 7
+  percent: 17
 ---
 
-# STATE -- BLADE (v1.5 -- Intelligence Layer)
+# STATE -- BLADE (v1.6 -- Narrowing Pass)
 
 **Project:** BLADE -- Desktop JARVIS
-**Current milestone:** v1.5 -- Intelligence Layer
-**Prior shipped:** v1.4 (2026-05-03), v1.3 (2026-05-02), v1.2 (2026-04-30), v1.1 (2026-04-27), v1.0 (2026-04-19)
-**Current Focus:** v1.5 Intelligence Layer closed 2026-05-08 (status: tech_debt). README + CHANGELOG + v1.5-MILESTONE-AUDIT shipped; Phase 32-38 directories archived to `.planning/milestones/v1.5-phases/`. Operator next-steps tracked in audit gaps + tech_debt arrays. v1.6 — TBD (operator runs `/gsd-new-milestone v1.6` to scope).
-**Status:** v1.5 closed `tech_debt`. Phases 32-37 carry operator-deferred runtime UAT (gaps array). OEVAL-01c v1.4 organism-eval drift carries forward to v1.6+ (tech_debt array). Phase 38 docs-only close shipped with sanity-checked static gates.
+**Current milestone:** v1.6 -- Narrowing Pass
+**Prior shipped:** v1.5 (2026-05-08), v1.4 (2026-05-03), v1.3 (2026-05-02), v1.2 (2026-04-30), v1.1 (2026-04-27), v1.0 (2026-04-19)
+**Current Focus:** v1.6 retroactive scaffold landed 2026-05-13 per V2-AUTONOMOUS-HANDOFF.md §4 Step 0. Phase 39 (Vertical Deletions) shipped 2026-05-12/13 as 7 `chore(v1.6)` commits without phase folder — now wrapped. Phases 40-44 remaining: Always-On→On-Demand, Persona Auto-Extraction Removal, Background Agent Delegation, Pulse Reduction, Close. Executing via `/gsd-autonomous` per handoff §4 Step 1.
+**Status:** v1.6 Phase 39 retroactively complete. Phases 40-43 = the 6 "Significantly reduced" VISION items (Total Recall on-demand + Audio Timeline on-demand + Tentacle default-off all bundled into Phase 40; Persona = 41; Background Agent = 42; Pulse = 43). Phase 44 = close. Onboarding Steps cut folded to v2.0 per handoff §0 item 7 (avoids two passes on same files).
 
 ## Current Position
 
-Phase 32 — Context Management (7/7 plans complete; checkpoint:human-verify open)
-Phase 33 — Agentic Loop (9/9 plans complete; checkpoint:human-verify open)
-Phase 34 — Resilience + Session Persistence (11/11 plans complete; checkpoint:human-verify open)
-Phase 35 — Auto-Decomposition (11/11 plans complete; checkpoint:human-verify open)
-Phase 36 — Context Intelligence (9/9 plans complete; checkpoint:human-verify open)
-Phase 37 — Intelligence Eval (8/8 plans complete; checkpoint:human-verify open — operator-deferred UAT (b) baseline.json)
-Status: Six phases code-complete with static-gate evidence packages green. Each phase resolved its own pre-existing v1.4-style debts during close-out (chat.css ghost tokens; WIRING-AUDIT modules + config fields + routes; DoctorPane TLS bug; verify-emit-policy allowlist; 4-5 critical review fixes per phase).
+Phase 39 — Vertical Deletions ✅ SHIPPED (7 chore commits)
+Phase 40 — Always-On → On-Demand (next — REDUCE-02, REDUCE-03, REDUCE-04)
+Phase 41 — Persona Auto-Extraction Removal (REDUCE-01)
+Phase 42 — Background Agent Delegation (REDUCE-05)
+Phase 43 — Pulse Reduction (REDUCE-06)
+Phase 44 — Close (CLOSE-01..04)
 
-Last activity: 2026-05-08 — Phase 37 closed to the v1.1-protected boundary autonomously. 16 commits across Phase 37 (CONTEXT + 8 PLANs + 8 SUMMARYs + feat commits). 13 intelligence_eval tests green (10 EVAL-01 + 3 EVAL-02 + EVAL-03 driver + EVAL-04 marker survival + EVAL-05 escape hatch + 2 panic-injection regressions); driver emits 26 rows top-1=26/26 top-3=26/26 MRR=1.000; cargo check clean; verify:intelligence is the 38th gate in verify:all and exits 0 standalone + 0 with BLADE_INTELLIGENCE_EVAL=false skip; intelligence-benchmark bin compiles + wrapper script env-gates correctly. UAT (b) `BLADE_RUN_BENCHMARK=true bash scripts/run-intel-benchmark.sh` is operator-deferred per memory feedback_deferred_uat_pattern.md — operator runs it once + commits eval-runs/v1.5-baseline.json as a separate post-Phase-37-close task.
+Last activity: 2026-05-13 — V2-AUTONOMOUS-HANDOFF.md §4 Step 0 executed: `/gsd-health --repair` ran (status: degraded — 7 W006 warnings for archived v1.5 phases, expected per `.planning/milestones/v1.5-phases/`, 0 repairable errors). `/gsd-new-milestone v1.6` retroactive scaffold landed: REQUIREMENTS.md, ROADMAP.md, STATE.md, PROJECT.md updated; MILESTONES.md to be updated next; phase 39 retro-folder being created. Handing off to `/gsd-autonomous` for Phase 40-44 execution.
 
-Last activity: 2026-05-07 — Phase 36 closed to the v1.1-protected boundary autonomously. 30+ commits across Phase 36 (CONTEXT + 9 PLANs + 9 SUMMARYs + feat commits + REVIEW pending). 67 phase36 unit tests + 58 intelligence module tests green; cargo check + cargo check --release + tsc clean; 35/37 npm run verify:all gates green (the 2 failures are pre-existing v1.4 OEVAL-01c organism-eval drift documented at Phase 32+33+34+35 close — out of Phase 36 scope, zero coupling between vitality_engine and intelligence surfaces).
-
-Progress: [████████░░] 84% (59/59 plans complete; 1/7 phases formally closed -- Phase 38 close shipped; Phases 32-37 code-complete + UAT-pending per audit gaps array)
+Progress: [██░░░░░░░░] 17% (1/6 phases complete; 7/13 plans (Phase 39 retro-counted))
 
 ```
-32 [~] Context Management              (code complete, UAT pending)
-33 [~] Agentic Loop                    (code complete, UAT pending)
-34 [~] Resilience + Session Persistence (code complete, UAT pending)
-35 [~] Auto-Decomposition              (code complete, UAT pending)
-36 [~] Context Intelligence            (code complete, UAT pending)
-37 [~] Intelligence Eval               (code complete, UAT pending)
-38 [x] Close                           (shipped 2026-05-08; tech_debt)
+39 [x] Vertical Deletions              (SHIPPED 2026-05-12/13; retroactive scaffold)
+40 [ ] Always-On → On-Demand           (next)
+41 [ ] Persona Auto-Extraction Removal
+42 [ ] Background Agent Delegation
+43 [ ] Pulse Reduction
+44 [ ] Close
 ```
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-05-03)
+See: `.planning/PROJECT.md` (updated 2026-05-13)
 
 **Core value:** BLADE works out of the box, you can always see what it's doing, and it thinks before it acts.
-**Current focus:** Fix the agentic loop — selective context, compaction, verification, stuck detection, auto-decomposition.
+**Current focus:** Narrow the codebase per VISION.md cut list before v2.0 builds setup-as-conversation on a clean substrate. **v2.0 = forge demo + install pipeline + hunt onboarding.**
 
 ## Performance Metrics
 
 | Metric | Value |
 |--------|-------|
-| Verify gates (entering v1.5) | 37 green |
-| Tests (entering v1.5) | 435+ |
-| Rust modules | 204+ |
+| Verify gates (entering v1.6) | 38 green (v1.5 close baseline) |
+| Tests (entering v1.6) | 435+ |
+| Rust modules | 204+ (will reduce after Phase 39 deletions counted) |
 | Tauri commands | 770+ |
 | TypeScript status | tsc --noEmit clean |
 | Rust status | cargo check clean |
-| v1.4 organism eval | 13/13 fixtures, MRR 1.000 |
+| v1.5 organism eval | 13/13 fixtures, MRR 1.000 |
+| v1.5 intelligence eval | 26/26 fixtures, MRR 1.000 |
 
 ## Accumulated Context
 
-From v1.4:
-- 37 verify gates green, 435+ tests, zero debt at close
-- 13/13 organism eval fixtures passing (MRR = 1.000)
-- Organism layer complete (hormones, vitality, active inference, safety bundle, metacognition)
-- Agentic loop audit (2026-05-03): 204 modules of smart infrastructure, naive 12-iteration tool loop. Context bloated (everything injected every turn), no verification, no stuck detection, no auto-decomposition.
-- Competitive landscape audit (2026-05-03): BLADE alone in full-stack desktop agent space. Closest: Claude Cowork (cloud-only), Screenpipe (passive). Loop quality lags Claude Code, Aider, OpenHands.
+From v1.5 close (2026-05-08, tech_debt):
+- 38 verify gates green (37 existing + verify:intelligence added; OEVAL-01c v1.4 carry-forward documented)
+- Context Management (CTX-01..07): selective injection, condenser compaction, tool output caps shipped
+- Agentic Loop (LOOP-01..06): mid-loop verification, plan adaptation, max-token escalation, configurable iteration limit
+- Resilience + Session Persistence (RES-01..05, SESS-01..04): stuck detection, circuit breaker, cost guard, JSONL session log
+- Auto-Decomposition (DECOMP-01..05): brain_planner → swarm wiring; isolated sub-agent contexts
+- Context Intelligence (INTEL-01..06): tree-sitter symbol graph, PageRank repo map, canonical_models.json, @context-anchor
+- Intelligence Eval (EVAL-01..05): 26 fixtures; verify:intelligence gate #38
+- Phases 32-37 closed at `checkpoint:human-verify` boundary; runtime UAT operator-deferred per feedback_deferred_uat_pattern.md
+- v1.4 OEVAL-01c organism-eval drift carries forward as documented tech_debt
 
-For v1.5:
-- Research sources locked: arxiv 2604.14228 (Claude Code), Aider repo map, OpenHands condenser, Goose capability registry, mini-SWE-agent
-- CTX-07 and loop fallback guarantees are hard requirements — the naive path must always be reachable
-- Phase 32 is the strict dependency root; nothing else starts until context management is stable
-- Phase 36 (INTEL) can proceed in parallel with Phase 33 (LOOP) after Phase 32 lands
+For v1.6 (per VISION.md cut list + V2-AUTONOMOUS-HANDOFF.md):
+- VISION.md locked 2026-05-10; authority over decisions.md
+- 2 retractions logged 2026-05-12/13: forge-first override of VISION (withdrawn), presence observability v1.6 priority (deprioritized)
+- v1.6 = pure deletion per decisions.md 2026-05-13 lock; agent-native audit recs #2-10 deferred to v2.0
+- Onboarding Steps cut folded to v2.0 Phase 1 per handoff §0 item 7
+- v2.0 = install pipeline + agentic hunt onboarding + ONE forge wire (the Twitter-video moment per VISION:40)
+- v2.0 OAuth = build flows + mock-server integration test only; real auth happens on each end-user's first run
 
-## Key Decisions (v1.5)
+## Risk Register (v1.6)
 
-| Decision | Rationale |
-|----------|-----------|
-| Port, don't reinvent (tree-sitter, condenser, capability registry) | MIT/Apache patterns proven in production; BLADE adapts, not rebuilds |
-| CTX-07 fallback guarantee is a hard requirement | v1.1 lesson: smart path must never crash the dumb path |
-| Mid-loop verification uses fast/cheap model | Full-cost LLM check every 3 tool calls would 3× cost on long tasks |
-| SESS grouped with RES in Phase 34 | Both are operational robustness; SESS-04 forking feeds DECOMP-04 |
-| verify:intelligence adds gate 38, all 37 prior must stay green | Verify gates extend, not replace (M-13 pattern) |
+See `.planning/ROADMAP.md` Risk Register section.
 
-## Session Continuity
+## Notes
 
-Last session: 2026-05-08 — Phase 38 close shipped. Plan 38-01 README updates (Intelligence Layer section + Research Foundations + Roadmap markers); Plan 38-02 CHANGELOG ## [1.5.0] entry + Verify-Gate Evolution row; Plan 38-03 .planning/milestones/v1.5-MILESTONE-AUDIT.md (status: tech_debt, 42/42 routed); Plan 38-04 phase archive (7 git mv to milestones/v1.5-phases) + REQUIREMENTS/ROADMAP snapshots + STATE/PROJECT updates. Sanity-checked: cargo check + tsc --noEmit + verify-intelligence.sh all exit 0.
-Stopped at: v1.5 milestone closed (status: tech_debt). No checkpoint:human-verify task — Phase 38 is documentary.
-Resume with: `/gsd-new-milestone v1.6` when operator decides v1.6 scope. Operator next-steps (audit gaps): runtime UAT for Phases 32-37 + `BLADE_RUN_BENCHMARK=true bash scripts/run-intel-benchmark.sh` + optional OEVAL-01c v1.4 repair.
+- **Wake conditions** per V2-AUTONOMOUS-HANDOFF §7: GSD verifier BLOCKED twice on same phase after one self-fix; verify gates regress below 36/38 and code-fixer fails; authority gap. Otherwise grind.
+- **Phase 39 is retroactively-complete.** The 7 `chore(v1.6)` deletion commits already landed before the GSD scaffold existed. Phase 39 folder is a paperwork wrapper around shipped work — no new code lands in it.
+- **Phases 40-43 dispatch sequentially via /gsd-autonomous** with `--auto` discuss-phase defaults sourced from V2-AUTONOMOUS-HANDOFF.md + this STATE.md.
+- **Phase 44 close** waits on all of 40-43; runs `/gsd-audit-milestone` per handoff §4 Step 2; if PASS or TECH_DEBT, runs `/gsd-complete-milestone` and advances to v2.0.
+
+---
+
+*Last updated: 2026-05-13 — v1.6 retroactive scaffold landed per V2-AUTONOMOUS-HANDOFF §4 Step 0.*

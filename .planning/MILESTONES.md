@@ -4,6 +4,100 @@ Historical record of shipped versions. Each entry summarizes what shipped, what 
 
 ---
 
+## v1.6 — Narrowing Pass [IN PROGRESS]
+
+**Started:** 2026-05-12 (chore deletions); retroactive scaffold 2026-05-13
+**Phases:** 39–44 (6 phases — 1 retro-complete, 4 reduction + close)
+**Status:** 🔄 Active. Per VISION.md (locked 2026-05-10) cut list + V2-AUTONOMOUS-HANDOFF.md §0 (2026-05-13).
+
+### Scope
+
+**Phase 39 — Vertical Deletions (SHIPPED retroactively)** — 7 `chore(v1.6)` commits remove the verticals VISION named "Removed (locked)":
+1. Financial Brain (`ae54a15`)
+2. Health Guardian (`b775857`)
+3. Security Monitor (`7083d14`)
+4. Pentest Mode incl. Kali (`c0bf13f`)
+5. Workflow Builder (`2686761`)
+6. deeplearn auto-write synthesizer (`568b236`)
+7. Deep Scan + ecosystem auto-enable + scan onboarding (`aa789f7`)
+
+**Phases 40–43 — Significantly Reduced items** per VISION cut list:
+- Phase 40: Always-On → On-Demand (Total Recall + Audio Timeline + tentacle passive obs default-off)
+- Phase 41: Persona Auto-Extraction Removal (rip silent inference from filenames + shell history)
+- Phase 42: Background Agent Delegation (detect + route to user's Claude Code / Cursor / Goose / Aider)
+- Phase 43: Pulse Reduction (cron primitive stays; daily-summary engine cuts)
+
+**Phase 44 — Close** — CHANGELOG v1.6, MILESTONE-AUDIT, phase archive, README narrowed-scope update, git tag v1.6.
+
+**Onboarding Steps cut folded to v2.0 Phase 1** per V2-AUTONOMOUS-HANDOFF §0 item 7 — the hunt replaces Steps wholesale, avoid two passes on same files.
+
+### Close criteria
+
+- `verify:all` ≥36/38 (OEVAL-01c v1.4 carry-forward documented)
+- cargo check + tsc --noEmit clean
+- CHANGELOG + MILESTONE-AUDIT + phase archive shipped
+- Git tag `v1.6` pushed
+
+---
+
+## v1.5 — Intelligence Layer
+
+**Shipped:** 2026-05-08 (status: tech_debt — runtime UAT operator-deferred)
+**Phases:** 32–38 (7 phases, 59 plans)
+**Archives:** `milestones/v1.5-ROADMAP.md`, `milestones/v1.5-REQUIREMENTS.md`, `milestones/v1.5-MILESTONE-AUDIT.md`, `milestones/v1.5-phases/`
+
+### Delivered
+
+Transformed BLADE's naive 12-iteration tool loop into agentic intelligence. Selective context injection (CTX-01..07, 8 brain sections gated by relevance), condenser compaction (keep-first-8k + last-8k, LLM-summarize middle), mid-loop verification every 3 tool calls (LOOP-01..06), stuck detection on 5 semantic patterns + circuit breaker + cost guard + JSONL session log + resume + fork (RES-01..05, SESS-01..04), brain_planner → swarm auto-decomposition with isolated sub-agent contexts (DECOMP-01..05), tree-sitter symbol graph + personalized PageRank repo map + canonical_models.json capability registry + @context-anchor chat syntax (INTEL-01..06), 26-fixture intelligence eval suite + verify:intelligence gate #38 (EVAL-01..05).
+
+37 → 38 verify gates. 435+ tests. cargo check + tsc clean. OEVAL-01c v1.4 organism-eval drift documented as carry-forward tech_debt. Phases 32-37 closed at checkpoint:human-verify boundary; runtime UAT operator-deferred per feedback_deferred_uat_pattern.md.
+
+---
+
+## v1.4 — Cognitive Architecture
+
+**Shipped:** 2026-05-03 (zero debt at close)
+**Phases:** 25–31 (7 phases)
+**Archives:** `milestones/v1.4-ROADMAP.md`, `milestones/v1.4-REQUIREMENTS.md`, `milestones/v1.4-MILESTONE-AUDIT.md`, `milestones/v1.4-phases/`
+
+### Delivered
+
+The organism layer. Metacognitive controller v0 (META-01..05) — confidence-delta detection, verifier routing, gap log → evolution.rs, DoctorPane signal. Safety bundle (SAFE-01..07) — danger-triple detection, mortality-salience cap, steering-toward-calm bias, eval-gate vitality drain, anti-attachment guardrails. Hormone physiology + emotion classifier (HORM-01..09) — 7 hormones with decay/gain, text→valence/arousal→hormone with α=0.05 smoothing, behavioral modulation (cortisol→terse, dopamine→exploration). Active inference loop (AINF-01..06) — tentacle predictions, prediction error → hormone bus → behavior, prediction-error-weighted memory replay. Vitality engine (VITA-01..06) — 0.0–1.0 scalar with 5 behavioral bands, SDT replenishment, dormancy at 0.0. Organism eval (OEVAL-01..05) — vitality dynamics, hormone-driven behavior, persona stability, 13/13 fixtures MRR 1.000, verify:organism gate.
+
+37 verify gates, 435+ tests.
+
+---
+
+## v1.3 — Self-Extending Agent Substrate
+
+**Shipped:** 2026-05-02 (closed at Phase 24)
+**Phases:** 21–24 (4 phases)
+**Archives:** `milestones/v1.3-ROADMAP.md`, `milestones/v1.3-REQUIREMENTS.md`, `milestones/v1.3-MILESTONE-AUDIT.md`, `milestones/v1.3-phases/`
+
+### Delivered
+
+The forge substrate (per VISION.md primitive #3). SKILLS — agentskills.io SKILL.md format (YAML+MD), progressive disclosure, workspace→user→bundled resolution, validator + 3 bundled exemplars (Phase 21, 65 tests). VOYAGER — `evolution.rs → autoskills.rs → tool_forge.rs` end-to-end, verify:voyager-loop gate, deterministic `youtube_transcript` fixture (Phase 22, 21 tests). REWARD — RLVR-style composite reward (0.5·skill_success + 0.3·eval_gate + 0.1·acceptance + 0.1·completion), 3 OOD eval modules, DoctorPane RewardTrend row, verify:eval extended to 8 modules (Phase 23, 45 tests). DREAM — `dream_mode.rs` skill consolidation (prune >90d, consolidate redundant, generate from traces), `.pending/` proposal queue, chat-injected operator confirmation, skill_validator CLI (Phase 24, 435 tests total at close).
+
+**Note:** The forge substrate has not fired on a real capability gap in lived chat as of 2026-05-13 (11 days). v2.0 wires the Twitter-video forge demo per VISION:40.
+
+---
+
+## v1.2 — Acting Layer with Brain Foundation
+
+**Shipped:** 2026-04-29 (closed 2026-04-30 at status tech_debt)
+**Phases:** 16–20 (5 phases)
+**Archives:** `milestones/v1.2-ROADMAP.md`, `milestones/v1.2-REQUIREMENTS.md`, `milestones/v1.2-MILESTONE-AUDIT.md`, `milestones/v1.2-phases/`
+
+### Delivered
+
+Chat → consent → cross-app write. Brain foundation: brain.rs system-prompt builder assembles identity + vision + memory + tools + personality from 16 context sections. JARVIS push-to-talk (deferred from v1.1 M-04). 4 tier-1 acting tentacles wired: Gmail send, Calendar create, Slack send, GitHub PR. Cross-app consent dialog per action class. Phase 19 wholesale + JARVIS-01/02 voice + JARVIS-12 cold-install demo deferred to v1.3.
+
+### Strategic anchor (2026-04-30)
+
+Chat-first pivot — "one chat capable of doing anything." UI-polish UAT deferred for UI-only phases; chat capability + tool reliability prioritized. Carried into v1.3 + v1.4 + v1.5.
+
+---
+
 ## v1.1 — Functionality, Wiring, Accessibility
 
 **Shipped:** 2026-04-24 (closed 2026-04-27)
@@ -58,4 +152,4 @@ See `git log` before commit `6a78538` for the v1.0 REQUIREMENTS.md.
 
 ---
 
-*Updated 2026-04-27 at v1.1 close.*
+*Updated 2026-05-13 — v1.6 entry added at retroactive scaffold landing; v1.2/v1.3/v1.4/v1.5 entries backfilled.*
