@@ -133,14 +133,10 @@ pub async fn post_pulse(thought: &str) {
     post_to_discord(&content, true, 0x5865F2).await; // Discord blurple
 }
 
-/// Post a morning briefing to Discord (amber embed).
-pub async fn post_briefing(briefing: &str) {
-    if get_saved_webhook().is_empty() {
-        return;
-    }
-    let content = format!("**Morning Briefing**\n\n{}", briefing);
-    post_to_discord(&content, true, 0xF0B429).await; // amber
-}
+// v1.6 narrowing (Phase 43 REDUCE-06): morning-briefing engine retired.
+// `post_briefing` removed — the caller (pulse.rs::run_morning_briefing) is gone.
+// Companion `post_pulse_thought` above stays — pulse-thoughts still flow,
+// just gated through decision_gate per Phase 43.
 
 // ── Tauri commands ────────────────────────────────────────────────────────────
 

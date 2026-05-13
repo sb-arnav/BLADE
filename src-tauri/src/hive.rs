@@ -353,31 +353,9 @@ async fn github_get(token: &str, path: &str) -> Result<serde_json::Value, String
     serde_json::from_str(&body).map_err(|e| e.to_string())
 }
 
-/// Parse "owner/repo" from a remote URL.
-/// Supports https://github.com/owner/repo[.git] and git@github.com:owner/repo[.git].
-fn parse_owner_repo(remote_url: &str) -> Option<(String, String)> {
-    // HTTPS
-    if let Some(rest) = remote_url.strip_prefix("https://github.com/") {
-        let without_git = rest.trim_end_matches(".git");
-        let mut parts = without_git.splitn(2, '/');
-        let owner = parts.next()?.to_string();
-        let repo = parts.next()?.trim_end_matches(".git").to_string();
-        if !owner.is_empty() && !repo.is_empty() {
-            return Some((owner, repo));
-        }
-    }
-    // SSH
-    if let Some(rest) = remote_url.strip_prefix("git@github.com:") {
-        let without_git = rest.trim_end_matches(".git");
-        let mut parts = without_git.splitn(2, '/');
-        let owner = parts.next()?.to_string();
-        let repo = parts.next()?.trim_end_matches(".git").to_string();
-        if !owner.is_empty() && !repo.is_empty() {
-            return Some((owner, repo));
-        }
-    }
-    None
-}
+// `parse_owner_repo` removed — utility was prep for a hive PR/issue-watcher
+// feature that ended up MCP-routed (per immune_system.rs catalog). If/when
+// a future hive feature needs GitHub-URL parsing, re-add it here.
 
 // ── Tentacle platform polling ─────────────────────────────────────────────────
 
