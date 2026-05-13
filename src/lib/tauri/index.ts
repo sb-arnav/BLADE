@@ -108,6 +108,10 @@ export * from './privacy';
 export * from './intelligence';
 export * from './system';
 
+// Phase 46 — agentic hunt onboarding wrappers (v2.0).
+export { startHunt, cancelHunt } from './onboarding';
+export type { HuntInitialContext } from './onboarding';
+
 // Events convenience re-export (D-38-evt, D-38-hook). Raw `listen`/`invoke`
 // are intentionally NOT re-exported here — the wrapped surfaces (useTauriEvent,
 // invokeTyped) are the only permitted escape hatches per D-13.

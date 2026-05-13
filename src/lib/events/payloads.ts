@@ -973,3 +973,52 @@ export type BladeLoopEventPayload =
    */
   | { kind: 'decomposition_complete'; subagent_count: number };
 
+// ---------------------------------------------------------------------------
+// Phase 46 — Agentic Hunt Onboarding (v2.0)
+//
+// Emitted by src-tauri/src/onboarding/hunt.rs. The hunt loop narrates every
+// probe via BLADE_HUNT_LINE; emits BLADE_HUNT_DONE with the final
+// HuntOutcome when the LLM synthesizes; BLADE_HUNT_ERROR on provider failure.
+// ---------------------------------------------------------------------------
+
+export interface BladeHuntLinePayload {
+  /** "blade" — narrated by the LLM. "system" — meta lines (cancelled, capped). */
+  role: 'blade' | 'system';
+  text: string;
+  /** RFC3339 UTC timestamp. */
+  timestamp: string;
+}
+
+export interface BladeHuntProbeRecord {
+  tool: string;
+  argument: string;
+  ok: boolean;
+  snippet: string;
+}
+
+export interface BladeHuntFindings {
+  initial: {
+    agents: Record<string, string | null>;
+    env_keys: Record<string, boolean>;
+    keyring_keys: Record<string, boolean>;
+    ollama_running: boolean;
+    os: string;
+    arch: string;
+    default_browser: string;
+    mic_permission: string;
+    elapsed_ms: number;
+  };
+  chat_lines: string[];
+  probes: BladeHuntProbeRecord[];
+  final_synthesis: string;
+}
+
+export interface BladeHuntDonePayload {
+  status: 'completed' | 'cancelled' | 'no_data_fallback' | 'error';
+  tokens_used: number;
+  findings: BladeHuntFindings;
+}
+
+/** Provider/network failure string. The hunt loop drops to no-data fallback. */
+export type BladeHuntErrorPayload = string;
+
