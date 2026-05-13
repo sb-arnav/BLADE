@@ -4,6 +4,30 @@ Historical record of shipped versions. Each entry summarizes what shipped, what 
 
 ---
 
+## v2.1 — Hunt + Forge + OAuth Depth
+
+**Shipped:** 2026-05-13 (status: tech_debt — OEVAL-01c v1.4 carry-forward + v2.2+ follow-ups documented)
+**Phases:** 49–52 (4 phases)
+**Archives:** `milestones/v2.1-ROADMAP.md`, `milestones/v2.1-REQUIREMENTS.md`, `milestones/v2.1-MILESTONE-AUDIT.md`, `milestones/v2.1-phases/`
+
+### Delivered
+
+Polish + completion pass on v2.0. Closes the rough edges in hunt onboarding, OAuth coverage, and forge robustness. No architectural reframe (deferred to v2.2+).
+
+1. **Hunt Advanced + Cost Surfacing (Phase 49)** — HUNT-05 answer-driven probing chain (fresh-machine path → sharp question → user answer drives subsequent probes). HUNT-06 thematic contradiction-detection (second LLM pass classifies findings into work/personal/hobby/past-self clusters; surfaces specific question on conflict). Live cost surfacing for hunt + forge with $3 default budget, soft 50% warning, hard 100% interrupt.
+2. **OAuth Coverage (Phase 50)** — Slack OAuth v2 full impl (no-refresh-token surfaces via `Err(NotSupported)`); GitHub OAuth full impl with device-code flow for headless. 10/10 OAuth integration tests (3 Gmail + 4 Slack + 3 GitHub).
+3. **Forge Multi-Gap Robustness (Phase 51)** — 3 new gap fixtures (arXiv + RSS + PyPI); 8/8 forge e2e tests; prompt tuning with explicit language anchors + library hints + JSON-serializable return + HN few-shot. Pre-check refined with `PreCheckOutcome` enum routing MCP-cataloged-but-not-installed → fire forge per user autonomy preference.
+
+### Verify chain
+
+cargo + tsc clean. 45/45 onboarding tests + 8/8 forge e2e + 10/10 OAuth integration + verify:all 37/38 (OEVAL-01c carry-forward).
+
+### Carry-forward
+
+OEVAL-01c v1.4 persists. v2.2+ follow-ups: agent-native audit recs #2-10 (architectural reframe), decision_gate threshold tuning (operator-dogfood), VISION-held trio re-evaluation, CDN provisioning + CI lint gates, Gmail error-type migration, Slack token-rotation, 5th holdout forge gap, Tauri-runtime emit assertions, `immune_system::check_mcp_catalog` retirement.
+
+---
+
 ## v2.0 — Setup-as-Conversation + Forge Demo
 
 **Shipped:** 2026-05-13 (status: tech_debt — OEVAL-01c v1.4 carry-forward + v2.1+ follow-ups documented)

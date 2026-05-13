@@ -1,5 +1,7 @@
 # BLADE — Claude Code Operating File
 
+> **Read first:** [`AGENT_OPERATING_MODE.md`](AGENT_OPERATING_MODE.md) — how Claude operates on BLADE (position-first, adversarial pass, wandering loop, log load-bearing positions to `.planning/decisions.md`). Authority order: VISION.md → PROJECT.md → STATE.md → git log -15 → CHANGELOG. Notes/ are inputs, not authority.
+
 ## What This Is
 
 BLADE is a JARVIS-level desktop AI agent. Tauri 2 (Rust) + React (TypeScript) + SQLite. 130+ Rust modules, 145 React components, 50+ routes. It sees your screen, hears your voice, remembers everything, controls your desktop, and acts autonomously. Local-first, zero telemetry.
