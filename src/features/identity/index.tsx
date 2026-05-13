@@ -16,7 +16,6 @@ const CharacterBible    = lazy(() => import('./CharacterBible').then((m) => ({ d
 const NegotiationView   = lazy(() => import('./NegotiationView').then((m) => ({ default: m.NegotiationView })));
 const ReasoningView     = lazy(() => import('./ReasoningView').then((m) => ({ default: m.ReasoningView })));
 const ContextEngineView = lazy(() => import('./ContextEngineView').then((m) => ({ default: m.ContextEngineView })));
-const ProfileView       = lazy(() => import('./ProfileView').then((m) => ({ default: m.ProfileView })));
 
 export const routes: RouteDefinition[] = [
   { id: 'soul',           label: 'Soul',            section: 'identity', component: SoulView,          phase: 6 },
@@ -25,6 +24,4 @@ export const routes: RouteDefinition[] = [
   { id: 'negotiation',    label: 'Negotiation',     section: 'identity', component: NegotiationView,   phase: 6 },
   { id: 'reasoning',      label: 'Reasoning',       section: 'identity', component: ReasoningView,     phase: 6 },
   { id: 'context-engine', label: 'Context Engine',  section: 'identity', component: ContextEngineView, phase: 6 },
-  // Phase 12 Plan 12-04 (D-63) — Profile as 8th identity sub-view
-  { id: 'profile',        label: 'Profile',         section: 'identity', component: ProfileView,       phase: 12 },
 ];

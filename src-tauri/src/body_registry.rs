@@ -88,7 +88,6 @@ pub fn get_body_map() -> Vec<ModuleMapping> {
         m("personality_mirror", "identity", "dna", "Chat style extraction + mirroring"),
         m("people_graph", "identity", "dna", "Contact knowledge + communication prefs"),
         m("social_graph", "identity", "dna", "Contact interactions + social network"),
-        m("deep_scan", "identity", "dna", "PC discovery scanner — 12 system scanners"),
         m("discovery", "identity", "dna", "MCP server auto-import from Claude Code/Codex"),
 
         // ── ENDOCRINE (Hormones) ─────────────────────────────────────────

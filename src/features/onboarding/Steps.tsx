@@ -12,11 +12,10 @@ import type { OnbStep } from './useOnboardingState';
 const STEP_LABEL: Record<OnbStep, string> = {
   provider: 'Provider',
   apikey: 'API key',
-  scan: 'Deep scan',
   persona: 'Persona',
 };
 
-const ORDER: OnbStep[] = ['provider', 'apikey', 'scan', 'persona'];
+const ORDER: OnbStep[] = ['provider', 'apikey', 'persona'];
 
 interface Props {
   current: OnbStep;

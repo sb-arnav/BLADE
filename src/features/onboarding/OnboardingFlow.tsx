@@ -14,7 +14,6 @@
 import { useOnboardingState } from './useOnboardingState';
 import { ProviderPicker } from './ProviderPicker';
 import { ApiKeyEntry } from './ApiKeyEntry';
-import { DeepScanStep } from './DeepScanStep';
 import { PersonaQuestions } from './PersonaQuestions';
 import './onboarding.css';
 
@@ -43,15 +42,6 @@ export function OnboardingFlow({ onComplete }: Props) {
           beginTest={hook.beginTest}
           endTestOk={hook.endTestOk}
           endTestErr={hook.endTestErr}
-        />
-      )}
-      {state.step === 'scan' && (
-        <DeepScanStep
-          state={state}
-          setStep={hook.setStep}
-          beginScan={hook.beginScan}
-          observePhase={hook.observePhase}
-          endScan={hook.endScan}
         />
       )}
       {state.step === 'persona' && (

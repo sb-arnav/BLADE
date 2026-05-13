@@ -34,7 +34,6 @@ export type {
   TemporalStandup,
   TemporalPattern,
   ExecutionMemoryEntry,
-  DeepScanResult,
   SupervisorService,
   SupervisorHealth,
   TraceEntry,

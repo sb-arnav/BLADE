@@ -36,10 +36,4 @@ export function ecosystemObserveOnlyCheck(): Promise<boolean> {
   return invokeTyped<boolean>('ecosystem_observe_only_check');
 }
 
-/**
- * @see ecosystem.rs `pub async fn ecosystem_run_auto_enable(app: AppHandle)`
- * Re-triggers auto-enable logic from the last saved scan results.
- */
-export function ecosystemRunAutoEnable(): Promise<void> {
-  return invokeTyped<void>('ecosystem_run_auto_enable');
-}
+// v1.6 narrowing — ecosystemRunAutoEnable cut (deep_scan removed).

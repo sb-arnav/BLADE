@@ -887,10 +887,8 @@ fn check_migration_ledger() -> (bool, String) {
 /// `deep_scan/leads.rs:165` — `pub scanned_at: i64` set via
 /// `chrono::Utc::now().timestamp_millis()`).
 fn scan_profile_age_days() -> Option<i64> {
-    let results = crate::deep_scan::load_results_pub()?;
-    let now_ms = chrono::Utc::now().timestamp_millis();
-    let age_ms = now_ms - results.scanned_at;
-    Some(age_ms / (86_400 * 1000))
+    // v1.6 narrowing — deep_scan cut; profile age is no longer derivable.
+    None
 }
 
 /// Compute the ConfigDrift signal per CONTEXT D-08.

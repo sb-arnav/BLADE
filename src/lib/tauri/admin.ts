@@ -289,23 +289,6 @@ export interface ExecutionMemoryEntry {
   [k: string]: unknown;
 }
 
-// ─── deep_scan.rs types ──────────────────────────────────────────────────────
-
-/** @see src-tauri/src/deep_scan.rs:96 DeepScanResults (permissive shape) */
-export interface DeepScanResult {
-  scanned_at: number;
-  installed_apps?: unknown[];
-  default_browser?: string | null;
-  ides?: unknown[];
-  git_repos?: unknown[];
-  shell_history?: unknown[];
-  wsl_distros?: unknown[];
-  package_managers?: unknown[];
-  ai_tools?: unknown[];
-  system_info?: unknown;
-  [k: string]: unknown;
-}
-
 // ─── supervisor.rs + trace.rs types ──────────────────────────────────────────
 
 /** @see src-tauri/src/supervisor.rs:32 ServiceHealth */
@@ -1212,34 +1195,6 @@ export function exmemSearch(args: { query: string; limit?: number }): Promise<st
  */
 export function exmemRecent(limit?: number): Promise<ExecutionMemoryEntry[]> {
   return invokeTyped<ExecutionMemoryEntry[], { limit?: number }>('exmem_recent', { limit });
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// deep_scan.rs — full machine identity discovery (3 commands)
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * @see src-tauri/src/deep_scan.rs:1321 deep_scan_start
- * Rust signature: `deep_scan_start(app: AppHandle) -> Result<DeepScanResults, String>`.
- */
-export function deepScanStart(): Promise<DeepScanResult> {
-  return invokeTyped<DeepScanResult>('deep_scan_start');
-}
-
-/**
- * @see src-tauri/src/deep_scan.rs:1425 deep_scan_results
- * Rust signature: `deep_scan_results() -> Result<Option<DeepScanResults>, String>`.
- */
-export function deepScanResults(): Promise<DeepScanResult | null> {
-  return invokeTyped<DeepScanResult | null>('deep_scan_results');
-}
-
-/**
- * @see src-tauri/src/deep_scan.rs:1431 deep_scan_summary
- * Rust signature: `deep_scan_summary() -> Result<String, String>`.
- */
-export function deepScanSummary(): Promise<string> {
-  return invokeTyped<string>('deep_scan_summary');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

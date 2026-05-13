@@ -34,17 +34,6 @@ export {
   cancelChat,
 } from './chat';
 
-export {
-  deepScanStart,
-  deepScanResults,
-  deepScanSummary,
-  profileGetRendered,
-  profileOverlayReset,
-  profileOverlayUpsert,
-  scanCancel,
-  setScanClassesEnabled,
-} from './deepscan';
-export type { ScanClassesEnabled } from './deepscan';
 export { minimizeWindow, closeWindow, toggleMaximize } from './window';
 
 // Phase 3 additions — chat tool-approval, history, quickask bridge,

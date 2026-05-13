@@ -904,7 +904,7 @@ fn build_system_prompt_inner(
 
         // Deep scan + user model
         {
-            let scan = crate::deep_scan::load_scan_summary();
+            let scan: Option<String> = None; // v1.6 narrowing — deep_scan cut
             let user_model = crate::persona_engine::get_user_model_summary();
             if scan.is_some() || user_model.is_some() {
                 let mut id_parts = Vec::new();
