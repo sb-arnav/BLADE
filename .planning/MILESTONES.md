@@ -4,6 +4,30 @@ Historical record of shipped versions. Each entry summarizes what shipped, what 
 
 ---
 
+## v2.0 — Setup-as-Conversation + Forge Demo
+
+**Shipped:** 2026-05-13 (status: tech_debt — OEVAL-01c v1.4 carry-forward + v2.1+ follow-ups documented)
+**Phases:** 45–48 (4 phases)
+**Archives:** `milestones/v2.0-ROADMAP.md`, `milestones/v2.0-REQUIREMENTS.md`, `milestones/v2.0-MILESTONE-AUDIT.md`, `milestones/v2.0-phases/`
+
+### Delivered
+
+First end-user-shippable release. The four VISION primitives live in chat, not just in the substrate.
+
+1. **Install pipeline (Phase 45)** — `curl -sSL slayerblade.site/install | sh` on macOS+Linux; `iwr -useb slayerblade.site/install.ps1 | iex` on Windows. Architecture detection (arm64 vs x86_64) with Rosetta brand-string override. Upgrade preserves `~/.blade/who-you-are.md`, keychain, blade.db. macOS Gatekeeper auto-cleared via `xattr -cr`. CDN fallback URL wired (provisioning is v2.1+).
+2. **Agentic hunt onboarding (Phase 46)** — Pre-scan ≤2s → message #1 with "feels illegal but legal" register → LLM-driven hunt with sandboxed readonly tools narrated live in chat → `platform_paths.md` per-OS knowledge file → synthesis to `~/.blade/who-you-are.md` (user-editable) → first task closes onboarding by BLADE *acting*, not a setup-complete screen. Steps wizard ripped (621 LOC retired). OAuth: Gmail full + 3 mock-server integration tests pass; Slack + GitHub stubs (v2.1+ for full impl).
+3. **One forge wire (Phase 47)** — The Twitter-video moment per VISION:40. Gap chosen = HackerNews top-N stories (overrode Twitter recommendation because Twitter already had MCP routing that would short-circuit the forge). 5 chat-line emissions wired (gap_detected → writing → testing → registered → retrying). Pre-check searches existing tools before firing. End-to-end loop covered by 5/5 mock-LLM integration tests. Real-LLM screencast path documented in `scripts/demo/forge-demo.md`.
+
+### Verify chain
+
+`cargo check` clean; `tsc --noEmit` clean; `verify:all` 37/38 (OEVAL-01c v1.4 carry-forward); 5/5 forge e2e tests pass; 3/3 OAuth Gmail integration tests pass.
+
+### Carry-forward
+
+OEVAL-01c v1.4 organism-eval drift persists. CDN provisioning + advanced hunt fallback + Slack/GitHub OAuth full impl + agent-native audit recs #2-10 deferred to v2.1+. Held-for-v2.0-evaluation trio (Body Map, mortality-salience, Ghost Mode) carries to v2.1+ pending operator-dogfood signal.
+
+---
+
 ## v1.6 — Narrowing Pass
 
 **Shipped:** 2026-05-13 (started 2026-05-12 with chore deletions; retroactive scaffold + Phases 40-44 closed 2026-05-13)

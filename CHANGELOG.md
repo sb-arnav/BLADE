@@ -13,6 +13,74 @@ Nothing yet.
 
 ---
 
+## [2.0.0] -- 2026-05-13
+
+### Added (v2.0 -- Setup-as-Conversation + Forge Demo)
+
+> Per VISION.md (locked 2026-05-10) + V2-AUTONOMOUS-HANDOFF.md §0, v2.0 ships three outcomes only: install pipeline, agentic hunt onboarding, and one forge wire end-to-end. This is the first end-user-shippable release that lives the four primitives (doesn't-refuse, finds-a-way, forges-tools, setup-as-conversation) in chat, not just in the substrate.
+
+**Phase 45 -- Install Pipeline**
+- INSTALL-01..05: `scripts/install/install.sh` (437 LOC) — macOS + Linux installer. Detects OS via `uname`, arch via `uname -m` with macOS-Rosetta brand-string override, upgrade-vs-fresh via `/Applications/Blade.app` or `~/.local/bin/blade` presence. Preserves `~/.blade/who-you-are.md`, keychain entries, `~/.blade/blade.db` on upgrade. Auto-runs `xattr -cr /Applications/Blade.app` after copy to clear Gatekeeper quarantine.
+- INSTALL-02..05: `scripts/install/install.ps1` (222 LOC) — Windows installer. Architecture detection via `$env:PROCESSOR_ARCHITECTURE` (+ `PROCESSOR_ARCHITEW6432` fallback for Rosetta-of-Windows). MSI preferred, EXE fallback. Preserves `%LOCALAPPDATA%\Blade\*` on upgrade.
+- INSTALL-06: macOS quarantine fix auto-runs; README documents the manual fallback (`xattr -cr /Applications/Blade.app`).
+- INSTALL-07: Fallback CDN host wired in both scripts (`https://cdn.slayerblade.site/releases/v<ver>/<asset>`) — CDN bucket provisioning is a v2.1+ release-CI follow-up.
+- README rewrite: install command at the top (`curl|sh` for macOS+Linux, `iwr|iex` for Windows). Manual download moved to subsection. Curl-pipe-sh audit workflow documented inline. Commits `0088b4a`, `c91fc5e`, `69e7e8c`, `3c799f0`.
+
+**Phase 46 -- Agentic Hunt Onboarding**
+- HUNT-01: `src-tauri/src/onboarding/pre_scan.rs` — ≤2s capability inventory: agent presence (`which claude/cursor/aider/goose/gh`), API keys (env + Claude Code config + Cursor config + OS keychain), Ollama TCP probe `:11434`, OS+arch, default browser, mic-permission check. Result lands in in-memory `InitialContext`; not persisted.
+- HUNT-02: Frontend `src/features/onboarding/Hunt.tsx` + `hunt.css` — message #1 lands as a four-sentence chat-line per spec Act 2 ("Found these on your machine: ... I'll default to ... Override or skip ..."). The "feels illegal but legal" register lands in the literal first interaction.
+- HUNT-03: `src-tauri/src/onboarding/hunt.rs` — LLM-driven hunt session via `providers::complete_turn`. Sandboxed readonly tool surface: `hunt_emit_chat_line`, `hunt_list_dir`, `hunt_read_file` (with `.ssh/`, `.env`, `.aws/credentials`, `.gnupg/`, `*keychain*`, `*credentials*`, `*password*`, `*.pem`, `*.key` deny list), `hunt_run_shell` (read-only commands only — `ls`, `cat`, `grep`, `find`, `git log/status/diff`, `which`, `uname`, `wsl --list`). 50K input token cap.
+- HUNT-04: `src-tauri/src/onboarding/platform_paths.md` — per-OS knowledge file (Windows + macOS + Linux + WSL detection conventions). Embedded via `include_str!`; loaded into hunt LLM context.
+- HUNT-05 (basic): No-data fallback fires the sharp question — *"Fresh machine — what do you do? not your job, the thing you'd point a friend at."* Answer-driven probing is a v2.1+ follow-up.
+- HUNT-06 (basic): Contradiction surfacing via prompt instructions only. Advanced contradiction-detection logic deferred.
+- HUNT-07: `src-tauri/src/onboarding/synthesis.rs` — writes `~/.blade/who-you-are.md` (user-editable Markdown) on hunt completion.
+- HUNT-08: First task closes onboarding by BLADE acting, not a setup-complete screen. After synthesis confirmation: *"Right? — Give me one thing you've been putting off this week. I'll handle it now."*
+- HUNT-09: Steps wizard ripped (621 LOC retired): `Steps.tsx`, `ApiKeyEntry.tsx`, `PersonaQuestions.tsx`, `ProviderPicker.tsx`, `useOnboardingState.ts`. `DeepScanReview` + `PersonaCheck` were already cut in v1.6.
+- HUNT-10: `src-tauri/src/oauth/` — Gmail OAuth implemented end-to-end (auth URL builder + code-for-token exchange + refresh-token preservation). `src-tauri/tests/oauth_gmail_integration.rs` runs 3 integration tests vs localhost mock TCP server (all pass). Slack + GitHub stubs with TODO(v2.1) markers per V2-AUTONOMOUS-HANDOFF.md §1 (real "click Allow" happens per-user on their machine; build-time uses mocks only).
+- Commits `e911b60`, `c602c89`, `aef7899`.
+
+**Phase 47 -- One Forge Wire** (the Twitter-video moment per VISION:40)
+- FORGE-01: Gap chosen = **HackerNews top-N stories extraction**. Overrode the CONTEXT.md Twitter recommendation because `immune_system.rs:130` already routes Twitter/X to an MCP suggestion before the forge can fire — that's the wrong demo outcome. HackerNews has a public, unauthenticated, stable Firebase API; the LLM writes a working tool first try with high probability. Rationale documented in `47-CONTEXT.md` §"Gap chosen".
+- FORGE-02: Forge fires 5 chat-line emissions at each transition — `gap_detected`, `writing`, `testing`, `registered`, `retrying`, plus `failed` on 3x test failure (`tool_forge.rs:40` helper; emission sites at lines 998, 530, 649, 700, 1009, 543/687/931/941/979/1021). Frontend renderer in `useChat.tsx:318` + `MessageBubble.tsx:52` + `chat.css:122`. Forge chat-lines render with a "⚒" prefix and distinct background tint, visually separable from user/assistant messages.
+- FORGE-02 pre-check: `pre_check_existing_tools()` searches native tool catalog + MCP registry before firing forge. Prevents false-positive fires on gaps an existing tool can already handle.
+- FORGE-03: `src-tauri/tests/forge_e2e_integration.rs` — 5 integration tests against mocked provider. End-to-end loop: gap detected → LLM writes tool → tool compiles → test passes → register → retry → success. Real-LLM screencast path lives in `scripts/demo/forge-demo.md`.
+- Commits `9b058aa`, `ce28117`, `e7a8c1a`, `e7ba2d2`, `069bbda`, `b872035`, `6a5853c`.
+
+**Phase 48 -- Close**
+- CLOSE-01: This CHANGELOG entry.
+- CLOSE-02: `.planning/milestones/v2.0-MILESTONE-AUDIT.md` written.
+- CLOSE-03: Phase 45-48 directories archived to `.planning/milestones/v2.0-phases/`. `REQUIREMENTS.md` + `ROADMAP.md` snapshotted.
+- CLOSE-04: README rewrite (install command up top + agentic hunt + forge demo sections). MILESTONES.md v2.0 entry. git tag `v2.0`.
+
+### Verify chain (v2.0 close)
+
+- `cargo check` clean.
+- `tsc --noEmit` clean.
+- `cargo test --features voyager-fixture --test forge_e2e_integration` — 5/5 pass.
+- `cargo test --test oauth_gmail_integration` — 3/3 pass.
+- `npm run verify:all` — 36/36 non-eval gates green; 29/30 lib evals (the OEVAL-01c v1.4 organism-eval carry-forward documented since v1.5 close). Above the V2-AUTONOMOUS-HANDOFF.md §0 floor (>=36/38).
+
+### Carry-forward (operator-visible, not v2.0 regressions)
+
+- **OEVAL-01c v1.4 organism-eval drift** — inherited from v1.5 close; persists.
+- **CDN bucket provisioning** (INSTALL-07) — install scripts have the URL wired but the actual CDN release-upload step is a v2.1 release-CI follow-up.
+- **shellcheck + PSScriptAnalyzer on CI** — install scripts pass `bash -n` and manual review; lint CI gate is v2.1+.
+- **GitHub API manifest cache** at `slayerblade.site/install/latest.json` — rate-limit mitigation; v2.1+.
+- **Windows ARM64 + Intel Mac assets** — install scripts are forward-compat; release-CI just needs to publish those binaries.
+- **HUNT-05 advanced no-data fallback** — basic implementation lands sharp question; answer-driven probing is v2.1+.
+- **HUNT-06 advanced contradiction-detection** — prompt-instruction-only in v2.0; explicit detection logic is v2.1+.
+- **HUNT-05/HUNT-06 live cost surfacing in chat** — cost is logged via `log::info!`; in-chat surfacing is a UX polish for v2.1+.
+- **OAuth full implementations** (Slack, GitHub) — only Gmail is full in v2.0 per scope contract; the others are stubs with TODO(v2.1).
+- **Real-host runtime UAT** — operator-owned per V2-AUTONOMOUS-HANDOFF.md §1; close at `checkpoint:human-verify`. Static-gates-green is the close bar per handoff §1.
+
+### What ships next
+
+- v2.1 polish on the items above
+- v2.2+: multi-gap forge robustness, expanded OAuth coverage, presence observability evaluation, agent-native audit recs #2-10
+- VISION-held-for-v2.0-evaluation trio (Body Map / mortality-salience / Ghost Mode) — outcome documented in `.planning/milestones/v2.0-MILESTONE-AUDIT.md`
+
+---
+
 ## [1.6.0] -- 2026-05-13
 
 ### Removed (v1.6 -- Narrowing Pass)
