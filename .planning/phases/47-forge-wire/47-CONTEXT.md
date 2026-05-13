@@ -85,3 +85,21 @@ Per ROADMAP.md:
 - Tuning forge's tool-writing prompt for production quality across many gaps (v2.0 ships ONE gap end-to-end; multi-gap robustness is v2.1+)
 - Frontend redesign of chat-line styling beyond the minimum needed for the demo
 - Adding new substrate primitives — the v1.3 forge substrate is the substrate; Phase 47 is integration
+
+## Gap chosen
+
+**Locked: HackerNews top-N stories extraction (candidate #3 in Approach).**
+
+### Decision (FORGE-01)
+
+Switched from the originally-recommended Twitter/X thread extraction to HackerNews top-N stories for three reasons:
+
+1. **No existing tool covers it.** Verified via `grep -rn "hackernews\|hacker.news" src-tauri/src/` — zero hits in the tool catalog (`native_tools.rs`), zero MCP-server mapping in `immune_system.rs::check_mcp_catalog`, zero hits in the forge fixture surface. Twitter has partial coverage: `immune_system.rs:130` maps "twitter/x.com" to a "Twitter/X" MCP suggestion, so the pre-check would route it away from the forge before the forge ever fires — the wrong outcome for the demo.
+
+2. **The forged tool must succeed end-to-end against a real LLM (FORGE-03).** The demo *requires* the loop to close — gap detected → tool written → test passes → registered → retry succeeds. HackerNews ships a public, unauthenticated, stable Firebase REST API (`https://hacker-news.firebaseio.com/v0/topstories.json` + per-item lookups). An LLM-written Python script using `requests` works on first try ~all-the-time. Twitter's API is broken for the LLM's pre-2024 training corpus (the same fragility CONTEXT.md cites as "high signal") — meaning a forged Twitter scraper has a high probability of failing the integration test and the on-device demo, eating the moat moment.
+
+3. **Demonstrably useful for the target user.** Builders + founders + power users (the VISION-named profile) check HN. The first task "show me today's top 5 HN stories with titles and points" is the kind of thing a real user types and a real BLADE should handle. The narrative survives the screencast: gap → forge → working tool → recorded answer.
+
+### What gets demoed
+
+Operator types in chat: *"Show me today's top 5 HackerNews stories with titles, points, and comment counts."* No matching tool exists. `pre_check_existing_tools` returns false. The forge fires. Chat-line sequence: `gap_detected` → `writing` → `testing` → `registered` → `retrying`. Tool runs, returns 5 stories, LLM summarizes. Total wall time target ≤ 30 seconds.
