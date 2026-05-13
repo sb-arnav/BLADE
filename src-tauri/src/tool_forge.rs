@@ -157,6 +157,166 @@ pub fn emit_forge_line(app: &tauri::AppHandle, phase: &str, detail: &str) {
 /// catalog (`crate::native_tools::all_tools()`) so forge doesn't duplicate
 /// built-in capability surfaces.
 ///
+/// Phase 51 (FORGE-PRECHECK-REFINE) — read the names of all MCP servers
+/// currently registered with the runtime `SharedMcpManager`. Best-effort:
+/// if the state isn't available (early boot, headless test path), returns
+/// an empty Vec and the caller treats every MCP-cataloged capability as
+/// "not installed" — which falls into the "forge anyway" branch, the
+/// correct conservative behavior.
+async fn collect_installed_mcp_servers(app: &tauri::AppHandle) -> Vec<String> {
+    use tauri::Manager;
+    let Some(state) = app.try_state::<crate::commands::SharedMcpManager>() else {
+        return Vec::new();
+    };
+    let manager = state.lock().await;
+    manager
+        .server_status()
+        .into_iter()
+        .map(|(name, _running)| name)
+        .collect()
+}
+
+/// Phase 51 (FORGE-PRECHECK-REFINE) — outcome of the MCP-aware pre-check.
+///
+/// `pre_check_existing_tools` returns `Some(name)` purely on native/forged
+/// matches; `pre_check_with_mcp_state` extends that with the MCP catalog
+/// dimension. The forge router uses the new variants to decide:
+///
+///   - `NativeMatch` / `ForgedMatch` → skip forge entirely (capability already
+///     resolvable in-app)
+///   - `McpInstalled` → skip forge; the user's existing MCP server handles it
+///   - `McpCatalogedNotInstalled` → emit a `forge_route` chat-line ("could
+///     install <MCP> from catalog, or forge a quick scraper now — picking
+///     forge") and FIRE the forge (in-app autonomy preference)
+///   - `NoMatch` → fire the forge normally
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PreCheckOutcome {
+    /// A native (built-in) tool already handles this capability. Skip forge.
+    NativeMatch(String),
+    /// A previously-forged tool already handles this capability. Skip forge.
+    ForgedMatch(String),
+    /// An MCP server in the catalog AND already installed by the user can
+    /// handle this. Skip forge (defer to the user's installed MCP).
+    McpInstalled(String),
+    /// An MCP server in the catalog COULD handle this, but the user hasn't
+    /// installed it. Per the autonomy preference (in-app forge > install MCP),
+    /// the caller surfaces a `forge_route` chat-line and fires the forge.
+    McpCatalogedNotInstalled(String),
+    /// Nothing in any catalog matches. Fire the forge normally.
+    NoMatch,
+}
+
+/// Phase 51 (FORGE-PRECHECK-REFINE) — keyword map of capability tokens to
+/// known MCP server names. Mirrors the immune_system.rs::check_mcp_catalog
+/// table but inverted: keywords map to a single server name we'd suggest.
+/// Kept in tool_forge.rs so the forge router has direct visibility without
+/// crossing the immune_system module boundary.
+fn mcp_catalog_lookup(capability: &str) -> Option<&'static str> {
+    let cap_lower = capability.to_lowercase();
+    let mappings: &[(&[&str], &str)] = &[
+        (&["kubernetes", "k8s", "kubectl", "pods", "cluster"], "Kubernetes"),
+        (&["docker", "container"], "Docker"),
+        (&["youtube"], "YouTube"),
+        (&["spotify", "playlist"], "Spotify"),
+        (&["notion", "wiki"], "Notion"),
+        (&["figma"], "Figma"),
+        (&["shopify"], "Shopify"),
+        (&["stripe", "payment"], "Stripe"),
+        (&["reddit", "subreddit"], "Reddit"),
+        (&["twitter", "tweet", "x.com"], "Twitter/X"),
+        (&["instagram"], "Instagram"),
+        (&["postgres", "postgresql"], "PostgreSQL"),
+        (&["mongodb", "mongo"], "MongoDB"),
+        (&["redis"], "Redis"),
+        (&["terraform"], "Terraform"),
+        (&["jira"], "Jira"),
+        (&["linear"], "Linear"),
+        (&["sentry"], "Sentry"),
+        (&["datadog"], "Datadog"),
+        (&["cloudflare"], "Cloudflare"),
+        (&["supabase"], "Supabase"),
+        (&["firebase"], "Firebase"),
+        (&["vercel"], "Vercel"),
+        (&["netlify"], "Netlify"),
+        (&["slack"], "Slack"),
+        (&["github", "gist"], "GitHub"),
+    ];
+    for (keywords, server_name) in mappings {
+        if keywords.iter().any(|k| cap_lower.contains(k)) {
+            return Some(server_name);
+        }
+    }
+    None
+}
+
+/// Phase 51 (FORGE-PRECHECK-REFINE) — MCP-aware pre-check.
+///
+/// Layered decision (in order):
+///   1. Forged-tool match → `ForgedMatch`
+///   2. Native-tool match → `NativeMatch`
+///   3. MCP catalog match:
+///        - if `installed_mcp_servers` contains the suggested name (case-
+///          insensitive, substring match either way) → `McpInstalled`
+///        - else → `McpCatalogedNotInstalled`
+///   4. Otherwise → `NoMatch`
+///
+/// `installed_mcp_servers` is supplied by the caller (forge router reads it
+/// from the runtime `SharedMcpManager`). Pure function — testable without
+/// any Tauri AppHandle.
+pub fn pre_check_with_mcp_state(
+    capability: &str,
+    installed_mcp_servers: &[String],
+) -> PreCheckOutcome {
+    let gap_lower = capability.to_lowercase();
+    let tokens: Vec<String> = gap_lower
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|t| t.len() >= 4)
+        .map(|s| s.to_string())
+        .collect();
+
+    if !tokens.is_empty() {
+        let all_tokens_match = |haystack: &str| -> bool {
+            let h = haystack.to_lowercase();
+            tokens.iter().all(|t| h.contains(t.as_str()))
+        };
+
+        // Forged tools first (cheap DB read).
+        for tool in get_forged_tools() {
+            let haystack = format!("{} {} {}", tool.name, tool.description, tool.forged_from);
+            if all_tokens_match(&haystack) {
+                return PreCheckOutcome::ForgedMatch(tool.name);
+            }
+        }
+
+        // Native tools next.
+        for tool in crate::native_tools::tool_definitions() {
+            let haystack = format!("{} {}", tool.name, tool.description);
+            if all_tokens_match(&haystack) {
+                return PreCheckOutcome::NativeMatch(tool.name);
+            }
+        }
+    }
+
+    // MCP catalog dimension.
+    if let Some(server) = mcp_catalog_lookup(capability) {
+        let installed = installed_mcp_servers.iter().any(|name| {
+            let lname = name.to_lowercase();
+            let lserver = server.to_lowercase();
+            // Either direction: registered name might be "github" while the
+            // catalog server is "GitHub", or registered might be a fuller
+            // string like "mcp-github" containing the server name.
+            lname.contains(&lserver) || lserver.contains(&lname)
+        });
+        return if installed {
+            PreCheckOutcome::McpInstalled(server.to_string())
+        } else {
+            PreCheckOutcome::McpCatalogedNotInstalled(server.to_string())
+        };
+    }
+
+    PreCheckOutcome::NoMatch
+}
+
 /// Returns `Some(matched_tool_name)` to short-circuit the forge; `None` to
 /// continue.
 pub fn pre_check_existing_tools(gap: &str) -> Option<String> {
@@ -478,6 +638,52 @@ async fn generate_tool_script_inner(
         _        => "accept arguments from CLI, print to stdout",
     };
 
+    // Phase 51 (FORGE-PROMPT-TUNING) — explicit library guidance + one HN
+    // few-shot example. v2.0 phase 47 prompt was tuned for a single gap (HN
+    // top stories); v2.1 phase 51 broadens to arXiv/RSS/PyPI which all share
+    // the "public unauthenticated JSON-or-XML API" shape. Inline guide:
+    //   - Anchor language to Python 3 / Node 18+ / POSIX bash
+    //   - Prefer `requests` for HTTP, `feedparser` for feeds, `json` for parse
+    //   - Return JSON-serializable result
+    //   - One HN few-shot demo (only 1 — keep prompt size down per token budget)
+    let tooling_hints = match language {
+        "python" => {
+            "- Use Python 3. Prefer `requests` for HTTP (or `urllib.request` if you want zero deps), \
+             `feedparser` for RSS/Atom, `xml.etree.ElementTree` for raw XML, `json` for parsing.\n         \
+             - Return a JSON-serializable result via `print(json.dumps(result))` whenever the output is structured."
+        }
+        "bash" => {
+            "- Use POSIX bash. Prefer `curl -fsSL` for HTTP, `jq` for JSON, `xmllint` for XML.\n         \
+             - Emit one JSON object per line on success."
+        }
+        "node" => {
+            "- Use Node 18+ (global `fetch` available). Avoid extra npm deps; use `node:` builtins.\n         \
+             - Return a JSON-serializable result via `console.log(JSON.stringify(result))`."
+        }
+        _ => "- Use the simplest sensible standard library.",
+    };
+
+    // Few-shot example: HackerNews top-N (the v2.0 proven gap). Inlined verbatim
+    // so the LLM has a concrete example of the JSON-response shape, error
+    // handling, arg parsing, and request idiom we want. Python-only — bash/node
+    // skip the example to keep prompt size down.
+    let few_shot_python = "Example response for a similar capability (HackerNews top-N stories):\n\
+         {\n\
+           \"script\": \"#!/usr/bin/env python3\\nimport json, sys, urllib.request\\n\
+HN_TOP = 'https://hacker-news.firebaseio.com/v0/topstories.json'\\n\
+HN_ITEM = 'https://hacker-news.firebaseio.com/v0/item/{id}.json'\\n\
+def fetch_json(url, timeout=8):\\n    with urllib.request.urlopen(url, timeout=timeout) as r:\\n        return json.loads(r.read().decode('utf-8'))\\n\
+def main():\\n    n = int(sys.argv[1]) if len(sys.argv) > 1 else 5\\n    try:\\n        ids = fetch_json(HN_TOP)[:max(1, min(n, 30))]\\n        items = [fetch_json(HN_ITEM.format(id=i)) for i in ids]\\n    except Exception as e:\\n        print(f'error: {e}', file=sys.stderr); return 1\\n    print(json.dumps([{'title': it.get('title',''), 'score': it.get('score',0), 'comments': it.get('descendants',0), 'url': it.get('url','')} for it in items if it], indent=2))\\n    return 0\\nif __name__ == '__main__':\\n    sys.exit(main())\",\n\
+           \"description\": \"Fetch the top N stories from HackerNews with titles, scores, and comment counts.\",\n\
+           \"usage\": \"python tool.py [N]\",\n\
+           \"parameters\": [{\"name\": \"n\", \"type\": \"integer\", \"description\": \"Number of stories\", \"required\": false}]\n\
+         }";
+    let example_block = if language == "python" {
+        format!("\n\n{}\n\n", few_shot_python)
+    } else {
+        "\n\n".to_string()
+    };
+
     let prompt = format!(
         "You are an expert programmer. Write a {language} script that implements this capability:\n\n\
          {capability}\n\n\
@@ -486,7 +692,8 @@ async fn generate_tool_script_inner(
          - Print results to stdout (one result per line, or JSON)\n\
          - Handle errors gracefully (print to stderr, exit code 1)\n\
          - Be self-contained (no external dependencies except standard library + common packages like requests, pathlib)\n\
-         - Be production-quality: handle edge cases, validate inputs\n\n\
+         - Be production-quality: handle edge cases, validate inputs\n\
+         {tooling_hints}{example_block}\
          Respond ONLY with a valid JSON object (no markdown fences, no extra text):\n\
          {{\n\
            \"script\": \"full script code here\",\n\
@@ -497,6 +704,8 @@ async fn generate_tool_script_inner(
         language = language,
         capability = capability,
         lang_notes = lang_notes,
+        tooling_hints = tooling_hints,
+        example_block = example_block,
     );
 
     // Phase 22 Plan 22-03 (v1.3) — Voyager skill-write budget cap (VOYAGER-07).
@@ -1332,17 +1541,51 @@ pub async fn forge_if_needed_with_app(
         return None;
     }
 
-    // Pre-check: don't forge if an existing tool already covers it.
-    if let Some(existing) = pre_check_existing_tools(user_request) {
-        emit_forge_line(
-            app,
-            "gap_detected",
-            &format!(
-                "pre-check matched existing tool '{}'; skipping forge",
-                existing
-            ),
-        );
-        return None;
+    // Phase 51 (FORGE-PRECHECK-REFINE) — MCP-aware pre-check. Read the
+    // installed MCP server list from the runtime state so the routing
+    // distinguishes "MCP cataloged AND installed" (skip forge — user's MCP
+    // handles it) from "MCP cataloged but not installed" (forge anyway, per
+    // the in-app autonomy preference).
+    let installed_mcp = collect_installed_mcp_servers(app).await;
+    match pre_check_with_mcp_state(user_request, &installed_mcp) {
+        PreCheckOutcome::ForgedMatch(name) | PreCheckOutcome::NativeMatch(name) => {
+            emit_forge_line(
+                app,
+                "gap_detected",
+                &format!(
+                    "pre-check matched existing tool '{}'; skipping forge",
+                    name
+                ),
+            );
+            return None;
+        }
+        PreCheckOutcome::McpInstalled(server) => {
+            emit_forge_line(
+                app,
+                "gap_detected",
+                &format!(
+                    "MCP server '{}' is installed and handles this; skipping forge",
+                    server
+                ),
+            );
+            return None;
+        }
+        PreCheckOutcome::McpCatalogedNotInstalled(server) => {
+            // Forge anyway — but surface the trade-off so the operator sees
+            // why we didn't route to "install <MCP>".
+            emit_forge_line(
+                app,
+                "forge_route",
+                &format!(
+                    "Could install {} from catalog, or forge a quick scraper now — picking forge.",
+                    server
+                ),
+            );
+            // Fall through to triage + forge below.
+        }
+        PreCheckOutcome::NoMatch => {
+            // Fall through to triage + forge below.
+        }
     }
 
     // Use cheap model for the triage decision
@@ -1944,6 +2187,155 @@ mod tests {
         ).unwrap();
         assert!(count2 <= 100, "expected <=100 rows after auto-prune, got {}", count2);
         std::env::remove_var("BLADE_CONFIG_DIR");
+    }
+
+    // -------------------------------------------------------------------
+    // Phase 51 (FORGE-PRECHECK-REFINE) — MCP-aware routing decision tests
+    //
+    // These are pure-function tests of `pre_check_with_mcp_state`. The forge
+    // router in `forge_if_needed_with_app` reads `installed_mcp_servers` from
+    // the runtime `SharedMcpManager`, then dispatches on the `PreCheckOutcome`
+    // enum. Here we cover the three router-side decisions independently:
+    //   1. MCP-installed → caller skips forge (`McpInstalled`)
+    //   2. MCP-cataloged-not-installed → caller emits `forge_route` and FIRES
+    //      forge (`McpCatalogedNotInstalled`)
+    //   3. Nothing in either catalog → caller fires forge (`NoMatch`)
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn precheck_mcp_installed_returns_skip() {
+        let _g = ENV_LOCK.lock().unwrap();
+        let tmp = tempfile::TempDir::new().expect("tempdir");
+        std::env::set_var("BLADE_CONFIG_DIR", tmp.path());
+
+        // Capability mentions "linear" → mcp_catalog_lookup → "Linear".
+        // Installed list contains "linear" (case-insensitive substring match)
+        // → McpInstalled outcome → router skips forge.
+        let installed = vec!["Linear".to_string()];
+        let outcome = pre_check_with_mcp_state(
+            "create a linear issue with title and description",
+            &installed,
+        );
+        assert_eq!(
+            outcome,
+            PreCheckOutcome::McpInstalled("Linear".to_string()),
+            "linear capability + installed Linear MCP should skip forge"
+        );
+        std::env::remove_var("BLADE_CONFIG_DIR");
+    }
+
+    #[test]
+    fn precheck_mcp_cataloged_not_installed_returns_fire_forge() {
+        let _g = ENV_LOCK.lock().unwrap();
+        let tmp = tempfile::TempDir::new().expect("tempdir");
+        std::env::set_var("BLADE_CONFIG_DIR", tmp.path());
+
+        // Capability mentions "twitter" → mcp_catalog_lookup → "Twitter/X".
+        // Installed list is EMPTY → McpCatalogedNotInstalled → router fires
+        // forge after surfacing the trade-off chat-line.
+        let installed: Vec<String> = vec![];
+        let outcome = pre_check_with_mcp_state(
+            "extract structured data from a twitter thread",
+            &installed,
+        );
+        assert_eq!(
+            outcome,
+            PreCheckOutcome::McpCatalogedNotInstalled("Twitter/X".to_string()),
+            "twitter capability + no installed MCP should fire forge with route line"
+        );
+        std::env::remove_var("BLADE_CONFIG_DIR");
+    }
+
+    #[test]
+    fn precheck_no_match_returns_fire_forge() {
+        let _g = ENV_LOCK.lock().unwrap();
+        let tmp = tempfile::TempDir::new().expect("tempdir");
+        std::env::set_var("BLADE_CONFIG_DIR", tmp.path());
+
+        // Capability has zero matches in forged/native/MCP catalog.
+        // "ascii art rainbow flag" is intentionally weird.
+        let installed: Vec<String> = vec![];
+        let outcome = pre_check_with_mcp_state(
+            "render ascii art rainbow flag with kerning",
+            &installed,
+        );
+        assert_eq!(
+            outcome,
+            PreCheckOutcome::NoMatch,
+            "fully-unknown capability should return NoMatch → router fires forge"
+        );
+        std::env::remove_var("BLADE_CONFIG_DIR");
+    }
+
+    #[test]
+    fn precheck_forged_tool_match_beats_mcp_catalog() {
+        let _g = ENV_LOCK.lock().unwrap();
+        let tmp = tempfile::TempDir::new().expect("tempdir");
+        std::env::set_var("BLADE_CONFIG_DIR", tmp.path());
+
+        // Seed a forged tool whose tokens overlap a capability that ALSO
+        // hits the MCP catalog. The forged-tool branch must win — we never
+        // duplicate capability already present in-app.
+        let now = chrono::Utc::now().timestamp();
+        let conn = open_db().unwrap();
+        ensure_table(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO forged_tools (id, name, description, language, script_path, usage, parameters, test_output, created_at, last_used, use_count, forged_from) \
+             VALUES ('id1', 'linear_issue_create', 'create a linear issue programmatically', 'python', '/tmp/x.py', 'u', '[]', '', ?1, ?1, 0, 'create a linear issue with title')",
+            params![now],
+        ).unwrap();
+
+        let installed = vec!["Linear".to_string()];
+        let outcome = pre_check_with_mcp_state(
+            "create a linear issue with title and description",
+            &installed,
+        );
+        match outcome {
+            PreCheckOutcome::ForgedMatch(name) => {
+                assert_eq!(name, "linear_issue_create");
+            }
+            other => panic!("expected ForgedMatch, got {:?}", other),
+        }
+        std::env::remove_var("BLADE_CONFIG_DIR");
+    }
+
+    #[test]
+    fn precheck_native_tool_match_beats_mcp_catalog() {
+        let _g = ENV_LOCK.lock().unwrap();
+        let tmp = tempfile::TempDir::new().expect("tempdir");
+        std::env::set_var("BLADE_CONFIG_DIR", tmp.path());
+
+        // "execute shell command return stdout" matches the native
+        // `blade_bash` description; even if MCP catalog also had a hit, the
+        // native branch wins because it's a stronger signal (in-process).
+        let installed: Vec<String> = vec![];
+        let outcome = pre_check_with_mcp_state(
+            "execute a shell command and return stdout",
+            &installed,
+        );
+        match outcome {
+            PreCheckOutcome::NativeMatch(name) => assert!(name.starts_with("blade_")),
+            other => panic!("expected NativeMatch, got {:?}", other),
+        }
+        std::env::remove_var("BLADE_CONFIG_DIR");
+    }
+
+    #[test]
+    fn precheck_mcp_installed_substring_matches_either_direction() {
+        // Verify the "either direction substring" rule: server name in the
+        // installed list might be a fuller "mcp-github" or a shorter "github".
+        let installed_short = vec!["github".to_string()];
+        let installed_long = vec!["mcp-github-extras".to_string()];
+        let outcome_short = pre_check_with_mcp_state(
+            "list github gists for the current user",
+            &installed_short,
+        );
+        let outcome_long = pre_check_with_mcp_state(
+            "list github gists for the current user",
+            &installed_long,
+        );
+        assert!(matches!(outcome_short, PreCheckOutcome::McpInstalled(_)));
+        assert!(matches!(outcome_long, PreCheckOutcome::McpInstalled(_)));
     }
 
     #[tokio::test]
