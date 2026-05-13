@@ -1,64 +1,63 @@
 # Requirements: BLADE
 
-**Defined:** 2026-05-03 baseline; v2.0 milestone scoped 2026-05-13.
+**Defined:** 2026-05-03 baseline; v2.1 milestone scoped 2026-05-13.
 **Core Value:** BLADE works out of the box, you can always see what it's doing, and it thinks before it acts.
 
-## v2.0 Requirements — Setup-as-Conversation + Forge Demo
+## v2.1 Requirements — Hunt + Forge + OAuth Depth
 
-Three outcomes only per V2-AUTONOMOUS-HANDOFF.md §0. Detailed flow in `.planning/v2.0-onboarding-spec.md`. Authority chain: VISION.md (locked 2026-05-10) > `.planning/decisions.md` 2026-05-13 entries > V2-AUTONOMOUS-HANDOFF.md > this milestone scope.
+Polish + completion pass on v2.0. Closes the rough edges in hunt onboarding, OAuth coverage, and forge robustness. Authority chain: VISION.md (locked 2026-05-10) > V2-AUTONOMOUS-HANDOFF.md > v2.0-MILESTONE-AUDIT.md carry-forward list > REQUIREMENTS.md.
 
-### Install Pipeline (Phase 45)
+Deliberately deferred to v2.2+:
+- Decision-gate per-source pulse threshold tuning (needs operator-dogfood signal)
+- VISION-held-for-v2.0-evaluation trio re-evaluation (Body Map / mortality-salience / Ghost Mode — needs operator engagement data)
+- Agent-native audit recs #2-10 (separate architectural reframe milestone)
+- CDN bucket provisioning (release-CI infrastructure, not feature work)
+- shellcheck + PSScriptAnalyzer CI gates (CI infrastructure)
+- Windows ARM64 + Intel Mac asset publishing (release-CI infrastructure)
 
-- [ ] **INSTALL-01**: `curl -sSL slayerblade.site/install | sh` macOS/Linux installer downloads BLADE Tauri binary, installs to `/Applications/Blade.app` (macOS) or `~/.local/bin/blade` (Linux), auto-launches.
-- [ ] **INSTALL-02**: PowerShell `iwr -useb slayerblade.site/install.ps1 | iex` Windows variant — installs to `%LOCALAPPDATA%\Programs\Blade\`.
-- [ ] **INSTALL-03**: WSL detection during install. If user runs the Linux installer inside WSL, install proceeds normally (no change). If user runs the Windows installer on a machine that has WSL with Claude Code installed inside WSL, document the WSL→Windows binary path delegation in `platform_paths.md` (consumed by Phase 46's hunt).
-- [ ] **INSTALL-04**: Architecture detection — installer picks the correct arm64-vs-x86_64 binary based on `uname -m` (macOS/Linux) and `$env:PROCESSOR_ARCHITECTURE` (Windows).
-- [ ] **INSTALL-05**: Upgrade-vs-fresh handling. On upgrade, preserve `~/.blade/who-you-are.md`, the OS keychain entries for API keys, and `~/.blade/blade.db` SQLite. On fresh install, none of these exist yet.
-- [ ] **INSTALL-06**: macOS quarantine fix. The installer post-install step or first-launch script runs `xattr -cr /Applications/Blade.app` automatically to clear Gatekeeper quarantine. README documents the manual fallback if it fails.
-- [ ] **INSTALL-07**: Fallback download host beyond GitHub Releases for proxied / restricted networks. Mirror to `cdn.slayerblade.site/releases/v{version}/` (or similar).
+### Hunt Advanced + Cost Surfacing (Phase 49)
 
-### Agentic Hunt Onboarding (Phase 46)
+- [ ] **HUNT-05-ADV**: Advanced no-data fallback. When `start_hunt` returns the sharp question and gets a user answer, BLADE re-prompts the hunt LLM with the answer as seed input. The hunt then probes for matching identity signals (e.g., user answered "I run a B2B SaaS called Clarify" → BLADE searches for `clarify*` patterns in `~/code/`, `git remote -v` of detected repos, GitHub handle if discoverable, Twitter handle if discoverable). Falls back to the basic synthesis path if probing still yields nothing.
+- [ ] **HUNT-06-ADV**: Advanced contradiction-detection. After the hunt accumulates findings, run a second LLM pass that classifies findings into thematic clusters (work / personal / hobby / past-self). If clusters conflict on identity (e.g., year-old Python iOS work vs this-week TypeScript SaaS), surface as a specific contradiction question. New struct `HuntContradictionReport` with thematic classification.
+- [ ] **HUNT-COST-CHAT**: Live cost surfacing in chat. Both hunt and forge emit a `blade_chat_line` with `kind: "cost"` after each LLM call, showing cumulative cost. Format: *"≈ $0.04 / $3.00 budget used"*. Soft warning at 50%; hard interrupt at 100% with a "continue?" prompt.
 
-Per `.planning/v2.0-onboarding-spec.md` Acts 1-7. Rips `Steps.tsx → ApiKeyEntry → DeepScanReview → PersonaCheck` wholesale (the cut deferred from v1.6 per V2-AUTONOMOUS-HANDOFF.md §0 item 7).
+### OAuth Coverage (Phase 50)
 
-- [ ] **HUNT-01**: Pre-scan (≤2s) — agent presence (`which claude/cursor/ollama/aider/gh`), API keys (env vars + Claude Code config + Cursor config + OS keychain), Ollama TCP probe `:11434`, OS+arch via `uname` / Windows registry, default browser via OS-native API, mic permission check (no recording). Result lands in in-memory `InitialContext`; nothing persisted unless user opts in.
-- [ ] **HUNT-02**: Message #1 — key disclosure + default model rationale + override paths + "feels illegal but legal" register + skip semantics. Four-sentence first bubble per spec.
-- [ ] **HUNT-03**: LLM-driven hunt with live chat narration. Single LLM session prompted to decide what to probe; equipped with sandboxed readonly tools (`read_file`, `list_dir`, `run_shell` no-network). Every probe narrates as it runs. ~50K token input cap; recency-weighted sampling; cost surfaces live.
-- [ ] **HUNT-04**: `platform_paths.md` knowledge file ships with BLADE. Per-OS install conventions (Windows + macOS + Linux + WSL detection). Loaded into the hunt LLM's context.
-- [ ] **HUNT-05**: No-data fallback. If hunt yields nothing (fresh machine), BLADE asks ONE sharp question — *"what do you do? not your job — the thing you'd point a friend at if they asked"* — then uses the answer as a search seed.
-- [ ] **HUNT-06**: Contradiction surfacing. When hunt finds contradictory signals (year-old Python iOS workspace + this-week TypeScript SaaS commits), BLADE asks the contradiction directly, not a generic question.
-- [ ] **HUNT-07**: Synthesis to `~/.blade/who-you-are.md` — user-editable Markdown file. Like CLAUDE.md but it's BLADE's model of the human.
-- [ ] **HUNT-08**: First task closes onboarding by BLADE *acting*, not a "setup complete" screen. *"Give me one thing you've been putting off this week — I'll handle it now."*
-- [ ] **HUNT-09**: Steps.tsx + ApiKeyEntry + DeepScanReview + PersonaCheck flow retired. The hunt replaces it wholesale.
-- [ ] **HUNT-10**: External-account OAuth flows (Slack/Gmail/etc.) built with mock-server integration tests. Real "click Allow on Google's screen" happens on each end-user's first run on their machine. Build-time only uses localhost mock OAuth servers per V2-AUTONOMOUS-HANDOFF.md §1.
+- [ ] **OAUTH-SLACK-FULL**: Promote `src-tauri/src/oauth/slack.rs` from stub to full implementation. Auth URL builder + state nonce + code-for-token exchange + refresh-token preservation + scope handling for `chat:write` + `channels:read` + `users:read`. Match Gmail's shape.
+- [ ] **OAUTH-GITHUB-FULL**: Promote `src-tauri/src/oauth/github.rs` from stub to full implementation. GitHub OAuth Apps flow with device-code fallback for headless installs. Scopes for `repo` (read-only) + `user:email` + `gist`.
+- [ ] **OAUTH-TESTS**: Add `src-tauri/tests/oauth_slack_integration.rs` (3 tests min, matching Gmail shape) + `src-tauri/tests/oauth_github_integration.rs` (3 tests min). All against localhost mock servers per V2-AUTONOMOUS-HANDOFF.md §1. No real-account auth at build time.
 
-### One Forge Wire (Phase 47)
+### Forge Multi-Gap Robustness (Phase 51)
 
-The Twitter-video moment per VISION:40. The forge primitive shipped substrate 2026-05-02 (v1.3 Phase 22: `evolution.rs` → `autoskills.rs` → `tool_forge.rs`) but has not fired on a real capability gap in lived chat in 11+ days. v2.0 makes it fire visibly on one real gap.
+- [ ] **FORGE-GAP-ARXIV**: Add arXiv abstract pull as a second proven gap. Forge fixture + integration test. LLM-written tool uses arXiv API (no auth).
+- [ ] **FORGE-GAP-RSS**: Add RSS/Atom feed extraction as a third proven gap. Forge fixture + integration test.
+- [ ] **FORGE-GAP-PYPI**: Add PyPI package metadata pull as a fourth proven gap. Forge fixture + integration test.
+- [ ] **FORGE-PROMPT-TUNING**: Iterate the forge tool-writing prompt for reliability across these 4 gaps (HackerNews from v2.0 + 3 new). Track success rate via test runs.
+- [ ] **FORGE-PRECHECK-REFINE**: Improve `pre_check_existing_tools` to better disambiguate "MCP server can handle" vs "needs forge." Specifically: handle the case where an MCP server exists but isn't installed by the user.
 
-- [ ] **FORGE-01**: Pick one capability gap a power user actually hits. Candidates: "fetch a YouTube transcript and summarize," "scrape this Notion page and extract the action items," "extract structured data from a Twitter/X thread." Lock the gap in `47-CONTEXT.md` discussion.
-- [ ] **FORGE-02**: Wire forge to fire visibly in chat. Chat-line emission: *"capability gap detected → writing tool → testing → registered → retrying"*. Each transition is a separate chat-line, not a single status update.
-- [ ] **FORGE-03**: End-to-end against a real LLM (not the existing `youtube_transcript` fixture). Forge writes the tool, registers it, retries the original user request, succeeds. The 30-second demo video is recordable.
+### Close (Phase 52)
 
-### Close (Phase 48)
+- [ ] **CLOSE-01**: CHANGELOG v2.1 entry — all REQ-IDs, commit SHAs, verify gate count
+- [ ] **CLOSE-02**: `.planning/milestones/v2.1-MILESTONE-AUDIT.md` (3-source cross-reference)
+- [ ] **CLOSE-03**: Phase 49-52 directories archived to `milestones/v2.1-phases/`. cargo + tsc + verify:all all green to floor.
+- [ ] **CLOSE-04**: README v2.1 polish update if user-visible features warrant. MILESTONES.md v2.1 entry. git tag `v2.1`.
 
-- [ ] **CLOSE-01**: CHANGELOG v2.0 entry — all 20 REQ-IDs, commit SHAs, verify gate count
-- [ ] **CLOSE-02**: `.planning/milestones/v2.0-MILESTONE-AUDIT.md` (3-source cross-reference: VISION ↔ REQUIREMENTS.md ↔ git log + the v2.0-onboarding-spec.md falsification conditions)
-- [ ] **CLOSE-03**: Phase 45-48 directories archived to `milestones/v2.0-phases/`. cargo + tsc + verify:all all green to floor.
-- [ ] **CLOSE-04**: README rewrite reflecting v2.0 positioning — install command up top, hunt onboarding documented, forge demo section. MILESTONES.md v2.0 entry. git tag `v2.0` pushed.
+## v2.0 Requirements (Validated — Setup-as-Conversation + Forge Demo, closed 2026-05-13 tech_debt)
+
+See `.planning/milestones/v2.0-REQUIREMENTS.md` for full text. 20/20 REQ-IDs shipped. First end-user-shippable release.
 
 ## v1.6 Requirements (Validated — Narrowing Pass, closed 2026-05-13 tech_debt)
 
-See `.planning/milestones/v1.6-REQUIREMENTS.md` for full text. 13/13 REQ-IDs shipped. OEVAL-01c v1.4 carry-forward from v1.5 inherited but not introduced by v1.6.
+See `.planning/milestones/v1.6-REQUIREMENTS.md` for full text. 13/13 REQ-IDs shipped.
 
-## Out of Scope — v2.0 (still held for evaluation)
+## Out of Scope — v2.1
 
-Per VISION.md "Held for v2.0 evaluation": Body Map / Organ Registry / Pixel World / Tentacle Detail panes, mortality-salience implementation, Ghost Mode invisible meeting overlay. v2.0 evaluation outcome documented at close.
+Per the deferred-to-v2.2+ list above. Not work for this milestone.
 
-## Kept (locked) — unchanged from v1.6
+## Kept (locked) — unchanged
 
-Hormones · vitality · active inference · character bible (SOUL) · Hive Mesh architecture · tentacles as a pattern · Evolution Engine (decision-gated). Untouched in v2.0.
+Hormones · vitality · active inference · character bible (SOUL) · Hive Mesh architecture · tentacles as a pattern · Evolution Engine (decision-gated). Untouched in v2.1.
 
 ---
 
-*Updated 2026-05-13 — v2.0 Setup-as-Conversation + Forge Demo milestone scope landed per V2-AUTONOMOUS-HANDOFF.md §0.*
+*Updated 2026-05-13 — v2.1 Hunt + Forge + OAuth Depth milestone scope landed.*

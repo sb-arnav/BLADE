@@ -1,8 +1,8 @@
 # Roadmap — BLADE
 
-**Current Milestone:** v2.0 — Setup-as-Conversation + Forge Demo
-**Created:** 2026-05-13 | **Source:** VISION.md (locked 2026-05-10) + V2-AUTONOMOUS-HANDOFF.md §0 + `.planning/v2.0-onboarding-spec.md` + `.planning/decisions.md` 2026-05-13 entries
-**Phases:** 45–48 (continues global numbering; v1.6 ended at Phase 44)
+**Current Milestone:** v2.1 — Hunt + Forge + OAuth Depth
+**Created:** 2026-05-13 | **Source:** v2.0-MILESTONE-AUDIT.md carry-forward list + autonomous-default scope per V2-AUTONOMOUS-HANDOFF.md §4 pattern
+**Phases:** 49–52 (continues global numbering; v2.0 ended at Phase 48)
 
 ---
 
@@ -17,132 +17,126 @@
 | v1.4 | Cognitive Architecture | ✅ Shipped | 25–31 | 2026-05-03 |
 | v1.5 | Intelligence Layer | ✅ Shipped (tech_debt) | 32–38 | 2026-05-08 |
 | v1.6 | Narrowing Pass | ✅ Shipped (tech_debt) | 39–44 | 2026-05-13 |
-| **v2.0** | **Setup-as-Conversation + Forge Demo** | 🔄 Active | **45–48** | — |
+| v2.0 | Setup-as-Conversation + Forge Demo | ✅ Shipped (tech_debt) | 45–48 | 2026-05-13 |
+| **v2.1** | **Hunt + Forge + OAuth Depth** | 🔄 Active | **49–52** | — |
 
 ---
 
-## v2.0 Phases
+## v2.1 Phases
 
 ### Summary Checklist
 
-- [ ] **Phase 45: Install Pipeline** — `curl|sh` macOS/Linux + `iwr|iex` Windows + WSL detection + arch detection + upgrade-vs-fresh + macOS xattr fix + fallback download host
-- [ ] **Phase 46: Agentic Hunt Onboarding** — Acts 1-7 per `.planning/v2.0-onboarding-spec.md`: pre-scan → message #1 → LLM-driven hunt with live chat narration → platform_paths.md → no-data fallback → contradiction surfacing → synthesis to `~/.blade/who-you-are.md` → first task closes onboarding by BLADE acting. Rips Steps.tsx flow wholesale. OAuth via mock-server integration tests.
-- [ ] **Phase 47: One Forge Wire** — Pick one real capability gap. Wire forge to fire visibly in chat. End-to-end against a real LLM. The Twitter-video moment per VISION:40.
-- [ ] **Phase 48: Close** — CHANGELOG v2.0, MILESTONE-AUDIT, phase archive, README rewrite, git tag v2.0.
+- [ ] **Phase 49: Hunt Advanced + Cost Surfacing** — HUNT-05-ADV (answer-driven probing chain), HUNT-06-ADV (contradiction-detection logic), HUNT-COST-CHAT (live cost surfacing in chat)
+- [ ] **Phase 50: OAuth Coverage** — Promote Slack + GitHub OAuth stubs to full implementations matching Gmail's shape. Add integration tests against localhost mock servers.
+- [ ] **Phase 51: Forge Multi-Gap Robustness** — Add arXiv + RSS + PyPI gaps (3 new fixtures + integration tests). Tune the forge tool-writing prompt. Refine pre_check_existing_tools.
+- [ ] **Phase 52: Close** — CHANGELOG v2.1, MILESTONE-AUDIT, phase archive, MILESTONES.md entry, git tag v2.1.
 
 ### Sequencing
 
 ```
-   Phase 45 (Install Pipeline)             FIRST — needed before any user can install v2.0
+   Phase 49 (Hunt Advanced + Cost Surfacing)    independent — touches onboarding + chat
        │
        ▼
-   Phase 46 (Agentic Hunt Onboarding)      depends on Install (user must be able to launch BLADE)
+   Phase 50 (OAuth Coverage)                    independent — touches src-tauri/src/oauth/
        │
        ▼
-   Phase 47 (One Forge Wire)               depends on Hunt (user must reach chat to see forge)
+   Phase 51 (Forge Multi-Gap)                   independent — touches tool_forge.rs + fixtures
        │
        ▼
-   Phase 48 (Close)                        gates on all prior phases
+   Phase 52 (Close)                             gates on all prior phases
 ```
+
+Phases 49-51 have no file overlap. Could parallelize but sequential keeps atomic commits clean per the V2-AUTONOMOUS-HANDOFF.md §4 pattern.
 
 ### Success Criteria (milestone-level)
 
-1. New user can run a single command (`curl|sh` or `iwr|iex`) and have BLADE installed + launched on macOS / Linux / Windows
-2. First launch opens chat → pre-scan completes < 2s → message #1 lands with key disclosure + override + "feels illegal but legal" register
-3. After key verify, BLADE runs the agentic hunt with live narration → synthesizes `~/.blade/who-you-are.md` (user-editable)
-4. Onboarding closes with BLADE acting on a real user task, not a "setup complete" screen
-5. Forge primitive fires visibly on one real capability gap end-to-end against a real LLM. A 30-second screen recording of the loop is producible.
-6. `verify:all` ≥36/38 (OEVAL-01c v1.4 carry-forward documented)
-7. Steps.tsx + ApiKeyEntry + DeepScanReview + PersonaCheck removed from codebase
+1. Hunt onboarding handles fresh-machine and contradictory-signals cases (HUNT-05-ADV, HUNT-06-ADV)
+2. Cost surfacing in chat for hunt + forge (HUNT-COST-CHAT)
+3. OAuth full implementations for Slack + GitHub (parity with Gmail from v2.0)
+4. Forge fires reliably on 4 distinct gaps (HN from v2.0 + arXiv + RSS + PyPI)
+5. `verify:all` ≥36/38 (OEVAL-01c v1.4 carry-forward documented)
+6. cargo + tsc clean
+7. v2.0 features remain functional — no regressions
 
 ### Phase Details
 
-#### Phase 45: Install Pipeline
+#### Phase 49: Hunt Advanced + Cost Surfacing
 
-**Goal**: One-command install on every supported platform. Fresh-install and upgrade paths both work. Architecture and WSL detection prevent the most common dev-on-Windows setup failure.
-**Requirements**: INSTALL-01..07
-**Depends on**: v1.6 close (substrate ready)
+**Goal**: Promote HUNT-05/06 from basic to advanced behaviors. Live cost surfacing in chat for hunt + forge to support the operator-dogfood feedback loop.
+**Depends on**: v2.0 close (hunt module exists)
+**Requirements**: HUNT-05-ADV, HUNT-06-ADV, HUNT-COST-CHAT
 **Success Criteria**:
-  1. `curl -sSL slayerblade.site/install | sh` installs + auto-launches on macOS + Linux
-  2. `iwr -useb slayerblade.site/install.ps1 | iex` installs + auto-launches on Windows
-  3. Architecture detection picks arm64 vs x86_64 correctly on macOS + Linux + Windows
-  4. Upgrade preserves `~/.blade/who-you-are.md`, keychain entries, blade.db
-  5. macOS Gatekeeper quarantine cleared automatically (`xattr -cr`)
-  6. README documents the install command + manual fallback if quarantine fix fails
-  7. Fallback download host wired (CDN mirror beyond GitHub Releases)
+  1. Fresh-machine user gets sharp question → answer drives subsequent probing (e.g., user names a project → BLADE looks for it in `~/code/`)
+  2. Contradiction detector emits a thematic classification + targeted question when findings conflict
+  3. Cost surfaces in chat after each LLM call (cumulative) with soft 50% + hard 100% thresholds
 
-#### Phase 46: Agentic Hunt Onboarding
+#### Phase 50: OAuth Coverage
 
-**Goal**: Replace the 4-step wizard with the LLM-driven agentic hunt. First 60 seconds delivers BLADE's wedge: it knows you before you tell it.
-**Requirements**: HUNT-01..10
-**Depends on**: Phase 45 (install must work for users to launch v2.0)
+**Goal**: Slack + GitHub OAuth full implementations matching Gmail's shape from v2.0.
+**Depends on**: v2.0 close (Gmail full impl exists as reference)
+**Requirements**: OAUTH-SLACK-FULL, OAUTH-GITHUB-FULL, OAUTH-TESTS
 **Success Criteria**:
-  1. Pre-scan completes < 2s on a typical machine; result lands in `InitialContext` in memory
-  2. Message #1 lands within 1s of chat window paint; four-sentence shape per spec
-  3. After key verify, the hunt LLM session begins; every probe narrates to chat in real time
-  4. `platform_paths.md` ships in the binary; hunt LLM reads from it as context for per-OS path conventions
-  5. Hunt synthesizes `~/.blade/who-you-are.md` (Markdown, user-editable)
-  6. No-data fallback fires on fresh machine: one sharp question, then probe driven by the answer
-  7. Contradiction surfacing: when signals conflict, BLADE asks the specific contradiction not a generic question
-  8. Onboarding closes with BLADE acting on a real user task (the first task IS the close)
-  9. Steps.tsx + ApiKeyEntry + DeepScanReview + PersonaCheck removed; their routes cleaned out of router.ts; their assertions cleaned out of any remaining verify scripts
-  10. OAuth flows (Slack/Gmail/etc.) build cleanly + pass localhost mock-server integration tests
+  1. `src-tauri/src/oauth/slack.rs` full impl (auth URL + token exchange + refresh)
+  2. `src-tauri/src/oauth/github.rs` full impl with device-code fallback for headless
+  3. 6+ new integration tests (3 per provider) against localhost mock servers — all pass
+  4. No real-account auth at build time per V2-AUTONOMOUS-HANDOFF.md §1
 
-#### Phase 47: One Forge Wire
+#### Phase 51: Forge Multi-Gap Robustness
 
-**Goal**: The forge primitive (`evolution.rs` → `autoskills.rs` → `tool_forge.rs` from v1.3) fires visibly on one real capability gap end-to-end against a real LLM. Per VISION:40 — the only feature in the vision other personal-AI projects cannot copy in a sprint.
-**Requirements**: FORGE-01..03
-**Depends on**: Phase 46 (user must reach the chat to see forge fire)
+**Goal**: Forge fires reliably on 4 gaps total (HN from v2.0 + arXiv + RSS + PyPI). Improves prompt + pre-check.
+**Depends on**: v2.0 close (forge wiring exists)
+**Requirements**: FORGE-GAP-ARXIV, FORGE-GAP-RSS, FORGE-GAP-PYPI, FORGE-PROMPT-TUNING, FORGE-PRECHECK-REFINE
 **Success Criteria**:
-  1. One real capability gap chosen (locked in `47-CONTEXT.md`)
-  2. Forge fires chat-line emissions in 4 phases: gap detected → writing tool → testing → registered → retrying
-  3. End-to-end against a real LLM: tool written, registered, original request retried successfully
-  4. 30-second screen recording captures the full loop visibly
+  1. 3 new forge fixtures (arXiv, RSS, PyPI) ship with integration tests
+  2. `forge_e2e_integration.rs` test suite covers 4 distinct gaps; all pass
+  3. Forge tool-writing prompt tuned — success rate measured across the 4 gaps
+  4. `pre_check_existing_tools` distinguishes "MCP exists + installed" vs "MCP exists + not installed"
 
-#### Phase 48: Close
+#### Phase 52: Close
 
-**Goal**: v2.0 milestone closed cleanly. CHANGELOG, audit, phase archive, README rewrite, git tag.
+**Goal**: v2.1 closed. CHANGELOG, audit, phase archive, tag.
+**Depends on**: Phase 49, 50, 51
 **Requirements**: CLOSE-01..04
-**Depends on**: Phase 45, 46, 47
 **Success Criteria**:
-  1. CHANGELOG.md v2.0 entry with all 20 REQ-IDs + commit SHAs
-  2. `.planning/milestones/v2.0-MILESTONE-AUDIT.md` written
-  3. Phase 45-48 directories archived to `milestones/v2.0-phases/`
-  4. README.md rewritten: install command up top + agentic hunt + forge demo
-  5. MILESTONES.md v2.0 entry
-  6. cargo + tsc + verify:all all green to floor
-  7. git tag `v2.0` pushed
+  1. CHANGELOG.md v2.1 entry shipped
+  2. `.planning/milestones/v2.1-MILESTONE-AUDIT.md` written
+  3. Phase 49-52 archived to `milestones/v2.1-phases/`
+  4. README updated if user-visible
+  5. MILESTONES.md v2.1 entry
+  6. git tag `v2.1`
+  7. cargo + tsc + verify:all green to floor
 
 ---
+
+## v2.0 Phases (Validated — Setup-as-Conversation + Forge Demo)
+
+See `.planning/milestones/v2.0-ROADMAP.md`. 4 phases shipped 2026-05-13.
 
 ## v1.6 Phases (Validated — Narrowing Pass)
 
-See `.planning/milestones/v1.6-ROADMAP.md` for full text. 6/6 phases shipped. ~17,700 LOC removed.
+See `.planning/milestones/v1.6-ROADMAP.md`. 6 phases shipped 2026-05-13.
 
 ---
 
-## Risk Register (v2.0)
+## Risk Register (v2.1)
 
 | Risk | Phase impacted | Mitigation |
 |---|---|---|
-| Install script fails silently on macOS with Gatekeeper blocking the auto-launch | 45 | xattr -cr runs automatically in post-install. Manual fallback documented in README. First-launch script checks and runs if needed. |
-| WSL-on-Windows: user has Claude Code installed inside WSL, naive PowerShell `which claude` returns nothing | 45 + 46 | `platform_paths.md` documents the `wsl --list --quiet` → per-distro `wsl which claude` probe pattern. Hunt LLM reads from it. |
-| Hunt LLM exceeds 50K token budget on a richly-instrumented machine | 46 | Hunt prompt instructs sample-not-exhaust. Recency-weighted: files >30 days get one-line summaries; files <7 days get deep reads. Cost surfaces live. |
-| Hunt reads sensitive files (~/.ssh, .env, .aws/credentials) | 46 | Sandboxed readonly tool: explicit deny-list (.ssh, .env, .aws, .gnupg, keyring/keychain paths). Live chat narration ensures user sees and can stop. |
-| Forge writes a tool that doesn't work on first try | 47 | Forge already has retry-on-test-fail in v1.3 substrate; verify the loop completes within 3 iterations. If still failing, surface the failure in chat ("capability gap is structural — not tool-shaped"). |
-| Forge fires on a gap that's actually solved by an existing tool (false positive) | 47 | Run pre-check before forge fires: search the existing tool catalog + MCP registry. Only fire if no extant tool matches. |
-| OAuth integration tests against localhost mock servers diverge from real provider behavior | 46 | Per V2-AUTONOMOUS-HANDOFF.md §1: build + ship; real "click Allow" happens per-user on their machine. Mock-server tests are sufficient for v2.0 close. |
-| OEVAL-01c v1.4 organism-eval drift regresses further during v2.0 work | 46 + 47 | v2.0 doesn't touch organism modules. If verify:eval drops below the 36/38 floor: wake per V2-AUTONOMOUS-HANDOFF.md §7 #2. |
+| Hunt advanced probing reads sensitive files via the answer-driven seed | 49 | Same sandbox + deny-list as v2.0 hunt — no path can escape the sensitive-file deny list |
+| Cost surfacing creates noise that obscures the actual chat | 49 | Render cost lines with reduced visual weight; merge consecutive cost updates into one line |
+| Slack + GitHub OAuth scope changes between build-time and user-runtime | 50 | Use Slack + GitHub's current public scope list; surface scope changes as a separate v2.2+ task if they happen |
+| Forge prompt-tuning over-fits to the 4 test gaps and degrades on novel gaps | 51 | Hold a 5th holdout gap (no fixture, no test) — verify a forge run on it after tuning still produces a working tool |
+| OEVAL-01c v1.4 carry-forward regresses further | any | v2.1 doesn't touch organism modules; document at close if it changes |
 
 ---
 
 ## Notes
 
-- **Phase numbering continues globally** per M-05/M-12. v2.0 starts at Phase 45.
-- **v2.0 close criteria** per V2-AUTONOMOUS-HANDOFF.md §0: install pipeline works on macOS+Linux+Windows; hunt onboarding lives in chat; forge fires visibly on one gap. Anything beyond rolls to v2.1+.
-- **Wake conditions** unchanged: GSD verifier BLOCKED twice on same phase after one self-fix; verify gates regress below 36/38 and code-fixer fails; authority gap.
-- **Static gates ≠ done** per CLAUDE.md verification protocol. Per V2-AUTONOMOUS-HANDOFF.md §1, runtime UAT is operator-owned for v2.0 (Arnav tests on his machine; you test on Windows when available). Close at static-gates-green.
+- **Phase numbering continues globally**. v2.1 starts at Phase 49; v2.2 starts at Phase 53.
+- **v2.1 = polish + completion**, not architectural reframe. Agent-native audit recs #2-10 are explicitly deferred to v2.2.
+- **Wake conditions** unchanged per V2-AUTONOMOUS-HANDOFF.md §7.
+- **Static gates green = close bar** per §1; runtime UAT operator-owned.
 
 ---
 
-*Last updated: 2026-05-13 — v2.0 scaffold landed per V2-AUTONOMOUS-HANDOFF.md §0.*
+*Last updated: 2026-05-13 — v2.1 scaffold landed.*
