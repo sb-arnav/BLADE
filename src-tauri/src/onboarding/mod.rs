@@ -24,6 +24,7 @@
 pub mod pre_scan;
 pub mod hunt;
 pub mod synthesis;
+pub mod contradictions;
 
 use pre_scan::InitialContext;
 

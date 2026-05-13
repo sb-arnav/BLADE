@@ -21,14 +21,50 @@
 //! `HUNT_CANCEL.store(true, ...)` → next tool-call iteration breaks out.
 
 use crate::onboarding::pre_scan::InitialContext;
-use crate::providers::{self, ConversationMessage, ToolCall, ToolDefinition};
+use crate::providers::{self, AssistantTurn, ConversationMessage, ToolCall, ToolDefinition};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 use tauri::Emitter;
 
 /// User-typed-"stop" interrupt flag. Set by the `cancel_hunt` Tauri command.
 pub(crate) static HUNT_CANCEL: AtomicBool = AtomicBool::new(false);
+
+// ── Phase 49 (HUNT-05-ADV) — answer-driven probing handshake ────────────────
+//
+// When the hunt detects a fresh-machine condition it emits a chat-line of kind
+// `hunt_question` and parks waiting for the frontend to call
+// `hunt_post_user_answer`. The frontend stores the user's typed answer into
+// `HUNT_USER_ANSWER` and notifies the parked task via a tokio Notify.
+//
+// Single-slot mailbox is sufficient: the hunt loop is single-tasked, and the
+// only writer is the Tauri command. We use a std::sync::Mutex<Option<String>>
+// rather than a oneshot channel so the answer survives a missed wake (e.g. if
+// the user types before the loop parks); the loop drains the slot on read.
+
+static HUNT_USER_ANSWER: Mutex<Option<String>> = Mutex::new(None);
+
+// tokio::sync::Notify can't be a `static` constructor pre-1.78, so build it
+// lazily via OnceLock.
+static HUNT_ANSWER_NOTIFY: once_cell::sync::Lazy<tokio::sync::Notify> =
+    once_cell::sync::Lazy::new(tokio::sync::Notify::new);
+
+/// Per-hunt-session cost tracker (HUNT-COST-CHAT). Reset at the start of each
+/// hunt run. The `complete_turn` wrapper updates this after every LLM call
+/// and emits a `cost` chat-line. Crossing 50% emits `cost_warning`; crossing
+/// 100% emits `cost_block`, suspends the loop, and parks waiting for a
+/// budget-extend acknowledgment from the user.
+///
+/// `forge.rs` maintains its own tracker (`FORGE_COST_TRACKER`) using the same
+/// shape so the chat surface can render forge costs separately.
+pub(crate) static HUNT_COST_TRACKER: once_cell::sync::Lazy<Mutex<CostTracker>> =
+    once_cell::sync::Lazy::new(|| Mutex::new(CostTracker::default()));
+
+/// Set when the user accepts a budget extension after a `cost_block`. Cleared
+/// at the start of each hunt session and at every block-emit. The loop polls
+/// this between iterations after emitting `cost_block`.
+static HUNT_COST_CONTINUE: AtomicBool = AtomicBool::new(false);
 
 /// Cap from spec Act 3: ~50K input tokens. We approximate via accumulated
 /// `tokens_in` from each turn's provider usage. Exceeding triggers an early
@@ -94,10 +130,21 @@ pub async fn start_hunt(
     initial_context: InitialContext,
 ) -> Result<HuntOutcome, String> {
     HUNT_CANCEL.store(false, Ordering::SeqCst);
+    HUNT_COST_CONTINUE.store(false, Ordering::SeqCst);
+    // Drain any stale user-answer from a previous session.
+    if let Ok(mut slot) = HUNT_USER_ANSWER.lock() {
+        *slot = None;
+    }
     let cfg = crate::config::load_config();
     let provider = cfg.provider.clone();
     let model = cfg.model.clone();
     let api_key = crate::config::get_provider_key(&provider);
+
+    // Reset the cost tracker with the configured hunt budget.
+    {
+        let mut t = HUNT_COST_TRACKER.lock().unwrap_or_else(|p| p.into_inner());
+        t.reset(cfg.hunt.budget_usd as f64);
+    }
 
     if api_key.is_empty() && provider != "ollama" {
         let msg = format!(
@@ -106,7 +153,7 @@ pub async fn start_hunt(
         );
         let _ = app.emit(EVENT_HUNT_LINE, HuntLine::system(&msg));
         // No-data fallback (HUNT-05 basic) — the four-sentence prompt.
-        let _ = app.emit(EVENT_HUNT_LINE, HuntLine::blade(
+        let _ = app.emit(EVENT_HUNT_LINE, HuntLine::hunt_question(
             "Fresh machine — what do you do? not your job, the thing you'd point a friend at."
         ));
         return Ok(HuntOutcome::no_data_fallback());
@@ -128,12 +175,54 @@ pub async fn start_hunt(
     let mut tokens_used: u32 = 0;
     let mut findings = HuntFindings::default();
     findings.initial = initial_context.clone();
+    // HUNT-05-ADV — fire the fresh-machine sharp question once per session.
+    let mut fresh_machine_question_fired = false;
+    let mut seed_search_completed = false;
 
     for iter in 0..MAX_ITERATIONS {
         if HUNT_CANCEL.load(Ordering::SeqCst) {
             emit_line(&app, HuntLine::system("Hunt cancelled by user."));
             return Ok(HuntOutcome::cancelled(findings, tokens_used));
         }
+
+        // HUNT-05-ADV — fresh-machine detection at end of first probe pass.
+        // After iter 3 we have enough signal: if findings.probes shows fewer
+        // than 3 non-narration probes that succeeded, no git repos found, no
+        // installed agents → fire the sharp question and re-prompt with the
+        // user's answer as a seed.
+        if iter >= 3 && !fresh_machine_question_fired && is_fresh_machine(&findings) {
+            fresh_machine_question_fired = true;
+            let _ = app.emit(EVENT_HUNT_LINE, HuntLine::hunt_question(
+                "Fresh machine — what do you do? not your job, the thing you'd point a friend at if they asked."
+            ));
+            // Park waiting for the user's answer. 60s cap so we don't block
+            // forever if the frontend dies.
+            let answer = wait_for_user_answer(60).await;
+            match answer {
+                Some(text) => {
+                    findings.chat_lines.push(format!("[user-answer] {}", text));
+                    // Inject the answer as a user message so the LLM can use it
+                    // and the new `hunt_seed_search` tool.
+                    conversation.push(ConversationMessage::User(format!(
+                        "User answered the fresh-machine question with: \"{}\".\n\nUse `hunt_seed_search` with the most distinctive token from that answer (project / company / brand name) to find their project on disk. Then probe the matched directories with the regular tools to ground the synthesis.",
+                        text
+                    )));
+                    seed_search_completed = false; // re-enable single-use guard
+                }
+                None => {
+                    // User didn't answer within the window — fall back to a
+                    // basic synthesis with no seed.
+                    emit_line(&app, HuntLine::system(
+                        "No answer in 60s — synthesizing with what I have."
+                    ));
+                    conversation.push(ConversationMessage::User(
+                        "No user answer arrived. Emit one final hunt_emit_chat_line summarizing what \
+                         you found (even if minimal), then stop calling tools.".to_string()
+                    ));
+                }
+            }
+        }
+
         if tokens_used > TOKEN_BUDGET {
             emit_line(&app, HuntLine::system(&format!(
                 "Hit ~{}K token cap — wrapping up with what I have.", TOKEN_BUDGET / 1000
@@ -146,7 +235,13 @@ pub async fn start_hunt(
             ));
         }
 
-        let turn = match providers::complete_turn(
+        // HUNT-COST-CHAT — cost-tracked turn. If the budget is exceeded the
+        // call emits `cost_block` and we suspend the loop pending user
+        // acknowledgment via `hunt_continue_after_cost_block`.
+        let tracked = match complete_turn_cost_tracked(
+            &app,
+            &HUNT_COST_TRACKER,
+            EVENT_HUNT_LINE,
             &provider,
             &api_key,
             &model,
@@ -160,6 +255,31 @@ pub async fn start_hunt(
                 return Err(format!("Hunt provider error: {}", e));
             }
         };
+        let turn = tracked.turn;
+        if tracked.blocked {
+            // Wait up to 120s for the user to confirm. If they do, raise the
+            // budget by another `cfg.hunt.budget_usd` and continue. If not,
+            // gracefully abort.
+            let extended = wait_for_cost_continue(120).await;
+            if !extended {
+                emit_line(&app, HuntLine::system(
+                    "Budget block — user did not extend. Wrapping up."
+                ));
+                break;
+            }
+            // Raise the budget by another bucket and clear the block flag.
+            let extra = cfg.hunt.budget_usd as f64;
+            let new_budget = {
+                let mut t = HUNT_COST_TRACKER.lock().unwrap_or_else(|p| p.into_inner());
+                t.budget_usd += extra;
+                t.block_emitted = false;
+                t.warning_emitted = false;
+                t.budget_usd
+            };
+            emit_line(&app, HuntLine::system(&format!(
+                "Budget extended to ${:.2}. Continuing.", new_budget
+            )));
+        }
 
         tokens_used = tokens_used.saturating_add(turn.tokens_in + turn.tokens_out);
         log::info!(
@@ -187,6 +307,9 @@ pub async fn start_hunt(
 
         // Execute each tool call and append the results to the conversation.
         for call in turn.tool_calls.iter() {
+            if call.name == "hunt_seed_search" {
+                seed_search_completed = true;
+            }
             let result = execute_tool_call(&app, call, &mut findings).await;
             let is_error = matches!(result, ToolOutcome::Err(_));
             let content = match result {
@@ -202,8 +325,262 @@ pub async fn start_hunt(
         }
     }
 
+    // HUNT-05-ADV — if the fresh-machine question fired but the LLM never
+    // grounded on the seed (didn't call hunt_seed_search successfully), fall
+    // back to basic synthesis using whatever the user said as the core
+    // command. We've already injected the answer as a user message above, so
+    // `findings.final_synthesis` may still be empty — the synthesis module
+    // handles that case.
+    let _ = seed_search_completed; // used for clarity / future telemetry
+
+    // HUNT-06-ADV — thematic contradiction detection pass.
+    // Runs only when we have enough signal to classify (at least 3 successful
+    // non-narration probes). Cheap-model second-pass with a strict 5s budget.
+    if findings.probes.iter().filter(|p| p.ok && p.tool != "hunt_emit_chat_line").count() >= 3 {
+        match crate::onboarding::contradictions::detect_contradictions(
+            &app,
+            &cfg,
+            &findings,
+        ).await {
+            Ok(Some(report)) if !report.contradictions.is_empty() => {
+                if let Some(first) = report.contradictions.first() {
+                    let _ = app.emit(
+                        EVENT_HUNT_LINE,
+                        HuntLine::hunt_question(&first.question),
+                    );
+                    let chosen = wait_for_user_answer(60).await;
+                    if let Some(answer) = chosen {
+                        findings.chat_lines.push(format!(
+                            "[contradiction-answer] {} (chose between {} / {})",
+                            answer, first.cluster_a, first.cluster_b
+                        ));
+                    }
+                }
+            }
+            Ok(_) => {}
+            Err(e) => log::warn!("[hunt] contradiction pass failed: {}", e),
+        }
+    }
+
     let _ = app.emit(EVENT_HUNT_DONE, &findings);
     Ok(HuntOutcome::completed(findings, tokens_used))
+}
+
+// ── Phase 49 (HUNT-05-ADV) — fresh-machine heuristic + answer plumbing ──────
+
+/// Returns true when the first probe pass yielded so little signal that the
+/// hunt should stop and ask the user directly. Heuristic per phase brief:
+///   - Fewer than 3 successful file/dir/shell findings (excluding narration)
+///   - No git repos found (no probe argument contains ".git" / "git status" / "git remote")
+///   - No installed agents in the initial context (claude / cursor / aider / codex / goose)
+fn is_fresh_machine(findings: &HuntFindings) -> bool {
+    let useful_probes = findings
+        .probes
+        .iter()
+        .filter(|p| p.ok && p.tool != "hunt_emit_chat_line")
+        .count();
+    if useful_probes >= 3 {
+        return false;
+    }
+    let agents = &findings.initial.agents;
+    let any_agent = agents.claude.is_some()
+        || agents.cursor.is_some()
+        || agents.aider.is_some()
+        || agents.codex.is_some()
+        || agents.goose.is_some();
+    if any_agent {
+        return false;
+    }
+    let any_git_signal = findings.probes.iter().any(|p| {
+        p.ok && (p.argument.contains(".git")
+            || p.argument.contains("git status")
+            || p.argument.contains("git remote")
+            || p.snippet.contains("origin")
+            || p.snippet.contains("github.com"))
+    });
+    if any_git_signal {
+        return false;
+    }
+    true
+}
+
+/// Park up to `timeout_secs` seconds waiting for the frontend to call
+/// `hunt_post_user_answer`. Returns `Some(answer)` on success, `None` on
+/// timeout / cancellation. Drains the slot on read so re-entry doesn't
+/// consume a stale answer.
+async fn wait_for_user_answer(timeout_secs: u64) -> Option<String> {
+    // Fast path: an answer might already be sitting in the slot if the user
+    // typed before we parked.
+    if let Ok(mut slot) = HUNT_USER_ANSWER.lock() {
+        if let Some(v) = slot.take() {
+            return Some(v);
+        }
+    }
+    let notified = HUNT_ANSWER_NOTIFY.notified();
+    tokio::pin!(notified);
+    let timeout = tokio::time::sleep(std::time::Duration::from_secs(timeout_secs));
+    tokio::pin!(timeout);
+    tokio::select! {
+        _ = &mut notified => {
+            if let Ok(mut slot) = HUNT_USER_ANSWER.lock() {
+                return slot.take();
+            }
+            None
+        }
+        _ = &mut timeout => None,
+    }
+}
+
+/// Park up to `timeout_secs` waiting for the user to acknowledge the budget
+/// block. Frontend sends `hunt_continue_after_cost_block` to flip the atomic.
+async fn wait_for_cost_continue(timeout_secs: u64) -> bool {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
+    while std::time::Instant::now() < deadline {
+        if HUNT_COST_CONTINUE.swap(false, Ordering::SeqCst) {
+            return true;
+        }
+        if HUNT_CANCEL.load(Ordering::SeqCst) {
+            return false;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+    }
+    false
+}
+
+// ── Phase 49 (HUNT-COST-CHAT) — cost tracker ────────────────────────────────
+
+/// Per-session running cost tracker. Updated after every `complete_turn` call
+/// by `complete_turn_with_cost`. The HUNT and FORGE sessions hold separate
+/// instances so the chat surface can render their cost lines independently.
+#[derive(Debug, Clone)]
+pub struct CostTracker {
+    pub cumulative_input_tokens: u64,
+    pub cumulative_output_tokens: u64,
+    pub cumulative_cost_usd: f64,
+    pub budget_usd: f64,
+    /// Set true when `cumulative_cost_usd >= 0.5 * budget_usd` and the warning
+    /// chat-line has already been emitted (avoids spamming on every turn).
+    pub warning_emitted: bool,
+    /// Set true when `cumulative_cost_usd >= budget_usd` and the block
+    /// chat-line has been emitted. Until the user accepts a budget extension
+    /// (via `hunt_continue_after_cost_block`), the loop is suspended.
+    pub block_emitted: bool,
+}
+
+impl Default for CostTracker {
+    fn default() -> Self {
+        Self {
+            cumulative_input_tokens: 0,
+            cumulative_output_tokens: 0,
+            cumulative_cost_usd: 0.0,
+            budget_usd: 3.00,
+            warning_emitted: false,
+            block_emitted: false,
+        }
+    }
+}
+
+impl CostTracker {
+    pub fn reset(&mut self, budget_usd: f64) {
+        self.cumulative_input_tokens = 0;
+        self.cumulative_output_tokens = 0;
+        self.cumulative_cost_usd = 0.0;
+        self.budget_usd = budget_usd;
+        self.warning_emitted = false;
+        self.block_emitted = false;
+    }
+}
+
+/// Outcome of a cost-tracked LLM turn. The boolean tells the caller whether
+/// the budget was exceeded and the loop must suspend until the user accepts a
+/// budget extension.
+pub(crate) struct CostTrackedTurn {
+    pub turn: AssistantTurn,
+    pub blocked: bool,
+}
+
+/// Compute USD cost for a single turn using `providers::price_per_million`.
+/// Falls back to the conservative estimate when the provider/model pair has
+/// no entry (estimate matches the phase brief: $0.001/1K in + $0.005/1K out).
+pub(crate) fn turn_cost_usd(provider: &str, model: &str, tokens_in: u32, tokens_out: u32) -> f64 {
+    let (in_p, out_p) = crate::providers::price_per_million(provider, model);
+    if in_p == 0.0 && out_p == 0.0 && provider != "ollama" {
+        log::warn!(
+            "[cost-tracker] no pricing for {}/{} — estimating $0.001/1K in + $0.005/1K out",
+            provider,
+            model
+        );
+        let est_in = (tokens_in as f64) / 1000.0 * 0.001;
+        let est_out = (tokens_out as f64) / 1000.0 * 0.005;
+        return est_in + est_out;
+    }
+    let in_cost = (tokens_in as f64) * (in_p as f64) / 1_000_000.0;
+    let out_cost = (tokens_out as f64) * (out_p as f64) / 1_000_000.0;
+    in_cost + out_cost
+}
+
+/// Wrap a `providers::complete_turn` call with cost tracking and chat-line
+/// emission. Used by the hunt loop AND `tool_forge` (via the public
+/// `complete_turn_cost_tracked` helper) so both surfaces share the same
+/// budget-warning / budget-block UX.
+///
+/// Behavior:
+///   1. Call `providers::complete_turn`.
+///   2. On success, attribute `tokens_in + tokens_out` to the provided tracker,
+///      compute the marginal USD cost, and accumulate.
+///   3. Emit a `cost` chat-line on the supplied event channel.
+///   4. If cumulative >= 50% of budget and the warning hasn't fired,
+///      emit `cost_warning` and set `warning_emitted = true`.
+///   5. If cumulative >= 100% of budget, emit `cost_block` and return
+///      `CostTrackedTurn { blocked: true }`. Caller is expected to suspend the
+///      loop and await user acknowledgment.
+pub(crate) async fn complete_turn_cost_tracked(
+    app: &tauri::AppHandle,
+    tracker: &'static once_cell::sync::Lazy<Mutex<CostTracker>>,
+    event_name: &'static str,
+    provider: &str,
+    api_key: &str,
+    model: &str,
+    conversation: &[ConversationMessage],
+    tools: &[ToolDefinition],
+    base_url: Option<&str>,
+) -> Result<CostTrackedTurn, String> {
+    let turn = providers::complete_turn(provider, api_key, model, conversation, tools, base_url)
+        .await?;
+    let marginal = turn_cost_usd(provider, model, turn.tokens_in, turn.tokens_out);
+
+    // Snapshot the tracker, then drop the lock before emitting.
+    let (cumulative, budget, fire_warning, fire_block) = {
+        let mut t = tracker.lock().unwrap_or_else(|p| p.into_inner());
+        t.cumulative_input_tokens =
+            t.cumulative_input_tokens.saturating_add(turn.tokens_in as u64);
+        t.cumulative_output_tokens =
+            t.cumulative_output_tokens.saturating_add(turn.tokens_out as u64);
+        t.cumulative_cost_usd += marginal;
+        let cumulative = t.cumulative_cost_usd;
+        let budget = t.budget_usd;
+        let fire_warning = cumulative >= 0.5 * budget && !t.warning_emitted && !t.block_emitted;
+        let fire_block = cumulative >= budget && !t.block_emitted;
+        if fire_warning {
+            t.warning_emitted = true;
+        }
+        if fire_block {
+            t.block_emitted = true;
+        }
+        (cumulative, budget, fire_warning, fire_block)
+    };
+
+    // Emit the running cost line on EVERY successful turn — the frontend
+    // renders these as small gray monospace, so noise is acceptable.
+    let _ = app.emit(event_name, HuntLine::cost(cumulative, budget));
+    if fire_warning {
+        let _ = app.emit(event_name, HuntLine::cost_warning(cumulative, budget));
+    }
+    let blocked = fire_block;
+    if blocked {
+        let _ = app.emit(event_name, HuntLine::cost_block(cumulative, budget));
+    }
+    Ok(CostTrackedTurn { turn, blocked })
 }
 
 // ── Outcome + findings ───────────────────────────────────────────────────────
@@ -261,6 +638,20 @@ pub struct HuntLine {
     pub role: String, // "blade" | "system"
     pub text: String,
     pub timestamp: String,
+    /// Phase 49 — extended kind discriminator. None for legacy plain
+    /// narration lines (v2.0 contract). Some(...) for:
+    ///   - "hunt_question" — sharp question awaiting user answer (HUNT-05-ADV,
+    ///                       HUNT-06-ADV)
+    ///   - "cost" / "cost_warning" / "cost_block" — live cost surfacing
+    ///                       (HUNT-COST-CHAT)
+    /// Frontend renderer (Hunt.tsx / ChatProvider) inspects `kind` to apply
+    /// the per-kind visual treatment.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub kind: Option<String>,
+    /// Optional structured payload for cost / question kinds. `serde_json::Value`
+    /// keeps the frontend free to extend without round-tripping a new Rust shape.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub payload: Option<serde_json::Value>,
 }
 
 impl HuntLine {
@@ -269,6 +660,8 @@ impl HuntLine {
             role: "blade".into(),
             text: text.to_string(),
             timestamp: chrono::Utc::now().to_rfc3339(),
+            kind: None,
+            payload: None,
         }
     }
     pub fn system(text: &str) -> Self {
@@ -276,6 +669,77 @@ impl HuntLine {
             role: "system".into(),
             text: text.to_string(),
             timestamp: chrono::Utc::now().to_rfc3339(),
+            kind: None,
+            payload: None,
+        }
+    }
+    /// Phase 49 (HUNT-05-ADV / HUNT-06-ADV) — sharp question awaiting user
+    /// answer. Frontend renders with an inline input that posts back via
+    /// `hunt_post_user_answer`.
+    pub fn hunt_question(text: &str) -> Self {
+        Self {
+            role: "blade".into(),
+            text: text.to_string(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            kind: Some("hunt_question".into()),
+            payload: None,
+        }
+    }
+    /// Phase 49 (HUNT-COST-CHAT) — running cost line. Rendered with reduced
+    /// visual weight (monospace, small font, gray).
+    pub fn cost(cumulative_usd: f64, budget_usd: f64) -> Self {
+        let pct = if budget_usd > 0.0 {
+            (cumulative_usd / budget_usd * 100.0).clamp(0.0, 9999.0)
+        } else {
+            0.0
+        };
+        Self {
+            role: "system".into(),
+            text: format!("≈ ${:.4} / ${:.2} budget ({:.0}%)", cumulative_usd, budget_usd, pct),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            kind: Some("cost".into()),
+            payload: Some(serde_json::json!({
+                "cumulative_cost_usd": cumulative_usd,
+                "budget_usd": budget_usd,
+                "percent_used": pct,
+            })),
+        }
+    }
+    pub fn cost_warning(cumulative_usd: f64, budget_usd: f64) -> Self {
+        let pct = if budget_usd > 0.0 {
+            (cumulative_usd / budget_usd * 100.0).clamp(0.0, 9999.0)
+        } else {
+            0.0
+        };
+        Self {
+            role: "system".into(),
+            text: format!(
+                "Heads up — past 50% of budget (${:.4} / ${:.2}).",
+                cumulative_usd, budget_usd
+            ),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            kind: Some("cost_warning".into()),
+            payload: Some(serde_json::json!({
+                "cumulative_cost_usd": cumulative_usd,
+                "budget_usd": budget_usd,
+                "percent_used": pct,
+            })),
+        }
+    }
+    pub fn cost_block(cumulative_usd: f64, budget_usd: f64) -> Self {
+        Self {
+            role: "system".into(),
+            text: format!(
+                "Hit the ${:.2} budget cap (spent ${:.4}). Continue at your expense?",
+                budget_usd, cumulative_usd
+            ),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            kind: Some("cost_block".into()),
+            payload: Some(serde_json::json!({
+                "cumulative_cost_usd": cumulative_usd,
+                "budget_usd": budget_usd,
+                "percent_used": 100.0,
+            })),
         }
     }
 }
@@ -305,6 +769,9 @@ Workflow:
 - Run probes (`hunt_list_dir`, `hunt_read_file`, `hunt_run_shell`).
 - Narrate findings as one or two crisp lines (`hunt_emit_chat_line`).
 - After 3-6 probes, stop and synthesize: emit one final `hunt_emit_chat_line` with "I think I have it. You're [identity]. Right?" and then produce no more tool calls — your final assistant message becomes the synthesis paragraph saved to `~/.blade/who-you-are.md`.
+
+Special seed tool:
+- `hunt_seed_search(seed)` becomes available AFTER the orchestrator asks the user a fresh-machine question and the user answers with a project / company / brand name. Pass the most distinctive token from the user's answer as `seed`. Returns up to 5 candidate directories (with git remotes where present). Use the regular probes on the matched directories afterwards to ground the synthesis.
 
 Per-OS path knowledge (BELOW). Read it before deciding probes.
 
@@ -383,7 +850,39 @@ fn build_tool_defs() -> Vec<ToolDefinition> {
                 "required": ["command"]
             }),
         },
+        // Phase 49 (HUNT-05-ADV) — seed-driven project lookup. Only useful
+        // AFTER the user has answered the fresh-machine sharp question with a
+        // project name / company / brand. Searches `~/code/` and `~/` for
+        // directories that match the seed, then runs `git remote -v` in each
+        // candidate. Cap of 5 results. Sensitive-path deny list applies.
+        ToolDefinition {
+            name: "hunt_seed_search".to_string(),
+            description: "Search for project directories matching a seed name the user supplied. \
+                Looks under ~/code (depth 3) and ~ (depth 2) for directories whose name contains \
+                the seed (case-insensitive). For each match, runs `git remote -v` to surface the \
+                origin URL. Returns up to 5 results. Sensitive paths rejected. Use AFTER receiving \
+                a user answer naming their project / company / brand.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "seed": {"type": "string", "description": "Project / company name fragment supplied by the user."}
+                },
+                "required": ["seed"]
+            }),
+        },
     ]
+}
+
+// ── Phase 49 (HUNT-05-ADV) — hunt_seed_search result shape ──────────────────
+
+/// One hit from `hunt_seed_search`. Surfaced to the LLM as part of the tool
+/// response so the next probes can ground on the user's actual project.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchHit {
+    pub path: String,
+    /// `git remote -v` output for the path (first origin URL grepped, or
+    /// empty if the dir isn't a git repo).
+    pub remote_url: Option<String>,
 }
 
 // ── Tool execution ───────────────────────────────────────────────────────────
@@ -506,7 +1005,171 @@ async fn execute_tool_call(
                 }
             }
         }
+        "hunt_seed_search" => {
+            let seed = call.arguments.get("seed").and_then(|v| v.as_str()).unwrap_or("");
+            if seed.is_empty() {
+                return ToolOutcome::Err("hunt_seed_search requires 'seed'.".into());
+            }
+            if let Some(err) = vet_seed(seed) {
+                return ToolOutcome::Err(err);
+            }
+            match hunt_seed_search_impl(seed).await {
+                Ok(hits) => {
+                    let snippet = serde_json::to_string(&hits).unwrap_or_else(|_| "[]".into());
+                    findings.probes.push(ProbeRecord {
+                        tool: "hunt_seed_search".into(),
+                        argument: seed.to_string(),
+                        ok: true,
+                        snippet: crate::safe_slice(&snippet, 400).to_string(),
+                    });
+                    let body = if hits.is_empty() {
+                        format!("No project directories matched seed '{}'.", seed)
+                    } else {
+                        let lines: Vec<String> = hits
+                            .iter()
+                            .map(|h| match &h.remote_url {
+                                Some(url) if !url.is_empty() => {
+                                    format!("- {} (remote: {})", h.path, url)
+                                }
+                                _ => format!("- {} (no git remote)", h.path),
+                            })
+                            .collect();
+                        format!(
+                            "Seed '{}' matched {} candidate{}:\n{}",
+                            seed,
+                            hits.len(),
+                            if hits.len() == 1 { "" } else { "s" },
+                            lines.join("\n")
+                        )
+                    };
+                    ToolOutcome::Ok(body)
+                }
+                Err(e) => {
+                    findings.probes.push(ProbeRecord {
+                        tool: "hunt_seed_search".into(),
+                        argument: seed.to_string(),
+                        ok: false,
+                        snippet: e.clone(),
+                    });
+                    ToolOutcome::Err(e)
+                }
+            }
+        }
         other => ToolOutcome::Err(format!("Unknown hunt tool: {}", other)),
+    }
+}
+
+// ── Phase 49 (HUNT-05-ADV) — seed sandbox + impl ─────────────────────────────
+
+/// Vet a seed string before letting it flow into `find` / `grep`. Rejects
+/// shell-metacharacter escape hatches AND empty / over-long seeds. The seed
+/// is interpolated into shell command lines (via `format!`), so we need the
+/// same posture as `vet_shell` for the substrings.
+pub(crate) fn vet_seed(seed: &str) -> Option<String> {
+    let trimmed = seed.trim();
+    if trimmed.is_empty() {
+        return Some("Empty seed rejected.".into());
+    }
+    if trimmed.len() > 60 {
+        return Some(format!(
+            "Seed too long ({} chars > 60). Pick a shorter project name.",
+            trimmed.len()
+        ));
+    }
+    // Same shell-injection guards as vet_shell. The seed is interpolated raw
+    // into `-iname "*SEED*"` and `grep SEED`, so any metacharacter is fatal.
+    for bad in &[
+        "$", "`", ";", "|", "&", "<", ">", "\\", "\"", "'", "\n", "\r",
+        "..",  // path traversal
+    ] {
+        if trimmed.contains(bad) {
+            return Some(format!(
+                "Seed rejected: contains forbidden character '{}'.",
+                bad
+            ));
+        }
+    }
+    // Sensitive-path heuristic on the seed itself — refuses seeds like
+    // ".ssh" or "credentials".
+    for frag in DENY_FRAGMENTS {
+        if trimmed.to_lowercase().contains(&frag.to_lowercase().replace('/', "")) {
+            return Some(format!(
+                "Seed rejected ('{}' overlaps deny fragment '{}'). Pick a different seed.",
+                trimmed, frag
+            ));
+        }
+    }
+    None
+}
+
+const SEED_SEARCH_CAP: usize = 5;
+
+async fn hunt_seed_search_impl(seed: &str) -> Result<Vec<SearchHit>, String> {
+    let home = match dirs::home_dir() {
+        Some(h) => h,
+        None => return Err("Could not resolve home directory.".into()),
+    };
+    let mut hits: Vec<SearchHit> = Vec::new();
+
+    // 1. find ~/code -maxdepth 3 -iname "*<seed>*" -type d
+    let code_dir = home.join("code");
+    if code_dir.exists() {
+        let cmd = format!(
+            "find {:?} -maxdepth 3 -iname \"*{}*\" -type d",
+            code_dir.display(),
+            seed
+        );
+        if let Ok(out) = hunt_run_shell_impl(&cmd).await {
+            for line in out.lines().take(SEED_SEARCH_CAP) {
+                let path = line.trim().trim_matches('"').to_string();
+                if path.is_empty() { continue; }
+                if check_sensitive(Path::new(&path)).is_some() { continue; }
+                if hits.iter().any(|h| h.path == path) { continue; }
+                let remote = git_remote_for(&path).await;
+                hits.push(SearchHit { path, remote_url: remote });
+                if hits.len() >= SEED_SEARCH_CAP { break; }
+            }
+        }
+    }
+
+    // 2. find ~ -maxdepth 2 -iname "*<seed>*" -type d
+    if hits.len() < SEED_SEARCH_CAP {
+        let cmd = format!(
+            "find {:?} -maxdepth 2 -iname \"*{}*\" -type d",
+            home.display(),
+            seed
+        );
+        if let Ok(out) = hunt_run_shell_impl(&cmd).await {
+            for line in out.lines() {
+                let path = line.trim().trim_matches('"').to_string();
+                if path.is_empty() { continue; }
+                if check_sensitive(Path::new(&path)).is_some() { continue; }
+                if hits.iter().any(|h| h.path == path) { continue; }
+                let remote = git_remote_for(&path).await;
+                hits.push(SearchHit { path, remote_url: remote });
+                if hits.len() >= SEED_SEARCH_CAP { break; }
+            }
+        }
+    }
+
+    Ok(hits)
+}
+
+/// Run `git -C <path> remote -v` and return the first remote URL line.
+async fn git_remote_for(path: &str) -> Option<String> {
+    let cmd = format!("git -C {:?} remote -v", path);
+    match hunt_run_shell_impl(&cmd).await {
+        Ok(out) => {
+            // First non-empty line, second whitespace-separated token is URL.
+            for line in out.lines() {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 2 {
+                    return Some(parts[1].to_string());
+                }
+            }
+            None
+        }
+        Err(_) => None,
     }
 }
 
@@ -672,6 +1335,30 @@ pub fn cancel_hunt() -> Result<(), String> {
     Ok(())
 }
 
+/// Phase 49 (HUNT-05-ADV) — frontend posts the user's answer to a
+/// `hunt_question` chat-line. Wakes the parked hunt task so it can re-prompt
+/// the LLM with the answer as seed input.
+#[tauri::command]
+pub fn hunt_post_user_answer(answer: String) -> Result<(), String> {
+    let trimmed = answer.trim().to_string();
+    if trimmed.is_empty() {
+        return Err("Empty answer".into());
+    }
+    if let Ok(mut slot) = HUNT_USER_ANSWER.lock() {
+        *slot = Some(trimmed);
+    }
+    HUNT_ANSWER_NOTIFY.notify_one();
+    Ok(())
+}
+
+/// Phase 49 (HUNT-COST-CHAT) — frontend acknowledges the cost block and
+/// asks BLADE to continue with another budget bucket.
+#[tauri::command]
+pub fn hunt_continue_after_cost_block() -> Result<(), String> {
+    HUNT_COST_CONTINUE.store(true, Ordering::SeqCst);
+    Ok(())
+}
+
 /// Run pre-scan + start the hunt. Returns the InitialContext immediately so
 /// the frontend can render Message #1 while the LLM-driven probes spawn in
 /// the background. The hunt itself streams via `blade_hunt_line` events.
@@ -783,5 +1470,145 @@ mod tests {
     fn expand_home_passes_through_absolute() {
         let p = expand_home("/tmp/foo");
         assert_eq!(p, PathBuf::from("/tmp/foo"));
+    }
+
+    // ── Phase 49 (HUNT-05-ADV / HUNT-COST-CHAT) — new behavior tests ─────
+
+    #[test]
+    fn vet_seed_rejects_empty() {
+        assert!(vet_seed("").is_some());
+        assert!(vet_seed("   ").is_some());
+    }
+
+    #[test]
+    fn vet_seed_rejects_shell_metachars() {
+        assert!(vet_seed("foo$(whoami)").is_some());
+        assert!(vet_seed("foo`bar`").is_some());
+        assert!(vet_seed("foo|bar").is_some());
+        assert!(vet_seed("foo;bar").is_some());
+        assert!(vet_seed("../etc").is_some());
+        assert!(vet_seed("foo>bar").is_some());
+        assert!(vet_seed("foo\\bar").is_some());
+    }
+
+    #[test]
+    fn vet_seed_rejects_overlong() {
+        let long = "a".repeat(61);
+        assert!(vet_seed(&long).is_some());
+    }
+
+    #[test]
+    fn vet_seed_rejects_sensitive_overlap() {
+        assert!(vet_seed("credentials").is_some());
+        assert!(vet_seed("password").is_some());
+        assert!(vet_seed("keychain").is_some());
+    }
+
+    #[test]
+    fn vet_seed_accepts_normal_project_names() {
+        assert!(vet_seed("clarify").is_none());
+        assert!(vet_seed("blade").is_none());
+        assert!(vet_seed("my-app").is_none());
+        assert!(vet_seed("project_42").is_none());
+    }
+
+    #[test]
+    fn turn_cost_anthropic_sonnet() {
+        // 1M in + 1M out should be 3 + 15 = 18 USD per the price table.
+        let cost = turn_cost_usd(
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            1_000_000,
+            1_000_000,
+        );
+        assert!((cost - 18.0).abs() < 1e-6, "expected $18, got {}", cost);
+    }
+
+    #[test]
+    fn turn_cost_ollama_zero() {
+        let cost = turn_cost_usd("ollama", "llama3.1", 10_000, 5_000);
+        assert_eq!(cost, 0.0);
+    }
+
+    #[test]
+    fn turn_cost_unknown_provider_uses_table_fallback() {
+        // Unknown providers fall back to ($1, $3)/1M per price_per_million.
+        // 1M in + 1M out = $1 + $3 = $4.
+        let cost = turn_cost_usd("nonexistent", "model-x", 1_000_000, 1_000_000);
+        assert!((cost - 4.0).abs() < 1e-6, "got {}", cost);
+    }
+
+    #[test]
+    fn cost_tracker_reset_clears_state() {
+        let mut t = CostTracker::default();
+        t.cumulative_cost_usd = 1.23;
+        t.cumulative_input_tokens = 100;
+        t.warning_emitted = true;
+        t.block_emitted = true;
+        t.reset(5.00);
+        assert_eq!(t.cumulative_cost_usd, 0.0);
+        assert_eq!(t.cumulative_input_tokens, 0);
+        assert_eq!(t.budget_usd, 5.00);
+        assert!(!t.warning_emitted);
+        assert!(!t.block_emitted);
+    }
+
+    #[test]
+    fn hunt_line_cost_payload_shape() {
+        let l = HuntLine::cost(1.5, 3.0);
+        assert_eq!(l.kind.as_deref(), Some("cost"));
+        let p = l.payload.expect("payload present");
+        assert!(p.get("cumulative_cost_usd").is_some());
+        assert!(p.get("budget_usd").is_some());
+        assert!(p.get("percent_used").is_some());
+    }
+
+    #[test]
+    fn hunt_line_question_marks_kind() {
+        let l = HuntLine::hunt_question("Fresh machine — what do you do?");
+        assert_eq!(l.kind.as_deref(), Some("hunt_question"));
+        assert_eq!(l.role, "blade");
+    }
+
+    #[test]
+    fn fresh_machine_returns_true_on_bare_findings() {
+        let findings = HuntFindings::default();
+        assert!(is_fresh_machine(&findings));
+    }
+
+    #[test]
+    fn fresh_machine_returns_false_when_agents_detected() {
+        let mut findings = HuntFindings::default();
+        findings.initial.agents.claude = Some("/usr/local/bin/claude".into());
+        assert!(!is_fresh_machine(&findings));
+    }
+
+    #[test]
+    fn fresh_machine_returns_false_when_useful_probes_accrue() {
+        let mut findings = HuntFindings::default();
+        for i in 0..4 {
+            findings.probes.push(ProbeRecord {
+                tool: "hunt_list_dir".into(),
+                argument: format!("/home/u/code/p{}", i),
+                ok: true,
+                snippet: "...".into(),
+            });
+        }
+        assert!(!is_fresh_machine(&findings));
+    }
+
+    #[test]
+    fn fresh_machine_ignores_narration_probes() {
+        // Narration-only probes don't count as "useful" — fresh-machine still true.
+        let mut findings = HuntFindings::default();
+        for _ in 0..10 {
+            findings.probes.push(ProbeRecord {
+                tool: "hunt_emit_chat_line".into(),
+                argument: "".into(),
+                ok: true,
+                snippet: "narrating".into(),
+            });
+        }
+        assert!(is_fresh_machine(&findings));
     }
 }

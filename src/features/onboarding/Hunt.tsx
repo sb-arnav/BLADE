@@ -34,8 +34,15 @@ import type {
   BladeHuntLinePayload,
   BladeHuntDonePayload,
   BladeHuntErrorPayload,
+  BladeHuntLineKind,
 } from '@/lib/events/payloads';
-import { startHunt, cancelHunt, TauriError } from '@/lib/tauri';
+import {
+  startHunt,
+  cancelHunt,
+  huntPostUserAnswer,
+  huntContinueAfterCostBlock,
+  TauriError,
+} from '@/lib/tauri';
 import './hunt.css';
 
 interface Props {
@@ -48,6 +55,8 @@ interface HuntLineRow {
   role: 'blade' | 'system' | 'user';
   text: string;
   timestamp: string;
+  /** Phase 49 — kind discriminator for cost / question lines. */
+  kind?: BladeHuntLineKind;
 }
 
 export function Hunt({ onComplete }: Props) {
@@ -57,6 +66,12 @@ export function Hunt({ onComplete }: Props) {
   const [error, setError] = useState<string | null>(null);
   /** First-task mode: closing line landed; next user input routes to chat. */
   const [closingShown, setClosingShown] = useState(false);
+  /** Phase 49 (HUNT-05-ADV) — true while a `hunt_question` chat-line is open
+   * and the next user submission should route to `huntPostUserAnswer`. */
+  const [awaitingAnswer, setAwaitingAnswer] = useState(false);
+  /** Phase 49 (HUNT-COST-CHAT) — true while a `cost_block` is suspending the
+   * hunt; the inline yes/no is offered. */
+  const [costBlocked, setCostBlocked] = useState(false);
   const startedRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -93,8 +108,22 @@ export function Hunt({ onComplete }: Props) {
         role: p.role,
         text: p.text,
         timestamp: p.timestamp,
+        kind: p.kind,
       },
     ]);
+    // Phase 49 — sharp question (HUNT-05-ADV / HUNT-06-ADV): show the inline
+    // answer input. The user's next submission routes through
+    // `huntPostUserAnswer` instead of being a passive interjection.
+    if (p.kind === 'hunt_question') {
+      setAwaitingAnswer(true);
+      requestAnimationFrame(() => inputRef.current?.focus());
+      return;
+    }
+    // Phase 49 — cost block (HUNT-COST-CHAT): offer the inline continue ack.
+    if (p.kind === 'cost_block') {
+      setCostBlocked(true);
+      return;
+    }
     // The closing chat-line ("one thing you've been putting off this week")
     // signals first-task mode — the user's next message routes to chat.
     if (p.role === 'blade' && p.text.toLowerCase().includes('one thing you')) {
@@ -154,6 +183,20 @@ export function Hunt({ onComplete }: Props) {
       return;
     }
 
+    // Phase 49 (HUNT-05-ADV) — the hunt is parked on a sharp question. Route
+    // the user's answer through the dedicated channel so the LLM gets it as
+    // a seed input.
+    if (awaitingAnswer) {
+      setAwaitingAnswer(false);
+      try {
+        await huntPostUserAnswer(trimmed);
+      } catch {
+        // Swallow — frontend already reflected the user's line; if the
+        // backend dropped, the hunt will time out and synthesize anyway.
+      }
+      return;
+    }
+
     if (closingShown) {
       // HUNT-08: this is the user's first task. Hand control to MainShell so
       // it re-gates and the chat route takes over. We store the task on
@@ -178,7 +221,17 @@ export function Hunt({ onComplete }: Props) {
         timestamp: new Date().toISOString(),
       },
     ]);
-  }, [closingShown, onComplete]);
+  }, [closingShown, onComplete, awaitingAnswer]);
+
+  // Phase 49 (HUNT-COST-CHAT) — user confirms budget extension.
+  const handleCostContinue = useCallback(async () => {
+    setCostBlocked(false);
+    try {
+      await huntContinueAfterCostBlock();
+    } catch {
+      // No-op — backend re-emits the block on the next turn if the ack didn't land.
+    }
+  }, []);
 
   // ─── 4. Render ──────────────────────────────────────────────────────────
   return (
@@ -207,11 +260,27 @@ export function Hunt({ onComplete }: Props) {
           <div className="hunt-line system">scanning your machine…</div>
         )}
         {lines.map((l) => (
-          <div key={l.id} className={`hunt-line ${l.role}`}>
-            {l.role === 'blade' && <span className="hunt-line-prefix" aria-hidden="true">›</span>}
+          <div
+            key={l.id}
+            className={`hunt-line ${l.role}${l.kind ? ` kind-${l.kind}` : ''}`}
+          >
+            {l.role === 'blade' && !l.kind && (
+              <span className="hunt-line-prefix" aria-hidden="true">›</span>
+            )}
             <span className="hunt-line-text">{l.text}</span>
           </div>
         ))}
+        {costBlocked && (
+          <div className="hunt-line system kind-cost_block_actions" role="alert">
+            <span className="hunt-line-text">Continue at your expense?</span>
+            <Button variant="primary" onClick={() => { void handleCostContinue(); }}>
+              Yes, raise budget
+            </Button>
+            <Button variant="ghost" onClick={() => { void cancelHunt().catch(() => {}); setCostBlocked(false); setStatus('done'); }}>
+              No, stop
+            </Button>
+          </div>
+        )}
         {error && (
           <div className="hunt-line error" role="alert">
             {error}
@@ -235,11 +304,13 @@ export function Hunt({ onComplete }: Props) {
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder={
-            closingShown
-              ? 'Name the one thing you\'ve been putting off…'
-              : status === 'running'
-                ? 'Type "stop" to interrupt — otherwise just wait.'
-                : 'Type "stop" to cancel.'
+            awaitingAnswer
+              ? 'Answer the question above…'
+              : closingShown
+                ? 'Name the one thing you\'ve been putting off…'
+                : status === 'running'
+                  ? 'Type "stop" to interrupt — otherwise just wait.'
+                  : 'Type "stop" to cancel.'
           }
           autoComplete="off"
           spellCheck={false}
@@ -251,7 +322,7 @@ export function Hunt({ onComplete }: Props) {
           type="submit"
           disabled={!draft.trim() || status === 'starting' || status === 'error'}
         >
-          {closingShown ? 'Send →' : 'Send'}
+          {awaitingAnswer ? 'Answer →' : closingShown ? 'Send →' : 'Send'}
         </Button>
       </form>
     </main>

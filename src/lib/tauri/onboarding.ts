@@ -57,3 +57,34 @@ export function startHunt(): Promise<HuntInitialContext> {
 export function cancelHunt(): Promise<void> {
   return invokeTyped<void>('cancel_hunt');
 }
+
+/**
+ * Phase 49 (HUNT-05-ADV) — post the user's answer to a `hunt_question`
+ * chat-line. Wakes the parked hunt task so it can re-prompt the LLM with the
+ * answer as seed input.
+ *
+ * @see src-tauri/src/onboarding/hunt.rs `hunt_post_user_answer`
+ */
+export function huntPostUserAnswer(answer: string): Promise<void> {
+  return invokeTyped<void, { answer: string }>('hunt_post_user_answer', { answer });
+}
+
+/**
+ * Phase 49 (HUNT-COST-CHAT) — acknowledge the cost block and grant another
+ * budget bucket so the hunt loop can continue.
+ *
+ * @see src-tauri/src/onboarding/hunt.rs `hunt_continue_after_cost_block`
+ */
+export function huntContinueAfterCostBlock(): Promise<void> {
+  return invokeTyped<void>('hunt_continue_after_cost_block');
+}
+
+/**
+ * Phase 49 (HUNT-COST-CHAT) — symmetric to `huntContinueAfterCostBlock` for
+ * the tool_forge cost-tracked session.
+ *
+ * @see src-tauri/src/tool_forge.rs `forge_continue_after_cost_block`
+ */
+export function forgeContinueAfterCostBlock(): Promise<void> {
+  return invokeTyped<void>('forge_continue_after_cost_block');
+}

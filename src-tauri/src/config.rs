@@ -328,6 +328,53 @@ impl Default for ContextConfig {
 // against partial JSON (missing sub-fields).
 // ---------------------------------------------------------------------
 
+// ---------------------------------------------------------------------
+// Phase 49 (HUNT-COST-CHAT) — per-session cost budgets for hunt + forge.
+//
+// Both surfaces (agentic hunt + tool forge) emit live cost lines into chat,
+// soft-warn at 50%, and hard-block at 100% pending user-acknowledged budget
+// extension. Defaults: $3.00 per hunt session, $3.00 per forge session.
+//
+// Six-place rule (CLAUDE.md): every BladeConfig field lands in DiskConfig
+// struct, DiskConfig::default, BladeConfig struct, BladeConfig::default,
+// load_config, and save_config.
+// ---------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct HuntConfig {
+    /// Per-session USD cap. When cumulative cost exceeds this value, the hunt
+    /// emits a `cost_block` chat-line and parks pending a user acknowledgment.
+    /// Default $3.00.
+    #[serde(default = "default_hunt_budget_usd")]
+    pub budget_usd: f32,
+}
+
+fn default_hunt_budget_usd() -> f32 { 3.00 }
+
+impl Default for HuntConfig {
+    fn default() -> Self {
+        Self { budget_usd: default_hunt_budget_usd() }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct ForgeConfig {
+    /// Per-session USD cap for `tool_forge` LLM calls. Same surfacing
+    /// behavior as `HuntConfig::budget_usd`. Default $3.00.
+    #[serde(default = "default_forge_budget_usd")]
+    pub budget_usd: f32,
+}
+
+fn default_forge_budget_usd() -> f32 { 3.00 }
+
+impl Default for ForgeConfig {
+    fn default() -> Self {
+        Self { budget_usd: default_forge_budget_usd() }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct LoopConfig {
@@ -962,6 +1009,12 @@ struct DiskConfig {
     // context_efficiency_strict. #[serde(default)] keeps legacy configs loadable.
     #[serde(default)]
     eval: EvalConfig,
+    // Phase 49 (HUNT-COST-CHAT) — per-session hunt cost budget. Default $3.00.
+    #[serde(default)]
+    hunt: HuntConfig,
+    // Phase 49 (HUNT-COST-CHAT) — per-session forge cost budget. Default $3.00.
+    #[serde(default)]
+    forge: ForgeConfig,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -1053,6 +1106,8 @@ impl Default for DiskConfig {
             decomposition: DecompositionConfig::default(),
             intelligence: IntelligenceConfig::default(),
             eval: EvalConfig::default(),
+            hunt: HuntConfig::default(),
+            forge: ForgeConfig::default(),
             api_key: None,
         }
     }
@@ -1249,6 +1304,16 @@ pub struct BladeConfig {
     /// See `EvalConfig`.
     #[serde(default)]
     pub eval: EvalConfig,
+    /// Phase 49 (HUNT-COST-CHAT) — per-session hunt cost budget. Default $3.00.
+    /// When cumulative cost exceeds this, the hunt emits a `cost_block`
+    /// chat-line and parks pending a user acknowledgment (which raises the
+    /// budget by another $3.00 bucket).
+    #[serde(default)]
+    pub hunt: HuntConfig,
+    /// Phase 49 (HUNT-COST-CHAT) — per-session forge cost budget. Same
+    /// semantics as `hunt.budget_usd`. Default $3.00.
+    #[serde(default)]
+    pub forge: ForgeConfig,
 }
 
 impl BladeConfig {
@@ -1326,6 +1391,8 @@ impl Default for BladeConfig {
             decomposition: DecompositionConfig::default(),
             intelligence: IntelligenceConfig::default(),
             eval: EvalConfig::default(),
+            hunt: HuntConfig::default(),
+            forge: ForgeConfig::default(),
         }
     }
 }
@@ -1496,6 +1563,8 @@ pub fn load_config() -> BladeConfig {
         decomposition: disk.decomposition,
         intelligence: disk.intelligence,
         eval: disk.eval,
+        hunt: disk.hunt,
+        forge: disk.forge,
     }
 }
 
@@ -1581,6 +1650,8 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         decomposition: config.decomposition.clone(),
         intelligence: config.intelligence.clone(),
         eval: config.eval.clone(),
+        hunt: config.hunt.clone(),
+        forge: config.forge.clone(),
         api_key: None,
     };
 
@@ -2157,6 +2228,8 @@ mod tests {
             decomposition: cfg.decomposition.clone(),
             intelligence: cfg.intelligence.clone(),
             eval: cfg.eval.clone(),
+            hunt: cfg.hunt.clone(),
+            forge: cfg.forge.clone(),
             api_key: None,
         };
 
