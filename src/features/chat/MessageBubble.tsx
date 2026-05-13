@@ -23,9 +23,17 @@
 //     append-only for the live bubble, and assistant tokens never contain
 //     user-typed @-syntax anyway.
 //
+// Phase 47 (FORGE-02):
+//   • Forge chat-lines (system-role messages with `forgePhase` set) get
+//     a dedicated `chat-bubble-forge chat-bubble-forge-<phase>` class
+//     pair and a hammer-glyph prefix so the gap_detected → writing →
+//     testing → registered → retrying sequence reads as a distinct band
+//     of the chat stream, not as a stack of system errors.
+//
 // @see .planning/phases/03-dashboard-chat-settings/03-CONTEXT.md §D-70, §D-72
 // @see .planning/phases/03-dashboard-chat-settings/03-PATTERNS.md §5
 // @see .planning/phases/36-context-intelligence/36-08-PLAN.md
+// @see .planning/phases/47-forge-wire/47-CONTEXT.md
 // @see ./AnchorChip.tsx
 
 import { useConfig } from '@/lib/context';
@@ -41,11 +49,22 @@ interface MessageBubbleProps {
 
 export function MessageBubble({ msg, streaming = false }: MessageBubbleProps) {
   const { config } = useConfig();
+  // Phase 47 (FORGE-02) — forge chat-lines are system-role messages with a
+  // `forgePhase` tag. They get a dedicated class + phase-coded modifier so
+  // CSS can tint the border per phase (failed = error red, registered =
+  // success green, others = neutral forge accent).
+  const forgePhase = msg.forgePhase;
   const cls =
-    `chat-bubble chat-bubble-${msg.role}` + (streaming ? ' chat-bubble-streaming' : '');
+    `chat-bubble chat-bubble-${msg.role}` +
+    (streaming ? ' chat-bubble-streaming' : '') +
+    (forgePhase ? ` chat-bubble-forge chat-bubble-forge-${forgePhase}` : '');
   // Zero-width non-breaking space keeps an empty streaming bubble tall enough
   // to be visible before the first token lands (prevents layout snap).
-  const body = msg.content || (streaming ? '' : ' ');
+  // Forge lines are prefixed with the hammer/anvil glyph so the eye can
+  // scan past them in the chat stream.
+  const body = forgePhase
+    ? `⚒ ${msg.content}`
+    : msg.content || (streaming ? '' : ' ');
 
   // BladeConfig ships the IntelligenceConfig sub-struct via get_config's
   // serde_json passthrough (`[k: string]: unknown` in the TS type). Default
@@ -66,7 +85,12 @@ export function MessageBubble({ msg, streaming = false }: MessageBubbleProps) {
       : body;
 
   return (
-    <article className={cls} data-message-id={msg.id} data-role={msg.role}>
+    <article
+      className={cls}
+      data-message-id={msg.id}
+      data-role={msg.role}
+      data-forge-phase={forgePhase ?? undefined}
+    >
       {msg.thinking ? (
         <ReasoningThinking thinking={msg.thinking} defaultOpen={streaming} />
       ) : null}

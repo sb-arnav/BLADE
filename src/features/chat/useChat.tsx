@@ -39,6 +39,7 @@ import {
 } from 'react';
 import { BLADE_EVENTS, useTauriEvent } from '@/lib/events';
 import type {
+  BladeForgeLinePayload,
   BladeMessageStartPayload,
   BladeReincarnationPayload,
   BladeThinkingChunkPayload,
@@ -63,6 +64,13 @@ export interface ChatStreamMessage {
   createdAt: number;
   /** Marks the message as an error-surface rather than a normal reply. */
   isError?: boolean;
+  /**
+   * Phase 47 (FORGE-02) — when set, this system-role message represents a
+   * single transition in the forge loop. MessageBubble renders it with a
+   * forge-specific visual treatment (monospace, glyph prefix, phase-coded
+   * border tint) instead of the default system-error styling.
+   */
+  forgePhase?: 'gap_detected' | 'writing' | 'testing' | 'registered' | 'retrying' | 'failed';
 }
 
 export type ChatStatus =
@@ -313,6 +321,28 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       createdAt: Date.now(),
     };
     setMessages((prev) => [...prev, reincarnationMsg]);
+  });
+
+  // Phase 47 (FORGE-02) — forge chat-line subscriber.
+  // On blade_forge_line, append a system-role message tagged with the forge
+  // phase. MessageBubble inspects msg.forgePhase and applies the forge
+  // visual treatment so the gap_detected → writing → testing → registered
+  // → retrying sequence renders as distinct chat lines visually separable
+  // from user/assistant turns. Same setMessages pattern as the
+  // reincarnation handler above — append-only, no replace.
+  useTauriEvent<BladeForgeLinePayload>(BLADE_EVENTS.BLADE_FORGE_LINE, (e) => {
+    const { phase, detail } = e.payload;
+    const forgeMsg: ChatStreamMessage = {
+      id: crypto.randomUUID(),
+      role: 'system',
+      // Content carries the phase label + detail so the bubble renders
+      // readable text even if MessageBubble doesn't (yet) consume
+      // forgePhase. Keeps the surface graceful-degrading.
+      content: `${phase.replace('_', ' ')} — ${detail}`,
+      createdAt: Date.now(),
+      forgePhase: phase,
+    };
+    setMessages((prev) => [...prev, forgeMsg]);
   });
 
   // Cancel any pending rAF when the provider unmounts (route change).

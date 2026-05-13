@@ -1022,3 +1022,45 @@ export interface BladeHuntDonePayload {
 /** Provider/network failure string. The hunt loop drops to no-data fallback. */
 export type BladeHuntErrorPayload = string;
 
+// ---------------------------------------------------------------------------
+// Phase 47 — Forge Wire (v2.0, FORGE-02)
+//
+// Emitted by src-tauri/src/tool_forge.rs::emit_forge_line at every transition
+// in the forge loop:
+//   - gap_detected — forge has decided to fire (triage LLM said yes)
+//   - writing      — LLM is drafting the tool implementation
+//   - testing      — smoke-test about to run on the generated script
+//   - registered   — tool inserted in forged_tools catalog, callable
+//   - retrying     — original user request is being retried with the new tool
+//   - failed       — loop bottoms out (no LLM, pre-check matched existing
+//                    tool, DB error, structural mismatch)
+//
+// ChatProvider (useChat.tsx) listens and appends a system-role
+// ChatStreamMessage prefixed with the forge glyph so the chat surface
+// renders the sequence as visually-distinct chat lines.
+// ---------------------------------------------------------------------------
+
+export type BladeForgePhase =
+  | 'gap_detected'
+  | 'writing'
+  | 'testing'
+  | 'registered'
+  | 'retrying'
+  | 'failed';
+
+export interface BladeForgeLinePayload {
+  /** Discriminator — always 'forge' for events on BLADE_FORGE_LINE. */
+  kind: 'forge';
+  /** Phase of the forge loop. See enum above. */
+  phase: BladeForgePhase;
+  /**
+   * Human-readable detail: capability description (gap_detected),
+   * provisional tool name (writing), smoke-test name (testing), final
+   * tool name (registered), original task summary (retrying), error
+   * reason (failed). Safe-sliced to 280 chars in Rust before emit.
+   */
+  detail: string;
+  /** Unix seconds when the line was emitted. */
+  timestamp: number;
+}
+
