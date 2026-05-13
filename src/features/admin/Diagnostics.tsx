@@ -13,7 +13,7 @@
 // @see src/lib/tauri/admin.ts (supervisor*, trace*, authority*, deep_scan*, config*)
 
 import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
-import { Button, Dialog, GlassPanel, Input, ListSkeleton } from '@/design-system/primitives';
+import { Button, Dialog, EmptyState, GlassPanel, Input, ListSkeleton } from '@/design-system/primitives';
 import { useToast } from '@/lib/context';
 import { usePrefs } from '@/hooks/usePrefs';
 import {
@@ -262,7 +262,12 @@ function TracesTab() {
             </span>
           </div>
         ))}
-        {traces && traces.length === 0 && <p className="admin-empty">No traces yet.</p>}
+        {traces && traces.length === 0 && (
+          <EmptyState
+            label="No traces yet"
+            description="Recent LLM/tool traces will appear here as the app runs."
+          />
+        )}
       </div>
     </section>
   );

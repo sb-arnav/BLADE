@@ -27,9 +27,8 @@ REQUIRED_FILES=(
   # Knowledge cluster (2)
   src/features/knowledge/KnowledgeBase.tsx
   src/features/knowledge/ScreenTimeline.tsx
-  # Life OS cluster (9)
+  # Life OS cluster (8 — FinanceView cut by v1.6 commit ae54a15, VISION list #1)
   src/features/life-os/HealthView.tsx
-  src/features/life-os/FinanceView.tsx
   src/features/life-os/GoalView.tsx
   src/features/life-os/HabitView.tsx
   src/features/life-os/MeetingsView.tsx
@@ -37,21 +36,19 @@ REQUIRED_FILES=(
   src/features/life-os/SocialGraphView.tsx
   src/features/life-os/AccountabilityView.tsx
   src/features/life-os/EmotionalIntelView.tsx
-  # Identity cluster (7)
+  # Identity cluster (6 — SidecarView cut by v1.6 commit aa789f7, VISION list #7)
   src/features/identity/CharacterBible.tsx
   src/features/identity/SoulView.tsx
   src/features/identity/PersonaView.tsx
   src/features/identity/ReasoningView.tsx
   src/features/identity/NegotiationView.tsx
-  src/features/identity/SidecarView.tsx
   src/features/identity/ContextEngineView.tsx
   # Dev-tools cluster (1 — Terminal excluded per D-217)
   src/features/dev-tools/FileBrowser.tsx
-  # Admin cluster (10)
+  # Admin cluster (9 — SecurityDashboard cut by v1.6 commit 7083d14, VISION list #3)
   src/features/admin/Analytics.tsx
   src/features/admin/CapabilityReports.tsx
   src/features/admin/DecisionLog.tsx
-  src/features/admin/SecurityDashboard.tsx
   src/features/admin/Diagnostics.tsx
   src/features/admin/IntegrationStatus.tsx
   src/features/admin/McpSettings.tsx

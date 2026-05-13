@@ -58,33 +58,14 @@ for cmd in \
 do check "$cmd"; done
 
 # ─────────────────────────────────────────────────────────────────────
-# Life OS — health_guardian (2)
+# Life OS — health_guardian: REMOVED by v1.6 chore commit b775857
+# (VISION cut list #2 — Health Guardian vertical cut).
 # ─────────────────────────────────────────────────────────────────────
-for cmd in \
-  'health_guardian::health_guardian_stats' \
-  'health_guardian::health_take_break'
-do check "$cmd"; done
 
 # ─────────────────────────────────────────────────────────────────────
-# Life OS — financial_brain (15)
+# Life OS — financial_brain: REMOVED by v1.6 chore commit ae54a15
+# (VISION cut list #1 — Financial Brain vertical cut).
 # ─────────────────────────────────────────────────────────────────────
-for cmd in \
-  'financial_brain::finance_add_transaction' \
-  'financial_brain::finance_get_transactions' \
-  'financial_brain::finance_delete_transaction' \
-  'financial_brain::finance_get_snapshot' \
-  'financial_brain::finance_generate_insights' \
-  'financial_brain::finance_get_goals' \
-  'financial_brain::finance_create_goal' \
-  'financial_brain::finance_update_goal' \
-  'financial_brain::finance_investment_suggestions' \
-  'financial_brain::finance_budget_recommendation' \
-  'financial_brain::finance_get_context' \
-  'financial_brain::finance_import_csv' \
-  'financial_brain::finance_auto_categorize' \
-  'financial_brain::finance_spending_summary' \
-  'financial_brain::finance_detect_subscriptions'
-do check "$cmd"; done
 
 # ─────────────────────────────────────────────────────────────────────
 # Life OS — goal_engine (6)
@@ -315,16 +296,9 @@ for cmd in \
 do check "$cmd"; done
 
 # ─────────────────────────────────────────────────────────────────────
-# Identity — kali (6)
+# Identity — kali: REMOVED by v1.6 chore commit c0bf13f
+# (VISION cut list #4 — Pentest Mode incl. Kali tools vertical cut).
 # ─────────────────────────────────────────────────────────────────────
-for cmd in \
-  'kali::kali_recon' \
-  'kali::kali_crack_hash' \
-  'kali::kali_analyze_ctf' \
-  'kali::kali_explain_exploit' \
-  'kali::kali_generate_payload' \
-  'kali::kali_check_tools'
-do check "$cmd"; done
 
 if [ ${#MISSING[@]} -gt 0 ]; then
   echo "[verify-phase6-rust-surface] ERROR: ${#MISSING[@]} Phase 6 Rust command(s) missing from $LIB_RS:" >&2
@@ -337,4 +311,4 @@ if [ ${#MISSING[@]} -gt 0 ]; then
   exit 1
 fi
 
-echo "[verify-phase6-rust-surface] OK — all 157 Phase 6 Rust commands registered in $LIB_RS."
+echo "[verify-phase6-rust-surface] OK — Phase 6 Rust commands registered in $LIB_RS (v1.6 narrowing: financial_brain + health_guardian + kali cut per VISION)."

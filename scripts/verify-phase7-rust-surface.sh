@@ -95,18 +95,9 @@ for cmd in \
 do check "$cmd"; done
 
 # ─────────────────────────────────────────────────────────────────────
-# Dev Tools — workflow_builder (8)
+# Dev Tools — workflow_builder: REMOVED by v1.6 chore commit 2686761
+# (VISION cut list #5 — Workflow Builder vertical cut).
 # ─────────────────────────────────────────────────────────────────────
-for cmd in \
-  'workflow_builder::workflow_list' \
-  'workflow_builder::workflow_get' \
-  'workflow_builder::workflow_create' \
-  'workflow_builder::workflow_update' \
-  'workflow_builder::workflow_delete' \
-  'workflow_builder::workflow_run_now' \
-  'workflow_builder::workflow_get_runs' \
-  'workflow_builder::workflow_generate_from_description'
-do check "$cmd"; done
 
 # ─────────────────────────────────────────────────────────────────────
 # Dev Tools — browser_agent (2) + browser_native (4)
@@ -263,13 +254,9 @@ do check "$cmd"; done
 for cmd in \
   'self_upgrade::self_upgrade_install' \
   'self_upgrade::self_upgrade_catalog' \
-  'self_upgrade::self_upgrade_audit' \
-  'pentest::pentest_authorize' \
-  'pentest::pentest_check_auth' \
-  'pentest::pentest_revoke' \
-  'pentest::pentest_list_auth' \
-  'pentest::pentest_check_model_safety'
+  'self_upgrade::self_upgrade_audit'
 do check "$cmd"; done
+# pentest::* commands REMOVED by v1.6 chore commit c0bf13f (VISION cut list #4 — Pentest Mode vertical cut).
 
 # ─────────────────────────────────────────────────────────────────────
 # Admin — evolution (6) + immune_system (1)
@@ -301,18 +288,9 @@ for cmd in \
 do check "$cmd"; done
 
 # ─────────────────────────────────────────────────────────────────────
-# Admin — security_monitor (9) + symbolic (4)
+# Admin — symbolic (4)  [security_monitor cut by v1.6 commit 7083d14 — VISION cut list #3]
 # ─────────────────────────────────────────────────────────────────────
 for cmd in \
-  'security_monitor::security_scan_network' \
-  'security_monitor::security_check_breach' \
-  'security_monitor::security_check_password_hash' \
-  'security_monitor::security_scan_sensitive_files' \
-  'security_monitor::security_check_url' \
-  'security_monitor::security_overview' \
-  'security_monitor::security_run_audit' \
-  'security_monitor::security_audit_deps' \
-  'security_monitor::security_scan_code' \
   'symbolic::symbolic_check_policy' \
   'symbolic::symbolic_list_policies' \
   'symbolic::symbolic_add_policy' \
@@ -333,12 +311,9 @@ for cmd in \
 do check "$cmd"; done
 
 # ─────────────────────────────────────────────────────────────────────
-# Admin — deep_scan (3) + supervisor (2) + trace (1)
+# Admin — supervisor (2) + trace (1)  [deep_scan cut by v1.6 commit aa789f7 — VISION cut list #7]
 # ─────────────────────────────────────────────────────────────────────
 for cmd in \
-  'deep_scan::deep_scan_start' \
-  'deep_scan::deep_scan_results' \
-  'deep_scan::deep_scan_summary' \
   'supervisor::supervisor_get_health' \
   'supervisor::supervisor_get_service' \
   'trace::get_recent_traces'
