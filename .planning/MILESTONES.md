@@ -4,11 +4,12 @@ Historical record of shipped versions. Each entry summarizes what shipped, what 
 
 ---
 
-## v1.6 — Narrowing Pass [IN PROGRESS]
+## v1.6 — Narrowing Pass
 
-**Started:** 2026-05-12 (chore deletions); retroactive scaffold 2026-05-13
-**Phases:** 39–44 (6 phases — 1 retro-complete, 4 reduction + close)
-**Status:** 🔄 Active. Per VISION.md (locked 2026-05-10) cut list + V2-AUTONOMOUS-HANDOFF.md §0 (2026-05-13).
+**Shipped:** 2026-05-13 (started 2026-05-12 with chore deletions; retroactive scaffold + Phases 40-44 closed 2026-05-13)
+**Phases:** 39–44 (6 phases — Phase 39 retro-wraps 7 chore commits)
+**Status:** ✅ Shipped (audit status: tech_debt — inherited OEVAL-01c v1.4 carry-forward; no v1.6-introduced gaps).
+**Archives:** `milestones/v1.6-ROADMAP.md`, `milestones/v1.6-REQUIREMENTS.md`, `milestones/v1.6-MILESTONE-AUDIT.md`, `milestones/v1.6-phases/`
 
 ### Scope
 
