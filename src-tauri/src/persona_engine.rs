@@ -640,18 +640,21 @@ fn collect_recent_execution_snippets() -> String {
 // ── UserModel — unified aggregated model of the user ─────────────────────────
 
 /// Everything BLADE knows about the user, compiled into one struct.
-/// Aggregated from persona_engine traits, deep_scan, typed_memory, people_graph,
-/// personality_mirror, character bible, and interaction history.
+/// Aggregated from persona_engine traits, typed_memory, people_graph,
+/// personality_mirror (chat-history-driven), character bible, and interaction
+/// history. v1.6 narrowing: deep_scan removed (commit aa789f7) — filesystem-
+/// walk auto-extraction retired; primary_languages + active_projects now
+/// reserved for v2.0 hunt-output ingestion (~/.blade/who-you-are.md).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserModel {
     pub name: String,
     pub role: String,                         // "full-stack developer"
-    pub primary_languages: Vec<String>,       // ["TypeScript", "Rust"]
+    pub primary_languages: Vec<String>,       // ["TypeScript", "Rust"] — v2.0 hunt fills (v1.6 cut deep_scan)
     pub work_hours: (u8, u8),                 // (10, 18) — 10am to 6pm
     pub energy_pattern: String,               // "most productive in morning"
     pub communication_style: String,          // "casual, concise, technical"
     pub pet_peeves: Vec<String>,              // ["verbose answers", "bullet points for simple questions"]
-    pub active_projects: Vec<String>,         // from deep_scan + git repos
+    pub active_projects: Vec<String>,         // v2.0 hunt fills (v1.6 cut deep_scan)
     pub goals: Vec<String>,                   // from typed_memory Goal category
     pub relationships: Vec<(String, String)>, // (name, relationship) from people_graph
     pub expertise: Vec<(String, f32)>,        // (topic, confidence) from interactions
@@ -767,8 +770,10 @@ pub fn bump_expertise(topic: &str, delta: f32, evidence: &str) {
 // ── build_user_model ──────────────────────────────────────────────────────────
 
 /// Aggregates everything BLADE knows about the user into a single `UserModel`.
-/// Pulls from: config, deep_scan, typed_memory, people_graph, persona traits,
-/// personality_mirror profile, character bible, and expertise map.
+/// Pulls from: config, typed_memory, people_graph, persona traits,
+/// personality_mirror profile (chat-history-driven), character bible, and
+/// expertise map. v1.6 narrowing: deep_scan retired — primary_languages +
+/// active_projects await v2.0 hunt-output ingestion.
 pub fn build_user_model() -> UserModel {
     let config = crate::config::load_config();
     let mut model = UserModel::default();
