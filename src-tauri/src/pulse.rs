@@ -9,12 +9,14 @@
 /// **Phase 43 (v1.6 narrowing):** Per VISION + V2-AUTONOMOUS-HANDOFF §0, the
 /// daily-summary engine + morning-briefing engine retired. The cron primitive
 /// stays. Pulse thought emission routes through `decision_gate::evaluate`
-/// (wired in the follow-up commit) so proactive interjection only fires when
-/// something genuinely matters per the user's core command.
+/// so proactive interjection only fires when something genuinely matters per
+/// the user's core command.
 
 
 use std::time::Duration;
 use tauri::Emitter;
+
+use crate::decision_gate::{evaluate, DecisionOutcome, Signal};
 
 const PULSE_INTERVAL_SECS: u64 = 15 * 60; // minimum 15 minutes between pulses
 const PULSE_POLL_SECS: u64 = 3 * 60;    // check every 3 minutes
@@ -86,6 +88,38 @@ pub fn start_pulse(app: tauri::AppHandle) {
                 match generate_pulse_thought(&config).await {
                     Ok(thought) if thought.len() >= MIN_PULSE_CHARS => {
                         last_pulse_at = std::time::Instant::now();
+
+                        // Phase 43: route the proactive interjection through decision_gate.
+                        // Pulse thoughts are observations (reversible, not time-sensitive).
+                        // Confidence 0.7 = not high enough to fire on a focused user; falls
+                        // into idle-only ActAutonomously or QueueForLater per gate rules.
+                        let signal = Signal {
+                            source: "pulse".to_string(),
+                            description: thought.clone(),
+                            confidence: 0.7,
+                            reversible: true,
+                            time_sensitive: false,
+                        };
+                        let perception = crate::perception_fusion::get_latest()
+                            .unwrap_or_default();
+                        let outcome = evaluate(&signal, &perception).await;
+
+                        let should_emit = match &outcome {
+                            DecisionOutcome::ActAutonomously { .. }
+                            | DecisionOutcome::AskUser { .. } => true,
+                            DecisionOutcome::Ignore { reason } => {
+                                log::debug!("[pulse] thought suppressed by decision_gate: {}", reason);
+                                false
+                            }
+                            DecisionOutcome::QueueForLater { .. } => {
+                                log::debug!("[pulse] thought queued by decision_gate (not emitted this cycle)");
+                                false
+                            }
+                        };
+
+                        if !should_emit {
+                            continue;
+                        }
 
                         let _ = app.emit_to("main", "blade_pulse", serde_json::json!({
                             "thought": &thought,
