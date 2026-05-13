@@ -40,6 +40,7 @@ import {
 import { BLADE_EVENTS, useTauriEvent } from '@/lib/events';
 import type {
   BladeForgeLinePayload,
+  BladeHuntLinePayload,
   BladeMessageStartPayload,
   BladeReincarnationPayload,
   BladeThinkingChunkPayload,
@@ -330,19 +331,37 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // → retrying sequence renders as distinct chat lines visually separable
   // from user/assistant turns. Same setMessages pattern as the
   // reincarnation handler above — append-only, no replace.
-  useTauriEvent<BladeForgeLinePayload>(BLADE_EVENTS.BLADE_FORGE_LINE, (e) => {
-    const { phase, detail } = e.payload;
-    const forgeMsg: ChatStreamMessage = {
-      id: crypto.randomUUID(),
-      role: 'system',
-      // Content carries the phase label + detail so the bubble renders
-      // readable text even if MessageBubble doesn't (yet) consume
-      // forgePhase. Keeps the surface graceful-degrading.
-      content: `${phase.replace('_', ' ')} — ${detail}`,
-      createdAt: Date.now(),
-      forgePhase: phase,
-    };
-    setMessages((prev) => [...prev, forgeMsg]);
+  useTauriEvent<BladeForgeLinePayload | BladeHuntLinePayload>(BLADE_EVENTS.BLADE_FORGE_LINE, (e) => {
+    const p = e.payload as Partial<BladeForgeLinePayload> & Partial<BladeHuntLinePayload>;
+    // Phase 49 (HUNT-COST-CHAT) — BLADE_FORGE_LINE now carries TWO event
+    // shapes: the original forge-phase payload and the cost-tracker
+    // chat-line payload (HuntLine-shaped with `kind`). Discriminate by the
+    // presence of `phase`.
+    if (typeof p.phase === 'string') {
+      const phase = p.phase;
+      const detail = p.detail ?? '';
+      const forgeMsg: ChatStreamMessage = {
+        id: crypto.randomUUID(),
+        role: 'system',
+        content: `${phase.replace('_', ' ')} — ${detail}`,
+        createdAt: Date.now(),
+        forgePhase: phase,
+      };
+      setMessages((prev) => [...prev, forgeMsg]);
+      return;
+    }
+    // Cost-tracker chat-line (kind: "cost" | "cost_warning" | "cost_block").
+    // Render as a system message — MessageBubble already de-emphasizes
+    // role=system so cost noise reads as ambient telemetry.
+    if (typeof p.text === 'string') {
+      const costMsg: ChatStreamMessage = {
+        id: crypto.randomUUID(),
+        role: 'system',
+        content: p.text,
+        createdAt: Date.now(),
+      };
+      setMessages((prev) => [...prev, costMsg]);
+    }
   });
 
   // Cancel any pending rAF when the provider unmounts (route change).
