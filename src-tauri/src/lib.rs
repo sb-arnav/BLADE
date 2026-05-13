@@ -628,6 +628,10 @@ pub fn run() {
             // Phase 46 v2.0 — agentic hunt onboarding (HUNT-01..09)
             onboarding::hunt::start_hunt_cmd,
             onboarding::hunt::cancel_hunt,
+            // Phase 49 v2.1 — answer-driven probing + cost surfacing
+            onboarding::hunt::hunt_post_user_answer,
+            onboarding::hunt::hunt_continue_after_cost_block,
+            tool_forge::forge_continue_after_cost_block,
             commands::set_config,
             commands::update_init_prefs,
             commands::test_provider,

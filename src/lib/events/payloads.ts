@@ -981,12 +981,42 @@ export type BladeLoopEventPayload =
 // HuntOutcome when the LLM synthesizes; BLADE_HUNT_ERROR on provider failure.
 // ---------------------------------------------------------------------------
 
+/**
+ * Phase 49 (HUNT-05-ADV / HUNT-COST-CHAT) — extended chat-line kinds.
+ *   - undefined / absent  — plain narration (v2.0 contract).
+ *   - "hunt_question"     — sharp question awaiting a user answer.
+ *                          Frontend renders an inline input that posts back
+ *                          via `huntPostUserAnswer`.
+ *   - "cost"              — running cost telemetry, rendered as small gray
+ *                          monospace. Payload carries
+ *                          { cumulative_cost_usd, budget_usd, percent_used }.
+ *   - "cost_warning"      — soft warn at 50% budget.
+ *   - "cost_block"        — hard block at 100%; frontend prompts the user to
+ *                          extend the budget via
+ *                          `huntContinueAfterCostBlock`.
+ */
+export type BladeHuntLineKind =
+  | 'hunt_question'
+  | 'cost'
+  | 'cost_warning'
+  | 'cost_block';
+
+export interface BladeHuntCostPayload {
+  cumulative_cost_usd: number;
+  budget_usd: number;
+  percent_used: number;
+}
+
 export interface BladeHuntLinePayload {
   /** "blade" — narrated by the LLM. "system" — meta lines (cancelled, capped). */
   role: 'blade' | 'system';
   text: string;
   /** RFC3339 UTC timestamp. */
   timestamp: string;
+  /** Phase 49 — kind discriminator. Absent for plain narration. */
+  kind?: BladeHuntLineKind;
+  /** Phase 49 — structured payload for cost / question kinds. */
+  payload?: BladeHuntCostPayload | Record<string, unknown>;
 }
 
 export interface BladeHuntProbeRecord {

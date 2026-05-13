@@ -127,6 +127,39 @@
   word-wrap: break-word;
 }
 
+/* Phase 49 (HUNT-COST-CHAT / HUNT-05-ADV) — kind-specific styling.
+ * Cost lines get reduced visual weight (mono, small, gray). Question lines
+ * get an attention-grabbing accent so the user notices an answer is wanted.
+ * Cost-block confirmation row arranges its inline buttons horizontally. */
+.hunt-line.kind-cost,
+.hunt-line.kind-cost_warning,
+.hunt-line.kind-cost_block {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--t-3);
+  opacity: 0.85;
+  letter-spacing: 0;
+}
+.hunt-line.kind-cost_warning {
+  color: rgba(245, 158, 11, 0.95);
+}
+.hunt-line.kind-cost_block {
+  color: rgba(248, 113, 113, 0.95);
+  font-weight: 600;
+}
+.hunt-line.kind-hunt_question {
+  color: var(--t-1);
+  font-weight: 600;
+  border-left: 2px solid rgba(138, 255, 199, 0.75);
+  padding-left: var(--s-3);
+}
+.hunt-line.kind-cost_block_actions {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+
 .hunt-composer {
   display: grid;
   grid-template-columns: 1fr auto;
