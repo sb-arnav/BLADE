@@ -12,6 +12,94 @@
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use tauri::Emitter;
+
+// ── Phase 47 — Forge chat-line wire (FORGE-02) ────────────────────────────────
+//
+// Emits a `blade_forge_line` Tauri event on every transition in the forge
+// loop so the chat surface can render forge progress as distinct system-style
+// chat lines. Six phases are emitted:
+//   1. gap_detected — forge_if_needed_with_app decides to fire
+//   2. writing      — generate_tool_script begins LLM call
+//   3. testing      — test_tool runs the smoke test
+//   4. registered   — persist_forged_tool lands the row in forged_tools
+//   5. retrying     — forge_if_needed_with_app returns; caller is expected to
+//                     retry the original user request with the new tool
+//                     available
+//   6. failed       — the loop bottoms out (no LLM, no tool, or test failure
+//                     escapes the retry budget). Detail carries the reason.
+//
+// Per the Phase 47 plan: do NOT add new substrate primitives. The 5 emit
+// sites below wrap existing code paths — the substrate is unchanged.
+
+/// Tauri event name. Mirrors the Phase 46 BLADE_HUNT_LINE pattern.
+pub const BLADE_FORGE_LINE: &str = "blade_forge_line";
+
+/// Emit a single forge chat-line. Best-effort; never panics, never bubbles
+/// an error — a stalled emit must not abort the forge loop.
+pub fn emit_forge_line(app: &tauri::AppHandle, phase: &str, detail: &str) {
+    let payload = serde_json::json!({
+        "kind": "forge",
+        "phase": phase,
+        "detail": crate::safe_slice(detail, 280).to_string(),
+        "timestamp": chrono::Utc::now().timestamp(),
+    });
+    let _ = app.emit_to("main", BLADE_FORGE_LINE, payload);
+}
+
+/// Phase 47 (FORGE-02) pre-check — search the existing tool surface for any
+/// tool whose name or description plausibly matches the capability gap. If
+/// a match exists, the forge should NOT fire — the user already has the
+/// capability they're looking for and we should use the existing tool.
+///
+/// Implementation: lowercase-keyword overlap. The gap is split into tokens
+/// (≥4 chars, alphanumeric), each token must appear in either the tool's
+/// `name`, `description`, or `forged_from`. We also scan the native-tool
+/// catalog (`crate::native_tools::all_tools()`) so forge doesn't duplicate
+/// built-in capability surfaces.
+///
+/// Returns `Some(matched_tool_name)` to short-circuit the forge; `None` to
+/// continue.
+pub fn pre_check_existing_tools(gap: &str) -> Option<String> {
+    let gap_lower = gap.to_lowercase();
+    // Tokenize: alphanumeric runs ≥4 chars. "fetch a youtube transcript"
+    // → ["fetch", "youtube", "transcript"]. The 4-char floor drops noise
+    // words like "a", "the", "of".
+    let tokens: Vec<String> = gap_lower
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|t| t.len() >= 4)
+        .map(|s| s.to_string())
+        .collect();
+    if tokens.is_empty() {
+        return None;
+    }
+
+    // Helper — every token must appear in haystack.
+    let all_tokens_match = |haystack: &str| -> bool {
+        let h = haystack.to_lowercase();
+        tokens.iter().all(|t| h.contains(t.as_str()))
+    };
+
+    // Check forged tools first (cheap DB read).
+    for tool in get_forged_tools() {
+        let haystack = format!("{} {} {}", tool.name, tool.description, tool.forged_from);
+        if all_tokens_match(&haystack) {
+            return Some(tool.name);
+        }
+    }
+
+    // Check native tools (in-memory iteration). `tool_definitions()` is the
+    // canonical catalog of the 60+ built-in tools — if any of them already
+    // covers the gap, forge would be duplicative.
+    for tool in crate::native_tools::tool_definitions() {
+        let haystack = format!("{} {}", tool.name, tool.description);
+        if all_tokens_match(&haystack) {
+            return Some(tool.name);
+        }
+    }
+
+    None
+}
 
 // ── Public structs ────────────────────────────────────────────────────────────
 
@@ -412,13 +500,58 @@ pub struct ForgeGeneration {
 /// test seam (`forge_tool_from_fixture`) share the persistence path without
 /// needing an LLM call.
 pub async fn forge_tool(capability: &str) -> Result<ForgedTool, String> {
+    forge_tool_inner(None, capability).await
+}
+
+/// Phase 47 (FORGE-02) — forge a new tool AND emit `blade_forge_line` events
+/// at every phase transition (`writing` → `testing` → `registered`).
+///
+/// Delegates to the same internal pipeline as `forge_tool`; the only
+/// difference is the `Some(app)` threaded through to `emit_forge_line`.
+/// Callers that have an `AppHandle` (chat dispatcher, immune_system) should
+/// prefer this entry-point so the chat surface renders forge progress.
+pub async fn forge_tool_with_app(
+    app: &tauri::AppHandle,
+    capability: &str,
+) -> Result<ForgedTool, String> {
+    forge_tool_inner(Some(app), capability).await
+}
+
+async fn forge_tool_inner(
+    app: Option<&tauri::AppHandle>,
+    capability: &str,
+) -> Result<ForgedTool, String> {
     let language = choose_language(capability).to_string();
+
+    // Phase 47 FORGE-02 emit #2: `writing`. The LLM call is about to fire.
+    // Detail = the provisional name we'd assign on persistence.
+    if let Some(a) = app {
+        let provisional = capability_to_name(capability);
+        emit_forge_line(
+            a,
+            "writing",
+            &format!("LLM drafting tool '{}' in {}", provisional, language),
+        );
+    }
 
     // Generate script via LLM (or budget-refuse if pathological prompt)
     let (script_code, description, usage_template, parameters) =
-        generate_tool_script(capability, &language).await?;
+        match generate_tool_script(capability, &language).await {
+            Ok(t) => t,
+            Err(e) => {
+                if let Some(a) = app {
+                    emit_forge_line(
+                        a,
+                        "failed",
+                        &format!("LLM tool-write failed: {}", e),
+                    );
+                }
+                return Err(e);
+            }
+        };
 
-    persist_forged_tool(
+    persist_forged_tool_inner(
+        app,
         capability,
         &language,
         ForgeGeneration {
@@ -446,6 +579,19 @@ pub async fn forge_tool(capability: &str) -> Result<ForgedTool, String> {
 ///
 /// On success, returns the populated `ForgedTool` record.
 pub async fn persist_forged_tool(
+    capability: &str,
+    language: &str,
+    gen: ForgeGeneration,
+) -> Result<ForgedTool, String> {
+    persist_forged_tool_inner(None, capability, language, gen).await
+}
+
+/// Phase 47 (FORGE-02) — internal persistence path that also emits
+/// `blade_forge_line` events on `testing` and `registered` phases when an
+/// `AppHandle` is supplied. Identical behavior to `persist_forged_tool`
+/// when `app == None`.
+pub async fn persist_forged_tool_inner(
+    app: Option<&tauri::AppHandle>,
     capability: &str,
     language: &str,
     gen: ForgeGeneration,
@@ -498,6 +644,15 @@ pub async fn persist_forged_tool(
     // Phase 22 (v1.3) — Voyager loop step 2 of 4: script artifact on disk.
     crate::voyager_log::skill_written(&name, &script_path_str);
 
+    // Phase 47 FORGE-02 emit #3: `testing`. Smoke-test about to run.
+    if let Some(a) = app {
+        emit_forge_line(
+            a,
+            "testing",
+            &format!("smoke-testing {}.{} (expect non-error exit)", name, ext),
+        );
+    }
+
     // Smoke-test
     let test_output = test_tool(&script_path_str, language)
         .await
@@ -528,9 +683,25 @@ pub async fn persist_forged_tool(
     ) {
         // Phase 22 Plan 22-04 (v1.3) — failure recovery (VOYAGER-08).
         rollback_partial_forge(&script_path, capability, &format!("DB insert error: {e}"));
+        if let Some(a) = app {
+            emit_forge_line(
+                a,
+                "failed",
+                &format!("DB insert failed (script rolled back): {}", e),
+            );
+        }
         return Err(format!(
             "[tool_forge] DB insert error after script write (script rolled back): {e}"
         ));
+    }
+
+    // Phase 47 FORGE-02 emit #4: `registered`. Tool is in the catalog.
+    if let Some(a) = app {
+        emit_forge_line(
+            a,
+            "registered",
+            &format!("tool '{}' is now callable via bash", name),
+        );
     }
 
     log::info!("Tool Forge: created '{}' ({})", name, language);
@@ -730,6 +901,131 @@ pub async fn forge_if_needed(user_request: &str, error_message: &str) -> Option<
 
     log::info!("Tool Forge: forging new tool for: {}", crate::safe_slice(&decision, 120));
     forge_tool(&decision).await.ok()
+}
+
+/// Phase 47 (FORGE-02) — `forge_if_needed` with chat-line emissions wired.
+///
+/// Five emit points on the happy path:
+///   1. `gap_detected` — triage LLM said "yes, forge it"
+///   2. `writing`      — inside `forge_tool_with_app` before the tool-write LLM call
+///   3. `testing`      — inside `persist_forged_tool_inner` before smoke-test
+///   4. `registered`   — inside `persist_forged_tool_inner` after DB insert
+///   5. `retrying`     — emitted here on success so the chat surface knows the
+///                       caller will retry the user's original request
+///
+/// On any failure (LLM call fails, triage says "no", forge_tool errors),
+/// emits `failed` with the structural reason and returns None.
+///
+/// Pre-check (`pre_check_existing_tools`) runs FIRST. If a matching tool
+/// already exists in the catalog, the forge does NOT fire — instead, we
+/// emit a single `gap_detected` line annotated with the matching tool
+/// name so the operator can see *why* the forge skipped, then return None.
+/// This is the FORGE-02 risk-mitigation per 47-CONTEXT.md §Risks #2.
+pub async fn forge_if_needed_with_app(
+    app: &tauri::AppHandle,
+    user_request: &str,
+    error_message: &str,
+) -> Option<ForgedTool> {
+    let config = crate::config::load_config();
+    if config.api_key.is_empty() {
+        emit_forge_line(
+            app,
+            "failed",
+            "no API key configured — forge cannot draft a tool",
+        );
+        return None;
+    }
+
+    // Pre-check: don't forge if an existing tool already covers it.
+    if let Some(existing) = pre_check_existing_tools(user_request) {
+        emit_forge_line(
+            app,
+            "gap_detected",
+            &format!(
+                "pre-check matched existing tool '{}'; skipping forge",
+                existing
+            ),
+        );
+        return None;
+    }
+
+    // Use cheap model for the triage decision
+    let cheap_model = crate::config::cheap_model_for_provider(&config.provider, &config.model);
+
+    let triage_prompt = format!(
+        "Given this failed request: '{request}' with error: '{error}', \
+         should a new standalone script tool be created to handle this capability? \
+         If yes, respond with a single sentence describing what the tool should do. \
+         If no (e.g., it's a permission error, a logic error, or the capability already exists), \
+         respond with exactly: no",
+        request = crate::safe_slice(user_request, 400),
+        error = crate::safe_slice(error_message, 400),
+    );
+
+    let messages = vec![crate::providers::ConversationMessage::User(triage_prompt)];
+
+    let decision = match crate::providers::complete_turn(
+        &config.provider,
+        &config.api_key,
+        &cheap_model,
+        &messages,
+        &[],
+        config.base_url.as_deref(),
+    )
+    .await
+    {
+        Ok(t) => t.content.trim().to_string(),
+        Err(e) => {
+            emit_forge_line(
+                app,
+                "failed",
+                &format!("triage LLM call failed: {}", e),
+            );
+            return None;
+        }
+    };
+
+    if decision.to_lowercase().starts_with("no") {
+        emit_forge_line(
+            app,
+            "failed",
+            "capability gap is structural — not tool-shaped (triage said no)",
+        );
+        return None;
+    }
+
+    // Phase 47 FORGE-02 emit #1: `gap_detected`. The forge has decided to fire.
+    emit_forge_line(
+        app,
+        "gap_detected",
+        &crate::safe_slice(&decision, 240),
+    );
+
+    log::info!("Tool Forge: forging new tool for: {}", crate::safe_slice(&decision, 120));
+    match forge_tool_with_app(app, &decision).await {
+        Ok(tool) => {
+            // Phase 47 FORGE-02 emit #5: `retrying`. The caller now retries
+            // the user's original request with the new tool available.
+            emit_forge_line(
+                app,
+                "retrying",
+                &format!(
+                    "retrying with '{}' available — '{}'",
+                    tool.name,
+                    crate::safe_slice(user_request, 160),
+                ),
+            );
+            Some(tool)
+        }
+        Err(e) => {
+            emit_forge_line(
+                app,
+                "failed",
+                &format!("forge_tool failed: {}", e),
+            );
+            None
+        }
+    }
 }
 
 /// Increment `use_count`, set `last_used`, append a per-invocation row to
