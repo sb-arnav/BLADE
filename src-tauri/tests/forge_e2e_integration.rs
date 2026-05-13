@@ -30,7 +30,7 @@
 
 use blade_lib::tool_forge::{
     arxiv_abstract_fixture, forge_tool_from_fixture, get_forged_tools, pre_check_existing_tools,
-    rss_feed_fixture, ForgeGeneration, ToolParameter,
+    pypi_metadata_fixture, rss_feed_fixture, ForgeGeneration, ToolParameter,
 };
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -411,6 +411,74 @@ async fn forge_e2e_rss_feed_lands_in_catalog() {
     assert!(
         !stderr.contains("SyntaxError"),
         "rss fixture should be syntactically valid Python; got: {}",
+        stderr
+    );
+
+    std::env::remove_var("BLADE_CONFIG_DIR");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Phase 51 (FORGE-GAP-PYPI) — gap detected → tool written → smoke-test runs
+/// → registered. PyPI metadata fixture; the `--help` path exits 0 cleanly so
+/// build-time tests stay hermetic (no network call to pypi.org during smoke
+/// test).
+#[tokio::test]
+async fn forge_e2e_pypi_metadata_lands_in_catalog() {
+    let _g = ENV_LOCK.lock().unwrap();
+    let dir = fresh_config_dir("pypi-metadata");
+    std::env::set_var("BLADE_CONFIG_DIR", &dir);
+
+    let forged = forge_tool_from_fixture(
+        "pull PyPI package metadata (latest version, description, dependencies)",
+        "python",
+        pypi_metadata_fixture(),
+    )
+    .await
+    .expect("forge_tool_from_fixture should land the PyPI tool");
+
+    let script_path = PathBuf::from(&forged.script_path);
+    assert!(script_path.is_file(), "script should exist");
+    assert!(forged.script_path.ends_with(".py"));
+
+    let all = get_forged_tools();
+    assert!(
+        all.iter().any(|t| t.id == forged.id),
+        "forged tool should be retrievable via get_forged_tools()"
+    );
+
+    let desc_lower = forged.description.to_lowercase();
+    assert!(
+        desc_lower.contains("pypi")
+            || desc_lower.contains("package")
+            || desc_lower.contains("metadata"),
+        "description should reference the capability; got: {}",
+        forged.description
+    );
+
+    let fname = format!("{}.py", forged.name);
+    assert!(
+        forged.usage.contains(&fname),
+        "usage '{}' should reference the actual script filename '{}'",
+        forged.usage,
+        fname
+    );
+
+    // --help path exits 0 (per the fixture's mock-friendly design); the smoke
+    // test must NOT hit pypi.org in CI. Assert both: exit 0 AND no SyntaxError.
+    let py = std::process::Command::new("python3")
+        .arg(&forged.script_path)
+        .arg("--help")
+        .output()
+        .expect("python3 should be available on the test host");
+    assert!(
+        py.status.success(),
+        "pypi fixture --help path should exit 0 (hermetic in CI); got status {:?}",
+        py.status
+    );
+    let stderr = String::from_utf8_lossy(&py.stderr);
+    assert!(
+        !stderr.contains("SyntaxError"),
+        "pypi fixture should be syntactically valid Python; got: {}",
         stderr
     );
 
