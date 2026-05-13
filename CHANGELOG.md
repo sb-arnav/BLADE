@@ -13,6 +13,68 @@ Nothing yet.
 
 ---
 
+## [2.1.0] -- 2026-05-13
+
+### Added (v2.1 -- Hunt + Forge + OAuth Depth)
+
+> Polish + completion pass on v2.0 per the carry-forward list in `v2.0-MILESTONE-AUDIT.md`. Closes the rough edges in hunt onboarding, OAuth coverage, and forge robustness. 4 phases (49-52). Deliberately defers items that need operator-dogfood signal (decision_gate threshold tuning, VISION-held trio) and items that are full architectural reframes (agent-native audit recs #2-10 → v2.2+).
+
+**Phase 49 -- Hunt Advanced + Cost Surfacing**
+- HUNT-05-ADV: Answer-driven probing chain. When hunt detects "fresh machine" (heuristic: fewer than 3 file findings + no git repos + no installed agents), emits the sharp question per spec Act 5 (*"Fresh machine — what do you do?"*), waits for user answer via `blade_hunt_user_answer`, re-prompts the hunt LLM with the answer as seed via new `hunt_seed_search(seed)` sandboxed tool that probes `~/code/` + git remotes for matching paths. Same sensitive-path deny list as v2.0.
+- HUNT-06-ADV: Thematic contradiction-detection. After main hunt session, a second LLM pass classifies findings into clusters (work / personal / hobby / past-self). Returns `HuntContradictionReport`. If contradictions exist, BLADE asks the specific question (per spec Act 6 — *"Python iOS from a year ago, TypeScript SaaS this month. Which one are you now?"*). Routes via `cheapest_model` to keep latency < 5s.
+- HUNT-COST-CHAT: Live cost surfacing for hunt + forge. `CostTracker` struct in `hunt.rs:392` + `tool_forge.rs:50`. Per-session token+cost tracking with $3.00 default budget. After each LLM call, emits chat-line kind `"cost"` with cumulative %. Soft warning at 50% (`"cost_warning"`); hard block at 100% (`"cost_block"` + suspend + continue prompt).
+- 4 new chat-line kinds: `hunt_question`, `cost`, `cost_warning`, `cost_block`.
+- 15 new tests; 45/45 onboarding tests pass.
+- Commits `2459af7`, `66d9bda`, `dec0e69`, `c2f8ee9`.
+
+**Phase 50 -- OAuth Coverage**
+- OAUTH-SLACK-FULL: Promoted `src-tauri/src/oauth/slack.rs` from v2.0 stub to full Slack OAuth v2 implementation. Auth URL builder (comma-separated scopes per Slack), code-for-token exchange (handles Slack's `{ok: true|false, ...}` envelope), refresh-token returns `Err(NotSupported)` (Slack OAuth v2 doesn't issue refresh tokens). Default scopes: `chat:write`, `channels:read`, `users:read`, `groups:read`, `im:read`, `mpim:read`.
+- OAUTH-GITHUB-FULL: Promoted `src-tauri/src/oauth/github.rs` to full implementation. Standard OAuth Apps flow with `Accept: application/json` header for JSON token response. Device-code fallback for headless installs (`start_device_flow` + `poll_device_flow` honoring `slow_down` backoff). Default scopes: `repo`, `user:email`, `gist`.
+- OAUTH-TESTS: `oauth_slack_integration.rs` (4 tests — added `ok_false_surfaces_provider_error` as a Slack-specific regression guard) + `oauth_github_integration.rs` (3 tests including device-flow polling).
+- Total OAuth integration tests: 10/10 green (3 Gmail + 4 Slack + 3 GitHub).
+- Notable asymmetry: Slack + GitHub return typed `Result<_, OAuthError>` because device-flow polling needs `slow_down`/`authorization_pending` discrimination; Gmail still returns `Result<_, String>` per v2.0. Migration to typed errors deferred to v2.2+ when callers want pattern-matching.
+- Commits `a6642bd`, `f8f462b`, `9563457`, `8d7e461`.
+
+**Phase 51 -- Forge Multi-Gap Robustness**
+- FORGE-GAP-ARXIV: arXiv abstract fixture. LLM-written tool uses `https://export.arxiv.org/api/query?id_list=<id>` Atom XML. Integration test in `forge_e2e_integration.rs`.
+- FORGE-GAP-RSS: RSS/Atom feed extraction fixture. LLM-written tool uses `feedparser`. Integration test.
+- FORGE-GAP-PYPI: PyPI metadata fixture (`https://pypi.org/pypi/<package>/json`). Integration test.
+- FORGE-PROMPT-TUNING: Forge system prompt iterated with explicit language anchors (Python 3 / POSIX bash / Node 18+), per-language library hints (requests, feedparser, xml.etree, jq, etc.), explicit JSON-serializable return, and one HN few-shot example. Tuned for the real-LLM path; mock-fixture tests are deterministic.
+- FORGE-PRECHECK-REFINE: New `PreCheckOutcome` enum (NativeMatch / ForgedMatch / McpInstalled / McpCatalogedNotInstalled / NoMatch). `pre_check_with_mcp_state` is a layered decision: forged → native → MCP. When MCP cataloged but not installed, emit `forge_route` chat-line (*"Could install X from catalog, or forge a quick scraper now — picking forge."*) then fire forge per user autonomy preference. Legacy `pre_check_existing_tools` unchanged so v2.0 HN tests stay pinned.
+- Forge fixture count: 1 → 5 (HN + arXiv + RSS + PyPI + youtube_transcript v1.3 demo).
+- Forge integration tests: 5/5 → 8/8 (HN baseline + 3 new gaps).
+- 6 new unit tests in `tool_forge::tests` for the routing decision logic.
+- Commits `0ce7f8c`, `dab2d04`, `1bd20dc`, `a845aa9`, `4ee51d0`.
+
+**Phase 52 -- Close**
+- CLOSE-01: This CHANGELOG entry.
+- CLOSE-02: `.planning/milestones/v2.1-MILESTONE-AUDIT.md` written.
+- CLOSE-03: Phase 49-52 directories archived to `.planning/milestones/v2.1-phases/`. `REQUIREMENTS.md` + `ROADMAP.md` snapshotted.
+- CLOSE-04: MILESTONES.md v2.1 entry. git tag `v2.1`.
+
+### Verify chain (v2.1 close)
+
+- `cargo check` clean (3 pre-existing dead_code warnings).
+- `tsc --noEmit` clean.
+- `cargo test --lib onboarding` — 45/45 pass.
+- `cargo test --features voyager-fixture --test forge_e2e_integration` — 8/8 pass.
+- `cargo test --test oauth_gmail_integration --test oauth_slack_integration --test oauth_github_integration` — 10/10 pass.
+- `npm run verify:all` — 37/38 sub-gates green; OEVAL-01c v1.4 carry-forward documented since v1.5 close.
+
+### Carry-forward (v2.2+, not v2.1 regressions)
+
+- **OEVAL-01c v1.4 organism-eval drift** — persists from v1.5/v1.6/v2.0.
+- **Decision_gate per-source pulse threshold tuning** — requires operator-dogfood signal.
+- **VISION-held-for-v2.0-evaluation trio** (Body Map / mortality-salience / Ghost Mode) — defer until v2.0/v2.1 ship externally and produce engagement data.
+- **Agent-native audit recs #2-10** — separate architectural reframe milestone (v2.2 candidate).
+- **CDN bucket provisioning + shellcheck CI + Windows ARM64 binaries** — release-CI infrastructure.
+- **Gmail error-type migration to `OAuthError`** — when callers want pattern-matching consistency.
+- **Slack token-rotation flow** — when user opts into rotation.
+- **5th holdout gap for forge** — Reddit or GitHub-trending; verify prompt-tuning didn't over-fit.
+- **Tauri-runtime emit assertions** — operator screen-recording demo covers; same as Phase 47 deferral.
+
+---
+
 ## [2.0.0] -- 2026-05-13
 
 ### Added (v2.0 -- Setup-as-Conversation + Forge Demo)
