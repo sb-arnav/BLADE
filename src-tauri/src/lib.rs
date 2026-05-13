@@ -166,6 +166,8 @@ mod resilience;       // Phase 34 v1.5 — RES-01 stuck + RES-05 provider fallba
 mod session;          // Phase 34 v1.5 — SESS-01 JSONL log + SESS-02 resume + SESS-03/04 list/fork (Plan 34-03 scaffold)
 mod decomposition;    // Phase 35 v1.5 — DECOMP-01..05 auto-decomposition (Plan 35-02 scaffold)
 mod intelligence;     // Phase 36 v1.5 — INTEL-01..06 context intelligence (Plan 36-01 scaffold)
+pub mod onboarding;   // Phase 46 v2.0 — agentic hunt onboarding (pre-scan + hunt + synthesis)
+pub mod oauth;        // Phase 46 v2.0 — HUNT-10 OAuth scaffolds (gmail primary, slack + github stubs)
 
 use chrono::Timelike;
 use std::sync::Arc;
@@ -623,6 +625,9 @@ pub fn run() {
             commands::reset_onboarding,
             commands::get_onboarding_status,
             commands::complete_onboarding,
+            // Phase 46 v2.0 — agentic hunt onboarding (HUNT-01..09)
+            onboarding::hunt::start_hunt_cmd,
+            onboarding::hunt::cancel_hunt,
             commands::set_config,
             commands::update_init_prefs,
             commands::test_provider,
