@@ -35,6 +35,105 @@ use tauri::Emitter;
 /// Tauri event name. Mirrors the Phase 46 BLADE_HUNT_LINE pattern.
 pub const BLADE_FORGE_LINE: &str = "blade_forge_line";
 
+// ── Phase 49 (HUNT-COST-CHAT) — per-forge-session cost tracker ──────────────
+//
+// Mirrors the hunt-side `HUNT_COST_TRACKER`. Reset at the top of every forge
+// invocation that has an `AppHandle` so cost lines reflect a fresh session.
+// Live cost lines emit on `BLADE_FORGE_LINE` with `kind: "cost"`; 50% soft
+// warn + 100% hard block share the helper in `onboarding::hunt`.
+
+pub(crate) static FORGE_COST_TRACKER: once_cell::sync::Lazy<std::sync::Mutex<crate::onboarding::hunt::CostTracker>> =
+    once_cell::sync::Lazy::new(|| std::sync::Mutex::new(crate::onboarding::hunt::CostTracker::default()));
+
+static FORGE_COST_CONTINUE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Frontend acknowledges the forge cost block and asks BLADE to continue
+/// with another budget bucket. Symmetric to `hunt_continue_after_cost_block`.
+#[tauri::command]
+pub fn forge_continue_after_cost_block() -> Result<(), String> {
+    FORGE_COST_CONTINUE.store(true, std::sync::atomic::Ordering::SeqCst);
+    Ok(())
+}
+
+/// Reset the forge cost tracker to the configured budget. Called at the top
+/// of every `forge_*_with_app` entry point.
+fn reset_forge_cost_tracker() {
+    let cfg = crate::config::load_config();
+    let mut t = FORGE_COST_TRACKER.lock().unwrap_or_else(|p| p.into_inner());
+    t.reset(cfg.forge.budget_usd as f64);
+    FORGE_COST_CONTINUE.store(false, std::sync::atomic::Ordering::SeqCst);
+}
+
+/// Emit a forge-side `cost*` chat-line. Re-uses the hunt-line shape but on
+/// the FORGE event so the frontend renderer can keep them visually distinct
+/// from hunt cost lines.
+fn emit_forge_cost(app: &tauri::AppHandle, line: crate::onboarding::hunt::HuntLine) {
+    let _ = app.emit_to("main", BLADE_FORGE_LINE, line);
+}
+
+/// Wrap a `providers::complete_turn` call inside `tool_forge` with the same
+/// 50% warning / 100% block / extend-bucket UX the hunt loop uses.
+///
+/// Returns the raw `AssistantTurn` on the happy path. On a hard block, parks
+/// for up to `wait_secs` waiting for `forge_continue_after_cost_block`; on
+/// acknowledgment, raises the budget by another bucket and returns the turn
+/// anyway (the call already happened). On timeout / decline, returns the
+/// turn but logs the budget overrun.
+async fn forge_complete_turn_tracked(
+    app: &tauri::AppHandle,
+    provider: &str,
+    api_key: &str,
+    model: &str,
+    messages: &[crate::providers::ConversationMessage],
+    tools: &[crate::providers::ToolDefinition],
+    base_url: Option<&str>,
+) -> Result<crate::providers::AssistantTurn, String> {
+    let turn = crate::providers::complete_turn(provider, api_key, model, messages, tools, base_url)
+        .await?;
+
+    let marginal = crate::onboarding::hunt::turn_cost_usd(
+        provider, model, turn.tokens_in, turn.tokens_out,
+    );
+
+    let (cumulative, budget, fire_warning, fire_block) = {
+        let mut t = FORGE_COST_TRACKER.lock().unwrap_or_else(|p| p.into_inner());
+        t.cumulative_input_tokens = t.cumulative_input_tokens.saturating_add(turn.tokens_in as u64);
+        t.cumulative_output_tokens = t.cumulative_output_tokens.saturating_add(turn.tokens_out as u64);
+        t.cumulative_cost_usd += marginal;
+        let cumulative = t.cumulative_cost_usd;
+        let budget = t.budget_usd;
+        let fire_warning = cumulative >= 0.5 * budget && !t.warning_emitted && !t.block_emitted;
+        let fire_block = cumulative >= budget && !t.block_emitted;
+        if fire_warning { t.warning_emitted = true; }
+        if fire_block { t.block_emitted = true; }
+        (cumulative, budget, fire_warning, fire_block)
+    };
+
+    emit_forge_cost(app, crate::onboarding::hunt::HuntLine::cost(cumulative, budget));
+    if fire_warning {
+        emit_forge_cost(app, crate::onboarding::hunt::HuntLine::cost_warning(cumulative, budget));
+    }
+    if fire_block {
+        emit_forge_cost(app, crate::onboarding::hunt::HuntLine::cost_block(cumulative, budget));
+        // Park up to 120s waiting for the user's continue ack. On timeout,
+        // log and return — the next turn will trigger the same block path
+        // since the flag stays set.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+        while std::time::Instant::now() < deadline {
+            if FORGE_COST_CONTINUE.swap(false, std::sync::atomic::Ordering::SeqCst) {
+                let cfg = crate::config::load_config();
+                let mut t = FORGE_COST_TRACKER.lock().unwrap_or_else(|p| p.into_inner());
+                t.budget_usd += cfg.forge.budget_usd as f64;
+                t.block_emitted = false;
+                t.warning_emitted = false;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+        }
+    }
+    Ok(turn)
+}
+
 /// Emit a single forge chat-line. Best-effort; never panics, never bubbles
 /// an error — a stalled emit must not abort the forge loop.
 pub fn emit_forge_line(app: &tauri::AppHandle, phase: &str, detail: &str) {
@@ -344,6 +443,25 @@ async fn generate_tool_script(
     capability: &str,
     language: &str,
 ) -> Result<(String, String, String, Vec<ToolParameter>), String> {
+    generate_tool_script_inner(None, capability, language).await
+}
+
+/// Phase 49 (HUNT-COST-CHAT) — variant that takes an `AppHandle` so the
+/// tool-write LLM call routes through the cost-tracked wrapper. Used by
+/// `forge_tool_with_app` (the app-aware entry point).
+async fn generate_tool_script_with_app(
+    app: &tauri::AppHandle,
+    capability: &str,
+    language: &str,
+) -> Result<(String, String, String, Vec<ToolParameter>), String> {
+    generate_tool_script_inner(Some(app), capability, language).await
+}
+
+async fn generate_tool_script_inner(
+    app: Option<&tauri::AppHandle>,
+    capability: &str,
+    language: &str,
+) -> Result<(String, String, String, Vec<ToolParameter>), String> {
     let config = crate::config::load_config();
 
     // Pick the best available model for code generation
@@ -397,16 +515,29 @@ async fn generate_tool_script(
 
     let messages = vec![crate::providers::ConversationMessage::User(prompt)];
 
-    let turn = crate::providers::complete_turn(
-        &provider,
-        &api_key,
-        &model,
-        &messages,
-        &[],
-        config.base_url.as_deref(),
-    )
-    .await
-    .map_err(|e| format!("LLM call failed: {}", e))?;
+    let turn = match app {
+        Some(a) => forge_complete_turn_tracked(
+            a,
+            &provider,
+            &api_key,
+            &model,
+            &messages,
+            &[],
+            config.base_url.as_deref(),
+        )
+        .await
+        .map_err(|e| format!("LLM call failed: {}", e))?,
+        None => crate::providers::complete_turn(
+            &provider,
+            &api_key,
+            &model,
+            &messages,
+            &[],
+            config.base_url.as_deref(),
+        )
+        .await
+        .map_err(|e| format!("LLM call failed: {}", e))?,
+    };
 
     let raw = turn.content.trim().to_string();
 
@@ -534,21 +665,27 @@ async fn forge_tool_inner(
         );
     }
 
-    // Generate script via LLM (or budget-refuse if pathological prompt)
-    let (script_code, description, usage_template, parameters) =
-        match generate_tool_script(capability, &language).await {
-            Ok(t) => t,
-            Err(e) => {
-                if let Some(a) = app {
-                    emit_forge_line(
-                        a,
-                        "failed",
-                        &format!("LLM tool-write failed: {}", e),
-                    );
-                }
-                return Err(e);
+    // Generate script via LLM (or budget-refuse if pathological prompt).
+    // Phase 49 (HUNT-COST-CHAT) — when an AppHandle is available, route the
+    // LLM call through the cost-tracked wrapper so the chat surfaces a
+    // running cost line for the forge session.
+    let gen_result = match app {
+        Some(a) => generate_tool_script_with_app(a, capability, &language).await,
+        None => generate_tool_script(capability, &language).await,
+    };
+    let (script_code, description, usage_template, parameters) = match gen_result {
+        Ok(t) => t,
+        Err(e) => {
+            if let Some(a) = app {
+                emit_forge_line(
+                    a,
+                    "failed",
+                    &format!("LLM tool-write failed: {}", e),
+                );
             }
-        };
+            return Err(e);
+        }
+    };
 
     persist_forged_tool_inner(
         app,
@@ -926,6 +1063,9 @@ pub async fn forge_if_needed_with_app(
     user_request: &str,
     error_message: &str,
 ) -> Option<ForgedTool> {
+    // Phase 49 (HUNT-COST-CHAT) — reset the per-forge-session tracker so cost
+    // lines reflect this run only.
+    reset_forge_cost_tracker();
     let config = crate::config::load_config();
     if config.api_key.is_empty() {
         emit_forge_line(
@@ -964,7 +1104,10 @@ pub async fn forge_if_needed_with_app(
 
     let messages = vec![crate::providers::ConversationMessage::User(triage_prompt)];
 
-    let decision = match crate::providers::complete_turn(
+    // Phase 49 (HUNT-COST-CHAT) — cost-tracked triage call. Emits running cost
+    // chat-line on BLADE_FORGE_LINE; soft-warns at 50%, hard-blocks at 100%.
+    let decision = match forge_complete_turn_tracked(
+        app,
         &config.provider,
         &config.api_key,
         &cheap_model,
