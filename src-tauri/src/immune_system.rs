@@ -83,7 +83,18 @@ pub async fn resolve_capability_gap(
         "status": "forging",
     }));
 
-    match crate::tool_forge::forge_if_needed(user_request, &format!("Missing capability: {}", capability)).await {
+    // Phase 47 (FORGE-02) — use the app-aware forge entry-point so the chat
+    // surface renders the 5-line forge sequence (gap_detected → writing →
+    // testing → registered → retrying). The pre-check inside
+    // forge_if_needed_with_app short-circuits if an existing tool covers
+    // the gap.
+    match crate::tool_forge::forge_if_needed_with_app(
+        app,
+        user_request,
+        &format!("Missing capability: {}", capability),
+    )
+    .await
+    {
         Some(tool) => {
             let _ = app.emit_to("main", "blade_evolving", serde_json::json!({
                 "capability": capability,
