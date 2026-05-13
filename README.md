@@ -54,11 +54,8 @@ Every AI tool on the market runs one agent at a time, forgets everything between
 | Browser Automation (CDP, real browser) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | partial | ✗ |
 | System Control (lock, volume, brightness) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | Smart Home (Home Assistant + Spotify) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Financial Brain (spending, subscriptions) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Health Guardian (screen time, breaks) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | Temporal Intelligence (recall, patterns) | ✓ | ✗ | ✗ | partial | ✗ | partial | ✗ | ✗ | ✗ |
-| Security Fortress (network, phishing) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Personality Mirror (learns your style) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Personality Mirror (chat-history-driven) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | Persistent vector memory (BM25 + vector, RRF) | ✓ | partial | ✗ | ✗ | ✗ | FTS5 | ✗ | ✗ | ✗ |
 | Auto-evolving MCP tool catalog | ✓ | partial | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
 | Background agent spawning (Claude Code, Aider, Goose) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
@@ -153,20 +150,11 @@ Runs in the background, capturing your active window title, clipboard contents, 
 ### Typed Memory — 7 Semantic Categories
 Old-style memory treats "birthday is March 15" the same as "prefers dark mode." BLADE's Typed Memory stores every fact in one of seven categories: **Fact** (immutable biographical data), **Preference** (how you like things), **Decision** (choices made with rationale), **Relationship** (people and their context), **Skill** (what you know or are learning), **Goal** (near-term intentions), **Routine** (recurring behavior and schedule). When context tags arrive from perception — "rust", "debugging" — the most relevant memories from matching categories are injected into the system prompt automatically.
 
-### Financial Brain — Personal Finance Intelligence
-Log transactions manually. BLADE analyzes spending patterns, identifies your top categories, shows month-over-month changes, flags when you're over budget, tracks subscriptions, detects savings opportunities, and surfaces investment suggestions based on monthly surplus. Import transactions from CSV. Financial context is injected into the system prompt when meaningful data exists — BLADE knows you're over budget on food before you ask.
-
-### Health Guardian — Screen Time and Wellbeing
-BLADE runs a background health monitor every 5 minutes. It tracks your active streak, fires break reminders at 90 minutes and 3 hours of continuous screen time, suggests winding down after 10pm, and stores daily stats (screen time, breaks taken, longest streak) to the local database. It knows when you worked, for how long, and whether you took care of yourself.
-
 ### Temporal Intelligence — Recall, Standup, Patterns
 *"What was I working on 3 hours ago?"* — BLADE queries the screen timeline, God Mode snapshots, and conversation history around that time window and summarizes what it finds. *"Give me yesterday's standup"* — generates a structured summary of what you worked on, what you completed, and what's next. Pattern detection runs across weeks of data to find recurring habits: when you start coding, when you deploy, when you context-switch.
 
-### Security Fortress — Network, Phishing, Passwords, Code Scan
-BLADE monitors active network connections and flags suspicious ones. It checks emails against breach databases. It scans your filesystem for sensitive files (credentials, private keys, `.env` files) and tells you which ones are missing from `.gitignore`. It analyzes URLs before you open them — detecting phishing indicators, suspicious redirects, and domain spoofing. Code scanning checks for hardcoded secrets and common vulnerability patterns.
-
 ### Personality Mirror — Learns Your Communication Style
-BLADE analyzes your own writing across chat history and imported external logs (WhatsApp, Telegram, Discord, iMessage, CSV) to build a PersonalityProfile: average message length, emoji frequency, formality level, technical depth, humor style, signature phrases, greeting and sign-off patterns. That profile gets injected into every response — BLADE writes back to you the way you write.
+BLADE analyzes your own writing across BLADE's chat history (and optional explicit imports from WhatsApp, Telegram, Discord, iMessage, CSV) to build a PersonalityProfile: average message length, emoji frequency, formality level, technical depth, humor style, signature phrases, greeting and sign-off patterns. That profile gets injected into every response — BLADE writes back to you the way you write. (v1.6: silent inference from filenames + shell history retired; voice comes from your stated core command + actual chat history.)
 
 ### Computer Use — Desktop Agent
 BLADE can see your screen and control it. Click buttons, fill forms, read UI elements with OCR, navigate apps, take screenshots and reason about them. Vision-driven autonomous loop: screenshot → analyze → decide → act → repeat until the goal is done.
@@ -179,8 +167,8 @@ Deep hardware detection (CPU features, GPUs with PCI IDs and IOMMU groups, virtu
 ### Memory That Compounds
 BLADE maintains three living memory blocks: what it knows about you (role, habits, preferences), its own persona, and a rolling conversation summary. Each block auto-compresses via LLM when full — there's no context limit that wipes your history. Every conversation, command, and tool result is also embedded locally and indexed with hybrid BM25 + vector search with Reciprocal Rank Fusion. The second week is smarter than the first. The second month is a different class of tool entirely.
 
-### Background Agents
-Spawn Claude Code, Aider, or Goose as background workers with one command. BLADE stays the orchestrator — one surface, multiple specialists.
+### Background Agents — Delegate to What You Already Have
+BLADE detects which coding CLIs you have installed (Claude Code, Aider, Goose, Codex CLI, Continue.dev) and routes code work to them — one surface, the specialist you already chose. (v1.6: BLADE no longer spawns arbitrary agents; it delegates to user-installed CLIs.)
 
 ### Auto-Evolving MCP Catalog
 BLADE ships with 24 MCP servers pre-catalogued (GitHub, Slack, Notion, Linear, Figma, Jira, PostgreSQL, Puppeteer, Playwright, Spotify, Obsidian, Supabase, Vercel, Gmail, Docker, AWS, Cloudflare, Stripe, MongoDB, Brave Search, Tavily, Filesystem, Memory, Composio) and auto-installs them as you use new apps. The toolkit grows without you touching a config file.
@@ -189,10 +177,7 @@ BLADE ships with 24 MCP servers pre-catalogued (GitHub, Slack, Notion, Linear, F
 Schedule recurring autonomous tasks: *"every Monday at 9am, summarize my GitHub notifications and brief me on what matters."* Runs while you sleep.
 
 ### Evolution Engine
-Background research loop that monitors AI news, suggests new MCP tools to install, and runs a morning briefing pulse. BLADE is always improving itself.
-
-### Pentest Mode
-Security testing with mandatory ownership verification. Uses Groq or Ollama — never your Anthropic key. Kali tools, nmap, sqlmap, metasploit — all gated behind an explicit authorization record.
+Background research loop that monitors AI news, suggests new MCP tools to install, and runs the proactive pulse through `decision_gate` so it only fires when something matters per your core command. BLADE is always improving itself.
 
 ---
 
@@ -264,11 +249,9 @@ BLADE/
 │   │   ├── ScreenTimeline.tsx        # Total Recall thumbnail grid + search
 │   │   ├── GodMode.tsx               # Screen context UI
 │   │   ├── GhostOverlay.tsx          # Invisible meeting overlay
-│   │   ├── FinanceDashboard.tsx      # Financial Brain UI
 │   │   ├── MeetingAssistant.tsx      # Meeting notes + audio timeline
 │   │   ├── PeopleGraph.tsx           # Relationship graph visualization
-│   │   ├── SecurityDashboard.tsx     # Security Fortress overview
-│   │   ├── OnboardingModal.tsx       # New onboarding (scan + personality)
+│   │   ├── OnboardingModal.tsx       # Onboarding (v2.0 rewrite: agentic hunt)
 │   │   └── ...                       # Settings, QuickAsk, Agents, 120+ more
 │   └── hooks/
 │       ├── useSwarm.ts               # Swarm state + real-time events
@@ -280,23 +263,19 @@ BLADE/
     ├── swarm_commands.rs             # Coordinator loop + agent spawning
     ├── swarm_planner.rs              # LLM goal decomposition + DAG synthesis
     ├── ghost_mode.rs                 # Invisible meeting overlay (cpal + Whisper)
-    ├── deep_scan.rs                  # 12-scanner system discovery
     ├── people_graph.rs               # Relationship graph (auto-learned)
     ├── auto_reply.rs                 # Draft replies in your style
     ├── typed_memory.rs               # 7-category semantic memory
-    ├── decision_gate.rs              # Autonomous action classifier
+    ├── decision_gate.rs              # Autonomous action classifier (gates pulse, agent routing)
     ├── browser_agent.rs              # Vision-driven browser agent loop
     ├── browser_native.rs             # Chrome DevTools Protocol layer
     ├── system_control.rs             # Lock, volume, brightness, apps
     ├── iot_bridge.rs                 # Home Assistant + Spotify
-    ├── financial_brain.rs            # Spending analysis + insights
-    ├── health_guardian.rs            # Screen time + break reminders
     ├── temporal_intel.rs             # Recall, standup, pattern detection
-    ├── security_monitor.rs           # Network, phishing, breach, code scan
-    ├── audio_timeline.rs             # Always-on audio capture + extraction
-    ├── personality_mirror.rs         # Communication style extraction
+    ├── audio_timeline.rs             # On-demand audio capture + extraction (v1.6: default off)
+    ├── personality_mirror.rs         # Communication style from chat history
     ├── voice_intelligence.rs         # Emotion-aware conversational voice
-    ├── screen_timeline.rs            # Screenshot capture + vision description
+    ├── screen_timeline.rs            # On-demand screenshot capture (v1.6: default off)
     ├── screen_timeline_commands.rs   # Timeline search, browse, config
     ├── godmode.rs                    # Live screen + clipboard context
     ├── brain.rs                      # System prompt builder (all context sources)
@@ -314,13 +293,12 @@ BLADE/
     ├── voice_global.rs               # Global push-to-talk + Whisper
     ├── voice_local.rs                # Local Whisper (whisper-rs)
     ├── tts.rs                        # TTS (system voices + OpenAI)
-    ├── cron.rs                       # Scheduled autonomous tasks
-    ├── pulse.rs                      # Morning briefing engine
+    ├── cron.rs                       # Scheduled autonomous tasks (primitive)
+    ├── pulse.rs                      # Proactive pulse — routed through decision_gate
     ├── soul_commands.rs              # SOUL: character bible + weekly snapshots
     ├── knowledge_graph.rs            # Entity-relationship knowledge graph
     ├── perception_fusion.rs          # Unified perception state
     ├── activity_monitor.rs           # App focus + idle detection
-    ├── kali.rs                       # Pentest mode (Groq/Ollama only)
     ├── character.rs                  # Preference learning from reactions
     ├── indexer.rs                    # Codebase symbol indexing
     └── providers/                    # Anthropic, OpenAI, Gemini, Groq, Ollama
@@ -369,7 +347,7 @@ Create `~/.blade/BLADE.md` to give BLADE workspace-level instructions (restrict 
 ### Done in v0.6.0
 - [x] Ghost Mode, Deep System Discovery, People Graph, Auto-Reply
 - [x] Typed Memory, Decision Gate, Browser Automation, System Control
-- [x] Smart Home, Financial Brain, Health Guardian, Audio Timeline
+- [x] Smart Home, Audio Timeline (on-demand from v1.6)
 - [x] Personality Mirror, Conversational Voice, Temporal Intelligence
 - [x] Security Fortress, Onboarding v2, "Hey BLADE" wake word
 

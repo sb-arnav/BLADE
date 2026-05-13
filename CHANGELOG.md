@@ -13,6 +13,64 @@ Nothing yet.
 
 ---
 
+## [1.6.0] -- 2026-05-13
+
+### Removed (v1.6 -- Narrowing Pass)
+
+> Per VISION.md (locked 2026-05-10) + V2-AUTONOMOUS-HANDOFF.md §0, v1.6 is a deletion + reduction milestone that narrows the BLADE substrate before v2.0 ships setup-as-conversation and the forge demo. No new features. 7 verticals cut, 6 always-on perception/agent paths converged.
+>
+> Phase 39 (Vertical Deletions) shipped 2026-05-12/13 as 7 `chore(v1.6)` commits before the GSD scaffold existed; commit `19f1084` retroactively wraps them. Phases 40-43 (the "Significantly reduced" track) shipped 2026-05-13 with atomic commits per requirement ID. Phase 44 closes.
+
+**Phase 39 -- Vertical Deletions** *(retroactive scaffold, shipped 2026-05-12/13)*
+- DEL-01: Financial Brain removed (`ae54a15` -- VISION cut #1)
+- DEL-02: Health Guardian removed (`b775857` -- VISION cut #2)
+- DEL-03: Security Monitor removed (`7083d14` -- VISION cut #3)
+- DEL-04: Pentest Mode (Kali tools + pentest) removed (`c0bf13f` -- VISION cut #4)
+- DEL-05: Workflow Builder removed (`2686761` -- VISION cut #5)
+- DEL-06: deeplearn auto-write synthesizer removed (`568b236` -- VISION cut #6)
+- DEL-07: Deep Scan + ecosystem auto-enable + scan onboarding removed (`aa789f7` -- VISION cut #7)
+- ~17,000+ LOC of vertical code cut from `src-tauri/src/` and `src/components/`.
+
+**Phase 40 -- Always-On to On-Demand**
+- REDUCE-02: Total Recall `screen_timeline.rs` background 30s screenshot loop default-off; on-demand `capture_screen_now` Tauri command preserved (`bcb1cd1`).
+- REDUCE-03: Audio Timeline always-on Whisper transcription default-off; on-demand command path preserved (`285a2c1`).
+- REDUCE-04: All observer-class tentacle defaults flipped to `enabled: false` in `DiskConfig::default()` and `BladeConfig::default()` per the 6-place rule. B1's existing config off-switches now ship as the default state (`6868d39`).
+
+**Phase 41 -- Persona Auto-Extraction Removal**
+- REDUCE-01: Confirmed retired. Filesystem-walk auto-extraction in `persona_engine.rs` + `personality_mirror.rs` was co-deleted when Phase 39 cut `deep_scan`. Phase 41 = formal recognition + stale doc cleanup. Voice comes from user-stated core command (v2.0 hunt fills) + actual chat history (`personality_mirror::personality_analyze` over `~/.blade/history/`). `UserModel.primary_languages` + `UserModel.active_projects` retained as v2.0 hunt-output ingestion targets (`7bd44a0`).
+
+**Phase 42 -- Background Agent Delegation**
+- REDUCE-05: `background_agent.rs` "spawn arbitrary scripts" path removed (`"bash"` agent_type from `build_agent_command()` + tool schema). Header rewritten to clarify: BLADE delegates to user-installed coding CLIs (Claude Code / Aider / Goose / Codex / Continue), it does NOT spawn arbitrary agents. Routing logic (`detect_available_agents`, `auto_spawn_agent`) and sibling-context injection retained as the delegation infrastructure. Direct shell exec routes via `blade_bash` native tool, not via background-agent system (`b0bfa65`).
+
+**Phase 43 -- Pulse Reduction**
+- REDUCE-06: `pulse.rs` 1085 -> 487 LOC (-598). Cut the daily-summary engine (`DailyDigest` + `generate_daily_digest` + helpers) and the morning-briefing engine (`maybe_morning_briefing` + `run_morning_briefing` + `generate_morning_briefing` + `gather_morning_context` + `build_morning_prompt`). Cron primitive (`start_pulse`) retained. Routed proactive pulse-thought emission through `decision_gate::evaluate` so pulse-thoughts now only emit when the gate returns `ActAutonomously` or `AskUser` (per-source threshold-learning will tune over time via `decision_feedback`). Removed corresponding handler registrations in `lib.rs` + cron preset task in `cron.rs` (`1d688a8`, `2c2e49f`).
+
+**Phase 44 -- Close**
+- CLOSE-01: This CHANGELOG entry.
+- CLOSE-02: `.planning/milestones/v1.6-MILESTONE-AUDIT.md` shipped (3-source cross-reference: VISION cut list <-> REQUIREMENTS.md <-> git log).
+- CLOSE-03: Phase 39-44 directories archived to `.planning/milestones/v1.6-phases/`.
+- CLOSE-04: README narrowed-scope update (cut-vertical claims removed). MILESTONES.md v1.6 entry updated to Shipped.
+
+### Verify chain (v1.6 close)
+
+- `cargo check` clean (3 pre-existing dead_code warnings on out-of-scope helpers).
+- `tsc --noEmit` clean.
+- `npm run verify:all` 37/38 sub-gates green. The 1 documented gap is `verify:eval` failing on `evals::organism_eval::evaluates_organism` -- the OEVAL-01c v1.4 carry-forward documented since v1.5 close. Above the V2-AUTONOMOUS-HANDOFF.md §0 close floor (>=36/38).
+- v1.6 added no new verify gates. Several existing scripts updated to match the deletion reality: `verify-feature-cluster-routes.sh`, `verify-phase6-rust-surface.sh`, `verify-phase7-rust-surface.sh`, `verify-empty-state-coverage.sh`, `verify-scan-event-compat.mjs`, `verify-ecosystem-guardrail.mjs`, and `.planning/milestones/v1.1-phases/10-inventory-wiring-audit/10-WIRING-AUDIT.json` (-22 cut modules, -5 cut routes).
+
+### Carry-forward / known gaps
+
+- OEVAL-01c v1.4 organism-eval drift -- inherited from v1.5 close (`tech_debt`). Not introduced by v1.6 work; persists into v2.0+.
+- `decision_gate` per-source threshold for `"pulse"` defaults to 0.9; current pulse-thought confidence = 0.7 -> all pulses queued / suppressed until operator feedback lowers the threshold. Intentional per VISION ("only when something genuinely matters"); revisit during v2.0 dogfood.
+- `agent_auto_spawned` event surfaces routing rationale (Claude Code vs Aider vs Goose) in payload but no frontend chat-line listener exists. Deferred to v2.0 forge demo phase per `.planning/decisions.md` 2026-05-13 ("v1.6 = pure deletion, NOT agent-native reframe").
+- Onboarding `Steps.tsx -> ApiKeyEntry -> DeepScanReview -> PersonaCheck` flow NOT cut in v1.6. Folded into **v2.0 Phase 1** per V2-AUTONOMOUS-HANDOFF.md §0 item 7 (the hunt onboarding replaces Steps wholesale; avoids two passes on the same files).
+
+### What ships next
+
+v2.0 = Setup-as-Conversation + Forge Demo. Three outcomes per V2-AUTONOMOUS-HANDOFF.md §0: (1) Install pipeline (`curl|sh` macOS/Linux, `iwr|iex` Windows, WSL detection, upgrade-vs-fresh), (2) Agentic hunt onboarding per `.planning/v2.0-onboarding-spec.md`, (3) One forge wire end-to-end -- the Twitter-video moment per VISION:40.
+
+---
+
 ## [1.5.0] -- 2026-05-08
 
 ### Added (v1.5 -- Intelligence Layer)
