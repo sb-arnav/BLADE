@@ -236,6 +236,16 @@ export const BLADE_EVENTS = {
   // Payload: BladeLoopEventPayload (see ./payloads.ts).
   // ActivityStrip subscribes via useActivityLog (see src/features/activity-log/index.tsx).
   BLADE_LOOP_EVENT: 'blade_loop_event',
+
+  // ───── Phase 46 — Agentic Hunt Onboarding (HUNT-01..09, v2.0) ───────────
+  // Emitted by src-tauri/src/onboarding/hunt.rs during the LLM-driven hunt.
+  // BLADE_HUNT_LINE: every chat-line (narration + findings + closing prompt).
+  // BLADE_HUNT_DONE: final HuntOutcome payload — Hunt.tsx flips to first-task.
+  // BLADE_HUNT_ERROR: provider/network failure string — Hunt.tsx surfaces and
+  //                   routes user to the no-data fallback.
+  BLADE_HUNT_LINE:  'blade_hunt_line',
+  BLADE_HUNT_DONE:  'blade_hunt_done',
+  BLADE_HUNT_ERROR: 'blade_hunt_error',
 } as const;
 
 /** Literal union of every string in BLADE_EVENTS. */

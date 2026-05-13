@@ -1,58 +1,34 @@
-// src/features/onboarding/OnboardingFlow.tsx — 4-step wizard container (D-47).
+// src/features/onboarding/OnboardingFlow.tsx — Phase 46 v2.0 agentic hunt entry.
 //
-// Mounts useOnboardingState once, passes state + atomic setters to whichever
-// step component matches `state.step`. No event subscriptions here — each
-// step owns its own useTauriEvent call (DeepScanStep owns the only one).
+// PRIOR SHAPE (v1.6 and earlier): 4-step wizard mounting useOnboardingState +
+//   ProviderPicker / ApiKeyEntry / PersonaQuestions. Steps.tsx rendered the
+//   pill row above each step. All five files were retired by Phase 46.
 //
-// The `onComplete` prop is the gate re-evaluation trigger; MainShell (Plan 06)
-// passes a callback that flips its gate status back to 'checking' → re-runs
-// getOnboardingStatus + useConfig().config.onboarded.
+// CURRENT SHAPE (v2.0): the hunt is the onboarding. The pre-scan runs in
+//   parallel to chat-window paint; Message #1 fires within ≤2s; the LLM hunt
+//   narrates probes in real time; synthesis writes ~/.blade/who-you-are.md
+//   and emits the closing "one thing you've been putting off" line. The
+//   user's first task IS the closing demo of onboarding — there is no
+//   separate "setup complete" screen.
 //
-// @see .planning/phases/02-onboarding-shell/02-CONTEXT.md §D-47, §D-48
-// @see src/features/onboarding/useOnboardingState.ts
+// MainShell.useOnboardingGate consumes `OnboardingFlow { onComplete }` —
+// preserving that export shape means no MainShell changes for the rip.
+//
+// @see .planning/phases/46-agentic-hunt-onboarding/46-CONTEXT.md
+// @see .planning/v2.0-onboarding-spec.md (Acts 1-7)
 
-import { useOnboardingState } from './useOnboardingState';
-import { ProviderPicker } from './ProviderPicker';
-import { ApiKeyEntry } from './ApiKeyEntry';
-import { PersonaQuestions } from './PersonaQuestions';
-import './onboarding.css';
+import { Hunt } from './Hunt';
+import './onboarding.css'; // surface wrapper + design tokens shared with the hunt
 
 interface Props {
   onComplete: () => void;
 }
 
 export function OnboardingFlow({ onComplete }: Props) {
-  const hook = useOnboardingState();
-  const { state } = hook;
-
   return (
-    <main className="onb-surface" role="main">
-      {state.step === 'provider' && (
-        <ProviderPicker
-          state={state}
-          setProvider={hook.setProvider}
-          setStep={hook.setStep}
-        />
-      )}
-      {state.step === 'apikey' && (
-        <ApiKeyEntry
-          state={state}
-          setApiKey={hook.setApiKey}
-          setStep={hook.setStep}
-          beginTest={hook.beginTest}
-          endTestOk={hook.endTestOk}
-          endTestErr={hook.endTestErr}
-        />
-      )}
-      {state.step === 'persona' && (
-        <PersonaQuestions
-          state={state}
-          setStep={hook.setStep}
-          setAnswer={hook.setAnswer}
-          onComplete={onComplete}
-        />
-      )}
-    </main>
+    <div className="onb-surface" role="main">
+      <Hunt onComplete={onComplete} />
+    </div>
   );
 }
 
