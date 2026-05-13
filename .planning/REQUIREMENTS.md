@@ -1,100 +1,64 @@
 # Requirements: BLADE
 
-**Defined:** 2026-05-03 (v1.5 baseline); v1.6 added 2026-05-13
+**Defined:** 2026-05-03 baseline; v2.0 milestone scoped 2026-05-13.
 **Core Value:** BLADE works out of the box, you can always see what it's doing, and it thinks before it acts.
 
-## v1.6 Requirements — Narrowing Pass
+## v2.0 Requirements — Setup-as-Conversation + Forge Demo
 
-VISION.md (locked 2026-05-10) names two reduction tracks for v1.6: **Removed (locked)** and **Significantly reduced**. The "Removed" track shipped 2026-05-12/13 as 7 `chore(v1.6)` commits without phase scaffold (now wrapped as retroactive Phase 39). The "Significantly reduced" track is what v1.6 closes.
+Three outcomes only per V2-AUTONOMOUS-HANDOFF.md §0. Detailed flow in `.planning/v2.0-onboarding-spec.md`. Authority chain: VISION.md (locked 2026-05-10) > `.planning/decisions.md` 2026-05-13 entries > V2-AUTONOMOUS-HANDOFF.md > this milestone scope.
 
-Per `.planning/decisions.md` 2026-05-13 "v1.6 shape = pure deletion, NOT the audit's 5-phase agent-native reframe": the agent-native audit's recs #2-10 (slash commands, crud_tools! macro, build-time codegen, etc.) roll into **v2.0**, not v1.6. Per V2-AUTONOMOUS-HANDOFF.md §0 item 7: the **onboarding Steps cut folds into v2.0 Phase 1**, not v1.6.
+### Install Pipeline (Phase 45)
 
-### Vertical Deletions (Phase 39 — SHIPPED retroactively)
+- [ ] **INSTALL-01**: `curl -sSL slayerblade.site/install | sh` macOS/Linux installer downloads BLADE Tauri binary, installs to `/Applications/Blade.app` (macOS) or `~/.local/bin/blade` (Linux), auto-launches.
+- [ ] **INSTALL-02**: PowerShell `iwr -useb slayerblade.site/install.ps1 | iex` Windows variant — installs to `%LOCALAPPDATA%\Programs\Blade\`.
+- [ ] **INSTALL-03**: WSL detection during install. If user runs the Linux installer inside WSL, install proceeds normally (no change). If user runs the Windows installer on a machine that has WSL with Claude Code installed inside WSL, document the WSL→Windows binary path delegation in `platform_paths.md` (consumed by Phase 46's hunt).
+- [ ] **INSTALL-04**: Architecture detection — installer picks the correct arm64-vs-x86_64 binary based on `uname -m` (macOS/Linux) and `$env:PROCESSOR_ARCHITECTURE` (Windows).
+- [ ] **INSTALL-05**: Upgrade-vs-fresh handling. On upgrade, preserve `~/.blade/who-you-are.md`, the OS keychain entries for API keys, and `~/.blade/blade.db` SQLite. On fresh install, none of these exist yet.
+- [ ] **INSTALL-06**: macOS quarantine fix. The installer post-install step or first-launch script runs `xattr -cr /Applications/Blade.app` automatically to clear Gatekeeper quarantine. README documents the manual fallback if it fails.
+- [ ] **INSTALL-07**: Fallback download host beyond GitHub Releases for proxied / restricted networks. Mirror to `cdn.slayerblade.site/releases/v{version}/` (or similar).
 
-- [x] **DEL-01**: Financial Brain removed — `financial_brain.rs` + UI + routes (commit `ae54a15`)
-- [x] **DEL-02**: Health Guardian removed — `health_guardian.rs` + UI + routes (commit `b775857`)
-- [x] **DEL-03**: Security Monitor removed — `security_monitor.rs` + scan tooling (commit `7083d14`)
-- [x] **DEL-04**: Pentest Mode removed — kali + pentest modules + UI (commit `c0bf13f`)
-- [x] **DEL-05**: Workflow Builder removed — visual graph editor (commit `2686761`)
-- [x] **DEL-06**: deeplearn auto-write synthesizer removed (commit `568b236`)
-- [x] **DEL-07**: Deep Scan + ecosystem auto-enable + scan onboarding removed (commit `aa789f7`)
+### Agentic Hunt Onboarding (Phase 46)
 
-### Always-On → On-Demand (Phase 40)
+Per `.planning/v2.0-onboarding-spec.md` Acts 1-7. Rips `Steps.tsx → ApiKeyEntry → DeepScanReview → PersonaCheck` wholesale (the cut deferred from v1.6 per V2-AUTONOMOUS-HANDOFF.md §0 item 7).
 
-- [ ] **REDUCE-02**: Total Recall — `screen_timeline.rs` background 30s screenshot loop disabled by default; fires on demand when user asks "what was on my screen N min ago" (LLM tool call into the on-demand capture path). Background loop in `lib.rs` removed; on-demand command remains.
-- [ ] **REDUCE-03**: Audio Timeline — `audio_timeline.rs` always-on transcription removed; on-demand transcription path stays (Whisper invoked from explicit user request only).
-- [ ] **REDUCE-04**: Tentacle passive observation — B1 already shipped config off-switches; Phase 40 flips defaults to **off** for all observer-class tentacles. Opt-in only.
+- [ ] **HUNT-01**: Pre-scan (≤2s) — agent presence (`which claude/cursor/ollama/aider/gh`), API keys (env vars + Claude Code config + Cursor config + OS keychain), Ollama TCP probe `:11434`, OS+arch via `uname` / Windows registry, default browser via OS-native API, mic permission check (no recording). Result lands in in-memory `InitialContext`; nothing persisted unless user opts in.
+- [ ] **HUNT-02**: Message #1 — key disclosure + default model rationale + override paths + "feels illegal but legal" register + skip semantics. Four-sentence first bubble per spec.
+- [ ] **HUNT-03**: LLM-driven hunt with live chat narration. Single LLM session prompted to decide what to probe; equipped with sandboxed readonly tools (`read_file`, `list_dir`, `run_shell` no-network). Every probe narrates as it runs. ~50K token input cap; recency-weighted sampling; cost surfaces live.
+- [ ] **HUNT-04**: `platform_paths.md` knowledge file ships with BLADE. Per-OS install conventions (Windows + macOS + Linux + WSL detection). Loaded into the hunt LLM's context.
+- [ ] **HUNT-05**: No-data fallback. If hunt yields nothing (fresh machine), BLADE asks ONE sharp question — *"what do you do? not your job — the thing you'd point a friend at if they asked"* — then uses the answer as a search seed.
+- [ ] **HUNT-06**: Contradiction surfacing. When hunt finds contradictory signals (year-old Python iOS workspace + this-week TypeScript SaaS commits), BLADE asks the contradiction directly, not a generic question.
+- [ ] **HUNT-07**: Synthesis to `~/.blade/who-you-are.md` — user-editable Markdown file. Like CLAUDE.md but it's BLADE's model of the human.
+- [ ] **HUNT-08**: First task closes onboarding by BLADE *acting*, not a "setup complete" screen. *"Give me one thing you've been putting off this week — I'll handle it now."*
+- [ ] **HUNT-09**: Steps.tsx + ApiKeyEntry + DeepScanReview + PersonaCheck flow retired. The hunt replaces it wholesale.
+- [ ] **HUNT-10**: External-account OAuth flows (Slack/Gmail/etc.) built with mock-server integration tests. Real "click Allow on Google's screen" happens on each end-user's first run on their machine. Build-time only uses localhost mock OAuth servers per V2-AUTONOMOUS-HANDOFF.md §1.
 
-### Persona Auto-Extraction Removal (Phase 41)
+### One Forge Wire (Phase 47)
 
-- [ ] **REDUCE-01**: Rip silent personality inference from filenames + shell history in `persona_engine.rs` (~1,317 LOC) and `personality_mirror.rs` (~821 LOC). Voice comes from user-stated core command (filled by v2.0 hunt) + actual chat history only. Significant LOC reduction, NOT deletion — keep the modules for v2.0 hunt output ingestion.
+The Twitter-video moment per VISION:40. The forge primitive shipped substrate 2026-05-02 (v1.3 Phase 22: `evolution.rs` → `autoskills.rs` → `tool_forge.rs`) but has not fired on a real capability gap in lived chat in 11+ days. v2.0 makes it fire visibly on one real gap.
 
-### Background Agent Delegation (Phase 42)
+- [ ] **FORGE-01**: Pick one capability gap a power user actually hits. Candidates: "fetch a YouTube transcript and summarize," "scrape this Notion page and extract the action items," "extract structured data from a Twitter/X thread." Lock the gap in `47-CONTEXT.md` discussion.
+- [ ] **FORGE-02**: Wire forge to fire visibly in chat. Chat-line emission: *"capability gap detected → writing tool → testing → registered → retrying"*. Each transition is a separate chat-line, not a single status update.
+- [ ] **FORGE-03**: End-to-end against a real LLM (not the existing `youtube_transcript` fixture). Forge writes the tool, registers it, retries the original user request, succeeds. The 30-second demo video is recordable.
 
-- [ ] **REDUCE-05**: `background_agent.rs` (~728 LOC) — rip BLADE's "spawn arbitrary agents" code. Replace with detection: which agent stacks does the user have installed (Claude Code, Cursor, Goose, Aider)? Route code work to the detected agent. BLADE itself stops spawning workers.
+### Close (Phase 48)
 
-### Pulse Reduction (Phase 43)
+- [ ] **CLOSE-01**: CHANGELOG v2.0 entry — all 20 REQ-IDs, commit SHAs, verify gate count
+- [ ] **CLOSE-02**: `.planning/milestones/v2.0-MILESTONE-AUDIT.md` (3-source cross-reference: VISION ↔ REQUIREMENTS.md ↔ git log + the v2.0-onboarding-spec.md falsification conditions)
+- [ ] **CLOSE-03**: Phase 45-48 directories archived to `milestones/v2.0-phases/`. cargo + tsc + verify:all all green to floor.
+- [ ] **CLOSE-04**: README rewrite reflecting v2.0 positioning — install command up top, hunt onboarding documented, forge demo section. MILESTONES.md v2.0 entry. git tag `v2.0` pushed.
 
-- [ ] **REDUCE-06**: `pulse.rs` (~1,094 LOC) — cron primitive stays. Daily-summary engine cuts. Proactive interjection routes through `decision_gate` so it only fires when something matters per the core command. Morning briefing as a feature retires; the underlying scheduler remains for future cron-driven work.
+## v1.6 Requirements (Validated — Narrowing Pass, closed 2026-05-13 tech_debt)
 
-### Close (Phase 44)
+See `.planning/milestones/v1.6-REQUIREMENTS.md` for full text. 13/13 REQ-IDs shipped. OEVAL-01c v1.4 carry-forward from v1.5 inherited but not introduced by v1.6.
 
-- [ ] **CLOSE-01**: CHANGELOG v1.6 entry — lists all 7 vertical deletions + 6 reductions + verify gate count (must remain ≥36/38 per V2-AUTONOMOUS-HANDOFF §0 close criteria; OEVAL-01c v1.4 carry-forward documented)
-- [ ] **CLOSE-02**: `milestones/v1.6-MILESTONE-AUDIT.md` written with phase coverage, requirements 3-source cross-reference, static gates, executive verdict
-- [ ] **CLOSE-03**: Phase 39–44 directories archived to `milestones/v1.6-phases/`; cargo check + tsc --noEmit + verify:all all exit 0
-- [ ] **CLOSE-04**: README updated to reflect narrowed scope (vertical product surfaces no longer claimed); MILESTONES.md gets v1.6 entry
+## Out of Scope — v2.0 (still held for evaluation)
 
-## Future Requirements — v2.0 (Setup-as-Conversation + Forge Demo)
+Per VISION.md "Held for v2.0 evaluation": Body Map / Organ Registry / Pixel World / Tentacle Detail panes, mortality-salience implementation, Ghost Mode invisible meeting overlay. v2.0 evaluation outcome documented at close.
 
-Three outcomes only per V2-AUTONOMOUS-HANDOFF §0. Detailed phase planning will be created at v1.6 close via `/gsd-new-milestone v2.0`.
+## Kept (locked) — unchanged from v1.6
 
-### Install Pipeline
-
-- **INSTALL-01**: `curl -sSL slayerblade.site/install | sh` macOS/Linux installer downloads, installs, auto-launches
-- **INSTALL-02**: PowerShell `iwr | iex` variant for Windows
-- **INSTALL-03**: WSL detection during install — if Windows + WSL, install inside the WSL distro the user is most active in
-- **INSTALL-04**: Architecture detection (arm64 vs x86_64, macOS vs Linux vs Windows)
-- **INSTALL-05**: Upgrade-vs-fresh handling — preserve `~/.blade/who-you-are.md` + keychain + SQLite on upgrade
-- **INSTALL-06**: macOS quarantine fix — `xattr -cr` auto-runs on Gatekeeper-blocked launch with README documentation
-- **INSTALL-07**: Fallback download host beyond GitHub Releases for proxied networks
-
-### Agentic Hunt Onboarding (per `.planning/v2.0-onboarding-spec.md`)
-
-- **HUNT-01**: Pre-scan (≤2s, no DB write) — agent presence, API keys, Ollama probe, OS+arch, default browser, mic permission
-- **HUNT-02**: Message #1 — key disclose + default model + override + "feels illegal but legal" register + skip path
-- **HUNT-03**: LLM-driven hunt with live chat narration — sandboxed readonly tools, ~50K token cap, recency-weighted
-- **HUNT-04**: `platform_paths.md` knowledge file — per-OS install conventions (Windows/macOS/Linux + WSL detection)
-- **HUNT-05**: No-data fallback — one sharp question + answer-driven probes
-- **HUNT-06**: Contradiction surfacing — sharp questions when signals conflict
-- **HUNT-07**: Synthesis to `~/.blade/who-you-are.md` (user-editable Markdown)
-- **HUNT-08**: First task closes onboarding by BLADE *acting*, not a "setup complete" screen
-- **HUNT-09**: Steps.tsx → ApiKeyEntry → DeepScanReview → PersonaCheck flow retired (folded from v1.6 cut list)
-- **HUNT-10**: External-account auth (OAuth/Slack/Gmail/etc.) — build OAuth flows + unit-test URL/token logic + integration-test against localhost mock OAuth servers. Real "click Allow" happens on each end-user's first run, NOT at build time.
-
-### One Forge Wire (the Twitter-video moment per VISION:40)
-
-- **FORGE-01**: Pick one capability gap a power user actually hits (e.g., "fetch a YouTube transcript and summarize", "scrape this Notion page")
-- **FORGE-02**: Wire forge to fire visibly in chat — *"capability gap detected → writing tool → testing → registered → retrying"*
-- **FORGE-03**: End-to-end against a real LLM (not a fixture) — forge writes the tool, registers it, retries the original request, succeeds
-
-## Out of Scope — v1.6 / v2.0 (per VISION.md "Held for v2.0 evaluation")
-
-These are NEITHER cut NOR kept locked. v2.0 evaluation decides, but no work happens on them in this milestone:
-
-- Body Map / Organ Registry / Pixel World / Tentacle Detail visualization panes
-- Mortality-salience implementation (the *concept* of dormancy stays; the impl is up for evaluation)
-- Ghost Mode (invisible meeting overlay) — demoted from tier-1; v2.0 evaluation question
-
-## Kept (locked — VISION.md "presence, not features")
-
-Hormones · vitality · active inference · character bible (SOUL) · Hive Mesh architecture · tentacles as a pattern · Evolution Engine (reframed as the proactive-presence + autonomous-knowledge-update layer, decision-gated).
-
-These create *liveliness* the way memory creates *continuity*. Both are load-bearing for the JARVIS feel. Not negotiable in v1.6 / v2.0.
-
-## v1.5 Requirements (Validated — Intelligence Layer, closed 2026-05-08 tech_debt)
-
-See `.planning/milestones/v1.5-REQUIREMENTS.md` for full text. All 38 requirements code-complete; runtime UAT operator-deferred per feedback_deferred_uat_pattern.md.
+Hormones · vitality · active inference · character bible (SOUL) · Hive Mesh architecture · tentacles as a pattern · Evolution Engine (decision-gated). Untouched in v2.0.
 
 ---
 
-*Updated 2026-05-13 — v1.6 retroactive scaffold per V2-AUTONOMOUS-HANDOFF.md*
+*Updated 2026-05-13 — v2.0 Setup-as-Conversation + Forge Demo milestone scope landed per V2-AUTONOMOUS-HANDOFF.md §0.*
