@@ -29,8 +29,8 @@
 // env var.
 
 use blade_lib::tool_forge::{
-    forge_tool_from_fixture, get_forged_tools, pre_check_existing_tools, ForgeGeneration,
-    ToolParameter,
+    arxiv_abstract_fixture, forge_tool_from_fixture, get_forged_tools, pre_check_existing_tools,
+    ForgeGeneration, ToolParameter,
 };
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -276,4 +276,82 @@ async fn pre_check_handles_empty_gap() {
     assert!(pre_check_existing_tools("").is_none());
     assert!(pre_check_existing_tools("   ").is_none());
     assert!(pre_check_existing_tools("a b c").is_none(), "no token ≥4 chars");
+}
+
+// ── Phase 51 (FORGE-GAP-*) — multi-gap robustness integration tests ──────────
+//
+// One test per new fixture, mirroring `forge_e2e_hackernews_top_stories_lands_
+// in_catalog` shape: forge the tool, then assert script-on-disk + DB row +
+// description carries the capability surface + usage substitution.
+
+/// Phase 51 (FORGE-GAP-ARXIV) — gap detected → tool written → smoke-test runs
+/// → registered. Equivalent to the HN test but for the arXiv abstract fetcher.
+#[tokio::test]
+async fn forge_e2e_arxiv_abstract_lands_in_catalog() {
+    let _g = ENV_LOCK.lock().unwrap();
+    let dir = fresh_config_dir("arxiv-abstract");
+    std::env::set_var("BLADE_CONFIG_DIR", &dir);
+
+    let forged = forge_tool_from_fixture(
+        "fetch the abstract of an arXiv paper by ID or URL",
+        "python",
+        arxiv_abstract_fixture(),
+    )
+    .await
+    .expect("forge_tool_from_fixture should land the arXiv tool");
+
+    // 1. Script artifact on disk
+    let script_path = PathBuf::from(&forged.script_path);
+    assert!(
+        script_path.is_file(),
+        "script should exist at {}",
+        script_path.display()
+    );
+    assert!(
+        forged.script_path.ends_with(".py"),
+        "language=python should write a .py file, got {}",
+        forged.script_path
+    );
+
+    // 2. DB row queryable via the public catalog API
+    let all = get_forged_tools();
+    assert!(
+        all.iter().any(|t| t.id == forged.id),
+        "forged tool should be retrievable via get_forged_tools()"
+    );
+
+    // 3. Description carries the capability surface
+    let desc_lower = forged.description.to_lowercase();
+    assert!(
+        desc_lower.contains("arxiv") || desc_lower.contains("abstract"),
+        "description should reference the capability; got: {}",
+        forged.description
+    );
+
+    // 4. Usage string substituted the real filename for the placeholder
+    let fname = format!("{}.py", forged.name);
+    assert!(
+        forged.usage.contains(&fname),
+        "usage '{}' should reference the actual script filename '{}'",
+        forged.usage,
+        fname
+    );
+
+    // 5. The script should actually be runnable in a sandbox — invoke it with
+    //    --help and confirm it doesn't crash (stderr usage line is fine, exit
+    //    code is non-zero by design; we only care that python parsed it).
+    let py = std::process::Command::new("python3")
+        .arg(&forged.script_path)
+        .arg("--help")
+        .output()
+        .expect("python3 should be available on the test host");
+    let stderr = String::from_utf8_lossy(&py.stderr);
+    assert!(
+        !stderr.contains("SyntaxError"),
+        "arxiv fixture should be syntactically valid Python; got: {}",
+        stderr
+    );
+
+    std::env::remove_var("BLADE_CONFIG_DIR");
+    let _ = std::fs::remove_dir_all(&dir);
 }
