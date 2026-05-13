@@ -261,6 +261,30 @@ sudo apt-get install -y \
 
 ---
 
+## Forge demo
+
+The forge primitive — BLADE detects a capability gap, writes a tool to
+fill it, tests it, registers it, and retries the user's request, all
+visible as chat lines — has a runnable demo:
+
+```bash
+BLADE_FORGE_DEMO=1 npm run tauri dev
+```
+
+Then in chat, type:
+```
+Show me today's top 5 HackerNews stories with titles, points, and comment counts.
+```
+
+Expected 5-line forge band (monospace, hammer-glyph prefix):
+`gap_detected → writing → testing → registered → retrying`,
+followed by the assistant reply with the actual HN list.
+
+Full demo guide + recording notes:
+[`scripts/demo/forge-demo.md`](scripts/demo/forge-demo.md).
+
+---
+
 ## Architecture
 
 ```
