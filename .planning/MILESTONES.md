@@ -4,6 +4,26 @@ Historical record of shipped versions. Each entry summarizes what shipped, what 
 
 ---
 
+## v2.2 — VISION-Close + Goose-Integrate + Launch-Ready
+
+**Status:** 🚧 In progress (scoped 2026-05-14, executing autonomously per V2-AUTONOMOUS-HANDOFF §4)
+**Phases:** 53–61 (9 phases)
+**Archives:** `milestones/v2.2-ROADMAP.md`, `milestones/v2.2-REQUIREMENTS.md`
+
+### Scope
+
+Three workstreams in one milestone, anchored on 5-agent research swarm 2026-05-14:
+
+1. **Close load-bearing VISION gaps** — presence layer (fifth primitive) observable in chat; setup-as-conversation produces TELOS-shaped optimization target; held-trio reorganized off main nav.
+2. **Stop building what already exists** — rip Goose's Provider trait + canonical_models.json + SQLite session schema (Apache 2 Rust foundations). Adopt OpenClaw's skill-as-markdown directory pattern. Kill embeddings.rs vector layer (BM25 + KG covers personal-scale retrieval per PAI v5 + Zep paper evidence).
+3. **Prep the forge launch demo + Show HN + Miessler DM** — assemble artifacts per VISION line 40 (Twitter-video moment). Recording/posting operator-owned.
+
+Phase order: 53 PRESENCE-NARRATE → 54 GOOSE-PROVIDER → 55 GOOSE-SESSION → 56 HUNT-TELOS → 57 SKILLS-MD → 58 MEMORY-SIMPLIFY → 59 TRIO-REORG → 60 LAUNCH-PREP → 61 CLOSE.
+
+Deliberately deferred to v2.3+: "second time destroys it" memory continuity rewrite (operator-dogfood signal needed), Recipes YAML engine (secondary), Cline-style approval gate (operator-feedback needed), context-gated privacy questions (wait for trust primitive), held-trio full eval (real engagement data), release-CI infrastructure.
+
+---
+
 ## v2.1 — Hunt + Forge + OAuth Depth
 
 **Shipped:** 2026-05-13 (status: tech_debt — OEVAL-01c v1.4 carry-forward + v2.2+ follow-ups documented)
