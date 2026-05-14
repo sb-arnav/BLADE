@@ -6,21 +6,58 @@ Historical record of shipped versions. Each entry summarizes what shipped, what 
 
 ## v2.2 — VISION-Close + Goose-Integrate + Launch-Ready
 
-**Status:** 🚧 In progress (scoped 2026-05-14, executing autonomously per V2-AUTONOMOUS-HANDOFF §4)
+**Shipped:** 2026-05-14 (status: tech_debt — OEVAL-01c v1.4 carry-forward persists; v2.3+ follow-ups documented in `v2.2-MILESTONE-AUDIT.md`)
 **Phases:** 53–61 (9 phases)
-**Archives:** `milestones/v2.2-ROADMAP.md`, `milestones/v2.2-REQUIREMENTS.md`
+**Archives:** `milestones/v2.2-ROADMAP.md`, `milestones/v2.2-REQUIREMENTS.md`, `milestones/v2.2-MILESTONE-AUDIT.md`, `milestones/v2.2-phases/`
 
-### Scope
+### Delivered
 
-Three workstreams in one milestone, anchored on 5-agent research swarm 2026-05-14:
+The wedge milestone. Three workstreams in 9 phases, anchored on a 5-agent parallel research swarm 2026-05-14.
 
-1. **Close load-bearing VISION gaps** — presence layer (fifth primitive) observable in chat; setup-as-conversation produces TELOS-shaped optimization target; held-trio reorganized off main nav.
-2. **Stop building what already exists** — rip Goose's Provider trait + canonical_models.json + SQLite session schema (Apache 2 Rust foundations). Adopt OpenClaw's skill-as-markdown directory pattern. Kill embeddings.rs vector layer (BM25 + KG covers personal-scale retrieval per PAI v5 + Zep paper evidence).
-3. **Prep the forge launch demo + Show HN + Miessler DM** — assemble artifacts per VISION line 40 (Twitter-video moment). Recording/posting operator-owned.
+1. **Close load-bearing VISION gaps** —
+   - Phase 53 ships the fifth primitive (presence) as a new chat-line kind. Evolution Engine + vitality bands + learning patterns now emit visible-to-user narration lines, decision-gated through `decision_gate::evaluate`. Brain prompt includes latest 3 emissions + current vitality band as a `<presence_state>` stance modulator. Closes VISION line 53.
+   - Phase 56 makes setup-as-conversation produce a TELOS-shaped optimization target (Mission / Goals / Beliefs / Challenges) — `~/.blade/who-you-are.md` written with YAML frontmatter, brain prompt ingests on every turn, `/edit-self` chat command + `blade_open_who_you_are` Tauri command.
+   - Phase 59 reorganizes the VISION §57–64 held-trio (Body Map / mortality-salience / Ghost Mode) into a `/dev-tools` route + Settings → Developer pane. Demoted from main nav, still accessible. Per workspace rule (no_feature_removal — reorganize hierarchy, don't delete).
 
-Phase order: 53 PRESENCE-NARRATE → 54 GOOSE-PROVIDER → 55 GOOSE-SESSION → 56 HUNT-TELOS → 57 SKILLS-MD → 58 MEMORY-SIMPLIFY → 59 TRIO-REORG → 60 LAUNCH-PREP → 61 CLOSE.
+2. **Stop building what already exists** —
+   - Phase 54 adopts Goose's Provider + ProviderDef traits (Apache 2.0) + `canonical_models.json` (4,355 entries / 117 providers, bundled verbatim). Router consults the registry for context-window + pricing. All 5 BLADE providers (anthropic/openai/groq/gemini/ollama) implement the new trait. VISION roadmap line 156 milestone met.
+   - Phase 55 adopts Goose's SQLite session schema — 4 tables (sessions/session_messages/tool_calls/tool_results) + indexes. `SessionManager` CRUD + transactional fork. `send_message_stream` dual-writes new schema + legacy JSON history. Substrate for v2.3 "second time destroys it"; legacy stays canonical for v2.2.
+   - Phase 57 adopts OpenClaw's skill-as-markdown pattern at `~/.config/blade/skills_md/`. Directory loader + trigger-matching dispatch + `blade_install_skill(url)` Tauri command. 5 seed skills shipped via `include_str!` (`summarize-page`, `draft-followup-email`, `extract-todos-from-notes`, `morning-context`, `kill-tabs-i-dont-need`).
+   - Phase 58 removes the embeddings vector layer (PAI v5 evidence + Zep paper personal-scale data — vectors don't earn weight at ~100k facts + typed-category structure + 1M-context models). BM25 + KG only. fastembed + ~80 transitive deps dropped (Cargo.lock -567 net entries). Existing hybrid_search_eval 8/8 still passes on BM25-only path (MRR 1.000).
 
-Deliberately deferred to v2.3+: "second time destroys it" memory continuity rewrite (operator-dogfood signal needed), Recipes YAML engine (secondary), Cline-style approval gate (operator-feedback needed), context-gated privacy questions (wait for trust primitive), held-trio full eval (real engagement data), release-CI infrastructure.
+3. **Prep the forge launch trigger** —
+   - Phase 60 assembles everything for operator to record + post: 75s screencast script (`scripts/demo/launch-forge-demo.md`), README rewrite (8-word literal first line + `curl|sh` install command above the fold), Show HN post (`docs/launch/show-hn-post.md`), Miessler DM template (`docs/launch/miessler-dm.md`), 3-tweet launch thread (`docs/launch/launch-tweet-thread.md`). Recording + posting are operator-owned per V2-AUTONOMOUS-HANDOFF.md §1.
+
+4. **Close (Phase 61)** — CHANGELOG v2.2 entry, MILESTONE-AUDIT, phase archive, MILESTONES.md update to Shipped, git tag `v2.2` (operator pushes when ready).
+
+### Verify chain
+
+`cargo check` clean. `tsc --noEmit` clean. Phase-specific test counts:
+- Phase 53: 5 unit + 4 integration (presence)
+- Phase 54: 5 integration + 33/33 existing provider tests
+- Phase 55: 10 integration (sessions)
+- Phase 56: 5 integration (TELOS)
+- Phase 57: 5 integration + 16 unit (skills-md)
+- Phase 58: 3 new + 8/8 existing hybrid_search_eval BM25-only path
+- Phase 59: 2 Playwright e2e
+- Phase 60: docs-only
+
+`verify:all` not regressed below the 37/38 v2.1 floor (OEVAL-01c v1.4 carry-forward documented since v1.4).
+
+### Surprises (logged to ~/surprises.md)
+
+1. **Concurrent multi-agent `git add` race** — 4-way parallel Wave A surfaced cross-agent index leakage; selective `git reset --soft` + restage was the recovery pattern. 2-way Wave B was fine.
+2. **`#[cfg(test)] pub fn` invisible to integration tests** — fix is `#[doc(hidden)] pub fn`.
+3. **Goose canonical_models bigger than scoped** — 4,355 entries vs ~1,700 estimate; used verbatim.
+4. **Skills namespace already occupied by Phase 21** — `skills_md/` adopted alongside, both modules coexist.
+
+### Carry-forward to v2.3+
+
+OEVAL-01c v1.4 persists. v2.3+ follow-ups: "second time destroys it" memory continuity cutover (substrate ready in Phase 55), Goose Recipes engine (defer), Cline-style approval gate (operator-dogfood), context-gated privacy questions (VISION §44, wait for trust primitive), held-trio full evaluation (engagement data), vector retrieval re-evaluation (3 callers TODO-flagged), CDN provisioning + Windows ARM64 + shellcheck CI, Gmail OAuth error-type migration.
+
+### Authority chain
+
+VISION.md (locked 2026-05-10) → V2-AUTONOMOUS-HANDOFF.md → v2.1-MILESTONE-AUDIT.md carry-forward → 5-agent research swarm 2026-05-14 → v2.2-REQUIREMENTS.md → execution. No §7 wake conditions fired. WSL crashed once mid-Phase-55-wrap-up; substantive work intact, SUMMARY reconstructed inline.
 
 ---
 

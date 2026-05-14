@@ -13,6 +13,114 @@ Nothing yet.
 
 ---
 
+## [2.2.0] -- 2026-05-14
+
+### Added (v2.2 -- VISION-Close + Goose-Integrate + Launch-Ready)
+
+> The wedge milestone. Closes the load-bearing VISION gaps (presence observable in chat, setup-as-conversation produces a TELOS-shaped optimization target, held-trio reorganized off main nav), integrates Apache-2 Goose foundations (Provider trait + canonical models registry + SQLite session schema) instead of continuing to maintain bespoke equivalents, cuts memory complexity (embeddings vector layer dropped, BM25 + KG only — matches PAI v5 architecture), and assembles every artifact needed to pull the forge-demo launch trigger (Show HN post, Miessler DM, Twitter thread, 75s screencast script, README rewrite). 9 phases (53-61). Scoped 2026-05-14 from a 5-agent parallel research swarm.
+
+**Phase 53 -- Presence Narrative in Chat**
+- PRESENCE-EMIT: New chat-line kind `presence` on the `BLADE_CHAT_LINE` event stream. Frontend listener in `useChat.tsx` appends as distinct system message styled differently from forge/cost lines.
+- PRESENCE-EVOLUTION: `evolution.rs` emits presence-line on MCP-catalog detection + capability-gap detection + integration opportunity. Decision-gated through `decision_gate::evaluate`.
+- PRESENCE-VITALITY: `vitality_engine.rs` emits presence-line on band transitions (low/med/high). Throttled to ≤1 per 10 min via `AtomicI64`.
+- PRESENCE-LEARNING: `learning_engine.rs` emits presence-line on cross-session pattern detection. Decision-gated.
+- PRESENCE-BRAIN-INJECT: `brain.rs` system prompt includes latest 3 presence emissions + current vitality band as a `<presence_state>` stance modulator.
+- PRESENCE-TESTS: 5 unit + 4 integration. Closes VISION line 53 — the fifth primitive is now observable, not just internal.
+- Commits `5187e45`, `9392c47`, `f3e09c9`, `2542cd9`, `b27da18`, `c1bfa06`, `3d656db`.
+
+**Phase 54 -- Goose Provider Trait Adoption**
+- PROVIDER-TRAIT-PORT: Adopted Goose's `Provider` + `ProviderDef` traits (Apache 2.0) into `providers/goose_traits.rs`. Stable `async fn in trait` (rustc 1.75+) instead of `async_trait` crate — zero new dependencies.
+- PROVIDER-CANONICAL-MODELS: Bundled Goose's `canonical_models.json` (4,355 entries / 117 providers — bigger than the v2.2 scoping estimate of ~1,700). `lookup(provider, model)` API in `providers/canonical.rs`. `gemini → google` transparent alias for Goose's naming convention.
+- PROVIDER-MIGRATION: All 5 BLADE providers (anthropic / openai / groq / gemini / ollama) implement the new trait. One commit per provider for bounded blast radius.
+- PROVIDER-ROUTER-WIRE: `router.rs` task classification consults `canonical_models.json` for context window + pricing; falls back to existing logic on lookup miss.
+- PROVIDER-TESTS: 5 integration tests + 33/33 existing provider tests green.
+- VISION roadmap line 156 milestone met: "Bundle Goose internals (rip + integrate)."
+- Commits `ed90327`, `08b9af0`, `4aeba6a`, `e057e89`, `16f3eb1`, `ad5a73c`, `8c6441e`, `beb5b37`, `94efe12`, `f436ccc`.
+
+**Phase 55 -- Goose SQLite Session Schema**
+- SESSION-SCHEMA-PORT: SQLite schema in `migrations/202605_session_schema.sql` matching Goose's column shape (4 tables: sessions / session_messages / tool_calls / tool_results + indexes). Idempotent `CREATE TABLE IF NOT EXISTS`.
+- SESSION-MANAGER: `sessions.rs` with `SessionManager` — create / append_message / record_tool_call / record_tool_result / load / list / fork. Fork transactionally clones messages up to fork point; `tool_calls`/`tool_results` deliberately NOT cloned.
+- SESSION-COMMANDS-MIGRATE: `send_message_stream` dual-writes new schema + legacy JSON history. Legacy stays canonical for v2.2; new schema is forensic substrate. v2.3 cutover is a single-call swap.
+- SESSION-FRONTEND: `src/lib/tauri/sessions.ts` typed bridge (`listSchemaSessions` / `loadSchemaSession` / `forkSchemaSession`) namespaced to avoid breaking existing callers.
+- SESSION-TESTS: 10/10 integration tests (over-delivered REQ 6 with 4 robustness sentinels for fork edge cases).
+- Foundation for v2.3 "second time destroys it" memory continuity — substrate only, no live-path commitment in v2.2.
+- Commits `bc5efba`, `0e5f9e3`, `0fd8910`, `72c6c32`, `8266f16`, `17e2ac4`.
+
+**Phase 56 -- TELOS in Hunt Output**
+- TELOS-PROMPT: Hunt LLM prompt extracts Mission / Goals / Beliefs / Challenges. Ingests opportunistically from existing conversation; explicitly asks only for items still missing.
+- TELOS-SYNTH: `~/.blade/who-you-are.md` written with YAML frontmatter `telos: {mission, goals, beliefs, challenges}` + human-readable body. Idempotent — re-running synthesis merges instead of clobbering user edits.
+- TELOS-INGEST: `brain.rs::telos_section()` includes Mission + active Goals on every chat turn. Beliefs + Challenges available on demand. Split into pure-data `render_telos_section(&Telos)` for testability.
+- TELOS-EDIT-FLOW: `blade_open_who_you_are` Tauri command + `/edit-self` chat trigger. First-run stub creation if file missing (prevents silent `xdg-open` failure on Linux).
+- TELOS-TESTS: 5/5 integration tests (over-delivered REQ 4 with empty-state sentinel).
+- Closes setup-as-conversation primitive — hunt now produces an *optimization target*, not just a context dump. Matches PAI's TELOS pattern.
+- Commits `96111dc`, `2d444f8`, `a91377d`, `4313629`, `fc2a1a8`, `b509287`.
+
+**Phase 57 -- Skills as Markdown Directory**
+- SKILLS-DIR-LAYOUT: `~/.config/blade/skills_md/` directory convention (chose `skills_md/` over `skills/` to avoid namespace collision with Phase 21's agentskills.io SKILL.md format — they coexist additively). YAML frontmatter schema `{name, description, triggers, tools, model_hint}`.
+- SKILLS-LOADER: `skills_md/loader.rs` walks the directory + parses YAML frontmatter via `serde_yaml`. Registry keyed by trigger phrases.
+- SKILLS-DISPATCH: `send_message_stream_inline` checks skill triggers before normal LLM routing. Trigger match (substring + word-boundary) → skill's prompt + tool list takes over for that turn.
+- SKILLS-INSTALL-CMD: `blade_install_skill(url)` Tauri command. HTTPS-only download + schema validation + write to user dir.
+- SKILLS-SEED: 5 seed skills shipped via `include_str!` (`summarize-page`, `draft-followup-email`, `extract-todos-from-notes`, `morning-context`, `kill-tabs-i-dont-need`). Copied to user dir on first run.
+- SKILLS-TESTS: 5/5 integration tests + 16 unit tests.
+- Marketplace foundation (OpenClaw pattern, zero SDK friction) for the eventual VISION roadmap item.
+- Commits `310e7a9`, `ae71b03`, `608fc36`, `d2d3bf2`, `45c8529`, `6962344`, `7340e58`.
+
+**Phase 58 -- Embeddings Simplification**
+- EMBED-AUDIT: Vector caller inventory in `58-AUDIT.md`. Three callers flagged for v2.3 dogfood verification.
+- EMBED-REMOVE-VECTORS: Vector index + embedding-generation pipeline removed from `embeddings.rs` (495 → 445 lines, -10%). BM25 + KG only via `smart_context_recall`.
+- EMBED-MIGRATION: Graceful deprecation — startup log + idempotent SQL migration.
+- EMBED-TESTS: 3 new BM25+KG retrieval tests + existing hybrid_search_eval 8/8 still pass (MRR 1.000). `real_embedding_eval` `#[ignore]`'d.
+- EMBED-DEPS: fastembed + ~80 transitive deps removed (Cargo.lock -567 net entries).
+- Architectural simplification per PAI v5 evidence + Zep paper personal-scale data.
+- Commits `4985b6a`, `fb5563c`, `4907fc3`, `3204255`, `26588b7`, `ad684d0`.
+
+**Phase 59 -- Held-Trio Reorganize**
+- TRIO-DEV-PANE: New `/dev-tools` route surfacing Body Map / Organ Registry / Pixel World / Tentacle Detail / Mortality Salience monitor / Ghost Mode in a single tabbed pane. Lazy-loaded.
+- TRIO-DEMOTE-NAV: Held-trio routes removed from main NavRail + top-level command palette; remain reachable via `/dev-tools` + Settings → Developer + new command palette entry. Per workspace rule (no_feature_removal — reorganize hierarchy, don't delete).
+- TRIO-VITALITY-EXPOSE: Chat-header vitality badge (1-char glyph + tooltip) subscribed to `BLADE_VITALITY_UPDATE` event.
+- TRIO-DECISION-LOG: Decision recorded in `.planning/decisions.md` — full evaluation pending external launch data.
+- TRIO-TESTS: 2 Playwright e2e specs (BLADE has no vitest — Playwright is the project's e2e equivalent).
+- Commits `526ef87`, `6477222`, `bc3f266`, `75d3714`, `f4670ea`, `06ddba0`.
+
+**Phase 60 -- Launch Demo Prep**
+- LAUNCH-DEMO-SCRIPT: `scripts/demo/launch-forge-demo.md` — 75s single-take screencast plan.
+- LAUNCH-README-LINE-1: README first line rewritten to 8-word literal description ("Desktop AI agent that writes its own tools.").
+- LAUNCH-INSTALL-VISIBLE: `curl|sh` + `iwr|iex` install commands above the fold.
+- LAUNCH-DEMO-GIF: `docs/launch/forge-demo.md` + `docs/launch/assets/` placeholder.
+- LAUNCH-HN-POST: `docs/launch/show-hn-post.md` — Show HN title (with load-bearing "(open source)" parenthetical), body, 6-question comment-thread prep.
+- LAUNCH-MIESSLER-DM: `docs/launch/miessler-dm.md` — 48-hour pre-HN outreach.
+- LAUNCH-TWEET-THREAD: `docs/launch/launch-tweet-thread.md` — 3-tweet sequence + 7-day follow-up plan.
+- Recording the demo + posting are operator-owned per V2-AUTONOMOUS-HANDOFF.md §1.
+- Commits `76e149f`, `947cb14`, `bfb047b`, `409fdea`, `c5490ca`, `98c5b2b`, `591f516`, `f1e9313`.
+
+**Phase 61 -- Close**
+- CLOSE-01: This CHANGELOG entry.
+- CLOSE-02: `v2.2-MILESTONE-AUDIT.md` written.
+- CLOSE-03: Phase 53-61 directories archived under `.planning/milestones/v2.2-phases/`. cargo check + tsc clean.
+- CLOSE-04: MILESTONES.md v2.2 entry marked Shipped. git tag `v2.2` locally (operator pushes when ready).
+
+### Carry-forward to v2.3+
+
+- "Second time destroys it" memory continuity rewrite — substrate ready (session schema); cutover + replay path deferred pending operator-dogfood signal
+- Goose Recipes engine (YAML + minijinja) — secondary to presence + provider + session foundations; defer
+- Cline-style per-step approval gate — operator-dogfood verifies whether non-developer trust friction warrants it
+- Context-gated privacy questions per VISION §44 — wait for trust primitive
+- Held-trio full evaluation — needs real engagement data from launch
+- CDN provisioning + Windows ARM64 + shellcheck CI — release-CI infrastructure
+- Gmail OAuth error-type migration (parity with Slack/GitHub typed `OAuthError`)
+- Vector retrieval re-evaluation — three callers flagged `TODO(v2.3)`
+- OEVAL-01c v1.4 organism-eval drift — persists since v1.4
+
+### Verify chain
+
+`cargo check` clean. `tsc --noEmit` clean. Phase-specific test counts: 53 (9), 54 (5 + 33 existing), 55 (10), 56 (5), 57 (5 + 16 unit), 58 (3 + 8/8 hybrid_search_eval BM25-only path), 59 (2 Playwright), 60 (docs-only). `verify:all` not regressed below the 37/38 v2.1 floor.
+
+### Authority chain
+
+VISION.md (locked 2026-05-10) → V2-AUTONOMOUS-HANDOFF.md → v2.1-MILESTONE-AUDIT.md carry-forward → 5-agent research swarm 2026-05-14 → v2.2-REQUIREMENTS.md → execution. No §7 wake conditions fired. WSL crashed once mid-Phase-55-wrap-up; substantive work intact, SUMMARY reconstructed inline.
+
+---
+
 ## [2.1.0] -- 2026-05-13
 
 ### Added (v2.1 -- Hunt + Forge + OAuth Depth)
