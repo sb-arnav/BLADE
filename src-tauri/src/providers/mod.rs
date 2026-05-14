@@ -1,5 +1,6 @@
 pub mod anthropic;
 pub mod gemini;
+pub mod goose_traits;
 pub mod groq;
 pub mod ollama;
 pub mod openai;
