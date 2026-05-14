@@ -392,3 +392,91 @@ pub async fn test(api_key: &str, model: &str) -> Result<String, String> {
 
     Ok(text)
 }
+
+// ── Phase 54 / PROVIDER-MIGRATION (groq) ─────────────────────────────────────
+//
+// Adapter struct + ProviderDef impl. Delegates to `complete_ext` so the
+// existing groq HTTP path + tool-error fallback is preserved verbatim.
+// Adapted from block/goose (Apache 2.0).
+
+use super::goose_traits::{
+    BladeModelConfig, ConfigKey, Provider, ProviderDef, ProviderMetadata,
+};
+
+pub struct GroqProvider {
+    api_key: String,
+    config: BladeModelConfig,
+}
+
+impl GroqProvider {
+    #[allow(dead_code)] // Phase 54 — wired in PROVIDER-ROUTER-WIRE / future call sites.
+    pub fn new(api_key: impl Into<String>, config: BladeModelConfig) -> Self {
+        Self {
+            api_key: api_key.into(),
+            config,
+        }
+    }
+}
+
+impl Provider for GroqProvider {
+    fn get_name(&self) -> &str {
+        "groq"
+    }
+
+    fn get_model_config(&self) -> &BladeModelConfig {
+        &self.config
+    }
+
+    async fn complete(
+        &self,
+        api_key: &str,
+        messages: &[ConversationMessage],
+        tools: &[ToolDefinition],
+    ) -> Result<AssistantTurn, String> {
+        let key = if api_key.is_empty() { &self.api_key } else { api_key };
+        complete_ext(
+            key,
+            &self.config.model_name,
+            messages,
+            tools,
+            self.config.max_tokens_override,
+        )
+        .await
+    }
+}
+
+pub struct GroqDef;
+
+impl ProviderDef for GroqDef {
+    fn metadata() -> ProviderMetadata {
+        ProviderMetadata::new(
+            "groq",
+            "Groq",
+            "Llama family hosted on Groq LPU — fastest inference, OpenAI-compatible",
+            "llama-3.3-70b-versatile",
+            "https://console.groq.com/docs/models",
+            vec![ConfigKey::new("GROQ_API_KEY", true, true, None)],
+        )
+    }
+}
+
+#[cfg(test)]
+mod phase54_migration_tests {
+    use super::*;
+
+    #[test]
+    fn groq_provider_def_metadata() {
+        let m = GroqDef::metadata();
+        assert_eq!(m.name, "groq");
+        assert_eq!(m.default_model, "llama-3.3-70b-versatile");
+    }
+
+    #[test]
+    fn groq_provider_get_name() {
+        let p = GroqProvider::new(
+            "gsk-test",
+            BladeModelConfig::new("llama-3.3-70b-versatile"),
+        );
+        assert_eq!(p.get_name(), "groq");
+    }
+}
