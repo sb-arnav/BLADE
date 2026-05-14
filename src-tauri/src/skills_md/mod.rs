@@ -30,11 +30,13 @@ pub mod dispatch;
 pub mod install;
 pub mod loader;
 pub mod manifest;
+pub mod seed;
 
 pub use dispatch::match_trigger;
 pub use install::{install_from_text, install_from_url};
 pub use loader::{install_registry, registry, scan_directory, user_skills_dir, SkillsRegistry};
 pub use manifest::SkillManifest;
+pub use seed::{seed_corpus, seed_skills_into_user_dir};
 
 /// Phase 57 (SKILLS-INSTALL-CMD) — Tauri command. Downloads a SKILL.md from
 /// an HTTPS URL, validates the schema, writes to `~/.config/blade/skills_md/`,
@@ -42,4 +44,12 @@ pub use manifest::SkillManifest;
 #[tauri::command]
 pub async fn blade_install_skill(url: String) -> Result<String, String> {
     install_from_url(&url).await
+}
+
+/// Phase 57 (SKILLS-SEED) — Tauri command. Copies the bundled seed skills
+/// into the user's `skills_md/` directory. Idempotent: never overwrites a
+/// user-customized skill. Returns the count of skills newly written.
+#[tauri::command]
+pub fn blade_seed_skills() -> Result<usize, String> {
+    Ok(seed::seed_skills_into_user_dir())
 }
