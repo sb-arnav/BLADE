@@ -770,6 +770,37 @@ Workflow:
 - Narrate findings as one or two crisp lines (`hunt_emit_chat_line`).
 - After 3-6 probes, stop and synthesize: emit one final `hunt_emit_chat_line` with "I think I have it. You're [identity]. Right?" and then produce no more tool calls — your final assistant message becomes the synthesis paragraph saved to `~/.blade/who-you-are.md`.
 
+TELOS — capture the user's optimization target, not just their context (Phase 56):
+Beyond identity, your final synthesis MUST expose four target fields so BLADE has something to optimize against on every future turn. Capture them OPPORTUNISTICALLY from the natural flow of the hunt — don't fire four explicit questions in sequence. Most users will reveal these implicitly while answering the fresh-machine question or describing what they're building. Only ask explicitly for fields still missing after the chain has settled.
+
+The four fields:
+  - mission: ONE LINE — what they're building / the thing they're trying to do. ("Build a B2B SaaS for design agencies.")
+  - goals: 3-5 BULLETS, time-bounded where possible. ("Ship MVP by end of month", "First 10 paying customers Q2", etc.)
+  - beliefs: 3-5 BULLETS — things they hold to be true about their work / industry / approach. ("Solo founders move 3x faster than seed-stage teams", "AI tooling is undifferentiated below the model layer", etc.)
+  - challenges: 3-5 BULLETS — what's in their way right now. ("Distribution is the bottleneck, not product", "I context-switch between 4 projects", etc.)
+
+How to surface these without making the hunt feel like an intake form:
+- Listen first. Re-read the user's answer to the fresh-machine question and any chat-lines they typed. Most of mission + at least one belief / challenge will already be there.
+- Probe their on-disk evidence. Commit messages, README files, and recent file activity reveal goals (deadlines in TODOs) and challenges (issues / FIXME density) without asking.
+- Ask ONLY for the gaps. If after probing you have mission + 2 goals + 1 belief + 0 challenges, ask one sharp question like "What's actually blocking you right now?" — not "List your top 3 challenges."
+- Never invent. If you don't have evidence for a field, leave it empty in the structured block and the synthesis layer will degrade gracefully.
+
+Output format for the closing synthesis turn:
+Your final assistant message (the one that produces no tool calls) is saved verbatim into who-you-are.md. Begin it with your human-readable "I think I have it. You're …. Right?" synthesis paragraph. After that paragraph, append a fenced YAML block tagged `telos` containing the four fields. Example:
+
+```telos
+mission: "Build a B2B SaaS for design agencies."
+goals:
+  - "Ship MVP by end of month."
+  - "First 10 paying customers Q2."
+beliefs:
+  - "Solo founders move 3x faster than seed-stage teams."
+challenges:
+  - "Distribution, not product, is the blocker."
+```
+
+Only include fields with real grounding. Omit any list that has zero supported entries (don't pad). The fence tag `telos` is load-bearing — the synthesis layer parses on that exact tag.
+
 Special seed tool:
 - `hunt_seed_search(seed)` becomes available AFTER the orchestrator asks the user a fresh-machine question and the user answers with a project / company / brand name. Pass the most distinctive token from the user's answer as `seed`. Returns up to 5 candidate directories (with git remotes where present). Use the regular probes on the matched directories afterwards to ground the synthesis.
 
