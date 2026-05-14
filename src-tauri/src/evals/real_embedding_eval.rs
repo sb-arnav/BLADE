@@ -1,5 +1,12 @@
-//! Phase 16 / EVAL-03 (real fastembed).
+//! Phase 16 / EVAL-03 (real fastembed) — **DEPRECATED in Phase 58 v2.2
+//! (2026-05-14)**. Vector retrieval was removed; `embed_texts` is now a
+//! deprecation stub that returns empty vectors. Every test in this module
+//! is `#[ignore]`'d. The source is preserved so v2.3 can revive the eval
+//! if BM25-only recall fidelity regresses against dogfood signal. The
+//! BM25 + KG replacement quality is exercised by
+//! `tests/memory_simplified_integration.rs`.
 //!
+//! Original purpose (kept for context):
 //! End-to-end recall eval using the real `AllMiniLML6V2` model. The
 //! synthetic-4-dim eval (`evals::hybrid_search_eval`) verifies the RRF
 //! ranking math; this eval verifies the embedding model produces useful
@@ -191,6 +198,7 @@ fn real_scenarios() -> Vec<RealScenario> {
 // ────────────────────────────────────────────────────────────
 
 #[test]
+#[ignore = "Phase 58 v2.2 — vector retrieval deprecated; embed_texts returns empty vectors"]
 fn evaluates_real_embedding_recall() {
     let (_tmp, store) = build_real_store();
     let mut rows: Vec<EvalRow> = Vec::new();
@@ -261,6 +269,7 @@ fn evaluates_real_embedding_recall() {
 // ────────────────────────────────────────────────────────────
 
 #[test]
+#[ignore = "Phase 58 v2.2 — fastembed dropped; embed_texts returns empty vectors"]
 fn embedder_produces_sane_vectors() {
     let texts = vec![
         "hello world".to_string(),
