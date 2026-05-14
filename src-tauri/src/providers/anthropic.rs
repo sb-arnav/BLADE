@@ -489,3 +489,104 @@ pub async fn test(api_key: &str, model: &str) -> Result<String, String> {
 
     Ok(text)
 }
+
+// ── Phase 54 / PROVIDER-MIGRATION (anthropic) ────────────────────────────────
+//
+// Adapter struct + ProviderDef impl. Delegates to `complete_ext` above so the
+// existing HTTP / streaming / cache-control behavior is preserved verbatim.
+// Adapted from block/goose (Apache 2.0).
+
+use super::goose_traits::{
+    BladeModelConfig, ConfigKey, Provider, ProviderDef, ProviderMetadata,
+};
+
+pub struct AnthropicProvider {
+    api_key: String,
+    config: BladeModelConfig,
+}
+
+impl AnthropicProvider {
+    #[allow(dead_code)] // Phase 54 — wired in PROVIDER-ROUTER-WIRE / future call sites.
+    pub fn new(api_key: impl Into<String>, config: BladeModelConfig) -> Self {
+        Self {
+            api_key: api_key.into(),
+            config,
+        }
+    }
+}
+
+impl Provider for AnthropicProvider {
+    fn get_name(&self) -> &str {
+        "anthropic"
+    }
+
+    fn get_model_config(&self) -> &BladeModelConfig {
+        &self.config
+    }
+
+    fn supports_cache_control(&self) -> bool {
+        // Anthropic prompt caching is GA on Sonnet 4 — `build_body` already
+        // sets cache_control on the system block + last tool def. Surface
+        // that capability via the trait so consumers can plan around it.
+        true
+    }
+
+    async fn complete(
+        &self,
+        api_key: &str,
+        messages: &[ConversationMessage],
+        tools: &[ToolDefinition],
+    ) -> Result<AssistantTurn, String> {
+        // Prefer the passed-in api_key (matches the runtime contract: keyring
+        // override at call time), fall back to the bound key.
+        let key = if api_key.is_empty() { &self.api_key } else { api_key };
+        complete_ext(
+            key,
+            &self.config.model_name,
+            messages,
+            tools,
+            self.config.max_tokens_override,
+        )
+        .await
+    }
+}
+
+pub struct AnthropicDef;
+
+impl ProviderDef for AnthropicDef {
+    fn metadata() -> ProviderMetadata {
+        ProviderMetadata::new(
+            "anthropic",
+            "Anthropic",
+            "Claude family — frontier reasoning + tool use + prompt caching",
+            "claude-sonnet-4-20250514",
+            "https://docs.anthropic.com/en/docs/about-claude/models",
+            vec![ConfigKey::new("ANTHROPIC_API_KEY", true, true, None)],
+        )
+    }
+}
+
+#[cfg(test)]
+mod phase54_migration_tests {
+    use super::*;
+
+    #[test]
+    fn anthropic_provider_def_metadata() {
+        let m = AnthropicDef::metadata();
+        assert_eq!(m.name, "anthropic");
+        assert_eq!(m.default_model, "claude-sonnet-4-20250514");
+        assert_eq!(m.config_keys.len(), 1);
+        assert!(m.config_keys[0].secret);
+    }
+
+    #[test]
+    fn anthropic_provider_get_name() {
+        let p = AnthropicProvider::new(
+            "sk-ant-test",
+            BladeModelConfig::new("claude-sonnet-4-20250514"),
+        );
+        assert_eq!(p.get_name(), "anthropic");
+        assert_eq!(p.get_model_config().model_name, "claude-sonnet-4-20250514");
+        assert!(p.supports_cache_control());
+    }
+}
