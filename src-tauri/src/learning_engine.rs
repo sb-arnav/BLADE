@@ -1264,3 +1264,59 @@ fn uuid_fragment(s: &str) -> String {
     }
     format!("{:x}", h)
 }
+
+// ── Phase 53 (PRESENCE-LEARNING) unit tests ─────────────────────────────────
+
+#[cfg(test)]
+mod presence_tests {
+    use super::*;
+
+    fn pattern_with(pattern_type: &str, description: &str) -> BehaviorPattern {
+        BehaviorPattern {
+            id: "test_pattern".to_string(),
+            pattern_type: pattern_type.to_string(),
+            description: description.to_string(),
+            frequency: 5,
+            last_seen: 0,
+            first_seen: 0,
+            confidence: 0.85,
+            metadata: serde_json::Value::Object(Default::default()),
+        }
+    }
+
+    /// pattern_narration_text must:
+    ///   1. Strip the internal "Repeating workflow: " / "Frequently
+    ///      discusses: " / "Often uses together: " prefix so the user sees
+    ///      their own vocabulary, not BLADE's internal labels.
+    ///   2. End with an offer ("want a shortcut?" / "want me to fuse those?")
+    ///      so the narration is actionable, not passive observation.
+    ///   3. Fall back gracefully on unknown pattern types instead of
+    ///      panicking.
+    #[test]
+    fn phase53_learning_pattern_narration_strips_prefix_and_offers_action() {
+        let workflow = pattern_with("workflow", "Repeating workflow: edit -> test -> commit");
+        let workflow_msg = pattern_narration_text(&workflow);
+        assert!(
+            !workflow_msg.contains("Repeating workflow:"),
+            "internal prefix leaked: {}",
+            workflow_msg
+        );
+        assert!(workflow_msg.contains("edit -> test -> commit"), "{}", workflow_msg);
+        assert!(workflow_msg.to_lowercase().contains("want"), "offer missing: {}", workflow_msg);
+
+        let topic = pattern_with("topic_cluster", "Frequently discusses: React, Hooks, State");
+        let topic_msg = pattern_narration_text(&topic);
+        assert!(!topic_msg.contains("Frequently discusses:"), "{}", topic_msg);
+        assert!(topic_msg.contains("React"), "{}", topic_msg);
+
+        let combo = pattern_with("tool_combo", "Often uses together: bash + grep");
+        let combo_msg = pattern_narration_text(&combo);
+        assert!(!combo_msg.contains("Often uses together:"), "{}", combo_msg);
+        assert!(combo_msg.to_lowercase().contains("fuse"), "{}", combo_msg);
+
+        // Unknown type -- fallback path must not panic.
+        let unknown = pattern_with("magic", "Mystery pattern");
+        let unknown_msg = pattern_narration_text(&unknown);
+        assert!(unknown_msg.contains("Mystery pattern"), "{}", unknown_msg);
+    }
+}

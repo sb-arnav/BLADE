@@ -88,7 +88,13 @@ pub fn recent_emissions(n: usize) -> Vec<PresenceLine> {
 }
 
 /// Test-only: clear the ring so unit tests start from a known empty state.
-#[cfg(test)]
+///
+/// Marked `#[doc(hidden)]` and intended for tests in this crate + the
+/// integration test at `tests/presence_integration.rs` only. Not `cfg(test)`
+/// because cargo builds the lib WITHOUT cfg(test) when integration tests
+/// link to it -- gating these helpers behind cfg(test) would make
+/// `presence_integration.rs` un-buildable.
+#[doc(hidden)]
 pub fn clear_for_test() {
     if let Ok(mut ring) = presence_ring().lock() {
         ring.clear();
@@ -97,7 +103,10 @@ pub fn clear_for_test() {
 
 /// Test-only: push a presence line directly into the ring without going
 /// through the Tauri emit path (which needs an AppHandle).
-#[cfg(test)]
+///
+/// Marked `#[doc(hidden)]` rather than `cfg(test)` for the reason above --
+/// integration tests need this symbol at non-test build time.
+#[doc(hidden)]
 pub fn push_for_test(message: &str, source: &str) {
     push_presence(PresenceLine {
         kind: "presence".to_string(),
