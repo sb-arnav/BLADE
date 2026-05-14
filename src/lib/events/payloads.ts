@@ -1094,3 +1094,35 @@ export interface BladeForgeLinePayload {
   timestamp: number;
 }
 
+// ---------------------------------------------------------------------------
+// Phase 53 — Presence Narrate (v2.2, PRESENCE-EMIT)
+//
+// Emitted by src-tauri/src/presence.rs::emit_presence_line whenever an
+// internal-state subsystem narrates a user-visible signal. Same architectural
+// shape as BladeForgeLinePayload — discriminator + message + timestamp — but
+// the `source` is mandatory so PRESENCE-BRAIN-INJECT (REQ-5) can attribute
+// recent emissions when composing the system prompt.
+// ---------------------------------------------------------------------------
+
+/** Which subsystem fired this presence line. Stable literal set; do not
+ *  invent new values without coordinating with brain.rs's
+ *  `<presence_state>` block. */
+export type BladePresenceSource = 'evolution' | 'vitality' | 'learning';
+
+export interface BladePresenceLinePayload {
+  /** Discriminator — always 'presence' for events on BLADE_PRESENCE_LINE. */
+  kind: 'presence';
+  /**
+   * Human-readable narration. First-person from BLADE's POV, short. Examples:
+   *   "I noticed you use GitHub — want me to wire it in?"
+   *   "Energy's running low — I'll lean on faster models for a bit."
+   *   "I'm seeing you sketch React component layouts most mornings — want a shortcut?"
+   * Safe-sliced to 280 chars in Rust before emit.
+   */
+  message: string;
+  /** Emitting subsystem; one of 'evolution' | 'vitality' | 'learning'. */
+  source: BladePresenceSource;
+  /** Unix seconds when the line was emitted. */
+  timestamp: number;
+}
+

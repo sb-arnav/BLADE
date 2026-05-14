@@ -254,6 +254,19 @@ export const BLADE_EVENTS = {
   // writing → testing → registered → retrying sequence as distinct
   // chat-lines. Payload: BladeForgeLinePayload (./payloads.ts).
   BLADE_FORGE_LINE: 'blade_forge_line',
+
+  // ───── Phase 53 — Presence Narrate (PRESENCE-EMIT, v2.2) ─────────────────
+  // Emitted by src-tauri/src/presence.rs::emit_presence_line whenever an
+  // internal-state subsystem narrates a user-visible signal:
+  //   - Evolution Engine detects a wireable capability (REQ-2)
+  //   - Vitality engine crosses a band threshold (REQ-3)
+  //   - Learning engine spots a cross-session pattern (REQ-4)
+  // ChatProvider (useChat.tsx) subscribes and appends a system-role
+  // ChatStreamMessage with presenceSource set; MessageBubble applies the
+  // chat-bubble-presence visual treatment so it reads as ambient liveliness,
+  // not as a forge transition or a system error.
+  // Payload: BladePresenceLinePayload (./payloads.ts).
+  BLADE_PRESENCE_LINE: 'blade_presence_line',
 } as const;
 
 /** Literal union of every string in BLADE_EVENTS. */

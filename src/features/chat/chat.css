@@ -158,6 +158,46 @@
   border-color: color-mix(in oklab, var(--g-edge-hi), #b83c3c 30%);
 }
 
+/* ── Phase 53 (PRESENCE-EMIT): presence chat-lines ─────────────────────────
+   System-role messages with a presenceSource get a distinct visual treatment
+   so internal-state narration from Evolution / Vitality / Learning reads as
+   an ambient liveliness band — not as a forge progress transition and not
+   as a system error.
+
+   Override .chat-bubble-system's red tint with a neutral presence accent
+   (soft teal); per-source modifiers narrow the band so the user learns to
+   recognize which subsystem is speaking. Italics + slightly smaller font
+   emphasize the ambient, BLADE-first-person character of these lines. */
+.chat-bubble-presence {
+  align-self: stretch;
+  max-width: 100%;
+  background: color-mix(in oklab, var(--g-fill), #38b3a6 8%);
+  border-color: color-mix(in oklab, var(--g-edge-hi), #38b3a6 24%);
+  color: var(--t-1);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1.5;
+  opacity: 0.96;
+  padding: var(--s-2) var(--s-3);
+}
+
+.chat-bubble-presence-evolution {
+  /* Evolution Engine — capability discovery — teal lean (inherits base) */
+}
+
+.chat-bubble-presence-vitality {
+  /* Vitality engine — band transitions — amber lean */
+  background: color-mix(in oklab, var(--g-fill), #d6a23a 8%);
+  border-color: color-mix(in oklab, var(--g-edge-hi), #d6a23a 26%);
+}
+
+.chat-bubble-presence-learning {
+  /* Learning engine — cross-session pattern — violet lean */
+  background: color-mix(in oklab, var(--g-fill), #8a6dff 8%);
+  border-color: color-mix(in oklab, var(--g-edge-hi), #8a6dff 26%);
+}
+
 /* ── Input bar ────────────────────────────────────────────────────────────── */
 
 .chat-input-bar {

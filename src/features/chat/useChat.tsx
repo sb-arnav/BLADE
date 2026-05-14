@@ -42,6 +42,7 @@ import type {
   BladeForgeLinePayload,
   BladeHuntLinePayload,
   BladeMessageStartPayload,
+  BladePresenceLinePayload,
   BladeReincarnationPayload,
   BladeThinkingChunkPayload,
   BladeTokenRatioPayload,
@@ -72,6 +73,14 @@ export interface ChatStreamMessage {
    * border tint) instead of the default system-error styling.
    */
   forgePhase?: 'gap_detected' | 'writing' | 'testing' | 'registered' | 'retrying' | 'failed';
+  /**
+   * Phase 53 (PRESENCE-EMIT, v2.2) — when set, this system-role message
+   * represents one presence-layer narration (Evolution / Vitality / Learning).
+   * MessageBubble inspects msg.presenceSource and applies a distinct visual
+   * treatment so liveliness narration reads ambient, not as a forge line
+   * and not as a system error.
+   */
+  presenceSource?: 'evolution' | 'vitality' | 'learning';
 }
 
 export type ChatStatus =
@@ -362,6 +371,27 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       };
       setMessages((prev) => [...prev, costMsg]);
     }
+  });
+
+  // Phase 53 (PRESENCE-EMIT) — presence chat-line subscriber.
+  // On blade_presence_line, append a system-role message tagged with the
+  // presence source. MessageBubble inspects msg.presenceSource and applies the
+  // chat-bubble-presence visual treatment so the line reads as ambient
+  // internal-state narration, visually separable from forge transitions
+  // (red/green/neutral progress band) and from system errors (red tint).
+  // Mirrors the forge-line listener immediately above (same setMessages
+  // append-only pattern; never replaces existing messages).
+  useTauriEvent<BladePresenceLinePayload>(BLADE_EVENTS.BLADE_PRESENCE_LINE, (e) => {
+    const p = e.payload;
+    if (typeof p?.message !== 'string' || !p.message) return;
+    const presenceMsg: ChatStreamMessage = {
+      id: crypto.randomUUID(),
+      role: 'system',
+      content: p.message,
+      createdAt: Date.now(),
+      presenceSource: p.source,
+    };
+    setMessages((prev) => [...prev, presenceMsg]);
   });
 
   // Cancel any pending rAF when the provider unmounts (route change).
