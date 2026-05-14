@@ -26,6 +26,8 @@
 
 #![allow(dead_code)] // Wave 1 lands substrate; tests + dispatch use it conditionally.
 
+pub mod loader;
 pub mod manifest;
 
+pub use loader::{install_registry, registry, scan_directory, user_skills_dir, SkillsRegistry};
 pub use manifest::SkillManifest;

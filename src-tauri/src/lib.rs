@@ -1536,6 +1536,12 @@ pub fn run() {
             // call would fail silently. This is the skull — structural integrity.
             skeleton::init_all_tables();
 
+            // Phase 57 v2.2 (SKILLS-LOADER) — scan ~/.config/blade/skills_md/ for
+            // user + installed SKILL.md skills and populate the in-memory registry
+            // so dispatch + the install command can resolve triggers immediately.
+            // Cheap: O(n) directory walk where n is typically <20.
+            let _ = skills_md::install_registry();
+
             // Start HUD update loop (pushes data every 10s when HUD is visible)
             overlay_manager::start_hud_update_loop(app.handle().clone());
 
