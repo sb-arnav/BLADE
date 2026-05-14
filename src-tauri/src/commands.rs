@@ -1329,6 +1329,30 @@ pub(crate) async fn send_message_stream_inline(
         timestamp_ms: crate::session::log::now_ms(),
     });
 
+    // ── Phase 55 / SESSION-COMMANDS-MIGRATE (v2.2 — 2026-05-14) ──
+    //
+    // Dual-write the user message to the new Goose-shaped session
+    // schema (`sessions` + `session_messages`). Invariant: the legacy
+    // conversation_id == new schema session_id, so frontend rollover is
+    // a no-op rename. We dual-write for one milestone (v2.2 → v2.3
+    // cutover) so any regression in the new path is recoverable by
+    // dropping back to the JSONL/history.json path.
+    //
+    // Failure mode: dual-write errors are swallowed (chat-continues
+    // posture — same v1.1 lesson the JSONL writer follows). The new
+    // schema is forensic substrate, not on the live response path.
+    if !session_id.is_empty() {
+        if let Ok(conn) = crate::db::init_db() {
+            let mgr = crate::sessions::SessionManager::new();
+            if let Err(e) = mgr.upsert_session_with_id(&conn, &session_id, None) {
+                log::debug!("[sess-migrate] upsert_session_with_id: {}", e);
+            }
+            if let Err(e) = mgr.append_message(&conn, &session_id, "user", &last_user_text) {
+                log::debug!("[sess-migrate] append_message(user): {}", e);
+            }
+        }
+    }
+
     // ── Phase 24 (v1.3) — chat-injected proposal reply apply path ────────────
     // intent_router classifies "yes <id>" / "no <id>" / "dismiss <id>" as
     // IntentClass::ProposalReply. When matched, apply the operator's reply
@@ -2670,6 +2694,74 @@ pub fn history_save_conversation(
     conversation_id: String,
     messages: Vec<HistoryMessage>,
 ) -> Result<ConversationSummary, String> {
+    // ── Phase 55 / SESSION-COMMANDS-MIGRATE (v2.2 — 2026-05-14) ──
+    //
+    // Dual-write the conversation snapshot to the Goose-shaped session
+    // schema. The legacy JSON history (history/<id>.json) remains the
+    // source of truth for v2.2; the new `sessions` + `session_messages`
+    // tables are written alongside so cutover in v2.3 is a single-call
+    // swap, not a rebuild. Invariant: legacy conversation_id == new
+    // schema session_id (1:1 mapping, no lookup table needed).
+    //
+    // Strategy: idempotent re-sync. We INSERT OR IGNORE the session row
+    // (no-op if it exists from the per-turn dual-write in
+    // `send_message_stream_inline`) then append any NEW messages —
+    // those whose synthetic external_message_id is not already present.
+    // The dual-write fires the user side per turn; assistant rows land
+    // here when the frontend snapshots after chat_done.
+    //
+    // Failure mode: chat-continues posture. Any error in the dual-write
+    // is logged at debug and swallowed — the legacy save_conversation
+    // call below stays canonical.
+    if !conversation_id.is_empty() {
+        if let Ok(conn) = crate::db::init_db() {
+            let mgr = crate::sessions::SessionManager::new();
+            let _ = mgr.upsert_session_with_id(&conn, &conversation_id, None);
+
+            // Snapshot the message_ids we've already mirrored.
+            let mut existing_external_ids: std::collections::HashSet<String> =
+                std::collections::HashSet::new();
+            if let Ok(data) = mgr.load_session(&conn, &conversation_id) {
+                for m in &data.messages {
+                    if let Some(ext) = &m.external_message_id {
+                        existing_external_ids.insert(ext.clone());
+                    }
+                }
+            }
+
+            for msg in &messages {
+                if existing_external_ids.contains(&msg.id) {
+                    continue;
+                }
+                // Tag the row with the frontend's stable message id so the
+                // next dual-write call skips this message and we don't
+                // duplicate-write on every history flush.
+                let _ = conn.execute(
+                    "INSERT INTO session_messages (
+                        message_id, session_id, role, content_json,
+                        created_timestamp, timestamp
+                     ) VALUES (?1, ?2, ?3, ?4, ?5, ?5)",
+                    rusqlite::params![
+                        &msg.id,
+                        &conversation_id,
+                        &msg.role,
+                        serde_json::Value::String(msg.content.clone()).to_string(),
+                        msg.timestamp as i64,
+                    ],
+                );
+            }
+            // Bump session.updated_at so list_sessions ordering matches activity.
+            let now_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as i64)
+                .unwrap_or(0);
+            let _ = conn.execute(
+                "UPDATE sessions SET updated_at = ?1 WHERE id = ?2",
+                rusqlite::params![now_ms, &conversation_id],
+            );
+        }
+    }
+
     save_conversation(&conversation_id, messages)
 }
 
