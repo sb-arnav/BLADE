@@ -312,3 +312,91 @@ pub async fn test(api_key: &str, model: &str) -> Result<String, String> {
 
     Ok(text)
 }
+
+// ── Phase 54 / PROVIDER-MIGRATION (gemini) ───────────────────────────────────
+//
+// Adapter struct + ProviderDef impl. Delegates to `complete_ext` so the
+// existing Gemini HTTP path is preserved verbatim.
+// Adapted from block/goose (Apache 2.0).
+
+use super::goose_traits::{
+    BladeModelConfig, ConfigKey, Provider, ProviderDef, ProviderMetadata,
+};
+
+pub struct GeminiProvider {
+    api_key: String,
+    config: BladeModelConfig,
+}
+
+impl GeminiProvider {
+    #[allow(dead_code)] // Phase 54 — wired in PROVIDER-ROUTER-WIRE / future call sites.
+    pub fn new(api_key: impl Into<String>, config: BladeModelConfig) -> Self {
+        Self {
+            api_key: api_key.into(),
+            config,
+        }
+    }
+}
+
+impl Provider for GeminiProvider {
+    fn get_name(&self) -> &str {
+        "gemini"
+    }
+
+    fn get_model_config(&self) -> &BladeModelConfig {
+        &self.config
+    }
+
+    async fn complete(
+        &self,
+        api_key: &str,
+        messages: &[ConversationMessage],
+        tools: &[ToolDefinition],
+    ) -> Result<AssistantTurn, String> {
+        let key = if api_key.is_empty() { &self.api_key } else { api_key };
+        complete_ext(
+            key,
+            &self.config.model_name,
+            messages,
+            tools,
+            self.config.max_tokens_override,
+        )
+        .await
+    }
+}
+
+pub struct GeminiDef;
+
+impl ProviderDef for GeminiDef {
+    fn metadata() -> ProviderMetadata {
+        ProviderMetadata::new(
+            "gemini",
+            "Google Gemini",
+            "Gemini family — fast multimodal models with long context",
+            "gemini-2.0-flash-exp",
+            "https://ai.google.dev/gemini-api/docs/models/gemini",
+            vec![ConfigKey::new("GEMINI_API_KEY", true, true, None)],
+        )
+    }
+}
+
+#[cfg(test)]
+mod phase54_migration_tests {
+    use super::*;
+
+    #[test]
+    fn gemini_provider_def_metadata() {
+        let m = GeminiDef::metadata();
+        assert_eq!(m.name, "gemini");
+        assert_eq!(m.default_model, "gemini-2.0-flash-exp");
+    }
+
+    #[test]
+    fn gemini_provider_get_name() {
+        let p = GeminiProvider::new(
+            "AIza-test",
+            BladeModelConfig::new("gemini-2.0-flash-exp"),
+        );
+        assert_eq!(p.get_name(), "gemini");
+    }
+}
