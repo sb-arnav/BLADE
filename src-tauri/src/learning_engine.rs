@@ -763,6 +763,14 @@ pub async fn proactive_suggestion(app: &tauri::AppHandle) {
         return;
     }
 
+    // Phase 53 (PRESENCE-LEARNING) — narrate the cross-session pattern that
+    // generated the high-confidence prediction. We pull the top-confidence
+    // BehaviorPattern (workflow / topic / tool_combo / time_of_day) and route
+    // it through decision_gate so noisy narrations suppress themselves. This
+    // fires BEFORE the prediction generation -- the pattern IS the cross-
+    // session observation; the prediction is the downstream consequence.
+    emit_learning_pattern_presence(app).await;
+
     // Build a short context string from recent activity
     let context = build_current_context();
 
@@ -820,6 +828,125 @@ pub async fn proactive_suggestion(app: &tauri::AppHandle) {
             LAST_SUGGESTION_TS.store(now, Ordering::SeqCst);
             break;
         }
+    }
+}
+
+// ── Phase 53 (PRESENCE-LEARNING) — narrate the highest-confidence pattern ───
+//
+// On each proactive_suggestion tick, pull the top-confidence BehaviorPattern
+// the engine has stored, route it through decision_gate, and -- if the gate
+// approves -- emit a presence-line narrating the cross-session observation.
+//
+// The pattern types we narrate:
+//   - workflow      : "I'm seeing you sketch <X> -- want a shortcut?"
+//   - topic_cluster : "I'm noticing <topics> keep coming up -- want a
+//                     summary view?"
+//   - tool_combo    : "I see you keep pairing <A> with <B> -- want me to
+//                     fuse those?"
+//   - time_of_day   : "I notice you're sharpest <range> -- want me to keep
+//                     deep work blocked then?"
+//
+// Decision-gating: 0.7 confidence (the pattern only fires here when its own
+// confidence is already > 0.7 after the threshold gate), reversible (the
+// user can always ignore the narration), not time-sensitive. The
+// "learning" source threshold in decision_gate learns from user feedback
+// so noisy patterns suppress themselves over time.
+
+async fn emit_learning_pattern_presence(app: &tauri::AppHandle) {
+    let conn = match open_db() {
+        Some(c) => c,
+        None => return,
+    };
+
+    let top: Option<BehaviorPattern> = conn
+        .prepare(
+            "SELECT id, pattern_type, description, frequency, last_seen, first_seen, confidence, metadata
+             FROM behavior_patterns
+             WHERE confidence > 0.7
+             ORDER BY confidence DESC, frequency DESC
+             LIMIT 1",
+        )
+        .ok()
+        .and_then(|mut stmt| {
+            stmt.query_row([], |row| {
+                Ok(BehaviorPattern {
+                    id: row.get(0)?,
+                    pattern_type: row.get(1)?,
+                    description: row.get(2)?,
+                    frequency: row.get(3)?,
+                    last_seen: row.get(4)?,
+                    first_seen: row.get(5)?,
+                    confidence: row.get(6)?,
+                    metadata: serde_json::from_str(
+                        &row.get::<_, String>(7).unwrap_or_else(|_| "{}".to_string()),
+                    )
+                    .unwrap_or(serde_json::Value::Object(Default::default())),
+                })
+            })
+            .ok()
+        });
+
+    let Some(pattern) = top else { return };
+
+    // Decision gate -- only narrate if the "learning" source threshold approves.
+    let signal = crate::decision_gate::Signal {
+        source: "learning".to_string(),
+        description: format!(
+            "Narrate cross-session pattern '{}' (confidence {:.0}%)",
+            pattern.description,
+            pattern.confidence * 100.0
+        ),
+        confidence: pattern.confidence,
+        reversible: true,
+        time_sensitive: false,
+    };
+    let perception = crate::perception_fusion::get_latest().unwrap_or_default();
+    let outcome = crate::decision_gate::evaluate(&signal, &perception).await;
+    let approved = matches!(
+        outcome,
+        crate::decision_gate::DecisionOutcome::ActAutonomously { .. }
+            | crate::decision_gate::DecisionOutcome::AskUser { .. }
+    );
+    if !approved {
+        log::debug!(
+            "[learning.presence] gate denied pattern '{}' (confidence {:.0}%)",
+            pattern.description,
+            pattern.confidence * 100.0
+        );
+        return;
+    }
+
+    let message = pattern_narration_text(&pattern);
+    crate::presence::emit_presence_line(app, &message, "learning");
+}
+
+/// Pure mapping from a BehaviorPattern to a first-person presence narration.
+/// Kept separate so it is straightforward to unit-test without the DB.
+pub(crate) fn pattern_narration_text(pattern: &BehaviorPattern) -> String {
+    match pattern.pattern_type.as_str() {
+        "workflow" => format!(
+            "I'm seeing a repeating workflow: {} -- want a shortcut?",
+            pattern
+                .description
+                .trim_start_matches("Repeating workflow: ")
+        ),
+        "topic_cluster" => format!(
+            "I'm noticing the same themes keep coming up: {} -- want a focused view?",
+            pattern
+                .description
+                .trim_start_matches("Frequently discusses: ")
+        ),
+        "tool_combo" => format!(
+            "I see you keep pairing the same tools: {} -- want me to fuse those into one step?",
+            pattern
+                .description
+                .trim_start_matches("Often uses together: ")
+        ),
+        "time_of_day" => format!(
+            "I notice your rhythm: {} -- want me to protect that window?",
+            pattern.description
+        ),
+        _ => format!("I'm noticing a pattern: {}.", pattern.description),
     }
 }
 
