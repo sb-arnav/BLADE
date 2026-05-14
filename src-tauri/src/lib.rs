@@ -622,6 +622,12 @@ pub fn run() {
             // Phase 57 v2.2 (SKILLS-SEED) — write the 5 bundled seed skills
             // into ~/.config/blade/skills_md/ if not present.
             skills_md::blade_seed_skills,
+            // Phase 55 v2.2 (SESSION-FRONTEND) — Goose-shaped session schema.
+            // Coexist with the Phase 34 JSONL session commands (list_sessions /
+            // fork_session / resume_session); v2.3 cutover retires the legacy.
+            sessions::sessions_list,
+            sessions::sessions_load,
+            sessions::sessions_fork,
             roles::roles_list,
             roles::roles_get_active,
             roles::roles_set_active,

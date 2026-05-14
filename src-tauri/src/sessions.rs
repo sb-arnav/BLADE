@@ -563,6 +563,41 @@ impl SessionManager {
 }
 
 // ---------------------------------------------------------------------------
+// Tauri command surface (Phase 55 / SESSION-FRONTEND)
+// ---------------------------------------------------------------------------
+//
+// These three commands are intentionally namespaced (`sessions_*`) to coexist
+// with the legacy `list_sessions` / `fork_session` / `resume_session`
+// commands at `src-tauri/src/session/list.rs` (Phase 34 — JSONL-based).
+// v2.3 cutover retires the legacy path; until then both surfaces ship.
+//
+// Failure mode: returns Err(String) so the Tauri bridge surfaces a typed
+// rejection at the frontend. The DB connection is opened per-call via
+// crate::db::init_db (matches BLADE's existing rusqlite convention; no
+// long-lived pool needed at this command rate).
+
+#[tauri::command]
+pub fn sessions_list() -> Result<Vec<SessionSummary>, String> {
+    let conn = crate::db::init_db()?;
+    SessionManager::new().list_sessions(&conn)
+}
+
+#[tauri::command]
+pub fn sessions_load(session_id: String) -> Result<SessionData, String> {
+    let conn = crate::db::init_db()?;
+    SessionManager::new().load_session(&conn, &session_id)
+}
+
+#[tauri::command]
+pub fn sessions_fork(
+    source_id: String,
+    fork_point_message_id: MessageId,
+) -> Result<SessionId, String> {
+    let conn = crate::db::init_db()?;
+    SessionManager::new().fork_session(&conn, &source_id, fork_point_message_id)
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

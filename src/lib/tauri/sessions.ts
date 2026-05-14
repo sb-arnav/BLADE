@@ -183,3 +183,125 @@ export function mergeForkBack(forkId: string): Promise<MergeResult> {
     { fork_id: forkId },
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 55 (v2.2 — 2026-05-14) — SESSION-FRONTEND bridge for the new
+// Goose-shaped SQLite session schema.
+//
+// These wrappers coexist with the Phase 34 JSONL-backed wrappers above
+// (listSessions / resumeSession / forkSession). v2.3 cutover will retire
+// the JSONL path and rename this bridge to the canonical names. Until
+// then we ship the new bridge under explicit `*SchemaSession*` names to
+// avoid breaking existing callers (chat.ts, useChat.tsx, SessionsView).
+//
+// @see src-tauri/src/sessions.rs (SessionManager + sessions_list /
+//      sessions_load / sessions_fork Tauri commands)
+// @see src-tauri/migrations/202605_session_schema.sql (canonical SQL)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Mirrors `src-tauri/src/sessions.rs::SessionSummary`. One row per session
+ * with a denormalized `message_count` for list-pane render.
+ */
+export interface SchemaSessionSummary {
+  id: string;
+  name: string;
+  session_type: string;
+  created_at_ms: number;
+  updated_at_ms: number;
+  message_count: number;
+  /** Populated for forked sessions (Phase 55 fork lineage column). */
+  forked_from: string | null;
+  /** `session_messages.id` (numeric, string-encoded in the column). */
+  forked_at_message_id: string | null;
+}
+
+/**
+ * Mirrors `src-tauri/src/sessions.rs::SessionMessage`. Goose-shaped
+ * `content_json` is the row payload — plain-text messages are encoded as
+ * a JSON string (`"hello"`) so the column-mapped Goose interop path
+ * stays viable.
+ */
+export interface SchemaSessionMessage {
+  id: number;
+  /** Frontend-provided stable message id when known (e.g. history.json id). */
+  external_message_id: string | null;
+  session_id: string;
+  role: string;
+  /** JSON-encoded content; usually a JSON string for plain-text messages. */
+  content_json: string;
+  created_timestamp_ms: number;
+  timestamp_ms: number;
+}
+
+/** Mirrors `src-tauri/src/sessions.rs::ToolCallRow`. */
+export interface SchemaToolCall {
+  id: string;
+  message_id: number;
+  session_id: string;
+  tool_name: string;
+  args_json: string;
+  created_at_ms: number;
+}
+
+/** Mirrors `src-tauri/src/sessions.rs::ToolResultRow`. */
+export interface SchemaToolResult {
+  tool_call_id: string;
+  result_json: string | null;
+  error_text: string | null;
+  created_at_ms: number;
+}
+
+/** Mirrors `src-tauri/src/sessions.rs::SessionData`. */
+export interface SchemaSessionData {
+  summary: SchemaSessionSummary;
+  messages: SchemaSessionMessage[];
+  tool_calls: SchemaToolCall[];
+  tool_results: SchemaToolResult[];
+}
+
+/**
+ * List all sessions in the new Goose-shaped schema ordered by
+ * `updated_at` DESC. Archived sessions are filtered out server-side.
+ *
+ * @see src-tauri/src/sessions.rs `pub fn sessions_list() -> Result<Vec<SessionSummary>, String>`
+ */
+export function listSchemaSessions(): Promise<SchemaSessionSummary[]> {
+  return invokeTyped<SchemaSessionSummary[]>('sessions_list');
+}
+
+/**
+ * Load the full payload for one session: summary + ordered messages +
+ * ordered tool_calls + ordered tool_results. Rejects when the session
+ * doesn't exist.
+ *
+ * @see src-tauri/src/sessions.rs `pub fn sessions_load(session_id: String) -> Result<SessionData, String>`
+ */
+export function loadSchemaSession(sessionId: string): Promise<SchemaSessionData> {
+  return invokeTyped<SchemaSessionData, { sessionId: string }>(
+    'sessions_load',
+    { sessionId },
+  );
+}
+
+/**
+ * Fork a session at a given fork-point message id. Returns the new
+ * session id. Copies messages up to and including the fork-point;
+ * tool_calls / tool_results are intentionally NOT cloned (the fork is
+ * meant for divergent continuation, not exact replay).
+ *
+ * `forkPointMessageId` is the numeric `session_messages.id` of the
+ * pivot message (return value of `append_message` / row id in
+ * `loadSchemaSession().messages`).
+ *
+ * @see src-tauri/src/sessions.rs `pub fn sessions_fork(source_id: String, fork_point_message_id: i64) -> Result<String, String>`
+ */
+export function forkSchemaSession(
+  sourceId: string,
+  forkPointMessageId: number,
+): Promise<string> {
+  return invokeTyped<string, { sourceId: string; forkPointMessageId: number }>(
+    'sessions_fork',
+    { sourceId, forkPointMessageId },
+  );
+}
