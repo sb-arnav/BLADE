@@ -1858,7 +1858,7 @@ pub fn build_fast_path_supplement(
 /// The model is instructed (last line) to treat this as a stance modulator,
 /// not as content to repeat back. Per Phase 53 plan: this is the difference
 /// between BLADE acting alive vs BLADE telling the user it's alive.
-pub(crate) fn build_presence_state_block(
+pub fn build_presence_state_block(
     band_str: &str,
     scalar: f32,
     recent: &[crate::presence::PresenceLine],

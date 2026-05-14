@@ -48,7 +48,7 @@ mod memory_palace;
 mod authority_engine;
 mod agents;
 mod automation;
-mod brain;
+pub mod brain;       // Phase 53 v2.2 — pub so presence_integration test can call build_presence_state_block
 mod browser_native;
 mod capability_probe;
 mod character;
@@ -89,7 +89,7 @@ mod intent_router;    // Phase 18 — IntentClass classification (D-03)
 mod jarvis_dispatch;  // Phase 18 — outbound fan-out (D-05)
 mod supervisor;
 mod urinary;
-mod embeddings;
+pub mod embeddings;        // Phase 58 v2.2 — pub for memory_simplified_integration test
 #[cfg(test)]
 mod evals;
 mod files;
@@ -102,7 +102,7 @@ mod memory;
 mod permissions;
 mod plugins;
 mod provider_paste_parser;
-mod providers;
+pub mod providers; // Phase 54 v2.2 — pub for provider_canonical_integration test (GOOSE-PROVIDER)
 mod rag;
 mod reports;
 mod router;
@@ -138,7 +138,7 @@ mod health_tracker;
 mod document_intelligence;
 mod meeting_intelligence;
 mod habit_engine;
-mod knowledge_graph;
+pub mod knowledge_graph;   // Phase 58 v2.2 — pub for memory_simplified_integration test
 mod emotional_intelligence;
 mod prediction_engine;
 mod activity_monitor;
@@ -151,7 +151,7 @@ mod system_control;
 mod notification_listener;
 mod temporal_intel;
 mod iot_bridge;
-mod typed_memory;
+pub mod typed_memory;      // Phase 58 v2.2 — pub for memory_simplified_integration test
 mod personality_mirror;
 mod ghost_mode;
 mod overlay_manager;
