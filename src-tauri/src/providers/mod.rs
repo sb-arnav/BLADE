@@ -401,6 +401,7 @@ pub fn default_max_tokens_for(provider: &str, _model: &str) -> u32 {
 /// model: when a task wants ≥100k context, the router walks candidate providers,
 /// asks this fn for the published window, and prefers the cheapest one that
 /// clears the floor.
+#[allow(dead_code)] // Surfaced for routers + tests; internal callsites land in subsequent phases.
 pub fn context_window_for(provider: &str, model: &str) -> Option<u32> {
     canonical::lookup(provider, model).map(|m| {
         let w = m.context_window();
@@ -417,6 +418,7 @@ pub fn context_window_for(provider: &str, model: &str) -> Option<u32> {
 /// Returns `None` when none of the candidates are in the registry OR when none
 /// clear the context floor. Caller is expected to fall back to its previous
 /// selection logic in that case (graceful degrade — never blocks routing).
+#[allow(dead_code)] // Surfaced for routers + tests; internal callsites land in subsequent phases.
 pub fn pick_cheapest_sufficient(
     candidates: &[(String, String)],
     min_context: u32,
