@@ -4,9 +4,9 @@
 
 # BLADE
 
-**The AI that watches, learns, and works — while others just talk.**
+**Desktop AI agent that writes its own tools.**
 
-Not a chat window. An operating intelligence with 60+ native tools, 24 auto-discoverable MCP servers, and full desktop control. Sees your screen. Hears your voice. Detects your hardware. Manages your system. Spawns coding agents. Learns your patterns. Acts without being asked.
+Open-source. Multi-provider. Local-first. Hits a capability gap, forges a tool mid-task, keeps going. Sees your screen. Hears your voice. Manages your system. The AI you'd build yourself if you could — now you can.
 
 [![Release](https://img.shields.io/github/v/release/sb-arnav/BLADE?style=flat-square&label=latest&color=0f0f0f)](https://github.com/sb-arnav/BLADE/releases/latest)
 [![License](https://img.shields.io/github/license/sb-arnav/BLADE?style=flat-square&color=0f0f0f)](LICENSE)
