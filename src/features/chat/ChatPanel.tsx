@@ -50,6 +50,7 @@ import { MessageList } from './MessageList';
 import { SubagentProgressBubble } from './SubagentProgressBubble';
 import { ToolApprovalDialog } from './ToolApprovalDialog';
 import { useChatCtx } from './useChat';
+import { VitalityBadge } from './VitalityBadge';
 import { VitalityIndicator } from './VitalityIndicator';
 
 export function ChatPanel() {
@@ -96,6 +97,9 @@ export function ChatPanel() {
         ) : (
           <Pill>—</Pill>
         )}
+        {/* Phase 59 Plan 59-03 (TRIO-VITALITY-EXPOSE) — fingernail-sized glyph
+            sits beside the existing VitalityIndicator scalar readout. */}
+        <VitalityBadge />
         <VitalityIndicator />
       </header>
       <CompactingIndicator />
