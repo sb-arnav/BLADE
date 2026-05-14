@@ -618,6 +618,9 @@ pub fn run() {
             // Phase 57 v2.2 (SKILLS-INSTALL-CMD) — install OpenClaw-style
             // SKILL.md from an HTTPS URL and refresh the in-memory registry.
             skills_md::blade_install_skill,
+            // Phase 57 v2.2 (SKILLS-SEED) — write the 5 bundled seed skills
+            // into ~/.config/blade/skills_md/ if not present.
+            skills_md::blade_seed_skills,
             roles::roles_list,
             roles::roles_get_active,
             roles::roles_set_active,
@@ -1538,6 +1541,12 @@ pub fn run() {
             // Without this, modules that query tables before their first ensure_tables()
             // call would fail silently. This is the skull — structural integrity.
             skeleton::init_all_tables();
+
+            // Phase 57 v2.2 (SKILLS-SEED) — first-run: copy the bundled seed
+            // skills into the user dir if not present. Idempotent: never
+            // overwrites a user-customized skill. Order matters — seed BEFORE
+            // install_registry so the first scan picks up the new files.
+            let _ = skills_md::seed_skills_into_user_dir();
 
             // Phase 57 v2.2 (SKILLS-LOADER) — scan ~/.config/blade/skills_md/ for
             // user + installed SKILL.md skills and populate the in-memory registry
