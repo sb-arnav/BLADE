@@ -29,7 +29,9 @@ export const routes: RouteDefinition[] = [
   { id: 'background-agents', label: 'Background Agents', section: 'agents', component: BackgroundAgents, phase: 5 },
   { id: 'task-agents',       label: 'Task Agents',       section: 'agents', component: TaskAgents,       phase: 5 },
   { id: 'swarm-view',        label: 'Swarm',             section: 'agents', component: SwarmView,        phase: 5 },
-  { id: 'agent-pixel-world', label: 'Pixel World',       section: 'agents', component: AgentPixelWorld,  phase: 5 },
+  // Phase 59 Plan 59-02 (TRIO-DEMOTE-NAV) — Pixel World is part of the v2.0-held
+  // trio; demoted from ⌘K + NavRail. Surfaced inside /dev-tools.
+  { id: 'agent-pixel-world', label: 'Pixel World',       section: 'agents', component: AgentPixelWorld,  phase: 5, paletteHidden: true, description: 'Held-trio — surfaced inside /dev-tools.' },
   // Phase 11 Plan 11-05 — tools capability-gap alias route. SwarmView surfaces
   // CapabilityGap when no tool-calling model is configured; CAPABILITY_SURFACES
   // references this alias so openRoute('agents-swarm') lands in the same place.

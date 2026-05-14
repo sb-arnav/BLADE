@@ -27,6 +27,9 @@ const PANES = {
   'settings-diagnostics':  lazy(() => import('./panes/DiagnosticsEntryPane').then(m => ({ default: m.DiagnosticsEntryPane }))),
   'settings-about':        lazy(() => import('./panes/AboutPane').then(m => ({ default: m.AboutPane }))),
   'settings-ecosystem':    lazy(() => import('./panes/EcosystemPane').then(m => ({ default: m.EcosystemPane }))),
+  // Phase 59 Plan 59-02 (TRIO-DEMOTE-NAV) — "Developer" section. Single-click
+  // handoff to /dev-tools + list of the v2.0-held trio surfaces hosted there.
+  'settings-developer':    lazy(() => import('./panes/DeveloperPane').then(m => ({ default: m.DeveloperPane }))),
 } as const;
 
 type PaneId = keyof typeof PANES;
@@ -43,6 +46,7 @@ const TABS: { id: PaneId; label: string }[] = [
   { id: 'settings-diagnostics', label: 'Diagnostics' },
   { id: 'settings-about',       label: 'About' },
   { id: 'settings-ecosystem',   label: 'Ecosystem' },
+  { id: 'settings-developer',   label: 'Developer' },
 ];
 
 export function SettingsShell() {

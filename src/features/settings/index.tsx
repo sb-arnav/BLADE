@@ -47,6 +47,8 @@ export const routes: RouteDefinition[] = [
   { id: 'settings-diagnostics',  label: 'Diagnostics', section: 'core', component: SettingsShell, phase: 3 },
   { id: 'settings-about',        label: 'About',       section: 'core', component: SettingsShell, phase: 3 },
   { id: 'settings-ecosystem',    label: 'Ecosystem',   section: 'core', component: SettingsShell, phase: 13 },
+  // Phase 59 Plan 59-02 (TRIO-DEMOTE-NAV) — settings "Developer" tab.
+  { id: 'settings-developer',    label: 'Developer',   section: 'core', component: SettingsShell, phase: 59 },
   // Palette-only — locks screen immediately; never rendered as a full page route
   {
     id: 'system-lock-screen',
