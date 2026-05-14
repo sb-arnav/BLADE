@@ -26,6 +26,7 @@ mod reminders;
 mod skill_engine;
 pub mod skills;         // Phase 21 v1.3 — agentskills.io SKILL.md format substrate (pub for skill_validator bin)
 pub mod skills_md;      // Phase 57 v2.2 — OpenClaw-style SKILL.md directory pattern (triggers+tools+model_hint)
+pub mod sessions;       // Phase 55 v2.2 — Goose-shaped SQLite session schema (SessionManager CRUD + fork)
 mod voyager_log;        // Phase 22 v1.3 — Voyager loop ActivityStrip emit helpers
 mod reward;             // Phase 23 v1.3 — composite reward + per-turn JSONL persistence + tail-reader
 mod safety_bundle;      // Phase 26 v1.4 — central safety enforcement (danger-triple, mortality cap, calm-vector, crisis)
