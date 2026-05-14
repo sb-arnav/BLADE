@@ -19,8 +19,15 @@ const EmailAssistant    = lazy(() => import('./EmailAssistant').then((m) => ({ d
 const DocumentGenerator = lazy(() => import('./DocumentGenerator').then((m) => ({ default: m.DocumentGenerator })));
 const CodeSandbox       = lazy(() => import('./CodeSandbox').then((m) => ({ default: m.CodeSandbox })));
 const ComputerUse       = lazy(() => import('./ComputerUse').then((m) => ({ default: m.ComputerUse })));
+// Phase 59 Plan 59-01 (TRIO-DEV-PANE) — host the v2.0-held trio (Body Map /
+// Organ Registry / Pixel World / Tentacle Detail / mortality-salience monitor
+// / Ghost Mode) inside a single /dev-tools route with sub-tabs. The trio's
+// individual routes stay registered (TRIO-DEMOTE-NAV demotes them from nav +
+// palette via paletteHidden, but keeps openRoute() reachability).
+const DevToolsPane      = lazy(() => import('./DevToolsPane').then((m) => ({ default: m.DevToolsPane })));
 
 export const routes: RouteDefinition[] = [
+  { id: 'dev-tools',          label: 'Developer Tools', section: 'dev', component: DevToolsPane,      phase: 59, description: 'Held-trio: Body Map / Organ Registry / Pixel World / Tentacle / Mortality / Ghost.' },
   { id: 'terminal',           label: 'Terminal',        section: 'dev', component: Terminal,          phase: 7 },
   { id: 'file-browser',       label: 'File Browser',    section: 'dev', component: FileBrowser,       phase: 7 },
   { id: 'git-panel',          label: 'Git',             section: 'dev', component: GitPanel,          phase: 7 },
