@@ -541,7 +541,13 @@ pub fn run() {
     let runtime_servers: runtimes::SharedRuntimeServerRegistry =
         Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
 
-    // Vector store for semantic search
+    // Vector store for semantic search.
+    // Phase 58 / MEMORY-SIMPLIFY (v2.2 — 2026-05-14): vector retrieval was
+    // dropped in favor of BM25 + KG; the type names survive for caller
+    // compatibility but the store is now a BM25-only text cache.
+    log::info!(
+        "[startup] memory retrieval: BM25 + KG (vector layer deprecated in v2.2, Phase 58)"
+    );
     let vector_store: embeddings::SharedVectorStore =
         Arc::new(std::sync::Mutex::new(embeddings::VectorStore::new()));
 
