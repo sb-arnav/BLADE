@@ -1277,6 +1277,37 @@ pub(crate) async fn send_message_stream_inline(
         (last_user_text.clone(), Vec::new())
     };
     let last_user_text = clean_query; // shadow with stripped query
+
+    // ─── Phase 57 (SKILLS-DISPATCH) ─────────────────────────────────────────
+    //
+    // Before the standard LLM routing, check whether the user message hits a
+    // registered skill trigger (OpenClaw-style SKILL.md, see
+    // `crate::skills_md`). If a trigger matches with high confidence
+    // (substring + word-boundary), the skill's system-prompt body takes over
+    // for this turn — it gets prepended to the eventual `system_prompt`
+    // built below, and we emit `blade_skill_dispatch` so the chat surface
+    // can show the takeover.
+    //
+    // This is a NEW code path *before* default routing — it never blocks the
+    // tool loop. If the matched skill has a `tools` whitelist, it informs
+    // downstream tool selection (recorded as `_skill_tool_whitelist` in this
+    // function; today consumed implicitly because the skill body itself names
+    // the tools it expects).
+    let matched_skill: Option<crate::skills_md::SkillManifest> =
+        crate::skills_md::match_trigger(&last_user_text);
+    if let Some(skill) = &matched_skill {
+        emit_stream_event(
+            &app,
+            "blade_skill_dispatch",
+            serde_json::json!({
+                "skill": skill.name,
+                "description": skill.description,
+                "model_hint": skill.model_hint,
+                "tools": skill.tools,
+            }),
+        );
+    }
+
     let anchor_injections: Vec<(String, String)> = if !anchors.is_empty() {
         crate::intelligence::anchor_parser::resolve_anchors(&anchors, &app, &config).await
     } else {
@@ -1413,6 +1444,23 @@ pub(crate) async fn send_message_stream_inline(
         messages.len(),
         &anchor_injections,
     );
+
+    // Phase 57 (SKILLS-DISPATCH) — if a phase-57 skill matched the user's
+    // trigger phrase upstream, prepend its system-prompt body to the assembled
+    // system_prompt so the skill takes over for THIS turn without removing
+    // any of the identity/context layers brain.rs assembles. The skill body
+    // intentionally lives at the top of the prompt — its instructions are
+    // the most specific signal we have for what the user wants right now.
+    if let Some(skill) = &matched_skill {
+        let mut prepended = String::with_capacity(skill.body.len() + system_prompt.len() + 64);
+        prepended.push_str("## Active skill: ");
+        prepended.push_str(&skill.name);
+        prepended.push_str("\n\n");
+        prepended.push_str(skill.body.trim());
+        prepended.push_str("\n\n---\n\n");
+        prepended.push_str(&system_prompt);
+        system_prompt = prepended;
+    }
 
     // Vision is always in the prompt via brain.rs priority 7 (always-on vision).
     // No reflex needed — BLADE always sees the screen.
