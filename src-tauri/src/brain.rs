@@ -892,6 +892,38 @@ fn build_system_prompt_inner(
         record_section("hormones", 0);
     }
 
+    // ── PRESENCE STATE (priority 2.7 — Phase 53 / PRESENCE-BRAIN-INJECT) ─────
+    //
+    // VISION line 53: "memory creates continuity; internal state creates
+    // liveliness. Both matter." This block exposes BLADE's live internal
+    // state to the LLM as a stance modulator -- the model should adjust tone
+    // (lean on faster models, terser responses, exploratory vs conservative)
+    // based on this state, NOT narrate it back to the user. Compact <key:
+    // value> shape so it reads as system telemetry, not as prose.
+    //
+    // Two components:
+    //   1. Current vitality band -- one of Thriving | Waning | Declining |
+    //      Critical. Dormant is impossible here (process exits at Dormant).
+    //   2. Last 3 presence emissions -- the most recent self-narrations the
+    //      user has seen. Each is the source label + the line itself so the
+    //      model knows what BLADE just told the user about its state.
+    //
+    // Always inject (no gate). The block is ~200 chars when populated; cheap.
+    // When the presence ring is empty (cold start, no events fired yet), we
+    // skip the recent-emissions sub-block but still emit the band line.
+    {
+        let vitality = crate::vitality_engine::get_vitality();
+        let recent = crate::presence::recent_emissions(3);
+        let block = build_presence_state_block(
+            &format!("{:?}", vitality.band),
+            vitality.scalar,
+            &recent,
+        );
+        let presence_section_chars = block.len();
+        parts.push(block);
+        record_section("presence_state", presence_section_chars);
+    }
+
     // ── IDENTITY EXTENSION (priority 3) ──────────────────────────────────────
     // Deep scan + user model + personality mirror + virtual contexts +
     // prefrontal + learned preferences. Together this can be 5–10k chars.
@@ -1805,6 +1837,50 @@ pub fn build_fast_path_supplement(
     }
 
     parts.join("\n\n---\n\n")
+}
+
+/// Phase 53 (PRESENCE-BRAIN-INJECT) — assemble the <presence_state> block.
+///
+/// Pure function so REQ-6 unit tests can exercise it without spinning up
+/// vitality_engine / presence ring DB state. Output shape (compact, system
+/// telemetry, NOT prose):
+///
+/// ```text
+/// <presence_state>
+/// vitality_band: Thriving (scalar=0.80)
+/// recent_emissions:
+///   - [evolution] I noticed you use GitHub — want me to wire it in?
+///   - [vitality] Energy's running low — I'll lean on faster models for a bit.
+/// stance: adapt tone to band; do NOT narrate state back to user.
+/// </presence_state>
+/// ```
+///
+/// The model is instructed (last line) to treat this as a stance modulator,
+/// not as content to repeat back. Per Phase 53 plan: this is the difference
+/// between BLADE acting alive vs BLADE telling the user it's alive.
+pub(crate) fn build_presence_state_block(
+    band_str: &str,
+    scalar: f32,
+    recent: &[crate::presence::PresenceLine],
+) -> String {
+    let mut block = String::from("<presence_state>\n");
+    block.push_str(&format!(
+        "vitality_band: {} (scalar={:.2})\n",
+        band_str, scalar
+    ));
+    if !recent.is_empty() {
+        block.push_str("recent_emissions:\n");
+        for line in recent {
+            block.push_str(&format!(
+                "  - [{}] {}\n",
+                line.source,
+                crate::safe_slice(&line.message, 160)
+            ));
+        }
+    }
+    block.push_str("stance: adapt tone to band; do NOT narrate state back to user.\n");
+    block.push_str("</presence_state>");
+    block
 }
 
 /// Lean runtime supplement to BLADE.md.
@@ -3454,5 +3530,58 @@ mod tests {
             "anchor_file row missing despite non-empty content; labels={:?}",
             labels
         );
+    }
+
+    // ── Phase 53 (PRESENCE-BRAIN-INJECT) unit test ──────────────────────────
+    //
+    // Verifies build_presence_state_block:
+    //   1. Always opens with the <presence_state> tag and closes with </presence_state>.
+    //   2. Includes vitality_band + scalar.
+    //   3. Lists each recent emission with its source label.
+    //   4. Emits the stance line so the model knows not to narrate back.
+    //   5. With empty `recent`, the `recent_emissions:` sub-block is omitted
+    //      (we don't want an empty list polluting the prompt).
+    #[test]
+    fn phase53_presence_brain_inject_block_shape() {
+        use crate::presence::PresenceLine;
+
+        let recent = vec![
+            PresenceLine {
+                kind: "presence".to_string(),
+                message: "I noticed you use GitHub — want me to wire it in?".to_string(),
+                source: "evolution".to_string(),
+                timestamp: 0,
+            },
+            PresenceLine {
+                kind: "presence".to_string(),
+                message: "Energy's running low — I'll lean on faster models.".to_string(),
+                source: "vitality".to_string(),
+                timestamp: 0,
+            },
+        ];
+
+        let block = build_presence_state_block("Thriving", 0.80, &recent);
+
+        assert!(block.starts_with("<presence_state>"), "missing open tag: {}", block);
+        assert!(block.trim_end().ends_with("</presence_state>"), "missing close tag: {}", block);
+        assert!(block.contains("vitality_band: Thriving"), "band label missing");
+        assert!(block.contains("scalar=0.80"), "scalar value missing: {}", block);
+        assert!(block.contains("[evolution]"), "evolution source missing");
+        assert!(block.contains("[vitality]"), "vitality source missing");
+        assert!(
+            block.contains("do NOT narrate state back to user"),
+            "stance line missing — model will paraphrase emissions back to user without it"
+        );
+
+        // Empty recent → no recent_emissions sub-block.
+        let empty_block = build_presence_state_block("Waning", 0.5, &[]);
+        assert!(
+            !empty_block.contains("recent_emissions:"),
+            "empty recent must skip the sub-block; got: {}",
+            empty_block
+        );
+        // But stance + band always present.
+        assert!(empty_block.contains("vitality_band: Waning"));
+        assert!(empty_block.contains("stance:"));
     }
 }
