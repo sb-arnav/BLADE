@@ -6,40 +6,283 @@
 //!
 //! Per `.planning/v2.0-onboarding-spec.md` Act 6, the file structure is:
 //!
+//!   ---
+//!   telos:
+//!     mission: "..."
+//!     goals: [...]
+//!     beliefs: [...]
+//!     challenges: [...]
+//!   ---
 //!   # Who you are (BLADE's working model)
 //!   **Last updated:** YYYY-MM-DD by hunt
 //!   **You can edit this file. BLADE re-reads it every session.**
 //!   ## Identity / What you're building / How you work / Off-limits / Notes
+//!
+//! Phase 56 (TELOS-SYNTH) adds the YAML frontmatter `telos:` block so BLADE has
+//! an optimization target — Mission / Goals / Beliefs / Challenges — not just a
+//! context dump. Idempotent merge: re-running synthesis preserves any user edits
+//! to the telos block, only overwriting fields the hunt actually re-captured.
 //!
 //! HUNT-08 (first-task close) also lives in this module: after writing the
 //! synthesis, emit the closing chat-line that invites the user to name one
 //! task they've been putting off.
 
 use crate::onboarding::hunt::{HuntFindings, HuntLine, HuntOutcome, EVENT_HUNT_LINE};
-use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 use tauri::Emitter;
 
 /// Filename under `$HOME/.blade/`.
 pub const WHO_YOU_ARE_FILENAME: &str = "who-you-are.md";
 
+/// Phase 56 (TELOS-SYNTH) — the four optimization-target fields BLADE captures
+/// during the hunt and reads on every chat turn. Daniel Miessler's PAI calls
+/// this the "telos" block: Mission / Goals / Beliefs / Challenges.
+///
+/// All fields are optional — synthesis degrades gracefully when the hunt
+/// produces only some of them. The YAML frontmatter on `who-you-are.md` uses
+/// this shape verbatim.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Telos {
+    /// One-line statement of what the user is building / doing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mission: Option<String>,
+    /// 3-5 bullets, time-bounded where possible.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub goals: Vec<String>,
+    /// 3-5 bullets — things the user holds to be true.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub beliefs: Vec<String>,
+    /// 3-5 bullets — what's in the user's way right now.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub challenges: Vec<String>,
+}
+
+impl Telos {
+    /// True when every field is empty / None. Used to skip frontmatter when
+    /// the hunt produced nothing structured.
+    pub fn is_empty(&self) -> bool {
+        self.mission.as_deref().map(|s| s.trim().is_empty()).unwrap_or(true)
+            && self.goals.is_empty()
+            && self.beliefs.is_empty()
+            && self.challenges.is_empty()
+    }
+
+    /// Merge `other` into `self`, but only for fields where `self` is empty.
+    /// This preserves user edits during re-synthesis — the existing file's
+    /// telos wins; the new hunt only fills in gaps.
+    pub fn merge_preserve_self(&mut self, other: &Telos) {
+        if self.mission.as_deref().map(|s| s.trim().is_empty()).unwrap_or(true) {
+            self.mission = other.mission.clone();
+        }
+        if self.goals.is_empty() {
+            self.goals = other.goals.clone();
+        }
+        if self.beliefs.is_empty() {
+            self.beliefs = other.beliefs.clone();
+        }
+        if self.challenges.is_empty() {
+            self.challenges = other.challenges.clone();
+        }
+    }
+}
+
+/// Parse a fenced ```telos ...``` block out of the LLM's final-synthesis turn.
+/// The hunt prompt instructs the LLM to append this block; we tolerate its
+/// absence (returns `Telos::default()`).
+///
+/// Format accepted (per the hunt prompt example):
+///
+/// ```text
+/// ```telos
+/// mission: "Build X."
+/// goals:
+///   - "Ship MVP."
+/// ```
+/// ```
+///
+/// Quoted strings preferred but `serde_yaml` handles bare scalars too.
+pub fn parse_telos_from_synthesis(synthesis: &str) -> Telos {
+    let fence_open = "```telos";
+    let Some(start) = synthesis.find(fence_open) else {
+        return Telos::default();
+    };
+    let after_open = &synthesis[start + fence_open.len()..];
+    // The body runs from the first newline after the opener to the next ``` fence.
+    let body_start = after_open.find('\n').map(|i| i + 1).unwrap_or(0);
+    let body = &after_open[body_start..];
+    let body_end = body.find("```").unwrap_or(body.len());
+    let yaml_body = &body[..body_end];
+    serde_yaml::from_str::<Telos>(yaml_body).unwrap_or_default()
+}
+
+/// Strip the fenced ```telos``` block from a synthesis paragraph so the human-
+/// readable text is clean when rendered into the markdown body. Returns the
+/// synthesis with the fence removed (or unchanged if no fence is present).
+pub fn strip_telos_fence(synthesis: &str) -> String {
+    let fence_open = "```telos";
+    let Some(start) = synthesis.find(fence_open) else {
+        return synthesis.to_string();
+    };
+    let after_open = &synthesis[start + fence_open.len()..];
+    let body_start = after_open.find('\n').map(|i| i + 1).unwrap_or(0);
+    let body = &after_open[body_start..];
+    let Some(close_rel) = body.find("```") else {
+        // Malformed — strip from the opener to end-of-string.
+        return synthesis[..start].trim_end().to_string();
+    };
+    let absolute_end = start + fence_open.len() + body_start + close_rel + 3;
+    let mut out = String::with_capacity(synthesis.len());
+    out.push_str(synthesis[..start].trim_end());
+    out.push_str(&synthesis[absolute_end..]);
+    out.trim().to_string()
+}
+
+/// Parse a YAML frontmatter `telos:` block from an existing who-you-are.md
+/// (idempotent merge support). Returns `Telos::default()` if no frontmatter is
+/// present or it doesn't contain a `telos:` key.
+pub fn parse_telos_from_frontmatter(content: &str) -> Telos {
+    let Some(stripped) = content.strip_prefix("---\n") else {
+        return Telos::default();
+    };
+    let Some(end_rel) = stripped.find("\n---\n") else {
+        return Telos::default();
+    };
+    let yaml = &stripped[..end_rel];
+
+    #[derive(Deserialize, Default)]
+    struct FrontMatter {
+        #[serde(default)]
+        telos: Option<Telos>,
+    }
+    let fm: FrontMatter = serde_yaml::from_str(yaml).unwrap_or_default();
+    fm.telos.unwrap_or_default()
+}
+
+/// Return the body of a who-you-are.md with any leading YAML frontmatter
+/// removed. Used when re-synthesizing so we replace the old frontmatter
+/// without touching the user-edited markdown body.
+pub fn strip_frontmatter(content: &str) -> &str {
+    let Some(stripped) = content.strip_prefix("---\n") else {
+        return content;
+    };
+    let Some(end_rel) = stripped.find("\n---\n") else {
+        return content;
+    };
+    // +5 = "\n---\n".len()
+    &stripped[end_rel + 5..]
+}
+
+/// Render a `Telos` to a YAML frontmatter block, including the leading and
+/// trailing `---` delimiters and a trailing newline.
+pub fn render_telos_frontmatter(telos: &Telos) -> String {
+    // Use serde_yaml's serializer for safe quoting + escaping. Wrap in the
+    // delimiter pair the markdown frontmatter convention requires.
+    #[derive(Serialize)]
+    struct FrontMatter<'a> {
+        telos: &'a Telos,
+    }
+    let yaml = serde_yaml::to_string(&FrontMatter { telos })
+        .unwrap_or_else(|_| "telos: {}\n".to_string());
+    format!("---\n{}---\n", yaml)
+}
+
+/// Read `~/.blade/who-you-are.md` if present. Returns None if the file does
+/// not exist or cannot be read.
+pub fn read_who_you_are() -> Option<String> {
+    let dir = blade_home_dir().ok()?;
+    let path = dir.join(WHO_YOU_ARE_FILENAME);
+    std::fs::read_to_string(&path).ok()
+}
+
+/// Read the path to `~/.blade/who-you-are.md` (creating directory if needed).
+pub fn who_you_are_path() -> Result<PathBuf, String> {
+    let dir = blade_home_dir()?;
+    Ok(dir.join(WHO_YOU_ARE_FILENAME))
+}
+
 /// Compose Markdown body from accumulated hunt findings. Deterministic — given
 /// the same `HuntFindings` the output is stable (modulo the date stamp).
+///
+/// Phase 56 (TELOS-SYNTH): emits a YAML `telos:` frontmatter block when the
+/// hunt's final-synthesis turn contained a fenced ```telos``` block. The
+/// frontmatter sits above the human-readable markdown body, allowing the
+/// brain (`brain.rs::telos_section`) to read mission + goals on every chat
+/// turn without re-parsing the full markdown.
 pub fn synthesize_to_markdown(findings: &HuntFindings) -> String {
+    synthesize_to_markdown_with_existing(findings, None)
+}
+
+/// Phase 56 (TELOS-SYNTH) — idempotent variant. When `existing_content` is
+/// `Some(...)`, the existing file's telos block + body are merged into the
+/// output so user edits survive a re-run of the hunt. Specifically:
+///
+///   - Telos fields are merged via `Telos::merge_preserve_self`: existing
+///     fields win, new hunt only fills gaps. This protects manual edits like
+///     "I overrode goal #2 to be more concrete" from being clobbered.
+///   - The markdown BODY (everything after the frontmatter) is preserved
+///     verbatim when present — only the frontmatter is regenerated.
+///
+/// When `existing_content` is `None`, this is the fresh-write path: build a
+/// new file from the hunt findings alone.
+pub fn synthesize_to_markdown_with_existing(
+    findings: &HuntFindings,
+    existing_content: Option<&str>,
+) -> String {
     let date = chrono::Local::now().format("%Y-%m-%d").to_string();
+
+    // ── TELOS extraction + merge ─────────────────────────────────────────────
+    // Parse the fence the LLM emitted in its closing synthesis turn.
+    let mut telos = parse_telos_from_synthesis(&findings.final_synthesis);
+    if let Some(existing) = existing_content {
+        // Existing user edits win — only fill gaps from the new hunt.
+        let prior = parse_telos_from_frontmatter(existing);
+        let new_from_hunt = telos.clone();
+        telos = prior;
+        telos.merge_preserve_self(&new_from_hunt);
+    }
+
     let mut out = String::new();
+
+    // YAML frontmatter — only when telos has something to say. Skipping when
+    // empty keeps the file clean on no-data hunts.
+    if !telos.is_empty() {
+        out.push_str(&render_telos_frontmatter(&telos));
+        out.push('\n');
+    }
+
+    // ── Idempotent body preservation ─────────────────────────────────────────
+    // If the existing file already had a markdown body (anything after the
+    // frontmatter), keep it verbatim. The synthesis acts as a frontmatter
+    // refresher, not a wholesale rewrite, after the first run.
+    if let Some(existing) = existing_content {
+        let body = strip_frontmatter(existing).trim_start();
+        if !body.is_empty() {
+            out.push_str(body);
+            if !out.ends_with('\n') {
+                out.push('\n');
+            }
+            return out;
+        }
+    }
+
     out.push_str("# Who you are (BLADE's working model)\n\n");
     out.push_str(&format!("**Last updated:** {} by hunt\n", date));
     out.push_str("**You can edit this file. BLADE re-reads it every session.**\n\n");
 
     // ── Identity ─────────────────────────────────────────────────────────────
     out.push_str("## Identity\n");
-    if findings.final_synthesis.trim().is_empty() {
+    // Strip the telos fence from the synthesis paragraph so the quoted
+    // human-readable section doesn't render the YAML twice (once in the
+    // frontmatter, once inline).
+    let synthesis_clean = strip_telos_fence(&findings.final_synthesis);
+    if synthesis_clean.trim().is_empty() {
         out.push_str("- (hunt produced no closing synthesis — edit this section to set who you are)\n");
     } else {
         // The closing assistant turn captured by the hunt loop. Quote verbatim
         // so the user sees what BLADE concluded and can correct it inline.
         out.push_str("> ");
-        out.push_str(findings.final_synthesis.trim());
+        out.push_str(synthesis_clean.trim());
         out.push('\n');
     }
     out.push('\n');
@@ -108,8 +351,13 @@ pub fn synthesize_to_markdown(findings: &HuntFindings) -> String {
 /// success. If the user has manually edited a prior version, we preserve it
 /// by backing up to `.who-you-are.md.bak.<timestamp>` before overwriting.
 pub fn write_who_you_are(content: &str) -> Result<PathBuf, String> {
-    let dir = blade_home_dir()?;
-    std::fs::create_dir_all(&dir)
+    write_who_you_are_at(content, &blade_home_dir()?)
+}
+
+/// Phase 56 helper — atomic write at an explicit directory. Lets integration
+/// tests redirect to a tempdir without touching real `~/.blade/`.
+pub fn write_who_you_are_at(content: &str, dir: &Path) -> Result<PathBuf, String> {
+    std::fs::create_dir_all(dir)
         .map_err(|e| format!("create_dir_all({}): {}", dir.display(), e))?;
     let target = dir.join(WHO_YOU_ARE_FILENAME);
 
@@ -144,7 +392,12 @@ pub async fn on_hunt_done(
     app: &tauri::AppHandle,
     outcome: &HuntOutcome,
 ) -> Result<(), String> {
-    let md = synthesize_to_markdown(&outcome.findings);
+    // Phase 56 (TELOS-SYNTH) — idempotent merge. If a prior who-you-are.md
+    // exists, preserve the user's body edits AND prefer the existing telos
+    // fields where present (new hunt only fills gaps). Fresh installs take
+    // the no-existing-content path and write a clean file.
+    let existing = read_who_you_are();
+    let md = synthesize_to_markdown_with_existing(&outcome.findings, existing.as_deref());
     let path = write_who_you_are(&md)?;
     log::info!("[hunt synthesis] wrote {} ({} bytes)", path.display(), md.len());
 
