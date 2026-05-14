@@ -25,6 +25,7 @@ mod pulse;
 mod reminders;
 mod skill_engine;
 pub mod skills;         // Phase 21 v1.3 — agentskills.io SKILL.md format substrate (pub for skill_validator bin)
+pub mod skills_md;      // Phase 57 v2.2 — OpenClaw-style SKILL.md directory pattern (triggers+tools+model_hint)
 mod voyager_log;        // Phase 22 v1.3 — Voyager loop ActivityStrip emit helpers
 mod reward;             // Phase 23 v1.3 — composite reward + per-turn JSONL persistence + tail-reader
 mod safety_bundle;      // Phase 26 v1.4 — central safety enforcement (danger-triple, mortality cap, calm-vector, crisis)
@@ -168,6 +169,7 @@ mod decomposition;    // Phase 35 v1.5 — DECOMP-01..05 auto-decomposition (Pla
 mod intelligence;     // Phase 36 v1.5 — INTEL-01..06 context intelligence (Plan 36-01 scaffold)
 pub mod onboarding;   // Phase 46 v2.0 — agentic hunt onboarding (pre-scan + hunt + synthesis)
 pub mod oauth;        // Phase 46 v2.0 — HUNT-10 OAuth scaffolds (gmail primary, slack + github stubs)
+pub mod presence;     // Phase 53 v2.2 — PRESENCE-NARRATE narration channel (Evolution/Vitality/Learning → chat)
 
 use chrono::Timelike;
 use std::sync::Arc;
@@ -955,6 +957,7 @@ pub fn run() {
             evolution::evolution_install_suggestion,
             evolution::evolution_run_now,
             evolution::evolution_log_capability_gap,
+            presence::presence_get_recent,
             research::research_get_recent,
             research::research_query,
             research::research_clear,

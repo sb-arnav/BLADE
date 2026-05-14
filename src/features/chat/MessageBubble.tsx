@@ -30,10 +30,18 @@
 //     testing → registered → retrying sequence reads as a distinct band
 //     of the chat stream, not as a stack of system errors.
 //
+// Phase 53 (PRESENCE-EMIT, v2.2):
+//   • Presence chat-lines (system-role messages with `presenceSource` set)
+//     get a `chat-bubble-presence chat-bubble-presence-<source>` class pair
+//     and a heart-glyph prefix so internal-state narration from Evolution /
+//     Vitality / Learning reads as an ambient liveliness band distinct from
+//     forge progress and system errors.
+//
 // @see .planning/phases/03-dashboard-chat-settings/03-CONTEXT.md §D-70, §D-72
 // @see .planning/phases/03-dashboard-chat-settings/03-PATTERNS.md §5
 // @see .planning/phases/36-context-intelligence/36-08-PLAN.md
 // @see .planning/phases/47-forge-wire/47-CONTEXT.md
+// @see .planning/milestones/v2.2-phases/53-presence-narrate/
 // @see ./AnchorChip.tsx
 
 import { useConfig } from '@/lib/context';
@@ -54,17 +62,26 @@ export function MessageBubble({ msg, streaming = false }: MessageBubbleProps) {
   // CSS can tint the border per phase (failed = error red, registered =
   // success green, others = neutral forge accent).
   const forgePhase = msg.forgePhase;
+  // Phase 53 (PRESENCE-EMIT) — presence chat-lines are system-role messages
+  // with `presenceSource` set. They get a dedicated chat-bubble-presence
+  // class + source-coded modifier so CSS can tint per source (evolution,
+  // vitality, learning) and the eye can scan them as a separate band from
+  // forge progress + system errors.
+  const presenceSource = msg.presenceSource;
   const cls =
     `chat-bubble chat-bubble-${msg.role}` +
     (streaming ? ' chat-bubble-streaming' : '') +
-    (forgePhase ? ` chat-bubble-forge chat-bubble-forge-${forgePhase}` : '');
+    (forgePhase ? ` chat-bubble-forge chat-bubble-forge-${forgePhase}` : '') +
+    (presenceSource ? ` chat-bubble-presence chat-bubble-presence-${presenceSource}` : '');
   // Zero-width non-breaking space keeps an empty streaming bubble tall enough
   // to be visible before the first token lands (prevents layout snap).
-  // Forge lines are prefixed with the hammer/anvil glyph so the eye can
-  // scan past them in the chat stream.
+  // Forge lines are prefixed with the hammer/anvil glyph; presence lines get
+  // a small heart so internal-state narration is scannable at a glance.
   const body = forgePhase
     ? `⚒ ${msg.content}`
-    : msg.content || (streaming ? '' : ' ');
+    : presenceSource
+      ? `♥ ${msg.content}`
+      : msg.content || (streaming ? '' : ' ');
 
   // BladeConfig ships the IntelligenceConfig sub-struct via get_config's
   // serde_json passthrough (`[k: string]: unknown` in the TS type). Default
@@ -90,6 +107,7 @@ export function MessageBubble({ msg, streaming = false }: MessageBubbleProps) {
       data-message-id={msg.id}
       data-role={msg.role}
       data-forge-phase={forgePhase ?? undefined}
+      data-presence-source={presenceSource ?? undefined}
     >
       {msg.thinking ? (
         <ReasoningThinking thinking={msg.thinking} defaultOpen={streaming} />
