@@ -184,3 +184,85 @@ pub async fn test(model: &str) -> Result<String, String> {
 
     Ok(text)
 }
+
+// ── Phase 54 / PROVIDER-MIGRATION (ollama) ───────────────────────────────────
+//
+// Adapter struct + ProviderDef impl. Delegates to local `complete` so the
+// existing local-socket HTTP path is preserved verbatim. Ollama doesn't
+// take an API key and currently ignores tool definitions — the trait impl
+// accepts both for signature compatibility but only `messages` reach the
+// underlying call.
+// Adapted from block/goose (Apache 2.0).
+
+use super::goose_traits::{BladeModelConfig, Provider, ProviderDef, ProviderMetadata};
+use super::ToolDefinition;
+
+pub struct OllamaProvider {
+    config: BladeModelConfig,
+}
+
+impl OllamaProvider {
+    #[allow(dead_code)] // Phase 54 — wired in PROVIDER-ROUTER-WIRE / future call sites.
+    pub fn new(config: BladeModelConfig) -> Self {
+        Self { config }
+    }
+}
+
+impl Provider for OllamaProvider {
+    fn get_name(&self) -> &str {
+        "ollama"
+    }
+
+    fn get_model_config(&self) -> &BladeModelConfig {
+        &self.config
+    }
+
+    async fn complete(
+        &self,
+        _api_key: &str,
+        messages: &[ConversationMessage],
+        _tools: &[ToolDefinition],
+    ) -> Result<AssistantTurn, String> {
+        // Ollama authenticates via local Unix socket / 127.0.0.1; no API
+        // key. Tool calling lives behind the model's native function-calling
+        // training (e.g. Hermes 3) and is invoked by the `complete` fn
+        // itself, not via the trait param — pass-through preserves shape.
+        complete(&self.config.model_name, messages).await
+    }
+}
+
+pub struct OllamaDef;
+
+impl ProviderDef for OllamaDef {
+    fn metadata() -> ProviderMetadata {
+        ProviderMetadata::new(
+            "ollama",
+            "Ollama (local)",
+            "Local model server — Hermes 3 / Llama 3 / others; zero-cost inference on user hardware",
+            "llama3",
+            "https://ollama.com/library",
+            // No config keys: local socket, no API key.
+            vec![],
+        )
+    }
+}
+
+#[cfg(test)]
+mod phase54_migration_tests {
+    use super::*;
+
+    #[test]
+    fn ollama_provider_def_metadata() {
+        let m = OllamaDef::metadata();
+        assert_eq!(m.name, "ollama");
+        assert_eq!(m.default_model, "llama3");
+        assert!(m.config_keys.is_empty(), "ollama has no API key");
+    }
+
+    #[test]
+    fn ollama_provider_get_name() {
+        let p = OllamaProvider::new(BladeModelConfig::new("llama3"));
+        assert_eq!(p.get_name(), "ollama");
+        assert_eq!(p.get_model_config().model_name, "llama3");
+    }
+}
