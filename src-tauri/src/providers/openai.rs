@@ -370,3 +370,93 @@ pub async fn test(api_key: &str, model: &str, base_url: Option<&str>) -> Result<
 
     Ok(text)
 }
+
+// ── Phase 54 / PROVIDER-MIGRATION (openai) ───────────────────────────────────
+//
+// Adapter struct + ProviderDef impl. Delegates to `complete_ext` so the
+// existing OpenAI-compatible HTTP path is preserved verbatim (also used by
+// OpenRouter, Vercel AI Gateway, NVIDIA NIM, etc. when `base_url` is set).
+// Adapted from block/goose (Apache 2.0).
+
+use super::goose_traits::{
+    BladeModelConfig, ConfigKey, Provider, ProviderDef, ProviderMetadata,
+};
+
+pub struct OpenAIProvider {
+    api_key: String,
+    config: BladeModelConfig,
+}
+
+impl OpenAIProvider {
+    #[allow(dead_code)] // Phase 54 — wired in PROVIDER-ROUTER-WIRE / future call sites.
+    pub fn new(api_key: impl Into<String>, config: BladeModelConfig) -> Self {
+        Self {
+            api_key: api_key.into(),
+            config,
+        }
+    }
+}
+
+impl Provider for OpenAIProvider {
+    fn get_name(&self) -> &str {
+        "openai"
+    }
+
+    fn get_model_config(&self) -> &BladeModelConfig {
+        &self.config
+    }
+
+    async fn complete(
+        &self,
+        api_key: &str,
+        messages: &[ConversationMessage],
+        tools: &[ToolDefinition],
+    ) -> Result<AssistantTurn, String> {
+        let key = if api_key.is_empty() { &self.api_key } else { api_key };
+        complete_ext(
+            key,
+            &self.config.model_name,
+            messages,
+            tools,
+            self.config.base_url.as_deref(),
+            self.config.max_tokens_override,
+        )
+        .await
+    }
+}
+
+pub struct OpenAIDef;
+
+impl ProviderDef for OpenAIDef {
+    fn metadata() -> ProviderMetadata {
+        ProviderMetadata::new(
+            "openai",
+            "OpenAI",
+            "GPT family — frontier general models + vision + tool use",
+            "gpt-4o",
+            "https://platform.openai.com/docs/models",
+            vec![ConfigKey::new("OPENAI_API_KEY", true, true, None)],
+        )
+    }
+}
+
+#[cfg(test)]
+mod phase54_migration_tests {
+    use super::*;
+
+    #[test]
+    fn openai_provider_def_metadata() {
+        let m = OpenAIDef::metadata();
+        assert_eq!(m.name, "openai");
+        assert_eq!(m.default_model, "gpt-4o");
+        assert!(m.config_keys.iter().any(|k| k.name == "OPENAI_API_KEY"));
+    }
+
+    #[test]
+    fn openai_provider_get_name() {
+        let p = OpenAIProvider::new("sk-test", BladeModelConfig::new("gpt-4o"));
+        assert_eq!(p.get_name(), "openai");
+        assert_eq!(p.get_model_config().model_name, "gpt-4o");
+        assert!(!p.supports_cache_control()); // default false; OpenAI cache is implicit
+    }
+}
