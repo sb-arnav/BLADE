@@ -650,6 +650,92 @@ pub(crate) fn run_migrations(conn: &Connection) -> Result<(), String> {
          retrieval is BM25 + KG (Phase 58, v2.2)"
     );
 
+    // ── Phase 55 / SESSION-SCHEMA-PORT (v2.2 — 2026-05-14) ──
+    // Goose-shaped SQLite session schema for cross-session continuity +
+    // session-fork + future Goose interop. Mirrors the column shape of
+    // Goose's `crates/goose/src/session/session_manager.rs` `sessions` +
+    // `messages` CREATE statements (Apache 2.0). BLADE additionally
+    // promotes tool invocations into first-class `tool_calls` +
+    // `tool_results` tables so query paths don't need to walk JSON.
+    //
+    // Canonical SQL source: `migrations/202605_session_schema.sql`
+    // (this is the inlined copy that boots will actually apply, per the
+    // Phase 58 precedent — the .sql file is documentation + audit trail).
+    // Idempotent throughout (CREATE TABLE / INDEX IF NOT EXISTS).
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS sessions (
+            id                          TEXT PRIMARY KEY,
+            name                        TEXT NOT NULL DEFAULT '',
+            description                 TEXT NOT NULL DEFAULT '',
+            user_set_name               INTEGER NOT NULL DEFAULT 0,
+            session_type                TEXT NOT NULL DEFAULT 'user',
+            working_dir                 TEXT NOT NULL DEFAULT '',
+            created_at                  INTEGER NOT NULL,
+            updated_at                  INTEGER NOT NULL,
+            extension_data              TEXT NOT NULL DEFAULT '{}',
+            total_tokens                INTEGER,
+            input_tokens                INTEGER,
+            output_tokens               INTEGER,
+            accumulated_total_tokens    INTEGER,
+            accumulated_input_tokens    INTEGER,
+            accumulated_output_tokens   INTEGER,
+            schedule_id                 TEXT,
+            recipe_json                 TEXT,
+            user_recipe_values_json     TEXT,
+            provider_name               TEXT,
+            model_config_json           TEXT,
+            goose_mode                  TEXT NOT NULL DEFAULT 'auto',
+            archived_at                 INTEGER,
+            project_id                  TEXT,
+            forked_from                 TEXT,
+            forked_at_message_id        TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_sessions_updated     ON sessions(updated_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_sessions_type        ON sessions(session_type);
+        CREATE INDEX IF NOT EXISTS idx_sessions_created     ON sessions(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_sessions_forked_from ON sessions(forked_from);
+
+        CREATE TABLE IF NOT EXISTS session_messages (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            message_id        TEXT,
+            session_id        TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+            role              TEXT NOT NULL,
+            content_json      TEXT NOT NULL,
+            created_timestamp INTEGER NOT NULL,
+            timestamp         INTEGER NOT NULL,
+            tokens            INTEGER,
+            metadata_json     TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_session_messages_session    ON session_messages(session_id);
+        CREATE INDEX IF NOT EXISTS idx_session_messages_timestamp  ON session_messages(timestamp);
+        CREATE INDEX IF NOT EXISTS idx_session_messages_message_id ON session_messages(message_id);
+        CREATE INDEX IF NOT EXISTS idx_session_messages_created    ON session_messages(created_timestamp);
+
+        CREATE TABLE IF NOT EXISTS tool_calls (
+            id           TEXT PRIMARY KEY,
+            message_id   INTEGER NOT NULL REFERENCES session_messages(id) ON DELETE CASCADE,
+            session_id   TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+            tool_name    TEXT NOT NULL,
+            args_json    TEXT NOT NULL DEFAULT '{}',
+            created_at   INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_tool_calls_session    ON tool_calls(session_id);
+        CREATE INDEX IF NOT EXISTS idx_tool_calls_message    ON tool_calls(message_id);
+        CREATE INDEX IF NOT EXISTS idx_tool_calls_tool_name  ON tool_calls(tool_name);
+        CREATE INDEX IF NOT EXISTS idx_tool_calls_created    ON tool_calls(created_at DESC);
+
+        CREATE TABLE IF NOT EXISTS tool_results (
+            tool_call_id TEXT PRIMARY KEY REFERENCES tool_calls(id) ON DELETE CASCADE,
+            result_json  TEXT,
+            error_text   TEXT,
+            created_at   INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_tool_results_created ON tool_results(created_at DESC);
+        ",
+    )
+    .map_err(|e| format!("DB error (session schema): {}", e))?;
+
     Ok(())
 }
 
