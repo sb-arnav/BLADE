@@ -27,9 +27,19 @@
 #![allow(dead_code)] // Wave 1 lands substrate; tests + dispatch use it conditionally.
 
 pub mod dispatch;
+pub mod install;
 pub mod loader;
 pub mod manifest;
 
 pub use dispatch::match_trigger;
+pub use install::{install_from_text, install_from_url};
 pub use loader::{install_registry, registry, scan_directory, user_skills_dir, SkillsRegistry};
 pub use manifest::SkillManifest;
+
+/// Phase 57 (SKILLS-INSTALL-CMD) — Tauri command. Downloads a SKILL.md from
+/// an HTTPS URL, validates the schema, writes to `~/.config/blade/skills_md/`,
+/// and refreshes the in-memory registry. Returns the installed skill's name.
+#[tauri::command]
+pub async fn blade_install_skill(url: String) -> Result<String, String> {
+    install_from_url(&url).await
+}

@@ -615,6 +615,9 @@ pub fn run() {
             commands::send_message_stream,
             commands::cancel_chat,
             commands::quickask_submit,   // WIRE-01 stub — Phase 3 Plan 03-01
+            // Phase 57 v2.2 (SKILLS-INSTALL-CMD) — install OpenClaw-style
+            // SKILL.md from an HTTPS URL and refresh the in-memory registry.
+            skills_md::blade_install_skill,
             roles::roles_list,
             roles::roles_get_active,
             roles::roles_set_active,
