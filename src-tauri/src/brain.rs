@@ -795,6 +795,25 @@ fn build_system_prompt_inner(
     parts.push(build_identity_supplement(&config, provider, model));
     record_section("identity_supplement", parts.last().map(|s| s.len()).unwrap_or(0));
 
+    // ── TELOS (priority 0.5 — Phase 56 / TELOS-INGEST) ────────────────────────
+    // Mission + Goals are the optimization target the hunt captured into
+    // ~/.blade/who-you-are.md's YAML frontmatter. They go HIGH in the prompt
+    // (right after identity supplement) so the model has them on every turn,
+    // independent of any selective-injection gate — telos is universally
+    // relevant. Beliefs + challenges are bundled here too but are short; the
+    // LLM can lean on them when the user asks "what am I working on" or
+    // "what's blocking me" without a separate fetch.
+    //
+    // Empty when no who-you-are.md exists, no frontmatter, or all telos
+    // fields are empty (fresh install, no hunt run yet).
+    {
+        let telos = telos_section();
+        if !telos.is_empty() {
+            parts.push(telos);
+            record_section("telos", parts.last().map(|s| s.len()).unwrap_or(0));
+        }
+    }
+
     // ── MEMORY CORE (priority 1) ──────────────────────────────────────────────
     // L0 critical facts — always-on, capped at source (always-keep core)
     let db_path = crate::config::blade_config_dir().join("blade.db");
@@ -2026,6 +2045,94 @@ fn load_blade_md() -> Option<String> {
     let path = blade_dir.join("BLADE.md");
     let raw = fs::read_to_string(path).ok()?;
     Some(scrub_system_reminders(&raw))
+}
+
+/// Phase 56 (TELOS-INGEST) — read the YAML `telos:` frontmatter from
+/// `~/.blade/who-you-are.md` and render it as a compact system-prompt block.
+///
+/// Always includes mission + goals when present (these are the optimization
+/// target — every turn). Beliefs + challenges are included when present too,
+/// but kept brief; LLMs may also pull them on demand via a tool / explicit
+/// query trigger. Returns an empty string when no telos block exists, when
+/// who-you-are.md is missing, or when all telos fields are empty.
+///
+/// Format produced (~200 chars when populated):
+///
+/// ```text
+/// ## Your Mission
+///
+/// Build a B2B SaaS for design agencies.
+///
+/// ## Active Goals
+///
+/// - Ship MVP by end of month.
+/// - First 10 paying customers Q2.
+/// ```
+pub fn telos_section() -> String {
+    let Some(content) = crate::onboarding::synthesis::read_who_you_are() else {
+        return String::new();
+    };
+    let telos = crate::onboarding::synthesis::parse_telos_from_frontmatter(&content);
+    if telos.is_empty() {
+        return String::new();
+    }
+    render_telos_section(&telos)
+}
+
+/// Format a parsed `Telos` for system-prompt injection. Separated from
+/// `telos_section` so integration tests can drive the renderer directly
+/// without touching the real `~/.blade/`.
+pub fn render_telos_section(telos: &crate::onboarding::synthesis::Telos) -> String {
+    let mut out = String::new();
+    if let Some(m) = telos.mission.as_deref() {
+        let m = m.trim();
+        if !m.is_empty() {
+            out.push_str("## Your Mission\n\n");
+            out.push_str(m);
+            if !m.ends_with('.') && !m.ends_with('!') && !m.ends_with('?') {
+                out.push('.');
+            }
+            out.push_str("\n\n");
+        }
+    }
+    if !telos.goals.is_empty() {
+        out.push_str("## Active Goals\n\n");
+        for g in telos.goals.iter() {
+            let g = g.trim();
+            if g.is_empty() { continue; }
+            out.push_str("- ");
+            out.push_str(g);
+            out.push('\n');
+        }
+        out.push('\n');
+    }
+    // Beliefs + Challenges: included but compact — the brain has them present
+    // for tone modulation, the LLM can lean on them when asked "what am I
+    // working on" / "what's blocking me". They are NOT the primary optimization
+    // target, so they live below mission + goals.
+    if !telos.beliefs.is_empty() {
+        out.push_str("## Beliefs You Hold\n\n");
+        for b in telos.beliefs.iter() {
+            let b = b.trim();
+            if b.is_empty() { continue; }
+            out.push_str("- ");
+            out.push_str(b);
+            out.push('\n');
+        }
+        out.push('\n');
+    }
+    if !telos.challenges.is_empty() {
+        out.push_str("## Current Challenges\n\n");
+        for c in telos.challenges.iter() {
+            let c = c.trim();
+            if c.is_empty() { continue; }
+            out.push_str("- ");
+            out.push_str(c);
+            out.push('\n');
+        }
+        out.push('\n');
+    }
+    out.trim_end().to_string()
 }
 
 /// Remove any `<system-reminder>...</system-reminder>` blocks from text.
