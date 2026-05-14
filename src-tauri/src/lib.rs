@@ -646,6 +646,8 @@ pub fn run() {
             commands::reset_onboarding,
             commands::get_onboarding_status,
             commands::complete_onboarding,
+            // Phase 56 v2.2 — TELOS edit flow (open who-you-are.md)
+            commands::blade_open_who_you_are,
             // Phase 46 v2.0 — agentic hunt onboarding (HUNT-01..09)
             onboarding::hunt::start_hunt_cmd,
             onboarding::hunt::cancel_hunt,

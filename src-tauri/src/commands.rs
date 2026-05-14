@@ -1353,6 +1353,36 @@ pub(crate) async fn send_message_stream_inline(
         }
     }
 
+    // ── Phase 56 (TELOS-EDIT-FLOW) — `/edit-self` slash command ──────────────
+    // Single recognized slash command (today). Routes to
+    // `blade_open_who_you_are` so the user can edit mission / goals / beliefs
+    // / challenges in their default editor. Matches before any LLM call so we
+    // don't burn a turn on what should be a side-effect-only request.
+    //
+    // Chat-streaming contract: emit blade_message_start BEFORE chat_token
+    // (CLAUDE.md memory: project_chat_streaming_contract). Early-return
+    // suppresses the standard LLM streaming path.
+    {
+        let trimmed = last_user_text.trim();
+        if trimmed.eq_ignore_ascii_case("/edit-self") {
+            let confirmation = match blade_open_who_you_are() {
+                Ok(p) => format!("Opening {} in your default editor.", p),
+                Err(e) => format!("Could not open who-you-are.md: {}", e),
+            };
+            let msg_id = uuid::Uuid::new_v4().to_string();
+            emit_stream_event(&app, "blade_message_start", serde_json::json!({
+                "message_id": &msg_id,
+                "role": "assistant",
+            }));
+            emit_stream_event(&app, "chat_token", serde_json::json!({
+                "content": confirmation,
+            }));
+            emit_stream_event(&app, "chat_done", ());
+            let _ = app.emit("blade_status", "idle");
+            return Ok(());
+        }
+    }
+
     // ── Phase 24 (v1.3) — chat-injected proposal reply apply path ────────────
     // intent_router classifies "yes <id>" / "no <id>" / "dismiss <id>" as
     // IntentClass::ProposalReply. When matched, apply the operator's reply
@@ -2383,6 +2413,72 @@ pub fn reset_onboarding() -> Result<(), String> {
     config.provider = "gemini".to_string();
     config.model = "gemini-2.0-flash".to_string();
     save_config(&config)
+}
+
+/// Phase 56 (TELOS-EDIT-FLOW) — open `~/.blade/who-you-are.md` in the user's
+/// default editor.
+///
+/// Three concerns this command serves:
+///   1. User control. who-you-are.md is THE optimization-target artifact —
+///      mission, goals, beliefs, challenges. The user owns it; they should be
+///      one click away from editing it.
+///   2. The `/edit-self` chat shortcut. `send_message_stream_inline` routes
+///      that trigger here so users can type one slash instead of digging in
+///      the filesystem.
+///   3. First-run support — if the file doesn't exist yet (no hunt completed),
+///      we create a stub with empty telos frontmatter so the editor doesn't
+///      open to a 404.
+///
+/// Platform-specific open: `start` (Windows), `open` (macOS), `xdg-open`
+/// (Linux). Same pattern as `automation::auto_open_path`, kept local here to
+/// avoid pulling automation into the onboarding compile-graph.
+#[tauri::command]
+pub fn blade_open_who_you_are() -> Result<String, String> {
+    let path = crate::onboarding::synthesis::who_you_are_path()?;
+
+    // First-run support: create an empty stub so the editor opens to a real
+    // file. Without this, xdg-open on Linux can fail silently when the path
+    // doesn't exist.
+    if !path.exists() {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("create_dir_all({}): {}", parent.display(), e))?;
+        }
+        let stub = "---\ntelos:\n  mission: \"\"\n  goals: []\n  beliefs: []\n  challenges: []\n---\n# Who you are (BLADE's working model)\n\n**You can edit this file. BLADE re-reads it every session.**\n\nRun the onboarding hunt or fill in the telos block above to give BLADE an optimization target.\n";
+        std::fs::write(&path, stub)
+            .map_err(|e| format!("write stub: {}", e))?;
+    }
+
+    let path_str = path.display().to_string();
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "", &path_str])
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .map_err(|e| format!("Open failed: {}", e))?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&path_str)
+            .spawn()
+            .map_err(|e| format!("Open failed: {}", e))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&path_str)
+            .spawn()
+            .map_err(|e| format!("Open failed: {}", e))?;
+    }
+
+    Ok(path_str)
 }
 
 #[tauri::command]
