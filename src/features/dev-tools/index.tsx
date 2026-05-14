@@ -27,7 +27,7 @@ const ComputerUse       = lazy(() => import('./ComputerUse').then((m) => ({ defa
 const DevToolsPane      = lazy(() => import('./DevToolsPane').then((m) => ({ default: m.DevToolsPane })));
 
 export const routes: RouteDefinition[] = [
-  { id: 'dev-tools',          label: 'Developer Tools', section: 'dev', component: DevToolsPane,      phase: 59, description: 'Held-trio: Body Map / Organ Registry / Pixel World / Tentacle / Mortality / Ghost.' },
+  { id: 'dev-tools',          label: 'Open Developer Tools', section: 'dev', component: DevToolsPane, phase: 59, description: 'Held-trio: Body Map / Organ Registry / Pixel World / Tentacle / Mortality / Ghost.' },
   { id: 'terminal',           label: 'Terminal',        section: 'dev', component: Terminal,          phase: 7 },
   { id: 'file-browser',       label: 'File Browser',    section: 'dev', component: FileBrowser,       phase: 7 },
   { id: 'git-panel',          label: 'Git',             section: 'dev', component: GitPanel,          phase: 7 },

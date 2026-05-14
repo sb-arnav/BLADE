@@ -18,7 +18,9 @@ const AiDelegate       = lazy(() => import('./AiDelegate').then((m) => ({ defaul
 
 export const routes: RouteDefinition[] = [
   { id: 'hive-mesh',           label: 'Hive',              section: 'hive', component: HiveMesh,         phase: 8, description: 'All tentacles overview' },
-  { id: 'hive-tentacle',       label: 'Tentacle Detail',   section: 'hive', component: TentacleDetail,   phase: 8 },
+  // Phase 59 Plan 59-02 (TRIO-DEMOTE-NAV) — Tentacle Detail is part of the
+  // v2.0-held trio; demoted from ⌘K + NavRail. Surfaced inside /dev-tools.
+  { id: 'hive-tentacle',       label: 'Tentacle Detail',   section: 'hive', component: TentacleDetail,   phase: 8, paletteHidden: true, description: 'Held-trio — surfaced inside /dev-tools.' },
   { id: 'hive-autonomy',       label: 'Autonomy Controls', section: 'hive', component: AutonomyControls, phase: 8 },
   { id: 'hive-approval-queue', label: 'Approval Queue',    section: 'hive', component: ApprovalQueue,    phase: 8 },
   { id: 'hive-ai-delegate',    label: 'AI Delegate',       section: 'hive', component: AiDelegate,       phase: 8 },
