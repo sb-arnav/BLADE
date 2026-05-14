@@ -16,6 +16,22 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use tauri::{Emitter, Manager};
 
+// ── Phase 53 (PRESENCE-EVOLUTION) — presence narration helper ───────────────
+//
+// Thin wrapper around `presence::emit_presence_line` that fixes the `source`
+// label to "evolution". Mirrors the `emit_forge_line` precedent in
+// `tool_forge.rs:139` — best-effort, never panics, never aborts the caller.
+//
+// Used at three emission sites in this module: auto-install success after
+// decision_gate approves (capability now wired in), pending suggestion that
+// surfaced past decision_gate (capability the user can wire), and level-up
+// milestone (BLADE just gained meaningful new ground). All three sites
+// route through `decision_gate::evaluate` so emissions only fire when the
+// "evolution" source threshold says yes.
+fn emit_presence_line(app: &tauri::AppHandle, message: &str) {
+    crate::presence::emit_presence_line(app, message, "evolution");
+}
+
 /// One entry in the built-in MCP catalog.
 struct CatalogEntry {
     /// Human-readable name shown in suggestions
@@ -728,6 +744,17 @@ pub async fn run_evolution_cycle(app: &tauri::AppHandle) {
                                 "[evolution] Auto-installed '{}' — {} tools discovered",
                                 entry.name, tool_count
                             );
+                            // Phase 53 (PRESENCE-EVOLUTION) — site 1: capability now
+                            // wired in. Decision_gate already returned ActAutonomously
+                            // (the source-threshold gate above), so the threshold
+                            // condition is satisfied; we narrate the wire-in.
+                            emit_presence_line(
+                                app,
+                                &format!(
+                                    "I noticed you use {} — I just wired in {} ({} tools available now).",
+                                    trigger_app, entry.name, tool_count
+                                ),
+                            );
                         }
                         Err(e) => {
                             log::warn!("[evolution] Auto-install failed for {}: {}", entry.name, e);
@@ -802,6 +829,41 @@ pub async fn run_evolution_cycle(app: &tauri::AppHandle) {
             });
             let _ = save_suggestion(&suggestion);
             new_suggestions.push(suggestion);
+
+            // Phase 53 (PRESENCE-EVOLUTION) — site 2: capability the user could
+            // wire (token-gated). Decision_gate.evaluate decides whether this
+            // capability is worth narrating to chat: ActAutonomously / AskUser
+            // outcomes pass the source threshold and emit a "want me to wire it
+            // in?" line; QueueForLater / Ignore stay silent. The save_suggestion
+            // ID guard above already dedupes per (capability, trigger_app), so
+            // we don't re-narrate the same opportunity every 15-min cycle.
+            let presence_signal = crate::decision_gate::Signal {
+                source: "evolution".to_string(),
+                description: format!(
+                    "Narrate capability opportunity '{}' (triggered by: {})",
+                    entry.name, trigger_app
+                ),
+                confidence: 0.8, // capability detected with high match against catalog triggers
+                reversible: true,
+                time_sensitive: false,
+            };
+            let presence_perception = crate::perception_fusion::get_latest()
+                .unwrap_or_else(crate::perception_fusion::update_perception);
+            let presence_outcome =
+                crate::decision_gate::evaluate(&presence_signal, &presence_perception).await;
+            if matches!(
+                presence_outcome,
+                crate::decision_gate::DecisionOutcome::ActAutonomously { .. }
+                    | crate::decision_gate::DecisionOutcome::AskUser { .. }
+            ) {
+                emit_presence_line(
+                    app,
+                    &format!(
+                        "I noticed you use {} — want me to wire it in? ({})",
+                        trigger_app, entry.description
+                    ),
+                );
+            }
         }
     }
 
@@ -833,6 +895,46 @@ pub async fn run_evolution_cycle(app: &tauri::AppHandle) {
             "breakdown": new_level.breakdown,
             "next_unlock": new_level.next_unlock,
         }));
+
+        // Phase 53 (PRESENCE-EVOLUTION) — site 3: integration milestone.
+        // Leveling up is reversible-via-config (the capabilities accrued can be
+        // unwired) so we route through decision_gate; "evolution" source
+        // threshold decides whether this moment is worth narrating. Level-ups
+        // are rare and qualitatively meaningful so we use high confidence here.
+        let level_signal = crate::decision_gate::Signal {
+            source: "evolution".to_string(),
+            description: format!(
+                "Narrate level-up to Level {} (score {})",
+                new_level.level, new_level.score
+            ),
+            confidence: 0.95,
+            reversible: true,
+            time_sensitive: false,
+        };
+        let level_perception = crate::perception_fusion::get_latest()
+            .unwrap_or_else(crate::perception_fusion::update_perception);
+        let level_outcome =
+            crate::decision_gate::evaluate(&level_signal, &level_perception).await;
+        if matches!(
+            level_outcome,
+            crate::decision_gate::DecisionOutcome::ActAutonomously { .. }
+                | crate::decision_gate::DecisionOutcome::AskUser { .. }
+        ) {
+            let next_hint = new_level
+                .next_unlock
+                .as_deref()
+                .map(|s| format!(" Next: {}", s))
+                .unwrap_or_default();
+            emit_presence_line(
+                app,
+                &format!(
+                    "I just reached Level {} — {} integrations wired in.{}",
+                    new_level.level,
+                    new_level.breakdown.len(),
+                    next_hint
+                ),
+            );
+        }
         // Log to activity timeline
         let db_path = crate::config::blade_config_dir().join("blade.db");
         if let Ok(conn) = rusqlite::Connection::open(&db_path) {
