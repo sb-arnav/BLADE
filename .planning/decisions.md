@@ -323,3 +323,24 @@ This **replaces** the autonomy-tier picker / 6-question wizard from my earlier d
 **Outcome (filled later):**
 
 ---
+
+## 2026-05-14 — Held-trio reorganized into /dev-tools, not deleted
+
+VISION §57-64 held Body Map / mortality-salience / Ghost Mode for v2.0 evaluation. Neither v2.0 nor v2.1 ran the evaluation. v2.2 Phase 59 reorganizes them into the new `/dev-tools` route + demotes them from main nav. Per workspace rule (no_feature_removal — reorganize hierarchy, don't delete).
+
+Full operator-engagement-data evaluation pending external launch (Phase 60 prep). v2.3+ will decide ship-or-kill based on real signal.
+
+**Position:** Demote (not delete) the v2.0-held trio into a single `/dev-tools` route with sub-tabs, keeping the underlying components and routes alive (`paletteHidden: true` on the trio's individual entries) so the verdict can be revisited cheaply once external-operator engagement data exists.
+
+**Rationale:**
+- Workspace rule `feedback_no_feature_removal` explicitly forbids removing features when reorganizing — "reorganize hierarchy, don't delete." Deleting these components forecloses the option to revive them; demoting preserves it at zero ongoing cost (lazy-imports, no main-nav weight, single dev tab).
+- The evaluation that should have happened in v2.0 / v2.1 needs *real user signal*, which BLADE doesn't have yet (operator dogfood + 0 external users). Running the evaluation against synthetic intuition would burn the only remaining ship-or-kill judgment without earning it.
+- A `/dev-tools` host route gives the trio a single discoverable entry point for the operator while staying off the primary surface for any future external user. The fingernail-sized chat-header vitality badge (Phase 59 TRIO-VITALITY-EXPOSE) gives the presence layer one visible footprint outside the dev pane.
+
+**Falsification:**
+- If external-launch operator engagement data (post-Phase 60) shows the held-trio surfaces never get opened from `/dev-tools` across 30 days of real use → the demote was a soft kill; the v2.3 ship-or-kill verdict is "kill" with evidence.
+- If operator engagement data shows the trio gets opened daily and feeds into other surfaces → demotion was correct; promote back to main nav in v2.3.
+- If the trio gets opened occasionally but never composes with anything else BLADE does → the surfaces are working but isolated; keep in `/dev-tools` indefinitely as power-user inventory.
+
+**Outcome (filled later):**
+
