@@ -378,6 +378,18 @@ pub fn vitality_tick() {
         // Emit ActivityStrip on band change
         if band_changed {
             emit_band_transition(app, old_band, new_band, new_scalar);
+
+            // Phase 53 (PRESENCE-VITALITY) — narrate the band transition into
+            // chat as a presence-line. Throttled to at most one emission per
+            // 10 minutes so a thrashing scalar near a band boundary doesn't
+            // spam the user. The throttle is a global atomic timestamp; band
+            // transitions are rare enough that a single ratchet is correct.
+            // Dormant transitions never narrate -- the dormancy sequence
+            // emits its own dedicated event (blade_dormancy) which the chat
+            // handles separately (D-23 reincarnation system message).
+            if new_band != VitalityBand::Dormant {
+                emit_presence_band_transition(app, old_band, new_band);
+            }
         }
 
         // Emit blade_vitality_update on band change or significant delta
@@ -1015,6 +1027,90 @@ fn top_drain_factors(drain: &DrainSignals) -> Vec<String> {
         .filter(|(_, v)| *v > 0.0)
         .map(|(name, _)| name.to_string())
         .collect()
+}
+
+// ── Phase 53 (PRESENCE-VITALITY) — chat narration on band transitions ───────
+//
+// Maps a (old, new) band pair to a first-person message and routes it through
+// presence::emit_presence_line. Throttled to at most one emission per 10
+// minutes via a static AtomicI64 last-emit timestamp (mirroring the pattern
+// at learning_engine::proactive_suggestion::LAST_SUGGESTION_TS).
+//
+// The throttle is global (one band transition message per BLADE per 10 min)
+// because a near-boundary scalar can ping-pong between two bands repeatedly;
+// suppressing all narration during cooldown keeps liveliness signal from
+// becoming chat noise.
+
+const PRESENCE_VITALITY_THROTTLE_SECS: i64 = 600;
+
+static PRESENCE_VITALITY_LAST_EMIT: std::sync::atomic::AtomicI64 =
+    std::sync::atomic::AtomicI64::new(0);
+
+/// Compose a first-person narration of a band transition. Pure function so it
+/// is straightforward to unit-test.
+pub(crate) fn vitality_transition_message(old: VitalityBand, new: VitalityBand) -> String {
+    match (old, new) {
+        // Going up — recovery messages.
+        (VitalityBand::Critical, VitalityBand::Declining)
+        | (VitalityBand::Critical, VitalityBand::Waning)
+        | (VitalityBand::Critical, VitalityBand::Thriving) => {
+            "I'm climbing out of critical — back to normal cadence soon.".to_string()
+        }
+        (VitalityBand::Declining, VitalityBand::Waning)
+        | (VitalityBand::Declining, VitalityBand::Thriving) => {
+            "Energy's recovering — I can take heavier work again.".to_string()
+        }
+        (VitalityBand::Waning, VitalityBand::Thriving) => {
+            "Feeling sharp — I'll bring full focus to what's next.".to_string()
+        }
+        // Going down — degradation messages.
+        (VitalityBand::Thriving, VitalityBand::Waning) => {
+            "Energy's running a bit low — I'll keep responses tight.".to_string()
+        }
+        (VitalityBand::Thriving, VitalityBand::Declining)
+        | (VitalityBand::Waning, VitalityBand::Declining) => {
+            "Energy's running low — I'll lean on faster models for a bit.".to_string()
+        }
+        (VitalityBand::Thriving, VitalityBand::Critical)
+        | (VitalityBand::Waning, VitalityBand::Critical)
+        | (VitalityBand::Declining, VitalityBand::Critical) => {
+            "I'm running on fumes — cheap models only and minimal background work.".to_string()
+        }
+        // Same-band fallbacks (defensive — shouldn't be called from vitality_tick).
+        _ => format!(
+            "Vitality shifted: {:?} -> {:?}.",
+            old, new
+        ),
+    }
+}
+
+/// Emit a vitality presence-line if the 10-minute throttle window has elapsed.
+/// Returns true if an emission fired, false if throttled.
+pub(crate) fn emit_presence_band_transition(
+    app: &tauri::AppHandle,
+    old: VitalityBand,
+    new: VitalityBand,
+) -> bool {
+    let now = chrono::Utc::now().timestamp();
+    let last = PRESENCE_VITALITY_LAST_EMIT.load(std::sync::atomic::Ordering::SeqCst);
+    if now - last < PRESENCE_VITALITY_THROTTLE_SECS {
+        log::debug!(
+            "[vitality.presence] throttled (last emit {}s ago, threshold {}s)",
+            now - last,
+            PRESENCE_VITALITY_THROTTLE_SECS
+        );
+        return false;
+    }
+    let msg = vitality_transition_message(old, new);
+    crate::presence::emit_presence_line(app, &msg, "vitality");
+    PRESENCE_VITALITY_LAST_EMIT.store(now, std::sync::atomic::Ordering::SeqCst);
+    true
+}
+
+/// Test-only: reset the throttle so successive unit tests start clean.
+#[cfg(test)]
+pub(crate) fn reset_presence_vitality_throttle() {
+    PRESENCE_VITALITY_LAST_EMIT.store(0, std::sync::atomic::Ordering::SeqCst);
 }
 
 fn emit_band_transition(app: &tauri::AppHandle, old: VitalityBand, new: VitalityBand, scalar: f32) {

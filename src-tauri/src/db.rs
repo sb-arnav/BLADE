@@ -631,6 +631,25 @@ pub(crate) fn run_migrations(conn: &Connection) -> Result<(), String> {
         let _ = conn.execute(sql, []);
     }
 
+    // ── Phase 58 / MEMORY-SIMPLIFY (v2.2 — 2026-05-14) ──
+    // Vector retrieval was removed in favor of BM25 + KG. The on-disk
+    // `vector_entries.embedding` column survives (non-destructive — keeps
+    // existing user data intact); we just add lookup indexes that
+    // accelerate the new BM25 path. Idempotent — safe to run every boot.
+    let vector_deprecation_upgrades = [
+        "CREATE INDEX IF NOT EXISTS idx_vector_entries_content_prefix \
+         ON vector_entries(substr(content, 1, 64))",
+        "CREATE INDEX IF NOT EXISTS idx_vector_entries_created_at \
+         ON vector_entries(created_at DESC)",
+    ];
+    for sql in &vector_deprecation_upgrades {
+        let _ = conn.execute(sql, []);
+    }
+    log::info!(
+        "[db] vector_entries: embedding column retained for compatibility; \
+         retrieval is BM25 + KG (Phase 58, v2.2)"
+    );
+
     Ok(())
 }
 
