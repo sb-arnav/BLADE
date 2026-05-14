@@ -48,7 +48,9 @@ xcap = "0.9.4"
 base64 = "0.22"
 image = "0.25"
 enigo = "0.2"
-fastembed = "5"
+# fastembed dropped in v2.2 Phase 58 (MEMORY-SIMPLIFY) — vector retrieval
+# replaced by BM25 + knowledge graph. See .planning/milestones/v2.2-phases/
+# 58-memory-simplify/58-AUDIT.md for the caller migration plan.
 uuid = { version = "1", features = ["v4"] }
 aes-gcm = "0.10"
 rand = "0.8"
