@@ -390,7 +390,66 @@ pub fn default_max_tokens_for(provider: &str, _model: &str) -> u32 {
     }
 }
 
+/// Phase 54 / PROVIDER-ROUTER-WIRE — registry-first context-window lookup.
+///
+/// Returns the model's published context window in tokens, sourced from Goose's
+/// canonical_models.json registry. Returns `None` when the model isn't in the
+/// bundled registry — callers should fall back to per-provider defaults
+/// (BLADE's existing `intelligence::capability_registry` or capability_probe).
+///
+/// Used by the router task-classification path to pick the cheapest-sufficient
+/// model: when a task wants ≥100k context, the router walks candidate providers,
+/// asks this fn for the published window, and prefers the cheapest one that
+/// clears the floor.
+pub fn context_window_for(provider: &str, model: &str) -> Option<u32> {
+    canonical::lookup(provider, model).map(|m| {
+        let w = m.context_window();
+        w.min(u32::MAX as usize) as u32
+    })
+}
+
+/// Phase 54 / PROVIDER-ROUTER-WIRE — registry-first cheapest-sufficient model.
+///
+/// Given a list of candidate (provider, model) pairs and a minimum context
+/// window, returns the candidate with the lowest combined input+output pricing
+/// from the canonical registry that still clears the context floor.
+///
+/// Returns `None` when none of the candidates are in the registry OR when none
+/// clear the context floor. Caller is expected to fall back to its previous
+/// selection logic in that case (graceful degrade — never blocks routing).
+pub fn pick_cheapest_sufficient(
+    candidates: &[(String, String)],
+    min_context: u32,
+) -> Option<(String, String)> {
+    let mut best: Option<((String, String), f32)> = None;
+    for (prov, model) in candidates {
+        if let Some(m) = canonical::lookup(prov, model) {
+            let ctx = m.context_window() as u32;
+            if ctx < min_context {
+                continue;
+            }
+            let total_price =
+                (m.pricing_per_1m_input() + m.pricing_per_1m_output()) as f32;
+            match &best {
+                Some((_, p)) if *p <= total_price => {}
+                _ => best = Some(((prov.clone(), model.clone()), total_price)),
+            }
+        }
+    }
+    best.map(|(c, _)| c)
+}
+
 pub fn max_output_tokens_for(provider: &str, model: &str) -> u32 {
+    // Phase 54 / PROVIDER-ROUTER-WIRE — registry-first: Goose's
+    // canonical_models.json carries explicit `limit.output` per model when
+    // upstream documents one. Fall through to the static table on miss so
+    // OpenRouter substring matching + unknown providers keep working.
+    if let Some(m) = canonical::lookup(provider, model) {
+        if let Some(out) = m.limit.output {
+            // Cap pathologically large values at u32::MAX as a safety net.
+            return out.min(u32::MAX as usize) as u32;
+        }
+    }
     match (provider, model) {
         ("anthropic", m) if m.starts_with("claude-sonnet-4") => 8_192,
         ("anthropic", m) if m.starts_with("claude-haiku")    => 8_192,
@@ -432,6 +491,22 @@ pub fn max_output_tokens_for(provider: &str, model: &str) -> u32 {
 /// silently bypass the cost guard (T-33-28 mitigation: prevent surprise
 /// free-tier passes via spoofed provider names).
 pub fn price_per_million(provider: &str, model: &str) -> (f32, f32) {
+    // Phase 54 / PROVIDER-ROUTER-WIRE — consult Goose's canonical_models.json
+    // registry first. The registry ships ~4,300 model records with upstream-
+    // maintained pricing; when a hit exists, prefer it over BLADE's static
+    // table. On miss, fall through to the per-provider arms below — those
+    // remain the source of truth for OpenRouter / Ollama / unknown providers
+    // and for models the registry hasn't tracked yet.
+    if let Some(m) = canonical::lookup(provider, model) {
+        let inp = m.pricing_per_1m_input() as f32;
+        let out = m.pricing_per_1m_output() as f32;
+        // Goose stores 0.0 when pricing is unknown/free-tier; preserve the
+        // "non-zero default for unknown providers" invariant (T-33-28) by
+        // falling through to the static table only if BOTH prices are 0.
+        if inp > 0.0 || out > 0.0 || provider == "ollama" {
+            return (inp, out);
+        }
+    }
     match (provider, model) {
         ("anthropic", m) if m.starts_with("claude-sonnet-4")  => (3.00, 15.00),
         ("anthropic", m) if m.starts_with("claude-opus-4")    => (15.00, 75.00),
