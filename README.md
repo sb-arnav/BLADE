@@ -6,6 +6,14 @@
 
 **Desktop AI agent that writes its own tools.**
 
+```bash
+# macOS / Linux
+curl -sSL slayerblade.site/install | sh
+
+# Windows (PowerShell)
+iwr -useb slayerblade.site/install.ps1 | iex
+```
+
 Open-source. Multi-provider. Local-first. Hits a capability gap, forges a tool mid-task, keeps going. Sees your screen. Hears your voice. Manages your system. The AI you'd build yourself if you could — now you can.
 
 [![Release](https://img.shields.io/github/v/release/sb-arnav/BLADE?style=flat-square&label=latest&color=0f0f0f)](https://github.com/sb-arnav/BLADE/releases/latest)
