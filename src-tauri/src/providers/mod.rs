@@ -1,4 +1,5 @@
 pub mod anthropic;
+pub mod canonical;
 pub mod gemini;
 pub mod goose_traits;
 pub mod groq;
