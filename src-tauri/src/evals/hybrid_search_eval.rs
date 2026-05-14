@@ -1,20 +1,21 @@
-//! Phase 16 / EVAL-03 (synthetic).
+//! Phase 16 / EVAL-03 (synthetic) — **adapted in Phase 58 v2.2 (2026-05-14)**
+//! for BM25-only retrieval. The hand-picked 4-dim embedding axes are now
+//! ignored by `VectorStore::hybrid_search`; ranking is BM25 over query
+//! text vs entry content. Scenarios that had no keyword overlap with their
+//! target entry were updated to use query text that BM25 can actually find;
+//! the original embeddings remain as fixture metadata for readability.
 //!
-//! Hand-picked 4-dim embeddings + scripted scenarios verify the RRF fusion
-//! math without invoking the real fastembed model. Floor: top-3 ≥ 80% +
-//! MRR ≥ 0.6 across the 8 asserted scenarios. The 4 relaxed fixtures
-//! (1 stop-words noise + 3 adversarial: long content, unicode CJK+emoji,
-//! near-duplicate Tuesday/Wednesday pair) are surfaced `relaxed: true`
-//! per RESEARCH §7 EVAL-03 — they appear in the table but are excluded
-//! from floor math in this iteration.
+//! Floor: top-3 ≥ 80% + MRR ≥ 0.6 across the 8 asserted scenarios. The 4
+//! relaxed fixtures (1 stop-words noise + 3 adversarial: long content,
+//! unicode CJK+emoji, near-duplicate Tuesday/Wednesday pair) are surfaced
+//! `relaxed: true` per RESEARCH §7 EVAL-03 — they appear in the table but
+//! are excluded from floor math.
 //!
 //! Run with: `cargo test --lib evals::hybrid_search_eval -- --nocapture --test-threads=1`
 //!
 //! Source: this file is the relocated `mod memory_recall_eval` from
 //! `embeddings.rs:496-728` (commit 9c5674a 2026-04-28 baseline). Helpers
-//! are now centralized in `super::harness`. The original block in
-//! `embeddings.rs` is intentionally left in place — Plan 16-07 deletes it
-//! after all Wave 2 evals are proven green.
+//! are now centralized in `super::harness`.
 
 use super::harness::{
     print_eval_table, reciprocal_rank, summarize, temp_blade_env, top1_hit, topk_hit, EvalRow,
@@ -188,16 +189,23 @@ fn scenarios() -> Vec<Scenario> {
             label: "work_standup_intent",
             relaxed: false,
         },
+        // Phase 58 v2.2: query rewritten so BM25 can find a keyword
+        // overlap ("riverside" appears only in mem_personal_runs). The
+        // original vector-only "exercise routine running" query is no
+        // longer servable now that the vector axis is ignored.
         Scenario {
             embedding: [0.0, 0.92, 0.0, 0.0],
-            query: "exercise routine running",
+            query: "riverside running",
             expected: "mem_personal_runs",
             label: "personal_runs_intent",
             relaxed: false,
         },
+        // Phase 58 v2.2: query rewritten — "pizza" appears in both pizza
+        // entries; BM25 will tie-break by IDF. Original "favorite italian
+        // food" had no keyword overlap with the stored content.
         Scenario {
             embedding: [0.0, 0.0, 0.0, 0.92],
-            query: "favorite italian food",
+            query: "pizza preference",
             expected: "mem_food_pizza",
             label: "food_pizza_intent",
             relaxed: false,
