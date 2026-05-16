@@ -34,7 +34,6 @@ function errMessage(e: unknown): string {
 // resolves — renders nothing.
 function DeepScanPrivacySection() {
   return null;
-  // eslint-disable-next-line @typescript-eslint/no-unreachable
 }
 
 // ---------------------------------------------------------------------------
