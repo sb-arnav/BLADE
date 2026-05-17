@@ -73,3 +73,30 @@ jobs:
           args: --config src-tauri/tauri.release.conf.json --bundles ${{ matrix.bundles }}
           includeUpdaterJson: true
           updaterJsonPreferNsis: true
+
+      # v2.3 Phase 64 (MAC-SIGNED-RELEASE no-cert workaround) — defense-in-depth
+      # re-codesign with a stable bundle identifier. tauri.conf.json now sets
+      # bundle.macOS.signingIdentity = "-" so tauri should already ad-hoc sign
+      # with the stable identifier (site.slayerblade.blade). This step re-asserts
+      # post-build in case tauri-action ever falls back to linker-signed (which
+      # generates a random per-build identifier and triggers the keychain ACL
+      # re-prompt storm — Mac UAT 2026-05-17 report B2). No Apple Developer ID
+      # certificate required. Users still see the Gatekeeper "unidentified
+      # developer" prompt on first launch (xattr -cr workaround in README).
+      # No untrusted input is interpolated into the run script — only static
+      # strings + find/codesign with literal arguments.
+      - name: Force-stable bundle identifier (macOS no-cert workaround)
+        if: runner.os == 'macOS'
+        env:
+          STABLE_BUNDLE_ID: site.slayerblade.blade
+        run: |
+          set -e
+          APP_PATH=$(find src-tauri/target/release/bundle/macos -name "*.app" -maxdepth 2 -print -quit)
+          if [ -z "$APP_PATH" ]; then
+            echo "::warning::No .app bundle found under src-tauri/target/release/bundle/macos — skipping re-codesign."
+            exit 0
+          fi
+          echo "Re-codesigning $APP_PATH with stable identifier $STABLE_BUNDLE_ID"
+          codesign --force --deep --sign - --identifier "$STABLE_BUNDLE_ID" "$APP_PATH"
+          echo "Verification:"
+          codesign -dv "$APP_PATH" 2>&1 | grep -E "Identifier|Signature|flags" || true
