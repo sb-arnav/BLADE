@@ -222,11 +222,11 @@ BLADE isn't notarized yet — Apple charges $99/year for a developer certificate
 
 | Platform | Download |
 |----------|----------|
-| **macOS** (Apple Silicon) | [`.dmg` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_1.5.0_aarch64.dmg) |
-| **Windows** | [`.exe` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_1.5.0_x64-setup.exe) · [`.msi` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_1.5.0_x64_en-US.msi) |
-| **Linux** | [`.AppImage` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_1.5.0_amd64.AppImage) · [`.deb` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_1.5.0_amd64.deb) · [`.rpm` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade-1.5.0-1.x86_64.rpm) |
+| **macOS** (Apple Silicon) | [`.dmg` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_1.5.1_aarch64.dmg) |
+| **Windows** | [`.exe` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_1.5.1_x64-setup.exe) · [`.msi` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_1.5.1_x64_en-US.msi) |
+| **Linux** | [`.AppImage` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_1.5.1_amd64.AppImage) · [`.deb` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade_1.5.1_amd64.deb) · [`.rpm` ↗](https://github.com/sb-arnav/BLADE/releases/latest/download/Blade-1.5.1-1.x86_64.rpm) |
 
-> **Intel Mac:** v1.5.0 ships Apple Silicon only. Intel users — open an issue if you need an x64 build.
+> **Intel Mac:** v1.5.1 ships Apple Silicon only. Intel users — open an issue if you need an x64 build.
 
 Installed builds auto-update from GitHub Releases. If GitHub is unreachable on your network, the installer falls back to a CDN mirror at `cdn.slayerblade.site`.
 

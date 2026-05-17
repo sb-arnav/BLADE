@@ -4,6 +4,31 @@ Historical record of shipped versions. Each entry summarizes what shipped, what 
 
 ---
 
+## v2.3 — HARNESS-REBUILD-ON-CLAW (in progress, scoped 2026-05-17)
+
+**Status:** In progress
+**Phases planned:** 62–67 (6 phases)
+**Artifacts:** `milestones/v2.3-REQUIREMENTS.md`, `milestones/v2.3-ROADMAP.md`, `milestones/v2.3-STATE.md`, `research/v2.3-competitor-scan.md`
+
+### Trigger
+
+Mac UAT 2026-05-17 reported the v2.2 build silently drops `tool_use` blocks on conversational-shaped prompts ("check my calendar" → 17 chars → fast-path streaming → text rendering instead of tool dispatch). Forge can't fire because `loop_engine::run_loop` is never reached on chat-shaped turns. `forged_tools` table stayed at 0 rows across every probe.
+
+### Scope (single focus: functionality recovery)
+
+- **Phase 62 TOOL-LOOP-ALWAYS** — rip the `is_conversational` heuristic at `commands.rs:1822` + add a Hermes-style streaming parser gate that switches to tool-accumulation on first `tool_use`/`<tool_call>` event.
+- **Phase 63 FORGE-GITHUB-FIRST** — search GitHub for existing MCP servers before write-from-scratch (operator-surfaced).
+- **Phase 64 MAC-SIGNED-RELEASE** — Developer ID + stable bundle ID so install doesn't trigger a permission storm.
+- **Phase 65 STATUS-INDICATOR-RENDER** — chat UI shows "Working…" between send and first token.
+- **Phase 66 ONBOARDED-FLAG-FROM-STATE** — flags reflect actual state; skill seed model_hint upgrade.
+- **Phase 67 CLOSE** — operator UAT on signed Mac build; falsification test (calendar prompt → real tool dispatch) must pass.
+
+### Authority
+
+VISION.md (locked 2026-05-10) → decisions.md 2026-05-17 → Mac UAT report → REQUIREMENTS.md.
+
+---
+
 ## v2.2 — VISION-Close + Goose-Integrate + Launch-Ready
 
 **Shipped:** 2026-05-14 (status: tech_debt — OEVAL-01c v1.4 carry-forward persists; v2.3+ follow-ups documented in `v2.2-MILESTONE-AUDIT.md`)

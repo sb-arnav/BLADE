@@ -15,8 +15,9 @@ import { Card, Pill } from '@/design-system/primitives';
 declare const __APP_VERSION__: string | undefined;
 declare const __APP_BUILD_DATE__: string | undefined;
 
-const FALLBACK_VERSION = '0.3.0-pre';
+const FALLBACK_VERSION = '2.3-dev';
 const TAURI_API_VERSION = '2.10.1'; // mirrors package.json @tauri-apps/api
+const REPO_URL = 'https://github.com/sb-arnav/BLADE';
 
 const APP_VERSION =
   typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : FALLBACK_VERSION;
@@ -47,7 +48,7 @@ export function AboutPane() {
             </>
           ) : null}
           <dt>License</dt>
-          <dd>Personal use</dd>
+          <dd>MIT — see LICENSE file</dd>
         </dl>
       </Card>
 
@@ -55,17 +56,19 @@ export function AboutPane() {
         <h3>Source</h3>
         <p>
           <a
-            href="https://github.com/arnavmaurya/blade"
+            href={REPO_URL}
             onClick={(e) => {
               e.preventDefault();
-              openUrl('https://github.com/arnavmaurya/blade').catch(() => {});
+              openUrl(REPO_URL).catch(() => {});
             }}
             className="settings-link"
           >
-            github.com/arnavmaurya/blade
+            github.com/sb-arnav/BLADE
           </a>
         </p>
-        <p style={{ color: 'var(--t-3)', fontSize: 13, marginTop: 8 }}>Built by Arnav.</p>
+        <p style={{ color: 'var(--t-3)', fontSize: 13, marginTop: 8 }}>
+          Built by Arnav. Local-first. Zero telemetry. Your machine, your model, your files, your rules.
+        </p>
       </Card>
     </div>
   );

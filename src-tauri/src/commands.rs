@@ -1771,55 +1771,33 @@ pub(crate) async fn send_message_stream_inline(
     //   - The conversation is long (>6 turns) — ongoing sessions often need tool continuity
     //
     // When in doubt we fall through to the tool loop which is always safe.
-    let only_native_tools = !tools.is_empty()
-        && tools.iter().all(|t| crate::native_tools::is_native(&t.name));
-    let is_conversational = {
-        let txt = last_user_text.trim();
-        let txt_lower = txt.to_lowercase();
-        // Use word-boundary matching: "find motivation" is conversational,
-        // "find the file" is not. Check that action words appear as standalone
-        // imperative commands (start of sentence or after space, followed by
-        // a space or end-of-string), not embedded in normal prose.
-        let has_action_word = txt.contains("```")
-            || txt_lower.starts_with("run ")
-            || txt_lower.starts_with("execute ")
-            || txt_lower.starts_with("install ")
-            || txt_lower.starts_with("build ")
-            || txt_lower.starts_with("open ")
-            || txt_lower.starts_with("search ")
-            || txt_lower.starts_with("find ")
-            || txt_lower.starts_with("fetch ")
-            || txt_lower.starts_with("write ")
-            || txt_lower.starts_with("delete ")
-            || txt_lower.starts_with("create ")
-            || txt_lower.starts_with("read ")
-            || txt_lower.contains("read file")
-            || txt_lower.contains("git ")
-            || txt_lower.contains(" npm ")
-            || txt_lower.starts_with("npm ")
-            || txt_lower.contains(" cargo ")
-            || txt_lower.starts_with("cargo ")
-            || txt_lower.contains("python ")
-            || txt_lower.contains("bash ")
-            || txt_lower.contains("terminal")
-            || txt_lower.contains("can you open ")
-            || txt_lower.contains("can you run ")
-            || txt_lower.contains("can you find ")
-            || txt_lower.contains("can you search ")
-            || txt_lower.contains("can you create ")
-            || txt_lower.contains("can you write ")
-            || txt_lower.contains("please open ")
-            || txt_lower.contains("please run ")
-            || txt_lower.contains("please find ")
-            || txt_lower.contains("please search ")
-            || txt_lower.contains("please create ");
-        txt.len() < 200 && !has_action_word
-    };
-    // Short conversations (≤6 messages) are safe to fast-path; longer sessions
-    // may have tool-call context the model needs to continue properly.
-    let is_short_conversation = input_message_count <= 6;
-
-    if tools.is_empty() || (only_native_tools && is_conversational && is_short_conversation) {
+    // v2.3 Phase 62 (TOOL-LOOP-ALWAYS) — the `is_conversational` keyword heuristic
+    // that used to live here was the cause of the v2.2 "function call written as
+    // text" regression. "check my calendar" (17 chars, no action-word keyword)
+    // matched is_conversational → fast-path → LLM streamed `tool_use` blocks that
+    // were rendered as raw text because loop_engine never saw them. Mac UAT
+    // 2026-05-17 report row 13: `forged_tools_invocations` table stayed at 0 rows
+    // across every probe including the explicit "convert mp4 to GIF" capability
+    // gap test. Forge structurally cannot fire when the loop_engine path is
+    // never reached.
+    //
+    // Sharper architecture (Hermes Function Calling pattern, MIT —
+    // NousResearch/Hermes-Function-Calling): hold the streaming parser in an
+    // undecided state until the first non-whitespace event arrives; switch to
+    // tool-accumulation on a `tool_use` block_start. v2.4+ candidate via a
+    // dedicated `streaming_gate.rs`. For v2.3 the gate is simpler: if any tool
+    // is configured, route through the tool loop (which already char-streams
+    // output after complete_turn returns, ~1-3s wait + progressive render).
+    //
+    // The legitimate optimization preserved: when NO tools are configured at
+    // all (no MCP servers, no native tools, no Skills-MD active), the streaming
+    // path runs unchanged.
+    //
+    // @see .planning/decisions.md 2026-05-17 — HARNESS-REBUILD-ON-CLAW position
+    // @see .planning/research/v2.3-competitor-scan.md — pattern catalogue
+    // @see _graveyard/2026-05-05/OP_SETUP/rust/crates/runtime/src/conversation.rs:335
+    //      — claw-code (Apache-2) reference implementation
+    if tools.is_empty() {
         // Phase 33 / LOOP-05 — gap closed (was Phase 18 KNOWN GAP at this
         // location). The fast-streaming branch now receives an identity
         // supplement built from the Phase 32-03 always-keep core. See

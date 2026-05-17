@@ -364,3 +364,49 @@ For the v2.2 release-CI unblock, OEVAL-01c (vitality recovery arc plateaus at ~0
 
 **Outcome (filled later):**
 
+---
+
+## 2026-05-17 — v2.3 = HARNESS-REBUILD-ON-CLAW (rip the fast-path gate, route every turn through the tool loop)
+
+Mac UAT report + operator verbal: "function calling was written in the answer it replied to the question." Confirmed root cause at `src-tauri/src/commands.rs:1822`:
+
+```rust
+if tools.is_empty() || (only_native_tools && is_conversational && is_short_conversation) {
+    // FAST-STREAMING BRANCH — NO TOOL DISPATCH
+}
+```
+
+`is_conversational` (L1776–1817) returns true for any message <200 chars without an action-word keyword. "check my calendar" is 17 chars, no keyword → fast-path → LLM streams text → if model emits `tool_use` block the harness never parses it. Forge can't fire because the loop_engine path is never reached on conversational-shaped prompts. Mac report row 13: `forged_tools` table 0 rows across every probe, including the explicit "convert mp4 to GIF" capability-gap test.
+
+**Position:** v2.3 is a single-focus harness rebuild. Rip the `is_conversational` heuristic. Pass tools to the model on every chat turn (Anthropic + OpenAI both stream `tool_use` deltas alongside text, so latency stays low). Parse the streamed response for tool_use blocks; if any, dispatch through the existing `loop_engine::run_loop` machinery. The fast-path was a latency optimization that traded silent tool drops for ~200ms; that trade is wrong for an agent product.
+
+Reference architecture: `/_graveyard/2026-05-05/OP_SETUP/rust/crates/runtime/src/conversation.rs:335` (claw-code, Apache-2 clean-room Rust port of leaked Claude Code harness). Pattern: send-with-tools → parse pending_tool_uses → empty=done, non-empty=dispatch-and-loop. No keyword heuristic.
+
+In-scope for v2.3:
+1. **TOOL-LOOP-ALWAYS** — remove the fast-path gate; route every send_message_stream turn through the tool-dispatching path. Streaming preserved via Anthropic/OpenAI tool_use delta parsing.
+2. **FORGE-GITHUB-FIRST** — before tool-writing-from-scratch, query GitHub for an existing MCP server / tool manifest matching the capability gap. Only fall back to write-new on miss. Operator surfaced this in the same message.
+3. **MAC-SIGNED-RELEASE** — Developer ID Application certificate + stable `CFBundleIdentifier`. Stops the keychain + TCC re-prompt storm at every install. Mac report B2.
+4. **STATUS-INDICATOR-RENDER** — `blade_status: "processing"` already emits; the chat UI doesn't render it visibly between user-send and first chat_token. Wire it in.
+5. **ONBOARDED-FLAG-FROM-STATE** — `config.json.onboarded` shouldn't pre-set to true before the user actually onboarded. Drift Mac report flagged in `Fresh onboarding observation`.
+
+Explicitly NOT in v2.3 (deferred):
+- Held-trio ship-or-kill (still needs external engagement data — Phase 60 launch isn't done yet)
+- New presence surfaces (v2.2 was the presence headline; v2.3 is functionality recovery)
+- Deep-scan opt-out gating (Mac report B4 — privacy-tier improvement, separate milestone)
+- TELOS upgrade-migration nudge (operator deferred — n=1 user, wipe-and-reonboard is fine)
+
+**Rationale:**
+- Forge is BLADE's signature primitive (VISION §39). If the tool loop never fires on a conversational prompt, forge structurally cannot fire either. Fixing this unlocks the primitive that justifies the entire project. Highest-leverage single change in the codebase.
+- Mac report shows the underlying loop_engine machinery is sound — when it's reached, it works (Mac report rows 2.1/2.2 multi-step file tasks PASS). The bug is purely the gate.
+- Claw-code rust port is already on disk (operator pointed at it). Lifting one file's pattern is cheaper than designing from scratch.
+- Operator explicitly authorized v2.3 = functionality recovery, not new features ("for this milestone stick to fixing functionality").
+
+**Falsification:**
+- If the gate-removal lands and the Gmail-MCP `check my calendar` prompt still doesn't dispatch a tool → diagnosis was wrong, the bug is deeper than the gate (provider tool serialization, or the streaming parser).
+- If gate-removal lands and chat latency on short conversational turns ("hi", "thanks") regresses by >500ms → the latency cost is real and we need a tool_use-aware fast-path, not a keyword-gated one.
+- If FORGE-GITHUB-FIRST search latency exceeds 8s for the common case → search is too slow to gate the forge path; needs to be background-eager or cached.
+- If MAC-SIGNED-RELEASE ships and keychain re-prompts still happen on upgrade → bundle ID stability isn't sufficient; need to investigate WebKit state inheritance (Mac report B6) and TCC entitlement migration separately.
+- If by v2.3 close `forged_tools_invocations` table is still 0 rows after a deliberate capability-gap prompt against the dev build → forge primitive is not reachable, v2.3 didn't ship its core promise.
+
+**Outcome (filled later):**
+
