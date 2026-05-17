@@ -11,7 +11,7 @@ tools:
   - clipboard_read
   - mcp_call_gmail_search
   - mcp_call_calendar_recent
-model_hint: claude-3-5-sonnet-20241022
+model_hint: claude-sonnet-4-20250514
 ---
 
 # draft-followup-email

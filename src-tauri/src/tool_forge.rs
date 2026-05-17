@@ -1588,6 +1588,44 @@ pub async fn forge_if_needed_with_app(
         }
     }
 
+    // ── v2.3 Phase 63 (FORGE-GITHUB-FIRST) — reuse-before-write probe ─────────
+    //
+    // Operator surfaced 2026-05-17: "first blade goes and tools for if the tool
+    // is available on github right?- it should cause it is easier." Before
+    // spending tokens drafting a tool from scratch, do a cheap GitHub search.
+    // If a credible MCP server or other reusable repo exists, surface it as a
+    // chat-line so the operator (or v2.3.1 auto-install path) can act on it.
+    //
+    // MVP behavior: emit a `github_candidate` forge_line if a hit lands. Forge
+    // continues to write-from-scratch — the install_from_readme path is v2.3.1.
+    // This makes the surface visible NOW so we can iterate on it based on real
+    // hits before committing to an auto-install protocol.
+    {
+        let probe = crate::forge_github_search::probe_github(user_request).await;
+        match &probe {
+            crate::forge_github_search::GitHubProbeOutcome::McpServerHit { candidates }
+            | crate::forge_github_search::GitHubProbeOutcome::OtherKindHit { candidates } => {
+                if let Some(top) = candidates.first() {
+                    emit_forge_line(
+                        app,
+                        "github_candidate",
+                        &format!(
+                            "Found on GitHub: {} ({} stars) — {} · {}",
+                            top.full_name,
+                            top.stars,
+                            top.description,
+                            top.html_url
+                        ),
+                    );
+                }
+            }
+            crate::forge_github_search::GitHubProbeOutcome::NoHit => {
+                // No emit on miss — keep the chat surface quiet when there's
+                // nothing to surface. Forge proceeds as before.
+            }
+        }
+    }
+
     // Use cheap model for the triage decision
     let cheap_model = crate::config::cheap_model_for_provider(&config.provider, &config.model);
 

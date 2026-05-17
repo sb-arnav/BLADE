@@ -9,7 +9,7 @@ triggers:
   - "what should i do from these notes"
 tools:
   - clipboard_read
-model_hint: claude-3-5-sonnet-20241022
+model_hint: claude-sonnet-4-20250514
 ---
 
 # extract-todos-from-notes

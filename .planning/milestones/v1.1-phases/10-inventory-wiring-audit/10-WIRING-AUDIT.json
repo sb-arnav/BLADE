@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "generated_at": "2026-05-16T20:40:40.899Z",
+  "generated_at": "2026-05-17T15:46:33.238Z",
   "modules": [
     {
       "file": "src-tauri/src/accountability.rs",
@@ -7583,6 +7583,21 @@
       "body_registry_entry": null,
       "reachable_paths": [
         "first_run -> seed::seed_default -> ~/.config/blade/skills_md/"
+      ]
+    },
+    {
+      "file": "src-tauri/src/forge_github_search.rs",
+      "classification": "ACTIVE",
+      "purpose": "v2.3 Phase 63 FORGE-GITHUB-FIRST search + rank layer. Before forge writes a tool from scratch, queries GitHub repository search for existing MCP servers / Tauri plugins / CLI tools matching the capability gap; ranks credible candidates by stars + kind heuristic.",
+      "trigger": "internal — invoked by tool_forge::forge_if_needed_with_app after pre_check, before triage LLM call. Emits a github_candidate forge_line on hit.",
+      "ui_surface": "BLADE_FORGE_LINE (kind: github_candidate)",
+      "commands": [],
+      "internal_callers": [
+        "src-tauri/src/tool_forge.rs"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": [
+        "forge_if_needed -> probe_github -> GitHub /search/repositories -> chat-line emit"
       ]
     }
   ],

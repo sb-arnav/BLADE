@@ -11,7 +11,7 @@ tools:
   - mcp_call_calendar_today
   - mcp_call_gmail_recent_priority
   - blade_recent_conversations
-model_hint: claude-3-5-sonnet-20241022
+model_hint: claude-sonnet-4-20250514
 ---
 
 # morning-context

@@ -11,7 +11,7 @@ tools:
   - browser_get_current_url
   - browser_get_page_text
   - clipboard_read
-model_hint: claude-3-5-sonnet-20241022
+model_hint: claude-sonnet-4-20250514
 ---
 
 # summarize-page
