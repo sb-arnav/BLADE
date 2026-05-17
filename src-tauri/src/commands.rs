@@ -2488,7 +2488,24 @@ pub fn set_config(
     }
     // If apiKey was empty or masked, keep the existing key from keyring.
     config.model = model;
-    config.onboarded = true;
+    // v2.3 Phase 66 (ONBOARDED-FLAG-FROM-STATE) — DO NOT flip onboarded here.
+    // The Mac UAT report 2026-05-17 observed `onboarded: true` set before any
+    // TELOS answers were given. Root cause: set_config is called by both the
+    // onboarding flow (when the user picks a provider during hunt) AND the
+    // Settings → Providers pane (long after onboarding). Unconditionally
+    // setting onboarded=true here flipped the flag at provider-pick time,
+    // before the user actually completed the hunt.
+    //
+    // Authoritative setters now:
+    //   - onboarding::synthesis::on_hunt_done — flips both onboarded +
+    //     persona_onboarding_complete after the hunt synthesis writes
+    //     ~/.blade/who-you-are.md.
+    //   - commands::complete_persona_onboarding — explicit persona path.
+    //
+    // The Settings → Providers callers don't need this set; if the user is
+    // changing their provider via Settings, they're already onboarded, and
+    // the flag is already true. If they aren't, the gate's `needs_provider_key`
+    // → `needs_persona` → `complete` chain stays honest.
     if let Some(v) = token_efficient { config.token_efficient = v; }
     if let Some(v) = user_name { config.user_name = v; }
     if let Some(v) = work_mode { config.work_mode = v; }

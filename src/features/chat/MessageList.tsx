@@ -69,6 +69,21 @@ export function MessageList() {
     currentMessageId !== null &&
     (status === 'streaming' || status === 'thinking');
 
+  // v2.3 Phase 65 (STATUS-INDICATOR-RENDER) — between the user pressing Send
+  // and the first chat_token arriving, the chat surface was previously silent.
+  // Operator complaint 2026-05-17: "there is no indication of Blade working
+  // after sending a prompt — you give prompt — you wait — you get the answer
+  // — there is no indication during the waiting time."
+  //
+  // status flips to 'streaming' at send-time (useChat.tsx:429), but
+  // currentMessageId stays null until blade_message_start arrives. During that
+  // window — typically 1-3s on the tool-loop path, longer on cold provider
+  // hits — the live bubble doesn't render and there was no other signal.
+  // Render a minimal "Working…" indicator in that gap, animate it, hide it as
+  // soon as the live bubble takes over.
+  const showWaiting =
+    currentMessageId === null && status === 'streaming';
+
   return (
     <div
       ref={scrollRef}
@@ -80,6 +95,18 @@ export function MessageList() {
       {messages.map((m) => (
         <MessageBubble key={m.id} msg={m} />
       ))}
+      {showWaiting ? (
+        <div
+          className="chat-waiting-indicator"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="chat-waiting-dot" />
+          <span className="chat-waiting-dot" />
+          <span className="chat-waiting-dot" />
+          <span className="chat-waiting-label">Working…</span>
+        </div>
+      ) : null}
       {showLive && currentMessageId ? (
         <MessageBubble
           msg={{

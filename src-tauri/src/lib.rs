@@ -40,6 +40,7 @@ mod learning_engine;
 mod loop_engine;          // Phase 33 v1.5 — Agentic Loop scaffolding (LoopState, LoopHaltReason, ToolError, enrich_alternatives)
 mod self_critique;
 pub mod tool_forge; // Phase 47 v2.0 — pub for forge_e2e_integration test (FORGE-03)
+pub mod forge_github_search; // v2.3 Phase 63 — FORGE-GITHUB-FIRST search/rank layer
 mod sidecar;
 mod proactive_engine;
 mod native_tools;

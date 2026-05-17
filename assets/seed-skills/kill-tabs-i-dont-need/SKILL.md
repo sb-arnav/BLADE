@@ -10,7 +10,7 @@ triggers:
 tools:
   - browser_list_tabs
   - browser_close_tab
-model_hint: claude-3-5-sonnet-20241022
+model_hint: claude-sonnet-4-20250514
 ---
 
 # kill-tabs-i-dont-need
