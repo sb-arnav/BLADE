@@ -3,8 +3,10 @@ pub mod canonical;
 pub mod gemini;
 pub mod goose_traits;
 pub mod groq;
+pub mod hermes_format; // v2.4 Phase 68 — HERMES-GRAMMAR
 pub mod ollama;
 pub mod openai;
+pub mod streaming_accumulator; // v2.4 Phase 69 — STREAMING-ACCUMULATOR
 
 use serde::{Deserialize, Serialize};
 

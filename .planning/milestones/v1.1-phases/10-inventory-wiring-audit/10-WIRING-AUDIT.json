@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "generated_at": "2026-05-17T15:46:33.238Z",
+  "generated_at": "2026-05-17T18:43:05.187Z",
   "modules": [
     {
       "file": "src-tauri/src/accountability.rs",
@@ -7598,6 +7598,37 @@
       "body_registry_entry": null,
       "reachable_paths": [
         "forge_if_needed -> probe_github -> GitHub /search/repositories -> chat-line emit"
+      ]
+    },
+    {
+      "file": "src-tauri/src/providers/hermes_format.rs",
+      "classification": "ACTIVE",
+      "purpose": "v2.4 Phase 68 HERMES-GRAMMAR — Hermes Function Calling format serialize + parse. Builds the 6-field system-prompt tools scaffold + the tool-call extraction parser for Hermes-family local models (Hermes 3/4, DeepHermes, Hermes-trained Qwen/Llama variants).",
+      "trigger": "internal — called by brain.rs when is_hermes_model(provider, model) returns true; called by streaming_accumulator for Hermes-substring tool-call extraction",
+      "ui_surface": null,
+      "commands": [],
+      "internal_callers": [
+        "src-tauri/src/providers/streaming_accumulator.rs"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": [
+        "chat turn with local Hermes model -> hermes_format::serialize_tools_hermes -> system prompt; assistant streaming -> hermes_format::parse_tool_calls_hermes -> ToolCall dispatch"
+      ]
+    },
+    {
+      "file": "src-tauri/src/providers/streaming_accumulator.rs",
+      "classification": "ACTIVE",
+      "purpose": "v2.4 Phase 69 STREAMING-ACCUMULATOR — text-stream-live + tool-buffer-until-block-stop state machine. Unified pattern across Anthropic native tool_use, OpenAI tool_calls chunks, and Hermes <tool_call> substring detection. Fixes v1.1 chat-streaming regression class.",
+      "trigger": "internal — wraps provider SSE parsers; emits AccumulatorEffect (EmitText | ToolCallReady | Noop) per StreamEvent observed",
+      "ui_surface": "chat_token emit pipeline",
+      "commands": [],
+      "internal_callers": [
+        "src-tauri/src/providers/anthropic.rs (future v2.4 wire)",
+        "src-tauri/src/providers/openai.rs (future v2.4 wire)"
+      ],
+      "body_registry_entry": null,
+      "reachable_paths": [
+        "provider SSE byte stream -> StreamEvent -> StreamingAccumulator::observe -> AccumulatorEffect -> chat_token emit or loop_engine dispatch"
       ]
     }
   ],
