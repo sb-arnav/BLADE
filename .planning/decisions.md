@@ -366,6 +366,63 @@ For the v2.2 release-CI unblock, OEVAL-01c (vitality recovery arc plateaus at ~0
 
 ---
 
+## 2026-05-17 — v2.3 Phase 64 no-cert workaround (ad-hoc + stable bundle identifier)
+
+Operator confirmed 2026-05-17: "we ain't getting that 99$" — no Apple Developer ID Application certificate. Phase 64's original spec (Developer ID signed release + notarization) is operator-action-gated and won't land. Mac UAT 2026-05-17 B2 documented two paths: (a) get the cert, (b) keep adhoc but stable the CFBundleIdentifier so the keychain ACL survives upgrades.
+
+**Position:** Take (b). Set `bundle.macOS.signingIdentity = "-"` in tauri.conf.json so tauri uses ad-hoc signing with the stable identifier (`site.slayerblade.blade`) instead of falling back to linker-signed (which generates a random per-build identifier). Belt-and-suspenders: post-build `codesign --force --deep --sign - --identifier site.slayerblade.blade` step in release.yml fires on macOS only.
+
+**Rationale:**
+- The keychain ACL is bound to the bundle identifier, not the certificate. A stable identifier means the ACL survives upgrades — which is the actual UX friction operator wanted fixed.
+- Users still see the Gatekeeper "unidentified developer" prompt on first launch (one-time per install, not per-upgrade). The `xattr -cr` workaround stays documented in README.
+- $99/yr saved. Real friction (re-prompt storm) eliminated. Trade-off: still no notarization, so the first-launch dialog persists.
+
+**Falsification:**
+- If a fresh v2.3 install + upgrade still re-prompts for keychain ACL → the identifier didn't actually stable; check `codesign -dv` output post-build.
+- If tauri-action's adhoc sign overrides the signingIdentity field → the belt-and-suspenders re-codesign step is what actually does the work; verify in CI logs.
+- If macOS rolls out a future Gatekeeper change that rejects adhoc-signed apps entirely → ad-hoc strategy dies; operator faces the $99 decision again.
+
+**Outcome (filled later):**
+
+---
+
+## 2026-05-17 — v2.4 = HERMES-PARITY ambition (operator-authorized destination beyond v2.3)
+
+Operator authorized 2026-05-17: "make it your goal to be a full copy of Hermes and then after achieving that goal the next goal right after that should be what the vision of Blade initially was — Greatest tool you could ask for — you ask it to do something and it will get it done." Operator history: Hermes was their original ambition, "beaten by team and time." Now they're here, asking if Claude can deliver it.
+
+**Position:** v2.4 milestone = HERMES-PARITY. Interpreted strictly: BLADE is a desktop harness, not a model, so "full copy of Hermes" means **ship a tool-calling harness so faithful to Hermes Function Calling's contract that any Hermes-trained checkpoint plugs in as local default and tool-calling Just Works without bespoke wiring.** This unblocks v2.5+ JARVIS-level capability because the local-model path becomes competitive with hosted providers — operator can give BLADE arbitrary tasks without paying per-token cloud fees.
+
+v2.4 phases scaffolded in `.planning/milestones/v2.4-REQUIREMENTS.md`:
+- 68 HERMES-GRAMMAR (Hermes XML tool-call format emit + parse)
+- 69 STREAMING-GATE (parser combinator gate, replaces v2.3 surgical fix)
+- 70 DEEPHERMES-PROMPT (two-system-prompt stack for local Hermes models)
+- 71 LOCAL-HERMES (Ollama + LM Studio first-run pull as default backend)
+- 72 CLOSE (operator UAT — calendar prompt via Hermes-on-Ollama, NO cloud key, must dispatch tool)
+
+After v2.4: v2.5+ aims at the operator's "JARVIS for real" vision — multi-step task execution, autonomous "make me money" / "build me a widget" prompts, with user-approval gates only on irreversible actions.
+
+**Rationale:**
+- Operator's reading of competitive landscape is correct: NousResearch's Hermes line is the open-source-tool-calling benchmark BLADE needs to clear before "do anything" becomes credible. Cloud providers have it; local doesn't.
+- v2.3's surgical Phase 62 fix (rip the heuristic, route everything through tool loop) is the foundation; v2.4 STREAMING-GATE makes it architecturally clean instead of a one-line gate flip.
+- Reuse > rewrite: Hermes Function Calling is MIT, claw-code is Apache-2. Patterns are liftable with attribution.
+- Operator explicit instruction: "actually reading the whole hermes and other stuff like OP_SETUP and other git repos" — prior research-agent pass was abstract; v2.4 starts with a deep source-read agent (dispatched 2026-05-17) before any code.
+
+**Adversarial pass — what defeats this:**
+- "Hermes is a MODEL, not a runtime — BLADE can't BE Hermes." True. Interpreted correctly: BLADE ships the harness contract; Hermes-trained models slot in. Not a contradiction.
+- "Going for ambition without scoping is how plans fail." v2.4 is narrowly scoped on PARITY (5 phases). v2.5 is where the JARVIS reach lives. Don't conflate.
+- "What if Hermes 4 / DeepHermes don't actually tool-call well enough locally?" The Phase 72 falsification gate (calendar prompt accuracy) catches this. If local <70% accuracy, ship v2.4 without "local default" claim; queue Atropos-style RL fine-tune for v3.x.
+- "Local-model RAM/disk cost might break the no-cloud claim for low-end machines." True. v2.4 keeps cloud as the on-ramp; local Hermes is offered as a path, not forced.
+
+**Falsification:**
+- Operator runs v2.4 build with Ollama-Hermes default, prompts "check my calendar" with Gmail MCP, gets real calendar data → position vindicated; proceed to v2.5 JARVIS phase.
+- v2.4 ships but local Hermes accuracy is <70% on simple tool tasks → diagnosis was right (harness is the bottleneck) but local-model-default claim is premature; reframe v2.4 as harness-only, defer local-default to v2.5+.
+- v2.4 ships and operator reports tool-calling is now reliable on cloud providers but local path is unusable → harness work was right but the destination is hybrid (cloud-default, local-fallback), not local-first.
+- A new agent runtime ships (Goose / OpenInterpreter / OpenHands) that solves the same problem with a different architecture, and is so much better that lifting from it makes more sense than the Hermes path → re-baseline v2.4 against the new option; don't honor the original plan for its own sake.
+
+**Outcome (filled later):**
+
+---
+
 ## 2026-05-17 — v2.3 = HARNESS-REBUILD-ON-CLAW (rip the fast-path gate, route every turn through the tool loop)
 
 Mac UAT report + operator verbal: "function calling was written in the answer it replied to the question." Confirmed root cause at `src-tauri/src/commands.rs:1822`:

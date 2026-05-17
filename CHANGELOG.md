@@ -13,6 +13,62 @@ Nothing yet.
 
 ---
 
+## [2.3.0] -- 2026-05-17
+
+### Added (v2.3 -- HARNESS-REBUILD-ON-CLAW)
+
+> Functionality recovery milestone. Mac UAT 2026-05-17 surfaced that the v2.2 build silently dropped `tool_use` blocks on conversational-shaped prompts ("check my calendar" → 17 chars → fast-path streaming → text rendering instead of tool dispatch). Forge couldn't fire because `loop_engine::run_loop` was never reached on chat-shaped turns. v2.3 rips the heuristic so any tool-using turn routes through the loop, adds a GitHub-first search to the forge path so existing MCP servers are surfaced before write-from-scratch, ships a chat "Working…" indicator so the silent wait between send and first token is no longer invisible, fixes the `onboarded` flag flipping prematurely, and lands a no-cert workaround for the Mac keychain re-prompt storm. 6 phases (62-67). Single-focus milestone — held-trio evaluation, AgentManager unification, and other architectural moves explicitly deferred to v2.4.
+
+**Phase 62 -- TOOL-LOOP-ALWAYS**
+- Removed the `is_conversational` heuristic at `commands.rs:1822`. Gate is now `if tools.is_empty()` only — any tool configured (native, MCP, Skills-MD) routes through `loop_engine::run_loop`. Forge can now fire on conversational prompts.
+- Reference architecture pointer in comments: claw-code `runtime/src/conversation.rs:335` (MIT) is the canonical Rust example. v2.4 will refactor into a dedicated streaming accumulator module per the deep source-read findings.
+- Commit `ed299ef`.
+
+**Phase 63 -- FORGE-GITHUB-FIRST (MVP)**
+- Operator-surfaced 2026-05-17: forge should query GitHub for an existing MCP server / Tauri plugin / CLI tool before writing from scratch. Reuse > rewrite.
+- New `src-tauri/src/forge_github_search.rs` (~280 LOC, 6 unit tests green). `build_search_query` strips noise words; `search_repositories` hits GitHub `/search/repositories` via the existing curl shell pattern; `parse_candidates_from_json` extracts `RepoCandidate` structs; `probe_github` returns `McpServerHit | OtherKindHit | NoHit`. `RepoKind` heuristic classifier (McpServer / TauriPlugin / CliTool / Library / Unknown).
+- Wired into `tool_forge::forge_if_needed_with_app` after pre_check_with_mcp_state; emits `github_candidate` forge_line on hit. Forge proceeds to write-from-scratch on miss (graceful fallback).
+- v2.3.1 polish path documented as TODO comments: LLM-eval ("does this README plausibly solve the gap?"), install_from_readme (sandbox shell exec), 24h SHA256-keyed cache.
+- Commit `cb961c1`.
+
+**Phase 64 -- MAC-STABLE-IDENTIFIER (no-cert workaround)**
+- Operator confirmed 2026-05-17 no Apple Developer ID Application certificate. Original signed + notarized path infeasible.
+- Mac UAT B2 documented two ways to fix the keychain re-prompt storm: get the cert, or keep ad-hoc but stable the `CFBundleIdentifier`. Took the second.
+- `tauri.conf.json` sets `bundle.macOS.signingIdentity = "-"` so tauri ad-hoc signs with the stable identifier `site.slayerblade.blade`.
+- `release.yml` adds a defense-in-depth post-build re-codesign step on macOS that re-asserts the stable identifier in case tauri-action falls back to linker-signed.
+- Trade preserved: Gatekeeper "unidentified developer" prompt persists once per install; `xattr -cr` workaround documented.
+
+**Phase 65 -- STATUS-INDICATOR-RENDER**
+- Operator complaint 2026-05-17: silent wait between prompt send and reply arrival. Root cause: `status === 'streaming'` flipped at send-time but the live bubble only renders once `currentMessageId !== null` (which flips on `blade_message_start`, 1-3s later).
+- `MessageList.tsx` renders a "Working…" indicator with three pulsing dots in that exact gap. CSS keyframes in `chat.css`.
+- Commit `cb961c1`.
+
+**Phase 66 -- ONBOARDED-FLAG-FROM-STATE**
+- Mac UAT observation: `config.json.onboarded: true` was set before any TELOS answers given. Root cause: `commands::set_config` unconditionally flipped `onboarded = true`; it's called by both the onboarding flow at provider-pick time AND Settings → Providers long after onboarding.
+- Removed the flag set from `set_config`. Authoritative setters are now `synthesis::on_hunt_done` (post-hunt) and `commands::complete_persona_onboarding` (explicit persona path).
+- All 5 seed `SKILL.md` files (`summarize-page`, `draft-followup-email`, `extract-todos-from-notes`, `morning-context`, `kill-tabs-i-dont-need`) bumped from stale model_hint to current runtime default (Mac UAT B8).
+- Commit `cb961c1`.
+
+**Phase 67 -- CLOSE**
+- CHANGELOG entry (this section), MILESTONES.md v2.3 entry, git tag v2.3.
+- Operator UAT falsification (calendar prompt → real tool dispatch with Gmail MCP) is a post-tag verification step. If the calendar test fails on the signed build, v2.3.1 patches the regression.
+
+**v2.3 hygiene (folded in)**
+- AboutPane.tsx: repo URL corrected to `sb-arnav/BLADE`, fallback version bumped to `2.3-dev`, license + tagline.
+- README.md: 7 download links bumped `1.5.0` → `1.5.1` (the assets v2.2 actually shipped under).
+- Wiring audit JSON resync: 1 new runtime module (`forge_github_search.rs`) added; total now 239.
+- decisions.md gained 4 entries: HARNESS-REBUILD position, OEVAL-01c carry-forward tolerance, no-cert workaround, HERMES-PARITY ambition (v2.4 destination).
+
+**Gates at close**
+- cargo check: 0 warnings, 0 errors
+- tsc --noEmit: clean
+- cargo test --lib forge_github_search: 6/6 passed
+- verify:all: green (38 gates), OEVAL-01c v1.4 carry-forward tolerated explicitly via EXPECTED_FAILURES
+
+**v2.4 = HERMES-PARITY** scaffolded in parallel. Deep source-read agent read the actual Hermes Function Calling repo, DeepHermes-Atropos model card, and claw-code Rust source directly (not abstracts). Report at `.planning/research/v2.4-hermes-source-read.md`. 5 phases (68-72): HERMES-GRAMMAR, STREAMING-ACCUMULATOR, HERMES-PROMPT, LOCAL-HERMES, CLOSE. Operator destination: "ask it to do something and it will get it done."
+
+---
+
 ## [2.2.0] -- 2026-05-14
 
 ### Added (v2.2 -- VISION-Close + Goose-Integrate + Launch-Ready)

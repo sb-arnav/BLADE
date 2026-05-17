@@ -4,28 +4,59 @@ Historical record of shipped versions. Each entry summarizes what shipped, what 
 
 ---
 
-## v2.3 — HARNESS-REBUILD-ON-CLAW (in progress, scoped 2026-05-17)
+## v2.4 — HERMES-PARITY (scoped 2026-05-17, in progress)
 
-**Status:** In progress
-**Phases planned:** 62–67 (6 phases)
-**Artifacts:** `milestones/v2.3-REQUIREMENTS.md`, `milestones/v2.3-ROADMAP.md`, `milestones/v2.3-STATE.md`, `research/v2.3-competitor-scan.md`
+**Status:** Scoped, deep source-read complete, Phase 68 ready to start
+**Phases planned:** 68–72 (5 phases)
+**Artifacts:** `milestones/v2.4-REQUIREMENTS.md`, `research/v2.4-hermes-source-read.md`
+
+Operator-authorized 2026-05-17: "make it your goal to be a full copy of Hermes." Interpreted strictly: BLADE is a desktop harness, not a model, so "full copy" means ship a tool-calling harness so faithful to Hermes Function Calling's contract that any Hermes-trained checkpoint plugs in as local default and tool-calling Just Works. Unblocks v2.5+ JARVIS-level capability (operator: "ask it to do something and it will get it done").
+
+Scope:
+- Phase 68 HERMES-GRAMMAR — Hermes XML tool-call format emit + parse (NOT special tokens — plain ChatML XML conventions, confirmed via direct source read)
+- Phase 69 STREAMING-ACCUMULATOR — text-stream-live + tool-buffer-until-block-stop pattern (claw-code reference)
+- Phase 70 HERMES-PROMPT — 6-field Hermes prompt scaffold + DeepHermes single-concatenated-message pattern for local Hermes models
+- Phase 71 LOCAL-HERMES — Ollama + LM Studio first-run Hermes pull as default backend
+- Phase 72 CLOSE — operator UAT calendar prompt via Hermes-on-Ollama (NO cloud key) must dispatch a tool
+
+---
+
+## v2.3 — HARNESS-REBUILD-ON-CLAW
+
+**Shipped:** 2026-05-17 (status: tech_debt — Phase 64 ad-hoc workaround; OEVAL-01c v1.4 carry-forward persists)
+**Phases:** 62–67 (6 phases)
+**Artifacts:** `milestones/v2.3-ROADMAP.md`, `milestones/v2.3-REQUIREMENTS.md`, `milestones/v2.3-STATE.md`, `research/v2.3-competitor-scan.md`
 
 ### Trigger
 
-Mac UAT 2026-05-17 reported the v2.2 build silently drops `tool_use` blocks on conversational-shaped prompts ("check my calendar" → 17 chars → fast-path streaming → text rendering instead of tool dispatch). Forge can't fire because `loop_engine::run_loop` is never reached on chat-shaped turns. `forged_tools` table stayed at 0 rows across every probe.
+Mac UAT 2026-05-17 reported the v2.2 build silently dropped `tool_use` blocks on conversational-shaped prompts ("check my calendar" → 17 chars → fast-path streaming → text rendering instead of tool dispatch). Forge couldn't fire because `loop_engine::run_loop` was never reached on chat-shaped turns. `forged_tools` table stayed at 0 rows across every probe.
 
-### Scope (single focus: functionality recovery)
+### Delivered
 
-- **Phase 62 TOOL-LOOP-ALWAYS** — rip the `is_conversational` heuristic at `commands.rs:1822` + add a Hermes-style streaming parser gate that switches to tool-accumulation on first `tool_use`/`<tool_call>` event.
-- **Phase 63 FORGE-GITHUB-FIRST** — search GitHub for existing MCP servers before write-from-scratch (operator-surfaced).
-- **Phase 64 MAC-SIGNED-RELEASE** — Developer ID + stable bundle ID so install doesn't trigger a permission storm.
-- **Phase 65 STATUS-INDICATOR-RENDER** — chat UI shows "Working…" between send and first token.
-- **Phase 66 ONBOARDED-FLAG-FROM-STATE** — flags reflect actual state; skill seed model_hint upgrade.
-- **Phase 67 CLOSE** — operator UAT on signed Mac build; falsification test (calendar prompt → real tool dispatch) must pass.
+- **Phase 62 TOOL-LOOP-ALWAYS** — `is_conversational` heuristic ripped at `commands.rs:1822`. Gate is now `if tools.is_empty()` only; any tool present routes through `loop_engine::run_loop`. v2.4 will refactor this into a dedicated streaming accumulator (claw-code pattern).
+- **Phase 63 FORGE-GITHUB-FIRST** (MVP) — new `forge_github_search.rs` module (~280 LOC, 6 unit tests green). Probes GitHub `/search/repositories` for existing MCP servers / Tauri plugins / CLI tools matching the capability gap. Emits a `github_candidate` chat-line on hit. LLM-eval + install_from_readme paths scaffolded as TODOs for v2.3.1 polish.
+- **Phase 64 MAC-STABLE-IDENTIFIER** (no-cert workaround) — `tauri.conf.json` sets `bundle.macOS.signingIdentity = "-"`; release.yml re-codesigns post-build with stable identifier `site.slayerblade.blade`. Fixes keychain ACL re-prompt storm (Mac UAT B2) without $99 Apple Dev cert. Trade: users still see Gatekeeper "unidentified developer" prompt once per install.
+- **Phase 65 STATUS-INDICATOR-RENDER** — `MessageList.tsx` renders animated "Working…" indicator with pulsing dots between user send and first `chat_token` arrival. Fixes operator complaint about silent wait time.
+- **Phase 66 ONBOARDED-FLAG-FROM-STATE** — `set_config` no longer flips `onboarded = true` prematurely (was being called by both onboarding-time provider pick AND Settings → Providers). Only `synthesis::on_hunt_done` flips it now. All 5 seed `SKILL.md` files bumped from stale `claude-3-5-sonnet-20241022` to `claude-sonnet-4-20250514` to match runtime default.
+- **Phase 67 CLOSE** — administrative close in this commit. CHANGELOG entry + git tag v2.3. Operator UAT falsification (calendar prompt → real tool dispatch with Gmail MCP) is a post-tag verification step.
 
-### Authority
+### Deferred to v2.4+
 
-VISION.md (locked 2026-05-10) → decisions.md 2026-05-17 → Mac UAT report → REQUIREMENTS.md.
+- Streaming-aware tool dispatcher (claw-code conversation.rs:286 pattern) — v2.4 Phase 69 STREAMING-ACCUMULATOR
+- Hermes XML format emit + parse — v2.4 Phase 68 HERMES-GRAMMAR
+- Local Hermes default backend — v2.4 Phase 71 LOCAL-HERMES
+- LLM-eval + install_from_readme for forge GitHub-first — v2.3.1 polish
+- Mac AX bridge regression (Mac UAT B1) — v2.4 candidate
+- Settings UI unreliable under automation (B3) — v2.4 candidate
+- Deep-scan opt-out gating (B4 / B5) — v2.4 privacy-tier milestone
+- WebKit state bundle-id migration (B6) — v2.4 candidate
+- Apple Developer ID Application certificate path — operator-funded if/when
+- Per-step approval gate (Cline pattern) — waits for launch dogfood signal
+- Goose Recipes engine — secondary to AgentManager unification
+
+### Authority chain
+
+VISION.md (locked 2026-05-10) → decisions.md 2026-05-17 (3 entries: HARNESS-REBUILD position, OEVAL-01c carry-forward, no-cert workaround, HERMES-PARITY-AMBITION) → Mac UAT 2026-05-17 report → REQUIREMENTS.md → REQUIREMENTS execution.
 
 ---
 
