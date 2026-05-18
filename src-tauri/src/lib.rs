@@ -18,6 +18,7 @@ mod indexer;
 mod self_upgrade;
 pub mod session_handoff; // Phase 24 v1.3 — pub for skill_validator bin (list --diff reads SessionHandoff)
 mod computer_use;
+mod x11_xdotool;        // v2.4 Phase 80 — Linux X11 window introspection (rmcp-xdotool lift, MIT)
 mod discord;
 mod obsidian;
 mod journal;
@@ -848,6 +849,11 @@ pub fn run() {
             computer_use::computer_use_task,
             computer_use::computer_use_stop,
             computer_use::computer_use_screenshot,
+            x11_xdotool::x11_probe,
+            x11_xdotool::x11_search_window,
+            x11_xdotool::x11_get_active_window,
+            x11_xdotool::x11_get_window_geometry,
+            x11_xdotool::x11_get_window_name,
             open_screen_overlay,
             voice_local::whisper_model_available,
             voice_local::whisper_download_model,
