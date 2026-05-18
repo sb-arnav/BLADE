@@ -40,6 +40,7 @@ mod goal_engine;
 mod learning_engine;
 mod loop_engine;          // Phase 33 v1.5 — Agentic Loop scaffolding (LoopState, LoopHaltReason, ToolError, enrich_alternatives)
 mod iteration_budget;     // v2.4 Phase 73 — IterationBudget (hermes-agent lift, MIT)
+mod tool_result_compress; // v2.4 Phase 75 — RTK tool-output compression (9router lift, MIT)
 mod self_critique;
 pub mod tool_forge; // Phase 47 v2.0 — pub for forge_e2e_integration test (FORGE-03)
 pub mod forge_github_search; // v2.3 Phase 63 — FORGE-GITHUB-FIRST search/rank layer
