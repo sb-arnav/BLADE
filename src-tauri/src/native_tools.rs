@@ -747,6 +747,37 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
                 }
             }),
         },
+        // v2.4 Phase 82 — desktop-control tools (3 ported modules)
+        ToolDefinition {
+            name: "blade_x11_active_window".to_string(),
+            description: "Linux X11 only: get the currently focused window's ID, title, and geometry via xdotool. Returns JSON {window_id, title, x, y, width, height} on success. Returns an error on non-X11 hosts (Wayland sessions, macOS, Windows). Use to discover what app the user is currently looking at on a Linux/X11 desktop.".to_string(),
+            input_schema: json!({"type": "object", "properties": {}}),
+        },
+        ToolDefinition {
+            name: "blade_macos_ui_tree".to_string(),
+            description: "macOS only: query the UI element tree of an app via Accessibility API (System Events / JXA). Returns JSON list of UIElement {role, title, position, size, children}. Filter by `role` (e.g. AXButton, AXTextField) and/or `title` (substring, case-insensitive). Requires macOS Accessibility permission on first call. Use to find clickable elements without screenshots, or to read text content from native UIs.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "app": {"type": "string", "description": "Target app name (optional — defaults to frontmost app). Examples: 'Safari', 'Finder', 'Calendar'."},
+                    "role": {"type": "string", "description": "Filter by AX role (optional). Examples: AXButton, AXTextField, AXStaticText."},
+                    "title": {"type": "string", "description": "Filter by element title substring, case-insensitive (optional)."},
+                    "max_depth": {"type": "integer", "description": "Max tree traversal depth (default 5, hard cap 10)."}
+                }
+            }),
+        },
+        ToolDefinition {
+            name: "blade_macos_recipe".to_string(),
+            description: "macOS only: search or execute one of 298 vendored AppleScript recipes covering system control, file ops, browser automation, editor integration, productivity apps, network, and developer tools. With `query` only → returns matching recipe metadata. With `id` → executes that recipe with the provided params and returns the script output. Recipes are catalogued from steipete/macos-automator-mcp (MIT).".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Search recipes by keyword (matches title/description/keywords). Use this first to discover recipe IDs."},
+                    "id": {"type": "string", "description": "Recipe ID to execute (from a prior search). Mutually exclusive with `query`."},
+                    "params": {"type": "object", "description": "Parameters to substitute for --MCP_INPUT:* placeholders in the recipe script (string-to-string map)."}
+                }
+            }),
+        },
     ]
     // Append browser-agent tool definitions (navigate, read_page, click stub, etc.)
     .into_iter()
@@ -2237,6 +2268,65 @@ pub async fn execute(name: &str, args: &Value, app: Option<&tauri::AppHandle>) -
 
             let _ = std::process::Command::new("sh").args(["-c", &cmd]).spawn();
             (format!("Recording screen for {} seconds → {}\nRecording runs in background. The file will be ready when recording finishes.", duration, output_path), false)
+        }
+
+        // v2.4 Phase 82 — desktop-control dispatch
+        "blade_x11_active_window" => {
+            match crate::x11_xdotool::get_active_window() {
+                Ok(id) => {
+                    let title = crate::x11_xdotool::get_window_name(&id).unwrap_or_default();
+                    match crate::x11_xdotool::get_window_geometry(&id) {
+                        Ok(g) => (
+                            serde_json::json!({
+                                "window_id": id, "title": title,
+                                "x": g.x, "y": g.y, "width": g.width, "height": g.height
+                            }).to_string(),
+                            false,
+                        ),
+                        Err(e) => (format!("x11 geometry error: {}", e), true),
+                    }
+                }
+                Err(e) => (format!("x11 active window error: {}", e), true),
+            }
+        }
+        "blade_macos_ui_tree" => {
+            let query = crate::macos_ax::AxQuery {
+                app: args["app"].as_str().map(|s| s.to_string()),
+                role: args["role"].as_str().map(|s| s.to_string()),
+                title: args["title"].as_str().map(|s| s.to_string()),
+                max_depth: args["max_depth"].as_u64().unwrap_or(5).clamp(1, 10) as u32,
+            };
+            match crate::macos_ax::get_ui_elements(&query) {
+                Ok(els) => (serde_json::to_string(&els).unwrap_or_else(|e| format!("serialize: {}", e)), false),
+                Err(e) => (e, true),
+            }
+        }
+        "blade_macos_recipe" => {
+            let path = crate::macos_recipes::default_catalog_path();
+            let cat_result = crate::macos_recipes::RecipeCatalog::load_from_dir(&path);
+            let (cat, _skipped) = match cat_result {
+                Ok(c) => c,
+                Err(e) => return (format!("recipe catalog load: {}", e), true),
+            };
+            // Two modes: search (returns metadata list) or exec (returns script output)
+            if let Some(id) = args["id"].as_str() {
+                let mut params: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+                if let Some(p) = args["params"].as_object() {
+                    for (k, v) in p {
+                        if let Some(s) = v.as_str() { params.insert(k.clone(), s.to_string()); }
+                    }
+                }
+                match crate::macos_recipes::exec_recipe(&cat, id, params) {
+                    Ok(out) => (out, false),
+                    Err(e) => (e, true),
+                }
+            } else if let Some(q) = args["query"].as_str() {
+                let results = cat.search_by_keyword(q);
+                let preview: Vec<_> = results.iter().take(15).map(|r| &r.metadata).collect();
+                (serde_json::to_string_pretty(&preview).unwrap_or_default(), false)
+            } else {
+                ("Provide `query` (search) or `id` (execute).".to_string(), true)
+            }
         }
 
         _ => (format!("Unknown native tool: {}", name), true),
