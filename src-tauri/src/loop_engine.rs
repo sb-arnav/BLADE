@@ -2788,6 +2788,19 @@ async fn run_loop_inner(
             // and `tool_call.name` references make the closure non-auto-
             // `UnwindSafe`. We do NOT depend on broken invariants after the
             // panic — `content` is read-only and rebound below.
+            // v2.4 Phase 81 — RTK tool-output compression (9router lift).
+            // Tool-type-aware shrink BEFORE cap_tool_output's token-bound truncation.
+            // Per-tool filters preserve structure (git diff +N -M counters; grep
+            // per-file groups; ls extension summary) instead of letting the cap
+            // truncate naively. Only fires on success (errors carry diagnostic
+            // text that compression would mangle) and only when smart_injection
+            // is enabled (same escape hatch as cap_tool_output).
+            let content = if config.context.smart_injection_enabled && !is_error {
+                crate::tool_result_compress::compress_auto(&tool_call.name, &content)
+            } else {
+                content
+            };
+
             let content = if config.context.smart_injection_enabled {
                 let cap_attempt = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     crate::commands::cap_tool_output(&content, config.context.tool_output_cap_tokens)
