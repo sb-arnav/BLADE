@@ -41,7 +41,7 @@ pub enum Anchor {
 
 // ── Locked regex patterns ───────────────────────────────────────────────────
 // `\B` matches the empty position that is NOT a word boundary. For
-// `user@example.com` the position before `@` sits between `v` (word) and `@`
+// `user@example.com` the position before `@` sits between `r` (word) and `@`
 // (non-word) → that IS a word boundary → `\B` fails → no match. For
 // `say @screen now` the position before `@` sits between ` ` (non-word) and
 // `@` (non-word) → NOT a word boundary → `\B` succeeds → match fires.
