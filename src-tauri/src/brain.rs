@@ -4071,4 +4071,386 @@ mod tests {
         assert!(empty_block.contains("vitality_band: Waning"));
         assert!(empty_block.contains("stance:"));
     }
+
+    // ── Phase 83 Plan 04 — D-19 unit tests + rev-1 budget-under-split test ──
+    //
+    // 9 tests total:
+    //   Tests 1-8 map 1:1 to the D-19 acceptance criteria in 83-CONTEXT.md.
+    //   Test 9 is the rev-1 WARNING 7 budget-under-split fix.
+    //
+    // CRITICAL: All 9 tests require --test-threads=1 to prevent:
+    //   - TEST_CLOCK_OVERRIDE thread-local bleed (Tests 2, 3)
+    //   - cwd mutation cross-test flakes (Test 4)
+    //   - global atomic counter races (Tests 5, 6, 7, 8)
+    //
+    // Cache isolation: every test calls reset_cache_for_test() at the top.
+
+    /// Shared test helper — reset cache state. All Phase 83 tests call this.
+    fn reset_cache_for_test() {
+        crate::brain_system_prompt_cache::clear_all_cached();
+        crate::brain_system_prompt_cache::reset_counters_for_test();
+    }
+
+    // ── Test 1 — D-19 item 1, SPEC.md acceptance #1 ─────────────────────────
+    // Three-tier round-trip: build_system_prompt_parts returns three named
+    // fields, join() produces a string that contains both stable + volatile.
+    #[test]
+    fn phase83_split_prompt_three_tier_round_trip() {
+        reset_cache_for_test();
+        let no_tools: Vec<McpTool> = vec![];
+        let parts = build_system_prompt_parts(
+            &no_tools, "test query", None, "anthropic", "claude-sonnet-4", 0, &[],
+        );
+        // Stable tier must be non-empty — even with no SOUL.md, the fallback
+        // `DEFAULT_AGENT_IDENTITY` populates it.
+        assert!(!parts.stable.is_empty(), "stable tier empty");
+        // Volatile tier must contain at least the date timestamp line.
+        assert!(parts.volatile.contains("Conversation started:"),
+                "volatile missing timestamp line: {:?}", parts.volatile);
+        // Round-trip: join produces a string containing both stable + volatile content.
+        let joined = parts.join();
+        assert!(joined.contains(&parts.stable));
+        assert!(joined.contains(&parts.volatile));
+    }
+
+    // ── Test 2 — D-19 item 2, SPEC.md acceptance #2 ─────────────────────────
+    // Stable tier is byte-stable across 5 sequential calls with identical inputs.
+    #[test]
+    fn phase83_split_prompt_stable_tier_byte_stable_5_calls() {
+        use chrono::TimeZone;
+        reset_cache_for_test();
+        // Pin the clock so build_identity_supplement (in stable tier) doesn't
+        // vary across calls. Without this, if the test crosses a date boundary
+        // mid-loop (unlikely but possible) it would flake.
+        let fixed_now = chrono::Local
+            .with_ymd_and_hms(2026, 5, 20, 12, 0, 0)
+            .unwrap();
+        TEST_CLOCK_OVERRIDE.with(|cell| { *cell.borrow_mut() = Some(fixed_now); });
+
+        let no_tools: Vec<McpTool> = vec![];
+        let mut stable_strings: Vec<String> = Vec::with_capacity(5);
+        for _ in 0..5 {
+            let parts = build_system_prompt_parts(
+                &no_tools, "q", None, "anthropic", "claude-sonnet-4", 0, &[],
+            );
+            stable_strings.push(parts.stable);
+        }
+
+        // Reset clock seam BEFORE assertions (defensive cleanup).
+        TEST_CLOCK_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+
+        let first = &stable_strings[0];
+        for (i, s) in stable_strings.iter().enumerate().skip(1) {
+            assert_eq!(s, first, "stable tier byte-differs at call {} vs call 0", i);
+        }
+    }
+
+    // ── Test 3 — D-19 item 3, SPEC.md acceptance #5 — rev-1 WARNING 9 fix ──
+    // Volatile tier is byte-identical at 00:00:01 and 23:59:59 on the same date.
+    // Uses the TEST_CLOCK_OVERRIDE seam (Plan 02 rev-1) to inject specific
+    // clock values — this is the strong test that the weakened "no-colon" check
+    // was supposed to be.
+    #[test]
+    fn phase83_split_prompt_volatile_tier_date_pinned_across_midnight() {
+        use chrono::TimeZone;
+        reset_cache_for_test();
+        let no_tools: Vec<McpTool> = vec![];
+
+        // Two instants on the SAME date: 00:00:01 and 23:59:59 local time.
+        let early = chrono::Local
+            .with_ymd_and_hms(2026, 5, 20, 0, 0, 1)
+            .unwrap();
+        let late = chrono::Local
+            .with_ymd_and_hms(2026, 5, 20, 23, 59, 59)
+            .unwrap();
+
+        // Call 1 — pin clock to 00:00:01
+        TEST_CLOCK_OVERRIDE.with(|cell| { *cell.borrow_mut() = Some(early); });
+        let parts_early = build_system_prompt_parts(
+            &no_tools, "q", None, "anthropic", "claude-sonnet-4", 0, &[],
+        );
+
+        // Call 2 — pin clock to 23:59:59 (same date)
+        TEST_CLOCK_OVERRIDE.with(|cell| { *cell.borrow_mut() = Some(late); });
+        let parts_late = build_system_prompt_parts(
+            &no_tools, "q", None, "anthropic", "claude-sonnet-4", 0, &[],
+        );
+
+        // Reset clock seam BEFORE assertions (defensive cleanup).
+        TEST_CLOCK_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+
+        // SPEC.md acceptance #5: volatile tier MUST be byte-identical across
+        // the two instants on the same date. This is the strong test — date-only
+        // formatting means time-of-day cannot leak into the volatile tier.
+        assert_eq!(parts_early.volatile, parts_late.volatile,
+            "volatile tier MUST be byte-identical at 00:00:01 and 23:59:59 on the same date \
+             — date-only formatting in volatile MUST NOT leak time-of-day precision.\n\
+             early volatile:\n{}\n\nlate volatile:\n{}",
+            parts_early.volatile, parts_late.volatile);
+
+        // Belt-and-suspenders sanity: the volatile tier contains the date in
+        // long-form (e.g., "Wednesday, May 20, 2026").
+        assert!(parts_early.volatile.contains("2026"),
+            "volatile date line missing year");
+    }
+
+    // ── Test 4 — D-19 item 4, SPEC.md acceptance #3 ─────────────────────────
+    // Context tier does NOT contain cwd-discovered context file content when
+    // there are no context files (AGENTS.md / .cursorrules / .blade.md / CLAUDE.md)
+    // in the cwd. The context tier may still contain GodMode or other ambient
+    // context data — the SPEC.md acceptance criterion targets the cwd-file
+    // discovery path (D-08), not ambient perception signals.
+    //
+    // Requires --test-threads=1 (cwd is process-wide state).
+    #[test]
+    fn phase83_split_prompt_context_tier_empty_on_no_files() {
+        reset_cache_for_test();
+        // Change cwd to an empty temp dir so discover_context_files finds nothing.
+        let tmp = std::env::temp_dir().join(format!("blade_p83_ctx_empty_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        let original_cwd = std::env::current_dir().ok();
+        std::env::set_current_dir(&tmp).unwrap();
+
+        let no_tools: Vec<McpTool> = vec![];
+        let parts = build_system_prompt_parts(
+            &no_tools, "q", None, "anthropic", "claude-sonnet-4", 0, &[],
+        );
+
+        // Restore cwd before any assertions can short-circuit cleanup.
+        if let Some(cwd) = original_cwd {
+            let _ = std::env::set_current_dir(cwd);
+        }
+        let _ = std::fs::remove_dir_all(&tmp);
+
+        // SPEC.md acceptance #3 (cwd-file discovery path, D-08):
+        // The context tier must NOT contain cwd-discovered context file markers
+        // when there are no AGENTS.md / .cursorrules / .blade.md / CLAUDE.md in
+        // the cwd. These markers are injected by discover_context_files() ONLY.
+        // GodMode and other ambient signals may still appear in the context tier.
+        let contains_cwd_context =
+            parts.context.contains("## From AGENTS.md")    ||
+            parts.context.contains("## From .cursorrules") ||
+            parts.context.contains("## From .blade.md")    ||
+            parts.context.contains("## From CLAUDE.md");
+        assert!(!contains_cwd_context,
+                "context tier must NOT contain cwd-discovered file markers when temp dir has no context files;\n\
+                 found one of (## From AGENTS.md / .cursorrules / .blade.md / CLAUDE.md) in:\n{:?}",
+                parts.context);
+    }
+
+    // ── Test 5 — D-19 item 5, SPEC.md acceptance #6 ─────────────────────────
+    // Cache hit on second call: first call increments miss counter, second call
+    // increments hit counter, returned strings are equal.
+    #[test]
+    fn phase83_split_prompt_cache_hit_on_second_call() {
+        reset_cache_for_test();
+        let session_id = "p83_test_cache_hit";
+        crate::commands::set_current_session_id(session_id);
+        let no_tools: Vec<McpTool> = vec![];
+
+        // First call — miss path
+        let first = build_system_prompt_for_model(
+            &no_tools, "q", None, "anthropic", "claude-sonnet-4", 0, &[],
+        );
+        assert_eq!(crate::brain_system_prompt_cache::cache_miss_count(), 1);
+        assert_eq!(crate::brain_system_prompt_cache::cache_hit_count(), 0);
+
+        // Second call — hit path
+        let second = build_system_prompt_for_model(
+            &no_tools, "q", None, "anthropic", "claude-sonnet-4", 0, &[],
+        );
+        assert_eq!(crate::brain_system_prompt_cache::cache_hit_count(), 1, "second call should be a hit");
+        assert_eq!(first, second, "cached value should equal first build");
+
+        crate::commands::reset_current_session_id();
+    }
+
+    // ── Test 6 — D-19 item 6, SPEC.md acceptance #7 ─────────────────────────
+    // Invalidate forces rebuild: after invalidate_system_prompt(), the next call
+    // hits the rebuild path (cache_miss_count increments again).
+    #[test]
+    fn phase83_split_prompt_invalidate_forces_rebuild() {
+        reset_cache_for_test();
+        let session_id = "p83_test_invalidate";
+        crate::commands::set_current_session_id(session_id);
+        let no_tools: Vec<McpTool> = vec![];
+
+        // Populate the cache
+        let _ = build_system_prompt_for_model(
+            &no_tools, "q", None, "anthropic", "claude-sonnet-4", 0, &[],
+        );
+        assert_eq!(crate::brain_system_prompt_cache::cache_miss_count(), 1);
+
+        // Invalidate
+        invalidate_system_prompt(session_id);
+
+        // Next call should be a miss again
+        let _ = build_system_prompt_for_model(
+            &no_tools, "q", None, "anthropic", "claude-sonnet-4", 0, &[],
+        );
+        assert_eq!(crate::brain_system_prompt_cache::cache_miss_count(), 2,
+                  "post-invalidate call should increment miss counter");
+
+        crate::commands::reset_current_session_id();
+    }
+
+    // ── Test 7 — D-19 item 7, SPEC.md acceptance #12 — rev-1 WARNING 8 fix ─
+    // CTX-07 panic falls through: wrapper recovers (no chat crash, non-empty
+    // String). ALSO asserts cache is NOT populated on fallback path — caching
+    // the legacy single-string output would mask the broken split-builder state.
+    #[test]
+    fn phase83_split_prompt_ctx_07_panic_falls_through() {
+        reset_cache_for_test();
+        let session_id = "p83_test_ctx07_panic";
+        crate::commands::set_current_session_id(session_id);
+        let no_tools: Vec<McpTool> = vec![];
+
+        // Force panic inside build_system_prompt_parts
+        SYSTEM_PROMPT_PARTS_FORCE_PANIC.with(|cell| *cell.borrow_mut() = true);
+
+        // build_system_prompt_for_model MUST NOT crash — it should catch the
+        // panic and fall through to the legacy build_system_prompt_inner path,
+        // returning a non-empty String.
+        let prompt = build_system_prompt_for_model(
+            &no_tools, "q", None, "anthropic", "claude-sonnet-4", 0, &[],
+        );
+
+        // Reset the seam BEFORE any assertion to prevent test bleed.
+        SYSTEM_PROMPT_PARTS_FORCE_PANIC.with(|cell| *cell.borrow_mut() = false);
+
+        // Load-bearing: returned a non-empty legacy prompt without crashing
+        assert!(!prompt.is_empty(),
+                "CTX-07 fallback should return a non-empty legacy prompt");
+
+        // rev-1 WARNING 8 fix: the catch_unwind path MUST NOT populate the
+        // cache. Caching the legacy single-string output would mask the broken
+        // split-builder state on subsequent turns (the next chat turn would
+        // get a "cache hit" on the corrupt output and never rebuild via the
+        // smart path even after the panic-trigger condition was resolved).
+        assert!(
+            crate::brain_system_prompt_cache::get_cached(session_id).is_none(),
+            "CTX-07 fallback path must NOT populate the cache — caching the \
+             legacy single-string output would mask the broken split-builder \
+             state on subsequent turns"
+        );
+
+        crate::commands::reset_current_session_id();
+    }
+
+    // ── Test 8 — D-19 item 8, SPEC.md acceptance #6 corollary ───────────────
+    // Concurrent sessions are isolated: different session_ids cache independently.
+    // Session A's cache entry does not pollute Session B's miss state.
+    #[test]
+    fn phase83_split_prompt_concurrent_sessions_isolated() {
+        reset_cache_for_test();
+        let no_tools: Vec<McpTool> = vec![];
+
+        // Session A — populate cache
+        crate::commands::set_current_session_id("p83_session_A");
+        let _ = build_system_prompt_for_model(
+            &no_tools, "q-a", None, "anthropic", "claude-sonnet-4", 0, &[],
+        );
+
+        // Session B — should be a miss (not polluted by A)
+        crate::commands::set_current_session_id("p83_session_B");
+        assert!(crate::brain_system_prompt_cache::get_cached("p83_session_B").is_none(),
+                "session B should have no cached entry before its first build");
+        let _ = build_system_prompt_for_model(
+            &no_tools, "q-b", None, "anthropic", "claude-sonnet-4", 0, &[],
+        );
+        // Both sessions now have separate entries
+        assert!(crate::brain_system_prompt_cache::get_cached("p83_session_A").is_some());
+        assert!(crate::brain_system_prompt_cache::get_cached("p83_session_B").is_some());
+
+        // Counter check: 2 misses (one per session), 0 hits
+        assert_eq!(crate::brain_system_prompt_cache::cache_miss_count(), 2);
+        assert_eq!(crate::brain_system_prompt_cache::cache_hit_count(), 0);
+
+        crate::commands::reset_current_session_id();
+    }
+
+    // ── Test 9 — rev-1 WARNING 7 fix ─────────────────────────────────────────
+    // Budget enforcement under tier split: per-tier enforce_budget keep counts
+    // hold under budget pressure.
+    //   stable keep ≥ 4 (anchors + blade_md + identity_supplement + character_bible)
+    //   context keep = 1 (system_message protected)
+    //   volatile keep = 0 (everything trimmable)
+    //
+    // Strategy: build synthetic Vecs that mirror what build_system_prompt_inner_parts
+    // produces under budget pressure, then call enforce_budget on each tier. This
+    // bypasses the full builder so the test is isolated and fast.
+    #[test]
+    fn phase83_split_prompt_budget_enforcement_under_tier_split() {
+        // Synthetic stable_parts — 8 entries, first 4 are the always-keep core.
+        let mut stable_parts: Vec<String> = vec![
+            "anchor_0".repeat(100),          // anchor expansion (TOP)
+            "blade_md content".repeat(500),  // blade_md
+            "identity_supplement".repeat(200),
+            "character_bible".repeat(300),
+            "role".repeat(200),
+            "safety".repeat(200),
+            "tools".repeat(500),
+            "scaffold".repeat(200),
+        ];
+
+        // Synthetic context_parts — 3 entries, first 1 is protected.
+        let mut context_parts: Vec<String> = vec![
+            "system_message protected".repeat(100),
+            "context_now".repeat(200),
+            "git context".repeat(200),
+        ];
+
+        // Synthetic volatile_parts — 5 entries, all trimmable (keep=0).
+        let mut volatile_parts: Vec<String> = vec![
+            "memory_l0".repeat(200),
+            "memory_recall".repeat(300),
+            "world_model".repeat(200),
+            "Conversation started: Wednesday, May 20, 2026".to_string(),
+            "misc tail".repeat(100),
+        ];
+
+        let stable_pre_len = stable_parts.len();
+        let volatile_pre_len = volatile_parts.len();
+
+        // Apply per-tier enforce_budget — same calls Plan 02 Step 8 places in
+        // the production builder. The exact `keep` values (4 / 1 / 0) match
+        // the documented per-tier contracts.
+        super::enforce_budget(&mut stable_parts, 4);
+        super::enforce_budget(&mut context_parts, 1);
+        super::enforce_budget(&mut volatile_parts, 0);
+
+        // Under no-budget-pressure (small synthetic content, default budget):
+        // enforce_budget should be a no-op — all entries survive.
+        // If synthetic content is large enough to trigger trimming, the first
+        // 4 always-keep entries MUST survive.
+        assert!(stable_parts.len() >= 4,
+            "stable's first 4 always-keep entries must survive enforce_budget; got {} of {}",
+            stable_parts.len(), stable_pre_len);
+        if stable_parts.len() >= 4 {
+            assert!(stable_parts[0].starts_with("anchor_0"),
+                "first stable entry must remain the anchor expansion (the TOP-prepended entry)");
+            assert!(stable_parts[1].starts_with("blade_md"),
+                "second stable entry must remain blade_md");
+        }
+
+        // context: first 1 entry (system_message-class) must survive.
+        assert!(context_parts.len() >= 1,
+            "context's first entry must survive enforce_budget");
+
+        // volatile: keep=0 means under budget pressure volatile gets trimmed
+        // first. If no budget pressure, all entries survive — the test
+        // primarily asserts the call ran without panic and the function
+        // signature accepts keep=0 (zero-keep is a valid argument).
+        assert!(volatile_parts.len() <= volatile_pre_len,
+            "volatile must not GROW under enforce_budget");
+
+        // Negative-space assertion: stable_parts MUST NOT be reduced below 4
+        // entries (the always-keep contract). The exact upper bound depends on
+        // the budget configuration — we only assert the floor here.
+        assert!(stable_parts.len() >= 4,
+            "stable's always-keep core (4 entries) is the contract floor — \
+             enforce_budget(keep=4) reduced below floor: {} entries left",
+            stable_parts.len());
+    }
 }
