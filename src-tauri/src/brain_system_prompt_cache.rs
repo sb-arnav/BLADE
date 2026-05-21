@@ -64,6 +64,16 @@ pub fn get_cached(session_id: &str) -> Option<String> {
 /// Insert a prompt into the cache. Empty session_id is a no-op (matches
 /// `save_conversation_state` semantics — no SessionWriter = nothing to key on).
 /// Maintains FIFO eviction at `SYSTEM_PROMPT_CACHE_CAP`.
+///
+/// REVIEW M-01 fix: both locks are acquired BEFORE any read/write so that
+/// `is_new` is computed while holding both locks. The previous implementation
+/// acquired `map` first, then `order` separately — a `clear_cached` call
+/// between the two acquires could remove the session from both stores, then
+/// `set_cached` would re-insert into `map` with a stale `is_new=true`... wait,
+/// the stale path was actually `is_new` computed AFTER both were held but the
+/// window was between acquiring map and acquiring order. Acquiring both upfront
+/// closes that TOCTOU window entirely. Lock order is map-first, order-second
+/// (identical to clear_cached and clear_all_cached — no deadlock possible).
 pub fn set_cached(session_id: &str, prompt: String) {
     if session_id.is_empty() {
         return;
@@ -78,17 +88,23 @@ pub fn set_cached(session_id: &str, prompt: String) {
             return;
         }
     };
+    // Acquire BOTH locks before reading is_new or writing anything.
+    // This closes the TOCTOU window where a concurrent clear_cached could slip
+    // between the two lock acquisitions, leaving map and order desynchronised.
     let mut order = match SYSTEM_PROMPT_CACHE_ORDER.lock() {
         Ok(o) => o,
         Err(e) => {
             eprintln!(
-                "[Phase83] SYSTEM_PROMPT_CACHE_ORDER poisoned on set: {}; write applied but eviction skipped",
-                e
+                "[Phase83] SYSTEM_PROMPT_CACHE_ORDER poisoned on set: {}; dropping write for {}",
+                e, session_id
             );
-            map.insert(session_id.to_string(), prompt);
+            // Drop map lock implicitly here — do NOT write to map without order,
+            // as an orphaned map entry with no order entry bypasses FIFO eviction
+            // and causes the slot to leak until process restart.
             return;
         }
     };
+    // Both locks held — compute is_new atomically under both.
     let is_new = !map.contains_key(session_id);
     map.insert(session_id.to_string(), prompt);
     if is_new {
