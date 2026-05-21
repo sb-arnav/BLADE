@@ -1254,16 +1254,22 @@ fn build_system_prompt_inner_parts(
 
     // ── PROJECT (priority 4) ─────────────────────────────────────────────────
     // Phase 83 / D-08: project instructions are cwd-dependent -> context tier.
+    // REVIEW H-02 fix: record_section("project", ...) was missing, causing the
+    // DoctorPane budget panel to silently under-report prompt size for any
+    // session with an active project (CLAUDE.md / PROJECT.md can be 50–200KB).
     if let Some((proj_path, proj_instructions)) = load_project_instructions() {
         let proj_dir = std::path::Path::new(&proj_path)
             .parent()
             .and_then(|p| p.file_name())
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| "project".to_string());
-        context_parts.push(format!(
+        let proj_section = format!(
             "## Project: {}\n\n{}",
             proj_dir, proj_instructions
-        ));
+        );
+        let proj_section_len = proj_section.len();
+        context_parts.push(proj_section);
+        record_section("project", proj_section_len);
     }
 
     // ── WORKING MEMORY / THREAD (priority 5) ─────────────────────────────────
