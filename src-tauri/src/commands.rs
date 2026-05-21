@@ -4052,4 +4052,84 @@ pub(crate) mod tests {
             "circuit_attempts_summary must be empty after clear"
         );
     }
+
+    // ── Phase 83 Plan 04 / D-20 — integration test ───────────────────────────
+    //
+    // Exercises the compression-invalidate-rebuild cycle WITHOUT requiring a
+    // full Tauri runtime. Tests the LOAD-BEARING SIDE EFFECT of
+    // compress_conversation_smart on the prompt cache: the single
+    // `crate::brain::invalidate_system_prompt(&session_id)` call Plan 03 added
+    // inside the `if conversation.len() != pre_compact_len` guard.
+    //
+    // Faithful end-to-end (driving compress_conversation_smart via
+    // send_message_stream) would require a tauri::AppHandle, a real provider
+    // API key, and a 30k-token conversation — out of unit-test scope.
+    // This test asserts the contract: after a compression event signals a
+    // boundary (via invalidate_system_prompt), the next build_system_prompt_for_model
+    // call is a miss (rebuild), not a hit.
+    //
+    // REQUIRES --test-threads=1 (global atomic counter assertions).
+    #[test]
+    fn phase83_compression_invalidates_prompt() {
+        // Phase 83 / D-20 — integration test for the
+        // compress_conversation_smart → invalidate_system_prompt → rebuild cycle.
+        //
+        // We exercise the LOAD-BEARING SIDE EFFECT of compress_conversation_smart
+        // on the prompt cache: the `crate::brain::invalidate_system_prompt(&session_id)`
+        // call Plan 03 added inside the `if conversation.len() != pre_compact_len`
+        // block. The full compression body is already tested by other commands::tests
+        // fixtures; this test specifically asserts that AFTER a compression event
+        // signals a boundary, the next chat turn's prompt build does NOT hit the cache.
+        //
+        // The session_id used here matches the canonical-id contract from
+        // Plan 03 Sub-step C (rev-1 BLOCKER 3 fix): a String, not an
+        // Option<String>. The integration test uses a synthetic id directly,
+        // which is structurally identical to what SessionWriter::new_with_id
+        // returns in production.
+
+        // Setup: clean cache + counters
+        crate::brain_system_prompt_cache::clear_all_cached();
+        crate::brain_system_prompt_cache::reset_counters_for_test();
+
+        let session_id = "p83_integ_compress_invalidate";
+        crate::commands::set_current_session_id(session_id);
+        let no_tools: Vec<crate::mcp::McpTool> = vec![];
+
+        // Turn 1 — populate the cache (cache miss)
+        let turn1_prompt = crate::brain::build_system_prompt_for_model(
+            &no_tools, "first turn", None, "anthropic", "claude-sonnet-4", 0, &[],
+        );
+        assert_eq!(crate::brain_system_prompt_cache::cache_miss_count(), 1,
+                   "turn 1 should be a miss (first build)");
+        assert!(crate::brain_system_prompt_cache::get_cached(session_id).is_some(),
+                "cache must be populated after turn 1");
+
+        // Simulate compression boundary — invoke the EXACT side effect that
+        // compress_conversation_smart now performs (per Plan 03 Sub-step C wire).
+        // This is the line Plan 03 added inside the `if conversation.len() !=
+        // pre_compact_len` guard at commands.rs:~2053:
+        crate::brain::invalidate_system_prompt(session_id);
+
+        // Post-invalidate: cache must be cold for this session
+        assert!(crate::brain_system_prompt_cache::get_cached(session_id).is_none(),
+                "cache must be invalidated after compression boundary");
+
+        // Turn 2 — should rebuild (cache miss again)
+        let turn2_prompt = crate::brain::build_system_prompt_for_model(
+            &no_tools, "second turn", None, "anthropic", "claude-sonnet-4", 0, &[],
+        );
+        assert_eq!(crate::brain_system_prompt_cache::cache_miss_count(), 2,
+                  "turn 2 after invalidate must be a miss (rebuild)");
+        // Hit counter unchanged — invalidation forced a miss, not a hit.
+        assert_eq!(crate::brain_system_prompt_cache::cache_hit_count(), 0,
+                  "no cache hits should occur — invalidation forced both turns to rebuild");
+
+        // Sanity — both turns produced non-empty prompts
+        assert!(!turn1_prompt.is_empty(), "turn 1 prompt must be non-empty");
+        assert!(!turn2_prompt.is_empty(), "turn 2 prompt must be non-empty");
+
+        // Cleanup
+        crate::commands::reset_current_session_id();
+        crate::brain_system_prompt_cache::clear_all_cached();
+    }
 }
