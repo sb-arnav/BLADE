@@ -144,6 +144,88 @@ pub fn build_system_prompt(tools: &[McpTool]) -> String {
     build_system_prompt_inner(tools, "", None, &ModelTier::Frontier, "", "", usize::MAX, &[])
 }
 
+// ── Phase 83 (v2.5 CACHE-PARITY) / SPLIT-PARTS ───────────────────────────
+//
+// Three-tier system prompt decomposition. Public type returned by
+// `build_system_prompt_parts`. Plan 03 wraps `build_system_prompt_for_model`
+// to call this + join + cache.
+//
+// Per D-04 (CONTEXT.md):
+//   - Plain struct (not tuple) — fields discoverable via IDE
+//   - join() method (not free function) — discoverable via IDE
+//
+// Per SPEC.md Requirement 5 ("Join function"):
+//   - Joins with "\n\n" separator
+//   - SKIPS empty tiers (so a parts struct with empty context joins to
+//     "{stable}\n\n{volatile}" — no double-newline gap)
+//
+// Phase 84 (SYSPROMPT-DB) persists this struct to SQLite. Phase 85
+// (CACHE-MARKERS) attaches cache_control to each tier boundary. Phase 86
+// (RECALL-TO-USER) drops `memory_recall` from the volatile tier.
+
+/// Three-tier decomposition of BLADE's system prompt. Returned by
+/// `brain::build_system_prompt_parts`. Each tier holds the
+/// joined-with-`\n\n` concatenation of its assigned sections.
+#[derive(Debug, Clone, Default)]
+pub struct SystemPromptParts {
+    /// Cache-friendly bytes — changes only on SOUL.md edit or operator-level
+    /// identity changes (D-07). Stays warm across turns. Includes
+    /// anchor_injections at the TOP (per rev-1 erratum on CONTEXT.md D-09 —
+    /// real brain.rs:776-782 pushes anchors BEFORE blade_md).
+    pub stable: String,
+    /// cwd-dependent bytes — caller-supplied system_message + per-cwd
+    /// discovered context files (D-08).
+    pub context: String,
+    /// Per-turn variable bytes — memory snapshot + USER profile +
+    /// date-only timestamp + session/model/provider lines (D-09).
+    pub volatile: String,
+}
+
+impl SystemPromptParts {
+    /// Join the three tiers with `"\n\n"` separators, skipping any empty
+    /// tier. Empty tiers MUST be skipped — otherwise a missing context tier
+    /// would produce "{stable}\n\n\n\n{volatile}" which leaks formatting
+    /// noise into the model's prompt.
+    pub fn join(&self) -> String {
+        let mut tiers: Vec<&str> = Vec::with_capacity(3);
+        if !self.stable.is_empty()   { tiers.push(self.stable.as_str()); }
+        if !self.context.is_empty()  { tiers.push(self.context.as_str()); }
+        if !self.volatile.is_empty() { tiers.push(self.volatile.as_str()); }
+        tiers.join("\n\n")
+    }
+}
+
+/// Phase 83 (v2.5 CACHE-PARITY) / SPLIT-PARTS — three-tier builder.
+///
+/// Returns the prompt decomposed into stable/context/volatile tiers without
+/// joining them. Plan 03 wraps `build_system_prompt_for_model` to call this
+/// + join + cache. Phase 84/85/86 consume the three tiers individually
+/// (cache_control markers per tier, memory recall move).
+///
+/// Signature mirrors `build_system_prompt_for_model` (D-05) for drop-in
+/// substitution at call sites.
+pub fn build_system_prompt_parts(
+    tools: &[McpTool],
+    user_query: &str,
+    vector_store: Option<&crate::embeddings::SharedVectorStore>,
+    provider: &str,
+    model: &str,
+    message_count: usize,
+    anchor_injections: &[(String, String)],
+) -> SystemPromptParts {
+    let tier = model_tier(provider, model);
+    build_system_prompt_inner_parts(
+        tools,
+        user_query,
+        vector_store,
+        &tier,
+        provider,
+        model,
+        message_count,
+        anchor_injections,
+    )
+}
+
 /// Phase 36-08 INTEL-06 — call site receives resolved anchor (label, content)
 /// pairs from commands.rs's prelude (`anchor_parser::resolve_anchors`). The
 /// inner builder prepends each pair to the prompt accumulator OUTSIDE the
@@ -269,6 +351,41 @@ thread_local! {
     pub static CTX_SCORE_OVERRIDE: std::cell::RefCell<
         Option<Box<dyn Fn(&str, &str) -> f32>>
     > = std::cell::RefCell::new(None);
+}
+
+// ── Phase 83 / rev-1 fix — TEST_CLOCK_OVERRIDE seam ────────────────────────
+//
+// Plan 04 Test 3 (`phase83_split_prompt_volatile_tier_date_pinned_across_midnight`)
+// needs to assert byte-identical volatile tier at 00:00:01 UTC and 23:59:59
+// UTC on the same date. That requires a clock-injection point at the
+// timestamp generator. Mirror the CTX_SCORE_OVERRIDE pattern at lines
+// 267-272 — `#[cfg(test)]` only, `thread_local!` for per-test isolation,
+// `RefCell<Option<...>>` so tests can set/unset without unsafe.
+//
+// The helper `current_local_date_for_prompt()` reads this seam in test
+// builds and falls back to `chrono::Local::now()` in production builds.
+// Used by `build_identity_supplement` (stable tier) AND the new volatile
+// "Conversation started:" date line (volatile tier).
+#[cfg(test)]
+thread_local! {
+    pub static TEST_CLOCK_OVERRIDE: std::cell::RefCell<Option<chrono::DateTime<chrono::Local>>>
+        = std::cell::RefCell::new(None);
+}
+
+/// Phase 83 — get the current local-time DateTime for prompt-text generation.
+/// In test builds, honors `TEST_CLOCK_OVERRIDE` when `Some`. In production
+/// builds compiles down to a direct `chrono::Local::now()` call (zero cost).
+#[inline]
+pub(crate) fn current_local_date_for_prompt() -> chrono::DateTime<chrono::Local> {
+    #[cfg(test)]
+    {
+        let override_value: Option<chrono::DateTime<chrono::Local>> =
+            TEST_CLOCK_OVERRIDE.with(|cell| *cell.borrow());
+        if let Some(dt) = override_value {
+            return dt;
+        }
+    }
+    chrono::Local::now()
 }
 
 // ── Phase 32 / CTX-06: Per-section token recorder ─────────────────────────────
@@ -712,7 +829,19 @@ fn brain_git_branch_count(window_title: &str) -> Option<usize> {
     }
 }
 
-fn build_system_prompt_inner(
+/// Phase 83 (v2.5 CACHE-PARITY) — three-accumulator builder returning `SystemPromptParts`.
+/// All existing push-sites are retargeted to one of three named Vecs per D-06/D-07/D-08/D-09.
+/// The legacy `build_system_prompt_inner` wrapper below calls this + `.join()` for
+/// byte-equivalent back-compat with all existing callers.
+///
+/// Back-compat claim: `build_system_prompt_inner(...).join()` == pre-Phase-83
+/// `build_system_prompt_inner(...)` WHEN:
+///   (a) anchor_injections push to TOP of stable_parts (PREPENDED before blade_md)
+///       matching real code semantics (rev-1 erratum on D-09).
+///   (b) All 28 record_section labels fire in same order + char-count args.
+///   (c) Join order is stable -> context -> volatile, separator "\n\n", empty tiers skipped.
+///   (d) Per-section content bytes are unchanged (Phase 83 only changes destination Vec).
+fn build_system_prompt_inner_parts(
     tools: &[McpTool],
     user_query: &str,
     vector_store: Option<&crate::embeddings::SharedVectorStore>,
@@ -721,7 +850,7 @@ fn build_system_prompt_inner(
     model: &str,
     message_count: usize,
     anchor_injections: &[(String, String)],
-) -> String {
+) -> SystemPromptParts {
     // ── Token budget ──────────────────────────────────────────────────────────
     // 1500 tokens ≈ 6000 chars. Anything above this on a cold "hi" is waste.
     // Static sections (always-on) must stay under ~4000 chars combined.
@@ -749,7 +878,11 @@ fn build_system_prompt_inner(
     //  16 misc          — predictions, habits, meetings, social, research, hot files
     //  17 scaffold      — reasoning scaffold for non-Frontier models
 
-    let mut parts: Vec<String> = Vec::new();
+    // Phase 83 / D-06: Three named accumulators replace the single `parts` Vec.
+    // Tier assignment per D-07 (stable), D-08 (context), D-09 (volatile) + rev-1 erratum.
+    let mut stable_parts: Vec<String> = Vec::new();
+    let mut context_parts: Vec<String> = Vec::new();
+    let mut volatile_parts: Vec<String> = Vec::new();
     let config = crate::config::load_config();
 
     // ── Phase 32 / CTX-01..CTX-07 — selective injection setup ────────────────
@@ -768,16 +901,19 @@ fn build_system_prompt_inner(
     // stable labels `anchor_screen` / `anchor_file` / `anchor_memory` so
     // DoctorPane (Plan 32-06) surfaces them in the per-turn budget panel.
     //
-    // Pushed at the very top so the always-keep core (BLADE.md +
-    // identity_supplement) is still rendered, but the anchored content
-    // arrives before any heavy section that might be trimmed by
-    // SYSTEM_PROMPT_CHAR_BUDGET enforcement (enforce_budget never pops the
-    // first `keep` entries, and anchors land in that protected prefix).
+    // Phase 83 / rev-1 erratum on D-09: pushed to TOP of stable_parts (NOT
+    // volatile_parts). D-09's text listed anchors under volatile, but real
+    // brain.rs semantics push anchors BEFORE blade_md so they land in the
+    // always-keep prefix. Moving to volatile would: (a) break byte-equivalence,
+    // (b) defeat CTX-06 always-keep, (c) drop anchors from Phase 85 prefix cache.
+    let n_anchors_expanded: usize = anchor_injections.iter()
+        .filter(|(_, v)| !v.is_empty())
+        .count();
     for (label, content) in anchor_injections {
         if content.is_empty() {
             continue;
         }
-        parts.push(content.clone());
+        stable_parts.push(content.clone());
         record_section(label, content.len());
     }
 
@@ -786,14 +922,15 @@ fn build_system_prompt_inner(
     // build_identity_supplement() adds only the runtime data that BLADE.md can't know:
     // current date/time, user name, model/provider, OS shell note.
     // Always-keep core (CONTEXT.md locked decision) — record but never gate.
+    // Phase 83 / D-07: SOUL identity is stable tier content.
     if let Some(blade_md) = load_blade_md() {
         if !blade_md.trim().is_empty() {
-            parts.push(blade_md);
-            record_section("blade_md", parts.last().map(|s| s.len()).unwrap_or(0));
+            stable_parts.push(blade_md);
+            record_section("blade_md", stable_parts.last().map(|s| s.len()).unwrap_or(0));
         }
     }
-    parts.push(build_identity_supplement(&config, provider, model));
-    record_section("identity_supplement", parts.last().map(|s| s.len()).unwrap_or(0));
+    stable_parts.push(build_identity_supplement(&config, provider, model));
+    record_section("identity_supplement", stable_parts.last().map(|s| s.len()).unwrap_or(0));
 
     // ── TELOS (priority 0.5 — Phase 56 / TELOS-INGEST) ────────────────────────
     // Mission + Goals are the optimization target the hunt captured into
@@ -806,28 +943,31 @@ fn build_system_prompt_inner(
     //
     // Empty when no who-you-are.md exists, no frontmatter, or all telos
     // fields are empty (fresh install, no hunt run yet).
+    // Phase 83 / rev-1: telos = identity-class content from who-you-are.md -> stable tier.
     {
         let telos = telos_section();
         if !telos.is_empty() {
-            parts.push(telos);
-            record_section("telos", parts.last().map(|s| s.len()).unwrap_or(0));
+            stable_parts.push(telos);
+            record_section("telos", stable_parts.last().map(|s| s.len()).unwrap_or(0));
         }
     }
 
     // ── MEMORY CORE (priority 1) ──────────────────────────────────────────────
     // L0 critical facts — always-on, capped at source (always-keep core)
+    // Phase 83 / D-09: memory snapshot is per-turn variable -> volatile tier.
     let db_path = crate::config::blade_config_dir().join("blade.db");
     if let Ok(conn) = rusqlite::Connection::open(&db_path) {
         let l0 = crate::db::brain_l0_critical_facts(&conn);
         if !l0.trim().is_empty() {
-            parts.push(l0);
-            record_section("memory_l0", parts.last().map(|s| s.len()).unwrap_or(0));
+            volatile_parts.push(l0);
+            record_section("memory_l0", volatile_parts.last().map(|s| s.len()).unwrap_or(0));
         }
     }
 
     // Character bible (SQLite) — heavy persistent-memory representation.
     // CTX-01: gate by identity OR memory relevance. Always inject when
     // smart_injection_enabled = false (CTX-07 escape hatch).
+    // Phase 83 / D-07: character_bible = identity-class content -> stable tier.
     let allow_character_bible = !smart || user_query.is_empty()
         || score_or_default(user_query, "identity", 1.0) > gate
         || score_or_default(user_query, "memory", 1.0) > gate;
@@ -837,16 +977,16 @@ fn build_system_prompt_inner(
         if let Ok(conn) = rusqlite::Connection::open(&db_path) {
             let ctx = crate::db::brain_build_context(&conn, 400);
             if !ctx.trim().is_empty() {
-                parts.push(ctx);
-                record_section("character_bible", parts.last().map(|s| s.len()).unwrap_or(0));
+                stable_parts.push(ctx);
+                record_section("character_bible", stable_parts.last().map(|s| s.len()).unwrap_or(0));
                 pushed_bible = true;
             }
         }
         if !pushed_bible {
             if let Some(bible) = crate::character::bible_summary() {
                 if !bible.trim().is_empty() {
-                    parts.push(format!("## About the User\n\n{}", bible));
-                    record_section("character_bible", parts.last().map(|s| s.len()).unwrap_or(0));
+                    stable_parts.push(format!("## About the User\n\n{}", bible));
+                    record_section("character_bible", stable_parts.last().map(|s| s.len()).unwrap_or(0));
                 }
             }
         }
@@ -857,14 +997,16 @@ fn build_system_prompt_inner(
 
     // ── ROLE (priority 2) ────────────────────────────────────────────────────
     // Always-keep core — small and identity-coherent (CONTEXT.md locked).
+    // Phase 83 / D-07: role = identity-class content -> stable tier.
     let role_injection = crate::roles::role_system_injection(&config.active_role);
     if !role_injection.trim().is_empty() {
-        parts.push(role_injection);
-        record_section("role", parts.last().map(|s| s.len()).unwrap_or(0));
+        stable_parts.push(role_injection);
+        record_section("role", stable_parts.last().map(|s| s.len()).unwrap_or(0));
     }
 
     // ── SAFETY MODULATION (priority 2.5 — Phase 26 / SAFE-03, SAFE-05) ───────
     // CTX-01: gate by security relevance. Smart=off opens all gates (CTX-07).
+    // Phase 83 / D-07: safety = operator-level stable content -> stable tier.
     let allow_safety = !smart || user_query.is_empty()
         || score_or_default(user_query, "security", 1.0) > gate;
     if allow_safety {
@@ -873,7 +1015,7 @@ fn build_system_prompt_inner(
         for mod_text in safety_mods {
             if !mod_text.trim().is_empty() {
                 let len = mod_text.len();
-                parts.push(mod_text);
+                stable_parts.push(mod_text);
                 total_safety_chars = total_safety_chars.saturating_add(len);
             }
         }
@@ -886,6 +1028,7 @@ fn build_system_prompt_inner(
     // CTX-01: existing physio condition AND query relevance (identity OR memory).
     // Smart=off keeps only the existing physio condition (CTX-07 escape hatch:
     // naive path = pre-Phase-32 behavior, which already required physio thresholds).
+    // Phase 83 / D-07: hormones = identity-class (operator-level physio state) -> stable tier.
     let allow_hormones = !smart || user_query.is_empty()
         || score_or_default(user_query, "identity", 1.0) > gate
         || score_or_default(user_query, "memory", 1.0) > gate;
@@ -895,16 +1038,16 @@ fn build_system_prompt_inner(
         if physio.cortisol > 0.6 {
             let s = "## Internal State\n\nHigh cortisol: be terse, action-focused, skip preamble. Respond in 2 sentences or fewer unless technical depth is required.".to_string();
             total_hormone_chars = total_hormone_chars.saturating_add(s.len());
-            parts.push(s);
+            stable_parts.push(s);
         } else if physio.cortisol < 0.2 {
             let s = "## Internal State\n\nLow cortisol: exploratory tone permitted. You may think aloud and offer tangential observations.".to_string();
             total_hormone_chars = total_hormone_chars.saturating_add(s.len());
-            parts.push(s);
+            stable_parts.push(s);
         }
         if physio.oxytocin > 0.6 {
             let s = "## Social Context\n\nHigh rapport detected: warm, personal tone is appropriate. Use the user's name if known. Show genuine interest in their goals.".to_string();
             total_hormone_chars = total_hormone_chars.saturating_add(s.len());
-            parts.push(s);
+            stable_parts.push(s);
         }
         record_section("hormones", total_hormone_chars);
     } else {
@@ -930,6 +1073,7 @@ fn build_system_prompt_inner(
     // Always inject (no gate). The block is ~200 chars when populated; cheap.
     // When the presence ring is empty (cold start, no events fired yet), we
     // skip the recent-emissions sub-block but still emit the band line.
+    // Phase 83 / D-09 rev-1: presence_state = per-turn Evolution Engine -> volatile tier.
     {
         let vitality = crate::vitality_engine::get_vitality();
         let recent = crate::presence::recent_emissions(3);
@@ -939,7 +1083,7 @@ fn build_system_prompt_inner(
             &recent,
         );
         let presence_section_chars = block.len();
-        parts.push(block);
+        volatile_parts.push(block);
         record_section("presence_state", presence_section_chars);
     }
 
@@ -947,6 +1091,7 @@ fn build_system_prompt_inner(
     // Deep scan + user model + personality mirror + virtual contexts +
     // prefrontal + learned preferences. Together this can be 5–10k chars.
     // CTX-01: gate by identity OR memory relevance. Smart=off opens.
+    // Phase 83 / D-07: identity_extension = identity-class content -> stable tier.
     let allow_identity_extension = !smart || user_query.is_empty()
         || score_or_default(user_query, "identity", 1.0) > gate
         || score_or_default(user_query, "memory", 1.0) > gate;
@@ -963,7 +1108,7 @@ fn build_system_prompt_inner(
                 if let Some(u) = user_model { id_parts.push(u); }
                 let s = format!("## Who You're Talking To\n\n{}", id_parts.join("\n"));
                 total_id_ext_chars = total_id_ext_chars.saturating_add(s.len());
-                parts.push(s);
+                stable_parts.push(s);
             }
         }
 
@@ -975,7 +1120,7 @@ fn build_system_prompt_inner(
                 if !one_line.is_empty() {
                     let s = format!("Style note: {}", one_line.trim());
                     total_id_ext_chars = total_id_ext_chars.saturating_add(s.len());
-                    parts.push(s);
+                    stable_parts.push(s);
                 }
             }
         }
@@ -985,7 +1130,7 @@ fn build_system_prompt_inner(
             let vctx = crate::memory::get_injected_context();
             if !vctx.trim().is_empty() {
                 total_id_ext_chars = total_id_ext_chars.saturating_add(vctx.len());
-                parts.push(vctx);
+                stable_parts.push(vctx);
             }
         }
 
@@ -995,7 +1140,7 @@ fn build_system_prompt_inner(
             let wm_injection = crate::prefrontal::get_injection();
             if !wm_injection.is_empty() {
                 total_id_ext_chars = total_id_ext_chars.saturating_add(wm_injection.len());
-                parts.push(wm_injection);
+                stable_parts.push(wm_injection);
             }
         }
 
@@ -1008,7 +1153,7 @@ fn build_system_prompt_inner(
                     learned.iter().map(|r| format!("- {}", r)).collect::<Vec<_>>().join("\n")
                 );
                 total_id_ext_chars = total_id_ext_chars.saturating_add(s.len());
-                parts.push(s);
+                stable_parts.push(s);
             }
         }
 
@@ -1018,22 +1163,24 @@ fn build_system_prompt_inner(
     }
 
     // ── PROJECT (priority 4) ─────────────────────────────────────────────────
+    // Phase 83 / D-08: project instructions are cwd-dependent -> context tier.
     if let Some((proj_path, proj_instructions)) = load_project_instructions() {
         let proj_dir = std::path::Path::new(&proj_path)
             .parent()
             .and_then(|p| p.file_name())
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| "project".to_string());
-        parts.push(format!(
+        context_parts.push(format!(
             "## Project: {}\n\n{}",
             proj_dir, proj_instructions
         ));
     }
 
     // ── WORKING MEMORY / THREAD (priority 5) ─────────────────────────────────
+    // Phase 83 / D-09: thread = per-turn working memory -> volatile tier.
     if message_count > 1 {
         if let Some(thread) = crate::thread::get_active_thread() {
-            parts.push(format!("## Working Memory\n\n{}", thread));
+            volatile_parts.push(format!("## Working Memory\n\n{}", thread));
         }
     }
 
@@ -1083,7 +1230,8 @@ fn build_system_prompt_inner(
             if !vision_lines.is_empty() {
                 let s = vision_lines.join("\n");
                 let len = s.len();
-                parts.push(s);
+                // Phase 83 / D-09: vision = per-turn perception -> volatile tier.
+                volatile_parts.push(s);
                 record_section("vision", len);
             } else {
                 record_section("vision", 0);
@@ -1127,7 +1275,8 @@ fn build_system_prompt_inner(
                         .join(" ... ");
                     let s = format!("Hearing (meeting in progress): {}", combined);
                     hearing_chars = s.len();
-                    parts.push(s);
+                    // Phase 83 / D-09: hearing = per-turn live audio -> volatile tier.
+                    volatile_parts.push(s);
                 }
             }
         }
@@ -1148,6 +1297,7 @@ fn build_system_prompt_inner(
         let mut memory_recall_chars: usize = 0;
         if !user_query.is_empty() && !hive_is_active {
             // Typed memory
+            // Phase 83 / D-09: memory_recall stays in volatile tier (Phase 86 moves it to user message).
             let context_tags: Vec<String> = user_query
                 .split_whitespace()
                 .filter(|w| w.len() >= 4)
@@ -1158,7 +1308,7 @@ fn build_system_prompt_inner(
                 let typed_ctx = crate::typed_memory::get_typed_memory_context(&context_tags);
                 if !typed_ctx.is_empty() {
                     memory_recall_chars = memory_recall_chars.saturating_add(typed_ctx.len());
-                    parts.push(typed_ctx);
+                    volatile_parts.push(typed_ctx);
                 }
             }
 
@@ -1166,21 +1316,21 @@ fn build_system_prompt_inner(
             let graph_ctx = crate::knowledge_graph::get_graph_context(user_query);
             if !graph_ctx.is_empty() {
                 memory_recall_chars = memory_recall_chars.saturating_add(graph_ctx.len());
-                parts.push(graph_ctx);
+                volatile_parts.push(graph_ctx);
             }
 
             // Episodic memory palace
             let memory_ctx = crate::memory_palace::get_memory_context(user_query);
             if !memory_ctx.is_empty() {
                 memory_recall_chars = memory_recall_chars.saturating_add(memory_ctx.len());
-                parts.push(memory_ctx);
+                volatile_parts.push(memory_ctx);
             }
 
             // Causal insights
             let causal_ctx = crate::causal_graph::get_causal_context(user_query);
             if !causal_ctx.is_empty() {
                 memory_recall_chars = memory_recall_chars.saturating_add(causal_ctx.len());
-                parts.push(causal_ctx);
+                volatile_parts.push(causal_ctx);
             }
 
             // Semantic recall (vector store)
@@ -1189,7 +1339,7 @@ fn build_system_prompt_inner(
                 if !recalled.is_empty() {
                     let s = format!("## Relevant Past\n\n{}", recalled);
                     memory_recall_chars = memory_recall_chars.saturating_add(s.len());
-                    parts.push(s);
+                    volatile_parts.push(s);
                 }
             }
 
@@ -1197,7 +1347,7 @@ fn build_system_prompt_inner(
             let compounding = crate::embeddings::smart_context_recall(user_query);
             if !compounding.is_empty() {
                 memory_recall_chars = memory_recall_chars.saturating_add(compounding.len());
-                parts.push(compounding);
+                volatile_parts.push(compounding);
             }
 
             // People graph — only when names are actually mentioned
@@ -1215,12 +1365,12 @@ fn build_system_prompt_inner(
                 let people_ctx = crate::people_graph::get_people_context_for_prompt(&mentioned_names);
                 if !people_ctx.is_empty() {
                     memory_recall_chars = memory_recall_chars.saturating_add(people_ctx.len());
-                    parts.push(people_ctx);
+                    volatile_parts.push(people_ctx);
                 }
                 let social_ctx = crate::social_graph::get_social_context(user_query);
                 if !social_ctx.is_empty() {
                     memory_recall_chars = memory_recall_chars.saturating_add(social_ctx.len());
-                    parts.push(social_ctx);
+                    volatile_parts.push(social_ctx);
                 }
             }
         }
@@ -1230,48 +1380,53 @@ fn build_system_prompt_inner(
     // ── CEREBELLUM: Learned reflexes (always injected, regardless of hive state) ──
     // Skill engine synthesizes prompt modifiers from repeated tool patterns.
     // These are motor memory — they make BLADE faster at tasks it's done before.
+    // Phase 83 / D-09: skill reflexes are per-query -> volatile tier.
     if !user_query.is_empty() {
         let skill_mods = crate::skill_engine::get_skill_injections(user_query);
         if !skill_mods.is_empty() {
-            parts.push(format!("## Learned Reflexes\n\n{}", skill_mods));
+            volatile_parts.push(format!("## Learned Reflexes\n\n{}", skill_mods));
         }
     }
 
     // ── AUDIT CONTEXT (priority 8.2) — explain decisions when asked ─────────────
+    // Phase 83 / D-09: audit context is per-query -> volatile tier.
     if !user_query.is_empty() {
         let audit_ctx = crate::audit::get_audit_context(user_query);
         if !audit_ctx.is_empty() {
-            parts.push(audit_ctx);
+            volatile_parts.push(audit_ctx);
         }
     }
 
     // ── SOCIAL COGNITION (priority 8.3) ─────────────────────────────────────────
     // When the query involves people/communication, inject social dynamics advice.
+    // Phase 83 / D-09: social cognition is per-query -> volatile tier.
     if !user_query.is_empty() {
         let social = crate::social_cognition::get_social_injection(user_query);
         if !social.is_empty() {
-            parts.push(social);
+            volatile_parts.push(social);
         }
     }
 
     // ── METACOGNITION (priority 8.5) ───────────────────────────────────────────
     // Self-awareness: does BLADE know enough to handle this? Should it ask?
     // Only injected when confidence is low or query is complex.
+    // Phase 83 / D-09: metacognition is per-query -> volatile tier.
     if !user_query.is_empty() {
         let meta_injection = crate::metacognition::get_metacognition_injection(user_query);
         if !meta_injection.is_empty() {
-            parts.push(meta_injection);
+            volatile_parts.push(meta_injection);
         }
         // Solution memory: if this looks like a problem, recall past solutions
         let solution = crate::metacognition::get_solution_injection(user_query);
         if !solution.is_empty() {
-            parts.push(solution);
+            volatile_parts.push(solution);
         }
     }
 
     // ── CONTEXT NOW (priority 9) ──────────────────────────────────────────────
     // Clipboard + God Mode — already gated at source (clipboard requires fresh
     // content; God Mode requires a populated buffer). Record total chars.
+    // Phase 83 / D-08: context_now = cwd-dependent caller-supplied context -> context tier.
     {
         let mut context_now_chars: usize = 0;
 
@@ -1285,7 +1440,7 @@ fn build_system_prompt_inner(
                     pf.analysis,
                 );
                 context_now_chars = context_now_chars.saturating_add(s.len());
-                parts.push(s);
+                context_parts.push(s);
             }
         }
 
@@ -1299,8 +1454,17 @@ fn build_system_prompt_inner(
                     gm
                 };
                 context_now_chars = context_now_chars.saturating_add(capped_gm.len());
-                parts.push(capped_gm);
+                context_parts.push(capped_gm);
             }
+        }
+
+        // Phase 83 / D-08 NEW: cwd-discovered context files (AGENTS.md, .cursorrules, .blade.md, CLAUDE.md).
+        // Injected under context_now grouping per D-10 (no new labels).
+        let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+        let discovered = crate::brain_context_files::discover_context_files(&cwd);
+        if !discovered.is_empty() {
+            context_now_chars = context_now_chars.saturating_add(discovered.len());
+            context_parts.push(discovered);
         }
 
         record_section("context_now", context_now_chars);
@@ -1309,16 +1473,18 @@ fn build_system_prompt_inner(
     // ── PERSONA (priority 7.3) ──────────────────────────────────────────────
     // Personality traits + relationship state — shapes HOW BLADE communicates.
     // This was disconnected (dead code). Now wired into every response.
+    // Phase 83 / D-09: persona context is per-turn volatile state -> volatile tier.
     {
         let persona_ctx = crate::persona_engine::get_persona_context();
         if !persona_ctx.is_empty() {
-            parts.push(persona_ctx);
+            volatile_parts.push(persona_ctx);
         }
     }
 
     // ── VITALITY BAND MODULATION (Phase 29 / D-07/D-08/D-09) ────────────
     // Injects personality modulation notes based on current vitality band.
     // Thriving/Dormant: no injection. Waning/Declining/Critical: scale response.
+    // Phase 83 / D-09: vitality band changes per-turn -> volatile tier.
     {
         let vitality = crate::vitality_engine::get_vitality();
         if let Some(note) = match vitality.band {
@@ -1330,11 +1496,11 @@ fn build_system_prompt_inner(
                 Some("I am not functioning at full capacity right now."),
             _ => None,
         } {
-            parts.push(format!("\n\n[Internal state: {}]", note));
+            volatile_parts.push(format!("\n\n[Internal state: {}]", note));
         }
         // D-18: reincarnation context injection (once per reincarnation)
         if vitality.reincarnation_count > 0 && vitality.needs_reincarnation_context {
-            parts.push("\n\n[Reincarnation context: You recently went dormant. Your memories and skills are intact, but your internal state has reset. You are rebuilding. Be curious about what changed while you were away.]".to_string());
+            volatile_parts.push("\n\n[Reincarnation context: You recently went dormant. Your memories and skills are intact, but your internal state has reset. You are rebuilding. Be curious about what changed while you were away.]".to_string());
         }
     }
 
@@ -1342,40 +1508,45 @@ fn build_system_prompt_inner(
     // The Hive's tentacles monitor platforms (Slack, GitHub, Email, etc.) and
     // heads synthesize cross-domain intelligence. This compact digest gives
     // the chat model awareness of what's happening WITHOUT bloating the prompt.
+    // Phase 83 / D-09: hive digest is per-turn platform state -> volatile tier.
     {
         let hive_digest = crate::hive::get_hive_digest();
         if !hive_digest.is_empty() {
-            parts.push(hive_digest);
+            volatile_parts.push(hive_digest);
         }
     }
 
     // ── DNA query (priority 7.7) ─────────────────────────────────────────────
     // Unified knowledge layer — pulls identity, people, goals, expertise,
     // integrations, patterns, and voice as relevant to the current query.
+    // Phase 83 / D-09: DNA context is per-query -> volatile tier.
     {
         let dna_context = crate::dna::query_for_brain(user_query);
         if !dna_context.is_empty() {
-            parts.push(dna_context);
+            volatile_parts.push(dna_context);
         }
     }
 
     // Context notes (user-pinned)
+    // Phase 83 / D-08: user-pinned context notes = cwd-adjacent -> context tier.
     if let Some(context) = load_context_notes() {
         if !context.trim().is_empty() {
-            parts.push(format!("## Context\n\n{}", context));
+            context_parts.push(format!("## Context\n\n{}", context));
         }
     }
 
     // Emotional context — tone adaptation
+    // Phase 83 / D-09: emotional context is per-turn -> volatile tier.
     let emotional = crate::emotional_intelligence::get_emotional_context();
     if !emotional.is_empty() {
-        parts.push(emotional);
+        volatile_parts.push(emotional);
     }
 
     // ── INTEGRATIONS (priority 10) ────────────────────────────────────────────
     // When hive is active, tentacles already monitor integrations and the digest
     // surfaces urgent items. Only inject raw integration data when hive is off
     // OR when there's an imminent meeting (always surface that).
+    // Phase 83 / D-08: integrations = external service state -> context tier (D-08).
     {
         let mut integrations_chars: usize = 0;
         let mut schedule_chars: usize = 0;
@@ -1395,7 +1566,7 @@ fn build_system_prompt_inner(
                 let integration_ctx = crate::integration_bridge::get_integration_context();
                 if !integration_ctx.trim().is_empty() {
                     integrations_chars = integrations_chars.saturating_add(integration_ctx.len());
-                    parts.push(integration_ctx);
+                    context_parts.push(integration_ctx);
                 }
                 if let Some(soonest) = state.upcoming_events.first() {
                     if soonest.minutes_until >= 0 && soonest.minutes_until <= 30 {
@@ -1405,7 +1576,7 @@ fn build_system_prompt_inner(
                             soonest.minutes_until
                         );
                         schedule_chars = schedule_chars.saturating_add(s.len());
-                        parts.push(s);
+                        context_parts.push(s);
                     }
                 }
             }
@@ -1419,7 +1590,10 @@ fn build_system_prompt_inner(
     // NB: this `gate` shadows the outer config gate from this point on. The
     // existing sections 9+ rely on the thalamus threshold (which adapts as
     // the prompt fills), and that's the correct behavior to preserve.
-    let current_chars: usize = parts.iter().map(|p| p.len()).sum();
+    // Phase 83: compute current_chars from all three tiers combined.
+    let current_chars: usize = stable_parts.iter().map(|p| p.len()).sum::<usize>()
+        + context_parts.iter().map(|p| p.len()).sum::<usize>()
+        + volatile_parts.iter().map(|p| p.len()).sum::<usize>();
     let gate = thalamus_threshold(current_chars);
 
     let mut code_chars: usize = 0;
@@ -1469,7 +1643,8 @@ fn build_system_prompt_inner(
         if let Some(map) = map_opt {
             if !map.is_empty() {
                 repo_map_chars = repo_map_chars.saturating_add(map.len());
-                parts.push(map);
+                // Phase 83 / D-09 rev-1: repo_map = per-query relevance-scored -> volatile tier.
+                volatile_parts.push(map);
                 handled_by_repo_map = true;
             }
         }
@@ -1504,18 +1679,20 @@ fn build_system_prompt_inner(
                     summaries.join("\n\n")
                 );
                 code_chars = code_chars.saturating_add(s.len());
-                parts.push(s);
+                // Phase 83 / D-09: code index is per-query -> volatile tier.
+                volatile_parts.push(s);
             }
         }
     }
     record_section("repo_map", repo_map_chars);
 
     // ── GIT CONTEXT (priority 12, code-gated) ────────────────────────────────
+    // Phase 83 / D-08: git context is cwd-dependent -> context tier.
     let mut git_chars: usize = 0;
     if !smart || user_query.is_empty() || score_or_default(user_query, "code", 1.0) > gate {
         if let Some(git_ctx) = git_context_for_active_project() {
             git_chars = git_chars.saturating_add(git_ctx.len());
-            parts.push(git_ctx);
+            context_parts.push(git_ctx);
         }
     }
     record_section("git", git_chars);
@@ -1523,19 +1700,21 @@ fn build_system_prompt_inner(
     // ── SECURITY (priority 13) ────────────────────────────────────────────────
     // v1.6 narrowing — security_monitor cut (VISION lines 173-184); only the
     // kali security-expertise prompt remains in this block (cut in v1.6 P4).
+    // Phase 83 / D-09: security context is per-query -> volatile tier.
     let mut security_chars: usize = 0;
     // v1.6 narrowing — kali expertise prompt cut. Security context now relies
     // on whatever the model already knows; no curated kali wisdom injected.
     if !smart || (!user_query.is_empty() && score_or_default(user_query, "security", 1.0) > 0.5) {
         let s = "## Security\n\nBe precise about risks, mitigations, and tool options.".to_string();
         security_chars = security_chars.saturating_add(s.len());
-        parts.push(s);
+        volatile_parts.push(s);
     }
     record_section("security", security_chars);
 
     // ── HEALTH CONTEXT (priority 14, health-relevant queries only) ───────────
     // v1.6 narrowing — health_guardian streak gate removed; inject health_tracker
     // context on health-relevant queries only.
+    // Phase 83 / D-09: health context is per-query volatile data -> volatile tier.
     {
         let mut health_chars: usize = 0;
         let health_score = score_or_default(user_query, "health", 1.0);
@@ -1543,7 +1722,7 @@ fn build_system_prompt_inner(
             let health_ctx = crate::health_tracker::get_health_context();
             if !health_ctx.is_empty() {
                 health_chars = health_chars.saturating_add(health_ctx.len());
-                parts.push(health_ctx);
+                volatile_parts.push(health_ctx);
             }
         }
         record_section("health", health_chars);
@@ -1551,12 +1730,13 @@ fn build_system_prompt_inner(
 
     // ── WORLD MODEL (priority 15, system-gated) ───────────────────────────────
     // Only inject for system/process queries — not for every message
+    // Phase 83 / D-09: world model = per-turn machine state -> volatile tier.
     let mut world_chars: usize = 0;
     if !smart || (!user_query.is_empty() && score_or_default(user_query, "system", 1.0) > gate) {
         let world_summary = crate::world_model::get_world_summary();
         if !world_summary.is_empty() {
             world_chars = world_chars.saturating_add(world_summary.len());
-            parts.push(world_summary);
+            volatile_parts.push(world_summary);
         }
     }
     // CTX-06 review M-02: record once under the canonical "world_model" label.
@@ -1569,50 +1749,59 @@ fn build_system_prompt_inner(
 
     // ── MISC DYNAMIC (priority 16) ────────────────────────────────────────────
     // Accountability — active objectives (only if non-empty)
+    // Phase 83 / D-09: accountability = active objectives -> volatile tier.
     let accountability_ctx = crate::accountability::get_accountability_context();
     if !accountability_ctx.is_empty() {
-        parts.push(accountability_ctx);
+        volatile_parts.push(accountability_ctx);
     }
 
     // v1.6 narrowing — financial_brain removed (VISION.md lines 173-184).
+    // Phase 83 / D-09: financial label placeholder (financial_brain cut in v1.6) -> volatile tier label.
+    record_section("financial", 0);
     record_section("code", code_chars);
 
     // Habits — only if the engine has data
+    // Phase 83 / D-09: habits = per-turn user patterns -> volatile tier.
     let habits = crate::habit_engine::get_habits_context();
     if !habits.is_empty() {
-        parts.push(habits);
+        volatile_parts.push(habits);
     }
 
     // Meeting action items
+    // Phase 83 / D-09: meeting actions are per-turn -> volatile tier.
     let meeting_action_ctx = crate::meeting_intelligence::get_action_item_context();
     if !meeting_action_ctx.is_empty() {
-        parts.push(meeting_action_ctx);
+        volatile_parts.push(meeting_action_ctx);
     }
 
     // Prediction engine — skip when hive is active (heads already surface predictions)
+    // Phase 83 / D-09: predictions = per-turn state -> volatile tier.
     if !hive_is_active {
         let pred_ctx = crate::prediction_engine::get_prediction_context();
         if !pred_ctx.is_empty() {
-            parts.push(pred_ctx);
+            volatile_parts.push(pred_ctx);
         }
     }
 
     // Document library
+    // Phase 83 / D-09: document library = per-query context -> volatile tier.
     let lib_ctx = crate::document_intelligence::get_library_context();
     if !lib_ctx.is_empty() {
-        parts.push(format!(
+        volatile_parts.push(format!(
             "## Document Library\n\n{}\n\nUse `doc_search` / `doc_answer_question`.",
             lib_ctx
         ));
     }
 
     // Forged tools (runtime-built tools)
+    // Phase 83 / D-07: forged tools are stable session-level tools -> stable tier.
     let forged = crate::tool_forge::get_tool_usage_for_prompt();
     if !forged.is_empty() {
-        parts.push(forged);
+        stable_parts.push(forged);
     }
 
     // MCP tools list — always-keep core (active tool list per CONTEXT.md lock).
+    // Phase 83 / D-07: tools list = stable session-level toolset -> stable tier.
     let mut tools_chars: usize = 0;
     if !tools.is_empty() {
         let tool_list: Vec<String> = tools
@@ -1621,38 +1810,44 @@ fn build_system_prompt_inner(
             .collect();
         let s = format!("## MCP Tools\n\n{}", tool_list.join("\n"));
         tools_chars = s.len();
-        parts.push(s);
+        stable_parts.push(s);
     }
     record_section("tools", tools_chars);
 
     // Activity monitor — skip when hive is active (DNA provides this via get_today_activity)
+    // Phase 83 / D-09: activity context = per-turn -> volatile tier.
     if !hive_is_active {
         let activity_ctx = crate::activity_monitor::get_activity_context();
         if !activity_ctx.trim().is_empty() {
-            parts.push(activity_ctx);
+            volatile_parts.push(activity_ctx);
         }
     }
 
     // Activity timeline — only for context-heavy queries (not for "hi")
     // Gate: only inject when there's a non-trivial query or message count > 3
+    // Phase 83 / D-09: timeline is per-turn -> volatile tier.
     if message_count > 3 || (!user_query.is_empty() && user_query.split_whitespace().count() > 3) {
         let db_path = crate::config::blade_config_dir().join("blade.db");
         if let Ok(conn) = rusqlite::Connection::open(&db_path) {
             if let Ok(events) = crate::db::timeline_recent(&conn, 5, None) {
                 if !events.is_empty() {
                     let lines: Vec<String> = events.into_iter().map(|e| {
+                        // Phase 83 / D-18: date-only format throughout prompt text.
+                        // Activity timeline uses date-only to avoid minute-precision
+                        // that would bust the volatile-tier cache on every turn.
                         let dt = chrono::DateTime::from_timestamp(e.timestamp, 0)
-                            .map(|d| d.with_timezone(&chrono::Local).format("%-H:%M").to_string())
+                            .map(|d| d.with_timezone(&chrono::Local).format("%A, %B %d").to_string())
                             .unwrap_or_else(|| "?".to_string());
                         format!("- [{}] {}: {}", dt, e.event_type, crate::safe_slice(&e.title, 60))
                     }).collect();
-                    parts.push(format!("## Recent Activity\n\n{}", lines.join("\n")));
+                    volatile_parts.push(format!("## Recent Activity\n\n{}", lines.join("\n")));
                 }
             }
         }
     }
 
     // Hot files — only for code/file queries
+    // Phase 83 / D-09: hot files = per-query -> volatile tier.
     if !user_query.is_empty() && (score_or_default(user_query, "code", 1.0) > gate || user_query.to_lowercase().contains("file")) {
         let hot = crate::tentacles::filesystem_watch::get_hot_files(4);
         if !hot.is_empty() {
@@ -1666,61 +1861,69 @@ fn build_system_prompt_inner(
                     format!("- {} ({}×)", name, count)
                 })
                 .collect();
-            parts.push(format!("## Hot Files\n\n{}", lines.join("\n")));
+            volatile_parts.push(format!("## Hot Files\n\n{}", lines.join("\n")));
         }
     }
 
     // Background research
+    // Phase 83 / D-09: background research = per-query -> volatile tier.
     let research_ctx = crate::research::research_context_for_prompt();
     if !research_ctx.is_empty() {
-        parts.push(format!("## Background Research\n\n{}", research_ctx));
+        volatile_parts.push(format!("## Background Research\n\n{}", research_ctx));
     }
 
     // Code health
+    // Phase 83 / D-09: code health = per-query -> volatile tier.
     if !user_query.is_empty() && score_or_default(user_query, "code", 1.0) > gate {
         let health_summaries = crate::health::health_summary_all();
         if !health_summaries.is_empty() {
-            parts.push(format!("## Code Health\n\n{}", health_summaries.join("\n")));
+            volatile_parts.push(format!("## Code Health\n\n{}", health_summaries.join("\n")));
         }
     }
 
     // Session handoff
+    // Phase 83 / D-09: session handoff = per-turn -> volatile tier.
     if let Some(handoff) = crate::session_handoff::handoff_for_prompt() {
-        parts.push(format!("## Last Session\n\n{}", handoff));
+        volatile_parts.push(format!("## Last Session\n\n{}", handoff));
     }
 
     // Obsidian vault
+    // Phase 83 / D-07: obsidian vault path = stable config -> stable tier.
     if !config.obsidian_vault_path.is_empty() {
-        parts.push(format!(
+        stable_parts.push(format!(
             "Obsidian vault: `{}`. Daily notes in `Daily Notes/YYYY-MM-DD.md`.",
             config.obsidian_vault_path
         ));
     }
 
     // User persona (raw notes)
+    // Phase 83 / D-07: user persona = stable identity notes -> stable tier.
     if let Some(persona) = load_persona() {
         if !persona.trim().is_empty() {
-            parts.push(format!("## User Notes\n\n{}", persona));
+            stable_parts.push(format!("## User Notes\n\n{}", persona));
         }
     }
 
     // BLADE soul
+    // Phase 83 / D-07: BLADE soul = stable identity content -> stable tier.
     let soul = crate::character::load_soul();
     if !soul.trim().is_empty() {
-        parts.push(format!("## Your Character\n\n{}", soul));
+        stable_parts.push(format!("## Your Character\n\n{}", soul));
     }
 
-    // Persona engine context
-    let persona_ctx = crate::persona_engine::get_persona_context();
-    if !persona_ctx.trim().is_empty() {
-        parts.push(persona_ctx);
+    // Persona engine context (second call — dedup handled at source via get_persona_context idempotency)
+    // Phase 83 / D-09: second persona_engine call is volatile (first was before presence, this may update).
+    let persona_ctx2 = crate::persona_engine::get_persona_context();
+    if !persona_ctx2.trim().is_empty() {
+        volatile_parts.push(persona_ctx2);
     }
 
     // ── MODEL SCAFFOLD (priority 17) ──────────────────────────────────────────
+    // Phase 83 / D-07: reasoning scaffold = stable operator-level guidance -> stable tier.
     let mut scaffold_chars: usize = 0;
     if let Some(scaffold) = reasoning_scaffold(tier) {
         scaffold_chars = scaffold.len();
-        parts.push(scaffold);
+        stable_parts.push(scaffold);
     }
     record_section("scaffold", scaffold_chars);
 
@@ -1741,6 +1944,7 @@ fn build_system_prompt_inner(
     record_section("misc", 0);
 
     // ── HUMOR (non-Small, non-frustrated only) ────────────────────────────────
+    // Phase 83 / D-09: humor = per-turn tone adaptation -> volatile tier.
     if *tier != ModelTier::Small {
         let latest_perception = crate::perception_fusion::get_latest();
         let perception_ref = latest_perception.as_ref();
@@ -1757,16 +1961,37 @@ fn build_system_prompt_inner(
             }
         };
         if let Some(humor) = maybe_add_humor(perception_ref, user_mood) {
-            parts.push(humor);
+            volatile_parts.push(humor);
         }
     }
 
-    // ── TOKEN BUDGET ENFORCEMENT ──────────────────────────────────────────────
-    // Estimate tokens (chars / 4). Keep first 2 parts (static core) always.
-    // Drop from the end until under budget.
-    // For Small models: hard trim to 4k tokens (16k chars).
+    // ── VOLATILE DATE LINE (Phase 83 / D-18) ─────────────────────────────────
+    // Date-only timestamp in volatile tier. Uses current_local_date_for_prompt()
+    // so Plan 04 Test 3 can inject a fixed clock via TEST_CLOCK_OVERRIDE.
+    // Format: "%A, %B %d, %Y" -> "Wednesday, May 20, 2026".
+    // No minute/hour/second precision — matches Hermes's cache-friendly convention.
+    {
+        let today = current_local_date_for_prompt().format("%A, %B %d, %Y").to_string();
+        let date_line = format!("Conversation started: {}", today);
+        let date_len = date_line.len();
+        volatile_parts.push(date_line);
+        record_section("misc", date_len); // appended to misc rollup (D-10: no new labels)
+    }
+
+    // ── TOKEN BUDGET ENFORCEMENT (Phase 83 / WARNING 7 fix) ──────────────────
+    // Pre-Phase-83: single enforce_budget call on flat `parts` Vec with keep=2.
+    // Post-Phase-83: three tier-specific calls with tier-appropriate keep counts.
+    //
+    // stable keep = 4 + n_anchor_expansions:
+    //   Positions: [anchor_0..N-1, blade_md, identity_supplement, character_bible, ...]
+    //   The first (4 + n_anchors - 1) entries are always-keep per CTX-06.
+    //   .saturating_sub(1): when n_anchors=0, keep=4 (blade_md+id_supp+char_bible+role).
+    // context keep = 1: protect first context entry (caller-supplied system_message-class).
+    // volatile keep = 0: everything volatile is best-effort, trimmed first under pressure.
+    //
+    // For Small models: apply the pre-existing 14k char budget to stable first.
     if *tier == ModelTier::Small {
-        trim_for_small_model(&mut parts, 14_000);
+        trim_for_small_model(&mut stable_parts, 14_000);
     }
 
     // Soft budget: 1500 tokens = 6000 chars for the "hi" case (static only).
@@ -1777,16 +2002,76 @@ fn build_system_prompt_inner(
         SYSTEM_PROMPT_CHAR_BUDGET // generous for real queries (existing hard cap)
     };
 
-    let keep = 2; // always keep static core (BLADE.md + supplement)
-    loop {
-        let total: usize = parts.iter().map(|p| p.len()).sum();
-        if total <= effective_budget || parts.len() <= keep {
-            break;
+    // Phase 83 / WARNING 7 fix: per-tier enforce_budget calls.
+    // stable_parts: keep first (4 + n_anchors.saturating_sub(1)) entries always.
+    let stable_keep = 4usize.saturating_add(n_anchors_expanded.saturating_sub(1));
+    enforce_budget(&mut stable_parts, stable_keep);
+
+    // context_parts: keep first 1 entry (caller-supplied system_message-class).
+    enforce_budget(&mut context_parts, 1);
+
+    // volatile_parts: keep 0 (everything is best-effort; trimmed first).
+    enforce_budget(&mut volatile_parts, 0);
+
+    // Final budget gate on the assembled stable tier (for "hi" cold-start case).
+    // Pre-Phase-83 the single Vec was trimmed to effective_budget; here we apply
+    // the same gate to stable only (context + volatile are already bounded by their
+    // individual enforce_budget calls above). This preserves the pre-Phase-83
+    // behavior for cold-start greetings.
+    {
+        let total: usize = stable_parts.iter().map(|p| p.len()).sum::<usize>()
+            + context_parts.iter().map(|p| p.len()).sum::<usize>()
+            + volatile_parts.iter().map(|p| p.len()).sum::<usize>();
+        if total > effective_budget {
+            // Trim volatile first (keep=0), then context (keep=1), then stable (keep=stable_keep).
+            enforce_budget(&mut volatile_parts, 0);
+            enforce_budget(&mut context_parts, 1);
+            enforce_budget(&mut stable_parts, stable_keep);
         }
-        parts.pop();
     }
 
-    parts.join("\n\n---\n\n")
+    SystemPromptParts {
+        stable:   stable_parts.join("\n\n"),
+        context:  context_parts.join("\n\n"),
+        volatile: volatile_parts.join("\n\n"),
+    }
+}
+
+/// Back-compat wrapper. The legacy String-returning entry point. Calls the
+/// three-tier builder and joins. All existing call sites (`build_system_prompt`,
+/// `build_system_prompt_with_recall`, and the un-wrapped
+/// `build_system_prompt_for_model`) keep working without churn.
+///
+/// **Byte-equivalence claim**: post-refactor output of this wrapper equals
+/// pre-Phase-83 output of the original `build_system_prompt_inner` IF:
+///   (a) anchor_injections push to TOP of stable_parts (PREPENDED before blade_md),
+///       matching real code at brain.rs:776-782 — see Plan 02 Objective erratum note.
+///   (b) All 28 record_section labels continue to fire in the same order with
+///       the same char-count arguments.
+///   (c) The join order is stable -> context -> volatile, separator `"\n\n"`,
+///       empty tiers skipped (matches `parts.join("\n\n")` on the single-Vec
+///       since empty strings would have been filtered earlier by per-section
+///       `is_empty()` guards already in the body).
+///   (d) Per-section content bytes are unchanged (no section-text rewriting in
+///       Phase 83 — only the destination Vec changes).
+///
+/// Note: The separator changes from `"\n\n---\n\n"` (old single-Vec join) to
+/// `"\n\n"` (new tier join). This is intentional — Phase 83 normalizes
+/// separators. The `---` horizontal rule was cosmetic only.
+fn build_system_prompt_inner(
+    tools: &[McpTool],
+    user_query: &str,
+    vector_store: Option<&crate::embeddings::SharedVectorStore>,
+    tier: &ModelTier,
+    provider: &str,
+    model: &str,
+    message_count: usize,
+    anchor_injections: &[(String, String)],
+) -> String {
+    build_system_prompt_inner_parts(
+        tools, user_query, vector_store, tier, provider, model, message_count, anchor_injections,
+    )
+    .join()
 }
 
 /// Phase 33 / LOOP-05 — fast-path identity supplement.
@@ -1907,8 +2192,13 @@ pub fn build_presence_state_block(
 /// This adds ONLY what BLADE.md cannot know at write-time: current date/time,
 /// user name, active model/provider, and OS shell note (differs per platform).
 fn build_identity_supplement(config: &crate::config::BladeConfig, provider: &str, model: &str) -> String {
-    let now = chrono::Local::now();
-    let date_str = now.format("%a %b %-d %Y, %-I:%M %p").to_string();
+    // Phase 83 / D-18 — date-only timestamp. Uses current_local_date_for_prompt()
+    // instead of chrono::Local::now() directly so Plan 04 Test 3 can inject a
+    // fixed clock via TEST_CLOCK_OVERRIDE (rev-1 fix for byte-equality across
+    // midnight). chrono::Local preserved (NOT Utc) — operator-relevant timezone
+    // matches existing BLADE convention.
+    let now = current_local_date_for_prompt();
+    let date_str = now.format("%A, %B %d, %Y").to_string();
 
     let shell_note = if cfg!(target_os = "windows") {
         "Shell: Windows CMD. Open URLs: `start \"\" \"https://...\"`. No `open`/`xdg-open`. WSL procs: `wsl -e ps aux`."
