@@ -27,6 +27,54 @@ pub type ApprovalMap = Arc<Mutex<StdHashMap<String, oneshot::Sender<bool>>>>;
 pub(crate) static CHAT_CANCEL: AtomicBool = AtomicBool::new(false);
 static CHAT_INFLIGHT: AtomicBool = AtomicBool::new(false);
 
+// ── Phase 83 / D-15 — active session_id thread-local ──────────────────────
+//
+// `brain::build_system_prompt_for_model` reads this to key the per-session
+// prompt cache. `send_message_stream_inline` sets this AFTER
+// SessionWriter::new_with_id resolves the canonical session_id String
+// (see commands.rs:~1047), then resets via a Drop guard at end-of-function
+// so non-chat callers (voice / dev tools / tests) on the same thread don't
+// inherit a stale session_id.
+//
+// Falls back to "_unscoped_" when not set — non-chat callers use that
+// single shared cache slot. Acceptable because voice / dev paths aren't
+// perf-sensitive and the cache miss-rebuild is cheap.
+//
+// rev-1 BLOCKER 3: The thread-local is set with the CANONICAL session_id
+// String from SessionWriter::new_with_id, NOT the Option<String>
+// conversation_id parameter from the frontend. For fresh chats, the
+// SessionWriter-generated ULID is the right key — using "_unscoped_" for
+// fresh chats would collide across concurrent sessions and break Phase 84's
+// SQLite restore (keyed by SessionWriter's session_id).
+thread_local! {
+    static CURRENT_SESSION_ID: std::cell::RefCell<String> =
+        std::cell::RefCell::new("_unscoped_".to_string());
+}
+
+/// Phase 83 — read the active session_id for the current Tokio task /
+/// thread. Returns `"_unscoped_"` when not set.
+pub fn current_session_id() -> String {
+    CURRENT_SESSION_ID.with(|cell| cell.borrow().clone())
+}
+
+/// Phase 83 — set the active session_id. Called by
+/// `send_message_stream_inline` AFTER SessionWriter::new_with_id resolves
+/// the canonical session_id String.
+pub(crate) fn set_current_session_id(session_id: &str) {
+    CURRENT_SESSION_ID.with(|cell| {
+        *cell.borrow_mut() = session_id.to_string();
+    });
+}
+
+/// Phase 83 — reset the active session_id back to "_unscoped_". Called at
+/// the end of `send_message_stream_inline` (defensive — prevents bleed if
+/// the same OS thread later services a non-chat call). The Drop guard in
+/// send_message_stream_inline ensures this fires on every exit path including
+/// panic.
+pub(crate) fn reset_current_session_id() {
+    set_current_session_id("_unscoped_");
+}
+
 // ---------------------------------------------------------------------------
 // Phase 4 Plan 04-01 (D-93, D-100): streaming-window registry.
 //
@@ -1058,6 +1106,34 @@ pub(crate) async fn send_message_stream_inline(
             (crate::session::log::SessionWriter::no_op(), String::new())
         }
     };
+    // ─── Phase 83 / D-15 (rev-1 BLOCKER 3 fix) — thread-local session_id ───
+    //
+    // Sourced from the CANONICAL `session_id: String` bound by
+    // SessionWriter::new_with_id above. This is the same identifier used by:
+    //   - The JSONL forensic log filename (session_writer)
+    //   - BL-01 CONVERSATION_STATES registry (loop_engine.rs)
+    //   - run_loop's per-conversation cost/latch/stuck buckets (line ~2106)
+    //   - Phase 84's SQLite prompt-restore key (future phase)
+    //
+    // Sourcing from the Option<String> conversation_id parameter (the
+    // pre-rev-1 approach) would collide across concurrent fresh chats
+    // (all keyed under "_unscoped_") and desync with SessionWriter.
+    crate::commands::set_current_session_id(&session_id);
+
+    // Defensive reset on scope exit (panic-safe). The Drop guard fires on
+    // every exit path — early Err returns, await-cancel unwinds, and
+    // panic-unwinds — so non-chat callers on the same OS thread aren't
+    // polluted with this turn's session_id.
+    struct SessionIdResetGuard;
+    impl Drop for SessionIdResetGuard {
+        fn drop(&mut self) {
+            // Phase 83 — restore the thread-local to "_unscoped_" so the next
+            // non-chat caller on this thread gets the safe default.
+            crate::commands::reset_current_session_id();
+        }
+    }
+    let _session_id_reset_guard = SessionIdResetGuard;
+
     // First JSONL line: SessionMeta. Skipped silently when the writer is
     // disabled or in no-op mode (SessionWriter::append checks `enabled`).
     //
@@ -2067,6 +2143,19 @@ pub(crate) async fn send_message_stream_inline(
                 summary_first_chars: summary_excerpt,
                 timestamp_ms: crate::session::log::now_ms(),
             });
+            // ─── Phase 83 / D-12 (rev-1 BLOCKER 3 fix) — invalidate prompt cache ───
+            //
+            // Compression altered the conversation; the next chat turn must
+            // rebuild the system prompt against fresh memory (D-11 reloads
+            // memory from disk inside invalidate_system_prompt).
+            //
+            // Argument is the CANONICAL `session_id: String` bound at
+            // commands.rs:~1047 by SessionWriter::new_with_id, NOT the
+            // Option<String> conversation_id parameter from the frontend.
+            // Using the canonical id ensures the cache key matches what
+            // build_system_prompt_for_model reads via current_session_id()
+            // (which is also seeded from this same String by the Drop guard above).
+            crate::brain::invalidate_system_prompt(&session_id);
         }
     }
 
