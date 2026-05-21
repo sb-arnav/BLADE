@@ -57,6 +57,7 @@ mod authority_engine;
 mod agents;
 mod automation;
 pub mod brain;       // Phase 53 v2.2 — pub so presence_integration test can call build_presence_state_block
+pub mod brain_system_prompt_cache; // Phase 83 — per-session prompt cache (D-01..D-03)
 mod browser_native;
 mod capability_probe;
 mod character;
