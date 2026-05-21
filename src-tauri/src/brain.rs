@@ -241,17 +241,79 @@ pub fn build_system_prompt_for_model(
     message_count: usize,
     anchor_injections: &[(String, String)],
 ) -> String {
+    // Phase 83 / D-15 — fetch the active session_id (falls back to
+    // "_unscoped_" for non-chat callers like voice / tests / dev tools).
+    // Set BY send_message_stream_inline AFTER SessionWriter::new_with_id
+    // resolves the canonical session_id String (rev-1 BLOCKER 3 fix —
+    // see Task 03.2 Sub-step B in 83-03-PLAN.md).
+    let session_id = crate::commands::current_session_id();
+
+    // Phase 83 / D-14 — cache hit path.
+    if let Some(cached) = crate::brain_system_prompt_cache::get_cached(&session_id) {
+        crate::brain_system_prompt_cache::increment_hit_count();
+        return cached;
+    }
+
+    // Phase 83 / D-16 — CTX-07 panic discipline. Wrap the new three-tier
+    // builder in catch_unwind. On panic → log + fall through to the legacy
+    // String-returning `build_system_prompt_inner` (byte-equivalent to
+    // pre-Phase-83 behavior). DO NOT cache the fallback output — if
+    // build_system_prompt_parts panicked, something is broken; we don't want
+    // to lock in a corrupt prompt.
     let tier = model_tier(provider, model);
-    build_system_prompt_inner(
-        tools,
-        user_query,
-        vector_store,
-        &tier,
-        provider,
-        model,
-        message_count,
-        anchor_injections,
-    )
+    let parts_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        maybe_force_panic_for_test();
+        build_system_prompt_parts(
+            tools, user_query, vector_store, provider, model, message_count, anchor_injections,
+        )
+    }));
+
+    match parts_result {
+        Ok(parts) => {
+            let joined = parts.join();
+            crate::brain_system_prompt_cache::set_cached(&session_id, joined.clone());
+            crate::brain_system_prompt_cache::increment_miss_count();
+            joined
+        }
+        Err(_panic) => {
+            eprintln!(
+                "[Phase83] build_system_prompt_parts panicked for session {}; falling through to legacy single-string build path (CTX-07)",
+                session_id
+            );
+            // Dumb path — legacy single-String builder. No caching on this path.
+            // Plan 04 Test 7 asserts the cache is NOT populated on this path.
+            build_system_prompt_inner(
+                tools, user_query, vector_store, &tier, provider, model, message_count, anchor_injections,
+            )
+        }
+    }
+}
+
+// ── Phase 83 / D-11 + D-12 — cache invalidation ───────────────────────────
+//
+// Called by `commands::compress_conversation_smart` post-success (the single
+// Phase 83 wire site per D-12). The `session_id` argument MUST be the
+// canonical String from SessionWriter::new_with_id (commands.rs:~1047),
+// NOT the Option<String> conversation_id parameter — see Plan 03 Objective
+// "rev-1 BLOCKER 3" for full rationale. Phase 84 adds a SQLite-row clear
+// here; Phase 86 adds memory-context-fence invalidation here.
+//
+// Two operations (D-11):
+//   1. clear_cached(session_id)  — drop the cached prompt
+//   2. load_memory_blocks()       — disk-to-memory refresh (the return value
+//      is discarded; the side effect is reloading the in-process memory
+//      snapshot so the NEXT prompt build sees fresh memory blocks)
+//
+// Empty session_id is acceptable — `clear_cached` no-ops on empty.
+
+/// Phase 83 — invalidate the cached system prompt for a session AND reload
+/// memory from disk. Idempotent. Safe to call multiple times. The next
+/// `build_system_prompt_for_model` call for this session_id will rebuild.
+pub fn invalidate_system_prompt(session_id: &str) {
+    crate::brain_system_prompt_cache::clear_cached(session_id);
+    // Memory reload — disk → in-process snapshot. The MemoryBlocks return
+    // value is intentionally discarded; the side effect is the disk read.
+    let _ = crate::memory::load_memory_blocks();
 }
 
 #[allow(dead_code)]
@@ -371,6 +433,34 @@ thread_local! {
     pub static TEST_CLOCK_OVERRIDE: std::cell::RefCell<Option<chrono::DateTime<chrono::Local>>>
         = std::cell::RefCell::new(None);
 }
+
+// ── Phase 83 / D-17 — CTX-07 panic regression seam ─────────────────────────
+// Set to `true` in a test to force `build_system_prompt_parts` to panic via
+// `crate::brain::maybe_force_panic_for_test()` at the top of the catch_unwind
+// closure in `build_system_prompt_for_model`.
+// Plan 04's `ctx_07_panic_falls_through` test uses this seam to exercise the
+// catch_unwind dumb-path fallback in `build_system_prompt_for_model`.
+#[cfg(test)]
+thread_local! {
+    pub static SYSTEM_PROMPT_PARTS_FORCE_PANIC: std::cell::RefCell<bool> =
+        std::cell::RefCell::new(false);
+}
+
+// ── Phase 83 / D-17 — CTX-07 panic injection helper (test-only) ────────────
+// Called from inside the `catch_unwind` closure in
+// `build_system_prompt_for_model`. In production builds (no `cfg(test)`) the
+// function compiles down to a no-op — zero runtime cost.
+#[cfg(test)]
+fn maybe_force_panic_for_test() {
+    SYSTEM_PROMPT_PARTS_FORCE_PANIC.with(|cell| {
+        if *cell.borrow() {
+            panic!("[Phase83] forced panic via SYSTEM_PROMPT_PARTS_FORCE_PANIC test seam");
+        }
+    });
+}
+#[cfg(not(test))]
+#[inline(always)]
+fn maybe_force_panic_for_test() {}
 
 /// Phase 83 — get the current local-time DateTime for prompt-text generation.
 /// In test builds, honors `TEST_CLOCK_OVERRIDE` when `Some`. In production
