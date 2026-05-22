@@ -17,7 +17,7 @@ import type { GitStyle } from '@/lib/tauri/dev_tools';
 import './dev-tools.css';
 import './dev-tools-rich-a.css';
 
-const DEFAULT_REPO = '/home/user/blade';
+const DEFAULT_REPO = '';
 
 function formatTimestamp(ts: number): string {
   if (!Number.isFinite(ts)) return '—';
@@ -216,7 +216,7 @@ export function GitPanel() {
               mono
               value={mineRepo}
               onChange={(e) => setMineRepo(e.target.value)}
-              placeholder="/home/user/blade"
+              placeholder="/path/to/repo"
               aria-label="Repository path"
               data-testid="git-mine-repo-input"
             />

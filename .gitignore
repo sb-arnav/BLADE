@@ -51,3 +51,26 @@ tests/evals/history.jsonl
 # Phase 23 — Verifiable Reward (REWARD-04): per-turn composite reward record.
 # Created at first runtime by reward::record_reward; same gitkeep posture.
 tests/evals/reward_history.jsonl
+
+# Dev/operator-only files — kept on local disk, removed from the public repo.
+# These are planning, brainstorming, and AI-operator material, not needed by
+# anyone installing or contributing to the application.
+.planning/
+.superpowers/
+.claude/
+docs/launch/
+docs/superpowers/
+docs/design/
+AGENT_OPERATING_MODE.md
+CLAUDE.md
+DOCS.md
+BLADE_CONTEXT.md
+BRIDGE.md
+VISION.md
+
+# Stale source backup — superseded by src/
+src.bak/
+
+# Python bytecode
+__pycache__/
+*.pyc

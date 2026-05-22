@@ -1,11 +1,10 @@
 //! Phase 46 — HUNT-10 — OAuth scaffolds.
 //! Phase 50 — OAUTH-COVERAGE — Slack + GitHub promoted from stubs to full impls.
 //!
-//! Per `.planning/V2-AUTONOMOUS-HANDOFF.md` §1: BLADE is a product, not a tool
-//! for Arnav. Real "click Allow on Google's screen" happens on each end-user's
-//! first run on their machine. Build-time correctness is the URL/token logic
-//! against a localhost mock OAuth server; we do NOT authenticate against real
-//! Arnav-account services.
+//! BLADE is a product, not a single-user tool. Real "click Allow on Google's
+//! screen" happens on each end-user's first run on their machine. Build-time
+//! correctness is the URL/token logic against a localhost mock OAuth server;
+//! we do NOT authenticate against real user-account services.
 //!
 //! Scope:
 //!   - `gmail` (v2.0 PRIMARY) — full impl + integration test against mock server.

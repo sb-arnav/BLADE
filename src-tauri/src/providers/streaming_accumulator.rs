@@ -4,9 +4,8 @@
 //! pattern that simultaneously fixes BLADE's v1.1 "40 calls, no UI" regression
 //! class AND enables Hermes-format tool dispatch through the same machinery.
 //!
-//! Architecture (described in own words, pattern reference:
-//! reference-impl `rusty-claude-cli/src/main.rs:4200-4250` — MIT, NousResearch/
-//! Hermes-Function-Calling `utils.py:92` — MIT):
+//! Architecture (described in own words; pattern reference:
+//! NousResearch Hermes-Function-Calling `utils.py:92` — MIT):
 //!
 //! State machine, per assistant turn:
 //! ```

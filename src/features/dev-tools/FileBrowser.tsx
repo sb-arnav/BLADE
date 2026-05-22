@@ -42,7 +42,7 @@ import './dev-tools.css';
 import './dev-tools-rich-a.css';
 
 type TabKey = 'files' | 'projects';
-const HOME_FALLBACK = '/home/user';
+const HOME_FALLBACK = '/';
 // 200KB truncation threshold per D-173 — increased in 200KB steps via "Load more".
 const PREVIEW_STEP = 200 * 1024;
 
@@ -654,7 +654,7 @@ export function FileBrowser() {
               mono
               value={indexPath}
               onChange={(e) => setIndexPath(e.target.value)}
-              placeholder="/home/user/my-project"
+              placeholder="/path/to/project"
               aria-label="Project absolute path"
             />
           </label>

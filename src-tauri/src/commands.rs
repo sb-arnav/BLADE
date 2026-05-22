@@ -1883,10 +1883,7 @@ pub(crate) async fn send_message_stream_inline(
     // all (no MCP servers, no native tools, no Skills-MD active), the streaming
     // path runs unchanged.
     //
-    // @see .planning/decisions.md 2026-05-17 — HARNESS-REBUILD-ON-CLAW position
-    // @see .planning/research/v2.3-competitor-scan.md — pattern catalogue
-    // @see _graveyard/2026-05-05/OP_SETUP/rust/crates/runtime/src/conversation.rs:335
-    //      — reference-impl (Apache-2) reference implementation
+    // Reference: streaming-accumulator pattern (see providers/streaming_accumulator.rs).
     if tools.is_empty() {
         // Phase 33 / LOOP-05 — gap closed (was Phase 18 KNOWN GAP at this
         // location). The fast-streaming branch now receives an identity

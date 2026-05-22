@@ -21,7 +21,7 @@ Nothing yet.
 
 **Phase 62 -- TOOL-LOOP-ALWAYS**
 - Removed the `is_conversational` heuristic at `commands.rs:1822`. Gate is now `if tools.is_empty()` only — any tool configured (native, MCP, Skills-MD) routes through `loop_engine::run_loop`. Forge can now fire on conversational prompts.
-- Reference architecture pointer in comments: reference-impl `runtime/src/conversation.rs:335` (MIT) is the canonical Rust example. v2.4 will refactor into a dedicated streaming accumulator module per the deep source-read findings.
+- Reference architecture pointer in comments: a public MIT Rust CLI reference implementation for the canonical streaming pattern. v2.4 will refactor into a dedicated streaming accumulator module per the deep source-read findings.
 - Commit `ed299ef`.
 
 **Phase 63 -- FORGE-GITHUB-FIRST (MVP)**
@@ -65,7 +65,7 @@ Nothing yet.
 - cargo test --lib forge_github_search: 6/6 passed
 - verify:all: green (38 gates), OEVAL-01c v1.4 carry-forward tolerated explicitly via EXPECTED_FAILURES
 
-**v2.4 = HERMES-PARITY** scaffolded in parallel. Deep source-read agent read the actual Hermes Function Calling repo, DeepHermes-Atropos model card, and reference-impl Rust source directly (not abstracts). Report at `.planning/research/v2.4-hermes-source-read.md`. 5 phases (68-72): HERMES-GRAMMAR, STREAMING-ACCUMULATOR, HERMES-PROMPT, LOCAL-HERMES, CLOSE. Operator destination: "ask it to do something and it will get it done."
+**v2.4 = HERMES-PARITY** scaffolded in parallel. Deep source-read agent read the actual Hermes Function Calling repo and DeepHermes-Atropos model card directly (not abstracts). 5 phases (68-72): HERMES-GRAMMAR, STREAMING-ACCUMULATOR, HERMES-PROMPT, LOCAL-HERMES, CLOSE. Operator destination: "ask it to do something and it will get it done."
 
 ---
 

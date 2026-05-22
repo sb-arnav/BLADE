@@ -13,8 +13,8 @@
 //!   https://www.googleapis.com/auth/gmail.send
 //!   https://www.googleapis.com/auth/userinfo.email
 //!
-//! Per V2-AUTONOMOUS-HANDOFF.md §1: BLADE is a product. Each user OAuths on
-//! their own machine; we never hold Arnav's tokens at build time.
+//! BLADE is a product. Each user OAuths on
+//! their own machine; we never hold the user's tokens at build time.
 
 use super::{OAuthConfig, OAuthToken};
 use serde::Deserialize;

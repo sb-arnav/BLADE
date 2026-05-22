@@ -6,7 +6,7 @@
 ///   - File scanner (every 5 min): scans Documents, Desktop, and home dir
 ///     for files modified in the last hour and derives work patterns.
 ///
-/// Also feeds the persona engine: if Arnav spends >2h/day in VS Code on .rs
+/// Also feeds the persona engine: if the user spends >2h/day in VS Code on .rs
 /// files, `developer` and `rust_user` traits get upserted at 0.9. Chrome
 /// time increases `researcher` etc.
 ///
@@ -337,7 +337,7 @@ fn build_context_string(
     _cutoff_1h: i64,
 ) -> String {
     let mut lines: Vec<String> = Vec::new();
-    lines.push("## What Arnav is doing right now".to_string());
+    lines.push("## What the user is doing right now".to_string());
 
     // Active app
     if let Some((app, title, ts)) = latest {

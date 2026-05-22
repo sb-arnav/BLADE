@@ -12,9 +12,9 @@
 ///   - Active context (what the user is working on right now)
 ///
 /// This means a spawned Claude Code agent knows:
-///   "I'm working for Arnav, he prefers direct communication, he's currently
-///    working on the BLADE project in Rust, his coding conventions are in
-///    CLAUDE.md, and he doesn't like over-explained code."
+///   "I'm working for the user, who prefers direct communication, is currently
+///    working on the BLADE project in Rust, keeps coding conventions in the
+///    project docs, and dislikes over-explained code."
 ///
 /// Without inheritance, spawned agents are blank slates that make generic
 /// decisions instead of user-specific ones.
