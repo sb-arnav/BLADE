@@ -144,7 +144,7 @@ Nothing yet.
 - LAUNCH-INSTALL-VISIBLE: `curl|sh` + `iwr|iex` install commands above the fold.
 - LAUNCH-DEMO-GIF: `docs/launch/forge-demo.md` + `docs/launch/assets/` placeholder.
 - LAUNCH-HN-POST: `docs/launch/show-hn-post.md` — Show HN title (with load-bearing "(open source)" parenthetical), body, 6-question comment-thread prep.
-- LAUNCH-outreach-DM: `docs/launch/outreach-dm.md` — 48-hour pre-HN outreach.
+- LAUNCH-OUTREACH: pre-HN outreach prep.
 - LAUNCH-TWEET-THREAD: `docs/launch/launch-tweet-thread.md` — 3-tweet sequence + 7-day follow-up plan.
 - Recording the demo + posting are operator-owned per V2-AUTONOMOUS-HANDOFF.md §1.
 - Commits `76e149f`, `947cb14`, `bfb047b`, `409fdea`, `c5490ca`, `98c5b2b`, `591f516`, `f1e9313`.

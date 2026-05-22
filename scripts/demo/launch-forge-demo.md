@@ -65,7 +65,7 @@
 - [ ] Export to MP4 + GIF. The GIF goes in README (line 3, right under the install command). The MP4 goes on Twitter (the platform compresses to its own format anyway).
 - [ ] Trim to ≤90s for Twitter (75s target gives 15s buffer). Twitter video cap is 2:20 but engagement drops sharply after 1:30.
 - [ ] Drop the MP4 file in `docs/launch/assets/forge-demo.mp4` and the GIF in `docs/launch/assets/forge-demo.gif`. Reference paths are already wired in the README + show-hn-post.md.
-- [ ] Send to Daniel a creator via the DM template at `docs/launch/outreach-dm.md` — 48 hours before Show HN goes up.
+- [ ] Send pre-launch outreach DMs — 48 hours before Show HN goes up.
 - [ ] Then post Show HN per `docs/launch/show-hn-post.md`. Mon or Tue, 10–11am ET.
 - [ ] Cross-post Twitter thread per `docs/launch/launch-tweet-thread.md` 2 hours before the HN post.
 
