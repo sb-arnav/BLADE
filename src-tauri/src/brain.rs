@@ -4521,4 +4521,250 @@ mod tests {
              enforce_budget(keep=4) reduced below floor: {} entries left",
             stable_parts.len());
     }
+
+    // ── Phase 84 / SYSPROMPT-DB — persist/restore unit tests ─────────────────
+    //
+    // 6 tests covering DB-PERSIST, DB-RESTORE, guards, and failure handling.
+    // All require --test-threads=1 (shared process-global cache + counters).
+    //
+    // Isolation: each test uses a unique tempdir pointed at by BLADE_CONFIG_DIR
+    // so blade.db is isolated per test. reset_cache_for_test() wipes L1 + counters.
+    // BLADE_CONFIG_DIR is restored / unset before assertions (cwd-restore discipline).
+
+    /// Shared helpers for Phase 84 tests: spin up an isolated blade.db.
+    fn phase84_temp_db_env(tag: &str) -> (std::path::PathBuf, Option<String>) {
+        let prev = std::env::var("BLADE_CONFIG_DIR").ok();
+        let dir = std::env::temp_dir()
+            .join(format!("blade_p84_{}_{}", tag, std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::env::set_var("BLADE_CONFIG_DIR", &dir);
+        // init_db creates blade.db + runs migrations (adds system_prompt column).
+        let _ = crate::db::init_db();
+        (dir, prev)
+    }
+
+    fn phase84_restore_env(dir: std::path::PathBuf, prev: Option<String>) {
+        match prev {
+            Some(p) => std::env::set_var("BLADE_CONFIG_DIR", p),
+            None => std::env::remove_var("BLADE_CONFIG_DIR"),
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ── Phase 84 Test 1 — DB-PERSIST / D-03 ─────────────────────────────────
+    // After a miss-path build for a real session, sessions.system_prompt
+    // contains the joined prompt verbatim.
+    #[test]
+    fn phase84_persist_writes_row() {
+        reset_cache_for_test();
+        let (dir, prev) = phase84_temp_db_env("persist");
+
+        // Use init_db so the connection has the Phase 84 column from run_migrations.
+        let db_path = crate::config::blade_config_dir().join("blade.db");
+        let conn = crate::db::init_db().unwrap();
+        crate::sessions::SessionManager::new()
+            .upsert_session_with_id(&conn, "s1_persist", None)
+            .unwrap();
+        drop(conn);
+
+        crate::commands::set_current_session_id("s1_persist");
+        let no_tools: Vec<McpTool> = vec![];
+        let built = build_system_prompt_for_model(
+            &no_tools, "q", None, "anthropic", "claude-sonnet-4", 0, &[],
+        );
+
+        // Check the DB BEFORE cleanup (dir still exists at this point).
+        let conn2 = rusqlite::Connection::open(db_path).unwrap();
+        let stored = crate::sessions::get_session_system_prompt(&conn2, "s1_persist").unwrap();
+        drop(conn2);
+
+        // Restore env + cleanup after DB read.
+        crate::commands::reset_current_session_id();
+        phase84_restore_env(dir, prev);
+        reset_cache_for_test();
+
+        assert_eq!(stored, Some(built), "persisted prompt must equal built prompt verbatim");
+    }
+
+    // ── Phase 84 Test 2 — DB-RESTORE / D-04, success criterion #3 ───────────
+    // Persist on turn 1, clear L1 (simulate restart), second build returns
+    // byte-identical prompt AND hit_count advances while miss_count stays at 1.
+    #[test]
+    fn phase84_restore_round_trip() {
+        reset_cache_for_test();
+        let (dir, prev) = phase84_temp_db_env("restore");
+
+        // Use init_db so the connection has the Phase 84 column from run_migrations.
+        let conn = crate::db::init_db().unwrap();
+        crate::sessions::SessionManager::new()
+            .upsert_session_with_id(&conn, "s1_restore", None)
+            .unwrap();
+        drop(conn);
+
+        crate::commands::set_current_session_id("s1_restore");
+        let no_tools: Vec<McpTool> = vec![];
+
+        // Turn 1 — miss path, persists to DB.
+        let built = build_system_prompt_for_model(
+            &no_tools, "q", None, "anthropic", "claude-sonnet-4", 0, &[],
+        );
+        assert_eq!(crate::brain_system_prompt_cache::cache_miss_count(), 1, "turn 1 should be a miss");
+        assert_eq!(crate::brain_system_prompt_cache::cache_hit_count(), 0, "no hits yet");
+
+        // Simulate restart: wipe L1 (DB row persists).
+        crate::brain_system_prompt_cache::clear_all_cached();
+        // (do NOT reset counters — we're verifying miss count stays at 1)
+
+        // Turn 2 — L1 miss but DB hit → restore.
+        let restored = build_system_prompt_for_model(
+            &no_tools, "q", None, "anthropic", "claude-sonnet-4", 0, &[],
+        );
+
+        // Capture counter values BEFORE cleanup (reset_cache_for_test zeros them).
+        let hit_count = crate::brain_system_prompt_cache::cache_hit_count();
+        let miss_count = crate::brain_system_prompt_cache::cache_miss_count();
+
+        // Restore env + cleanup.
+        crate::commands::reset_current_session_id();
+        phase84_restore_env(dir, prev);
+        reset_cache_for_test();
+
+        assert_eq!(restored, built, "restored prompt must be byte-identical to built prompt");
+        assert_eq!(hit_count, 1, "restore must count as a hit");
+        assert_eq!(miss_count, 1, "miss count must stay 1 — no rebuild on restore");
+    }
+
+    // ── Phase 84 Test 3 — D-04: DB miss falls through to rebuild ────────────
+    // Empty DB (row exists but system_prompt is NULL) → rebuild + persist.
+    // miss_count advances; row is now populated.
+    #[test]
+    fn phase84_db_miss_falls_through_to_rebuild() {
+        reset_cache_for_test();
+        let (dir, prev) = phase84_temp_db_env("miss");
+
+        let db_path = crate::config::blade_config_dir().join("blade.db");
+        // Use init_db so the connection has the Phase 84 column from run_migrations.
+        let conn = crate::db::init_db().unwrap();
+        crate::sessions::SessionManager::new()
+            .upsert_session_with_id(&conn, "s_miss", None)
+            .unwrap();
+        // system_prompt is NULL at this point (never persisted).
+        drop(conn);
+
+        crate::commands::set_current_session_id("s_miss");
+        let no_tools: Vec<McpTool> = vec![];
+        let _ = build_system_prompt_for_model(
+            &no_tools, "q", None, "anthropic", "claude-sonnet-4", 0, &[],
+        );
+
+        // Check DB BEFORE cleanup (dir still exists).
+        let conn2 = rusqlite::Connection::open(&db_path).unwrap();
+        let stored = crate::sessions::get_session_system_prompt(&conn2, "s_miss").unwrap();
+        drop(conn2);
+
+        // miss_count == 1 indicates rebuild happened (DB miss → rebuild path).
+        let miss = crate::brain_system_prompt_cache::cache_miss_count();
+
+        crate::commands::reset_current_session_id();
+        phase84_restore_env(dir, prev);
+        reset_cache_for_test();
+
+        assert_eq!(miss, 1, "DB-miss must trigger a rebuild (miss count == 1)");
+        assert!(stored.is_some(), "persist must fire after DB-miss rebuild");
+        assert!(!stored.unwrap().is_empty(), "persisted prompt must be non-empty");
+    }
+
+    // ── Phase 84 Test 4 — RESEARCH OQ-1: empty-string restore guard ─────────
+    // A row with system_prompt = "" is treated as absent → rebuild (not empty restore).
+    #[test]
+    fn phase84_empty_string_restore_guard() {
+        reset_cache_for_test();
+        let (dir, prev) = phase84_temp_db_env("empty");
+
+        // Use init_db so the connection has the Phase 84 column from run_migrations.
+        let conn = crate::db::init_db().unwrap();
+        crate::sessions::SessionManager::new()
+            .upsert_session_with_id(&conn, "s_empty", None)
+            .unwrap();
+        // Force empty string into system_prompt.
+        crate::sessions::set_session_system_prompt(&conn, "s_empty", "").unwrap();
+        drop(conn);
+
+        crate::commands::set_current_session_id("s_empty");
+        let no_tools: Vec<McpTool> = vec![];
+        let result = build_system_prompt_for_model(
+            &no_tools, "q", None, "anthropic", "claude-sonnet-4", 0, &[],
+        );
+        let miss_count = crate::brain_system_prompt_cache::cache_miss_count();
+
+        crate::commands::reset_current_session_id();
+        phase84_restore_env(dir, prev);
+        reset_cache_for_test();
+
+        // Empty string treated as absent → rebuild (miss), NOT a verbatim empty restore.
+        assert_eq!(miss_count, 1, "empty string must trigger rebuild (miss), not restore");
+        assert!(!result.is_empty(), "result must be a real rebuilt prompt, not empty");
+    }
+
+    // ── Phase 84 Test 5 — RESEARCH Pitfall 4: _unscoped_ sentinel ───────────
+    // session_id "_unscoped_" skips all DB ops — no row created, no panic.
+    #[test]
+    fn phase84_unscoped_session_skips_db() {
+        reset_cache_for_test();
+        let (dir, prev) = phase84_temp_db_env("unscoped");
+
+        // Do NOT create any "_unscoped_" row.
+        crate::commands::reset_current_session_id(); // sets "_unscoped_"
+        let no_tools: Vec<McpTool> = vec![];
+        let result = build_system_prompt_for_model(
+            &no_tools, "q", None, "anthropic", "claude-sonnet-4", 0, &[],
+        );
+
+        // Use init_db so the connection has the Phase 84 migration columns.
+        let conn = crate::db::init_db().unwrap();
+        let stored = crate::sessions::get_session_system_prompt(&conn, "_unscoped_").unwrap();
+        drop(conn);
+
+        crate::commands::reset_current_session_id();
+        phase84_restore_env(dir, prev);
+        reset_cache_for_test();
+
+        assert!(!result.is_empty(), "build must return a non-empty prompt even for unscoped");
+        assert_eq!(stored, None, "no DB write must occur for '_unscoped_' session");
+    }
+
+    // ── Phase 84 Test 6 — DB-PERSIST / D-05: persist failure is non-fatal ───
+    // Delete blade.db after init so the UPDATE has no sessions table.
+    // Build must still return a non-empty prompt without panicking.
+    #[test]
+    fn phase84_persist_failure_is_nonfatal() {
+        reset_cache_for_test();
+        let (dir, prev) = phase84_temp_db_env("fail");
+
+        let db_path = crate::config::blade_config_dir().join("blade.db");
+        // Use init_db so the connection has the Phase 84 column from run_migrations.
+        let conn = crate::db::init_db().unwrap();
+        crate::sessions::SessionManager::new()
+            .upsert_session_with_id(&conn, "s_fail", None)
+            .unwrap();
+        drop(conn);
+
+        // Delete the DB file so the persist Connection::open recreates an empty
+        // file (no sessions table → UPDATE errors silently per D-05).
+        let _ = std::fs::remove_file(&db_path);
+
+        crate::commands::set_current_session_id("s_fail");
+        let no_tools: Vec<McpTool> = vec![];
+        // Must not panic.
+        let result = build_system_prompt_for_model(
+            &no_tools, "q", None, "anthropic", "claude-sonnet-4", 0, &[],
+        );
+
+        phase84_restore_env(dir, prev);
+        crate::commands::reset_current_session_id();
+        reset_cache_for_test();
+
+        assert!(!result.is_empty(), "build must return a non-empty prompt even when persist fails");
+    }
 }

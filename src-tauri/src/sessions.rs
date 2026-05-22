@@ -644,3 +644,38 @@ fn now_ms() -> i64 {
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0)
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── Phase 84 / SYSPROMPT-DB — SQL round-trip test (D-07) ─────────────────
+    // Verifies set_session_system_prompt + get_session_system_prompt against an
+    // in-memory DB with the Phase 84 migration applied (the column exists).
+    // Proves verbatim round-trip AND missing-row → Ok(None) via .optional().
+    #[test]
+    fn phase84_sessions_sql_round_trip() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::db::run_migrations(&conn).unwrap();
+
+        // Create a session row so the UPDATE has a target.
+        SessionManager::new()
+            .upsert_session_with_id(&conn, "s7", None)
+            .unwrap();
+
+        // Write + read back verbatim.
+        set_session_system_prompt(&conn, "s7", "PROMPT-BYTES").unwrap();
+        let result = get_session_system_prompt(&conn, "s7").unwrap();
+        assert_eq!(result, Some("PROMPT-BYTES".to_string()),
+            "verbatim round-trip: stored value must equal what was written");
+
+        // Missing row → Ok(None) via .optional().
+        let missing = get_session_system_prompt(&conn, "no_such_session").unwrap();
+        assert_eq!(missing, None,
+            "missing row must return Ok(None), not an error");
+    }
+}

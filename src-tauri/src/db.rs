@@ -631,13 +631,6 @@ pub(crate) fn run_migrations(conn: &Connection) -> Result<(), String> {
         let _ = conn.execute(sql, []);
     }
 
-    // ── Phase 84 / SYSPROMPT-DB (v2.5 — 2026-05-22) ──
-    // Per-session L2 cache for the assembled system prompt. Nullable: NULL = no
-    // cached prompt (first turn after upgrade or post-invalidate) → fall through
-    // to rebuild. ALTER ADD COLUMN is not IF NOT EXISTS-safe; the error on a
-    // duplicate column is harmless and ignored (matches swarm_upgrades above).
-    let _ = conn.execute("ALTER TABLE sessions ADD COLUMN system_prompt TEXT", []);
-
     // ── Phase 58 / MEMORY-SIMPLIFY (v2.2 — 2026-05-14) ──
     // Vector retrieval was removed in favor of BM25 + KG. The on-disk
     // `vector_entries.embedding` column survives (non-destructive — keeps
@@ -742,6 +735,15 @@ pub(crate) fn run_migrations(conn: &Connection) -> Result<(), String> {
         ",
     )
     .map_err(|e| format!("DB error (session schema): {}", e))?;
+
+    // ── Phase 84 / SYSPROMPT-DB (v2.5 — 2026-05-22) ──
+    // Per-session L2 cache for the assembled system prompt. Nullable: NULL = no
+    // cached prompt (first turn after upgrade or post-invalidate) → fall through
+    // to rebuild. ALTER ADD COLUMN is not IF NOT EXISTS-safe; the error on a
+    // duplicate column is harmless and ignored (matches swarm_upgrades above).
+    // Placed AFTER the session-schema execute_batch above so the sessions table
+    // exists before the ALTER runs (fresh-DB ordering requirement).
+    let _ = conn.execute("ALTER TABLE sessions ADD COLUMN system_prompt TEXT", []);
 
     Ok(())
 }
@@ -1560,11 +1562,18 @@ mod tests {
         let conn = test_db();
 
         track_event(&conn, "app_open", None).unwrap();
-        track_event(&conn, "message_sent", Some("{\"model\": \"gpt-4\"}")).unwrap();
+        // Insert second event 1ms later so DESC order is deterministic.
+        // Using explicit SQL so we can control the timestamp without a sleep.
+        conn.execute(
+            "INSERT INTO analytics_events (event_type, timestamp, metadata)
+             VALUES ('message_sent', (SELECT MAX(timestamp) + 1 FROM analytics_events), '{\"model\": \"gpt-4\"}')",
+            [],
+        ).unwrap();
 
         let events = get_events_since(&conn, 0).unwrap();
         assert_eq!(events.len(), 2);
-        assert_eq!(events[0].event_type, "message_sent"); // DESC order
+        // DESC order: the later event (message_sent, +1ms) must be first.
+        assert_eq!(events[0].event_type, "message_sent");
 
         // Prune: set threshold in the far future to delete all
         prune_old_events(&conn, i64::MAX).unwrap();
