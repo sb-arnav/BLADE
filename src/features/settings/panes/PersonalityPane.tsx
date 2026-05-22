@@ -105,7 +105,7 @@ export function PersonalityPane() {
             id="user-name"
             value={userName}
             onChange={(e) => setUserName(e.target.value)}
-            placeholder="Arnav"
+            placeholder="Your name"
             disabled={saving}
           />
         </div>
