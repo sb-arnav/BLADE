@@ -597,6 +597,43 @@ pub fn sessions_fork(
     SessionManager::new().fork_session(&conn, &source_id, fork_point_message_id)
 }
 
+// ── Phase 84 / SYSPROMPT-DB (v2.5) — system-prompt L2 persistence ──
+// Free functions (not SessionManager methods) per CONTEXT D-07: brain.rs
+// opens a short-lived Connection and calls these, keeping it decoupled from
+// raw sessions SQL. Mirror the append_message UPDATE shape (sessions.rs:227).
+
+/// Write-through persist of the assembled system prompt for a session.
+/// UPDATE-only: a non-existent session_id (e.g. "_unscoped_") updates zero
+/// rows and returns Ok — callers guard the sentinel before reaching here.
+pub fn set_session_system_prompt(
+    conn: &Connection,
+    session_id: &str,
+    prompt: &str,
+) -> Result<(), String> {
+    conn.execute(
+        "UPDATE sessions SET system_prompt = ?1 WHERE id = ?2",
+        params![prompt, session_id],
+    )
+    .map_err(|e| format!("set_session_system_prompt: {}", e))?;
+    Ok(())
+}
+
+/// Lazy L2 restore: read the persisted system prompt for a session.
+/// `Ok(None)` when the row is absent OR the column is NULL (via .optional()).
+pub fn get_session_system_prompt(
+    conn: &Connection,
+    session_id: &str,
+) -> Result<Option<String>, String> {
+    conn.query_row(
+        "SELECT system_prompt FROM sessions WHERE id = ?1",
+        params![session_id],
+        |row| row.get::<_, Option<String>>(0),
+    )
+    .optional()
+    .map(|outer| outer.flatten()) // Option<Option<String>> → Option<String>
+    .map_err(|e| format!("get_session_system_prompt: {}", e))
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

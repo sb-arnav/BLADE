@@ -64,7 +64,10 @@ CREATE TABLE IF NOT EXISTS sessions (
     -- A non-null `forked_from` points to the parent session.id; `forked_at_message_id`
     -- pins the message after which the fork diverged.
     forked_from                 TEXT,
-    forked_at_message_id        TEXT
+    forked_at_message_id        TEXT,
+    -- Phase 84 / SYSPROMPT-DB (v2.5): per-session L2 cache of the assembled
+    -- system prompt. Nullable. Applied at boot via run_migrations ALTER.
+    system_prompt               TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_sessions_updated     ON sessions(updated_at DESC);

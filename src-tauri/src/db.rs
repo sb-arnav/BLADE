@@ -631,6 +631,13 @@ pub(crate) fn run_migrations(conn: &Connection) -> Result<(), String> {
         let _ = conn.execute(sql, []);
     }
 
+    // ── Phase 84 / SYSPROMPT-DB (v2.5 — 2026-05-22) ──
+    // Per-session L2 cache for the assembled system prompt. Nullable: NULL = no
+    // cached prompt (first turn after upgrade or post-invalidate) → fall through
+    // to rebuild. ALTER ADD COLUMN is not IF NOT EXISTS-safe; the error on a
+    // duplicate column is harmless and ignored (matches swarm_upgrades above).
+    let _ = conn.execute("ALTER TABLE sessions ADD COLUMN system_prompt TEXT", []);
+
     // ── Phase 58 / MEMORY-SIMPLIFY (v2.2 — 2026-05-14) ──
     // Vector retrieval was removed in favor of BM25 + KG. The on-disk
     // `vector_entries.embedding` column survives (non-destructive — keeps
