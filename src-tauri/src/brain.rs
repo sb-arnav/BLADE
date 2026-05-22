@@ -254,6 +254,42 @@ pub fn build_system_prompt_for_model(
         return cached;
     }
 
+    // Phase 84 / SYSPROMPT-DB — skip ALL DB ops for the voice/test sentinel and
+    // empty ids. UPDATE on "_unscoped_" would hit zero rows and a SELECT would
+    // return nothing, but skipping avoids wasteful opens + false-positive WARNs
+    // in voice mode (RESEARCH Pitfall 4). Matches the empty-id guard in
+    // brain_system_prompt_cache::{get,set}_cached.
+    let db_persist_enabled = session_id != "_unscoped_" && !session_id.is_empty();
+
+    // Phase 84 / SYSPROMPT-DB — D-04 lazy L2 restore. On an L1 miss, BEFORE
+    // rebuilding, try the persisted prompt. A DB hit returns verbatim with NO
+    // rebuild (D-06 trust-invalidation). Counts as a HIT (served without a
+    // rebuild) per D-04 counter semantics — the falsification gate cares about
+    // "served without rebuild," not which tier served it.
+    if db_persist_enabled {
+        let db_path = crate::config::blade_config_dir().join("blade.db");
+        if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+            match crate::sessions::get_session_system_prompt(&conn, &session_id) {
+                // Empty-string guard (RESEARCH OQ-1): treat "" as absent → rebuild.
+                Ok(Some(prompt)) if !prompt.is_empty() => {
+                    crate::brain_system_prompt_cache::set_cached(&session_id, prompt.clone());
+                    crate::brain_system_prompt_cache::increment_hit_count();
+                    return prompt;
+                }
+                Ok(_) => {} // None or empty string — fall through to rebuild
+                Err(e) => {
+                    log::warn!(
+                        "[Phase84] restore system_prompt for session {}: {} — rebuilding",
+                        session_id, e
+                    );
+                    // fall through to rebuild
+                }
+            }
+        }
+        // DB open failure: silently fall through (no DB yet on first boot is
+        // expected, not a warning condition).
+    }
+
     // Phase 83 / D-16 — CTX-07 panic discipline. Wrap the new three-tier
     // builder in catch_unwind. On panic → log + fall through to the legacy
     // String-returning `build_system_prompt_inner` (byte-equivalent to
@@ -273,6 +309,32 @@ pub fn build_system_prompt_for_model(
             let joined = parts.join();
             crate::brain_system_prompt_cache::set_cached(&session_id, joined.clone());
             crate::brain_system_prompt_cache::increment_miss_count();
+            // Phase 84 / SYSPROMPT-DB — D-03 write-through persist. Covers first build
+            // AND post-invalidate rebuild (invalidate clears L1 → next call is a miss →
+            // rebuild → here). D-05: a write failure is WARNING-level + non-fatal — L1
+            // still serves this process; only cross-restart warmth is lost. Never fails
+            // the turn.
+            if db_persist_enabled {
+                let db_path = crate::config::blade_config_dir().join("blade.db");
+                match rusqlite::Connection::open(&db_path) {
+                    Ok(conn) => {
+                        if let Err(e) =
+                            crate::sessions::set_session_system_prompt(&conn, &session_id, &joined)
+                        {
+                            log::warn!(
+                                "[Phase84] persist system_prompt for session {}: {}",
+                                session_id, e
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        log::warn!(
+                            "[Phase84] persist system_prompt: could not open DB for session {}: {}",
+                            session_id, e
+                        );
+                    }
+                }
+            }
             joined
         }
         Err(_panic) => {
