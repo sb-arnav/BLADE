@@ -36,7 +36,7 @@ use tauri::Emitter;
 pub const WHO_YOU_ARE_FILENAME: &str = "who-you-are.md";
 
 /// Phase 56 (TELOS-SYNTH) — the four optimization-target fields BLADE captures
-/// during the hunt and reads on every chat turn. Daniel a creator's PAI calls
+/// during the hunt and reads on every chat turn. The PAI framework calls
 /// this the "telos" block: Mission / Goals / Beliefs / Challenges.
 ///
 /// All fields are optional — synthesis degrades gracefully when the hunt

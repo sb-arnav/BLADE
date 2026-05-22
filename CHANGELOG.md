@@ -73,7 +73,7 @@ Nothing yet.
 
 ### Added (v2.2 -- VISION-Close + Goose-Integrate + Launch-Ready)
 
-> The wedge milestone. Closes the load-bearing VISION gaps (presence observable in chat, setup-as-conversation produces a TELOS-shaped optimization target, held-trio reorganized off main nav), integrates Apache-2 Goose foundations (Provider trait + canonical models registry + SQLite session schema) instead of continuing to maintain bespoke equivalents, cuts memory complexity (embeddings vector layer dropped, BM25 + KG only — matches PAI v5 architecture), and assembles every artifact needed to pull the forge-demo launch trigger (Show HN post, a creator DM, Twitter thread, 75s screencast script, README rewrite). 9 phases (53-61). Scoped 2026-05-14 from a 5-agent parallel research swarm.
+> The wedge milestone. Closes the load-bearing VISION gaps (presence observable in chat, setup-as-conversation produces a TELOS-shaped optimization target, held-trio reorganized off main nav), integrates Apache-2 Goose foundations (Provider trait + canonical models registry + SQLite session schema) instead of continuing to maintain bespoke equivalents, cuts memory complexity (embeddings vector layer dropped, BM25 + KG only — matches PAI v5 architecture), and assembles every artifact needed to pull the forge-demo launch trigger (Show HN post, outreach DM, Twitter thread, 75s screencast script, README rewrite). 9 phases (53-61). Scoped 2026-05-14 from a 5-agent parallel research swarm.
 
 **Phase 53 -- Presence Narrative in Chat**
 - PRESENCE-EMIT: New chat-line kind `presence` on the `BLADE_CHAT_LINE` event stream. Frontend listener in `useChat.tsx` appends as distinct system message styled differently from forge/cost lines.
