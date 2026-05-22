@@ -618,6 +618,21 @@ pub fn set_session_system_prompt(
     Ok(())
 }
 
+/// Clear the persisted system prompt for a session (set to NULL).
+/// Called by `invalidate_system_prompt` so the next build rebuilds rather than
+/// restoring the pre-invalidation (stale) prompt. Non-existent session_id
+/// updates zero rows and returns Ok — callers guard the sentinel.
+pub fn clear_session_system_prompt(
+    conn: &Connection,
+    session_id: &str,
+) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE sessions SET system_prompt = NULL WHERE id = ?1",
+        params![session_id],
+    )?;
+    Ok(())
+}
+
 /// Lazy L2 restore: read the persisted system prompt for a session.
 /// `Ok(None)` when the row is absent OR the column is NULL (via .optional()).
 pub fn get_session_system_prompt(

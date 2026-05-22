@@ -373,6 +373,33 @@ pub fn build_system_prompt_for_model(
 /// `build_system_prompt_for_model` call for this session_id will rebuild.
 pub fn invalidate_system_prompt(session_id: &str) {
     crate::brain_system_prompt_cache::clear_cached(session_id);
+
+    // Phase 84: also clear the L2 DB row so the next build rebuilds rather
+    // than restoring the pre-invalidation (stale) prompt. Without this, the
+    // compress → invalidate → restart → restore sequence serves the pre-compress
+    // prompt verbatim, silently discarding compression from the system-prompt
+    // perspective (see Phase 84 checklist "Invalidate clears DB row").
+    let db_persist_enabled = session_id != "_unscoped_" && !session_id.is_empty();
+    if db_persist_enabled {
+        let db_path = crate::config::blade_config_dir().join("blade.db");
+        match rusqlite::Connection::open(&db_path) {
+            Ok(conn) => {
+                if let Err(e) = crate::sessions::clear_session_system_prompt(&conn, session_id) {
+                    log::warn!(
+                        "[Phase84] invalidate: could not clear system_prompt DB row for session {}: {}",
+                        session_id, e
+                    );
+                }
+            }
+            Err(e) => {
+                log::warn!(
+                    "[Phase84] invalidate: could not open DB for session {}: {}",
+                    session_id, e
+                );
+            }
+        }
+    }
+
     // Memory reload — disk → in-process snapshot. The MemoryBlocks return
     // value is intentionally discarded; the side effect is the disk read.
     let _ = crate::memory::load_memory_blocks();
@@ -4529,7 +4556,7 @@ mod tests {
     //
     // Isolation: each test uses a unique tempdir pointed at by BLADE_CONFIG_DIR
     // so blade.db is isolated per test. reset_cache_for_test() wipes L1 + counters.
-    // BLADE_CONFIG_DIR is restored / unset before assertions (cwd-restore discipline).
+    // BLADE_CONFIG_DIR env var is restored before assertions; tempdir is cleaned up at the same time.
 
     /// Shared helpers for Phase 84 tests: spin up an isolated blade.db.
     fn phase84_temp_db_env(tag: &str) -> (std::path::PathBuf, Option<String>) {
@@ -4766,5 +4793,65 @@ mod tests {
         reset_cache_for_test();
 
         assert!(!result.is_empty(), "build must return a non-empty prompt even when persist fails");
+    }
+
+    // ── Phase 84 Test 7 — invalidate clears DB row → post-invalidate turn rebuilds
+    // Proves that after invalidate_system_prompt, a cold turn (L1 wiped) does NOT
+    // restore from DB (the row was NULLed) but rebuilds instead (miss_count == 2).
+    // Without the CR-01 fix, this test fails: the DB row survives invalidate,
+    // cold turn restores stale prompt, miss_count stays at 1.
+    #[test]
+    fn phase84_invalidate_clears_db_row_forces_rebuild() {
+        reset_cache_for_test();
+        let (dir, prev) = phase84_temp_db_env("invalidate");
+
+        let db_path = crate::config::blade_config_dir().join("blade.db");
+        let conn = crate::db::init_db().unwrap();
+        crate::sessions::SessionManager::new()
+            .upsert_session_with_id(&conn, "s_inv", None)
+            .unwrap();
+        drop(conn);
+
+        crate::commands::set_current_session_id("s_inv");
+        let no_tools: Vec<McpTool> = vec![];
+
+        // Turn 1 — miss path, persists to DB.
+        let _ = build_system_prompt_for_model(
+            &no_tools, "q", None, "anthropic", "claude-sonnet-4", 0, &[],
+        );
+        assert_eq!(crate::brain_system_prompt_cache::cache_miss_count(), 1, "turn 1 must be a miss");
+
+        // Invalidate — must clear both L1 and the DB row (CR-01 fix).
+        invalidate_system_prompt("s_inv");
+
+        // Confirm the DB row is NULL immediately after invalidate.
+        let conn2 = rusqlite::Connection::open(&db_path).unwrap();
+        let after_invalidate = crate::sessions::get_session_system_prompt(&conn2, "s_inv").unwrap();
+        drop(conn2);
+        assert!(
+            after_invalidate.is_none(),
+            "DB row must be NULL after invalidate_system_prompt"
+        );
+
+        // Wipe L1 explicitly to simulate a process restart (invalidate already cleared
+        // it via clear_cached, but clear_all_cached ensures full isolation here).
+        crate::brain_system_prompt_cache::clear_all_cached();
+
+        // Turn 2 — L1 miss, DB miss (row is NULL) → must REBUILD (miss_count == 2).
+        let _ = build_system_prompt_for_model(
+            &no_tools, "q", None, "anthropic", "claude-sonnet-4", 0, &[],
+        );
+
+        let miss = crate::brain_system_prompt_cache::cache_miss_count();
+
+        // Restore env before assertions (BLADE_CONFIG_DIR env var restored; tempdir cleaned up).
+        crate::commands::reset_current_session_id();
+        phase84_restore_env(dir, prev);
+        reset_cache_for_test();
+
+        assert_eq!(
+            miss, 2,
+            "post-invalidate cold turn must rebuild (miss), not restore stale DB row"
+        );
     }
 }
