@@ -7,6 +7,7 @@ pub mod hermes_format; // v2.4 Phase 68 — HERMES-GRAMMAR
 pub mod ollama;
 pub mod openai;
 pub mod streaming_accumulator; // v2.4 Phase 69 — STREAMING-ACCUMULATOR
+pub mod prompt_caching; // Phase 85 — Anthropic cache_control marker injection
 
 use serde::{Deserialize, Serialize};
 
@@ -261,6 +262,30 @@ pub async fn complete_turn_with_max_tokens(
     ).await
 }
 
+/// Phase 85 — Resolve the Anthropic cache TTL for a request, reading config ONCE.
+///
+/// Returns `None` when caching is disabled or the provider/model is not
+/// native-anthropic-compatible (openrouter marker injection is deferred —
+/// this function gates the native Anthropic path only).
+///
+/// Called synchronously at each mod.rs dispatch entry before any async body
+/// builder runs — avoids per-request fs reads inside the tokio streaming hot path
+/// (T-85-05: config read once per dispatch, not once per token).
+fn resolve_anthropic_cache(
+    provider: &str,
+    model: &str,
+    base_url: Option<&str>,
+) -> Option<crate::providers::prompt_caching::CacheTtl> {
+    let cfg = crate::config::load_config().cache;
+    if cfg.enabled
+        && crate::providers::prompt_caching::is_anthropic_compatible(provider, model, base_url)
+    {
+        Some(crate::providers::prompt_caching::CacheTtl::from_config(&cfg.anthropic_cache_ttl))
+    } else {
+        None
+    }
+}
+
 /// Private impl shared by `complete_turn` (override=None → provider default)
 /// and `complete_turn_with_max_tokens` (override=Some(N) → cap at N).
 async fn complete_turn_inner(
@@ -296,11 +321,16 @@ async fn complete_turn_inner(
         }
         return result;
     }
+    // Phase 85: read cache config ONCE here (sync, outside the async body builder)
+    // and resolve to Option<CacheTtl>. Only the native anthropic branch consumes
+    // this; all other branches ignore it (openrouter marker injection is deferred).
+    let cache = resolve_anthropic_cache(provider, model, base_url);
+
     let result = match provider {
         "gemini"     => gemini::complete_ext(api_key, model, messages, tools, max_tokens_override).await,
         "groq"       => groq::complete_ext(api_key, model, messages, tools, max_tokens_override).await,
         "openai"     => openai::complete_ext(api_key, model, messages, tools, base_url, max_tokens_override).await,
-        "anthropic"  => anthropic::complete_ext(api_key, model, messages, tools, max_tokens_override).await,
+        "anthropic"  => anthropic::complete_ext(api_key, model, messages, tools, max_tokens_override, cache).await,
         "ollama"     => ollama::complete(model, messages).await,
         "openrouter" => openai::complete_ext(api_key, model, messages, tools, Some(OPENROUTER_BASE_URL), max_tokens_override).await,
         _            => Err(format!("Unknown provider: {}", provider)),
@@ -580,11 +610,14 @@ pub async fn stream_text(
     if base_url.is_some() && provider != "ollama" {
         return openai::stream_text(app, api_key, model, messages, base_url).await;
     }
+    // Phase 85: read cache config ONCE (sync, before the async match) and thread
+    // Option<CacheTtl> into the anthropic branch only.
+    let cache = resolve_anthropic_cache(provider, model, base_url);
     match provider {
         "gemini"     => gemini::stream_text(app, api_key, model, messages).await,
         "groq"       => groq::stream_text(app, api_key, model, messages).await,
         "openai"     => openai::stream_text(app, api_key, model, messages, base_url).await,
-        "anthropic"  => anthropic::stream_text(app, api_key, model, messages).await,
+        "anthropic"  => anthropic::stream_text(app, api_key, model, messages, cache).await,
         "ollama"     => ollama::stream_text(app, model, messages).await,
         "openrouter" => openai::stream_text(app, api_key, model, messages, Some(OPENROUTER_BASE_URL)).await,
         _            => Err(format!("Unknown provider: {}", provider)),
@@ -608,8 +641,16 @@ pub async fn stream_text_thinking(
     let model    = bare_model.as_str();
     let api_key  = if resolved_key.is_empty() { api_key } else { resolved_key.as_str() };
 
+    // Phase 85: read cache config ONCE (sync, outside the async fn) and thread
+    // Option<CacheTtl> into the anthropic branch.
+    let cache = if provider == "anthropic" {
+        resolve_anthropic_cache(provider, model, None)
+    } else {
+        None
+    };
+
     if provider == "anthropic" {
-        anthropic::stream_text_with_thinking(app, api_key, model, messages, budget_tokens).await
+        anthropic::stream_text_with_thinking(app, api_key, model, messages, budget_tokens, cache).await
     } else {
         // Other providers: regular stream (no thinking support yet)
         stream_text(app, provider, api_key, model, messages, None).await
