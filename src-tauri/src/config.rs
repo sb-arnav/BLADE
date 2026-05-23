@@ -375,6 +375,37 @@ impl Default for ForgeConfig {
     }
 }
 
+// ── Phase 85 — Anthropic cache_control marker config ─────────────────────────
+//
+// Controls whether native Anthropic requests carry cache_control markers
+// (prefix caching). Master toggle + TTL selection. No cross-field constraints.
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct CacheConfig {
+    /// Master toggle. false = skip all cache_control marker application
+    /// (prompt still sent, just uncached). Default true.
+    #[serde(default = "default_cache_enabled")]
+    pub enabled: bool,
+    /// Anthropic cache TTL: "5m" (default, GA) or "1h".
+    /// "5m" → {"type":"ephemeral"}; "1h" → {"type":"ephemeral","ttl":"1h"}.
+    /// No beta header required for either value.
+    #[serde(default = "default_anthropic_cache_ttl")]
+    pub anthropic_cache_ttl: String,
+}
+
+fn default_cache_enabled() -> bool { true }
+fn default_anthropic_cache_ttl() -> String { "5m".to_string() }
+
+impl Default for CacheConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_cache_enabled(),
+            anthropic_cache_ttl: default_anthropic_cache_ttl(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct LoopConfig {
@@ -1015,6 +1046,9 @@ struct DiskConfig {
     // Phase 49 (HUNT-COST-CHAT) — per-session forge cost budget. Default $3.00.
     #[serde(default)]
     forge: ForgeConfig,
+    // Phase 85 — Anthropic cache_control marker toggle + TTL.
+    #[serde(default)]
+    cache: CacheConfig,
     // Legacy field — read for migration, never written
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
@@ -1108,6 +1142,7 @@ impl Default for DiskConfig {
             eval: EvalConfig::default(),
             hunt: HuntConfig::default(),
             forge: ForgeConfig::default(),
+            cache: CacheConfig::default(),
             api_key: None,
         }
     }
@@ -1314,6 +1349,9 @@ pub struct BladeConfig {
     /// semantics as `hunt.budget_usd`. Default $3.00.
     #[serde(default)]
     pub forge: ForgeConfig,
+    /// Phase 85 — Anthropic cache_control marker toggle + TTL.
+    #[serde(default)]
+    pub cache: CacheConfig,
 }
 
 impl BladeConfig {
@@ -1393,6 +1431,7 @@ impl Default for BladeConfig {
             eval: EvalConfig::default(),
             hunt: HuntConfig::default(),
             forge: ForgeConfig::default(),
+            cache: CacheConfig::default(),
         }
     }
 }
@@ -1565,6 +1604,7 @@ pub fn load_config() -> BladeConfig {
         eval: disk.eval,
         hunt: disk.hunt,
         forge: disk.forge,
+        cache: disk.cache,
     }
 }
 
@@ -1652,6 +1692,7 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         eval: config.eval.clone(),
         hunt: config.hunt.clone(),
         forge: config.forge.clone(),
+        cache: config.cache.clone(),
         api_key: None,
     };
 
@@ -2696,5 +2737,35 @@ mod tests {
             .expect("legacy config should parse with defaults");
         assert_eq!(parsed.eval, EvalConfig::default(),
             "missing 'eval' key must fall back to EvalConfig::default()");
+    }
+
+    // -------------------------------------------------------------------------
+    // Phase 85 — CacheConfig tests (MARKERS-CONFIG)
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn phase85_cache_config_defaults() {
+        let cfg = CacheConfig::default();
+        assert_eq!(cfg.enabled, true, "CacheConfig default enabled must be true");
+        assert_eq!(cfg.anthropic_cache_ttl, "5m", "CacheConfig default anthropic_cache_ttl must be '5m'");
+    }
+
+    #[test]
+    fn phase85_cache_config_missing_in_disk_uses_defaults() {
+        // An existing user's config.json that predates Phase 85 has no `cache`
+        // key. The #[serde(default)] on DiskConfig.cache MUST fall back to
+        // CacheConfig::default() (backward-compat invariant — all existing users
+        // upgrade without a manual config edit).
+        let legacy_json = r#"{
+            "provider": "anthropic",
+            "model": "claude-sonnet-4",
+            "onboarded": true
+        }"#;
+        let parsed: DiskConfig = serde_json::from_str(legacy_json)
+            .expect("legacy config without cache key must parse with defaults");
+        assert_eq!(parsed.cache.enabled, true,
+            "missing cache key must fall back to enabled=true");
+        assert_eq!(parsed.cache.anthropic_cache_ttl, "5m",
+            "missing cache key must fall back to anthropic_cache_ttl='5m'");
     }
 }
