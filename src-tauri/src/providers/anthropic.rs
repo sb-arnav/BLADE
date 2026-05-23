@@ -403,9 +403,10 @@ pub async fn stream_text_with_thinking(
         if status.as_u16() == 400
             && (body_text.contains("thinking") || body_text.contains("budget_tokens"))
         {
-            // Non-thinking fallback: pass None for cache (thinking path owns its
-            // own cache param — the fallback stream uses a fresh dispatch). Phase 85.
-            return stream_text(app, api_key, model, messages, None).await;
+            // Non-thinking fallback: same turn, just without thinking — keep the
+            // resolved cache markers so the fallback stream still gets prefix-cache
+            // hits (dropping them would silently lose caching on this turn). Phase 85.
+            return stream_text(app, api_key, model, messages, cache).await;
         }
         return Err(format!("Anthropic API error {}: {}", status, body_text));
     }
