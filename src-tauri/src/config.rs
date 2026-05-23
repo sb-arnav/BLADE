@@ -2271,6 +2271,7 @@ mod tests {
             eval: cfg.eval.clone(),
             hunt: cfg.hunt.clone(),
             forge: cfg.forge.clone(),
+            cache: cfg.cache.clone(),
             api_key: None,
         };
 
