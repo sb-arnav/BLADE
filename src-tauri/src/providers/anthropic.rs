@@ -5,16 +5,26 @@ use super::{AssistantTurn, ConversationMessage, ToolCall, ToolDefinition};
 /// tier-1 (10k input tokens / minute) that's ~1 turn / minute and constant
 /// 429s on agentic flows.
 ///
-/// Cache breakpoints we set:
+/// Cache breakpoints we set (Phase 85 / D-01 / D-02):
 /// 1. End of system prompt — caches the (large, mostly stable) BLADE system
-///    prompt across requests in the same 5-minute window.
-/// 2. End of tools array — caches the tool definitions block, which is
-///    long and rarely changes within a session.
+///    prompt across requests in the same 5-minute window. Because Anthropic
+///    caches everything up to and including the marked block in prefix order
+///    (tools → system → messages), the system-block marker ALSO caches the
+///    tools prefix at no extra breakpoint cost.
+/// 2–4. Last 3 non-system messages — applied by
+///    `prompt_caching::apply_anthropic_cache_control` via a threaded
+///    `Option<CacheTtl>` (config read once at mod.rs dispatch; no fs access
+///    inside these async fns). Per-message markers cover the conversation tail
+///    so cache hits compound across turns.
+///
+/// The old per-tool-array marker (`mark_last_tool_cached`) has been removed
+/// (Phase 85 / D-02): it spent one of the 4 available breakpoint slots on a
+/// block already covered by the system-marker prefix. Net result: same tool
+/// caching, one extra message marker.
 ///
 /// Anthropic charges cached reads at 10% of input rate, so cache hits give
 /// ~10x effective rate-limit headroom after the first request of every
-/// 5-minute window. Prompt caching is GA on Sonnet 4 — no beta header
-/// needed.
+/// 5-minute window. Prompt caching is GA on Sonnet 4 — no beta header needed.
 const EPHEMERAL: &str = "ephemeral";
 
 /// Wrap a string system prompt as a single text block with `cache_control`.
@@ -25,21 +35,6 @@ fn system_block_with_cache(text: String) -> serde_json::Value {
         "text": text,
         "cache_control": { "type": EPHEMERAL },
     }])
-}
-
-/// Mark the last tool in the array with `cache_control`. The cache breakpoint
-/// covers everything up to and including that tool, so all tool defs are
-/// cached as one block.
-fn mark_last_tool_cached(mut tool_defs: Vec<serde_json::Value>) -> Vec<serde_json::Value> {
-    if let Some(last) = tool_defs.last_mut() {
-        if let Some(obj) = last.as_object_mut() {
-            obj.insert(
-                "cache_control".to_string(),
-                serde_json::json!({ "type": EPHEMERAL }),
-            );
-        }
-    }
-    tool_defs
 }
 
 fn build_body(
@@ -63,7 +58,10 @@ fn build_body(
             })
         })
         .collect();
-    let tool_defs = mark_last_tool_cached(tool_defs);
+    // Phase 85 / D-02: no cache_control on tools. Tools are cached as a prefix
+    // side-effect of the system-block marker (Anthropic prefix order: tools →
+    // system → messages). Placing a separate tool-array marker wasted 1 of 4
+    // breakpoint slots for no additional caching benefit.
 
     // Phase 33 / LOOP-04 — caller may force a higher max_tokens (truncation
     // retry path). Default of 4096 is unchanged for every existing call site.
@@ -149,21 +147,33 @@ pub async fn complete(
     messages: &[ConversationMessage],
     tools: &[ToolDefinition],
 ) -> Result<AssistantTurn, String> {
-    complete_ext(api_key, model, messages, tools, None).await
+    // Fast-ack / no-cache path. cache=None: no markers added.
+    complete_ext(api_key, model, messages, tools, None, None).await
 }
 
 /// Phase 33 / LOOP-04 — extended `complete` accepting an explicit
 /// `max_tokens_override` from the smart-loop truncation retry path. When
 /// `None`, the legacy 4096 default applies.
+///
+/// Phase 85: `cache` carries the resolved `CacheTtl` (config read once at
+/// mod.rs dispatch via `resolve_anthropic_cache`; never load_config here).
+/// `None` → no markers applied (disabled, non-anthropic, or fast-ack path).
 pub async fn complete_ext(
     api_key: &str,
     model: &str,
     messages: &[ConversationMessage],
     tools: &[ToolDefinition],
     max_tokens_override: Option<u32>,
+    cache: Option<crate::providers::prompt_caching::CacheTtl>,
 ) -> Result<AssistantTurn, String> {
     let client = super::http_client();
-    let body = build_body(model, messages, tools, max_tokens_override);
+    let mut body = build_body(model, messages, tools, max_tokens_override);
+    // Phase 85: apply cache_control markers when the caller threaded a CacheTtl.
+    // Config was read once at dispatch (mod.rs::resolve_anthropic_cache) —
+    // no fs access here.
+    if let Some(ttl) = cache {
+        crate::providers::prompt_caching::apply_anthropic_cache_control(&mut body, ttl);
+    }
 
     let response = client
         .post("https://api.anthropic.com/v1/messages")
@@ -246,11 +256,14 @@ fn serialize_simple(message: &ConversationMessage) -> Option<serde_json::Value> 
     }
 }
 
+/// Phase 85: `cache` carries the resolved `CacheTtl` (config read once at
+/// mod.rs dispatch; never load_config here). `None` → no markers applied.
 pub async fn stream_text(
     app: &tauri::AppHandle,
     api_key: &str,
     model: &str,
     messages: &[ConversationMessage],
+    cache: Option<crate::providers::prompt_caching::CacheTtl>,
 ) -> Result<(), String> {
     use futures::StreamExt;
     use tauri::Emitter;
@@ -270,6 +283,10 @@ pub async fn stream_text(
     });
     if let Some(sys) = system {
         body["system"] = system_block_with_cache(sys);
+    }
+    // Phase 85: apply cache_control markers after system block is set.
+    if let Some(ttl) = cache {
+        crate::providers::prompt_caching::apply_anthropic_cache_control(&mut body, ttl);
     }
 
     let response = client
@@ -325,12 +342,16 @@ pub async fn stream_text(
 
 /// Stream with extended thinking enabled — Claude reasons before responding.
 /// Emits `chat_thinking` events with thinking text and `chat_token` with the final answer.
+///
+/// Phase 85: `cache` carries the resolved `CacheTtl` (config read once at
+/// mod.rs dispatch; never load_config here). `None` → no markers applied.
 pub async fn stream_text_with_thinking(
     app: &tauri::AppHandle,
     api_key: &str,
     model: &str,
     messages: &[ConversationMessage],
     budget_tokens: u32,
+    cache: Option<crate::providers::prompt_caching::CacheTtl>,
 ) -> Result<(), String> {
     use futures::StreamExt;
     use tauri::Emitter;
@@ -358,6 +379,10 @@ pub async fn stream_text_with_thinking(
     if let Some(sys) = system {
         body["system"] = system_block_with_cache(sys);
     }
+    // Phase 85: apply cache_control markers after system block is set.
+    if let Some(ttl) = cache {
+        crate::providers::prompt_caching::apply_anthropic_cache_control(&mut body, ttl);
+    }
 
     let response = client
         .post("https://api.anthropic.com/v1/messages")
@@ -378,7 +403,9 @@ pub async fn stream_text_with_thinking(
         if status.as_u16() == 400
             && (body_text.contains("thinking") || body_text.contains("budget_tokens"))
         {
-            return stream_text(app, api_key, model, messages).await;
+            // Non-thinking fallback: pass None for cache (thinking path owns its
+            // own cache param — the fallback stream uses a fresh dispatch). Phase 85.
+            return stream_text(app, api_key, model, messages, None).await;
         }
         return Err(format!("Anthropic API error {}: {}", status, body_text));
     }
@@ -546,6 +573,7 @@ impl Provider for AnthropicProvider {
             messages,
             tools,
             self.config.max_tokens_override,
+            None, // Phase 85: goose trait adapter is a legacy path; cache=None (no markers).
         )
         .await
     }
