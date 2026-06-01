@@ -27,6 +27,15 @@
 // Serializes against the module-level ENV_LOCK pattern from
 // `tool_forge::tests` because `BLADE_CONFIG_DIR` is a process-global
 // env var.
+//
+// FEATURE GATE: `forge_tool_from_fixture` + the `*_fixture` seams are
+// `#[cfg(any(test, feature = "voyager-fixture"))]` in tool_forge.rs. The
+// `test` cfg only fires for in-crate unit tests; an integration test links
+// against `blade_lib` built as a plain library, so it needs the
+// `voyager-fixture` feature to see those symbols. Gate the whole file to
+// match — under plain `cargo test` this compiles to an empty crate (no
+// failure); run it with `cargo test --features voyager-fixture`.
+#![cfg(feature = "voyager-fixture")]
 
 use blade_lib::tool_forge::{
     arxiv_abstract_fixture, forge_tool_from_fixture, get_forged_tools, pre_check_existing_tools,
