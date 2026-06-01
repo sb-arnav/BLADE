@@ -351,6 +351,23 @@ fn truncate_to_budget(conversation: &mut Vec<ConversationMessage>, max_tokens: u
     }
 }
 
+/// Phase 86 / RECALL-INJECT — append the recall fence to the LAST user message
+/// in `conv` (the api copy only — NEVER canonical history). The fence string is
+/// `<memory-context>` / `</memory-context>` so the Plan 86-02 scrubber regex
+/// matches an echo. Mutates the matched message in place (does NOT rebuild
+/// UserWithImage — that would clone the large image_base64 payload). No-op if no
+/// user message is present; callers also no-op when `recall` is empty.
+fn inject_memory_fence(conv: &mut Vec<ConversationMessage>, recall: &str) {
+    let fenced = format!("\n\n<memory-context>\n{}\n</memory-context>", recall);
+    for m in conv.iter_mut().rev() {
+        match m {
+            ConversationMessage::User(s) => { s.push_str(&fenced); return; }
+            ConversationMessage::UserWithImage { text, .. } => { text.push_str(&fenced); return; }
+            _ => {}
+        }
+    }
+}
+
 /// Phase 32 / CTX-03 — token-aware safety cap on the keep_recent suffix.
 ///
 /// RESEARCH.md notes that 8 messages × 50k-token bash outputs each = 400k
@@ -1831,11 +1848,10 @@ pub(crate) async fn send_message_stream_inline(
 
     // Capture message count before build_conversation moves the Vec.
     let input_message_count = messages.len();
-    // Phase 33 / LOOP-05 — `mut` (was immutable) so the fast-path branch can
-    // inject `build_fast_path_supplement` at index 0. The tool-loop branch's
-    // shadow-rebind below (was `let mut conversation = conversation;`) is now
-    // redundant.
-    let mut conversation = providers::build_conversation(messages, Some(system_prompt));
+    // Phase 86 / RECALL-INJECT — `conversation` is the CANONICAL turn vector
+    // (clone source below); it is no longer mutated here. The fence + every
+    // downstream mutation lands on the `api_conversation` clone instead.
+    let conversation = providers::build_conversation(messages, Some(system_prompt));
 
     // Check if any message has an image (vision request).
     // Used by the fast-path heuristic: image-only queries are conversational
@@ -1844,6 +1860,31 @@ pub(crate) async fn send_message_stream_inline(
     let _has_image = conversation
         .iter()
         .any(|m| matches!(m, ConversationMessage::UserWithImage { .. }));
+
+    // Phase 86 / RECALL-INJECT — compute recall ONCE per user turn and inject it
+    // into a CLONE so canonical history + last_user_text + JSONL stay fence-free
+    // (success criteria #4/#5). There is NO pre-existing api copy: the working
+    // vector is passed &mut into run_loop AND & into the fast path — fencing it in
+    // place would ride the recall into the replayed/persisted user message.
+    // Clone-or-bleed (RESEARCH §Open risks #1). `api_conversation` is THE working
+    // vector for the entire rest of this turn (fast path, tool loop, AND the
+    // post-loop summary path) — run_loop appends into it and the post-loop block
+    // consumes those appends, so every downstream `conversation` use is the clone.
+    let mut api_conversation = conversation.clone();
+    let hive_is_active = !crate::hive::get_hive_digest().is_empty();
+    let recall = crate::brain::build_memory_recall_block(
+        &last_user_text,
+        Some(&vector_store),
+        hive_is_active,
+    );
+    if !recall.is_empty() {
+        inject_memory_fence(&mut api_conversation, &recall);
+    }
+    // CTX-06 / D-09 Option A — record memory_recall ONCE here (label preserved;
+    // moved off the system-prompt builder in Plan 86-01). Unconditional so the
+    // DoctorPane row still records 0 on the empty-recall path. Single record —
+    // brain.rs records it nowhere (T-86-11).
+    crate::brain::record_section("memory_recall", recall.len());
 
     // Fast path: stream directly when we can confidently skip the tool loop.
     //
@@ -1942,7 +1983,7 @@ pub(crate) async fn send_message_stream_inline(
             }))
             .unwrap_or_default();
             if !supplement.is_empty() {
-                if let Some(ConversationMessage::System(existing)) = conversation.get_mut(0) {
+                if let Some(ConversationMessage::System(existing)) = api_conversation.get_mut(0) {
                     // Merge into existing slow-path system prompt — the
                     // supplement comes first (identity grounding, then the
                     // rich downstream context), separated by a clear delimiter
@@ -1955,7 +1996,7 @@ pub(crate) async fn send_message_stream_inline(
                     // index 0 when the slow-path prompt is non-empty) but
                     // covers the defensive case where commands.rs evolves to
                     // skip the slow-path prompt for some fast-path branch.
-                    conversation.insert(0, ConversationMessage::System(supplement));
+                    api_conversation.insert(0, ConversationMessage::System(supplement));
                 }
             }
         }
@@ -1984,7 +2025,7 @@ pub(crate) async fn send_message_stream_inline(
                 &config.provider,
                 &config.api_key,
                 &config.model,
-                &conversation,
+                &api_conversation,
                 8000, // 8K thinking budget — good balance of depth vs cost
             )
             .await
@@ -2001,7 +2042,7 @@ pub(crate) async fn send_message_stream_inline(
                 &config.provider,
                 &config.api_key,
                 &config.model,
-                &conversation,
+                &api_conversation,
                 config.base_url.as_deref(),
             )
             .await
@@ -2034,7 +2075,12 @@ pub(crate) async fn send_message_stream_inline(
                     crate::emotional_intelligence::process_message_emotion(&emotion_msg, emotion_app).await;
                 });
             }
-            // CONVERSATION SUMMARIZATION (streaming path) — 5+ turns only
+            // CONVERSATION SUMMARIZATION (streaming path) — 5+ turns only.
+            // Phase 86 / RECALL-INJECT: read the CLEAN `conversation`, NOT
+            // `api_conversation` — this persists a summary into the memory palace,
+            // so the fenced api copy would leak recalled private memory into
+            // long-term storage (T-86-07). Do NOT "consistency"-rename this to
+            // api_conversation.
             if input_message_count >= 5 {
                 let conv_msgs: Vec<crate::providers::ChatMessage> = conversation
                     .iter()
@@ -2101,7 +2147,7 @@ pub(crate) async fn send_message_stream_inline(
         } else {
             140_000 // legacy literal — naive path
         };
-        let pre_tokens = estimate_tokens(&conversation);
+        let pre_tokens = estimate_tokens(&api_conversation);
         if pre_tokens > trigger {
             // Emit BEFORE the await so the UI can surface a "compacting…"
             // spinner immediately. Wrapped in `let _ =` because emit may fail
@@ -2116,7 +2162,7 @@ pub(crate) async fn send_message_stream_inline(
             }));
         }
         let compression_modified = compress_conversation_smart(
-            &mut conversation,
+            &mut api_conversation,
             trigger,
             &config.provider,
             &config.api_key,
@@ -2141,7 +2187,7 @@ pub(crate) async fn send_message_stream_inline(
         // message substitutes for the collapsed prefix). The summary excerpt's
         // first 200 chars are captured for forensic display in list_sessions (SESS-03).
         if compression_modified {
-            let summary_excerpt = conversation
+            let summary_excerpt = api_conversation
                 .iter()
                 .find_map(|m| match m {
                     crate::providers::ConversationMessage::User(s)
@@ -2153,7 +2199,7 @@ pub(crate) async fn send_message_stream_inline(
                 })
                 .unwrap_or_default();
             session_writer.append(&crate::session::log::SessionEvent::CompactionBoundary {
-                kept_message_count: conversation.len() as u32,
+                kept_message_count: api_conversation.len() as u32,
                 summary_first_chars: summary_excerpt,
                 timestamp_ms: crate::session::log::now_ms(),
             });
@@ -2194,7 +2240,7 @@ pub(crate) async fn send_message_stream_inline(
         approvals.clone(),
         vector_store.clone(),
         &mut config,
-        &mut conversation,
+        &mut api_conversation,
         &tools,
         &last_user_text,
         brain_plan_used,
@@ -2372,7 +2418,7 @@ pub(crate) async fn send_message_stream_inline(
             // produced verbatim by `synthetic_assistant_turn_from_summary`
             // (loop_engine.rs §synthetic_assistant_turn_from_summary). This
             // is a clean exit — chat_done fires, NO chat_error.
-            let subagent_count = conversation
+            let subagent_count = api_conversation
                 .iter()
                 .filter(|m| matches!(m, ConversationMessage::Assistant { content, .. }
                     if content.starts_with("[Sub-agent summary")))
@@ -2401,7 +2447,7 @@ pub(crate) async fn send_message_stream_inline(
     // summary user prompt.
     {
         // Collect tool call IDs from the last assistant message that have no result
-        let pending_ids: Vec<(String, String)> = conversation
+        let pending_ids: Vec<(String, String)> = api_conversation
             .iter()
             .rev()
             .find_map(|m| match m {
@@ -2413,7 +2459,7 @@ pub(crate) async fn send_message_stream_inline(
             .unwrap_or_default();
 
         // Which of those already have a Tool result in the conversation?
-        let resolved_ids: std::collections::HashSet<String> = conversation
+        let resolved_ids: std::collections::HashSet<String> = api_conversation
             .iter()
             .filter_map(|m| match m {
                 ConversationMessage::Tool { tool_call_id, .. } => Some(tool_call_id.clone()),
@@ -2424,7 +2470,7 @@ pub(crate) async fn send_message_stream_inline(
         // Inject stubs for any unresolved tool calls
         for (id, name) in pending_ids {
             if !resolved_ids.contains(&id) {
-                conversation.push(ConversationMessage::Tool {
+                api_conversation.push(ConversationMessage::Tool {
                     tool_call_id: id,
                     tool_name: name,
                     content: "[Tool execution did not complete — loop limit reached]".to_string(),
@@ -2442,7 +2488,7 @@ pub(crate) async fn send_message_stream_inline(
         return Ok(());
     }
 
-    conversation.push(ConversationMessage::User(
+    api_conversation.push(ConversationMessage::User(
         "Summarise what you've done so far and whether the task is complete.".to_string(),
     ));
     let summary_result = providers::stream_text(
@@ -2450,7 +2496,7 @@ pub(crate) async fn send_message_stream_inline(
         &config.provider,
         &config.api_key,
         &config.model,
-        &conversation,
+        &api_conversation,
         config.base_url.as_deref(),
     )
     .await;
@@ -3611,6 +3657,92 @@ pub(crate) mod tests {
         let per_turn_chars = 200usize;
         let n = (target_chars / per_turn_chars).max(2);
         build_test_conversation(n)
+    }
+
+    // ── Phase 86 / RECALL-INJECT — inject_memory_fence + persistence-boundary ──
+
+    fn last_user_text_of(conv: &[ConversationMessage]) -> &str {
+        conv.iter().rev().find_map(|m| match m {
+            ConversationMessage::User(s) => Some(s.as_str()),
+            ConversationMessage::UserWithImage { text, .. } => Some(text.as_str()),
+            _ => None,
+        }).expect("conversation should contain a user message")
+    }
+
+    #[test]
+    fn recall_inject_string_tail() {
+        let mut conv = vec![
+            ConversationMessage::System("sys".into()),
+            ConversationMessage::User("hello".into()),
+        ];
+        inject_memory_fence(&mut conv, "RECALLDATA");
+        let s = last_user_text_of(&conv);
+        assert!(s.starts_with("hello"), "original text must be preserved at the head: {s}");
+        assert!(s.contains("RECALLDATA"), "recall payload must be present: {s}");
+        assert!(s.ends_with("</memory-context>"), "fence must close at the tail: {s}");
+    }
+
+    #[test]
+    fn recall_inject_multimodal_textblock() {
+        let mut conv = vec![ConversationMessage::UserWithImage {
+            text: "hi".into(),
+            image_base64: "ABC123==".into(),
+        }];
+        inject_memory_fence(&mut conv, "R");
+        match &conv[0] {
+            ConversationMessage::UserWithImage { text, image_base64 } => {
+                assert!(text.ends_with("</memory-context>"), "fence appended to text field: {text}");
+                assert_eq!(image_base64, "ABC123==", "image bytes must be byte-unchanged");
+            }
+            other => panic!("expected UserWithImage, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn recall_inject_api_only() {
+        let conv = vec![
+            ConversationMessage::System("sys".into()),
+            ConversationMessage::User("real user turn".into()),
+        ];
+        // Clone-or-bleed: inject into the api copy only; the original stays clean.
+        let mut api_conv = conv.clone();
+        inject_memory_fence(&mut api_conv, "R");
+        assert!(
+            !last_user_text_of(&conv).contains("<memory-context>"),
+            "the ORIGINAL conversation's user message must remain fence-free"
+        );
+        assert!(
+            last_user_text_of(&api_conv).contains("<memory-context>"),
+            "the api copy must carry the fence"
+        );
+    }
+
+    #[test]
+    fn recall_empty_recall_inject_noop() {
+        let mut conv = vec![
+            ConversationMessage::System("sys".into()),
+            ConversationMessage::User("hello".into()),
+        ];
+        // The no-op contract lives at the CALLER guard, not in inject_memory_fence.
+        let recall = String::new();
+        if !recall.is_empty() {
+            inject_memory_fence(&mut conv, &recall);
+        }
+        assert!(
+            !last_user_text_of(&conv).contains("<memory-context>"),
+            "empty recall => caller skips inject => no fence"
+        );
+    }
+
+    #[test]
+    fn recall_persist_user_fence_free() {
+        // `last_user_text` (the value handed to SessionEvent::UserMessage / dual-write)
+        // is bound BEFORE the clone and never touched by inject_memory_fence.
+        let last_user_text = sanitize_input("what's the weather today?");
+        assert!(
+            !last_user_text.contains("<memory-context>"),
+            "the persisted user text must never carry the recall fence"
+        );
     }
 
     #[test]

@@ -1851,6 +1851,18 @@ async fn run_loop_inner(
             }
         }
 
+        // Phase 86 / RECALL-SCRUBBER — strip any echoed <memory-context> span from
+        // the assistant text before it is persisted (JSONL AssistantTurn), pushed
+        // into the conversation, displayed, or learned-from. Placed HERE (after the
+        // LOOP-04 truncation/retry block) rather than right after the `match` at the
+        // top of the loop body: the retry path reassigns `turn = retry_turn`, so a
+        // scrub above it would miss an echo in the RETRIED response. `turn` is the
+        // mutable rebind from the LOOP-04 block and holds its final value here. Empty
+        // or fence-free content = no-op pass-through. (Deviation from 86-03 Task 3's
+        // literal "scrub at the match" instruction — correctness fix for the retry
+        // reassignment the plan's anchor list did not account for.)
+        turn.content = crate::streaming_context_scrubber::strip(&turn.content);
+
         // ─── LOOP-06 — cumulative cost tracking (Plan 33-08) ────────────
         //
         // Accumulate the just-completed turn's cost into LoopState.
