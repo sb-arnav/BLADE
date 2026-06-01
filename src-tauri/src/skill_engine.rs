@@ -110,7 +110,7 @@ pub async fn maybe_synthesize_skills(app: tauri::AppHandle) {
 }
 
 /// Get prompt modifier injections for active skills matching the current query.
-/// Called synchronously from build_system_prompt_with_recall.
+/// Called synchronously from build_system_prompt_inner_parts.
 pub fn get_skill_injections(user_query: &str) -> String {
     if user_query.len() < 5 {
         return String::new();

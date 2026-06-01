@@ -405,15 +405,6 @@ pub fn invalidate_system_prompt(session_id: &str) {
     let _ = crate::memory::load_memory_blocks();
 }
 
-#[allow(dead_code)]
-pub fn build_system_prompt_with_recall(
-    tools: &[McpTool],
-    user_query: &str,
-    vector_store: Option<&crate::embeddings::SharedVectorStore>,
-) -> String {
-    build_system_prompt_inner(tools, user_query, vector_store, &ModelTier::Frontier, "", "", usize::MAX, &[])
-}
-
 /// Build a lean system prompt for the voice conversation loop.
 /// Skips tool/MCP context for speed — voice turns should be fast.
 pub async fn build_system_prompt_voice(_app: &tauri::AppHandle) -> String {
@@ -1008,6 +999,95 @@ fn brain_git_branch_count(window_title: &str) -> Option<usize> {
     }
 }
 
+/// Phase 86 / RECALL-RETIRE-SECTION — recall block lifted verbatim from
+/// build_system_prompt_inner_parts (was brain.rs:1481-1563). Pure: returns the
+/// joined recall text ("" when nothing recalled). Injected into the user
+/// message at api-build time (commands.rs), NOT the system prompt.
+///
+/// `hive_is_active` is a parameter (caller computes
+/// `!crate::hive::get_hive_digest().is_empty()`): when hive + DNA are active,
+/// DNA::query_for_brain already pulls typed_memory/knowledge_graph/people_graph
+/// with selective relevance, so the individual pulls are skipped to avoid
+/// prompt duplication. CTX-06 char accounting is NOT done here — the caller
+/// records `recall.len()` once at the inject site (D-09 Option A).
+pub fn build_memory_recall_block(
+    user_query: &str,
+    vector_store: Option<&crate::embeddings::SharedVectorStore>,
+    hive_is_active: bool,
+) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    if !user_query.is_empty() && !hive_is_active {
+        // Typed memory
+        let context_tags: Vec<String> = user_query
+            .split_whitespace()
+            .filter(|w| w.len() >= 4)
+            .map(|w| w.to_lowercase().trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+            .filter(|w| !w.is_empty())
+            .collect();
+        if !context_tags.is_empty() {
+            let typed_ctx = crate::typed_memory::get_typed_memory_context(&context_tags);
+            if !typed_ctx.is_empty() {
+                parts.push(typed_ctx);
+            }
+        }
+
+        // Knowledge graph
+        let graph_ctx = crate::knowledge_graph::get_graph_context(user_query);
+        if !graph_ctx.is_empty() {
+            parts.push(graph_ctx);
+        }
+
+        // Episodic memory palace
+        let memory_ctx = crate::memory_palace::get_memory_context(user_query);
+        if !memory_ctx.is_empty() {
+            parts.push(memory_ctx);
+        }
+
+        // Causal insights
+        let causal_ctx = crate::causal_graph::get_causal_context(user_query);
+        if !causal_ctx.is_empty() {
+            parts.push(causal_ctx);
+        }
+
+        // Semantic recall (vector store)
+        if let Some(store) = vector_store {
+            let recalled = crate::embeddings::recall_relevant(store, user_query, 3);
+            if !recalled.is_empty() {
+                parts.push(format!("## Relevant Past\n\n{}", recalled));
+            }
+        }
+
+        // Compounding smart recall
+        let compounding = crate::embeddings::smart_context_recall(user_query);
+        if !compounding.is_empty() {
+            parts.push(compounding);
+        }
+
+        // People graph — only when names are actually mentioned
+        let mentioned_names: Vec<String> = user_query
+            .split_whitespace()
+            .filter(|w| {
+                w.len() >= 2
+                    && w.chars().next().map(|c| c.is_uppercase()).unwrap_or(false)
+                    && w.chars().all(|c| c.is_alphabetic() || c == '\'' || c == '-')
+            })
+            .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+            .filter(|w| !w.is_empty())
+            .collect();
+        if !mentioned_names.is_empty() {
+            let people_ctx = crate::people_graph::get_people_context_for_prompt(&mentioned_names);
+            if !people_ctx.is_empty() {
+                parts.push(people_ctx);
+            }
+            let social_ctx = crate::social_graph::get_social_context(user_query);
+            if !social_ctx.is_empty() {
+                parts.push(social_ctx);
+            }
+        }
+    }
+    parts.join("\n\n")
+}
+
 /// Phase 83 (v2.5 CACHE-PARITY) — three-accumulator builder returning `SystemPromptParts`.
 /// All existing push-sites are retargeted to one of three named Vecs per D-06/D-07/D-08/D-09.
 /// The legacy `build_system_prompt_inner` wrapper below calls this + `.join()` for
@@ -1023,7 +1103,10 @@ fn brain_git_branch_count(window_title: &str) -> Option<usize> {
 fn build_system_prompt_inner_parts(
     tools: &[McpTool],
     user_query: &str,
-    vector_store: Option<&crate::embeddings::SharedVectorStore>,
+    // Phase 86: recall (the only consumer of vector_store) moved to
+    // build_memory_recall_block / the user-message inject site. Param kept for
+    // signature stability across all call sites; no longer read by the builder.
+    _vector_store: Option<&crate::embeddings::SharedVectorStore>,
     tier: &ModelTier,
     provider: &str,
     model: &str,
@@ -1471,96 +1554,12 @@ fn build_system_prompt_inner_parts(
     }
 
     // ── MEMORY RECALL (priority 8, query-gated) ───────────────────────────────
-    // When hive + DNA are active, DNA::query_for_brain already pulls typed_memory,
-    // knowledge_graph, people_graph with selective relevance. Skip the individual
-    // pulls to avoid prompt duplication. Fall back to full recall when hive is off.
-    //
-    // CTX-06: track total chars contributed by this block for the breakdown.
-    // The block already short-circuits when user_query is empty or hive is on,
-    // so a record_section("memory_recall", 0) lands in those branches too.
-    {
-        let mut memory_recall_chars: usize = 0;
-        if !user_query.is_empty() && !hive_is_active {
-            // Typed memory
-            // Phase 83 / D-09: memory_recall stays in volatile tier (Phase 86 moves it to user message).
-            let context_tags: Vec<String> = user_query
-                .split_whitespace()
-                .filter(|w| w.len() >= 4)
-                .map(|w| w.to_lowercase().trim_matches(|c: char| !c.is_alphanumeric()).to_string())
-                .filter(|w| !w.is_empty())
-                .collect();
-            if !context_tags.is_empty() {
-                let typed_ctx = crate::typed_memory::get_typed_memory_context(&context_tags);
-                if !typed_ctx.is_empty() {
-                    memory_recall_chars = memory_recall_chars.saturating_add(typed_ctx.len());
-                    volatile_parts.push(typed_ctx);
-                }
-            }
-
-            // Knowledge graph
-            let graph_ctx = crate::knowledge_graph::get_graph_context(user_query);
-            if !graph_ctx.is_empty() {
-                memory_recall_chars = memory_recall_chars.saturating_add(graph_ctx.len());
-                volatile_parts.push(graph_ctx);
-            }
-
-            // Episodic memory palace
-            let memory_ctx = crate::memory_palace::get_memory_context(user_query);
-            if !memory_ctx.is_empty() {
-                memory_recall_chars = memory_recall_chars.saturating_add(memory_ctx.len());
-                volatile_parts.push(memory_ctx);
-            }
-
-            // Causal insights
-            let causal_ctx = crate::causal_graph::get_causal_context(user_query);
-            if !causal_ctx.is_empty() {
-                memory_recall_chars = memory_recall_chars.saturating_add(causal_ctx.len());
-                volatile_parts.push(causal_ctx);
-            }
-
-            // Semantic recall (vector store)
-            if let Some(store) = vector_store {
-                let recalled = crate::embeddings::recall_relevant(store, user_query, 3);
-                if !recalled.is_empty() {
-                    let s = format!("## Relevant Past\n\n{}", recalled);
-                    memory_recall_chars = memory_recall_chars.saturating_add(s.len());
-                    volatile_parts.push(s);
-                }
-            }
-
-            // Compounding smart recall
-            let compounding = crate::embeddings::smart_context_recall(user_query);
-            if !compounding.is_empty() {
-                memory_recall_chars = memory_recall_chars.saturating_add(compounding.len());
-                volatile_parts.push(compounding);
-            }
-
-            // People graph — only when names are actually mentioned
-            let mentioned_names: Vec<String> = user_query
-                .split_whitespace()
-                .filter(|w| {
-                    w.len() >= 2
-                        && w.chars().next().map(|c| c.is_uppercase()).unwrap_or(false)
-                        && w.chars().all(|c| c.is_alphabetic() || c == '\'' || c == '-')
-                })
-                .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
-                .filter(|w| !w.is_empty())
-                .collect();
-            if !mentioned_names.is_empty() {
-                let people_ctx = crate::people_graph::get_people_context_for_prompt(&mentioned_names);
-                if !people_ctx.is_empty() {
-                    memory_recall_chars = memory_recall_chars.saturating_add(people_ctx.len());
-                    volatile_parts.push(people_ctx);
-                }
-                let social_ctx = crate::social_graph::get_social_context(user_query);
-                if !social_ctx.is_empty() {
-                    memory_recall_chars = memory_recall_chars.saturating_add(social_ctx.len());
-                    volatile_parts.push(social_ctx);
-                }
-            }
-        }
-        record_section("memory_recall", memory_recall_chars);
-    }
+    // Phase 86 / RECALL-RETIRE-SECTION: the recall block left the volatile tier.
+    // It now lives in the pure `build_memory_recall_block` function and is injected
+    // into the user message at api-build time (commands.rs), keeping the system
+    // prompt byte-stable so Phase 85's cache markers hit prefix cache turn-2+.
+    // The CTX-06 `record_section("memory_recall", ...)` moved with it to the inject
+    // site (D-09 Option A) — it is recorded exactly once there, not here.
 
     // ── CEREBELLUM: Learned reflexes (always injected, regardless of hive state) ──
     // Skill engine synthesizes prompt modifiers from repeated tool patterns.
@@ -2223,9 +2222,8 @@ fn build_system_prompt_inner_parts(
 }
 
 /// Back-compat wrapper. The legacy String-returning entry point. Calls the
-/// three-tier builder and joins. All existing call sites (`build_system_prompt`,
-/// `build_system_prompt_with_recall`, and the un-wrapped
-/// `build_system_prompt_for_model`) keep working without churn.
+/// three-tier builder and joins. All existing call sites (`build_system_prompt`
+/// and the un-wrapped `build_system_prompt_for_model`) keep working without churn.
 ///
 /// **Byte-equivalence claim**: post-refactor output of this wrapper equals
 /// pre-Phase-83 output of the original `build_system_prompt_inner` IF:
@@ -3538,6 +3536,117 @@ mod tests {
             identity_chars > 0 && identity_chars <= 800,
             "identity_supplement must be small core, got {} chars",
             identity_chars
+        );
+    }
+
+    // ── Phase 86 / RECALL-TO-USER — recall-block extraction tests ─────────────
+    //
+    // These prove the RECALL-RETIRE-SECTION half of Phase 86: the memory-recall
+    // block left the system-prompt volatile tier and now lives in the pure
+    // `build_memory_recall_block` function (injected into the user message by
+    // Plan 03). Names are prefixed `recall_` so `cargo test recall_` picks them up.
+
+    /// Success criterion #4: `build_system_prompt` output never contains the
+    /// `<memory-context>` fence — for an empty query AND for a query that would
+    /// have triggered recall under the old in-prompt block. The load-bearing
+    /// invariant is the FENCE STRING never appears (recall *content* may
+    /// legitimately resemble other prompt text — do not assert "no recall at all").
+    #[test]
+    fn recall_system_prompt_has_no_fence() {
+        let _g = BREAKDOWN_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        // The recall-triggering input is irrelevant now — the builder takes no
+        // user_query at this entry point — but assert across several to be safe.
+        let prompt = build_system_prompt(&[]);
+        assert!(
+            !prompt.contains("<memory-context>"),
+            "system prompt must never contain the memory-context fence"
+        );
+        // The inner builder DOES take a recall-triggering query; assert the fence
+        // is absent there too (this is the path that used to assemble recall).
+        let parts = build_system_prompt_inner_parts(
+            &[], "remind me about the project deadline", None,
+            &ModelTier::Frontier, "anthropic", "claude-sonnet-4", 1, &[],
+        );
+        let joined = parts.join();
+        assert!(
+            !joined.contains("<memory-context>"),
+            "inner builder output must never contain the memory-context fence"
+        );
+    }
+
+    /// D-01 hive landmine: the hive short-circuit must produce empty output even
+    /// for a meaningful query (hive pulls recall differently to avoid duplication).
+    #[test]
+    fn recall_block_hive_guard() {
+        assert_eq!(
+            build_memory_recall_block("anything meaningful about a project", None, true),
+            "",
+            "hive_is_active=true must short-circuit to empty recall"
+        );
+    }
+
+    /// Block half of RECALL-TEST #6: an empty query yields empty recall (no fence
+    /// content to inject). EXACT name per the plan (accepted deviation from
+    /// VALIDATION.md's `recall_empty_recall_noop`).
+    #[test]
+    fn recall_empty_recall_inject_noop() {
+        assert_eq!(
+            build_memory_recall_block("", None, false),
+            "",
+            "empty query must yield empty recall"
+        );
+    }
+
+    /// Structural guard test: with no cheap way to seed the 7 global/disk recall
+    /// sources in a unit test, assert the function returns "" for both guard
+    /// branches (empty query and hive-on). Full source-ordering verification
+    /// (typed → graph → palace → causal → recall_relevant → smart → people/social)
+    /// requires seeded fixtures and is deferred (tests 2-3 are the load-bearing ones).
+    #[test]
+    fn recall_block_order() {
+        assert_eq!(build_memory_recall_block("", None, false), "");
+        assert_eq!(build_memory_recall_block("meaningful query", None, true), "");
+    }
+
+    /// R4 / CTX-06 "both label families populated" proof gate for the
+    /// `record_section("memory_recall", ...)` MOVE that ships in Plan 03 Task 2.
+    /// After a system-prompt build (which records its section labels) plus a
+    /// simulated inject-site `record_section("memory_recall", n)`, the breakdown
+    /// must contain BOTH a system-prompt-family label AND the inject-site
+    /// `memory_recall` row, and the snapshot must surface the `memory_recall` key.
+    #[test]
+    fn recall_ctx06_label_families() {
+        let _g = BREAKDOWN_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        CTX_SCORE_OVERRIDE.with(|cell| { *cell.borrow_mut() = None; });
+        // (a) Clear first — the prod builder normally clears, but RESEARCH §Finding 6
+        //     warns it may serve a cached prompt and SKIP the clear. The test must
+        //     not rely on the builder clearing for it.
+        clear_section_accumulator();
+        // (b) Build the system prompt so the builder records its section labels.
+        let _ = build_system_prompt(&[]);
+        // (c) Simulate the Plan 03 inject-site record. n large enough that n/4 > 0.
+        let n: usize = 80;
+        record_section("memory_recall", n);
+        // (d) Both label families must coexist in the raw breakdown.
+        let breakdown = read_section_breakdown();
+        assert!(
+            breakdown.iter().any(|(l, _)| l == "identity_supplement"),
+            "system-prompt-family label (identity_supplement) missing: {:?}",
+            breakdown.iter().map(|(l, _)| l.as_str()).collect::<Vec<_>>()
+        );
+        assert!(
+            breakdown.iter().any(|(l, c)| l == "memory_recall" && *c == n),
+            "inject-site memory_recall row (== {}) missing: {:?}",
+            n,
+            breakdown
+        );
+        // (e) Snapshot must surface the memory_recall KEY (value is n/4 tokens,
+        //     NOT n — the snapshot divides chars by 4).
+        let snap = build_breakdown_snapshot("anthropic", "claude-sonnet-4");
+        assert!(
+            snap.sections.contains_key("memory_recall"),
+            "snapshot must contain the memory_recall key: {:?}",
+            snap.sections.keys().collect::<Vec<_>>()
         );
     }
 
