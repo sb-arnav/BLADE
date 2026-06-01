@@ -642,16 +642,16 @@ None — no test framework installation needed (Rust `#[test]` is built-in).
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `apply_anthropic_cache_control` also set the system marker, or rely on `system_block_with_cache` having done it?**
-   - What we know: `build_body` calls `system_block_with_cache` which marks the system block. Streaming paths also call `system_block_with_cache`.
-   - What's unclear: If the function is applied universally, it can be made the sole source of truth by un-marking the system block from `build_body` and centralizing.
-   - Recommendation: Keep `system_block_with_cache` in `build_body` (backward compat, less risky), make `apply_anthropic_cache_control` idempotent by checking for existing system block marker before adding one.
+   - **RESOLVED:** `apply_anthropic_cache_control` is the single source of truth for cache breakpoints and is idempotent — it marks the system block if not already marked. `system_block_with_cache` keeps emitting the system block but its `cache_control` is reconciled so the total never exceeds 4 markers (system + last 3 non-system messages). The redundant `mark_last_tool_cached` is removed (D-02 — tools cache via the system prefix).
 
 2. **Should `complete_ext` receive the config, or should the cache application happen at the `complete_turn_inner` level?**
-   - What we know: `complete_ext` is called from multiple places (including `stream_fast_acknowledgment`). `complete_turn_inner` has the config available (callers pass it via loop_engine/commands).
-   - Recommendation: Apply inside `complete_ext` by adding an optional `cache_config: Option<&CacheConfig>` param OR apply at `complete_turn_inner` where provider routing happens and config is available. The latter avoids changing `complete_ext`'s signature which is called from many places.
+   - **RESOLVED:** Pass `CacheConfig` (or its resolved fields) as a parameter into the Anthropic build/marker path rather than calling `load_config()` inline inside the async hot paths (`complete_ext` / `stream_text` / `stream_text_with_thinking`). The config is read ONCE at the dispatch/call site and threaded down — avoids per-request synchronous disk I/O on the tokio streaming executor.
+
+3. **Does openrouter+claude get markers this phase?**
+   - **RESOLVED (scope):** NO — native Anthropic only this phase. openrouter routes through `openai::complete_ext` (mod.rs) with an OpenAI-format body where `cache_control` placement differs materially (system-as-message, passthrough semantics). The v2.5 falsification gate (Phase 89) tests NATIVE Anthropic, so native is the load-bearing path. `is_anthropic_compatible` keeps its correct openrouter+claude classification (it's a tested primitive and gates the native path), but the openrouter marker INTEGRATION is deferred — see CONTEXT Deferred Ideas. The must_have truth for openrouter is unit-classification only, not an integration claim.
 
 ---
 
