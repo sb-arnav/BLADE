@@ -337,12 +337,18 @@ fn eval_02_run(fix: &ContextEfficiencyFixture) -> (bool, String) {
     // clear cannot bleed entries into our read.
     crate::brain::clear_section_accumulator();
 
-    // Use the public Tauri-friendly wrapper. The wrapper calls
-    // build_system_prompt_inner with a real provider/model so the smart
-    // injection gate engages (matches production behavior). Default tier
-    // resolves via model_tier(provider, model); anchor_injections=&[] for
-    // the simple/code fixtures, populated for screen-anchor.
-    let _prompt = crate::brain::build_system_prompt_for_model(
+    // Phase 89 (v2.5 CLOSE) — call the three-tier builder
+    // `build_system_prompt_parts` DIRECTLY rather than the cache-aware wrapper
+    // `build_system_prompt_for_model`. Phase 83/84 made the wrapper short-
+    // circuit on an L1/L2 cache hit, returning the cached string WITHOUT
+    // running record_section() — so when a sibling test warmed the process-
+    // global cache (keyed by the unscoped session) this eval read an empty
+    // breakdown (total=0t, every required label "missing"). The parts builder
+    // always builds fresh and repopulates the section accumulator, which is
+    // exactly what EVAL-02 inspects. We discard the returned parts; the eval
+    // reads the breakdown below. The simple/code fixtures use no anchors;
+    // the screen-anchor fixture has its own body (passes synthetic anchors).
+    let _parts = crate::brain::build_system_prompt_parts(
         &[],
         fix.query,
         None,
@@ -525,7 +531,12 @@ fn fixture_screen_anchor_query() -> (bool, String) {
         ("anchor_screen".to_string(), synthetic_screen_payload),
     ];
 
-    let _prompt = crate::brain::build_system_prompt_for_model(
+    // Phase 89 (v2.5 CLOSE) — call the three-tier builder directly (not the
+    // cache-aware wrapper) so the section breakdown is always repopulated.
+    // Phase 83/84's L1/L2 cache made the wrapper short-circuit on a hit,
+    // returning a cached string without running record_section() → empty
+    // breakdown (total=0t) when a sibling test warmed the process-global cache.
+    let _parts = crate::brain::build_system_prompt_parts(
         &[],
         FIXTURE_SCREEN_ANCHOR_QUERY.query,
         None,
