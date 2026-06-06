@@ -13,6 +13,38 @@ Nothing yet.
 
 ---
 
+## [2.5.0] -- 2026-06-06
+
+### Added / Changed (v2.5 -- CACHE-PARITY)
+
+> Single-thesis milestone: make BLADE's chat loop cache-correct end-to-end so the Anthropic prefix cache stays warm across turns. Every downstream Hermes loop-substrate feature (v2.6 background_review / auxiliary_client, v2.7 curator) compounds off this. Source: `.planning/research/v2.5-hermes-loop-parity-gap.md` (direct read of NousResearch/hermes-agent). 7 phases (83-89). Phases 83-86 shipped 2026-05-21..06-01; 87-89 closed 2026-06-06.
+
+**Phase 83 -- SPLIT-PROMPT** — Three-tier `{stable, context, volatile}` system prompt via `build_system_prompt_parts`, cached once per session on a process-global cache + invalidated only on context-compression. Date-only timestamp so the stable prefix is byte-stable across turns. Commits `99eff01` / `8f0d431` / `614a359` / `0200f7f`.
+
+**Phase 84 -- SYSPROMPT-DB** — Persist the cached system prompt to the `sessions.system_prompt` SQLite column; restore verbatim on the next turn / gateway re-instantiation (L2). `invalidate_system_prompt` clears both L1 cache and the L2 DB row (CR-01). Commits `0e2b156` / `9ae4687` / `9e7ab7b`.
+
+**Phase 85 -- CACHE-MARKERS** — `apply_anthropic_cache_control` 4-breakpoint injection (system + last 3 non-system), 5m default TTL, Anthropic + Anthropic-compatible only. `CacheConfig` 6-place. Commits `438da97` + prior.
+
+**Phase 86 -- RECALL-TO-USER** — Memory recall lifted out of the system prompt into the current user message, fenced `<memory-context>...</memory-context>`, injected on a transient `api_conversation` clone only (never persisted). Minimal `streaming_context_scrubber` strips echoed fences. Makes the system prompt byte-stable so Phase 85's markers actually hit prefix cache. Commits `38636af` / `99cc446` / `3a58952`.
+
+**Phase 87 -- BUDGET-WIRE** — Wired the v2.4 Phase 73 ghost module `iteration_budget.rs` into `loop_engine::run_loop_inner`. Replaced `for iteration in 0..max_iter` with a budget-driven `while loop_state.iteration_budget.consume()` loop (check-before-tick: ceiling N ⇒ N body passes, identical to the old loop). `IterationBudget` gains `consume()`/`refund()`/`used()`; `LoopHaltReason::IterationCap` now carries `{used, max_total}`. `iteration_budget.rs` no longer ghost code. Tests: 11/11 iteration_budget + 21/21 iteration-cap regression. Commit `992c8cb`.
+
+**Phase 88 -- GUARDRAILS-WIRE** — Wired the v2.4 Phase 74 ghost module `tool_guardrails.rs` into the tool-dispatch site. `LoopState` owns a `GuardrailObserver` (built from the new `config.tool_guardrails`, 6-place); the inline `consecutive_same_tool_failures` HashMap + Phase 33-05 reject_plan trigger are retired. `observe()` runs post-result: `Halt` → new `LoopHaltReason::ToolGuardrailHalt`, `Warn(SameToolFailing)` reproduces the reject_plan side effect (R6), other warns prepend an advisory. Default `hard_stop_enabled=false` (halts opt-in). `tool_guardrails.rs` no longer ghost code. Tests: 8/8 module + 4/4 wire. Commit `70d7913`.
+
+**Phase 89 -- CLOSE** — CHANGELOG + milestone audit. Static gates: `cargo check` clean, `tsc --noEmit` clean. **Fixed a v2.5 self-regression:** Phase 83/84's cache-aware `build_system_prompt_for_model` made the 3 EVAL-02 verify gates read an empty section breakdown (`total=0t`) on a cache hit; the eval fixtures now call the always-building `build_system_prompt_parts` directly (3 gates restored). Commit `9f7f30f`.
+
+### Known carry-forward (pre-existing, untouched by v2.5)
+
+- `phase33_loop_04_escalation_caps_at_provider_max` — stale `o1` token-cap expectation (32768 vs the canonical registry's current ≥40000); `providers/mod.rs` has zero v2.5 commits.
+- `OEVAL-01a` / `OEVAL-01c` / `VITA-02` — presence-subsystem (vitality/organism) band-threshold evals; `vitality.rs` / `organism_eval.rs` / `hormones.rs` have zero v2.5 commits. Consistent with VISION "presence held for v2.0 evaluation."
+
+### Operator-pending (live-API gates — see `milestones/v2.5-MILESTONE-AUDIT.md`)
+
+- **CLOSE-04 falsification gate** — 5-turn live-Anthropic conversation; PASS = turn 2-5 `cache_read_tokens` > 0 OR `prompt_tokens` ≥70% lower than turn 1. Requires a running build + Anthropic key + token budget; not runnable headlessly/autonomously.
+- **CLOSE-05 calendar smoke** — calendar-prompt tool dispatch through the cache-aware loop.
+
+---
+
 ## [2.3.0] -- 2026-05-17
 
 ### Added (v2.3 -- HARNESS-REBUILD-ON-CLAW)
