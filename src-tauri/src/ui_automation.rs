@@ -597,3 +597,334 @@ mod imp {
 }
 
 pub use imp::*;
+
+// ───────────────────────────────────────────────────────────────────────────
+// CLICK hand (v3.0 OPERATOR) — A11Y grounding resolver.
+//
+// Platform-independent. Operates on a captured `UiElementSummary` tree (the
+// thing `uia_get_active_window_snapshot` returns on Windows) and turns a
+// natural-language target — "click the Submit button", "the search field" —
+// into ranked, addressable element candidates. This is the deterministic,
+// model-free, OFFLINE core of the CLICK hand: the "accessibility-tree +
+// Set-of-Mark" grounding the 2026 computer-use research found beats raw
+// pixel-vision 3-5x with far fewer misclicks. It needs no API key, so it is
+// fully buildable + unit-testable here (the live UIA read/click is Windows-only
+// above; the model-driven vision fallback is a later phase).
+// ───────────────────────────────────────────────────────────────────────────
+
+/// A scored grounding candidate — the element plus an explainable reason.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroundedElement {
+    pub element: UiElementSummary,
+    pub score: f32,
+    /// Click point — center of the element's bounds (screen coords).
+    pub center: (i32, i32),
+    pub reason: String,
+}
+
+/// Role keywords a user might say, mapped to UIA control-type substrings.
+/// Matched case-insensitively against `control_type` + `localized_control_type`.
+const ROLE_HINTS: &[(&str, &[&str])] = &[
+    ("button", &["button"]),
+    ("btn", &["button"]),
+    ("link", &["hyperlink", "link"]),
+    ("tab", &["tab"]),
+    ("menu", &["menu"]),
+    ("checkbox", &["checkbox", "check box"]),
+    ("radio", &["radio"]),
+    ("field", &["edit", "text", "combo", "document"]),
+    ("input", &["edit", "text", "combo"]),
+    ("textbox", &["edit", "text"]),
+    ("box", &["edit", "combo", "check box", "list"]),
+    ("dropdown", &["combo", "list"]),
+    ("combo", &["combo"]),
+    ("list", &["list"]),
+    ("item", &["item", "list item", "menu item"]),
+    ("icon", &["button", "image"]),
+    ("toggle", &["button", "checkbox"]),
+    ("switch", &["button", "checkbox"]),
+];
+
+/// Stop-words stripped from a target query before label matching, so
+/// "click the Submit button" reduces to the meaningful token "submit".
+const QUERY_STOPWORDS: &[&str] = &[
+    "click", "press", "tap", "select", "choose", "open", "the", "a", "an",
+    "on", "in", "to", "please", "go", "hit", "this", "that", "my",
+];
+
+fn normalize(s: &str) -> String {
+    s.trim().to_lowercase()
+}
+
+fn tokens(s: &str) -> Vec<String> {
+    normalize(s)
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|t| !t.is_empty())
+        .map(|t| t.to_string())
+        .collect()
+}
+
+/// Role substrings implied by the query's role words, if any.
+fn role_targets(query_tokens: &[String]) -> Vec<&'static str> {
+    let mut out = Vec::new();
+    for (word, subs) in ROLE_HINTS {
+        if query_tokens.iter().any(|t| t == word) {
+            for s in *subs {
+                if !out.contains(s) {
+                    out.push(*s);
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Meaningful label tokens of the query (role words + stop-words removed).
+fn label_tokens(query_tokens: &[String]) -> Vec<String> {
+    let role_words: Vec<&str> = ROLE_HINTS.iter().map(|(w, _)| *w).collect();
+    query_tokens
+        .iter()
+        .filter(|t| !QUERY_STOPWORDS.contains(&t.as_str()) && !role_words.contains(&t.as_str()))
+        .cloned()
+        .collect()
+}
+
+/// Flatten the element tree depth-first into a flat list (Set-of-Mark indexing).
+pub fn flatten_elements(root: &[UiElementSummary]) -> Vec<UiElementSummary> {
+    let mut out = Vec::new();
+    fn walk(el: &UiElementSummary, out: &mut Vec<UiElementSummary>) {
+        let mut shallow = el.clone();
+        shallow.children = Vec::new(); // flat copy — children live as their own entries
+        out.push(shallow);
+        for child in &el.children {
+            walk(child, out);
+        }
+    }
+    for el in root {
+        walk(el, &mut out);
+    }
+    out
+}
+
+fn control_type_matches(el: &UiElementSummary, role_subs: &[&str]) -> bool {
+    if role_subs.is_empty() {
+        return false;
+    }
+    let ct = normalize(&el.control_type);
+    let lct = normalize(&el.localized_control_type);
+    role_subs.iter().any(|s| ct.contains(s) || lct.contains(s))
+}
+
+/// Score how well an element's label matches the query's label tokens.
+/// 0.0 (no overlap) .. 1.0 (exact). Considers exact, substring, and token
+/// overlap so "save" hits "Save All" and "submit" hits "Submit order".
+fn label_score(el_name: &str, query_label: &[String]) -> f32 {
+    if query_label.is_empty() {
+        return 0.0; // role-only query — handled separately
+    }
+    let name_norm = normalize(el_name);
+    if name_norm.is_empty() {
+        return 0.0;
+    }
+    let joined = query_label.join(" ");
+    if name_norm == joined {
+        return 1.0;
+    }
+    let name_toks = tokens(el_name);
+    if name_toks.is_empty() {
+        return 0.0;
+    }
+    // Whole-query substring of the label (or vice-versa) → strong.
+    if name_norm.contains(&joined) || joined.contains(&name_norm) {
+        return 0.9;
+    }
+    // Token overlap: fraction of query-label tokens present in the label.
+    let hits = query_label
+        .iter()
+        .filter(|qt| name_toks.iter().any(|nt| nt == *qt || nt.contains(qt.as_str())))
+        .count();
+    if hits == 0 {
+        return 0.0;
+    }
+    0.5 + 0.4 * (hits as f32 / query_label.len() as f32)
+}
+
+/// Resolve a natural-language target against a captured UIA tree. Returns
+/// candidates ranked best-first (empty when nothing clears the floor).
+///
+/// Deterministic scoring (no model): label match dominates; role affinity,
+/// enabled, focus, and addressability adjust; invisible/disabled elements are
+/// penalized. `center` is the click point. This is what lets the agent loop
+/// say "click Submit" and get a reliable target instead of guessing pixels.
+pub fn resolve_target(root: &[UiElementSummary], query: &str) -> Vec<GroundedElement> {
+    let q_tokens = tokens(query);
+    let role_subs = role_targets(&q_tokens);
+    let q_label = label_tokens(&q_tokens);
+    let role_only = q_label.is_empty() && !role_subs.is_empty();
+
+    let mut scored: Vec<GroundedElement> = Vec::new();
+    for el in flatten_elements(root) {
+        // Addressability: must have a name or automation_id to be actionable.
+        let addressable = !el.name.trim().is_empty() || !el.automation_id.trim().is_empty();
+        if !addressable {
+            continue;
+        }
+
+        let lscore = label_score(&el.name, &q_label);
+        let role_hit = control_type_matches(&el, &role_subs);
+
+        // Base must come from either a label hit or (for role-only queries) a
+        // role hit — otherwise this element isn't a candidate at all.
+        if lscore == 0.0 && !(role_only && role_hit) {
+            continue;
+        }
+
+        let mut score = lscore;
+        let mut why: Vec<String> = Vec::new();
+        if lscore > 0.0 {
+            why.push(format!("label~{:.2}", lscore));
+        }
+        if role_hit {
+            score += 0.25;
+            // Role-only query ("the button") has no label to score — the role
+            // match IS the signal, so give it a base above the floor.
+            if role_only {
+                score += 0.35;
+            }
+            why.push("role".into());
+        } else if !role_subs.is_empty() && !role_only {
+            // Query named a role but this element is a different type → mild penalty.
+            score -= 0.10;
+        }
+        if el.is_enabled {
+            score += 0.05;
+        } else {
+            score -= 0.30;
+            why.push("disabled".into());
+        }
+        if el.has_keyboard_focus {
+            score += 0.05;
+            why.push("focused".into());
+        }
+        // Invisible / zero-size elements are not clickable targets.
+        if el.bounds.width <= 0 || el.bounds.height <= 0 {
+            score -= 0.50;
+            why.push("zero-size".into());
+        }
+
+        let center = (
+            el.bounds.left + el.bounds.width / 2,
+            el.bounds.top + el.bounds.height / 2,
+        );
+        scored.push(GroundedElement {
+            element: el,
+            score,
+            center,
+            reason: why.join("+"),
+        });
+    }
+
+    // Rank best-first; drop anything below a confidence floor.
+    scored.retain(|g| g.score >= 0.35);
+    scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    scored
+}
+
+#[cfg(test)]
+mod grounding_tests {
+    use super::*;
+
+    fn el(name: &str, ct: &str, enabled: bool, w: i32, h: i32) -> UiElementSummary {
+        UiElementSummary {
+            name: name.to_string(),
+            automation_id: String::new(),
+            class_name: String::new(),
+            control_type: ct.to_string(),
+            localized_control_type: ct.to_lowercase(),
+            framework_id: String::new(),
+            has_keyboard_focus: false,
+            is_enabled: enabled,
+            bounds: UiBounds { left: 10, top: 20, right: 10 + w, bottom: 20 + h, width: w, height: h },
+            children: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn exact_label_ranks_first() {
+        let tree = vec![
+            el("Cancel", "Button", true, 80, 30),
+            el("Submit", "Button", true, 80, 30),
+            el("Submit order details", "Text", true, 200, 20),
+        ];
+        let r = resolve_target(&tree, "click the Submit button");
+        assert!(!r.is_empty());
+        assert_eq!(r[0].element.name, "Submit", "exact label + role beats partial text");
+    }
+
+    #[test]
+    fn role_word_disambiguates_same_label() {
+        // A Text and a Button both say "Save". "Save button" → the Button wins.
+        let tree = vec![
+            el("Save", "Text", true, 60, 18),
+            el("Save", "Button", true, 60, 30),
+        ];
+        let r = resolve_target(&tree, "save button");
+        assert_eq!(r[0].element.control_type, "Button");
+    }
+
+    #[test]
+    fn disabled_ranks_below_enabled_twin() {
+        let tree = vec![
+            el("Next", "Button", false, 70, 30),
+            el("Next", "Button", true, 70, 30),
+        ];
+        let r = resolve_target(&tree, "Next");
+        assert!(r[0].element.is_enabled, "enabled twin outranks disabled");
+    }
+
+    #[test]
+    fn finds_nested_children() {
+        let mut root = el("Toolbar", "ToolBar", true, 400, 40);
+        root.children = vec![el("Bold", "Button", true, 30, 30), el("Italic", "Button", true, 30, 30)];
+        let r = resolve_target(&[root], "Italic");
+        assert!(r.iter().any(|g| g.element.name == "Italic"), "nested child resolved via flatten");
+    }
+
+    #[test]
+    fn fuzzy_partial_label_matches() {
+        let tree = vec![el("Save All Files", "Button", true, 120, 30)];
+        let r = resolve_target(&tree, "save");
+        assert!(!r.is_empty() && r[0].element.name == "Save All Files");
+    }
+
+    #[test]
+    fn no_match_returns_empty() {
+        let tree = vec![el("Submit", "Button", true, 80, 30)];
+        assert!(resolve_target(&tree, "purchase quantum widgets").is_empty());
+    }
+
+    #[test]
+    fn center_is_bounds_center() {
+        let tree = vec![el("OK", "Button", true, 100, 40)]; // left10 top20 → center (60,40)
+        let r = resolve_target(&tree, "OK");
+        assert_eq!(r[0].center, (60, 40));
+    }
+
+    #[test]
+    fn unaddressable_elements_skipped() {
+        // No name, no automation_id → not a candidate even with a role hit.
+        let blank = el("", "Button", true, 50, 30);
+        assert!(resolve_target(&[blank], "button").is_empty());
+    }
+
+    #[test]
+    fn role_only_query_returns_buttons() {
+        let tree = vec![
+            el("Open", "Button", true, 60, 30),
+            el("Filename", "Edit", true, 200, 24),
+        ];
+        let r = resolve_target(&tree, "the button");
+        assert!(r.iter().all(|g| g.element.control_type == "Button"));
+        assert!(!r.is_empty());
+    }
+}
