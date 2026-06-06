@@ -1009,6 +1009,11 @@ struct DiskConfig {
     // keeps legacy configs loadable. Field name uses raw identifier (`loop` is a Rust keyword).
     #[serde(default)]
     r#loop: LoopConfig,
+    // Phase 88 (v2.5 GUARDRAILS-WIRE) — tool-guardrail thresholds (warn/halt).
+    // #[serde(default)] keeps legacy configs loadable. hard_stop_enabled
+    // defaults false (halts are explicit opt-in).
+    #[serde(default)]
+    tool_guardrails: crate::tool_guardrails::GuardrailConfig,
     // Phase 34 Plan 34-01 — Resilience runtime knobs (RES-01..05).
     // smart_resilience_enabled escape hatch + 5 stuck thresholds + circuit
     // breaker threshold + per-conversation cost cap + provider fallback chain
@@ -1135,6 +1140,7 @@ impl Default for DiskConfig {
             reward_weights: default_reward_weights(),
             context: ContextConfig::default(),
             r#loop: LoopConfig::default(),
+            tool_guardrails: crate::tool_guardrails::GuardrailConfig::default(),
             resilience: ResilienceConfig::default(),
             session: SessionConfig::default(),
             decomposition: DecompositionConfig::default(),
@@ -1308,6 +1314,12 @@ pub struct BladeConfig {
     /// See `LoopConfig`.
     #[serde(default)]
     pub r#loop: LoopConfig,
+    /// Phase 88 (v2.5 GUARDRAILS-WIRE) — tool-guardrail thresholds. Defaults:
+    /// warnings_enabled=true, hard_stop_enabled=false (halts opt-in),
+    /// exact warn@2/block@5, same-tool warn@3/halt@8, no-progress warn@2/block@5.
+    /// See `tool_guardrails::GuardrailConfig`.
+    #[serde(default)]
+    pub tool_guardrails: crate::tool_guardrails::GuardrailConfig,
     /// Phase 34 Plan 34-01 — Resilience runtime knobs (RES-01..05). Defaults:
     /// smart_resilience_enabled=true, 5 stuck thresholds, circuit_breaker_threshold=3,
     /// cost_guard_per_conversation_dollars=25.0, provider_fallback_chain=
@@ -1424,6 +1436,7 @@ impl Default for BladeConfig {
             reward_weights: default_reward_weights(),
             context: ContextConfig::default(),
             r#loop: LoopConfig::default(),
+            tool_guardrails: crate::tool_guardrails::GuardrailConfig::default(),
             resilience: ResilienceConfig::default(),
             session: SessionConfig::default(),
             decomposition: DecompositionConfig::default(),
@@ -1597,6 +1610,7 @@ pub fn load_config() -> BladeConfig {
         reward_weights: disk.reward_weights.clone(),
         context: disk.context,
         r#loop: disk.r#loop,
+        tool_guardrails: disk.tool_guardrails,
         resilience: disk.resilience,
         session: disk.session,
         decomposition: disk.decomposition,
@@ -1685,6 +1699,7 @@ pub fn save_config(config: &BladeConfig) -> Result<(), String> {
         reward_weights: config.reward_weights.clone(),
         context: config.context.clone(),
         r#loop: config.r#loop.clone(),
+        tool_guardrails: config.tool_guardrails.clone(),
         resilience: config.resilience.clone(),
         session: config.session.clone(),
         decomposition: config.decomposition.clone(),
@@ -2264,6 +2279,7 @@ mod tests {
             reward_weights: cfg.reward_weights.clone(),
             context: cfg.context.clone(),
             r#loop: cfg.r#loop.clone(),
+            tool_guardrails: cfg.tool_guardrails.clone(),
             resilience: cfg.resilience.clone(),
             session: cfg.session.clone(),
             decomposition: cfg.decomposition.clone(),

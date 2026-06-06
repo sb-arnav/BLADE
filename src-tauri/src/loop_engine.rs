@@ -94,10 +94,13 @@ pub struct LoopState {
     /// RepeatedActionObservation detector. Capacity is RECENT_ACTIONS_CAPACITY (6).
     /// Renamed from the legacy 3-slot field in Plan 34-02; the previous name is gone.
     pub recent_actions: VecDeque<ActionRecord>,
-    /// LOOP-03 trigger — count of consecutive failures per tool name.
-    /// Resets to 0 when the tool succeeds or a different tool fails.
-    /// On 3rd entry, reject_plan is called + replan nudge injected.
-    pub consecutive_same_tool_failures: HashMap<String, u32>,
+    /// Phase 88 (GUARDRAILS-WIRE) — tool-call guardrail observer. Owns the
+    /// per-tool failure counts, exact-call-repeat dedup, and idempotent
+    /// no-progress tracking that the inline `consecutive_same_tool_failures`
+    /// HashMap used to hold. Constructed from `config.tool_guardrails` at
+    /// `run_loop_inner` entry; `observe()` is called at the tool-result site.
+    /// `Warn(SameToolFailing)` reproduces the LOOP-03 reject_plan side effect.
+    pub guardrail: crate::tool_guardrails::GuardrailObserver,
     /// Plan 33-05 — last iteration where a nudge was injected (LOOP-01 NO/REPLAN
     /// or LOOP-03 third-same-tool). Used to suppress stacking — if a nudge was
     /// injected within the last 2 iterations, the next one is skipped.
@@ -212,7 +215,7 @@ pub struct ActionRecord {
 //   - cumulative_cost_usd              (PerLoop cap is per-turn by design)
 //   - replans_this_run / token_escalations  (per-turn; reset OK)
 //   - recent_actions                   (per-turn ring buffer for verification probe)
-//   - consecutive_same_tool_failures   (per-turn streak; reset OK)
+//   - guardrail (GuardrailObserver)    (per-turn; reset_turn() at run_loop entry)
 //   - last_nudge_iteration             (per-turn anti-stacking)
 
 /// Carry-over slice of LoopState that persists across `send_message_stream`
@@ -404,6 +407,12 @@ pub enum LoopHaltReason {
     /// loop returns this halt reason to commands.rs which stops iterating.
     /// Carries no payload — the conversation already holds the summaries.
     DecompositionComplete,
+    /// Phase 88 (GUARDRAILS-WIRE) — `tool_guardrails::GuardrailObserver`
+    /// returned a Halt (hard_stop_enabled opt-in tripped: repeated identical
+    /// failing call, same-tool failures past the halt threshold, or idempotent
+    /// no-progress past the block threshold). Carries the `HaltKind` for the
+    /// analytics key + chat surface. commands.rs renders the user-facing error.
+    ToolGuardrailHalt { kind: crate::tool_guardrails::HaltKind },
 }
 
 // ─── Structured tool errors (LOOP-02) ──────────────────────────────────────
@@ -925,6 +934,15 @@ async fn run_loop_inner(
     };
     loop_state.iteration_budget =
         crate::iteration_budget::IterationBudget::with_max_iterations(ceiling);
+
+    // Phase 88 (GUARDRAILS-WIRE) — construct the tool-guardrail observer from
+    // config and reset its per-turn counters. Replaces the inline
+    // `consecutive_same_tool_failures` HashMap. Default config has
+    // hard_stop_enabled=false (halts opt-in); warnings (incl. the LOOP-03
+    // reject_plan path) are on by default.
+    loop_state.guardrail =
+        crate::tool_guardrails::GuardrailObserver::new(config.tool_guardrails.clone());
+    loop_state.guardrail.reset_turn();
 
     let mut last_tool_signature = String::new();
     let mut repeat_count = 0u8;
@@ -2895,63 +2913,81 @@ async fn run_loop_inner(
                     content.clone(),
                 );
                 tool_err.suggested_alternatives = enrich_alternatives(&tool_call.name);
+                let rendered = tool_err.render_for_model();
 
-                // LOOP-03 — track consecutive same-tool failures.
-                // Reset map if the previous failure was for a different tool.
-                let last_failed_tool = loop_state
-                    .consecutive_same_tool_failures
-                    .keys()
-                    .next()
-                    .cloned();
-                if let Some(prev) = last_failed_tool {
-                    if prev != tool_call.name {
-                        loop_state.consecutive_same_tool_failures.clear();
+                // Phase 88 (GUARDRAILS-WIRE) — observe this FAILED call.
+                // GuardrailDecision is Copy; capture it before mutating other
+                // loop_state fields to avoid an overlapping borrow.
+                let args_json = serde_json::to_string(&tool_call.arguments).unwrap_or_default();
+                let decision = loop_state.guardrail.observe(
+                    crate::tool_guardrails::ToolCallObservation {
+                        tool_name: &tool_call.name,
+                        args_json: &args_json,
+                        succeeded: false,
+                    },
+                );
+                match decision {
+                    crate::tool_guardrails::GuardrailDecision::Halt(kind) => {
+                        // hard_stop opt-in tripped — surface via commands.rs arm.
+                        return Err(LoopHaltReason::ToolGuardrailHalt { kind });
                     }
-                }
-                let counter = loop_state
-                    .consecutive_same_tool_failures
-                    .entry(tool_call.name.clone())
-                    .or_insert(0);
-                *counter += 1;
-                let triggered = *counter >= 3;
-
-                if triggered {
-                    // Stacking prevention (landmine #11) — if a nudge was
-                    // injected within the last 2 iterations, skip this one.
-                    let stacking = loop_state
-                        .last_nudge_iteration
-                        .map_or(false, |prev| {
+                    crate::tool_guardrails::GuardrailDecision::Warn(
+                        crate::tool_guardrails::WarnKind::SameToolFailing,
+                    ) => {
+                        // LOOP-03 — preserve the Phase 33-05 reject_plan side
+                        // effect verbatim (R6). Stacking guard suppresses a
+                        // nudge injected within the last 2 iterations.
+                        let stacking = loop_state.last_nudge_iteration.map_or(false, |prev| {
                             loop_state.iteration.saturating_sub(prev) <= 2
                         });
-                    if !stacking {
-                        crate::brain_planner::reject_plan(last_user_text);
-                        loop_state.replans_this_run =
-                            loop_state.replans_this_run.saturating_add(1);
-                        loop_state.last_nudge_iteration = Some(loop_state.iteration);
-                        // Plan 34-08 (SESS-01) — JSONL-paired replanning emit.
-                        crate::commands::emit_with_jsonl(
-                            &app,
-                            session_writer,
-                            "replanning",
-                            serde_json::json!({
-                                "count": loop_state.replans_this_run,
-                            }),
-                        );
-                        conversation.push(ConversationMessage::System(
-                            "Internal check: re-plan from current state. Do not retry the failing step verbatim.".to_string(),
-                        ));
+                        if !stacking {
+                            crate::brain_planner::reject_plan(last_user_text);
+                            loop_state.replans_this_run =
+                                loop_state.replans_this_run.saturating_add(1);
+                            loop_state.last_nudge_iteration = Some(loop_state.iteration);
+                            // Plan 34-08 (SESS-01) — JSONL-paired replanning emit.
+                            crate::commands::emit_with_jsonl(
+                                &app,
+                                session_writer,
+                                "replanning",
+                                serde_json::json!({ "count": loop_state.replans_this_run }),
+                            );
+                            conversation.push(ConversationMessage::System(
+                                "Internal check: re-plan from current state. Do not retry the failing step verbatim.".to_string(),
+                            ));
+                        }
+                        rendered
                     }
-                    // Reset the streak regardless — we acted on it (or
-                    // suppressed via stacking guard); next failure starts a
-                    // fresh count for this tool.
-                    *counter = 0;
+                    crate::tool_guardrails::GuardrailDecision::Warn(other) => {
+                        // Exact-call-repeat / idempotent-no-progress — advisory
+                        // prepended so the model self-corrects next turn.
+                        format!("Tool guardrail observation: {:?}.\n\n{}", other, rendered)
+                    }
+                    crate::tool_guardrails::GuardrailDecision::Allow => rendered,
                 }
-
-                tool_err.render_for_model()
             } else if config.r#loop.smart_loop_enabled && !is_error {
-                // Successful tool call — break any active failure streak.
-                loop_state.consecutive_same_tool_failures.clear();
-                content
+                // Successful tool call — still observe (idempotent-no-progress +
+                // exact-call tracking; same-tool/exact-failure warns are gated
+                // on !succeeded inside observe() so they cannot fire here).
+                let args_json = serde_json::to_string(&tool_call.arguments).unwrap_or_default();
+                let decision = loop_state.guardrail.observe(
+                    crate::tool_guardrails::ToolCallObservation {
+                        tool_name: &tool_call.name,
+                        args_json: &args_json,
+                        succeeded: true,
+                    },
+                );
+                match decision {
+                    crate::tool_guardrails::GuardrailDecision::Halt(kind) => {
+                        return Err(LoopHaltReason::ToolGuardrailHalt { kind });
+                    }
+                    crate::tool_guardrails::GuardrailDecision::Warn(
+                        crate::tool_guardrails::WarnKind::IdempotentNoProgress,
+                    ) => {
+                        format!("Tool guardrail observation: IdempotentNoProgress.\n\n{}", content)
+                    }
+                    _ => content,
+                }
             } else {
                 // Legacy path (smart_loop_enabled=false) — preserve verbatim.
                 content
@@ -3103,7 +3139,9 @@ mod tests {
         assert_eq!(s.replans_this_run, 0);
         assert_eq!(s.token_escalations, 0);
         assert!(s.recent_actions.is_empty());
-        assert!(s.consecutive_same_tool_failures.is_empty());
+        // Phase 88 — default guardrail has hard_stop off + warnings on.
+        assert!(!s.guardrail.config.hard_stop_enabled);
+        assert!(s.guardrail.config.warnings_enabled);
         assert_eq!(s.last_nudge_iteration, None);
         assert_eq!(s.consecutive_no_tool_turns, 0);
         assert_eq!(s.compactions_this_run, 0);
@@ -4053,87 +4091,127 @@ mod tests {
 
     #[test]
     fn phase33_loop_03_replans_observed_after_three_same_tool_failures() {
-        // Synthetic LoopState — directly exercise the counter logic that
-        // triggers reject_plan on the third consecutive same-tool failure.
+        // Phase 88 (GUARDRAILS-WIRE) — the LOOP-03 reject_plan observable now
+        // originates from GuardrailObserver: 3 same-tool failures →
+        // Warn(SameToolFailing), which the loop (D-03) maps to reject_plan +
+        // replans_this_run += 1. This test drives the observer (the trigger)
+        // and reproduces the loop's mapping. Uses a neutral tool ("bash", in
+        // neither IDEMPOTENT nor MUTATING) so no-progress detection doesn't
+        // fire first and mask the same-tool warn.
+        use crate::tool_guardrails::{
+            GuardrailConfig, GuardrailDecision, GuardrailObserver, ToolCallObservation, WarnKind,
+        };
+        let mut g = GuardrailObserver::new(GuardrailConfig::default()); // same-tool warn @ 3
         let mut state = LoopState::default();
-        let mut last_failed_tool: Option<String> = None;
-
-        for _ in 0..3 {
-            // Simulate three same-tool failures (tool-change reset path).
-            if let Some(prev) = last_failed_tool.clone() {
-                if prev != "read_file" {
-                    state.consecutive_same_tool_failures.clear();
-                }
-            }
-            let counter = state
-                .consecutive_same_tool_failures
-                .entry("read_file".to_string())
-                .or_insert(0);
-            *counter += 1;
-            last_failed_tool = Some("read_file".to_string());
-        }
-        assert_eq!(
-            *state.consecutive_same_tool_failures.get("read_file").unwrap(),
-            3,
-            "third same-tool failure must register count=3"
+        let fail = |a: &'static str| ToolCallObservation {
+            tool_name: "bash",
+            args_json: a,
+            succeeded: false,
+        };
+        assert!(matches!(g.observe(fail("{\"c\":\"a\"}")), GuardrailDecision::Allow));
+        assert!(matches!(g.observe(fail("{\"c\":\"b\"}")), GuardrailDecision::Allow));
+        let third = g.observe(fail("{\"c\":\"c\"}"));
+        assert!(
+            matches!(third, GuardrailDecision::Warn(WarnKind::SameToolFailing)),
+            "3rd same-tool failure warns (the LOOP-03 trigger), got {:?}",
+            third
         );
-
-        // Now simulate the trigger logic (the production code path increments
-        // replans_this_run + writes last_nudge_iteration when count >= 3).
-        if *state.consecutive_same_tool_failures.get("read_file").unwrap() >= 3 {
+        // Loop's mapping (D-03): Warn(SameToolFailing) → reject_plan side effect.
+        if matches!(third, GuardrailDecision::Warn(WarnKind::SameToolFailing)) {
             state.replans_this_run = state.replans_this_run.saturating_add(1);
             state.last_nudge_iteration = Some(state.iteration);
         }
-        assert_eq!(state.replans_this_run, 1, "replans_this_run must increment");
+        assert_eq!(state.replans_this_run, 1, "replans_this_run increments on the trigger");
+        assert!(state.last_nudge_iteration.is_some(), "last_nudge_iteration set on trigger");
+    }
+
+    #[test]
+    fn phase88_guardrail_tracks_tools_independently() {
+        // Phase 88 (D-04) — Hermes per-tool-cumulative model: a different tool
+        // failing does NOT reset another tool's count (unlike the retired inline
+        // consecutive model). Counts are independent until reset_turn().
+        use crate::tool_guardrails::{
+            GuardrailConfig, GuardrailDecision, GuardrailObserver, ToolCallObservation, WarnKind,
+        };
+        let mut g = GuardrailObserver::new(GuardrailConfig::default());
+        let fail = |t: &'static str, a: &'static str| ToolCallObservation {
+            tool_name: t,
+            args_json: a,
+            succeeded: false,
+        };
+        let _ = g.observe(fail("bash", "{\"c\":\"1\"}")); // bash failures = 1
+        let _ = g.observe(fail("bash", "{\"c\":\"2\"}")); // bash failures = 2
+        let _ = g.observe(fail("curl_tool", "{\"u\":\"x\"}")); // different tool — no reset
+        // 3rd bash failure still reaches the same-tool warn threshold.
         assert!(
-            state.last_nudge_iteration.is_some(),
-            "last_nudge_iteration must be set on trigger"
+            matches!(
+                g.observe(fail("bash", "{\"c\":\"3\"}")),
+                GuardrailDecision::Warn(WarnKind::SameToolFailing)
+            ),
+            "bash count survives an interleaved different-tool failure (per-tool independent)"
         );
     }
 
     #[test]
-    fn phase33_loop_03_different_tool_resets_counter() {
-        // CONTEXT lock §Plan Adaptation: counter resets when a *different*
-        // tool name fails after a streak. The HashMap shape (one key at a
-        // time) matches the locked design.
-        let mut state = LoopState::default();
-        let mut last_failed_tool: Option<String> = None;
-
-        // Two failures of read_file
-        for _ in 0..2 {
-            if let Some(prev) = last_failed_tool.clone() {
-                if prev != "read_file" {
-                    state.consecutive_same_tool_failures.clear();
-                }
-            }
-            let counter = state
-                .consecutive_same_tool_failures
-                .entry("read_file".to_string())
-                .or_insert(0);
-            *counter += 1;
-            last_failed_tool = Some("read_file".to_string());
-        }
-        // One failure of bash — must clear read_file
-        if let Some(prev) = last_failed_tool.clone() {
-            if prev != "bash" {
-                state.consecutive_same_tool_failures.clear();
-            }
-        }
-        let counter = state
-            .consecutive_same_tool_failures
-            .entry("bash".to_string())
-            .or_insert(0);
-        *counter += 1;
-
+    fn phase88_reset_turn_clears_failure_counts() {
+        // Phase 88 — within a turn the guardrail accumulates per-tool failures;
+        // reset_turn() (called at run_loop entry) clears them so each user turn
+        // starts fresh. Replaces the retired success-clears-streak inline test.
+        use crate::tool_guardrails::{
+            GuardrailConfig, GuardrailDecision, GuardrailObserver, ToolCallObservation,
+        };
+        let mut g = GuardrailObserver::new(GuardrailConfig::default());
+        let fail = |a: &'static str| ToolCallObservation {
+            tool_name: "bash",
+            args_json: a,
+            succeeded: false,
+        };
+        let _ = g.observe(fail("{\"c\":\"1\"}"));
+        let _ = g.observe(fail("{\"c\":\"2\"}"));
+        g.reset_turn();
+        // After reset the count restarts — 2 more failures do NOT warn yet.
+        assert!(matches!(g.observe(fail("{\"c\":\"3\"}")), GuardrailDecision::Allow));
         assert!(
-            state.consecutive_same_tool_failures.get("read_file").is_none(),
-            "different-tool failure must clear the previous tool's streak"
+            matches!(g.observe(fail("{\"c\":\"4\"}")), GuardrailDecision::Allow),
+            "reset_turn cleared the failure count"
         );
-        assert_eq!(
-            *state.consecutive_same_tool_failures.get("bash").unwrap(),
-            1,
-            "new tool's first failure registers count=1"
-        );
+    }
+
+    #[test]
+    fn phase88_guardrail_halt_maps_to_tool_guardrail_halt() {
+        // Success-criterion #7 — 5x identical FAILING call with hard_stop_enabled
+        // → Halt(ExactCallRepeatingTooMany), which the loop (D-03) maps to
+        // LoopHaltReason::ToolGuardrailHalt.
+        use crate::tool_guardrails::{
+            GuardrailConfig, GuardrailDecision, GuardrailObserver, ToolCallObservation,
+        };
+        let cfg = GuardrailConfig { hard_stop_enabled: true, ..Default::default() };
+        let mut g = GuardrailObserver::new(cfg);
+        let same = ToolCallObservation {
+            tool_name: "bash",
+            args_json: "{\"c\":\"same\"}",
+            succeeded: false,
+        };
+        let mut last = GuardrailDecision::Allow;
+        for _ in 0..5 {
+            last = g.observe(same.clone());
+        }
+        let kind = match last {
+            GuardrailDecision::Halt(k) => k,
+            other => panic!("expected Halt after 5 identical failures, got {:?}", other),
+        };
+        let halt = LoopHaltReason::ToolGuardrailHalt { kind };
+        assert!(matches!(halt, LoopHaltReason::ToolGuardrailHalt { .. }));
+    }
+
+    #[test]
+    fn phase88_guardrail_from_config_default_hard_stop_off() {
+        // Observer constructed from BladeConfig::default().tool_guardrails has
+        // warnings on, hard stops opt-in (default shipping state).
+        let cfg = crate::config::BladeConfig::default();
+        let g = crate::tool_guardrails::GuardrailObserver::new(cfg.tool_guardrails.clone());
+        assert!(g.config.warnings_enabled);
+        assert!(!g.config.hard_stop_enabled, "halts are opt-in by default");
     }
 
     #[test]
@@ -4158,28 +4236,12 @@ mod tests {
         );
     }
 
-    #[test]
-    fn phase33_loop_03_successful_tool_clears_streak() {
-        // Success arm of the LoopState boundary: a successful tool call must
-        // clear consecutive_same_tool_failures so the next failure of the
-        // same tool starts a fresh streak.
-        let mut state = LoopState::default();
-        state
-            .consecutive_same_tool_failures
-            .insert("read_file".to_string(), 2);
-        assert_eq!(
-            *state.consecutive_same_tool_failures.get("read_file").unwrap(),
-            2
-        );
-
-        // Simulate the success-arm reset.
-        state.consecutive_same_tool_failures.clear();
-
-        assert!(
-            state.consecutive_same_tool_failures.is_empty(),
-            "successful tool call must clear all streak counters"
-        );
-    }
+    // Phase 88 (GUARDRAILS-WIRE) — `phase33_loop_03_successful_tool_clears_streak`
+    // removed: the inline "success clears the same-tool streak within a turn"
+    // semantics are intentionally retired (D-04). The guardrail clears failure
+    // counts per-turn via reset_turn() — covered by
+    // `phase88_reset_turn_clears_failure_counts` + the module's
+    // `successful_mutation_resets_no_progress_counter` test.
 
     // ─── Plan 33-09 (CTX-07 panic-injection regression suite) ─────────────
     //

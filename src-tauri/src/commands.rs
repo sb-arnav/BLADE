@@ -2359,6 +2359,24 @@ pub(crate) async fn send_message_stream_inline(
             let _ = app.emit("blade_status", "error");
             return Ok(());
         }
+        Err(crate::loop_engine::LoopHaltReason::ToolGuardrailHalt { kind }) => {
+            // Phase 88 (GUARDRAILS-WIRE) — the tool guardrail tripped a hard
+            // stop (opt-in via config.tool_guardrails.hard_stop_enabled).
+            // Surface the user-facing chat_error + the ActivityStrip chip,
+            // mirroring the Stuck arm.
+            let msg = format!(
+                "Loop halted: tool guardrail tripped ({:?}). Try a different approach.",
+                kind
+            );
+            emit_stream_event(&app, "blade_loop_event", serde_json::json!({
+                "kind": "halted",
+                "reason": format!("tool_guardrail:{:?}", kind),
+            }));
+            emit_stream_event(&app, "chat_error", msg.clone());
+            emit_stream_event(&app, "chat_done", ());
+            let _ = app.emit("blade_status", "error");
+            return Ok(());
+        }
         Err(crate::loop_engine::LoopHaltReason::CircuitOpen { error_kind, attempts_summary }) => {
             // Plan 34-05 (RES-02) — structured "what was tried" chat surface.
             // Renders the most-recent attempts (capped at 3) so the user sees
