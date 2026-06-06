@@ -66,6 +66,12 @@ pub const RECENT_ACTIONS_CAPACITY: usize = 6;
 pub struct LoopState {
     /// Current iteration count (0-indexed).
     pub iteration: u32,
+    /// Phase 87 (BUDGET-WIRE) — owns the iteration ceiling. Replaces the bare
+    /// `for iteration in 0..max_iter`. Ceiling is set per user turn at
+    /// `run_loop_inner` entry from `config.r#loop.max_iterations` (or the
+    /// legacy 12 when smart loop is off). `consume()` at the loop head ticks +
+    /// reports whether another model dispatch may proceed.
+    pub iteration_budget: crate::iteration_budget::IterationBudget,
     /// Per-loop (single user turn) cumulative spend in USD. Phase 33-08 wired
     /// the runtime check at the top of each iteration. Phase 34 keeps this
     /// field untouched and adds `conversation_cumulative_cost_usd` as the
@@ -372,10 +378,11 @@ pub enum LoopHaltReason {
     /// per-conversation (Phase 34 RES-04). Emit blade_loop_event
     /// {kind: "halted", reason: "cost_exceeded"} + chat_error with the figures.
     CostExceeded { spent_usd: f32, cap_usd: f32, scope: CostScope },
-    /// LOOP-06 — `config.r#loop.max_iterations` exhausted without resolution.
-    /// Existing iteration-exhausted handling continues (preserve current
-    /// commands.rs behavior; just emit blade_loop_event).
-    IterationCap,
+    /// LOOP-06 / Phase 87 (BUDGET-WIRE) — iteration ceiling exhausted without
+    /// resolution. Carries the budget figures (`used`/`max_total`); REQ's
+    /// `BudgetExhausted` semantics fold into this payload. Existing
+    /// iteration-exhausted handling in commands.rs is preserved.
+    IterationCap { used: u32, max_total: u32 },
     /// User pressed cancel (CHAT_CANCEL atomic flipped).
     Cancelled,
     /// Provider error that wasn't recoverable via classify_api_error fallback.
@@ -907,11 +914,17 @@ async fn run_loop_inner(
     // disabled — the trigger still works (executor handles the empty-id path).
     conversation_id: &str,
 ) -> Result<(), LoopHaltReason> {
-    let max_iter: usize = if config.r#loop.smart_loop_enabled {
-        config.r#loop.max_iterations as usize
+    // Phase 87 (BUDGET-WIRE) — the iteration ceiling is now owned by
+    // `loop_state.iteration_budget` instead of a bare `for 0..max_iter`. Set
+    // the ceiling per user turn from config (or the legacy 12 when smart loop
+    // is off — CONTEXT lock §Backward Compatibility / CTX-07 escape hatch).
+    let ceiling: u32 = if config.r#loop.smart_loop_enabled {
+        config.r#loop.max_iterations
     } else {
-        12 // legacy literal — CONTEXT lock §Backward Compatibility
+        12
     };
+    loop_state.iteration_budget =
+        crate::iteration_budget::IterationBudget::with_max_iterations(ceiling);
 
     let mut last_tool_signature = String::new();
     let mut repeat_count = 0u8;
@@ -1036,10 +1049,20 @@ async fn run_loop_inner(
         }
     }
 
-    for iteration in 0..max_iter {
-        // Plan 33-05 — keep LoopState.iteration in sync with the for-loop
-        // index so the stacking-prevention check (last_nudge_iteration) and
-        // future verification cadence (Plan 33-04) read the right value.
+    // Phase 87 (BUDGET-WIRE) — budget-driven loop. `consume()` ticks the
+    // counter then reports whether another dispatch may proceed; ceiling N ⇒
+    // N body passes (iteration 0..N-1), identical to the prior
+    // `for iteration in 0..max_iter`. Exhaustion falls through to the
+    // IterationCap return below.
+    while loop_state.iteration_budget.consume() {
+        // 0-indexed iteration index, derived from the budget (used()==1 on the
+        // first pass ⇒ iteration==0). Preserves every downstream read:
+        // `iteration % verification_every_n`, `iteration > 0`, and the
+        // `loop_state.iteration` sync below.
+        let iteration = (loop_state.iteration_budget.used() - 1) as usize;
+        // Plan 33-05 — keep LoopState.iteration in sync with the loop index so
+        // the stacking-prevention check (last_nudge_iteration) and the
+        // verification cadence (Plan 33-04) read the right value.
         loop_state.iteration = iteration as u32;
 
         // Check cancellation before each iteration
@@ -3009,13 +3032,15 @@ async fn run_loop_inner(
     // the cost_exceeded emit at iteration top.
     //
     // Plan 34-08 (SESS-01) — JSONL-paired iteration_cap halted emit.
+    let budget_used = loop_state.iteration_budget.used();
+    let budget_max = loop_state.iteration_budget.max();
     crate::commands::emit_with_jsonl(
         &app,
         session_writer,
         "halted",
-        serde_json::json!({ "reason": "iteration_cap" }),
+        serde_json::json!({ "reason": "iteration_cap", "used": budget_used, "max_total": budget_max }),
     );
-    Err(LoopHaltReason::IterationCap)
+    Err(LoopHaltReason::IterationCap { used: budget_used, max_total: budget_max })
 }
 
 // ─── Tests ─────────────────────────────────────────────────────────────────
@@ -3130,6 +3155,27 @@ mod tests {
             "smart-off path must hard-code 12 iterations regardless of config (was {})",
             max_iter
         );
+    }
+
+    #[test]
+    fn phase87_budget_ceiling_honors_smart_toggle() {
+        // Phase 87 (BUDGET-WIRE) — the IterationBudget constructed at
+        // run_loop_inner entry must take its ceiling from the same branch the
+        // old `let max_iter` used: max_iterations when smart on, literal 12 off.
+        // Smart on → 25.
+        let mut cfg = crate::config::BladeConfig::default();
+        cfg.r#loop.smart_loop_enabled = true;
+        cfg.r#loop.max_iterations = 25;
+        let ceiling: u32 = if cfg.r#loop.smart_loop_enabled { cfg.r#loop.max_iterations } else { 12 };
+        let b = crate::iteration_budget::IterationBudget::with_max_iterations(ceiling);
+        assert_eq!(b.max(), 25, "smart-on budget ceiling = config.max_iterations");
+
+        // Smart off → 12 regardless of max_iterations.
+        cfg.r#loop.smart_loop_enabled = false;
+        cfg.r#loop.max_iterations = 999;
+        let ceiling: u32 = if cfg.r#loop.smart_loop_enabled { cfg.r#loop.max_iterations } else { 12 };
+        let b = crate::iteration_budget::IterationBudget::with_max_iterations(ceiling);
+        assert_eq!(b.max(), 12, "smart-off budget ceiling = legacy 12 (CTX-07 escape hatch)");
     }
 
     // ─── LOOP-04 detection + escalation tests (Plan 33-06) ─────────────

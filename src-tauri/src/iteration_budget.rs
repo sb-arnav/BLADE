@@ -107,6 +107,34 @@ impl IterationBudget {
         self.state() == BudgetState::Exhausted
     }
 
+    /// Phase 87 (BUDGET-WIRE) loop predicate. Call at the TOP of each loop
+    /// pass: `while budget.consume() { ... }`. Checks the ceiling FIRST; if a
+    /// dispatch may still proceed it advances the counter and returns `true`,
+    /// otherwise returns `false` without ticking. Ceiling N ⇒ exactly N `true`
+    /// returns then `false`, so the loop body runs N times with `used()`
+    /// reading 1..=N inside the body — identical body count to the prior
+    /// `for iteration in 0..max_iter` (use `used() - 1` for the 0-indexed
+    /// iteration value).
+    pub fn consume(&mut self) -> bool {
+        if self.is_exhausted() {
+            return false;
+        }
+        self.tick();
+        true
+    }
+
+    /// Release one consumed iteration. Hook for non-API-call rebuild paths
+    /// (none today — every iteration dispatches a turn). Present for v2.6
+    /// sub-agent / rebuild paths. Saturating; never underflows below 0.
+    pub fn refund(&mut self) {
+        self.current = self.current.saturating_sub(1);
+    }
+
+    /// Iterations consumed so far (alias of `current()` — REQ `budget.used`).
+    pub fn used(&self) -> u32 {
+        self.current
+    }
+
     /// Human-readable escalation reason for chat UI when exhausted.
     pub fn escalation_reason(&self) -> Option<String> {
         match self.state() {
@@ -195,5 +223,77 @@ mod tests {
     fn with_max_iterations_floors_at_one() {
         let b = IterationBudget::with_max_iterations(0);
         assert_eq!(b.max(), 1, "max iterations is floored at 1 to prevent zero-iter loops");
+    }
+
+    // ── Phase 87 (BUDGET-WIRE) — wire-level falsification ───────────────
+
+    #[test]
+    fn consume_returns_true_within_budget_and_used_increments() {
+        // Check-before-tick: ceiling N ⇒ N `true` returns then `false`. used()
+        // reads 1..=N inside the body. Body count == old `for 0..N`.
+        let mut b = IterationBudget::with_max_iterations(3);
+        assert!(b.consume() && b.used() == 1, "1st pass");
+        assert!(b.consume() && b.used() == 2, "2nd pass");
+        assert!(b.consume() && b.used() == 3, "3rd pass (still within ceiling)");
+        assert!(!b.consume(), "4th consume — ceiling reached, no tick");
+        assert_eq!(b.used(), 3, "used does not advance past the ceiling");
+
+        // Body-count equivalence: `while consume {}` runs exactly N times.
+        let mut b2 = IterationBudget::with_max_iterations(3);
+        let mut body_passes = 0u32;
+        while b2.consume() { body_passes += 1; }
+        assert_eq!(body_passes, 3, "ceiling 3 ⇒ 3 body passes, == old for 0..3");
+    }
+
+    #[test]
+    fn consume_returns_false_at_exhaustion() {
+        let mut b = IterationBudget::with_max_iterations(2);
+        assert!(b.consume(), "1st");
+        assert!(b.consume(), "2nd");
+        assert!(!b.consume(), "ceiling reached");
+        assert!(!b.consume(), "stays false once exhausted");
+    }
+
+    #[test]
+    fn refund_restores_one_slot() {
+        let mut b = IterationBudget::with_max_iterations(2);
+        assert!(b.consume()); // used 1
+        b.refund();           // back to 0
+        assert_eq!(b.used(), 0);
+        assert!(b.consume(), "after refund another consume succeeds"); // used 1
+        // refund at zero saturates — no underflow/panic.
+        let mut z = IterationBudget::with_max_iterations(2);
+        z.refund();
+        assert_eq!(z.used(), 0, "refund at zero saturates");
+    }
+
+    #[test]
+    fn concurrent_consume_thread_safe() {
+        use std::sync::{Arc, Mutex};
+        let b = Arc::new(Mutex::new(IterationBudget::with_max_iterations(100)));
+        let mut handles = vec![];
+        for _ in 0..2 {
+            let b = Arc::clone(&b);
+            handles.push(std::thread::spawn(move || {
+                for _ in 0..25 {
+                    let _ = b.lock().unwrap().consume();
+                }
+            }));
+        }
+        for h in handles { h.join().unwrap(); }
+        assert_eq!(b.lock().unwrap().used(), 50, "2×25 concurrent consumes total 50");
+    }
+
+    #[test]
+    fn iteration_cap_payload_carries_figures() {
+        // Mirrors the loop_engine fall-through construction of
+        // LoopHaltReason::IterationCap { used: b.used(), max_total: b.max() }.
+        let mut b = IterationBudget::with_max_iterations(2);
+        assert!(b.consume());
+        assert!(b.consume());
+        assert!(!b.consume(), "exhausted");
+        let (used, max_total) = (b.used(), b.max());
+        assert_eq!(used, 2);
+        assert_eq!(max_total, 2);
     }
 }

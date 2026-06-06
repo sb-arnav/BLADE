@@ -2332,9 +2332,12 @@ pub(crate) async fn send_message_stream_inline(
             let _ = app.emit("blade_status", "error");
             return Ok(());
         }
-        Err(crate::loop_engine::LoopHaltReason::IterationCap) => {
-            // Loop exhausted (max_iter reached) or stuck-loop break triggered.
-            // Fall through to the loop-exhausted summary block below.
+        Err(crate::loop_engine::LoopHaltReason::IterationCap { used, max_total }) => {
+            // Loop exhausted (iteration budget reached) or stuck-loop break
+            // triggered. Phase 87 (BUDGET-WIRE) — the budget figures are now
+            // available; existing fall-through to the loop-exhausted summary
+            // block below is preserved unchanged.
+            log::info!("[BUDGET-WIRE] iteration cap halt: {}/{} iterations used", used, max_total);
         }
         Err(crate::loop_engine::LoopHaltReason::Stuck { pattern }) => {
             // Plan 34-04 (RES-01) — surface the stuck halt to the chat UI.
