@@ -110,6 +110,7 @@ mod mcp;
 mod mcp_memory_server;
 mod mcp_fs_server;
 mod memory;
+mod memory_manager;       // v2.6 Phase 90 — MemoryManager facade (hermes-agent lift, MIT)
 mod permissions;
 mod plugins;
 mod provider_paste_parser;

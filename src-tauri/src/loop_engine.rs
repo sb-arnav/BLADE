@@ -2318,23 +2318,16 @@ async fn run_loop_inner(
                         "improved": improved,
                     }));
                 }
-                // Extract compounding facts from this exchange into KG + typed memory
-                // Only run when there's enough content worth learning from (>50 chars each side)
-                if user_text.len() > 50 || assistant_text.len() > 50 {
-                    let fact_msgs = vec![
-                        crate::providers::ChatMessage {
-                            role: "user".to_string(),
-                            content: user_text.clone(),
-                            image_base64: None,
-                        },
-                        crate::providers::ChatMessage {
-                            role: "assistant".to_string(),
-                            content: assistant_text.clone(),
-                            image_base64: None,
-                        },
-                    ];
-                    crate::memory::extract_conversation_facts(&fact_msgs).await;
-                }
+                // Phase 90 (v2.6 MEMORY-FACADE) — coalesced end-of-turn memory
+                // write. Routes the finished exchange through every memory-write
+                // subsystem (fact extraction → KG + typed memory [gated >50
+                // chars], memory palace, knowledge graph, people graph,
+                // personality mirror) in one call. Replaces the previously
+                // scattered inline fact-extraction block + the four separate
+                // fire-and-forget calls below.
+                crate::memory_manager::MemoryManager::new()
+                    .sync_all(&user_text, &assistant_text)
+                    .await;
                 // Record activity for dream mode
                 crate::dream_mode::record_user_activity();
                 // Detect knowledge gaps from this conversation
@@ -2345,15 +2338,9 @@ async fn run_loop_inner(
                     crate::safe_slice(&user_text, 200),
                     serde_json::json!({"response_len": assistant_text.len()}),
                 );
-                // Memory palace auto-consolidation — crystallise substantive exchanges
-                crate::memory_palace::auto_consolidate_from_conversation(&user_text, &assistant_text).await;
-                // Knowledge graph — extract concepts and grow the semantic network
-                let full_exchange = format!("User: {}\n\nAssistant: {}", user_text, assistant_text);
-                crate::knowledge_graph::grow_graph_from_conversation(&full_exchange).await;
-                // People graph — extract names mentioned and learn communication context
-                crate::people_graph::learn_from_conversation_text(&user_text, &assistant_text).await;
-                // Personality mirror — extract BLADE's chat style from this exchange
-                crate::personality_mirror::learn_from_exchange(&user_text, &assistant_text).await;
+                // (memory palace / knowledge graph / people graph / personality
+                // mirror writes now run inside MemoryManager::sync_all above —
+                // Phase 90 MEMORY-FACADE coalesce.)
             });
             // CONVERSATION SUMMARIZATION — for 5+ turn conversations, generate a 2-sentence
             // summary episode so "what did we discuss about X last week?" actually works.
