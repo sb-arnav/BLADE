@@ -3,7 +3,7 @@
 # downloads the matching asset (.msi preferred, .exe fallback), verifies SHA256 when sibling published,
 # installs silently, and launches BLADE.
 # Preserves %LOCALAPPDATA%\Blade user data (blade.db, who-you-are.md, Credential Manager) across upgrades.
-# Safe to audit: iwr -useb slayerblade.site/install.ps1 -OutFile install.ps1 ; notepad install.ps1
+# Safe to audit: iwr -useb slayerblade.in/install.ps1 -OutFile install.ps1 ; notepad install.ps1
 
 [CmdletBinding()]
 param(
@@ -16,7 +16,7 @@ $ErrorActionPreference = 'Stop'
 # --- constants ----------------------------------------------------------------
 $GitHubRepo  = 'sb-arnav/BLADE'
 $GitHubApi   = "https://api.github.com/repos/$GitHubRepo/releases/latest"
-$CdnBase     = 'https://cdn.slayerblade.site/releases'
+$CdnBase     = 'https://cdn.slayerblade.in/releases'
 
 # Force TLS 1.2 on older PowerShell 5.1.
 try {

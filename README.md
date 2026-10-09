@@ -8,10 +8,10 @@
 
 ```bash
 # macOS / Linux
-curl -sSL slayerblade.site/install | sh
+curl -sSL slayerblade.in/install | sh
 
 # Windows (PowerShell)
-iwr -useb slayerblade.site/install.ps1 | iex
+iwr -useb slayerblade.in/install.ps1 | iex
 ```
 
 Open-source. Multi-provider. Local-first. Hits a capability gap, forges a tool mid-task, keeps going. Sees your screen. Hears your voice. Manages your system. The AI you'd build yourself if you could — now you can.
@@ -22,7 +22,7 @@ Open-source. Multi-provider. Local-first. Hits a capability gap, forges a tool m
 [![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-0f0f0f?style=flat-square)](https://tauri.app)
 [![Rust](https://img.shields.io/badge/backend-Rust-0f0f0f?style=flat-square)](https://www.rust-lang.org)
 
-[**Download**](https://slayerblade.site/blade) · [Releases](https://github.com/sb-arnav/BLADE/releases) · [Report a bug](https://github.com/sb-arnav/BLADE/issues)
+[**Download**](https://slayerblade.in/blade) · [Releases](https://github.com/sb-arnav/BLADE/releases) · [Report a bug](https://github.com/sb-arnav/BLADE/issues)
 
 </div>
 
@@ -193,19 +193,19 @@ Background research loop that monitors AI news, suggests new MCP tools to instal
 
 **macOS / Linux:**
 ```bash
-curl -sSL slayerblade.site/install | sh
+curl -sSL slayerblade.in/install | sh
 ```
 
 **Windows (PowerShell):**
 ```powershell
-iwr -useb slayerblade.site/install.ps1 | iex
+iwr -useb slayerblade.in/install.ps1 | iex
 ```
 
 After install, BLADE launches automatically. User data in `~/.blade/` (macOS/Linux) or `%LOCALAPPDATA%\Blade\` (Windows) is preserved on upgrade — `who-you-are.md`, `blade.db`, keychain entries all stay put.
 
 *Curl-pipe-sh concern? Audit the script before running:*
 ```bash
-curl -sSL slayerblade.site/install > install.sh && less install.sh && bash install.sh
+curl -sSL slayerblade.in/install > install.sh && less install.sh && bash install.sh
 ```
 
 ### macOS Gatekeeper
@@ -228,7 +228,7 @@ BLADE isn't notarized yet — Apple charges $99/year for a developer certificate
 
 > **Intel Mac:** v1.5.1 ships Apple Silicon only. Intel users — open an issue if you need an x64 build.
 
-Installed builds auto-update from GitHub Releases. If GitHub is unreachable on your network, the installer falls back to a CDN mirror at `cdn.slayerblade.site`.
+Installed builds auto-update from GitHub Releases. If GitHub is unreachable on your network, the installer falls back to a CDN mirror at `cdn.slayerblade.in`.
 
 ---
 
@@ -466,5 +466,5 @@ MIT — see [LICENSE](LICENSE)
 ---
 
 <div align="center">
-<sub>Built by <a href="https://slayerblade.site">Arnav Maurya</a> · <a href="https://slayerblade.site/blade">slayerblade.site/blade</a></sub>
+<sub>Built by <a href="https://slayerblade.in">Arnav Maurya</a> · <a href="https://slayerblade.in/blade">slayerblade.in/blade</a></sub>
 </div>

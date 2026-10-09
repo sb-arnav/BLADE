@@ -4,14 +4,14 @@
 # downloads the matching asset (.dmg / .deb / .rpm / .AppImage), verifies SHA256 when sibling
 # checksum is published, installs to the platform-native location, and launches BLADE.
 # Preserves ~/.blade/ user data (who-you-are.md, blade.db, keychain) across upgrades — never deletes it.
-# Safe to audit: curl -sSL slayerblade.site/install > install.sh && less install.sh && bash install.sh
+# Safe to audit: curl -sSL slayerblade.in/install > install.sh && less install.sh && bash install.sh
 
 set -euo pipefail
 
 # --- constants ----------------------------------------------------------------
 GITHUB_REPO="sb-arnav/BLADE"
 GITHUB_API="https://api.github.com/repos/${GITHUB_REPO}/releases/latest"
-CDN_BASE="https://cdn.slayerblade.site/releases"
+CDN_BASE="https://cdn.slayerblade.in/releases"
 CURL_TIMEOUT=30
 CURL_RETRY=3
 CURL_RETRY_DELAY=2
